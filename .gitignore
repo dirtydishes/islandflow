@@ -1,0 +1,16 @@
+.DS_Store
+.node-version
+.bun
+bun.lockb
+node_modules/
+dist/
+.env
+.env.*
+coverage/
+logs/
+.tmp/
+AGENTS.md
+PLAN.md
+CODING_STYLE.md
+RESEARCH.md
+README.md

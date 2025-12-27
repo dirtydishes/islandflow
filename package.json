@@ -1,0 +1,17 @@
+{
+  "name": "islandflow",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "services/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun run scripts/dev.ts",
+    "dev:infra": "docker compose up",
+    "dev:infra:down": "docker compose down",
+    "dev:web": "bun --cwd apps/web run dev",
+    "dev:services": "bun run scripts/dev-services.ts"
+  }
+}

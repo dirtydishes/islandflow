@@ -1,0 +1,12 @@
+{
+  "name": "@islandflow/api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run src/index.ts"
+  },
+  "dependencies": {
+    "@islandflow/config": "workspace:*",
+    "@islandflow/observability": "workspace:*"
+  }
+}
