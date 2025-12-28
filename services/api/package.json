@@ -6,7 +6,11 @@
     "dev": "bun run src/index.ts"
   },
   "dependencies": {
+    "@islandflow/bus": "workspace:*",
     "@islandflow/config": "workspace:*",
-    "@islandflow/observability": "workspace:*"
+    "@islandflow/observability": "workspace:*",
+    "@islandflow/storage": "workspace:*",
+    "@islandflow/types": "workspace:*",
+    "zod": "^3.23.8"
   }
 }
