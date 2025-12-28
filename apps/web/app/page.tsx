@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { EquityPrint, OptionPrint } from "@islandflow/types";
 
 const MAX_ITEMS = 60;
@@ -19,6 +19,9 @@ type TapeState<T> = {
   status: WsStatus;
   items: T[];
   lastUpdate: number | null;
+  paused: boolean;
+  dropped: number;
+  togglePause: () => void;
 };
 
 const buildWsUrl = (path: string): string => {
@@ -53,7 +56,11 @@ const formatTime = (ts: number): string => {
   return new Date(ts).toLocaleTimeString();
 };
 
-const statusLabel = (status: WsStatus): string => {
+const statusLabel = (status: WsStatus, paused: boolean): string => {
+  if (paused) {
+    return "Paused";
+  }
+
   switch (status) {
     case "connected":
       return "Live";
@@ -69,8 +76,20 @@ const useTape = <T,>(path: string, expectedType: MessageType): TapeState<T> => {
   const [status, setStatus] = useState<WsStatus>("connecting");
   const [items, setItems] = useState<T[]>([]);
   const [lastUpdate, setLastUpdate] = useState<number | null>(null);
+  const [paused, setPaused] = useState<boolean>(false);
+  const [dropped, setDropped] = useState<number>(0);
   const reconnectRef = useRef<number | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
+
+  const togglePause = useCallback(() => {
+    setPaused((prev) => {
+      const next = !prev;
+      if (!next) {
+        setDropped(0);
+      }
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -100,6 +119,12 @@ const useTape = <T,>(path: string, expectedType: MessageType): TapeState<T> => {
         try {
           const message = JSON.parse(event.data) as StreamMessage<T>;
           if (!message || message.type !== expectedType) {
+            return;
+          }
+
+          if (paused) {
+            setDropped((prev) => prev + 1);
+            setLastUpdate(Date.now());
             return;
           }
 
@@ -145,26 +170,35 @@ const useTape = <T,>(path: string, expectedType: MessageType): TapeState<T> => {
         socketRef.current.close();
       }
     };
-  }, [path, expectedType]);
+  }, [path, expectedType, paused]);
 
-  return { status, items, lastUpdate };
+  return { status, items, lastUpdate, paused, dropped, togglePause };
 };
 
 type TapeStatusProps = {
   status: WsStatus;
   lastUpdate: number | null;
+  paused: boolean;
+  dropped: number;
+  onTogglePause: () => void;
 };
 
-const TapeStatus = ({ status, lastUpdate }: TapeStatusProps) => {
+const TapeStatus = ({ status, lastUpdate, paused, dropped, onTogglePause }: TapeStatusProps) => {
   return (
-    <div className={`status status-${status} status-compact`}>
+    <div className={`status status-${status} status-compact ${paused ? "status-paused" : ""}`}>
       <span className="status-dot" />
-      <span>{statusLabel(status)}</span>
+      <span>{statusLabel(status, paused)}</span>
       {lastUpdate ? (
         <span className="timestamp">Updated {formatTime(lastUpdate)}</span>
       ) : (
         <span className="timestamp">Waiting for data</span>
       )}
+      {paused && dropped > 0 ? (
+        <span className="timestamp">{dropped} new while paused</span>
+      ) : null}
+      <button className="pause-button" type="button" onClick={onTogglePause}>
+        {paused ? "Resume" : "Pause"}
+      </button>
     </div>
   );
 };
@@ -204,7 +238,13 @@ export default function HomePage() {
               <h2>Options Tape</h2>
               <p className="card-subtitle">Newest prints first (max {MAX_ITEMS}).</p>
             </div>
-            <TapeStatus status={options.status} lastUpdate={options.lastUpdate} />
+            <TapeStatus
+              status={options.status}
+              lastUpdate={options.lastUpdate}
+              paused={options.paused}
+              dropped={options.dropped}
+              onTogglePause={options.togglePause}
+            />
           </div>
 
           <div className="list">
@@ -237,7 +277,13 @@ export default function HomePage() {
               <h2>Equities Tape</h2>
               <p className="card-subtitle">Off-exchange flag highlighted.</p>
             </div>
-            <TapeStatus status={equities.status} lastUpdate={equities.lastUpdate} />
+            <TapeStatus
+              status={equities.status}
+              lastUpdate={equities.lastUpdate}
+              paused={equities.paused}
+              dropped={equities.dropped}
+              onTogglePause={equities.togglePause}
+            />
           </div>
 
           <div className="list">
