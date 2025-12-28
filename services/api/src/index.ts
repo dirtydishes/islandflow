@@ -2,8 +2,10 @@ import { readEnv } from "@islandflow/config";
 import { createLogger } from "@islandflow/observability";
 import {
   SUBJECT_EQUITY_PRINTS,
+  SUBJECT_FLOW_PACKETS,
   SUBJECT_OPTION_PRINTS,
   STREAM_EQUITY_PRINTS,
+  STREAM_FLOW_PACKETS,
   STREAM_OPTION_PRINTS,
   buildDurableConsumer,
   connectJetStreamWithRetry,
@@ -21,7 +23,7 @@ import {
   fetchOptionPrintsAfter,
   fetchRecentOptionPrints
 } from "@islandflow/storage";
-import { EquityPrintSchema, OptionPrintSchema } from "@islandflow/types";
+import { EquityPrintSchema, FlowPacketSchema, OptionPrintSchema } from "@islandflow/types";
 import { z } from "zod";
 
 const service = "api";
@@ -44,7 +46,7 @@ const replayParamsSchema = z.object({
   limit: z.coerce.number().int().positive().max(1000).default(200)
 });
 
-type Channel = "options" | "equities";
+type Channel = "options" | "equities" | "flow";
 
 type WsData = {
   channel: Channel;
@@ -52,6 +54,7 @@ type WsData = {
 
 const optionSockets = new Set<WebSocket<WsData>>();
 const equitySockets = new Set<WebSocket<WsData>>();
+const flowSockets = new Set<WebSocket<WsData>>();
 
 const jsonResponse = (body: unknown, status = 200): Response => {
   return new Response(JSON.stringify(body), {
@@ -136,6 +139,19 @@ const run = async () => {
     num_replicas: 1
   });
 
+  await ensureStream(jsm, {
+    name: STREAM_FLOW_PACKETS,
+    subjects: [SUBJECT_FLOW_PACKETS],
+    retention: "limits",
+    storage: "file",
+    discard: "old",
+    max_msgs_per_subject: -1,
+    max_msgs: -1,
+    max_bytes: -1,
+    max_age: 0,
+    num_replicas: 1
+  });
+
   const clickhouse = createClickHouseClient({
     url: env.CLICKHOUSE_URL,
     database: env.CLICKHOUSE_DATABASE
@@ -155,6 +171,12 @@ const run = async () => {
     js,
     SUBJECT_EQUITY_PRINTS,
     buildDurableConsumer("api-equity-prints")
+  );
+
+  const flowSubscription = await subscribeJson(
+    js,
+    SUBJECT_FLOW_PACKETS,
+    buildDurableConsumer("api-flow-packets")
   );
 
   const pumpOptions = async () => {
@@ -187,8 +209,24 @@ const run = async () => {
     }
   };
 
+  const pumpFlow = async () => {
+    for await (const msg of flowSubscription.messages) {
+      try {
+        const payload = FlowPacketSchema.parse(flowSubscription.decode(msg));
+        broadcast(flowSockets, { type: "flow-packet", payload });
+        msg.ack();
+      } catch (error) {
+        logger.error("failed to process flow packet", {
+          error: error instanceof Error ? error.message : String(error)
+        });
+        msg.term();
+      }
+    }
+  };
+
   void pumpOptions();
   void pumpEquities();
+  void pumpFlow();
 
   const server = Bun.serve<WsData>({
     port: env.API_PORT,
@@ -249,14 +287,24 @@ const run = async () => {
         return jsonResponse({ error: "websocket upgrade failed" }, 400);
       }
 
+      if (req.method === "GET" && url.pathname === "/ws/flow") {
+        if (serverRef.upgrade(req, { data: { channel: "flow" } })) {
+          return new Response(null, { status: 101 });
+        }
+
+        return jsonResponse({ error: "websocket upgrade failed" }, 400);
+      }
+
       return jsonResponse({ error: "not found" }, 404);
     },
     websocket: {
       open: (socket) => {
         if (socket.data.channel === "options") {
           optionSockets.add(socket);
-        } else {
+        } else if (socket.data.channel === "equities") {
           equitySockets.add(socket);
+        } else {
+          flowSockets.add(socket);
         }
 
         logger.info("websocket connected", { channel: socket.data.channel });
@@ -264,8 +312,10 @@ const run = async () => {
       close: (socket) => {
         if (socket.data.channel === "options") {
           optionSockets.delete(socket);
-        } else {
+        } else if (socket.data.channel === "equities") {
           equitySockets.delete(socket);
+        } else {
+          flowSockets.delete(socket);
         }
 
         logger.info("websocket disconnected", { channel: socket.data.channel });

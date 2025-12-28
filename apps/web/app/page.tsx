@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { EquityPrint, OptionPrint } from "@islandflow/types";
+import type { EquityPrint, FlowPacket, OptionPrint } from "@islandflow/types";
 
 const MAX_ITEMS = 60;
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"]);
@@ -10,7 +10,7 @@ type WsStatus = "connecting" | "connected" | "disconnected";
 
 type TapeMode = "live" | "replay";
 
-type MessageType = "option-print" | "equity-print";
+type MessageType = "option-print" | "equity-print" | "flow-packet";
 
 type StreamMessage<T> = {
   type: MessageType;
@@ -87,6 +87,21 @@ const formatSize = (size: number): string => {
 
 const formatTime = (ts: number): string => {
   return new Date(ts).toLocaleTimeString();
+};
+
+const parseNumber = (value: unknown, fallback: number): number => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return fallback;
 };
 
 const statusLabel = (status: WsStatus, paused: boolean, mode: TapeMode): string => {
@@ -298,6 +313,119 @@ const useTape = <T extends { ts: number; seq: number }>(
   return { status, items, lastUpdate, paused, dropped, togglePause };
 };
 
+const useFlowStream = (enabled: boolean): TapeState<FlowPacket> => {
+  const [status, setStatus] = useState<WsStatus>(enabled ? "connecting" : "disconnected");
+  const [items, setItems] = useState<FlowPacket[]>([]);
+  const [lastUpdate, setLastUpdate] = useState<number | null>(null);
+  const [paused, setPaused] = useState<boolean>(false);
+  const [dropped, setDropped] = useState<number>(0);
+  const reconnectRef = useRef<number | null>(null);
+  const socketRef = useRef<WebSocket | null>(null);
+  const pausedRef = useRef(paused);
+
+  useEffect(() => {
+    pausedRef.current = paused;
+  }, [paused]);
+
+  const togglePause = useCallback(() => {
+    setPaused((prev) => {
+      const next = !prev;
+      if (!next) {
+        setDropped(0);
+      }
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!enabled) {
+      setStatus("disconnected");
+      return;
+    }
+
+    let active = true;
+
+    const connect = () => {
+      if (!active) {
+        return;
+      }
+
+      setStatus("connecting");
+
+      const socket = new WebSocket(buildWsUrl("/ws/flow"));
+      socketRef.current = socket;
+
+      socket.onopen = () => {
+        if (!active) {
+          return;
+        }
+        setStatus("connected");
+      };
+
+      socket.onmessage = (event) => {
+        if (!active) {
+          return;
+        }
+
+        try {
+          const message = JSON.parse(event.data) as StreamMessage<FlowPacket>;
+          if (!message || message.type !== "flow-packet") {
+            return;
+          }
+
+          if (pausedRef.current) {
+            setDropped((prev) => prev + 1);
+            setLastUpdate(Date.now());
+            return;
+          }
+
+          setItems((prev) => {
+            const next = [message.payload, ...prev];
+            return next.slice(0, MAX_ITEMS);
+          });
+          setLastUpdate(Date.now());
+        } catch (error) {
+          console.warn("Failed to parse flow packet", error);
+        }
+      };
+
+      socket.onclose = () => {
+        if (!active) {
+          return;
+        }
+
+        setStatus("disconnected");
+        reconnectRef.current = window.setTimeout(() => {
+          connect();
+        }, 1000);
+      };
+
+      socket.onerror = () => {
+        if (!active) {
+          return;
+        }
+
+        setStatus("disconnected");
+        socket.close();
+      };
+    };
+
+    connect();
+
+    return () => {
+      active = false;
+      if (reconnectRef.current !== null) {
+        window.clearTimeout(reconnectRef.current);
+      }
+      if (socketRef.current) {
+        socketRef.current.close();
+      }
+    };
+  }, [enabled]);
+
+  return { status, items, lastUpdate, paused, dropped, togglePause };
+};
+
 type TapeStatusProps = {
   status: WsStatus;
   lastUpdate: number | null;
@@ -330,6 +458,14 @@ const TapeStatus = ({ status, lastUpdate, paused, dropped, mode, onTogglePause }
   );
 };
 
+const formatFlowMetric = (value: number, suffix?: string): string => {
+  if (suffix) {
+    return `${value}${suffix}`;
+  }
+
+  return value.toLocaleString();
+};
+
 export default function HomePage() {
   const [mode, setMode] = useState<TapeMode>("live");
 
@@ -347,11 +483,13 @@ export default function HomePage() {
     expectedType: "equity-print"
   });
 
+  const flow = useFlowStream(mode === "live");
+
   const lastSeen = useMemo(() => {
-    return [options.lastUpdate, equities.lastUpdate]
+    return [options.lastUpdate, equities.lastUpdate, flow.lastUpdate]
       .filter((value): value is number => value !== null)
       .sort((a, b) => b - a)[0] ?? null;
-  }, [options.lastUpdate, equities.lastUpdate]);
+  }, [options.lastUpdate, equities.lastUpdate, flow.lastUpdate]);
 
   const toggleMode = () => {
     setMode((prev) => (prev === "live" ? "replay" : "live"));
@@ -465,6 +603,61 @@ export default function HomePage() {
                   <div className="time">{formatTime(print.ts)}</div>
                 </div>
               ))
+            )}
+          </div>
+        </section>
+
+        <section className="card">
+          <div className="card-header">
+            <div>
+              <h2>Flow Packets</h2>
+              <p className="card-subtitle">Deterministic clusters (live only).</p>
+            </div>
+            <TapeStatus
+              status={flow.status}
+              lastUpdate={flow.lastUpdate}
+              paused={flow.paused}
+              dropped={flow.dropped}
+              mode={mode}
+              onTogglePause={flow.togglePause}
+            />
+          </div>
+
+          <div className="list">
+            {mode !== "live" ? (
+              <div className="empty">Flow packets are live-only in this build.</div>
+            ) : flow.items.length === 0 ? (
+              <div className="empty">No flow packets yet. Start compute.</div>
+            ) : (
+              flow.items.map((packet) => {
+                const features = packet.features ?? {};
+                const contract = String(features.option_contract_id ?? packet.id ?? "unknown");
+                const count = parseNumber(features.count, packet.members.length);
+                const totalSize = parseNumber(features.total_size, 0);
+                const totalPremium = parseNumber(features.total_premium, 0);
+                const startTs = parseNumber(features.start_ts, packet.source_ts);
+                const endTs = parseNumber(features.end_ts, startTs);
+                const windowMs = parseNumber(features.window_ms, 0);
+
+                return (
+                  <div className="row" key={packet.id}>
+                    <div>
+                      <div className="contract">{contract}</div>
+                      <div className="meta flow-meta">
+                        <span>{formatFlowMetric(count)} prints</span>
+                        <span>{formatFlowMetric(totalSize)} size</span>
+                        <span>${formatPrice(totalPremium)}</span>
+                        {windowMs > 0 ? (
+                          <span>{formatFlowMetric(windowMs, "ms")}</span>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="time">
+                      {formatTime(startTs)} → {formatTime(endTs)}
+                    </div>
+                  </div>
+                );
+              })
             )}
           </div>
         </section>

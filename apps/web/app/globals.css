@@ -243,6 +243,12 @@ h1 {
   color: #5b4c34;
 }
 
+.flow-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .flag {
   padding: 2px 8px;
   border-radius: 999px;
