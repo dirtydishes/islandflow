@@ -13,7 +13,9 @@ import {
 import {
   createClickHouseClient,
   ensureEquityPrintsTable,
+  ensureFlowPacketsTable,
   ensureOptionPrintsTable,
+  fetchRecentFlowPackets,
   fetchEquityPrintsAfter,
   fetchRecentEquityPrints,
   fetchOptionPrintsAfter,
@@ -141,6 +143,7 @@ const run = async () => {
 
   await ensureOptionPrintsTable(clickhouse);
   await ensureEquityPrintsTable(clickhouse);
+  await ensureFlowPacketsTable(clickhouse);
 
   const optionSubscription = await subscribeJson(
     js,
@@ -205,6 +208,12 @@ const run = async () => {
       if (req.method === "GET" && url.pathname === "/prints/equities") {
         const limit = parseLimit(url.searchParams.get("limit"));
         const data = await fetchRecentEquityPrints(clickhouse, limit);
+        return jsonResponse({ data });
+      }
+
+      if (req.method === "GET" && url.pathname === "/flow/packets") {
+        const limit = parseLimit(url.searchParams.get("limit"));
+        const data = await fetchRecentFlowPackets(clickhouse, limit);
         return jsonResponse({ data });
       }
 

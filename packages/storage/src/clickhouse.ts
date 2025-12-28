@@ -1,6 +1,6 @@
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
-import { EquityPrintSchema, OptionPrintSchema } from "@islandflow/types";
-import type { EquityPrint, OptionPrint } from "@islandflow/types";
+import { EquityPrintSchema, FlowPacketSchema, OptionPrintSchema } from "@islandflow/types";
+import type { EquityPrint, FlowPacket, OptionPrint } from "@islandflow/types";
 import {
   normalizeOptionPrint,
   optionPrintsTableDDL,
@@ -11,6 +11,13 @@ import {
   EQUITY_PRINTS_TABLE,
   normalizeEquityPrint
 } from "./equity-prints";
+import {
+  FLOW_PACKETS_TABLE,
+  flowPacketsTableDDL,
+  fromFlowPacketRecord,
+  toFlowPacketRecord,
+  type FlowPacketRecord
+} from "./flow-packets";
 
 export type ClickHouseOptions = {
   url: string;
@@ -44,6 +51,14 @@ export const ensureEquityPrintsTable = async (
   });
 };
 
+export const ensureFlowPacketsTable = async (
+  client: ClickHouseClient
+): Promise<void> => {
+  await client.exec({
+    query: flowPacketsTableDDL()
+  });
+};
+
 export const insertOptionPrint = async (
   client: ClickHouseClient,
   print: OptionPrint
@@ -63,6 +78,18 @@ export const insertEquityPrint = async (
   const record = normalizeEquityPrint(print);
   await client.insert({
     table: EQUITY_PRINTS_TABLE,
+    values: [record],
+    format: "JSONEachRow"
+  });
+};
+
+export const insertFlowPacket = async (
+  client: ClickHouseClient,
+  packet: FlowPacket
+): Promise<void> => {
+  const record = toFlowPacketRecord(packet);
+  await client.insert({
+    table: FLOW_PACKETS_TABLE,
     values: [record],
     format: "JSONEachRow"
   });
@@ -149,6 +176,26 @@ const normalizeEquityRow = (row: unknown): unknown => {
   return row;
 };
 
+const normalizeFlowPacketRow = (row: unknown): FlowPacketRecord | null => {
+  if (!row || typeof row !== "object") {
+    return null;
+  }
+
+  const record = row as Record<string, unknown>;
+  return {
+    source_ts: coerceNumber(record.source_ts) as number,
+    ingest_ts: coerceNumber(record.ingest_ts) as number,
+    seq: coerceNumber(record.seq) as number,
+    trace_id: String(record.trace_id ?? ""),
+    id: String(record.id ?? ""),
+    members: Array.isArray(record.members)
+      ? record.members.map((value) => String(value))
+      : [],
+    features_json: String(record.features_json ?? "{}"),
+    join_quality_json: String(record.join_quality_json ?? "{}")
+  };
+};
+
 export const fetchRecentOptionPrints = async (
   client: ClickHouseClient,
   limit: number
@@ -175,6 +222,24 @@ export const fetchRecentEquityPrints = async (
 
   const rows = await result.json<unknown[]>();
   return EquityPrintSchema.array().parse(rows.map(normalizeEquityRow));
+};
+
+export const fetchRecentFlowPackets = async (
+  client: ClickHouseClient,
+  limit: number
+): Promise<FlowPacket[]> => {
+  const safeLimit = clampLimit(limit);
+  const result = await client.query({
+    query: `SELECT * FROM ${FLOW_PACKETS_TABLE} ORDER BY source_ts DESC, seq DESC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  const records = rows
+    .map(normalizeFlowPacketRow)
+    .filter((record): record is FlowPacketRecord => record !== null);
+  const packets = records.map(fromFlowPacketRecord);
+  return FlowPacketSchema.array().parse(packets);
 };
 
 export const fetchOptionPrintsAfter = async (
