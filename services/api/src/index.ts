@@ -14,7 +14,9 @@ import {
   createClickHouseClient,
   ensureEquityPrintsTable,
   ensureOptionPrintsTable,
+  fetchEquityPrintsAfter,
   fetchRecentEquityPrints,
+  fetchOptionPrintsAfter,
   fetchRecentOptionPrints
 } from "@islandflow/storage";
 import { EquityPrintSchema, OptionPrintSchema } from "@islandflow/types";
@@ -34,6 +36,11 @@ const envSchema = z.object({
 const env = readEnv(envSchema);
 
 const limitSchema = z.coerce.number().int().positive().max(1000);
+const replayParamsSchema = z.object({
+  after_ts: z.coerce.number().int().nonnegative().default(0),
+  after_seq: z.coerce.number().int().nonnegative().default(0),
+  limit: z.coerce.number().int().positive().max(1000).default(200)
+});
 
 type Channel = "options" | "equities";
 
@@ -59,6 +66,20 @@ const parseLimit = (value: string | null): number => {
   }
 
   return limitSchema.parse(value);
+};
+
+const parseReplayParams = (url: URL): { afterTs: number; afterSeq: number; limit: number } => {
+  const params = replayParamsSchema.parse({
+    after_ts: url.searchParams.get("after_ts") ?? undefined,
+    after_seq: url.searchParams.get("after_seq") ?? undefined,
+    limit: url.searchParams.get("limit") ?? undefined
+  });
+
+  return {
+    afterTs: params.after_ts,
+    afterSeq: params.after_seq,
+    limit: params.limit
+  };
 };
 
 const broadcast = (sockets: Set<WebSocket<WsData>>, payload: unknown): void => {
@@ -185,6 +206,22 @@ const run = async () => {
         const limit = parseLimit(url.searchParams.get("limit"));
         const data = await fetchRecentEquityPrints(clickhouse, limit);
         return jsonResponse({ data });
+      }
+
+      if (req.method === "GET" && url.pathname === "/replay/options") {
+        const { afterTs, afterSeq, limit } = parseReplayParams(url);
+        const data = await fetchOptionPrintsAfter(clickhouse, afterTs, afterSeq, limit);
+        const last = data.at(-1);
+        const next = last ? { ts: last.ts, seq: last.seq } : null;
+        return jsonResponse({ data, next });
+      }
+
+      if (req.method === "GET" && url.pathname === "/replay/equities") {
+        const { afterTs, afterSeq, limit } = parseReplayParams(url);
+        const data = await fetchEquityPrintsAfter(clickhouse, afterTs, afterSeq, limit);
+        const last = data.at(-1);
+        const next = last ? { ts: last.ts, seq: last.seq } : null;
+        return jsonResponse({ data, next });
       }
 
       if (req.method === "GET" && url.pathname === "/ws/options") {

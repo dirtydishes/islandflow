@@ -8,11 +8,23 @@ const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"]);
 
 type WsStatus = "connecting" | "connected" | "disconnected";
 
+type TapeMode = "live" | "replay";
+
 type MessageType = "option-print" | "equity-print";
 
 type StreamMessage<T> = {
   type: MessageType;
   payload: T;
+};
+
+type ReplayCursor = {
+  ts: number;
+  seq: number;
+};
+
+type ReplayResponse<T> = {
+  data: T[];
+  next: ReplayCursor | null;
 };
 
 type TapeState<T> = {
@@ -44,6 +56,27 @@ const buildWsUrl = (path: string): string => {
   return `${wsProtocol}://${host}${path}`;
 };
 
+const buildApiUrl = (path: string): string => {
+  const envBase = process.env.NEXT_PUBLIC_API_URL;
+
+  if (envBase) {
+    const url = new URL(envBase);
+    const secure = url.protocol === "https:" || url.protocol === "wss:";
+    url.protocol = secure ? "https:" : "http:";
+    url.pathname = path;
+    url.search = "";
+    url.hash = "";
+    return url.toString();
+  }
+
+  const { protocol, hostname } = window.location;
+  const httpProtocol = protocol === "https:" ? "https" : "http";
+  const isLocal = LOCAL_HOSTS.has(hostname);
+  const host = isLocal ? `${hostname}:4000` : window.location.host;
+
+  return `${httpProtocol}://${host}${path}`;
+};
+
 const formatPrice = (price: number): string => {
   return price.toFixed(2);
 };
@@ -56,9 +89,13 @@ const formatTime = (ts: number): string => {
   return new Date(ts).toLocaleTimeString();
 };
 
-const statusLabel = (status: WsStatus, paused: boolean): string => {
+const statusLabel = (status: WsStatus, paused: boolean, mode: TapeMode): string => {
   if (paused) {
     return "Paused";
+  }
+
+  if (mode === "replay") {
+    return status === "disconnected" ? "Replay Down" : "Replay";
   }
 
   switch (status) {
@@ -72,7 +109,21 @@ const statusLabel = (status: WsStatus, paused: boolean): string => {
   }
 };
 
-const useTape = <T,>(path: string, expectedType: MessageType): TapeState<T> => {
+type TapeConfig<T> = {
+  mode: TapeMode;
+  wsPath: string;
+  replayPath: string;
+  expectedType: MessageType;
+  batchSize?: number;
+  pollMs?: number;
+};
+
+const useTape = <T extends { ts: number; seq: number }>(
+  config: TapeConfig<T>
+): TapeState<T> => {
+  const { mode, wsPath, replayPath, expectedType } = config;
+  const batchSize = config.batchSize ?? 40;
+  const pollMs = config.pollMs ?? 1000;
   const [status, setStatus] = useState<WsStatus>("connecting");
   const [items, setItems] = useState<T[]>([]);
   const [lastUpdate, setLastUpdate] = useState<number | null>(null);
@@ -80,6 +131,12 @@ const useTape = <T,>(path: string, expectedType: MessageType): TapeState<T> => {
   const [dropped, setDropped] = useState<number>(0);
   const reconnectRef = useRef<number | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
+  const cursorRef = useRef<ReplayCursor>({ ts: 0, seq: 0 });
+  const pausedRef = useRef(paused);
+
+  useEffect(() => {
+    pausedRef.current = paused;
+  }, [paused]);
 
   const togglePause = useCallback(() => {
     setPaused((prev) => {
@@ -92,6 +149,18 @@ const useTape = <T,>(path: string, expectedType: MessageType): TapeState<T> => {
   }, []);
 
   useEffect(() => {
+    setItems([]);
+    setLastUpdate(null);
+    setDropped(0);
+    setStatus("connecting");
+    cursorRef.current = { ts: 0, seq: 0 };
+  }, [mode]);
+
+  useEffect(() => {
+    if (mode !== "live") {
+      return;
+    }
+
     let active = true;
 
     const connect = () => {
@@ -101,7 +170,7 @@ const useTape = <T,>(path: string, expectedType: MessageType): TapeState<T> => {
 
       setStatus("connecting");
 
-      const socket = new WebSocket(buildWsUrl(path));
+      const socket = new WebSocket(buildWsUrl(wsPath));
       socketRef.current = socket;
 
       socket.onopen = () => {
@@ -122,7 +191,7 @@ const useTape = <T,>(path: string, expectedType: MessageType): TapeState<T> => {
             return;
           }
 
-          if (paused) {
+          if (pausedRef.current) {
             setDropped((prev) => prev + 1);
             setLastUpdate(Date.now());
             return;
@@ -170,7 +239,61 @@ const useTape = <T,>(path: string, expectedType: MessageType): TapeState<T> => {
         socketRef.current.close();
       }
     };
-  }, [path, expectedType, paused]);
+  }, [mode, wsPath, expectedType]);
+
+  useEffect(() => {
+    if (mode !== "replay") {
+      return;
+    }
+
+    let active = true;
+
+    const poll = async () => {
+      if (!active || pausedRef.current) {
+        return;
+      }
+
+      try {
+        const cursor = cursorRef.current;
+        const url = new URL(buildApiUrl(replayPath));
+        url.searchParams.set("after_ts", cursor.ts.toString());
+        url.searchParams.set("after_seq", cursor.seq.toString());
+        url.searchParams.set("limit", batchSize.toString());
+
+        const response = await fetch(url.toString());
+        if (!response.ok) {
+          throw new Error(`Replay request failed with ${response.status}`);
+        }
+
+        const payload = (await response.json()) as ReplayResponse<T>;
+        if (payload.data.length > 0) {
+          const nextItems = [...payload.data].reverse();
+          setItems((prev) => {
+            const next = [...nextItems, ...prev];
+            return next.slice(0, MAX_ITEMS);
+          });
+          setLastUpdate(Date.now());
+        }
+
+        if (payload.next) {
+          cursorRef.current = payload.next;
+        }
+
+        setStatus("connected");
+      } catch (error) {
+        console.warn("Replay poll failed", error);
+        setStatus("disconnected");
+      }
+    };
+
+    void poll();
+    const interval = window.setInterval(poll, pollMs);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [mode, replayPath, batchSize, pollMs]);
 
   return { status, items, lastUpdate, paused, dropped, togglePause };
 };
@@ -180,14 +303,18 @@ type TapeStatusProps = {
   lastUpdate: number | null;
   paused: boolean;
   dropped: number;
+  mode: TapeMode;
   onTogglePause: () => void;
 };
 
-const TapeStatus = ({ status, lastUpdate, paused, dropped, onTogglePause }: TapeStatusProps) => {
+const TapeStatus = ({ status, lastUpdate, paused, dropped, mode, onTogglePause }: TapeStatusProps) => {
+  const replayClass = mode === "replay" ? "status-replay" : "";
+  const pausedClass = paused ? "status-paused" : "";
+
   return (
-    <div className={`status status-${status} status-compact ${paused ? "status-paused" : ""}`}>
+    <div className={`status status-${status} status-compact ${replayClass} ${pausedClass}`.trim()}>
       <span className="status-dot" />
-      <span>{statusLabel(status, paused)}</span>
+      <span>{statusLabel(status, paused, mode)}</span>
       {lastUpdate ? (
         <span className="timestamp">Updated {formatTime(lastUpdate)}</span>
       ) : (
@@ -204,14 +331,31 @@ const TapeStatus = ({ status, lastUpdate, paused, dropped, onTogglePause }: Tape
 };
 
 export default function HomePage() {
-  const options = useTape<OptionPrint>("/ws/options", "option-print");
-  const equities = useTape<EquityPrint>("/ws/equities", "equity-print");
+  const [mode, setMode] = useState<TapeMode>("live");
+
+  const options = useTape<OptionPrint>({
+    mode,
+    wsPath: "/ws/options",
+    replayPath: "/replay/options",
+    expectedType: "option-print"
+  });
+
+  const equities = useTape<EquityPrint>({
+    mode,
+    wsPath: "/ws/equities",
+    replayPath: "/replay/equities",
+    expectedType: "equity-print"
+  });
 
   const lastSeen = useMemo(() => {
     return [options.lastUpdate, equities.lastUpdate]
       .filter((value): value is number => value !== null)
       .sort((a, b) => b - a)[0] ?? null;
   }, [options.lastUpdate, equities.lastUpdate]);
+
+  const toggleMode = () => {
+    setMode((prev) => (prev === "live" ? "replay" : "live"));
+  };
 
   return (
     <main className="dashboard">
@@ -220,7 +364,7 @@ export default function HomePage() {
           <p className="eyebrow">Realtime flow workspace</p>
           <h1>Islandflow</h1>
           <p className="subtitle">
-            Options + equities streaming over WebSocket from the local API gateway.
+            Options + equities streaming over WebSocket or replayed from ClickHouse.
           </p>
         </div>
         <div className="summary">
@@ -228,6 +372,9 @@ export default function HomePage() {
           <span className="summary-value">
             {lastSeen ? formatTime(lastSeen) : "Waiting for data"}
           </span>
+          <button className="mode-button" type="button" onClick={toggleMode}>
+            Switch to {mode === "live" ? "Replay" : "Live"}
+          </button>
         </div>
       </header>
 
@@ -243,13 +390,18 @@ export default function HomePage() {
               lastUpdate={options.lastUpdate}
               paused={options.paused}
               dropped={options.dropped}
+              mode={mode}
               onTogglePause={options.togglePause}
             />
           </div>
 
           <div className="list">
             {options.items.length === 0 ? (
-              <div className="empty">No option prints yet. Start ingest-options.</div>
+              <div className="empty">
+                {mode === "live"
+                  ? "No option prints yet. Start ingest-options."
+                  : "Replay queue empty. Ensure ClickHouse has data."}
+              </div>
             ) : (
               options.items.map((print) => (
                 <div className="row" key={`${print.trace_id}-${print.seq}`}>
@@ -282,13 +434,18 @@ export default function HomePage() {
               lastUpdate={equities.lastUpdate}
               paused={equities.paused}
               dropped={equities.dropped}
+              mode={mode}
               onTogglePause={equities.togglePause}
             />
           </div>
 
           <div className="list">
             {equities.items.length === 0 ? (
-              <div className="empty">No equity prints yet. Start ingest-equities.</div>
+              <div className="empty">
+                {mode === "live"
+                  ? "No equity prints yet. Start ingest-equities."
+                  : "Replay queue empty. Ensure ClickHouse has data."}
+              </div>
             ) : (
               equities.items.map((print) => (
                 <div className="row" key={`${print.trace_id}-${print.seq}`}>

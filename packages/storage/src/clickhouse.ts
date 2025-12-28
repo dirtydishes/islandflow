@@ -76,6 +76,14 @@ const clampLimit = (limit: number): number => {
   return Math.max(1, Math.min(1000, Math.floor(limit)));
 };
 
+const clampCursor = (value: number): number => {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.floor(value));
+};
+
 const coerceNumber = (value: unknown): unknown => {
   if (typeof value === "string") {
     const parsed = Number(value);
@@ -102,6 +110,45 @@ const normalizeNumericFields = (
   return record;
 };
 
+const normalizeOptionRow = (row: unknown): unknown => {
+  if (row && typeof row === "object") {
+    return normalizeNumericFields(row as Record<string, unknown>, [
+      "source_ts",
+      "ingest_ts",
+      "seq",
+      "ts",
+      "price",
+      "size"
+    ]);
+  }
+
+  return row;
+};
+
+const normalizeEquityRow = (row: unknown): unknown => {
+  if (row && typeof row === "object") {
+    const record = normalizeNumericFields(row as Record<string, unknown>, [
+      "source_ts",
+      "ingest_ts",
+      "seq",
+      "ts",
+      "price",
+      "size"
+    ]);
+
+    if ("offExchangeFlag" in record) {
+      return {
+        ...record,
+        offExchangeFlag: Boolean(record.offExchangeFlag)
+      };
+    }
+
+    return record;
+  }
+
+  return row;
+};
+
 export const fetchRecentOptionPrints = async (
   client: ClickHouseClient,
   limit: number
@@ -113,22 +160,7 @@ export const fetchRecentOptionPrints = async (
   });
 
   const rows = await result.json<unknown[]>();
-  const normalized = rows.map((row) => {
-    if (row && typeof row === "object") {
-      return normalizeNumericFields(row as Record<string, unknown>, [
-        "source_ts",
-        "ingest_ts",
-        "seq",
-        "ts",
-        "price",
-        "size"
-      ]);
-    }
-
-    return row;
-  });
-
-  return OptionPrintSchema.array().parse(normalized);
+  return OptionPrintSchema.array().parse(rows.map(normalizeOptionRow));
 };
 
 export const fetchRecentEquityPrints = async (
@@ -142,29 +174,43 @@ export const fetchRecentEquityPrints = async (
   });
 
   const rows = await result.json<unknown[]>();
-  const normalized = rows.map((row) => {
-    if (row && typeof row === "object") {
-      const record = normalizeNumericFields(row as Record<string, unknown>, [
-        "source_ts",
-        "ingest_ts",
-        "seq",
-        "ts",
-        "price",
-        "size"
-      ]);
+  return EquityPrintSchema.array().parse(rows.map(normalizeEquityRow));
+};
 
-      if ("offExchangeFlag" in record) {
-        return {
-          ...record,
-          offExchangeFlag: Boolean(record.offExchangeFlag)
-        };
-      }
+export const fetchOptionPrintsAfter = async (
+  client: ClickHouseClient,
+  afterTs: number,
+  afterSeq: number,
+  limit: number
+): Promise<OptionPrint[]> => {
+  const safeLimit = clampLimit(limit);
+  const safeAfterTs = clampCursor(afterTs);
+  const safeAfterSeq = clampCursor(afterSeq);
 
-      return record;
-    }
-
-    return row;
+  const result = await client.query({
+    query: `SELECT * FROM ${OPTION_PRINTS_TABLE} WHERE (ts, seq) > (${safeAfterTs}, ${safeAfterSeq}) ORDER BY ts ASC, seq ASC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
   });
 
-  return EquityPrintSchema.array().parse(normalized);
+  const rows = await result.json<unknown[]>();
+  return OptionPrintSchema.array().parse(rows.map(normalizeOptionRow));
+};
+
+export const fetchEquityPrintsAfter = async (
+  client: ClickHouseClient,
+  afterTs: number,
+  afterSeq: number,
+  limit: number
+): Promise<EquityPrint[]> => {
+  const safeLimit = clampLimit(limit);
+  const safeAfterTs = clampCursor(afterTs);
+  const safeAfterSeq = clampCursor(afterSeq);
+
+  const result = await client.query({
+    query: `SELECT * FROM ${EQUITY_PRINTS_TABLE} WHERE (ts, seq) > (${safeAfterTs}, ${safeAfterSeq}) ORDER BY ts ASC, seq ASC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  return EquityPrintSchema.array().parse(rows.map(normalizeEquityRow));
 };

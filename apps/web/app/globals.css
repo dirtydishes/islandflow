@@ -9,6 +9,7 @@
   --accent: #2f6d4f;
   --accent-soft: rgba(47, 109, 79, 0.18);
   --warning: #c46f2a;
+  --replay: #1f4a7b;
   --grid: rgba(82, 64, 36, 0.12);
 }
 
@@ -69,7 +70,7 @@ h1 {
 
 .summary {
   display: grid;
-  gap: 8px;
+  gap: 12px;
   padding: 16px 20px;
   border-radius: 16px;
   border: 1px solid var(--panel-border);
@@ -86,6 +87,23 @@ h1 {
 
 .summary-value {
   font-size: 1rem;
+}
+
+.mode-button {
+  border: 1px solid rgba(31, 74, 123, 0.35);
+  border-radius: 999px;
+  padding: 8px 14px;
+  background: rgba(31, 74, 123, 0.12);
+  color: #1f4a7b;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.mode-button:focus-visible {
+  outline: 2px solid rgba(31, 74, 123, 0.4);
+  outline-offset: 2px;
 }
 
 .cards {
@@ -124,6 +142,11 @@ h1 {
 .status-connected .status-dot {
   background: var(--accent);
   box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+.status-replay .status-dot {
+  background: var(--replay);
+  box-shadow: 0 0 0 4px rgba(31, 74, 123, 0.18);
 }
 
 .status-connecting .status-dot {
