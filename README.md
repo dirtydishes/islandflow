@@ -41,6 +41,7 @@ Not started:
 - Deterministic option FlowPacket clustering (time-window)
 - API gateway with REST, WS, and replay endpoints
 - UI tapes for options/equities/flow packets with live/replay toggle and pause controls
+- Alpaca options adapter (dev-only) with bounded contract selection
 
 ## Planned Capabilities (from PLAN.md)
 
@@ -90,6 +91,27 @@ Run just the web app (auto-picks a free port in 3001-3005):
 
 Run just the API:
 - `bun --cwd services/api run dev`
+
+IBKR adapter (options, via Python `ib_insync`):
+- Install Python deps: `python3 -m pip install -r services/ingest-options/py/requirements.txt`
+- Set `INGEST_ADAPTER=ibkr` and configure:
+  - `IBKR_HOST`, `IBKR_PORT`, `IBKR_CLIENT_ID`
+  - `IBKR_SYMBOL`, `IBKR_EXPIRY` (YYYYMMDD), `IBKR_STRIKE`, `IBKR_RIGHT`
+  - Optional: `IBKR_EXCHANGE` (default `SMART`), `IBKR_CURRENCY` (default `USD`), `IBKR_PYTHON_BIN`
+
+Alpaca adapter (options, dev-only bridge):
+- Set `INGEST_ADAPTER=alpaca` and configure:
+  - `ALPACA_KEY_ID`, `ALPACA_SECRET_KEY`
+  - `ALPACA_UNDERLYINGS` (comma-separated, default `SPY`)
+  - Optional: `ALPACA_FEED` (`indicative` default, `opra` with subscription)
+  - Optional: `ALPACA_MAX_QUOTES` (default `200`), `ALPACA_REST_URL`, `ALPACA_WS_BASE_URL`
+  - Optional selection tuning: `ALPACA_STRIKES_PER_SIDE` (default `8`), `ALPACA_MAX_DTE_DAYS` (default `30`),
+    `ALPACA_MONEYNESS_PCT` (default `0.06`), `ALPACA_MONEYNESS_FALLBACK_PCT` (default `0.10`)
+
+Alpaca selection policy (dev-only, deterministic):
+- Pick nearest weekly and nearest monthly expiries within 30 DTE (fallback to earliest expiries if missing)
+- For each expiry, select 8 strikes per side closest to ATM within ±6% (fallback to ±10% if needed)
+- Subscriptions are built once at startup to keep the stream bounded and repeatable
 
 Run tests:
 - `bun test`
