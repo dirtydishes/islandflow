@@ -1,0 +1,185 @@
+name: Discord notifications
+
+on:
+  push:
+    branches: ["main"]
+  workflow_run:
+    workflows: ["CI"] # <-- change to your workflow name EXACTLY (case-sensitive)
+    types: [completed]
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: discord-notify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  push_to_discord:
+    name: Push -> Discord (main)
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post push embed to Discord (Catppuccin green)
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, subprocess, textwrap
+          webhook = os.environ["DISCORD_WEBHOOK_URL"]
+          path = os.environ["GITHUB_EVENT_PATH"]
+          evt = json.load(open(path))
+          repo = os.environ.get("GITHUB_REPOSITORY", "")
+          actor = os.environ.get("GITHUB_ACTOR", "")
+          branch = os.environ.get("GITHUB_REF_NAME", "")
+          sha = os.environ.get("GITHUB_SHA", "")
+          short_sha = sha[:7]
+          commits = evt.get("commits", []) or []
+          commit_lines = []
+          for c in commits[:10]:
+            msg = (c.get("message") or "").splitlines()[0]
+            cid = (c.get("id") or "")[:7]
+            commit_lines.append(f"• `{cid}` {msg}")
+          commit_count = len(commits)
+          before = evt.get("before", "")
+          after = evt.get("after", sha)
+          compare_url = f"{os.environ.get('GITHUB_SERVER_URL')}/{repo}/compare/{before}...{after}"
+          commit_url = f"{os.environ.get('GITHUB_SERVER_URL')}/{repo}/commit/{sha}"
+          # Catppuccin Mocha Green: #a6e3a1
+          color = int("a6e3a1", 16)
+          title = f"🟢 Push to {branch}"
+          desc = f"**{repo}**\n{commit_count} commit(s) by **{actor}**"
+          body = desc + ("\n\n" + "\n".join(commit_lines) if commit_lines else "")
+          # Discord embed description limit safety
+          if len(body) > 3900:
+            body = body[:3900] + "\n…(truncated)"
+          payload = {
+            "embeds": [{
+              "title": title,
+              "description": body,
+              "color": color,
+              "url": compare_url,
+              "footer": {"text": f"{repo} • {short_sha}"}
+            }],
+            "components": [{
+              "type": 1,
+              "components": [
+                {"type": 2, "style": 5, "label": "View commit", "url": commit_url},
+                {"type": 2, "style": 5, "label": "Compare", "url": compare_url},
+              ]
+            }]
+          }
+          # Write payload to file and curl it (simple + robust)
+          with open("/tmp/payload.json", "w") as f:
+            json.dump(payload, f)
+          subprocess.check_call([
+            "curl", "-fsS", "-X", "POST",
+            "-H", "Content-Type: application/json",
+            "--data", "@/tmp/payload.json",
+            webhook
+          ])
+          PY
+  ci_result_to_discord:
+    name: CI result -> Discord (red on failure)
+    if: github.event_name == 'workflow_run'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post CI failure embed to Discord (Catppuccin red)
+        if: ${{ github.event.workflow_run.conclusion != 'success' }}
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, subprocess
+          webhook = os.environ["DISCORD_WEBHOOK_URL"]
+          path = os.environ["GITHUB_EVENT_PATH"]
+          evt = json.load(open(path))
+          wr = evt.get("workflow_run", {}) or {}
+          repo = os.environ.get("GITHUB_REPOSITORY", "")
+          workflow = wr.get("name", "CI")
+          conclusion = wr.get("conclusion", "unknown")
+          run_url = wr.get("html_url", "")
+          branch = wr.get("head_branch", "")
+          actor = (wr.get("actor") or {}).get("login", "")
+          sha = (wr.get("head_sha") or "")[:7]
+          # Catppuccin Mocha Red: #f38ba8
+          color = int("f38ba8", 16)
+          payload = {
+            "embeds": [{
+              "title": f"🔴 {workflow} failed",
+              "description": (
+                f"**{repo}**\n"
+                f"Branch: **{branch}**\n"
+                f"By: **{actor}**\n"
+                f"Conclusion: **{conclusion}**\n"
+                f"SHA: `{sha}`"
+              ),
+              "color": color,
+              "url": run_url,
+              "footer": {"text": "Build failed • open logs"}
+            }],
+            "components": [{
+              "type": 1,
+              "components": [
+                {"type": 2, "style": 5, "label": "Open run", "url": run_url}
+              ]
+            }]
+          }
+          with open("/tmp/payload.json", "w") as f:
+            json.dump(payload, f)
+          subprocess.check_call([
+            "curl", "-fsS", "-X", "POST",
+            "-H", "Content-Type: application/json",
+            "--data", "@/tmp/payload.json",
+            webhook
+          ])
+          PY
+  release_to_discord:
+    name: Release -> Discord (lavender)
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post release embed to Discord (Catppuccin lavender)
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, subprocess
+          webhook = os.environ["DISCORD_WEBHOOK_URL"]
+          path = os.environ["GITHUB_EVENT_PATH"]
+          evt = json.load(open(path))
+          repo = os.environ.get("GITHUB_REPOSITORY", "")
+          rel = evt.get("release", {}) or {}
+          tag = rel.get("tag_name", "")
+          name = rel.get("name", "") or tag
+          url = rel.get("html_url", "")
+          # Catppuccin Mocha Lavender: #b4befe
+          color = int("b4befe", 16)
+          payload = {
+            "embeds": [{
+              "title": f"🟣 Release: {tag}",
+              "description": f"**{repo}**\n{name}",
+              "color": color,
+              "url": url
+            }],
+            "components": [{
+              "type": 1,
+              "components": [
+                {"type": 2, "style": 5, "label": "View release", "url": url}
+              ]
+            }]
+          }
+          with open("/tmp/payload.json", "w") as f:
+            json.dump(payload, f)
+          subprocess.check_call([
+            "curl", "-fsS", "-X", "POST",
+            "-H", "Content-Type: application/json",
+            "--data", "@/tmp/payload.json",
+            webhook
+          ])
+          PY
