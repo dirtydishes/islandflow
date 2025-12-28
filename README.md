@@ -36,6 +36,7 @@ Not started:
 ## Current Capabilities
 
 - Synthetic options/equity prints with deterministic sequencing
+- Ingest adapter seam (env-selected, default `synthetic`) for options and equities
 - Raw event persistence in ClickHouse + streaming via NATS JetStream
 - Deterministic option FlowPacket clustering (time-window)
 - API gateway with REST, WS, and replay endpoints

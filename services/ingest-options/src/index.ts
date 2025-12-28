@@ -13,6 +13,9 @@ import {
   insertOptionPrint
 } from "@islandflow/storage";
 import { OptionPrintSchema, type OptionPrint } from "@islandflow/types";
+import { createIbkrOptionsAdapter } from "./adapters/ibkr";
+import { createSyntheticOptionsAdapter } from "./adapters/synthetic";
+import type { OptionIngestAdapter, StopHandler } from "./adapters/types";
 import { z } from "zod";
 
 const service = "ingest-options";
@@ -22,15 +25,17 @@ const envSchema = z.object({
   NATS_URL: z.string().default("nats://localhost:4222"),
   CLICKHOUSE_URL: z.string().default("http://localhost:8123"),
   CLICKHOUSE_DATABASE: z.string().default("default"),
+  INGEST_ADAPTER: z.string().min(1).default("synthetic"),
+  IBKR_HOST: z.string().default("127.0.0.1"),
+  IBKR_PORT: z.coerce.number().int().positive().default(7497),
+  IBKR_CLIENT_ID: z.coerce.number().int().nonnegative().default(0),
   EMIT_INTERVAL_MS: z.coerce.number().int().positive().default(1000)
 });
 
 const env = readEnv(envSchema);
 
 const state = {
-  shuttingDown: false,
-  seq: 0,
-  timer: null as ReturnType<typeof setInterval> | null
+  shuttingDown: false
 };
 
 const retry = async <T>(
@@ -60,22 +65,20 @@ const retry = async <T>(
   throw lastError ?? new Error(`${label} failed after retries`);
 };
 
-const buildSyntheticPrint = (): OptionPrint => {
-  const now = Date.now();
-  state.seq += 1;
+const selectAdapter = (name: string): OptionIngestAdapter => {
+  if (name === "synthetic") {
+    return createSyntheticOptionsAdapter({ emitIntervalMs: env.EMIT_INTERVAL_MS });
+  }
 
-  return {
-    source_ts: now,
-    ingest_ts: now,
-    seq: state.seq,
-    trace_id: `ingest-options-${state.seq}`,
-    ts: now,
-    option_contract_id: "SPY-2025-01-17-450-C",
-    price: 1.25,
-    size: 10,
-    exchange: "TEST",
-    conditions: ["TEST"]
-  };
+  if (name === "ibkr") {
+    return createIbkrOptionsAdapter({
+      host: env.IBKR_HOST,
+      port: env.IBKR_PORT,
+      clientId: env.IBKR_CLIENT_ID
+    });
+  }
+
+  throw new Error(`Unknown ingest adapter: ${name}`);
 };
 
 const run = async () => {
@@ -111,33 +114,33 @@ const run = async () => {
     await ensureOptionPrintsTable(clickhouse);
   });
 
-  const emit = async () => {
-    if (state.shuttingDown) {
-      return;
+  const adapter = selectAdapter(env.INGEST_ADAPTER);
+  logger.info("ingest adapter selected", { adapter: adapter.name });
+
+  const stopAdapter: StopHandler = await adapter.start({
+    onTrade: async (candidate: OptionPrint) => {
+      if (state.shuttingDown) {
+        return;
+      }
+
+      const print = OptionPrintSchema.parse(candidate);
+
+      try {
+        await insertOptionPrint(clickhouse, print);
+        await publishJson(js, SUBJECT_OPTION_PRINTS, print);
+        logger.info("published option print", {
+          trace_id: print.trace_id,
+          seq: print.seq,
+          option_contract_id: print.option_contract_id
+        });
+      } catch (error) {
+        logger.error("failed to publish option print", {
+          error: error instanceof Error ? error.message : String(error),
+          trace_id: print.trace_id
+        });
+      }
     }
-
-    const candidate = buildSyntheticPrint();
-    const print = OptionPrintSchema.parse(candidate);
-
-    try {
-      await insertOptionPrint(clickhouse, print);
-      await publishJson(js, SUBJECT_OPTION_PRINTS, print);
-      logger.info("published option print", {
-        trace_id: print.trace_id,
-        seq: print.seq,
-        option_contract_id: print.option_contract_id
-      });
-    } catch (error) {
-      logger.error("failed to publish option print", {
-        error: error instanceof Error ? error.message : String(error),
-        trace_id: print.trace_id
-      });
-    }
-  };
-
-  state.timer = setInterval(() => {
-    void emit();
-  }, env.EMIT_INTERVAL_MS);
+  });
 
   const shutdown = async (signal: string) => {
     if (state.shuttingDown) {
@@ -145,9 +148,7 @@ const run = async () => {
     }
 
     state.shuttingDown = true;
-    if (state.timer) {
-      clearInterval(state.timer);
-    }
+    await stopAdapter();
 
     logger.info("service stopping", { signal });
 

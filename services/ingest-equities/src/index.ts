@@ -13,6 +13,8 @@ import {
   insertEquityPrint
 } from "@islandflow/storage";
 import { EquityPrintSchema, type EquityPrint } from "@islandflow/types";
+import { createSyntheticEquitiesAdapter } from "./adapters/synthetic";
+import type { EquityIngestAdapter, StopHandler } from "./adapters/types";
 import { z } from "zod";
 
 const service = "ingest-equities";
@@ -22,15 +24,14 @@ const envSchema = z.object({
   NATS_URL: z.string().default("nats://localhost:4222"),
   CLICKHOUSE_URL: z.string().default("http://localhost:8123"),
   CLICKHOUSE_DATABASE: z.string().default("default"),
+  INGEST_ADAPTER: z.string().min(1).default("synthetic"),
   EMIT_INTERVAL_MS: z.coerce.number().int().positive().default(1000)
 });
 
 const env = readEnv(envSchema);
 
 const state = {
-  shuttingDown: false,
-  seq: 0,
-  timer: null as ReturnType<typeof setInterval> | null
+  shuttingDown: false
 };
 
 const retry = async <T>(
@@ -60,22 +61,12 @@ const retry = async <T>(
   throw lastError ?? new Error(`${label} failed after retries`);
 };
 
-const buildSyntheticPrint = (): EquityPrint => {
-  const now = Date.now();
-  state.seq += 1;
+const selectAdapter = (name: string): EquityIngestAdapter => {
+  if (name === "synthetic") {
+    return createSyntheticEquitiesAdapter({ emitIntervalMs: env.EMIT_INTERVAL_MS });
+  }
 
-  return {
-    source_ts: now,
-    ingest_ts: now,
-    seq: state.seq,
-    trace_id: `ingest-equities-${state.seq}`,
-    ts: now,
-    underlying_id: "SPY",
-    price: 450.1,
-    size: 100,
-    exchange: "TEST",
-    offExchangeFlag: false
-  };
+  throw new Error(`Unknown ingest adapter: ${name}`);
 };
 
 const run = async () => {
@@ -111,33 +102,33 @@ const run = async () => {
     await ensureEquityPrintsTable(clickhouse);
   });
 
-  const emit = async () => {
-    if (state.shuttingDown) {
-      return;
+  const adapter = selectAdapter(env.INGEST_ADAPTER);
+  logger.info("ingest adapter selected", { adapter: adapter.name });
+
+  const stopAdapter: StopHandler = await adapter.start({
+    onTrade: async (candidate: EquityPrint) => {
+      if (state.shuttingDown) {
+        return;
+      }
+
+      const print = EquityPrintSchema.parse(candidate);
+
+      try {
+        await insertEquityPrint(clickhouse, print);
+        await publishJson(js, SUBJECT_EQUITY_PRINTS, print);
+        logger.info("published equity print", {
+          trace_id: print.trace_id,
+          seq: print.seq,
+          underlying_id: print.underlying_id
+        });
+      } catch (error) {
+        logger.error("failed to publish equity print", {
+          error: error instanceof Error ? error.message : String(error),
+          trace_id: print.trace_id
+        });
+      }
     }
-
-    const candidate = buildSyntheticPrint();
-    const print = EquityPrintSchema.parse(candidate);
-
-    try {
-      await insertEquityPrint(clickhouse, print);
-      await publishJson(js, SUBJECT_EQUITY_PRINTS, print);
-      logger.info("published equity print", {
-        trace_id: print.trace_id,
-        seq: print.seq,
-        underlying_id: print.underlying_id
-      });
-    } catch (error) {
-      logger.error("failed to publish equity print", {
-        error: error instanceof Error ? error.message : String(error),
-        trace_id: print.trace_id
-      });
-    }
-  };
-
-  state.timer = setInterval(() => {
-    void emit();
-  }, env.EMIT_INTERVAL_MS);
+  });
 
   const shutdown = async (signal: string) => {
     if (state.shuttingDown) {
@@ -145,9 +136,7 @@ const run = async () => {
     }
 
     state.shuttingDown = true;
-    if (state.timer) {
-      clearInterval(state.timer);
-    }
+    await stopAdapter();
 
     logger.info("service stopping", { signal });
 
