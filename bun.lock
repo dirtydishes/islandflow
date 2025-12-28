@@ -75,8 +75,12 @@
     "services/ingest-equities": {
       "name": "@islandflow/ingest-equities",
       "dependencies": {
+        "@islandflow/bus": "workspace:*",
         "@islandflow/config": "workspace:*",
         "@islandflow/observability": "workspace:*",
+        "@islandflow/storage": "workspace:*",
+        "@islandflow/types": "workspace:*",
+        "zod": "^3.23.8",
       },
     },
     "services/ingest-options": {

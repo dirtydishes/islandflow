@@ -3,6 +3,7 @@ services:
     image: clickhouse/clickhouse-server:23.8
     ports:
       - "8123:8123"
+      - "9000:9000"
     volumes:
       - clickhouse-data:/var/lib/clickhouse
     ulimits:
@@ -12,7 +13,7 @@ services:
   redis:
     image: redis:7.2
     ports:
-      - "6380:6379"
+      - "6379:6379"
     volumes:
       - redis-data:/data
   nats:
