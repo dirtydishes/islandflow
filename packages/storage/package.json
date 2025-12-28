@@ -1,0 +1,12 @@
+{
+  "name": "@islandflow/storage",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@clickhouse/client": "^0.2.6",
+    "@islandflow/types": "workspace:*"
+  }
+}
