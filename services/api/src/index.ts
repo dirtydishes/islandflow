@@ -39,6 +39,33 @@ const envSchema = z.object({
 
 const env = readEnv(envSchema);
 
+const retry = async <T>(
+  label: string,
+  attempts: number,
+  delayMs: number,
+  task: () => Promise<T>
+): Promise<T> => {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await task();
+    } catch (error) {
+      lastError = error;
+      logger.warn(`${label} attempt failed`, {
+        attempt,
+        error: error instanceof Error ? error.message : String(error)
+      });
+
+      if (attempt < attempts) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+
+  throw lastError ?? new Error(`${label} failed after retries`);
+};
+
 const limitSchema = z.coerce.number().int().positive().max(1000);
 const replayParamsSchema = z.object({
   after_ts: z.coerce.number().int().nonnegative().default(0),
@@ -157,9 +184,11 @@ const run = async () => {
     database: env.CLICKHOUSE_DATABASE
   });
 
-  await ensureOptionPrintsTable(clickhouse);
-  await ensureEquityPrintsTable(clickhouse);
-  await ensureFlowPacketsTable(clickhouse);
+  await retry("clickhouse table init", 20, 500, async () => {
+    await ensureOptionPrintsTable(clickhouse);
+    await ensureEquityPrintsTable(clickhouse);
+    await ensureFlowPacketsTable(clickhouse);
+  });
 
   const optionSubscription = await subscribeJson(
     js,
