@@ -28,8 +28,8 @@ const envSchema = z.object({
   CLICKHOUSE_URL: z.string().default("http://localhost:8123"),
   CLICKHOUSE_DATABASE: z.string().default("default"),
   INGEST_ADAPTER: z.string().min(1).default("alpaca"),
-  ALPACA_KEY_ID: z.string().default("PKQDUYKNHDYCPONSMWIXZHT6QV"),
-  ALPACA_SECRET_KEY: z.string().default("5ktmszfCiWg125GtPguuFpSeTB2zHNewScncAaY4hnKo"),
+  ALPACA_KEY_ID: z.string().default(""),
+  ALPACA_SECRET_KEY: z.string().default(""),
   ALPACA_REST_URL: z.string().default("https://data.alpaca.markets"),
   ALPACA_WS_BASE_URL: z.string().default("wss://stream.data.alpaca.markets/v1beta1"),
   ALPACA_FEED: z.enum(["indicative", "opra"]).default("indicative"),
@@ -105,6 +105,7 @@ const selectAdapter = (name: string): OptionIngestAdapter => {
 
   if (name === "alpaca") {
     if (!env.ALPACA_KEY_ID || !env.ALPACA_SECRET_KEY) {
+      logger.warn("alpaca credentials missing; set ALPACA_KEY_ID and ALPACA_SECRET_KEY");
       throw new Error("ALPACA_KEY_ID and ALPACA_SECRET_KEY are required for the alpaca adapter.");
     }
 
@@ -127,10 +128,12 @@ const selectAdapter = (name: string): OptionIngestAdapter => {
 
   if (name === "databento") {
     if (!env.DATABENTO_API_KEY) {
+      logger.warn("databento api key missing; set DATABENTO_API_KEY");
       throw new Error("DATABENTO_API_KEY is required for the databento adapter.");
     }
 
     if (!env.DATABENTO_START) {
+      logger.warn("databento start missing; set DATABENTO_START");
       throw new Error("DATABENTO_START is required for the databento adapter.");
     }
 

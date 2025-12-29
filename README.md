@@ -14,10 +14,12 @@ Done now (in repo):
 - Synthetic options/equity prints published to NATS and persisted to ClickHouse
 - Deterministic option FlowPacket clustering (time window) + persistence
 - API: REST for prints/flow packets, WS for live options/equities/flow, replay endpoints
-- UI: live tapes for options/equities/flow + replay toggle + pause controls
+- UI: live tapes for options/equities/flow + replay toggle + pause controls + replay time/completion
+- Databento historical replay adapter (options) with symbol mapping
+- Alpaca options adapter (dev-only, bounded contract list)
 
 In progress / blocked:
-- Live data adapters (requires licensed data source)
+- Live data adapters beyond dev-only feeds (requires licensed data source)
 - Rolling stats and advanced clustering
 
 Not started:
@@ -83,6 +85,9 @@ Install dependencies:
 
 Start infra:
 - `docker compose up -d`
+
+Create env file:
+- Copy `.env.example` to `.env` and fill in the API keys you plan to use.
 
 Start everything (infra + services + web):
 - `bun run dev`
