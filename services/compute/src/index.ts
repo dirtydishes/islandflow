@@ -26,7 +26,22 @@ const envSchema = z.object({
   NATS_URL: z.string().default("nats://localhost:4222"),
   CLICKHOUSE_URL: z.string().default("http://localhost:8123"),
   CLICKHOUSE_DATABASE: z.string().default("default"),
-  CLUSTER_WINDOW_MS: z.coerce.number().int().positive().default(500)
+  CLUSTER_WINDOW_MS: z.coerce.number().int().positive().default(500),
+  COMPUTE_DELIVER_POLICY: z.enum(["new", "all", "last", "last_per_subject"]).default("new"),
+  COMPUTE_CONSUMER_RESET: z
+    .preprocess((value) => {
+      if (typeof value === "string") {
+        const normalized = value.trim().toLowerCase();
+        if (["1", "true", "yes", "on"].includes(normalized)) {
+          return true;
+        }
+        if (["0", "false", "no", "off"].includes(normalized)) {
+          return false;
+        }
+      }
+      return value;
+    }, z.boolean())
+    .default(false)
 });
 
 const env = readEnv(envSchema);
@@ -73,6 +88,27 @@ type ClusterState = {
 };
 
 const clusters = new Map<string, ClusterState>();
+
+const applyDeliverPolicy = (
+  opts: ReturnType<typeof buildDurableConsumer>,
+  policy: typeof env.COMPUTE_DELIVER_POLICY
+) => {
+  switch (policy) {
+    case "all":
+      opts.deliverAll();
+      break;
+    case "last":
+      opts.deliverLast();
+      break;
+    case "last_per_subject":
+      opts.deliverLastPerSubject();
+      break;
+    case "new":
+    default:
+      opts.deliverNew();
+      break;
+  }
+};
 
 const buildCluster = (print: OptionPrint): ClusterState => {
   return {
@@ -206,9 +242,41 @@ const run = async () => {
   });
 
   const durableName = "compute-option-prints";
-  const subscription = await (async () => {
+
+  if (env.COMPUTE_CONSUMER_RESET) {
     try {
-      return await subscribeJson(js, SUBJECT_OPTION_PRINTS, buildDurableConsumer(durableName));
+      await jsm.consumers.delete(STREAM_OPTION_PRINTS, durableName);
+      logger.warn("reset jetstream consumer", { durable: durableName });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes("not found")) {
+        logger.warn("failed to reset jetstream consumer", { durable: durableName, error: message });
+      }
+    }
+  } else {
+    try {
+      const info = await jsm.consumers.info(STREAM_OPTION_PRINTS, durableName);
+      if (info?.config?.deliver_policy && info.config.deliver_policy !== env.COMPUTE_DELIVER_POLICY) {
+        logger.warn("resetting consumer due to deliver policy change", {
+          durable: durableName,
+          current: info.config.deliver_policy,
+          desired: env.COMPUTE_DELIVER_POLICY
+        });
+        await jsm.consumers.delete(STREAM_OPTION_PRINTS, durableName);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes("not found")) {
+        logger.warn("failed to inspect jetstream consumer", { durable: durableName, error: message });
+      }
+    }
+  }
+
+  const subscription = await (async () => {
+    const opts = buildDurableConsumer(durableName);
+    applyDeliverPolicy(opts, env.COMPUTE_DELIVER_POLICY);
+    try {
+      return await subscribeJson(js, SUBJECT_OPTION_PRINTS, opts);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const shouldReset =
@@ -234,7 +302,9 @@ const run = async () => {
         }
       }
 
-      return await subscribeJson(js, SUBJECT_OPTION_PRINTS, buildDurableConsumer(durableName));
+      const resetOpts = buildDurableConsumer(durableName);
+      applyDeliverPolicy(resetOpts, env.COMPUTE_DELIVER_POLICY);
+      return await subscribeJson(js, SUBJECT_OPTION_PRINTS, resetOpts);
     }
   })();
 

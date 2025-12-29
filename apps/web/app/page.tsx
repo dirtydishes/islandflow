@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { EquityPrint, FlowPacket, OptionPrint } from "@islandflow/types";
 
-const MAX_ITEMS = 60;
+const MAX_ITEMS = 500;
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"]);
 
 type WsStatus = "connecting" | "connected" | "disconnected";
@@ -38,6 +38,63 @@ const extractTracePrefix = <T,>(item: T): string | null => {
     return null;
   }
   return inferTracePrefix(traceId);
+};
+
+type SortableItem = {
+  ts?: number;
+  source_ts?: number;
+  ingest_ts?: number;
+  seq?: number;
+  trace_id?: string;
+  id?: string;
+};
+
+const extractSortTs = (item: SortableItem): number =>
+  item.ts ?? item.source_ts ?? item.ingest_ts ?? 0;
+
+const extractSortSeq = (item: SortableItem): number => item.seq ?? 0;
+
+const buildItemKey = (item: SortableItem): string | null => {
+  if (item.trace_id) {
+    return `${item.trace_id}:${item.seq ?? ""}`;
+  }
+
+  if (item.id) {
+    return `id:${item.id}`;
+  }
+
+  return null;
+};
+
+const mergeNewest = <T extends SortableItem>(incoming: T[], existing: T[]): T[] => {
+  const combined = [...incoming, ...existing];
+  if (combined.length === 0) {
+    return combined;
+  }
+
+  const seen = new Set<string>();
+  const deduped: T[] = [];
+
+  for (const item of combined) {
+    const key = buildItemKey(item);
+    if (key) {
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+    }
+    deduped.push(item);
+  }
+
+  deduped.sort((a, b) => {
+    const delta = extractSortTs(b) - extractSortTs(a);
+    if (delta !== 0) {
+      return delta;
+    }
+    return extractSortSeq(b) - extractSortSeq(a);
+  });
+
+  return deduped.slice(0, MAX_ITEMS);
 };
 
 type TapeState<T> = {
@@ -119,6 +176,72 @@ const parseNumber = (value: unknown, fallback: number): number => {
   return fallback;
 };
 
+type ListScrollState = {
+  listRef: React.RefObject<HTMLDivElement>;
+  isAtTop: boolean;
+  missed: number;
+  onNewItems: (count: number) => void;
+  jumpToTop: () => void;
+};
+
+const useListScroll = (): ListScrollState => {
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const [isAtTop, setIsAtTop] = useState(true);
+  const [missed, setMissed] = useState(0);
+  const isAtTopRef = useRef(true);
+
+  useEffect(() => {
+    isAtTopRef.current = isAtTop;
+  }, [isAtTop]);
+
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) {
+      return;
+    }
+
+    const onScroll = () => {
+      const atTop = el.scrollTop <= 2;
+      setIsAtTop(atTop);
+      if (atTop) {
+        setMissed(0);
+      }
+    };
+
+    onScroll();
+    el.addEventListener("scroll", onScroll);
+
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+    };
+  }, []);
+
+  const onNewItems = useCallback((count: number) => {
+    if (count <= 0) {
+      return;
+    }
+
+    if (isAtTopRef.current) {
+      setMissed(0);
+      return;
+    }
+
+    setMissed((prev) => prev + count);
+  }, []);
+
+  const jumpToTop = useCallback(() => {
+    const el = listRef.current;
+    if (!el) {
+      return;
+    }
+
+    el.scrollTo({ top: 0, behavior: "smooth" });
+    setMissed(0);
+  }, []);
+
+  return { listRef, isAtTop, missed, onNewItems, jumpToTop };
+};
+
 const statusLabel = (status: WsStatus, paused: boolean, mode: TapeMode): string => {
   if (paused) {
     return "Paused";
@@ -147,12 +270,13 @@ type TapeConfig<T> = {
   expectedType: MessageType;
   batchSize?: number;
   pollMs?: number;
+  onNewItems?: (count: number) => void;
 };
 
 const useTape = <T extends { ts: number; seq: number }>(
   config: TapeConfig<T>
 ): TapeState<T> => {
-  const { mode, wsPath, replayPath, expectedType, latestPath } = config;
+  const { mode, wsPath, replayPath, expectedType, latestPath, onNewItems } = config;
   const batchSize = config.batchSize ?? 40;
   const pollMs = config.pollMs ?? 1000;
   const [status, setStatus] = useState<WsStatus>("connecting");
@@ -276,10 +400,11 @@ const useTape = <T extends { ts: number; seq: number }>(
             return;
           }
 
-          setItems((prev) => {
-            const next = [message.payload, ...prev];
-            return next.slice(0, MAX_ITEMS);
-          });
+          if (onNewItems) {
+            onNewItems(1);
+          }
+
+          setItems((prev) => mergeNewest([message.payload], prev));
           setLastUpdate(Date.now());
         } catch (error) {
           console.warn("Failed to parse websocket payload", error);
@@ -384,10 +509,10 @@ const useTape = <T extends { ts: number; seq: number }>(
 
           if (filtered.length > 0) {
             const nextItems = [...filtered].reverse();
-            setItems((prev) => {
-              const next = [...nextItems, ...prev];
-              return next.slice(0, MAX_ITEMS);
-            });
+            if (onNewItems) {
+              onNewItems(nextItems.length);
+            }
+            setItems((prev) => mergeNewest(nextItems, prev));
             setLastUpdate(Date.now());
             const last = filtered.at(-1);
             if (last) {
@@ -457,7 +582,10 @@ const useTape = <T extends { ts: number; seq: number }>(
   };
 };
 
-const useFlowStream = (enabled: boolean): TapeState<FlowPacket> => {
+const useFlowStream = (
+  enabled: boolean,
+  onNewItems?: (count: number) => void
+): TapeState<FlowPacket> => {
   const [status, setStatus] = useState<WsStatus>(enabled ? "connecting" : "disconnected");
   const [items, setItems] = useState<FlowPacket[]>([]);
   const [lastUpdate, setLastUpdate] = useState<number | null>(null);
@@ -525,10 +653,11 @@ const useFlowStream = (enabled: boolean): TapeState<FlowPacket> => {
             return;
           }
 
-          setItems((prev) => {
-            const next = [message.payload, ...prev];
-            return next.slice(0, MAX_ITEMS);
-          });
+          if (onNewItems) {
+            onNewItems(1);
+          }
+
+          setItems((prev) => mergeNewest([message.payload], prev));
           setLastUpdate(Date.now());
         } catch (error) {
           console.warn("Failed to parse flow packet", error);
@@ -630,6 +759,24 @@ const TapeStatus = ({
   );
 };
 
+type TapeControlsProps = {
+  isAtTop: boolean;
+  missed: number;
+  onJump: () => void;
+};
+
+const TapeControls = ({ isAtTop, missed, onJump }: TapeControlsProps) => {
+  const active = !isAtTop && missed > 0;
+  return (
+    <div className={`tape-controls${active ? " tape-controls-active" : ""}`}>
+      <button className="jump-button" type="button" onClick={onJump} disabled={isAtTop}>
+        Jump to top
+      </button>
+      <span className="missed-count">{active ? `+${missed} new` : ""}</span>
+    </div>
+  );
+};
+
 const formatFlowMetric = (value: number, suffix?: string): string => {
   if (suffix) {
     return `${value}${suffix}`;
@@ -640,6 +787,9 @@ const formatFlowMetric = (value: number, suffix?: string): string => {
 
 export default function HomePage() {
   const [mode, setMode] = useState<TapeMode>("live");
+  const optionsScroll = useListScroll();
+  const equitiesScroll = useListScroll();
+  const flowScroll = useListScroll();
 
   const options = useTape<OptionPrint>({
     mode,
@@ -648,7 +798,8 @@ export default function HomePage() {
     latestPath: "/prints/options",
     expectedType: "option-print",
     batchSize: mode === "replay" ? 120 : undefined,
-    pollMs: mode === "replay" ? 200 : undefined
+    pollMs: mode === "replay" ? 200 : undefined,
+    onNewItems: optionsScroll.onNewItems
   });
 
   const equities = useTape<EquityPrint>({
@@ -658,10 +809,11 @@ export default function HomePage() {
     latestPath: "/prints/equities",
     expectedType: "equity-print",
     batchSize: mode === "replay" ? 120 : undefined,
-    pollMs: mode === "replay" ? 200 : undefined
+    pollMs: mode === "replay" ? 200 : undefined,
+    onNewItems: equitiesScroll.onNewItems
   });
 
-  const flow = useFlowStream(mode === "live");
+  const flow = useFlowStream(mode === "live", flowScroll.onNewItems);
 
   const lastSeen = useMemo(() => {
     return [options.lastUpdate, equities.lastUpdate, flow.lastUpdate]
@@ -701,6 +853,8 @@ export default function HomePage() {
               <h2>Options Tape</h2>
               <p className="card-subtitle">Newest prints first (max {MAX_ITEMS}).</p>
             </div>
+          </div>
+          <div className="card-controls">
             <TapeStatus
               status={options.status}
               lastUpdate={options.lastUpdate}
@@ -711,9 +865,14 @@ export default function HomePage() {
               mode={mode}
               onTogglePause={options.togglePause}
             />
+            <TapeControls
+              isAtTop={optionsScroll.isAtTop}
+              missed={optionsScroll.missed}
+              onJump={optionsScroll.jumpToTop}
+            />
           </div>
 
-          <div className="list">
+          <div className="list" ref={optionsScroll.listRef}>
             {options.items.length === 0 ? (
               <div className="empty">
                 {mode === "live"
@@ -747,6 +906,8 @@ export default function HomePage() {
               <h2>Equities Tape</h2>
               <p className="card-subtitle">Off-exchange flag highlighted.</p>
             </div>
+          </div>
+          <div className="card-controls">
             <TapeStatus
               status={equities.status}
               lastUpdate={equities.lastUpdate}
@@ -757,9 +918,14 @@ export default function HomePage() {
               mode={mode}
               onTogglePause={equities.togglePause}
             />
+            <TapeControls
+              isAtTop={equitiesScroll.isAtTop}
+              missed={equitiesScroll.missed}
+              onJump={equitiesScroll.jumpToTop}
+            />
           </div>
 
-          <div className="list">
+          <div className="list" ref={equitiesScroll.listRef}>
             {equities.items.length === 0 ? (
               <div className="empty">
                 {mode === "live"
@@ -795,6 +961,8 @@ export default function HomePage() {
               <h2>Flow Packets</h2>
               <p className="card-subtitle">Deterministic clusters (live only).</p>
             </div>
+          </div>
+          <div className="card-controls">
             <TapeStatus
               status={flow.status}
               lastUpdate={flow.lastUpdate}
@@ -805,9 +973,14 @@ export default function HomePage() {
               mode={mode}
               onTogglePause={flow.togglePause}
             />
+            <TapeControls
+              isAtTop={flowScroll.isAtTop}
+              missed={flowScroll.missed}
+              onJump={flowScroll.jumpToTop}
+            />
           </div>
 
-          <div className="list">
+          <div className="list" ref={flowScroll.listRef}>
             {mode !== "live" ? (
               <div className="empty">Flow packets are live-only in this build.</div>
             ) : flow.items.length === 0 ? (

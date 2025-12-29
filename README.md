@@ -101,6 +101,7 @@ Run just the API:
 Adapter selection (env):
 - Options: `OPTIONS_INGEST_ADAPTER` (defaults to `alpaca`)
 - Equities: `EQUITIES_INGEST_ADAPTER` (defaults to `synthetic`)
+- Compute: `COMPUTE_DELIVER_POLICY` (`new` default), `COMPUTE_CONSUMER_RESET` (force skip backlog)
 
 IBKR adapter (options, via Python `ib_insync`):
 - Install Python deps: `python3 -m pip install -r services/ingest-options/py/requirements.txt`
