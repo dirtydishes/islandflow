@@ -27,13 +27,13 @@ const envSchema = z.object({
   NATS_URL: z.string().default("nats://localhost:4222"),
   CLICKHOUSE_URL: z.string().default("http://localhost:8123"),
   CLICKHOUSE_DATABASE: z.string().default("default"),
-  INGEST_ADAPTER: z.string().min(1).default("alpaca"),
+  OPTIONS_INGEST_ADAPTER: z.string().min(1).default("alpaca"),
   ALPACA_KEY_ID: z.string().default(""),
   ALPACA_SECRET_KEY: z.string().default(""),
   ALPACA_REST_URL: z.string().default("https://data.alpaca.markets"),
   ALPACA_WS_BASE_URL: z.string().default("wss://stream.data.alpaca.markets/v1beta1"),
   ALPACA_FEED: z.enum(["indicative", "opra"]).default("indicative"),
-  ALPACA_UNDERLYINGS: z.string().default("SPY"),
+  ALPACA_UNDERLYINGS: z.string().default("SPY,NVDA,AAPL"),
   ALPACA_STRIKES_PER_SIDE: z.coerce.number().int().positive().default(8),
   ALPACA_MAX_DTE_DAYS: z.coerce.number().int().positive().default(30),
   ALPACA_MONEYNESS_PCT: z.coerce.number().positive().default(0.06),
@@ -203,7 +203,7 @@ const run = async () => {
     await ensureOptionPrintsTable(clickhouse);
   });
 
-  const adapter = selectAdapter(env.INGEST_ADAPTER);
+  const adapter = selectAdapter(env.OPTIONS_INGEST_ADAPTER);
   logger.info("ingest adapter selected", { adapter: adapter.name });
 
   const stopAdapter: StopHandler = await adapter.start({

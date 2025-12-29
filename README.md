@@ -98,17 +98,21 @@ Run just the web app (auto-picks a free port in 3001-3005):
 Run just the API:
 - `bun --cwd services/api run dev`
 
+Adapter selection (env):
+- Options: `OPTIONS_INGEST_ADAPTER` (defaults to `alpaca`)
+- Equities: `EQUITIES_INGEST_ADAPTER` (defaults to `synthetic`)
+
 IBKR adapter (options, via Python `ib_insync`):
 - Install Python deps: `python3 -m pip install -r services/ingest-options/py/requirements.txt`
-- Set `INGEST_ADAPTER=ibkr` and configure:
+- Set `OPTIONS_INGEST_ADAPTER=ibkr` and configure:
   - `IBKR_HOST`, `IBKR_PORT`, `IBKR_CLIENT_ID`
   - `IBKR_SYMBOL`, `IBKR_EXPIRY` (YYYYMMDD), `IBKR_STRIKE`, `IBKR_RIGHT`
   - Optional: `IBKR_EXCHANGE` (default `SMART`), `IBKR_CURRENCY` (default `USD`), `IBKR_PYTHON_BIN`
 
 Alpaca adapter (options, dev-only bridge):
-- Set `INGEST_ADAPTER=alpaca` and configure:
+- Set `OPTIONS_INGEST_ADAPTER=alpaca` and configure:
   - `ALPACA_KEY_ID`, `ALPACA_SECRET_KEY`
-  - `ALPACA_UNDERLYINGS` (comma-separated, default `SPY`)
+  - `ALPACA_UNDERLYINGS` (comma-separated, default `SPY,NVDA,AAPL`)
   - Optional: `ALPACA_FEED` (`indicative` default, `opra` with subscription)
   - Optional: `ALPACA_MAX_QUOTES` (default `200`), `ALPACA_REST_URL`, `ALPACA_WS_BASE_URL`
   - Optional selection tuning: `ALPACA_STRIKES_PER_SIDE` (default `8`), `ALPACA_MAX_DTE_DAYS` (default `30`),
@@ -121,7 +125,7 @@ Alpaca selection policy (dev-only, deterministic):
 
 Databento historical replay adapter (options, via Python `databento`):
 - Install Python deps: `python3 -m pip install -r services/ingest-options/py/requirements.txt`
-- Set `INGEST_ADAPTER=databento` and configure:
+- Set `OPTIONS_INGEST_ADAPTER=databento` and configure:
   - `DATABENTO_API_KEY`, `DATABENTO_START` (ISO date/time)
   - Optional: `DATABENTO_END`, `DATABENTO_DATASET` (default `OPRA.PILLAR`), `DATABENTO_SCHEMA` (default `trades`)
   - Optional: `DATABENTO_SYMBOLS` (`ALL` or comma list), `DATABENTO_STYPE_IN`/`DATABENTO_STYPE_OUT` (default `raw_symbol`)

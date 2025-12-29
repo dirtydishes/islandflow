@@ -205,11 +205,38 @@ const run = async () => {
     await ensureFlowPacketsTable(clickhouse);
   });
 
-  const subscription = await subscribeJson(
-    js,
-    SUBJECT_OPTION_PRINTS,
-    buildDurableConsumer("compute-option-prints")
-  );
+  const durableName = "compute-option-prints";
+  const subscription = await (async () => {
+    try {
+      return await subscribeJson(js, SUBJECT_OPTION_PRINTS, buildDurableConsumer(durableName));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const shouldReset =
+        message.includes("duplicate subscription") ||
+        message.includes("durable requires") ||
+        message.includes("subject does not match consumer");
+
+      if (!shouldReset) {
+        throw error;
+      }
+
+      logger.warn("resetting jetstream consumer", { durable: durableName, error: message });
+
+      try {
+        await jsm.consumers.delete(STREAM_OPTION_PRINTS, durableName);
+      } catch (deleteError) {
+        const deleteMessage = deleteError instanceof Error ? deleteError.message : String(deleteError);
+        if (!deleteMessage.includes("not found")) {
+          logger.warn("failed to delete jetstream consumer", {
+            durable: durableName,
+            error: deleteMessage
+          });
+        }
+      }
+
+      return await subscribeJson(js, SUBJECT_OPTION_PRINTS, buildDurableConsumer(durableName));
+    }
+  })();
 
   const shutdown = async (signal: string) => {
     logger.info("service stopping", { signal });

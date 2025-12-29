@@ -24,7 +24,7 @@ const envSchema = z.object({
   NATS_URL: z.string().default("nats://localhost:4222"),
   CLICKHOUSE_URL: z.string().default("http://localhost:8123"),
   CLICKHOUSE_DATABASE: z.string().default("default"),
-  INGEST_ADAPTER: z.string().min(1).default("synthetic"),
+  EQUITIES_INGEST_ADAPTER: z.string().min(1).default("synthetic"),
   EMIT_INTERVAL_MS: z.coerce.number().int().positive().default(1000)
 });
 
@@ -102,7 +102,7 @@ const run = async () => {
     await ensureEquityPrintsTable(clickhouse);
   });
 
-  const adapter = selectAdapter(env.INGEST_ADAPTER);
+  const adapter = selectAdapter(env.EQUITIES_INGEST_ADAPTER);
   logger.info("ingest adapter selected", { adapter: adapter.name });
 
   const stopAdapter: StopHandler = await adapter.start({
