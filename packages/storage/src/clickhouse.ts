@@ -1,6 +1,18 @@
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
-import { EquityPrintSchema, FlowPacketSchema, OptionPrintSchema } from "@islandflow/types";
-import type { EquityPrint, FlowPacket, OptionPrint } from "@islandflow/types";
+import {
+  AlertEventSchema,
+  ClassifierHitEventSchema,
+  EquityPrintSchema,
+  FlowPacketSchema,
+  OptionPrintSchema
+} from "@islandflow/types";
+import type {
+  AlertEvent,
+  ClassifierHitEvent,
+  EquityPrint,
+  FlowPacket,
+  OptionPrint
+} from "@islandflow/types";
 import {
   normalizeOptionPrint,
   optionPrintsTableDDL,
@@ -18,6 +30,20 @@ import {
   toFlowPacketRecord,
   type FlowPacketRecord
 } from "./flow-packets";
+import {
+  CLASSIFIER_HITS_TABLE,
+  classifierHitsTableDDL,
+  fromClassifierHitRecord,
+  toClassifierHitRecord,
+  type ClassifierHitRecord
+} from "./classifier-hits";
+import {
+  ALERTS_TABLE,
+  alertsTableDDL,
+  fromAlertRecord,
+  toAlertRecord,
+  type AlertRecord
+} from "./alerts";
 
 export type ClickHouseOptions = {
   url: string;
@@ -59,6 +85,20 @@ export const ensureFlowPacketsTable = async (
   });
 };
 
+export const ensureClassifierHitsTable = async (
+  client: ClickHouseClient
+): Promise<void> => {
+  await client.exec({
+    query: classifierHitsTableDDL()
+  });
+};
+
+export const ensureAlertsTable = async (client: ClickHouseClient): Promise<void> => {
+  await client.exec({
+    query: alertsTableDDL()
+  });
+};
+
 export const insertOptionPrint = async (
   client: ClickHouseClient,
   print: OptionPrint
@@ -90,6 +130,27 @@ export const insertFlowPacket = async (
   const record = toFlowPacketRecord(packet);
   await client.insert({
     table: FLOW_PACKETS_TABLE,
+    values: [record],
+    format: "JSONEachRow"
+  });
+};
+
+export const insertClassifierHit = async (
+  client: ClickHouseClient,
+  hit: ClassifierHitEvent
+): Promise<void> => {
+  const record = toClassifierHitRecord(hit);
+  await client.insert({
+    table: CLASSIFIER_HITS_TABLE,
+    values: [record],
+    format: "JSONEachRow"
+  });
+};
+
+export const insertAlert = async (client: ClickHouseClient, alert: AlertEvent): Promise<void> => {
+  const record = toAlertRecord(alert);
+  await client.insert({
+    table: ALERTS_TABLE,
     values: [record],
     format: "JSONEachRow"
   });
@@ -196,6 +257,42 @@ const normalizeFlowPacketRow = (row: unknown): FlowPacketRecord | null => {
   };
 };
 
+const normalizeClassifierHitRow = (row: unknown): ClassifierHitRecord | null => {
+  if (!row || typeof row !== "object") {
+    return null;
+  }
+
+  const record = row as Record<string, unknown>;
+  return {
+    source_ts: coerceNumber(record.source_ts) as number,
+    ingest_ts: coerceNumber(record.ingest_ts) as number,
+    seq: coerceNumber(record.seq) as number,
+    trace_id: String(record.trace_id ?? ""),
+    classifier_id: String(record.classifier_id ?? ""),
+    confidence: Number(coerceNumber(record.confidence) ?? 0),
+    direction: String(record.direction ?? ""),
+    explanations_json: String(record.explanations_json ?? "[]")
+  };
+};
+
+const normalizeAlertRow = (row: unknown): AlertRecord | null => {
+  if (!row || typeof row !== "object") {
+    return null;
+  }
+
+  const record = row as Record<string, unknown>;
+  return {
+    source_ts: coerceNumber(record.source_ts) as number,
+    ingest_ts: coerceNumber(record.ingest_ts) as number,
+    seq: coerceNumber(record.seq) as number,
+    trace_id: String(record.trace_id ?? ""),
+    score: Number(coerceNumber(record.score) ?? 0),
+    severity: String(record.severity ?? ""),
+    hits_json: String(record.hits_json ?? "[]"),
+    evidence_refs_json: String(record.evidence_refs_json ?? "[]")
+  };
+};
+
 export const fetchRecentOptionPrints = async (
   client: ClickHouseClient,
   limit: number
@@ -240,6 +337,42 @@ export const fetchRecentFlowPackets = async (
     .filter((record): record is FlowPacketRecord => record !== null);
   const packets = records.map(fromFlowPacketRecord);
   return FlowPacketSchema.array().parse(packets);
+};
+
+export const fetchRecentClassifierHits = async (
+  client: ClickHouseClient,
+  limit: number
+): Promise<ClassifierHitEvent[]> => {
+  const safeLimit = clampLimit(limit);
+  const result = await client.query({
+    query: `SELECT * FROM ${CLASSIFIER_HITS_TABLE} ORDER BY source_ts DESC, seq DESC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  const records = rows
+    .map(normalizeClassifierHitRow)
+    .filter((record): record is ClassifierHitRecord => record !== null);
+  const hits = records.map(fromClassifierHitRecord);
+  return ClassifierHitEventSchema.array().parse(hits);
+};
+
+export const fetchRecentAlerts = async (
+  client: ClickHouseClient,
+  limit: number
+): Promise<AlertEvent[]> => {
+  const safeLimit = clampLimit(limit);
+  const result = await client.query({
+    query: `SELECT * FROM ${ALERTS_TABLE} ORDER BY source_ts DESC, seq DESC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  const records = rows
+    .map(normalizeAlertRow)
+    .filter((record): record is AlertRecord => record !== null);
+  const alerts = records.map(fromAlertRecord);
+  return AlertEventSchema.array().parse(alerts);
 };
 
 export const fetchOptionPrintsAfter = async (

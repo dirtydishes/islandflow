@@ -4,3 +4,7 @@ export const STREAM_EQUITY_PRINTS = "EQUITY_PRINTS";
 export const SUBJECT_EQUITY_PRINTS = "equities.prints";
 export const STREAM_FLOW_PACKETS = "FLOW_PACKETS";
 export const SUBJECT_FLOW_PACKETS = "flow.packets";
+export const STREAM_CLASSIFIER_HITS = "CLASSIFIER_HITS";
+export const SUBJECT_CLASSIFIER_HITS = "flow.classifier_hits";
+export const STREAM_ALERTS = "ALERTS";
+export const SUBJECT_ALERTS = "flow.alerts";

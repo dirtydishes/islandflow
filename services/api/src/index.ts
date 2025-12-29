@@ -1,9 +1,13 @@
 import { readEnv } from "@islandflow/config";
 import { createLogger } from "@islandflow/observability";
 import {
+  SUBJECT_ALERTS,
+  SUBJECT_CLASSIFIER_HITS,
   SUBJECT_EQUITY_PRINTS,
   SUBJECT_FLOW_PACKETS,
   SUBJECT_OPTION_PRINTS,
+  STREAM_ALERTS,
+  STREAM_CLASSIFIER_HITS,
   STREAM_EQUITY_PRINTS,
   STREAM_FLOW_PACKETS,
   STREAM_OPTION_PRINTS,
@@ -14,16 +18,26 @@ import {
 } from "@islandflow/bus";
 import {
   createClickHouseClient,
+  ensureAlertsTable,
+  ensureClassifierHitsTable,
   ensureEquityPrintsTable,
   ensureFlowPacketsTable,
   ensureOptionPrintsTable,
+  fetchRecentAlerts,
+  fetchRecentClassifierHits,
   fetchRecentFlowPackets,
   fetchEquityPrintsAfter,
   fetchRecentEquityPrints,
   fetchOptionPrintsAfter,
   fetchRecentOptionPrints
 } from "@islandflow/storage";
-import { EquityPrintSchema, FlowPacketSchema, OptionPrintSchema } from "@islandflow/types";
+import {
+  AlertEventSchema,
+  ClassifierHitEventSchema,
+  EquityPrintSchema,
+  FlowPacketSchema,
+  OptionPrintSchema
+} from "@islandflow/types";
 import { z } from "zod";
 
 const service = "api";
@@ -73,7 +87,7 @@ const replayParamsSchema = z.object({
   limit: z.coerce.number().int().positive().max(1000).default(200)
 });
 
-type Channel = "options" | "equities" | "flow";
+type Channel = "options" | "equities" | "flow" | "classifier-hits" | "alerts";
 
 type WsData = {
   channel: Channel;
@@ -82,6 +96,8 @@ type WsData = {
 const optionSockets = new Set<WebSocket<WsData>>();
 const equitySockets = new Set<WebSocket<WsData>>();
 const flowSockets = new Set<WebSocket<WsData>>();
+const classifierHitSockets = new Set<WebSocket<WsData>>();
+const alertSockets = new Set<WebSocket<WsData>>();
 
 const jsonResponse = (body: unknown, status = 200): Response => {
   return new Response(JSON.stringify(body), {
@@ -179,6 +195,32 @@ const run = async () => {
     num_replicas: 1
   });
 
+  await ensureStream(jsm, {
+    name: STREAM_CLASSIFIER_HITS,
+    subjects: [SUBJECT_CLASSIFIER_HITS],
+    retention: "limits",
+    storage: "file",
+    discard: "old",
+    max_msgs_per_subject: -1,
+    max_msgs: -1,
+    max_bytes: -1,
+    max_age: 0,
+    num_replicas: 1
+  });
+
+  await ensureStream(jsm, {
+    name: STREAM_ALERTS,
+    subjects: [SUBJECT_ALERTS],
+    retention: "limits",
+    storage: "file",
+    discard: "old",
+    max_msgs_per_subject: -1,
+    max_msgs: -1,
+    max_bytes: -1,
+    max_age: 0,
+    num_replicas: 1
+  });
+
   const clickhouse = createClickHouseClient({
     url: env.CLICKHOUSE_URL,
     database: env.CLICKHOUSE_DATABASE
@@ -188,6 +230,8 @@ const run = async () => {
     await ensureOptionPrintsTable(clickhouse);
     await ensureEquityPrintsTable(clickhouse);
     await ensureFlowPacketsTable(clickhouse);
+    await ensureClassifierHitsTable(clickhouse);
+    await ensureAlertsTable(clickhouse);
   });
 
   const optionSubscription = await subscribeJson(
@@ -206,6 +250,18 @@ const run = async () => {
     js,
     SUBJECT_FLOW_PACKETS,
     buildDurableConsumer("api-flow-packets")
+  );
+
+  const classifierHitSubscription = await subscribeJson(
+    js,
+    SUBJECT_CLASSIFIER_HITS,
+    buildDurableConsumer("api-classifier-hits")
+  );
+
+  const alertSubscription = await subscribeJson(
+    js,
+    SUBJECT_ALERTS,
+    buildDurableConsumer("api-alerts")
   );
 
   const pumpOptions = async () => {
@@ -253,9 +309,41 @@ const run = async () => {
     }
   };
 
+  const pumpClassifierHits = async () => {
+    for await (const msg of classifierHitSubscription.messages) {
+      try {
+        const payload = ClassifierHitEventSchema.parse(classifierHitSubscription.decode(msg));
+        broadcast(classifierHitSockets, { type: "classifier-hit", payload });
+        msg.ack();
+      } catch (error) {
+        logger.error("failed to process classifier hit", {
+          error: error instanceof Error ? error.message : String(error)
+        });
+        msg.term();
+      }
+    }
+  };
+
+  const pumpAlerts = async () => {
+    for await (const msg of alertSubscription.messages) {
+      try {
+        const payload = AlertEventSchema.parse(alertSubscription.decode(msg));
+        broadcast(alertSockets, { type: "alert", payload });
+        msg.ack();
+      } catch (error) {
+        logger.error("failed to process alert", {
+          error: error instanceof Error ? error.message : String(error)
+        });
+        msg.term();
+      }
+    }
+  };
+
   void pumpOptions();
   void pumpEquities();
   void pumpFlow();
+  void pumpClassifierHits();
+  void pumpAlerts();
 
   const server = Bun.serve<WsData>({
     port: env.API_PORT,
@@ -281,6 +369,18 @@ const run = async () => {
       if (req.method === "GET" && url.pathname === "/flow/packets") {
         const limit = parseLimit(url.searchParams.get("limit"));
         const data = await fetchRecentFlowPackets(clickhouse, limit);
+        return jsonResponse({ data });
+      }
+
+      if (req.method === "GET" && url.pathname === "/flow/classifier-hits") {
+        const limit = parseLimit(url.searchParams.get("limit"));
+        const data = await fetchRecentClassifierHits(clickhouse, limit);
+        return jsonResponse({ data });
+      }
+
+      if (req.method === "GET" && url.pathname === "/flow/alerts") {
+        const limit = parseLimit(url.searchParams.get("limit"));
+        const data = await fetchRecentAlerts(clickhouse, limit);
         return jsonResponse({ data });
       }
 
@@ -324,6 +424,22 @@ const run = async () => {
         return jsonResponse({ error: "websocket upgrade failed" }, 400);
       }
 
+      if (req.method === "GET" && url.pathname === "/ws/classifier-hits") {
+        if (serverRef.upgrade(req, { data: { channel: "classifier-hits" } })) {
+          return new Response(null, { status: 101 });
+        }
+
+        return jsonResponse({ error: "websocket upgrade failed" }, 400);
+      }
+
+      if (req.method === "GET" && url.pathname === "/ws/alerts") {
+        if (serverRef.upgrade(req, { data: { channel: "alerts" } })) {
+          return new Response(null, { status: 101 });
+        }
+
+        return jsonResponse({ error: "websocket upgrade failed" }, 400);
+      }
+
       return jsonResponse({ error: "not found" }, 404);
     },
     websocket: {
@@ -332,8 +448,12 @@ const run = async () => {
           optionSockets.add(socket);
         } else if (socket.data.channel === "equities") {
           equitySockets.add(socket);
-        } else {
+        } else if (socket.data.channel === "flow") {
           flowSockets.add(socket);
+        } else if (socket.data.channel === "classifier-hits") {
+          classifierHitSockets.add(socket);
+        } else {
+          alertSockets.add(socket);
         }
 
         logger.info("websocket connected", { channel: socket.data.channel });
@@ -343,8 +463,12 @@ const run = async () => {
           optionSockets.delete(socket);
         } else if (socket.data.channel === "equities") {
           equitySockets.delete(socket);
-        } else {
+        } else if (socket.data.channel === "flow") {
           flowSockets.delete(socket);
+        } else if (socket.data.channel === "classifier-hits") {
+          classifierHitSockets.delete(socket);
+        } else {
+          alertSockets.delete(socket);
         }
 
         logger.info("websocket disconnected", { channel: socket.data.channel });

@@ -1,8 +1,12 @@
 import { readEnv } from "@islandflow/config";
 import { createLogger } from "@islandflow/observability";
 import {
+  SUBJECT_ALERTS,
+  SUBJECT_CLASSIFIER_HITS,
   SUBJECT_FLOW_PACKETS,
   SUBJECT_OPTION_PRINTS,
+  STREAM_ALERTS,
+  STREAM_CLASSIFIER_HITS,
   STREAM_FLOW_PACKETS,
   STREAM_OPTION_PRINTS,
   buildDurableConsumer,
@@ -13,11 +17,25 @@ import {
 } from "@islandflow/bus";
 import {
   createClickHouseClient,
+  ensureAlertsTable,
+  ensureClassifierHitsTable,
   ensureFlowPacketsTable,
+  insertAlert,
+  insertClassifierHit,
   insertFlowPacket
 } from "@islandflow/storage";
-import { FlowPacketSchema, OptionPrintSchema, type FlowPacket, type OptionPrint } from "@islandflow/types";
+import {
+  AlertEventSchema,
+  ClassifierHitEventSchema,
+  FlowPacketSchema,
+  OptionPrintSchema,
+  type AlertEvent,
+  type ClassifierHitEvent,
+  type FlowPacket,
+  type OptionPrint
+} from "@islandflow/types";
 import { z } from "zod";
+import { evaluateClassifiers, type ClassifierConfig } from "./classifiers";
 
 const service = "compute";
 const logger = createLogger({ service });
@@ -41,10 +59,21 @@ const envSchema = z.object({
       }
       return value;
     }, z.boolean())
-    .default(false)
+    .default(false),
+  CLASSIFIER_SWEEP_MIN_PREMIUM: z.coerce.number().positive().default(50_000),
+  CLASSIFIER_SWEEP_MIN_COUNT: z.coerce.number().int().positive().default(3),
+  CLASSIFIER_SPIKE_MIN_PREMIUM: z.coerce.number().positive().default(25_000),
+  CLASSIFIER_SPIKE_MIN_SIZE: z.coerce.number().int().positive().default(500)
 });
 
 const env = readEnv(envSchema);
+
+const classifierConfig: ClassifierConfig = {
+  sweepMinPremium: env.CLASSIFIER_SWEEP_MIN_PREMIUM,
+  sweepMinCount: env.CLASSIFIER_SWEEP_MIN_COUNT,
+  spikeMinPremium: env.CLASSIFIER_SPIKE_MIN_PREMIUM,
+  spikeMinSize: env.CLASSIFIER_SPIKE_MIN_SIZE
+};
 
 const retry = async <T>(
   label: string,
@@ -170,11 +199,86 @@ const flushCluster = async (
   await insertFlowPacket(clickhouse, validated);
   await publishJson(js, SUBJECT_FLOW_PACKETS, validated);
 
+  await emitClassifiers(clickhouse, js, validated);
+
   logger.info("emitted flow packet", {
     id: validated.id,
     contract: cluster.contractId,
     count: cluster.members.length
   });
+};
+
+const scoreAlert = (packet: FlowPacket, hits: ClassifierHitEvent[]): { score: number; severity: string } => {
+  const premium =
+    typeof packet.features.total_premium === "number" ? packet.features.total_premium : 0;
+  const premiumScore = Math.min(70, Math.round(premium / 1000));
+  const maxConfidence = hits.reduce((max, hit) => Math.max(max, hit.confidence), 0);
+  const confidenceScore = Math.round(maxConfidence * 20);
+  const hitScore = Math.min(20, hits.length * 5);
+  const score = Math.max(0, Math.min(100, premiumScore + confidenceScore + hitScore));
+  const severity = score >= 80 ? "high" : score >= 45 ? "medium" : "low";
+  return { score, severity };
+};
+
+const emitClassifiers = async (
+  clickhouse: ReturnType<typeof createClickHouseClient>,
+  js: Awaited<ReturnType<typeof connectJetStreamWithRetry>>["js"],
+  packet: FlowPacket
+): Promise<void> => {
+  const hits = evaluateClassifiers(packet, classifierConfig);
+  if (hits.length === 0) {
+    return;
+  }
+
+  const hitEvents: ClassifierHitEvent[] = hits.map((hit) =>
+    ClassifierHitEventSchema.parse({
+      source_ts: packet.source_ts,
+      ingest_ts: packet.ingest_ts,
+      seq: packet.seq,
+      trace_id: `classifier:${hit.classifier_id}:${packet.id}`,
+      ...hit
+    })
+  );
+
+  for (const hit of hitEvents) {
+    try {
+      await insertClassifierHit(clickhouse, hit);
+      await publishJson(js, SUBJECT_CLASSIFIER_HITS, hit);
+    } catch (error) {
+      logger.error("failed to emit classifier hit", {
+        error: error instanceof Error ? error.message : String(error),
+        classifier_id: hit.classifier_id,
+        packet_id: packet.id
+      });
+    }
+  }
+
+  const { score, severity } = scoreAlert(packet, hitEvents);
+  const alert: AlertEvent = AlertEventSchema.parse({
+    source_ts: packet.source_ts,
+    ingest_ts: packet.ingest_ts,
+    seq: packet.seq,
+    trace_id: `alert:${packet.id}`,
+    score,
+    severity,
+    hits: hitEvents.map((hit) => ({
+      classifier_id: hit.classifier_id,
+      confidence: hit.confidence,
+      direction: hit.direction,
+      explanations: hit.explanations
+    })),
+    evidence_refs: [packet.id, ...packet.members]
+  });
+
+  try {
+    await insertAlert(clickhouse, alert);
+    await publishJson(js, SUBJECT_ALERTS, alert);
+  } catch (error) {
+    logger.error("failed to emit alert", {
+      error: error instanceof Error ? error.message : String(error),
+      packet_id: packet.id
+    });
+  }
 };
 
 const flushEligibleClusters = async (
@@ -232,6 +336,32 @@ const run = async () => {
     num_replicas: 1
   });
 
+  await ensureStream(jsm, {
+    name: STREAM_CLASSIFIER_HITS,
+    subjects: [SUBJECT_CLASSIFIER_HITS],
+    retention: "limits",
+    storage: "file",
+    discard: "old",
+    max_msgs_per_subject: -1,
+    max_msgs: -1,
+    max_bytes: -1,
+    max_age: 0,
+    num_replicas: 1
+  });
+
+  await ensureStream(jsm, {
+    name: STREAM_ALERTS,
+    subjects: [SUBJECT_ALERTS],
+    retention: "limits",
+    storage: "file",
+    discard: "old",
+    max_msgs_per_subject: -1,
+    max_msgs: -1,
+    max_bytes: -1,
+    max_age: 0,
+    num_replicas: 1
+  });
+
   const clickhouse = createClickHouseClient({
     url: env.CLICKHOUSE_URL,
     database: env.CLICKHOUSE_DATABASE
@@ -239,6 +369,8 @@ const run = async () => {
 
   await retry("clickhouse table init", 20, 500, async () => {
     await ensureFlowPacketsTable(clickhouse);
+    await ensureClassifierHitsTable(clickhouse);
+    await ensureAlertsTable(clickhouse);
   });
 
   const durableName = "compute-option-prints";
