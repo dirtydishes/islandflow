@@ -905,7 +905,7 @@ export default function HomePage() {
       </header>
 
       <div className="cards">
-        <section className="card">
+        <section className="card card-options">
           <div className="card-header">
             <div>
               <h2>Options Tape</h2>
@@ -958,7 +958,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="card">
+        <section className="card card-equities">
           <div className="card-header">
             <div>
               <h2>Equities Tape</h2>
@@ -1013,7 +1013,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="card">
+        <section className="card card-flow">
           <div className="card-header">
             <div>
               <h2>Flow Packets</h2>
@@ -1077,7 +1077,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="card">
+        <section className="card card-alerts">
           <div className="card-header">
             <div>
               <h2>Alerts</h2>
@@ -1138,7 +1138,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="card">
+        <section className="card card-classifiers">
           <div className="card-header">
             <div>
               <h2>Classifier Hits</h2>

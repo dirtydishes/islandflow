@@ -109,7 +109,21 @@ h1 {
 .cards {
   display: grid;
   gap: 28px;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.card-options {
+  grid-column: span 4;
+}
+
+.card-equities {
+  grid-column: span 2;
+}
+
+.card-flow,
+.card-alerts,
+.card-classifiers {
+  grid-column: span 2;
 }
 
 .status {
@@ -429,5 +443,33 @@ h1 {
 
   .time {
     text-align: left;
+  }
+}
+
+@media (max-width: 1100px) {
+  .cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .card-options,
+  .card-equities,
+  .card-flow,
+  .card-alerts,
+  .card-classifiers {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 860px) {
+  .cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .card-options,
+  .card-equities,
+  .card-flow,
+  .card-alerts,
+  .card-classifiers {
+    grid-column: span 1;
   }
 }
