@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { EquityPrint, FlowPacket, OptionPrint } from "@islandflow/types";
+import type { AlertEvent, ClassifierHitEvent, EquityPrint, FlowPacket, OptionPrint } from "@islandflow/types";
 
 const MAX_ITEMS = 500;
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"]);
@@ -10,7 +10,7 @@ type WsStatus = "connecting" | "connected" | "disconnected";
 
 type TapeMode = "live" | "replay";
 
-type MessageType = "option-print" | "equity-print" | "flow-packet";
+type MessageType = "option-print" | "equity-print" | "flow-packet" | "classifier-hit" | "alert";
 
 type StreamMessage<T> = {
   type: MessageType;
@@ -159,6 +159,27 @@ const formatSize = (size: number): string => {
 
 const formatTime = (ts: number): string => {
   return new Date(ts).toLocaleTimeString();
+};
+
+const formatConfidence = (value: number): string => `${Math.round(value * 100)}%`;
+
+const humanizeClassifierId = (value: string): string => {
+  if (!value) {
+    return "Classifier";
+  }
+
+  return value
+    .split("_")
+    .map((part) => (part ? part[0].toUpperCase() + part.slice(1) : part))
+    .join(" ");
+};
+
+const normalizeDirection = (value: string): "bullish" | "bearish" | "neutral" => {
+  const normalized = value.toLowerCase();
+  if (normalized === "bullish" || normalized === "bearish" || normalized === "neutral") {
+    return normalized;
+  }
+  return "neutral";
 };
 
 const parseNumber = (value: unknown, fallback: number): number => {
@@ -582,12 +603,14 @@ const useTape = <T extends { ts: number; seq: number }>(
   };
 };
 
-const useFlowStream = (
+const useLiveStream = <T extends SortableItem>(
   enabled: boolean,
+  wsPath: string,
+  expectedType: MessageType,
   onNewItems?: (count: number) => void
-): TapeState<FlowPacket> => {
+): TapeState<T> => {
   const [status, setStatus] = useState<WsStatus>(enabled ? "connecting" : "disconnected");
-  const [items, setItems] = useState<FlowPacket[]>([]);
+  const [items, setItems] = useState<T[]>([]);
   const [lastUpdate, setLastUpdate] = useState<number | null>(null);
   const [replayTime] = useState<number | null>(null);
   const [replayComplete] = useState<boolean>(false);
@@ -614,6 +637,8 @@ const useFlowStream = (
   useEffect(() => {
     if (!enabled) {
       setStatus("disconnected");
+      setItems([]);
+      setLastUpdate(null);
       return;
     }
 
@@ -626,7 +651,7 @@ const useFlowStream = (
 
       setStatus("connecting");
 
-      const socket = new WebSocket(buildWsUrl("/ws/flow"));
+      const socket = new WebSocket(buildWsUrl(wsPath));
       socketRef.current = socket;
 
       socket.onopen = () => {
@@ -642,8 +667,8 @@ const useFlowStream = (
         }
 
         try {
-          const message = JSON.parse(event.data) as StreamMessage<FlowPacket>;
-          if (!message || message.type !== "flow-packet") {
+          const message = JSON.parse(event.data) as StreamMessage<T>;
+          if (!message || message.type !== expectedType) {
             return;
           }
 
@@ -660,7 +685,7 @@ const useFlowStream = (
           setItems((prev) => mergeNewest([message.payload], prev));
           setLastUpdate(Date.now());
         } catch (error) {
-          console.warn("Failed to parse flow packet", error);
+          console.warn("Failed to parse live stream payload", error);
         }
       };
 
@@ -696,7 +721,7 @@ const useFlowStream = (
         socketRef.current.close();
       }
     };
-  }, [enabled]);
+  }, [enabled, expectedType, wsPath, onNewItems]);
 
   return {
     status,
@@ -708,6 +733,13 @@ const useFlowStream = (
     dropped,
     togglePause
   };
+};
+
+const useFlowStream = (
+  enabled: boolean,
+  onNewItems?: (count: number) => void
+): TapeState<FlowPacket> => {
+  return useLiveStream<FlowPacket>(enabled, "/ws/flow", "flow-packet", onNewItems);
 };
 
 type TapeStatusProps = {
@@ -790,6 +822,8 @@ export default function HomePage() {
   const optionsScroll = useListScroll();
   const equitiesScroll = useListScroll();
   const flowScroll = useListScroll();
+  const alertsScroll = useListScroll();
+  const classifierScroll = useListScroll();
 
   const options = useTape<OptionPrint>({
     mode,
@@ -814,12 +848,36 @@ export default function HomePage() {
   });
 
   const flow = useFlowStream(mode === "live", flowScroll.onNewItems);
+  const alerts = useLiveStream<AlertEvent>(
+    mode === "live",
+    "/ws/alerts",
+    "alert",
+    alertsScroll.onNewItems
+  );
+  const classifierHits = useLiveStream<ClassifierHitEvent>(
+    mode === "live",
+    "/ws/classifier-hits",
+    "classifier-hit",
+    classifierScroll.onNewItems
+  );
 
   const lastSeen = useMemo(() => {
-    return [options.lastUpdate, equities.lastUpdate, flow.lastUpdate]
+    return [
+      options.lastUpdate,
+      equities.lastUpdate,
+      flow.lastUpdate,
+      alerts.lastUpdate,
+      classifierHits.lastUpdate
+    ]
       .filter((value): value is number => value !== null)
       .sort((a, b) => b - a)[0] ?? null;
-  }, [options.lastUpdate, equities.lastUpdate, flow.lastUpdate]);
+  }, [
+    options.lastUpdate,
+    equities.lastUpdate,
+    flow.lastUpdate,
+    alerts.lastUpdate,
+    classifierHits.lastUpdate
+  ]);
 
   const toggleMode = () => {
     setMode((prev) => (prev === "live" ? "replay" : "live"));
@@ -1012,6 +1070,120 @@ export default function HomePage() {
                     <div className="time">
                       {formatTime(startTs)} → {formatTime(endTs)}
                     </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </section>
+
+        <section className="card">
+          <div className="card-header">
+            <div>
+              <h2>Alerts</h2>
+              <p className="card-subtitle">Rule-based scoring from flow packets.</p>
+            </div>
+          </div>
+          <div className="card-controls">
+            <TapeStatus
+              status={alerts.status}
+              lastUpdate={alerts.lastUpdate}
+              replayTime={alerts.replayTime}
+              replayComplete={alerts.replayComplete}
+              paused={alerts.paused}
+              dropped={alerts.dropped}
+              mode="live"
+              onTogglePause={alerts.togglePause}
+            />
+            <TapeControls
+              isAtTop={alertsScroll.isAtTop}
+              missed={alertsScroll.missed}
+              onJump={alertsScroll.jumpToTop}
+            />
+          </div>
+
+          <div className="list" ref={alertsScroll.listRef}>
+            {mode !== "live" ? (
+              <div className="empty">Alerts are live-only in this build.</div>
+            ) : alerts.items.length === 0 ? (
+              <div className="empty">No alerts yet. Start compute.</div>
+            ) : (
+              alerts.items.map((alert) => {
+                const primary = alert.hits[0];
+                const direction = primary ? normalizeDirection(primary.direction) : "neutral";
+
+                return (
+                  <div className="row" key={`${alert.trace_id}-${alert.seq}`}>
+                    <div>
+                      <div className="contract">
+                        {primary ? humanizeClassifierId(primary.classifier_id) : "Alert"}
+                      </div>
+                      <div className="meta">
+                        <span className={`pill severity-${alert.severity}`}>{alert.severity}</span>
+                        <span>Score {Math.round(alert.score)}</span>
+                        <span>{alert.hits.length} hits</span>
+                        {primary ? (
+                          <span className={`pill direction-${direction}`}>{direction}</span>
+                        ) : null}
+                      </div>
+                      {primary?.explanations?.[0] ? (
+                        <div className="note">{primary.explanations[0]}</div>
+                      ) : null}
+                    </div>
+                    <div className="time">{formatTime(alert.source_ts)}</div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </section>
+
+        <section className="card">
+          <div className="card-header">
+            <div>
+              <h2>Classifier Hits</h2>
+              <p className="card-subtitle">Raw rule hits before alert scoring.</p>
+            </div>
+          </div>
+          <div className="card-controls">
+            <TapeStatus
+              status={classifierHits.status}
+              lastUpdate={classifierHits.lastUpdate}
+              replayTime={classifierHits.replayTime}
+              replayComplete={classifierHits.replayComplete}
+              paused={classifierHits.paused}
+              dropped={classifierHits.dropped}
+              mode="live"
+              onTogglePause={classifierHits.togglePause}
+            />
+            <TapeControls
+              isAtTop={classifierScroll.isAtTop}
+              missed={classifierScroll.missed}
+              onJump={classifierScroll.jumpToTop}
+            />
+          </div>
+
+          <div className="list" ref={classifierScroll.listRef}>
+            {mode !== "live" ? (
+              <div className="empty">Classifier hits are live-only in this build.</div>
+            ) : classifierHits.items.length === 0 ? (
+              <div className="empty">No classifier hits yet. Start compute.</div>
+            ) : (
+              classifierHits.items.map((hit) => {
+                const direction = normalizeDirection(hit.direction);
+                return (
+                  <div className="row" key={`${hit.trace_id}-${hit.seq}`}>
+                    <div>
+                      <div className="contract">{humanizeClassifierId(hit.classifier_id)}</div>
+                      <div className="meta">
+                        <span className={`pill direction-${direction}`}>{direction}</span>
+                        <span>Confidence {formatConfidence(hit.confidence)}</span>
+                      </div>
+                      {hit.explanations?.[0] ? (
+                        <div className="note">{hit.explanations[0]}</div>
+                      ) : null}
+                    </div>
+                    <div className="time">{formatTime(hit.source_ts)}</div>
                   </div>
                 );
               })
