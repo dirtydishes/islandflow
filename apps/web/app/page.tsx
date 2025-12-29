@@ -27,10 +27,25 @@ type ReplayResponse<T> = {
   next: ReplayCursor | null;
 };
 
+const inferTracePrefix = (traceId: string): string => {
+  const match = traceId.match(/^(.*)-\d+$/);
+  return match ? match[1] : traceId;
+};
+
+const extractTracePrefix = <T,>(item: T): string | null => {
+  const traceId = (item as { trace_id?: string }).trace_id;
+  if (!traceId) {
+    return null;
+  }
+  return inferTracePrefix(traceId);
+};
+
 type TapeState<T> = {
   status: WsStatus;
   items: T[];
   lastUpdate: number | null;
+  replayTime: number | null;
+  replayComplete: boolean;
   paused: boolean;
   dropped: number;
   togglePause: () => void;
@@ -128,6 +143,7 @@ type TapeConfig<T> = {
   mode: TapeMode;
   wsPath: string;
   replayPath: string;
+  latestPath?: string;
   expectedType: MessageType;
   batchSize?: number;
   pollMs?: number;
@@ -136,17 +152,23 @@ type TapeConfig<T> = {
 const useTape = <T extends { ts: number; seq: number }>(
   config: TapeConfig<T>
 ): TapeState<T> => {
-  const { mode, wsPath, replayPath, expectedType } = config;
+  const { mode, wsPath, replayPath, expectedType, latestPath } = config;
   const batchSize = config.batchSize ?? 40;
   const pollMs = config.pollMs ?? 1000;
   const [status, setStatus] = useState<WsStatus>("connecting");
   const [items, setItems] = useState<T[]>([]);
   const [lastUpdate, setLastUpdate] = useState<number | null>(null);
+  const [replayTime, setReplayTime] = useState<number | null>(null);
+  const [replayComplete, setReplayComplete] = useState<boolean>(false);
   const [paused, setPaused] = useState<boolean>(false);
   const [dropped, setDropped] = useState<number>(0);
   const reconnectRef = useRef<number | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const cursorRef = useRef<ReplayCursor>({ ts: 0, seq: 0 });
+  const replayEndRef = useRef<number | null>(null);
+  const replayCompleteRef = useRef<boolean>(false);
+  const replaySourceRef = useRef<string | null>(null);
+  const emptyPollsRef = useRef<number>(0);
   const pausedRef = useRef(paused);
 
   useEffect(() => {
@@ -166,10 +188,52 @@ const useTape = <T extends { ts: number; seq: number }>(
   useEffect(() => {
     setItems([]);
     setLastUpdate(null);
+    setReplayTime(null);
+    setReplayComplete(false);
+    replayCompleteRef.current = false;
+    replaySourceRef.current = null;
+    emptyPollsRef.current = 0;
     setDropped(0);
     setStatus("connecting");
     cursorRef.current = { ts: 0, seq: 0 };
   }, [mode]);
+
+  useEffect(() => {
+    if (mode !== "replay" || !latestPath) {
+      replayEndRef.current = null;
+      return;
+    }
+
+    let active = true;
+    replayEndRef.current = null;
+    setReplayComplete(false);
+    replayCompleteRef.current = false;
+
+    const fetchReplayEnd = async () => {
+      try {
+        const url = new URL(buildApiUrl(latestPath));
+        url.searchParams.set("limit", "1");
+        const response = await fetch(url.toString());
+        if (!response.ok) {
+          throw new Error(`Replay baseline failed with ${response.status}`);
+        }
+
+        const payload = (await response.json()) as { data?: T[] };
+        const latest = payload.data?.[0];
+        if (active && latest) {
+          replayEndRef.current = latest.ts;
+        }
+      } catch (error) {
+        console.warn("Failed to load replay end cursor", error);
+      }
+    };
+
+    void fetchReplayEnd();
+
+    return () => {
+      active = false;
+    };
+  }, [mode, latestPath]);
 
   useEffect(() => {
     if (mode !== "live") {
@@ -268,33 +332,104 @@ const useTape = <T extends { ts: number; seq: number }>(
         return;
       }
 
+      if (replayCompleteRef.current) {
+        return;
+      }
+
       try {
-        const cursor = cursorRef.current;
-        const url = new URL(buildApiUrl(replayPath));
-        url.searchParams.set("after_ts", cursor.ts.toString());
-        url.searchParams.set("after_seq", cursor.seq.toString());
-        url.searchParams.set("limit", batchSize.toString());
+        let keepPolling = true;
 
-        const response = await fetch(url.toString());
-        if (!response.ok) {
-          throw new Error(`Replay request failed with ${response.status}`);
+        while (keepPolling && active && !pausedRef.current) {
+          const replayEnd = replayEndRef.current;
+          const cursor = cursorRef.current;
+
+          if (replayEnd !== null && cursor.ts >= replayEnd) {
+            replayCompleteRef.current = true;
+            setReplayComplete(true);
+            setStatus("disconnected");
+            return;
+          }
+
+          const url = new URL(buildApiUrl(replayPath));
+          url.searchParams.set("after_ts", cursor.ts.toString());
+          url.searchParams.set("after_seq", cursor.seq.toString());
+          url.searchParams.set("limit", batchSize.toString());
+
+          const response = await fetch(url.toString());
+          if (!response.ok) {
+            throw new Error(`Replay request failed with ${response.status}`);
+          }
+
+          const payload = (await response.json()) as ReplayResponse<T>;
+
+          let sourcePrefix = replaySourceRef.current;
+          if (!sourcePrefix) {
+            const firstWithTrace = payload.data.find((item) => extractTracePrefix(item));
+            if (firstWithTrace) {
+              sourcePrefix = extractTracePrefix(firstWithTrace);
+              replaySourceRef.current = sourcePrefix ?? null;
+            }
+          }
+
+          const filtered = sourcePrefix
+            ? payload.data.filter((item) => extractTracePrefix(item) === sourcePrefix)
+            : payload.data;
+
+          const hasForeign =
+            sourcePrefix &&
+            payload.data.some((item) => {
+              const prefix = extractTracePrefix(item);
+              return prefix !== null && prefix !== sourcePrefix;
+            });
+
+          if (filtered.length > 0) {
+            const nextItems = [...filtered].reverse();
+            setItems((prev) => {
+              const next = [...nextItems, ...prev];
+              return next.slice(0, MAX_ITEMS);
+            });
+            setLastUpdate(Date.now());
+            const last = filtered.at(-1);
+            if (last) {
+              setReplayTime(last.ts);
+              if (replayEnd !== null && last.ts >= replayEnd) {
+                cursorRef.current = { ts: last.ts, seq: last.seq };
+                replayCompleteRef.current = true;
+                setReplayComplete(true);
+                setStatus("disconnected");
+                return;
+              }
+            }
+            emptyPollsRef.current = 0;
+          } else if (sourcePrefix) {
+            emptyPollsRef.current += 1;
+          }
+
+          if (payload.next) {
+            cursorRef.current = payload.next;
+          }
+
+          setStatus("connected");
+          keepPolling = filtered.length === batchSize;
+
+          if (keepPolling) {
+            await new Promise((resolve) => setTimeout(resolve, 0));
+          }
+
+          if (hasForeign) {
+            replayCompleteRef.current = true;
+            setReplayComplete(true);
+            setStatus("disconnected");
+            return;
+          }
+
+          if (sourcePrefix && emptyPollsRef.current >= 3) {
+            replayCompleteRef.current = true;
+            setReplayComplete(true);
+            setStatus("disconnected");
+            return;
+          }
         }
-
-        const payload = (await response.json()) as ReplayResponse<T>;
-        if (payload.data.length > 0) {
-          const nextItems = [...payload.data].reverse();
-          setItems((prev) => {
-            const next = [...nextItems, ...prev];
-            return next.slice(0, MAX_ITEMS);
-          });
-          setLastUpdate(Date.now());
-        }
-
-        if (payload.next) {
-          cursorRef.current = payload.next;
-        }
-
-        setStatus("connected");
       } catch (error) {
         console.warn("Replay poll failed", error);
         setStatus("disconnected");
@@ -310,13 +445,24 @@ const useTape = <T extends { ts: number; seq: number }>(
     };
   }, [mode, replayPath, batchSize, pollMs]);
 
-  return { status, items, lastUpdate, paused, dropped, togglePause };
+  return {
+    status,
+    items,
+    lastUpdate,
+    replayTime,
+    replayComplete,
+    paused,
+    dropped,
+    togglePause
+  };
 };
 
 const useFlowStream = (enabled: boolean): TapeState<FlowPacket> => {
   const [status, setStatus] = useState<WsStatus>(enabled ? "connecting" : "disconnected");
   const [items, setItems] = useState<FlowPacket[]>([]);
   const [lastUpdate, setLastUpdate] = useState<number | null>(null);
+  const [replayTime] = useState<number | null>(null);
+  const [replayComplete] = useState<boolean>(false);
   const [paused, setPaused] = useState<boolean>(false);
   const [dropped, setDropped] = useState<number>(0);
   const reconnectRef = useRef<number | null>(null);
@@ -423,26 +569,47 @@ const useFlowStream = (enabled: boolean): TapeState<FlowPacket> => {
     };
   }, [enabled]);
 
-  return { status, items, lastUpdate, paused, dropped, togglePause };
+  return {
+    status,
+    items,
+    lastUpdate,
+    replayTime,
+    replayComplete,
+    paused,
+    dropped,
+    togglePause
+  };
 };
 
 type TapeStatusProps = {
   status: WsStatus;
   lastUpdate: number | null;
+  replayTime: number | null;
+  replayComplete: boolean;
   paused: boolean;
   dropped: number;
   mode: TapeMode;
   onTogglePause: () => void;
 };
 
-const TapeStatus = ({ status, lastUpdate, paused, dropped, mode, onTogglePause }: TapeStatusProps) => {
+const TapeStatus = ({
+  status,
+  lastUpdate,
+  replayTime,
+  replayComplete,
+  paused,
+  dropped,
+  mode,
+  onTogglePause
+}: TapeStatusProps) => {
   const replayClass = mode === "replay" ? "status-replay" : "";
   const pausedClass = paused ? "status-paused" : "";
+  const label = replayComplete ? "Replay Complete" : statusLabel(status, paused, mode);
 
   return (
     <div className={`status status-${status} status-compact ${replayClass} ${pausedClass}`.trim()}>
       <span className="status-dot" />
-      <span>{statusLabel(status, paused, mode)}</span>
+      <span>{label}</span>
       {lastUpdate ? (
         <span className="timestamp">Updated {formatTime(lastUpdate)}</span>
       ) : (
@@ -450,6 +617,11 @@ const TapeStatus = ({ status, lastUpdate, paused, dropped, mode, onTogglePause }
       )}
       {paused && dropped > 0 ? (
         <span className="timestamp">{dropped} new while paused</span>
+      ) : null}
+      {mode === "replay" ? (
+        <span className="timestamp">
+          Replay time {replayTime ? formatTime(replayTime) : "—"}
+        </span>
       ) : null}
       <button className="pause-button" type="button" onClick={onTogglePause}>
         {paused ? "Resume" : "Pause"}
@@ -473,14 +645,20 @@ export default function HomePage() {
     mode,
     wsPath: "/ws/options",
     replayPath: "/replay/options",
-    expectedType: "option-print"
+    latestPath: "/prints/options",
+    expectedType: "option-print",
+    batchSize: mode === "replay" ? 120 : undefined,
+    pollMs: mode === "replay" ? 200 : undefined
   });
 
   const equities = useTape<EquityPrint>({
     mode,
     wsPath: "/ws/equities",
     replayPath: "/replay/equities",
-    expectedType: "equity-print"
+    latestPath: "/prints/equities",
+    expectedType: "equity-print",
+    batchSize: mode === "replay" ? 120 : undefined,
+    pollMs: mode === "replay" ? 200 : undefined
   });
 
   const flow = useFlowStream(mode === "live");
@@ -526,6 +704,8 @@ export default function HomePage() {
             <TapeStatus
               status={options.status}
               lastUpdate={options.lastUpdate}
+              replayTime={options.replayTime}
+              replayComplete={options.replayComplete}
               paused={options.paused}
               dropped={options.dropped}
               mode={mode}
@@ -570,6 +750,8 @@ export default function HomePage() {
             <TapeStatus
               status={equities.status}
               lastUpdate={equities.lastUpdate}
+              replayTime={equities.replayTime}
+              replayComplete={equities.replayComplete}
               paused={equities.paused}
               dropped={equities.dropped}
               mode={mode}
@@ -616,6 +798,8 @@ export default function HomePage() {
             <TapeStatus
               status={flow.status}
               lastUpdate={flow.lastUpdate}
+              replayTime={flow.replayTime}
+              replayComplete={flow.replayComplete}
               paused={flow.paused}
               dropped={flow.dropped}
               mode={mode}

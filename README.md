@@ -17,7 +17,7 @@ Done now (in repo):
 - UI: live tapes for options/equities/flow + replay toggle + pause controls
 
 In progress / blocked:
-- Real data adapters (requires licensed data source)
+- Live data adapters (requires licensed data source)
 - Rolling stats and advanced clustering
 
 Not started:
@@ -36,12 +36,13 @@ Not started:
 ## Current Capabilities
 
 - Synthetic options/equity prints with deterministic sequencing
-- Ingest adapter seam (env-selected, default `synthetic`) for options and equities
+- Ingest adapter seam (env-selected; options default `alpaca`, equities default `synthetic`)
 - Raw event persistence in ClickHouse + streaming via NATS JetStream
 - Deterministic option FlowPacket clustering (time-window)
 - API gateway with REST, WS, and replay endpoints
 - UI tapes for options/equities/flow packets with live/replay toggle and pause controls
 - Alpaca options adapter (dev-only) with bounded contract selection
+- Databento historical replay adapter (options, Python sidecar)
 
 ## Planned Capabilities (from PLAN.md)
 
@@ -112,6 +113,15 @@ Alpaca selection policy (dev-only, deterministic):
 - Pick nearest weekly and nearest monthly expiries within 30 DTE (fallback to earliest expiries if missing)
 - For each expiry, select 8 strikes per side closest to ATM within ±6% (fallback to ±10% if needed)
 - Subscriptions are built once at startup to keep the stream bounded and repeatable
+
+Databento historical replay adapter (options, via Python `databento`):
+- Install Python deps: `python3 -m pip install -r services/ingest-options/py/requirements.txt`
+- Set `INGEST_ADAPTER=databento` and configure:
+  - `DATABENTO_API_KEY`, `DATABENTO_START` (ISO date/time)
+  - Optional: `DATABENTO_END`, `DATABENTO_DATASET` (default `OPRA.PILLAR`), `DATABENTO_SCHEMA` (default `trades`)
+  - Optional: `DATABENTO_SYMBOLS` (`ALL` or comma list), `DATABENTO_STYPE_IN`/`DATABENTO_STYPE_OUT` (default `raw_symbol`)
+  - Optional: `DATABENTO_LIMIT` (record cap), `DATABENTO_PRICE_SCALE` (divide raw price), `DATABENTO_PYTHON_BIN`
+- This adapter replays historical data only; live capture will be added later.
 
 Run tests:
 - `bun test`

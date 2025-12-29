@@ -14,6 +14,7 @@ import {
 } from "@islandflow/storage";
 import { OptionPrintSchema, type OptionPrint } from "@islandflow/types";
 import { createAlpacaOptionsAdapter } from "./adapters/alpaca";
+import { createDatabentoOptionsAdapter } from "./adapters/databento";
 import { createIbkrOptionsAdapter } from "./adapters/ibkr";
 import { createSyntheticOptionsAdapter } from "./adapters/synthetic";
 import type { OptionIngestAdapter, StopHandler } from "./adapters/types";
@@ -38,6 +39,17 @@ const envSchema = z.object({
   ALPACA_MONEYNESS_PCT: z.coerce.number().positive().default(0.06),
   ALPACA_MONEYNESS_FALLBACK_PCT: z.coerce.number().positive().default(0.1),
   ALPACA_MAX_QUOTES: z.coerce.number().int().positive().default(200),
+  DATABENTO_API_KEY: z.string().default(""),
+  DATABENTO_DATASET: z.string().default("OPRA.PILLAR"),
+  DATABENTO_SCHEMA: z.string().default("trades"),
+  DATABENTO_START: z.string().default(""),
+  DATABENTO_END: z.string().default(""),
+  DATABENTO_SYMBOLS: z.string().default("ALL"),
+  DATABENTO_STYPE_IN: z.string().default("raw_symbol"),
+  DATABENTO_STYPE_OUT: z.string().default("raw_symbol"),
+  DATABENTO_LIMIT: z.coerce.number().int().nonnegative().default(0),
+  DATABENTO_PRICE_SCALE: z.coerce.number().positive().default(1),
+  DATABENTO_PYTHON_BIN: z.string().default("python3"),
   IBKR_HOST: z.string().default("127.0.0.1"),
   IBKR_PORT: z.coerce.number().int().positive().default(7497),
   IBKR_CLIENT_ID: z.coerce.number().int().nonnegative().default(0),
@@ -110,6 +122,30 @@ const selectAdapter = (name: string): OptionIngestAdapter => {
       moneynessPct: env.ALPACA_MONEYNESS_PCT,
       moneynessFallbackPct: env.ALPACA_MONEYNESS_FALLBACK_PCT,
       maxQuotes: env.ALPACA_MAX_QUOTES
+    });
+  }
+
+  if (name === "databento") {
+    if (!env.DATABENTO_API_KEY) {
+      throw new Error("DATABENTO_API_KEY is required for the databento adapter.");
+    }
+
+    if (!env.DATABENTO_START) {
+      throw new Error("DATABENTO_START is required for the databento adapter.");
+    }
+
+    return createDatabentoOptionsAdapter({
+      apiKey: env.DATABENTO_API_KEY,
+      dataset: env.DATABENTO_DATASET,
+      schema: env.DATABENTO_SCHEMA,
+      start: env.DATABENTO_START,
+      end: env.DATABENTO_END || undefined,
+      symbols: env.DATABENTO_SYMBOLS,
+      stypeIn: env.DATABENTO_STYPE_IN,
+      stypeOut: env.DATABENTO_STYPE_OUT,
+      limit: env.DATABENTO_LIMIT,
+      priceScale: env.DATABENTO_PRICE_SCALE,
+      pythonBin: env.DATABENTO_PYTHON_BIN
     });
   }
 
