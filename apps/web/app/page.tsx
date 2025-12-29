@@ -163,6 +163,11 @@ const formatTime = (ts: number): string => {
 
 const formatConfidence = (value: number): string => `${Math.round(value * 100)}%`;
 
+const formatDateTime = (ts: number): string => {
+  const date = new Date(ts);
+  return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
+};
+
 const humanizeClassifierId = (value: string): string => {
   if (!value) {
     return "Classifier";
@@ -180,6 +185,14 @@ const normalizeDirection = (value: string): "bullish" | "bearish" | "neutral" =>
     return normalized;
   }
   return "neutral";
+};
+
+const extractUnderlying = (contractId: string): string => {
+  const match = contractId.match(/^(.+)-\d{4}-\d{2}-\d{2}-/);
+  if (match?.[1]) {
+    return match[1].toUpperCase();
+  }
+  return contractId.split("-")[0]?.toUpperCase() ?? contractId.toUpperCase();
 };
 
 const parseNumber = (value: unknown, fallback: number): number => {
@@ -809,6 +822,167 @@ const TapeControls = ({ isAtTop, missed, onJump }: TapeControlsProps) => {
   );
 };
 
+type AlertSeverityStripProps = {
+  alerts: AlertEvent[];
+};
+
+const AlertSeverityStrip = ({ alerts }: AlertSeverityStripProps) => {
+  const windowMs = 30 * 60 * 1000;
+  const now = Date.now();
+  const counts = alerts.reduce(
+    (acc, alert) => {
+      if (now - alert.source_ts > windowMs) {
+        return acc;
+      }
+      if (alert.severity === "high") {
+        acc.high += 1;
+      } else if (alert.severity === "medium") {
+        acc.medium += 1;
+      } else {
+        acc.low += 1;
+      }
+      return acc;
+    },
+    { high: 0, medium: 0, low: 0 }
+  );
+
+  const total = counts.high + counts.medium + counts.low;
+  const highPct = total > 0 ? (counts.high / total) * 100 : 0;
+  const mediumPct = total > 0 ? (counts.medium / total) * 100 : 0;
+  const lowPct = total > 0 ? (counts.low / total) * 100 : 0;
+
+  return (
+    <div className="severity-strip">
+      <div className="severity-strip-header">
+        <span>Last 30m</span>
+        <span>{total} alerts</span>
+      </div>
+      <div className="severity-strip-bar">
+        <div className="severity-segment severity-high" style={{ width: `${highPct}%` }}>
+          {counts.high > 0 ? counts.high : ""}
+        </div>
+        <div className="severity-segment severity-medium" style={{ width: `${mediumPct}%` }}>
+          {counts.medium > 0 ? counts.medium : ""}
+        </div>
+        <div className="severity-segment severity-low" style={{ width: `${lowPct}%` }}>
+          {counts.low > 0 ? counts.low : ""}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+type EvidenceItem =
+  | { kind: "flow"; id: string; packet: FlowPacket }
+  | { kind: "print"; id: string; print: OptionPrint }
+  | { kind: "unknown"; id: string };
+
+type AlertDrawerProps = {
+  alert: AlertEvent;
+  flowPacket: FlowPacket | null;
+  evidence: EvidenceItem[];
+  onClose: () => void;
+};
+
+const AlertDrawer = ({ alert, flowPacket, evidence, onClose }: AlertDrawerProps) => {
+  const primary = alert.hits[0];
+  const direction = primary ? normalizeDirection(primary.direction) : "neutral";
+  const evidencePrints = evidence.filter((item) => item.kind === "print");
+  const unknownCount = evidence.filter((item) => item.kind === "unknown").length;
+
+  return (
+    <aside className="drawer">
+      <div className="drawer-header">
+        <div>
+          <p className="drawer-eyebrow">Alert details</p>
+          <h3>{primary ? humanizeClassifierId(primary.classifier_id) : "Alert"}</h3>
+          <p className="drawer-subtitle">{formatDateTime(alert.source_ts)}</p>
+        </div>
+        <button className="drawer-close" type="button" onClick={onClose}>
+          Close
+        </button>
+      </div>
+
+      <div className="drawer-meta">
+        <span className={`pill severity-${alert.severity}`}>{alert.severity}</span>
+        <span className="drawer-chip">Score {Math.round(alert.score)}</span>
+        {primary ? <span className={`pill direction-${direction}`}>{direction}</span> : null}
+      </div>
+
+      <div className="drawer-section">
+        <h4>Classifier hits</h4>
+        {alert.hits.length === 0 ? (
+          <p className="drawer-empty">No classifier hits captured.</p>
+        ) : (
+          <div className="drawer-list">
+            {alert.hits.map((hit, index) => (
+              <div className="drawer-row" key={`${alert.trace_id}-${hit.classifier_id}-${index}`}>
+                <div className="drawer-row-title">{humanizeClassifierId(hit.classifier_id)}</div>
+                <div className="drawer-row-meta">
+                  <span className={`pill direction-${normalizeDirection(hit.direction)}`}>
+                    {normalizeDirection(hit.direction)}
+                  </span>
+                  <span>Confidence {formatConfidence(hit.confidence)}</span>
+                </div>
+                {hit.explanations?.[0] ? (
+                  <p className="drawer-note">{hit.explanations[0]}</p>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="drawer-section">
+        <h4>Flow packet</h4>
+        {flowPacket ? (
+          <div className="drawer-row">
+            <div className="drawer-row-title">
+              {String(flowPacket.features.option_contract_id ?? flowPacket.id ?? "Flow packet")}
+            </div>
+            <div className="drawer-row-meta">
+              <span>{formatFlowMetric(parseNumber(flowPacket.features.count, flowPacket.members.length))} prints</span>
+              <span>{formatFlowMetric(parseNumber(flowPacket.features.total_size, 0))} size</span>
+              <span>${formatPrice(parseNumber(flowPacket.features.total_premium, 0))}</span>
+            </div>
+            <p className="drawer-note">
+              Window {formatFlowMetric(parseNumber(flowPacket.features.window_ms, 0), "ms")} ·{" "}
+              {formatTime(parseNumber(flowPacket.features.start_ts, flowPacket.source_ts))} →{" "}
+              {formatTime(parseNumber(flowPacket.features.end_ts, flowPacket.source_ts))}
+            </p>
+          </div>
+        ) : (
+          <p className="drawer-empty">Flow packet not in the current live cache.</p>
+        )}
+      </div>
+
+      <div className="drawer-section">
+        <h4>Evidence prints</h4>
+        {evidencePrints.length === 0 ? (
+          <p className="drawer-empty">No evidence prints in the live cache yet.</p>
+        ) : (
+          <div className="drawer-list">
+            {evidencePrints.slice(0, 6).map((item) => (
+              <div className="drawer-row" key={item.id}>
+                <div className="drawer-row-title">{item.print.option_contract_id}</div>
+                <div className="drawer-row-meta">
+                  <span>${formatPrice(item.print.price)}</span>
+                  <span>{formatSize(item.print.size)}x</span>
+                  <span>{item.print.exchange}</span>
+                </div>
+                <p className="drawer-note">{formatTime(item.print.ts)}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        {unknownCount > 0 ? (
+          <p className="drawer-empty">+{unknownCount} evidence prints not in cache.</p>
+        ) : null}
+      </div>
+    </aside>
+  );
+};
+
 const formatFlowMetric = (value: number, suffix?: string): string => {
   if (suffix) {
     return `${value}${suffix}`;
@@ -819,6 +993,8 @@ const formatFlowMetric = (value: number, suffix?: string): string => {
 
 export default function HomePage() {
   const [mode, setMode] = useState<TapeMode>("live");
+  const [selectedAlert, setSelectedAlert] = useState<AlertEvent | null>(null);
+  const [filterInput, setFilterInput] = useState<string>("");
   const optionsScroll = useListScroll();
   const equitiesScroll = useListScroll();
   const flowScroll = useListScroll();
@@ -860,6 +1036,165 @@ export default function HomePage() {
     "classifier-hit",
     classifierScroll.onNewItems
   );
+
+  const activeTickers = useMemo(() => {
+    const parts = filterInput
+      .split(/[,\s]+/)
+      .map((value) => value.trim().toUpperCase())
+      .filter(Boolean);
+    return Array.from(new Set(parts));
+  }, [filterInput]);
+
+  const tickerSet = useMemo(() => new Set(activeTickers), [activeTickers]);
+
+  const optionPrintMap = useMemo(() => {
+    const map = new Map<string, OptionPrint>();
+    for (const print of options.items) {
+      if (print.trace_id) {
+        map.set(print.trace_id, print);
+      }
+    }
+    return map;
+  }, [options.items]);
+
+  const flowPacketMap = useMemo(() => {
+    const map = new Map<string, FlowPacket>();
+    for (const packet of flow.items) {
+      map.set(packet.id, packet);
+    }
+    return map;
+  }, [flow.items]);
+
+  const selectedEvidence = useMemo((): EvidenceItem[] => {
+    if (!selectedAlert) {
+      return [];
+    }
+
+    return selectedAlert.evidence_refs.map((id) => {
+      const packet = flowPacketMap.get(id);
+      if (packet) {
+        return { kind: "flow", id, packet };
+      }
+      const print = optionPrintMap.get(id);
+      if (print) {
+        return { kind: "print", id, print };
+      }
+      return { kind: "unknown", id };
+    });
+  }, [selectedAlert, flowPacketMap, optionPrintMap]);
+
+  const selectedFlowPacket = useMemo(() => {
+    if (!selectedAlert) {
+      return null;
+    }
+    const packetId = selectedAlert.evidence_refs[0];
+    return packetId ? flowPacketMap.get(packetId) ?? null : null;
+  }, [selectedAlert, flowPacketMap]);
+
+  useEffect(() => {
+    if (mode !== "live") {
+      setSelectedAlert(null);
+    }
+  }, [mode]);
+
+  const extractPacketContract = useCallback((packet: FlowPacket): string => {
+    const contract = packet.features.option_contract_id;
+    if (typeof contract === "string") {
+      return contract;
+    }
+    const match = packet.id.match(/^flowpacket:([^:]+):/);
+    return match?.[1] ?? packet.id;
+  }, []);
+
+  const extractUnderlyingFromTrace = useCallback((traceId: string): string | null => {
+    const match = traceId.match(/flowpacket:([^:]+):/);
+    if (!match?.[1]) {
+      return null;
+    }
+    return extractUnderlying(match[1]);
+  }, []);
+
+  const inferAlertUnderlying = useCallback(
+    (alert: AlertEvent): string | null => {
+      const fromTrace = extractUnderlyingFromTrace(alert.trace_id);
+      if (fromTrace) {
+        return fromTrace;
+      }
+
+      const packetId = alert.evidence_refs[0];
+      if (packetId) {
+        const packet = flowPacketMap.get(packetId);
+        if (packet) {
+          return extractUnderlying(extractPacketContract(packet));
+        }
+      }
+
+      for (const ref of alert.evidence_refs) {
+        const print = optionPrintMap.get(ref);
+        if (print) {
+          return extractUnderlying(print.option_contract_id);
+        }
+      }
+
+      return null;
+    },
+    [extractPacketContract, extractUnderlyingFromTrace, flowPacketMap, optionPrintMap]
+  );
+
+  const matchesTicker = useCallback(
+    (value: string | null) => {
+      if (tickerSet.size === 0) {
+        return true;
+      }
+      if (!value) {
+        return false;
+      }
+      return tickerSet.has(value.toUpperCase());
+    },
+    [tickerSet]
+  );
+
+  const filteredOptions = useMemo(() => {
+    if (tickerSet.size === 0) {
+      return options.items;
+    }
+    return options.items.filter((print) =>
+      matchesTicker(extractUnderlying(print.option_contract_id))
+    );
+  }, [options.items, matchesTicker, tickerSet]);
+
+  const filteredEquities = useMemo(() => {
+    if (tickerSet.size === 0) {
+      return equities.items;
+    }
+    return equities.items.filter((print) => matchesTicker(print.underlying_id));
+  }, [equities.items, matchesTicker, tickerSet]);
+
+  const filteredFlow = useMemo(() => {
+    if (tickerSet.size === 0) {
+      return flow.items;
+    }
+    return flow.items.filter((packet) =>
+      matchesTicker(extractUnderlying(extractPacketContract(packet)))
+    );
+  }, [flow.items, extractPacketContract, matchesTicker, tickerSet]);
+
+  const filteredAlerts = useMemo(() => {
+    if (tickerSet.size === 0) {
+      return alerts.items;
+    }
+    return alerts.items.filter((alert) => matchesTicker(inferAlertUnderlying(alert)));
+  }, [alerts.items, inferAlertUnderlying, matchesTicker, tickerSet]);
+
+  const filteredClassifierHits = useMemo(() => {
+    if (tickerSet.size === 0) {
+      return classifierHits.items;
+    }
+    return classifierHits.items.filter((hit) => {
+      const underlying = extractUnderlyingFromTrace(hit.trace_id);
+      return matchesTicker(underlying);
+    });
+  }, [classifierHits.items, extractUnderlyingFromTrace, matchesTicker, tickerSet]);
 
   const lastSeen = useMemo(() => {
     return [
@@ -904,6 +1239,31 @@ export default function HomePage() {
         </div>
       </header>
 
+      <div className="filter-bar">
+        <div>
+          <p className="filter-label">Ticker filter</p>
+          <p className="filter-help">
+            {activeTickers.length > 0 ? `Filtering ${activeTickers.join(", ")}` : "All tickers"}
+          </p>
+        </div>
+        <div className="filter-controls">
+          <input
+            className="filter-input"
+            value={filterInput}
+            onChange={(event) => setFilterInput(event.target.value)}
+            placeholder="SPY, NVDA, AAPL"
+          />
+          <button
+            className="filter-clear"
+            type="button"
+            onClick={() => setFilterInput("")}
+            disabled={filterInput.trim().length === 0}
+          >
+            Clear
+          </button>
+        </div>
+      </div>
+
       <div className="cards">
         <section className="card card-options">
           <div className="card-header">
@@ -931,14 +1291,16 @@ export default function HomePage() {
           </div>
 
           <div className="list" ref={optionsScroll.listRef}>
-            {options.items.length === 0 ? (
+            {filteredOptions.length === 0 ? (
               <div className="empty">
-                {mode === "live"
-                  ? "No option prints yet. Start ingest-options."
-                  : "Replay queue empty. Ensure ClickHouse has data."}
+                {tickerSet.size > 0
+                  ? "No option prints match the current filter."
+                  : mode === "live"
+                    ? "No option prints yet. Start ingest-options."
+                    : "Replay queue empty. Ensure ClickHouse has data."}
               </div>
             ) : (
-              options.items.map((print) => (
+              filteredOptions.map((print) => (
                 <div className="row" key={`${print.trace_id}-${print.seq}`}>
                   <div>
                     <div className="contract">{print.option_contract_id}</div>
@@ -984,14 +1346,16 @@ export default function HomePage() {
           </div>
 
           <div className="list" ref={equitiesScroll.listRef}>
-            {equities.items.length === 0 ? (
+            {filteredEquities.length === 0 ? (
               <div className="empty">
-                {mode === "live"
-                  ? "No equity prints yet. Start ingest-equities."
-                  : "Replay queue empty. Ensure ClickHouse has data."}
+                {tickerSet.size > 0
+                  ? "No equity prints match the current filter."
+                  : mode === "live"
+                    ? "No equity prints yet. Start ingest-equities."
+                    : "Replay queue empty. Ensure ClickHouse has data."}
               </div>
             ) : (
-              equities.items.map((print) => (
+              filteredEquities.map((print) => (
                 <div className="row" key={`${print.trace_id}-${print.seq}`}>
                   <div>
                     <div className="contract">{print.underlying_id}</div>
@@ -1041,10 +1405,14 @@ export default function HomePage() {
           <div className="list" ref={flowScroll.listRef}>
             {mode !== "live" ? (
               <div className="empty">Flow packets are live-only in this build.</div>
-            ) : flow.items.length === 0 ? (
-              <div className="empty">No flow packets yet. Start compute.</div>
+            ) : filteredFlow.length === 0 ? (
+              <div className="empty">
+                {tickerSet.size > 0
+                  ? "No flow packets match the current filter."
+                  : "No flow packets yet. Start compute."}
+              </div>
             ) : (
-              flow.items.map((packet) => {
+              filteredFlow.map((packet) => {
                 const features = packet.features ?? {};
                 const contract = String(features.option_contract_id ?? packet.id ?? "unknown");
                 const count = parseNumber(features.count, packet.members.length);
@@ -1102,18 +1470,29 @@ export default function HomePage() {
             />
           </div>
 
+          <AlertSeverityStrip alerts={filteredAlerts} />
+
           <div className="list" ref={alertsScroll.listRef}>
             {mode !== "live" ? (
               <div className="empty">Alerts are live-only in this build.</div>
-            ) : alerts.items.length === 0 ? (
-              <div className="empty">No alerts yet. Start compute.</div>
+            ) : filteredAlerts.length === 0 ? (
+              <div className="empty">
+                {tickerSet.size > 0
+                  ? "No alerts match the current filter."
+                  : "No alerts yet. Start compute."}
+              </div>
             ) : (
-              alerts.items.map((alert) => {
+              filteredAlerts.map((alert) => {
                 const primary = alert.hits[0];
                 const direction = primary ? normalizeDirection(primary.direction) : "neutral";
 
                 return (
-                  <div className="row" key={`${alert.trace_id}-${alert.seq}`}>
+                  <button
+                    className="row row-button"
+                    key={`${alert.trace_id}-${alert.seq}`}
+                    type="button"
+                    onClick={() => setSelectedAlert(alert)}
+                  >
                     <div>
                       <div className="contract">
                         {primary ? humanizeClassifierId(primary.classifier_id) : "Alert"}
@@ -1131,7 +1510,7 @@ export default function HomePage() {
                       ) : null}
                     </div>
                     <div className="time">{formatTime(alert.source_ts)}</div>
-                  </div>
+                  </button>
                 );
               })
             )}
@@ -1166,10 +1545,14 @@ export default function HomePage() {
           <div className="list" ref={classifierScroll.listRef}>
             {mode !== "live" ? (
               <div className="empty">Classifier hits are live-only in this build.</div>
-            ) : classifierHits.items.length === 0 ? (
-              <div className="empty">No classifier hits yet. Start compute.</div>
+            ) : filteredClassifierHits.length === 0 ? (
+              <div className="empty">
+                {tickerSet.size > 0
+                  ? "No classifier hits match the current filter."
+                  : "No classifier hits yet. Start compute."}
+              </div>
             ) : (
-              classifierHits.items.map((hit) => {
+              filteredClassifierHits.map((hit) => {
                 const direction = normalizeDirection(hit.direction);
                 return (
                   <div className="row" key={`${hit.trace_id}-${hit.seq}`}>
@@ -1191,6 +1574,15 @@ export default function HomePage() {
           </div>
         </section>
       </div>
+
+      {selectedAlert ? (
+        <AlertDrawer
+          alert={selectedAlert}
+          flowPacket={selectedFlowPacket}
+          evidence={selectedEvidence}
+          onClose={() => setSelectedAlert(null)}
+        />
+      ) : null}
     </main>
   );
 }
