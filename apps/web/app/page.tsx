@@ -1202,7 +1202,15 @@ const AlertDrawer = ({ alert, flowPacket, evidence, onClose }: AlertDrawerProps)
             <div className="drawer-row-meta">
               <span>{formatFlowMetric(parseNumber(flowPacket.features.count, flowPacket.members.length))} prints</span>
               <span>{formatFlowMetric(parseNumber(flowPacket.features.total_size, 0))} size</span>
-              <span>${formatPrice(parseNumber(flowPacket.features.total_premium, 0))}</span>
+              <span>
+                Notional $
+                {formatUsd(
+                  parseNumber(
+                    flowPacket.features.total_notional,
+                    parseNumber(flowPacket.features.total_premium, 0) * 100
+                  )
+                )}
+              </span>
             </div>
             <p className="drawer-note">
               Window {formatFlowMetric(parseNumber(flowPacket.features.window_ms, 0), "ms")} ·{" "}
@@ -1781,11 +1789,10 @@ export default function HomePage() {
                   const contract = String(features.option_contract_id ?? packet.id ?? "unknown");
                   const count = parseNumber(features.count, packet.members.length);
                   const totalSize = parseNumber(features.total_size, 0);
-                  const totalPremium = parseNumber(features.total_premium, 0);
                   const totalNotional = parseNumber(features.total_notional, Number.NaN);
                   const notional = Number.isFinite(totalNotional)
                     ? totalNotional
-                    : totalPremium * 100;
+                    : parseNumber(features.total_premium, 0) * 100;
                   const startTs = parseNumber(features.start_ts, packet.source_ts);
                   const endTs = parseNumber(features.end_ts, startTs);
                   const windowMs = parseNumber(features.window_ms, 0);
@@ -1820,7 +1827,6 @@ export default function HomePage() {
                       <div className="meta flow-meta">
                         <span>{formatFlowMetric(count)} prints</span>
                         <span>{formatFlowMetric(totalSize)} size</span>
-                        <span>Premium ${formatPrice(totalPremium)}</span>
                         <span>Notional ${formatUsd(notional)}</span>
                         {windowMs > 0 ? (
                           <span>{formatFlowMetric(windowMs, "ms")}</span>
