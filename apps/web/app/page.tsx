@@ -276,6 +276,7 @@ type ListScrollState = {
   isAtTop: boolean;
   isAtTopRef: React.MutableRefObject<boolean>;
   missed: number;
+  resumeTick: number;
   onNewItems: (count: number) => void;
   jumpToTop: () => void;
 };
@@ -284,7 +285,9 @@ const useListScroll = (): ListScrollState => {
   const listRef = useRef<HTMLDivElement | null>(null);
   const [isAtTop, setIsAtTop] = useState(true);
   const [missed, setMissed] = useState(0);
+  const [resumeTick, setResumeTick] = useState(0);
   const isAtTopRef = useRef(true);
+  const prevAtTopRef = useRef(true);
 
   useEffect(() => {
     isAtTopRef.current = isAtTop;
@@ -298,6 +301,11 @@ const useListScroll = (): ListScrollState => {
 
     const atTop = el.scrollTop <= 2;
 
+    if (atTop && !prevAtTopRef.current) {
+      setResumeTick((prev) => prev + 1);
+    }
+
+    prevAtTopRef.current = atTop;
     isAtTopRef.current = atTop;
     setIsAtTop(atTop);
 
@@ -353,6 +361,7 @@ const useListScroll = (): ListScrollState => {
     isAtTop,
     isAtTopRef,
     missed,
+    resumeTick,
     onNewItems,
     jumpToTop
   };
@@ -793,6 +802,8 @@ const useLiveStream = <T extends SortableItem>(
     expectedType: MessageType;
     onNewItems?: (count: number) => void;
     captureScroll?: () => void;
+    shouldHold?: () => boolean;
+    resumeSignal?: number;
   }
 ): TapeState<T> => {
   const [status, setStatus] = useState<WsStatus>(
@@ -810,6 +821,7 @@ const useLiveStream = <T extends SortableItem>(
   const pendingRef = useRef<T[]>([]);
   const pendingCountRef = useRef(0);
   const flushHandleRef = useRef<number | null>(null);
+  const holdRef = useRef<T[]>([]);
 
   useEffect(() => {
     pausedRef.current = paused;
@@ -842,14 +854,25 @@ const useLiveStream = <T extends SortableItem>(
         config.onNewItems(pendingCount);
       }
 
-      if (config.captureScroll) {
+      const shouldHold = config.shouldHold ? config.shouldHold() : false;
+      if (!shouldHold && config.captureScroll) {
         config.captureScroll();
       }
 
-      setItems((prev) => mergeNewest(buffered, prev));
+      if (shouldHold) {
+        holdRef.current = mergeNewest(buffered, holdRef.current);
+        setLastUpdate(Date.now());
+        return;
+      }
+
+      const nextBatch =
+        holdRef.current.length > 0 ? [...holdRef.current, ...buffered] : buffered;
+      holdRef.current = [];
+
+      setItems((prev) => mergeNewest(nextBatch, prev));
       setLastUpdate(Date.now());
     });
-  }, [config.captureScroll, config.onNewItems]);
+  }, [config.captureScroll, config.onNewItems, config.shouldHold]);
 
   const togglePause = useCallback(() => {
     setPaused((prev) => {
@@ -868,6 +891,7 @@ const useLiveStream = <T extends SortableItem>(
       setLastUpdate(null);
       pendingRef.current = [];
       pendingCountRef.current = 0;
+      holdRef.current = [];
       cancelFlush();
       return;
     }
@@ -951,6 +975,21 @@ const useLiveStream = <T extends SortableItem>(
     };
   }, [config.enabled, config.expectedType, config.wsPath, scheduleFlush, cancelFlush]);
 
+  useEffect(() => {
+    if (config.resumeSignal === undefined) {
+      return;
+    }
+    if (config.shouldHold && config.shouldHold()) {
+      return;
+    }
+    if (holdRef.current.length === 0) {
+      return;
+    }
+    setItems((prev) => mergeNewest(holdRef.current, prev));
+    holdRef.current = [];
+    setLastUpdate(Date.now());
+  }, [config.resumeSignal, config.shouldHold]);
+
   return {
     status,
     items,
@@ -966,14 +1005,18 @@ const useLiveStream = <T extends SortableItem>(
 const useFlowStream = (
   enabled: boolean,
   onNewItems?: (count: number) => void,
-  captureScroll?: () => void
+  captureScroll?: () => void,
+  shouldHold?: () => boolean,
+  resumeSignal?: number
 ): TapeState<FlowPacket> => {
   return useLiveStream<FlowPacket>({
     enabled,
     wsPath: "/ws/flow",
     expectedType: "flow-packet",
     onNewItems,
-    captureScroll
+    captureScroll,
+    shouldHold,
+    resumeSignal
   });
 };
 
@@ -1311,7 +1354,14 @@ export default function HomePage() {
     pollMs: mode === "replay" ? 200 : undefined
   });
 
-  const flow = useFlowStream(mode === "live", flowScroll.onNewItems, flowAnchor.capture);
+  const flowHold = useCallback(() => !flowScroll.isAtTopRef.current, [flowScroll.isAtTopRef]);
+  const flow = useFlowStream(
+    mode === "live",
+    flowScroll.onNewItems,
+    flowAnchor.capture,
+    flowHold,
+    flowScroll.resumeTick
+  );
   const alerts = useLiveStream<AlertEvent>({
     enabled: mode === "live",
     wsPath: "/ws/alerts",
