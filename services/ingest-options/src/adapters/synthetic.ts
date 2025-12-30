@@ -1,4 +1,4 @@
-import { SP500_SYMBOLS, type OptionPrint } from "@islandflow/types";
+import { SP500_SYMBOLS, type OptionNBBO, type OptionPrint } from "@islandflow/types";
 import type { OptionIngestAdapter, OptionIngestHandlers } from "./types";
 
 type SyntheticOptionsAdapterConfig = {
@@ -13,6 +13,8 @@ type Burst = {
   conditions?: string[];
   printCount: number;
   priceStep: number;
+  scenarioId: string;
+  seed: number;
 };
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -20,6 +22,13 @@ const EXPIRY_OFFSETS = [0, 1, 7, 14, 28, 45, 60, 90];
 const EXCHANGES = ["CBOE", "PHLX", "ISE", "ARCA", "BOX", "MIAX"];
 const CONDITIONS = ["SWEEP", "ISO", "FILL", "TEST"];
 const BURST_RUN_RANGE: [number, number] = [2, 4];
+
+type PricePlacement = "AA" | "A" | "B" | "BB";
+
+type WeightedValue<T> = {
+  value: T;
+  weight: number;
+};
 
 type Scenario = {
   id: string;
@@ -75,6 +84,35 @@ const SCENARIOS: Scenario[] = [
   }
 ];
 
+const PRICE_PLACEMENTS: Record<string, WeightedValue<PricePlacement>[]> = {
+  bullish_sweep: [
+    { value: "AA", weight: 25 },
+    { value: "A", weight: 40 },
+    { value: "B", weight: 20 },
+    { value: "BB", weight: 15 }
+  ],
+  bearish_sweep: [
+    { value: "AA", weight: 15 },
+    { value: "A", weight: 20 },
+    { value: "B", weight: 40 },
+    { value: "BB", weight: 25 }
+  ],
+  contract_spike: [
+    { value: "AA", weight: 25 },
+    { value: "A", weight: 25 },
+    { value: "B", weight: 25 },
+    { value: "BB", weight: 25 }
+  ],
+  noise: [
+    { value: "AA", weight: 25 },
+    { value: "A", weight: 25 },
+    { value: "B", weight: 25 },
+    { value: "BB", weight: 25 }
+  ]
+};
+
+const PLACEMENT_PATTERN: PricePlacement[] = ["A", "AA", "B", "BB"];
+
 const pick = <T,>(items: T[], seed: number): T => {
   return items[Math.abs(seed) % items.length];
 };
@@ -107,6 +145,19 @@ const pickWeighted = <T extends { weight: number }>(items: T[], seed: number): T
   return items[0];
 };
 
+const pickWeightedValue = <T>(items: WeightedValue<T>[], seed: number): T => {
+  return pickWeighted(items, seed).value;
+};
+
+const pickPlacement = (burst: Burst, index: number): PricePlacement => {
+  const placementOptions = PRICE_PLACEMENTS[burst.scenarioId] ?? PRICE_PLACEMENTS.noise;
+  const offset = Math.abs(burst.seed) % PLACEMENT_PATTERN.length;
+  if (index < PLACEMENT_PATTERN.length) {
+    return PLACEMENT_PATTERN[(offset + index) % PLACEMENT_PATTERN.length];
+  }
+  return pickWeightedValue(placementOptions, burst.seed + index * 11);
+};
+
 const hashSymbol = (value: string): number => {
   let hash = 0;
   for (let i = 0; i < value.length; i += 1) {
@@ -128,7 +179,8 @@ const formatExpiry = (now: number, offsetDays: number): string => {
 const buildBurst = (burstIndex: number, now: number): Burst => {
   const symbol = SP500_SYMBOLS[burstIndex % SP500_SYMBOLS.length];
   const symbolHash = hashSymbol(symbol);
-  const scenario = pickWeighted(SCENARIOS, symbolHash + burstIndex * 7);
+  const seed = symbolHash + burstIndex * 7;
+  const scenario = pickWeighted(SCENARIOS, seed);
   const baseUnderlying = 30 + (symbolHash % 470);
   const expiryOffset = pick(EXPIRY_OFFSETS, symbolHash + burstIndex);
   const expiry = formatExpiry(now, expiryOffset);
@@ -166,7 +218,9 @@ const buildBurst = (burstIndex: number, now: number): Burst => {
     exchange,
     conditions,
     printCount,
-    priceStep
+    priceStep,
+    scenarioId: scenario.id,
+    seed
   };
 };
 
@@ -177,6 +231,7 @@ export const createSyntheticOptionsAdapter = (
     name: "synthetic",
     start: (handlers: OptionIngestHandlers) => {
       let seq = 0;
+      let nbboSeq = 0;
       let burstIndex = 0;
       let currentBurst: Burst | null = null;
       let remainingRuns = 0;
@@ -203,6 +258,24 @@ export const createSyntheticOptionsAdapter = (
           const priceJitter = ((i % 3) - 1) * 0.004;
           const sizeJitter = ((i % 3) - 1) * 0.08;
           const priceMultiplier = 1 + burst.priceStep * i + priceJitter;
+          const mid = Math.max(0.05, Number((burst.basePrice * priceMultiplier).toFixed(2)));
+          const spread = Math.max(0.02, Number((mid * 0.02).toFixed(2)));
+          const bid = Math.max(0.01, Number((mid - spread / 2).toFixed(2)));
+          const ask = Math.max(bid + 0.01, Number((mid + spread / 2).toFixed(2)));
+          const tick = Math.max(0.01, Number((spread * 0.25).toFixed(2)));
+          const placement = pickPlacement(burst, i);
+          let tradePrice = mid;
+
+          if (placement === "AA") {
+            tradePrice = ask + tick;
+          } else if (placement === "A") {
+            tradePrice = ask;
+          } else if (placement === "BB") {
+            tradePrice = Math.max(0.01, bid - tick);
+          } else {
+            tradePrice = bid;
+          }
+
           const print: OptionPrint = {
             source_ts: now + i * 5,
             ingest_ts: now + i * 5,
@@ -210,13 +283,34 @@ export const createSyntheticOptionsAdapter = (
             trace_id: `synthetic-options-${seq}`,
             ts: now + i * 5,
             option_contract_id: burst.contractId,
-            price: Math.max(0.05, Number((burst.basePrice * priceMultiplier).toFixed(2))),
+            price: tradePrice,
             size: Math.max(1, Math.round(burst.baseSize * (1 + sizeJitter))),
             exchange: burst.exchange,
             conditions: burst.conditions
           };
 
           void handlers.onTrade(print);
+
+          if (handlers.onNBBO) {
+            nbboSeq += 1;
+            const sizeBase = Math.max(1, Math.round(burst.baseSize * 0.4));
+            const bidSize = Math.max(1, Math.round(sizeBase * (1 + sizeJitter)));
+            const askSize = Math.max(1, Math.round(sizeBase * (1 - sizeJitter)));
+            const nbbo: OptionNBBO = {
+              source_ts: print.ts,
+              ingest_ts: print.ingest_ts,
+              seq: nbboSeq,
+              trace_id: `synthetic-nbbo-${nbboSeq}`,
+              ts: print.ts,
+              option_contract_id: burst.contractId,
+              bid,
+              ask,
+              bidSize,
+              askSize
+            };
+
+            void handlers.onNBBO(nbbo);
+          }
         }
 
         remainingRuns -= 1;

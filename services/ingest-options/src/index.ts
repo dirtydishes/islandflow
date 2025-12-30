@@ -1,7 +1,9 @@
 import { readEnv } from "@islandflow/config";
 import { createLogger } from "@islandflow/observability";
 import {
+  SUBJECT_OPTION_NBBO,
   SUBJECT_OPTION_PRINTS,
+  STREAM_OPTION_NBBO,
   STREAM_OPTION_PRINTS,
   connectJetStreamWithRetry,
   ensureStream,
@@ -9,10 +11,12 @@ import {
 } from "@islandflow/bus";
 import {
   createClickHouseClient,
+  ensureOptionNBBOTable,
   ensureOptionPrintsTable,
+  insertOptionNBBO,
   insertOptionPrint
 } from "@islandflow/storage";
-import { OptionPrintSchema, type OptionPrint } from "@islandflow/types";
+import { OptionNBBOSchema, OptionPrintSchema, type OptionNBBO, type OptionPrint } from "@islandflow/types";
 import { createAlpacaOptionsAdapter } from "./adapters/alpaca";
 import { createDatabentoOptionsAdapter } from "./adapters/databento";
 import { createIbkrOptionsAdapter } from "./adapters/ibkr";
@@ -237,6 +241,19 @@ const run = async () => {
     num_replicas: 1
   });
 
+  await ensureStream(jsm, {
+    name: STREAM_OPTION_NBBO,
+    subjects: [SUBJECT_OPTION_NBBO],
+    retention: "limits",
+    storage: "file",
+    discard: "old",
+    max_msgs_per_subject: -1,
+    max_msgs: -1,
+    max_bytes: -1,
+    max_age: 0,
+    num_replicas: 1
+  });
+
   const clickhouse = createClickHouseClient({
     url: env.CLICKHOUSE_URL,
     database: env.CLICKHOUSE_DATABASE
@@ -244,11 +261,13 @@ const run = async () => {
 
   await retry("clickhouse table init", 20, 500, async () => {
     await ensureOptionPrintsTable(clickhouse);
+    await ensureOptionNBBOTable(clickhouse);
   });
 
   const adapter = selectAdapter(env.OPTIONS_INGEST_ADAPTER);
   logger.info("ingest adapter selected", { adapter: adapter.name });
   const allowPublish = buildThrottle(env.TESTING_MODE, env.TESTING_THROTTLE_MS);
+  const allowNbboPublish = buildThrottle(env.TESTING_MODE, env.TESTING_THROTTLE_MS);
 
   const stopAdapter: StopHandler = await adapter.start({
     onTrade: async (candidate: OptionPrint) => {
@@ -275,6 +294,28 @@ const run = async () => {
         logger.error("failed to publish option print", {
           error: error instanceof Error ? error.message : String(error),
           trace_id: print.trace_id
+        });
+      }
+    },
+    onNBBO: async (candidate: OptionNBBO) => {
+      if (state.shuttingDown) {
+        return;
+      }
+
+      const now = Date.now();
+      if (!allowNbboPublish(now)) {
+        return;
+      }
+
+      const nbbo = OptionNBBOSchema.parse(candidate);
+
+      try {
+        await insertOptionNBBO(clickhouse, nbbo);
+        await publishJson(js, SUBJECT_OPTION_NBBO, nbbo);
+      } catch (error) {
+        logger.error("failed to publish option nbbo", {
+          error: error instanceof Error ? error.message : String(error),
+          trace_id: nbbo.trace_id
         });
       }
     }

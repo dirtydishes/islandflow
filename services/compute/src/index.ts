@@ -4,10 +4,12 @@ import {
   SUBJECT_ALERTS,
   SUBJECT_CLASSIFIER_HITS,
   SUBJECT_FLOW_PACKETS,
+  SUBJECT_OPTION_NBBO,
   SUBJECT_OPTION_PRINTS,
   STREAM_ALERTS,
   STREAM_CLASSIFIER_HITS,
   STREAM_FLOW_PACKETS,
+  STREAM_OPTION_NBBO,
   STREAM_OPTION_PRINTS,
   buildDurableConsumer,
   connectJetStreamWithRetry,
@@ -28,10 +30,12 @@ import {
   AlertEventSchema,
   ClassifierHitEventSchema,
   FlowPacketSchema,
+  OptionNBBOSchema,
   OptionPrintSchema,
   type AlertEvent,
   type ClassifierHitEvent,
   type FlowPacket,
+  type OptionNBBO,
   type OptionPrint
 } from "@islandflow/types";
 import { z } from "zod";
@@ -60,6 +64,7 @@ const envSchema = z.object({
       return value;
     }, z.boolean())
     .default(false),
+  NBBO_MAX_AGE_MS: z.coerce.number().int().positive().default(1000),
   CLASSIFIER_SWEEP_MIN_PREMIUM: z.coerce.number().positive().default(40_000),
   CLASSIFIER_SWEEP_MIN_COUNT: z.coerce.number().int().positive().default(3),
   CLASSIFIER_SPIKE_MIN_PREMIUM: z.coerce.number().positive().default(20_000),
@@ -117,6 +122,7 @@ type ClusterState = {
 };
 
 const clusters = new Map<string, ClusterState>();
+const nbboCache = new Map<string, OptionNBBO>();
 
 const applyDeliverPolicy = (
   opts: ReturnType<typeof buildDurableConsumer>,
@@ -166,12 +172,43 @@ const updateCluster = (cluster: ClusterState, print: OptionPrint): ClusterState 
   return cluster;
 };
 
+type NbboJoin = {
+  nbbo: OptionNBBO | null;
+  ageMs: number;
+  stale: boolean;
+};
+
+const updateNbboCache = (nbbo: OptionNBBO): void => {
+  const existing = nbboCache.get(nbbo.option_contract_id);
+  if (
+    !existing ||
+    nbbo.ts > existing.ts ||
+    (nbbo.ts === existing.ts && nbbo.seq >= existing.seq)
+  ) {
+    nbboCache.set(nbbo.option_contract_id, nbbo);
+  }
+};
+
+const selectNbbo = (contractId: string, ts: number): NbboJoin => {
+  const nbbo = nbboCache.get(contractId) ?? null;
+  if (!nbbo) {
+    return { nbbo: null, ageMs: env.NBBO_MAX_AGE_MS + 1, stale: true };
+  }
+
+  const ageMs = Math.abs(ts - nbbo.ts);
+  const stale = ageMs > env.NBBO_MAX_AGE_MS;
+  return { nbbo, ageMs, stale };
+};
+
 const flushCluster = async (
   clickhouse: ReturnType<typeof createClickHouseClient>,
   js: Awaited<ReturnType<typeof connectJetStreamWithRetry>>["js"],
   cluster: ClusterState
 ): Promise<void> => {
-  const features = {
+  const joinQuality: Record<string, number> = {};
+  const nbboJoin = selectNbbo(cluster.contractId, cluster.endTs);
+
+  const features: Record<string, string | number | boolean> = {
     option_contract_id: cluster.contractId,
     count: cluster.members.length,
     total_size: cluster.totalSize,
@@ -183,6 +220,23 @@ const flushCluster = async (
     window_ms: env.CLUSTER_WINDOW_MS
   };
 
+  if (!nbboJoin.nbbo) {
+    joinQuality.nbbo_missing = 1;
+  } else {
+    joinQuality.nbbo_age_ms = nbboJoin.ageMs;
+    if (nbboJoin.stale) {
+      joinQuality.nbbo_stale = 1;
+    } else {
+      const mid = (nbboJoin.nbbo.bid + nbboJoin.nbbo.ask) / 2;
+      features.nbbo_bid = nbboJoin.nbbo.bid;
+      features.nbbo_ask = nbboJoin.nbbo.ask;
+      features.nbbo_mid = Number(mid.toFixed(4));
+      features.nbbo_spread = Number((nbboJoin.nbbo.ask - nbboJoin.nbbo.bid).toFixed(4));
+      features.nbbo_bid_size = nbboJoin.nbbo.bidSize;
+      features.nbbo_ask_size = nbboJoin.nbbo.askSize;
+    }
+  }
+
   const packet: FlowPacket = {
     source_ts: cluster.startSourceTs,
     ingest_ts: cluster.endIngestTs,
@@ -191,7 +245,7 @@ const flushCluster = async (
     id: `flowpacket:${cluster.contractId}:${cluster.startTs}:${cluster.endTs}`,
     members: cluster.members,
     features,
-    join_quality: {}
+    join_quality: joinQuality
   };
 
   const validated = FlowPacketSchema.parse(packet);
@@ -324,6 +378,19 @@ const run = async () => {
   });
 
   await ensureStream(jsm, {
+    name: STREAM_OPTION_NBBO,
+    subjects: [SUBJECT_OPTION_NBBO],
+    retention: "limits",
+    storage: "file",
+    discard: "old",
+    max_msgs_per_subject: -1,
+    max_msgs: -1,
+    max_bytes: -1,
+    max_age: 0,
+    num_replicas: 1
+  });
+
+  await ensureStream(jsm, {
     name: STREAM_FLOW_PACKETS,
     subjects: [SUBJECT_FLOW_PACKETS],
     retention: "limits",
@@ -374,6 +441,7 @@ const run = async () => {
   });
 
   const durableName = "compute-option-prints";
+  const nbboDurableName = "compute-option-nbbo";
 
   if (env.COMPUTE_CONSUMER_RESET) {
     try {
@@ -400,6 +468,35 @@ const run = async () => {
       const message = error instanceof Error ? error.message : String(error);
       if (!message.includes("not found")) {
         logger.warn("failed to inspect jetstream consumer", { durable: durableName, error: message });
+      }
+    }
+  }
+
+  if (env.COMPUTE_CONSUMER_RESET) {
+    try {
+      await jsm.consumers.delete(STREAM_OPTION_NBBO, nbboDurableName);
+      logger.warn("reset jetstream consumer", { durable: nbboDurableName });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes("not found")) {
+        logger.warn("failed to reset jetstream consumer", { durable: nbboDurableName, error: message });
+      }
+    }
+  } else {
+    try {
+      const info = await jsm.consumers.info(STREAM_OPTION_NBBO, nbboDurableName);
+      if (info?.config?.deliver_policy && info.config.deliver_policy !== env.COMPUTE_DELIVER_POLICY) {
+        logger.warn("resetting consumer due to deliver policy change", {
+          durable: nbboDurableName,
+          current: info.config.deliver_policy,
+          desired: env.COMPUTE_DELIVER_POLICY
+        });
+        await jsm.consumers.delete(STREAM_OPTION_NBBO, nbboDurableName);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes("not found")) {
+        logger.warn("failed to inspect jetstream consumer", { durable: nbboDurableName, error: message });
       }
     }
   }
@@ -439,6 +536,59 @@ const run = async () => {
       return await subscribeJson(js, SUBJECT_OPTION_PRINTS, resetOpts);
     }
   })();
+
+  const nbboSubscription = await (async () => {
+    const opts = buildDurableConsumer(nbboDurableName);
+    applyDeliverPolicy(opts, env.COMPUTE_DELIVER_POLICY);
+    try {
+      return await subscribeJson(js, SUBJECT_OPTION_NBBO, opts);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const shouldReset =
+        message.includes("duplicate subscription") ||
+        message.includes("durable requires") ||
+        message.includes("subject does not match consumer");
+
+      if (!shouldReset) {
+        throw error;
+      }
+
+      logger.warn("resetting jetstream consumer", { durable: nbboDurableName, error: message });
+
+      try {
+        await jsm.consumers.delete(STREAM_OPTION_NBBO, nbboDurableName);
+      } catch (deleteError) {
+        const deleteMessage = deleteError instanceof Error ? deleteError.message : String(deleteError);
+        if (!deleteMessage.includes("not found")) {
+          logger.warn("failed to delete jetstream consumer", {
+            durable: nbboDurableName,
+            error: deleteMessage
+          });
+        }
+      }
+
+      const resetOpts = buildDurableConsumer(nbboDurableName);
+      applyDeliverPolicy(resetOpts, env.COMPUTE_DELIVER_POLICY);
+      return await subscribeJson(js, SUBJECT_OPTION_NBBO, resetOpts);
+    }
+  })();
+
+  const nbboLoop = async () => {
+    for await (const msg of nbboSubscription.messages) {
+      try {
+        const nbbo = OptionNBBOSchema.parse(nbboSubscription.decode(msg));
+        updateNbboCache(nbbo);
+        msg.ack();
+      } catch (error) {
+        logger.error("failed to process option nbbo", {
+          error: error instanceof Error ? error.message : String(error)
+        });
+        msg.term();
+      }
+    }
+  };
+
+  void nbboLoop();
 
   const shutdown = async (signal: string) => {
     logger.info("service stopping", { signal });

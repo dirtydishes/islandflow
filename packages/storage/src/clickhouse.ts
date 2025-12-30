@@ -4,6 +4,7 @@ import {
   ClassifierHitEventSchema,
   EquityPrintSchema,
   FlowPacketSchema,
+  OptionNBBOSchema,
   OptionPrintSchema
 } from "@islandflow/types";
 import type {
@@ -11,6 +12,7 @@ import type {
   ClassifierHitEvent,
   EquityPrint,
   FlowPacket,
+  OptionNBBO,
   OptionPrint
 } from "@islandflow/types";
 import {
@@ -18,6 +20,7 @@ import {
   optionPrintsTableDDL,
   OPTION_PRINTS_TABLE
 } from "./option-prints";
+import { normalizeOptionNBBO, optionNBBOTableDDL, OPTION_NBBO_TABLE } from "./option-nbbo";
 import {
   equityPrintsTableDDL,
   EQUITY_PRINTS_TABLE,
@@ -69,6 +72,14 @@ export const ensureOptionPrintsTable = async (
   });
 };
 
+export const ensureOptionNBBOTable = async (
+  client: ClickHouseClient
+): Promise<void> => {
+  await client.exec({
+    query: optionNBBOTableDDL()
+  });
+};
+
 export const ensureEquityPrintsTable = async (
   client: ClickHouseClient
 ): Promise<void> => {
@@ -106,6 +117,18 @@ export const insertOptionPrint = async (
   const record = normalizeOptionPrint(print);
   await client.insert({
     table: OPTION_PRINTS_TABLE,
+    values: [record],
+    format: "JSONEachRow"
+  });
+};
+
+export const insertOptionNBBO = async (
+  client: ClickHouseClient,
+  nbbo: OptionNBBO
+): Promise<void> => {
+  const record = normalizeOptionNBBO(nbbo);
+  await client.insert({
+    table: OPTION_NBBO_TABLE,
     values: [record],
     format: "JSONEachRow"
   });
@@ -213,6 +236,24 @@ const normalizeOptionRow = (row: unknown): unknown => {
   return row;
 };
 
+const normalizeOptionNbboRow = (row: unknown): unknown => {
+  if (row && typeof row === "object") {
+    return normalizeNumericFields(row as Record<string, unknown>, [
+      "source_ts",
+      "ingest_ts",
+      "seq",
+      "ts",
+      "bid",
+      "ask",
+      "bidSize",
+      "askSize"
+    ]);
+  }
+
+  return row;
+};
+
+
 const normalizeEquityRow = (row: unknown): unknown => {
   if (row && typeof row === "object") {
     const record = normalizeNumericFields(row as Record<string, unknown>, [
@@ -307,6 +348,20 @@ export const fetchRecentOptionPrints = async (
   return OptionPrintSchema.array().parse(rows.map(normalizeOptionRow));
 };
 
+export const fetchRecentOptionNBBO = async (
+  client: ClickHouseClient,
+  limit: number
+): Promise<OptionNBBO[]> => {
+  const safeLimit = clampLimit(limit);
+  const result = await client.query({
+    query: `SELECT * FROM ${OPTION_NBBO_TABLE} ORDER BY ts DESC, seq DESC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  return OptionNBBOSchema.array().parse(rows.map(normalizeOptionNbboRow));
+};
+
 export const fetchRecentEquityPrints = async (
   client: ClickHouseClient,
   limit: number
@@ -392,6 +447,25 @@ export const fetchOptionPrintsAfter = async (
 
   const rows = await result.json<unknown[]>();
   return OptionPrintSchema.array().parse(rows.map(normalizeOptionRow));
+};
+
+export const fetchOptionNBBOAfter = async (
+  client: ClickHouseClient,
+  afterTs: number,
+  afterSeq: number,
+  limit: number
+): Promise<OptionNBBO[]> => {
+  const safeLimit = clampLimit(limit);
+  const safeAfterTs = clampCursor(afterTs);
+  const safeAfterSeq = clampCursor(afterSeq);
+
+  const result = await client.query({
+    query: `SELECT * FROM ${OPTION_NBBO_TABLE} WHERE (ts, seq) > (${safeAfterTs}, ${safeAfterSeq}) ORDER BY ts ASC, seq ASC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  return OptionNBBOSchema.array().parse(rows.map(normalizeOptionNbboRow));
 };
 
 export const fetchEquityPrintsAfter = async (

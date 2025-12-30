@@ -5,11 +5,13 @@ import {
   SUBJECT_CLASSIFIER_HITS,
   SUBJECT_EQUITY_PRINTS,
   SUBJECT_FLOW_PACKETS,
+  SUBJECT_OPTION_NBBO,
   SUBJECT_OPTION_PRINTS,
   STREAM_ALERTS,
   STREAM_CLASSIFIER_HITS,
   STREAM_EQUITY_PRINTS,
   STREAM_FLOW_PACKETS,
+  STREAM_OPTION_NBBO,
   STREAM_OPTION_PRINTS,
   buildDurableConsumer,
   connectJetStreamWithRetry,
@@ -22,12 +24,15 @@ import {
   ensureClassifierHitsTable,
   ensureEquityPrintsTable,
   ensureFlowPacketsTable,
+  ensureOptionNBBOTable,
   ensureOptionPrintsTable,
   fetchRecentAlerts,
   fetchRecentClassifierHits,
   fetchRecentFlowPackets,
+  fetchRecentOptionNBBO,
   fetchEquityPrintsAfter,
   fetchRecentEquityPrints,
+  fetchOptionNBBOAfter,
   fetchOptionPrintsAfter,
   fetchRecentOptionPrints
 } from "@islandflow/storage";
@@ -36,6 +41,7 @@ import {
   ClassifierHitEventSchema,
   EquityPrintSchema,
   FlowPacketSchema,
+  OptionNBBOSchema,
   OptionPrintSchema
 } from "@islandflow/types";
 import { z } from "zod";
@@ -87,13 +93,14 @@ const replayParamsSchema = z.object({
   limit: z.coerce.number().int().positive().max(1000).default(200)
 });
 
-type Channel = "options" | "equities" | "flow" | "classifier-hits" | "alerts";
+type Channel = "options" | "options-nbbo" | "equities" | "flow" | "classifier-hits" | "alerts";
 
 type WsData = {
   channel: Channel;
 };
 
 const optionSockets = new Set<WebSocket<WsData>>();
+const optionNbboSockets = new Set<WebSocket<WsData>>();
 const equitySockets = new Set<WebSocket<WsData>>();
 const flowSockets = new Set<WebSocket<WsData>>();
 const classifierHitSockets = new Set<WebSocket<WsData>>();
@@ -170,6 +177,19 @@ const run = async () => {
   });
 
   await ensureStream(jsm, {
+    name: STREAM_OPTION_NBBO,
+    subjects: [SUBJECT_OPTION_NBBO],
+    retention: "limits",
+    storage: "file",
+    discard: "old",
+    max_msgs_per_subject: -1,
+    max_msgs: -1,
+    max_bytes: -1,
+    max_age: 0,
+    num_replicas: 1
+  });
+
+  await ensureStream(jsm, {
     name: STREAM_EQUITY_PRINTS,
     subjects: [SUBJECT_EQUITY_PRINTS],
     retention: "limits",
@@ -228,6 +248,7 @@ const run = async () => {
 
   await retry("clickhouse table init", 20, 500, async () => {
     await ensureOptionPrintsTable(clickhouse);
+    await ensureOptionNBBOTable(clickhouse);
     await ensureEquityPrintsTable(clickhouse);
     await ensureFlowPacketsTable(clickhouse);
     await ensureClassifierHitsTable(clickhouse);
@@ -238,6 +259,12 @@ const run = async () => {
     js,
     SUBJECT_OPTION_PRINTS,
     buildDurableConsumer("api-option-prints")
+  );
+
+  const optionNbboSubscription = await subscribeJson(
+    js,
+    SUBJECT_OPTION_NBBO,
+    buildDurableConsumer("api-option-nbbo")
   );
 
   const equitySubscription = await subscribeJson(
@@ -272,6 +299,21 @@ const run = async () => {
         msg.ack();
       } catch (error) {
         logger.error("failed to process option print", {
+          error: error instanceof Error ? error.message : String(error)
+        });
+        msg.term();
+      }
+    }
+  };
+
+  const pumpOptionNbbo = async () => {
+    for await (const msg of optionNbboSubscription.messages) {
+      try {
+        const payload = OptionNBBOSchema.parse(optionNbboSubscription.decode(msg));
+        broadcast(optionNbboSockets, { type: "option-nbbo", payload });
+        msg.ack();
+      } catch (error) {
+        logger.error("failed to process option nbbo", {
           error: error instanceof Error ? error.message : String(error)
         });
         msg.term();
@@ -340,6 +382,7 @@ const run = async () => {
   };
 
   void pumpOptions();
+  void pumpOptionNbbo();
   void pumpEquities();
   void pumpFlow();
   void pumpClassifierHits();
@@ -357,6 +400,12 @@ const run = async () => {
       if (req.method === "GET" && url.pathname === "/prints/options") {
         const limit = parseLimit(url.searchParams.get("limit"));
         const data = await fetchRecentOptionPrints(clickhouse, limit);
+        return jsonResponse({ data });
+      }
+
+      if (req.method === "GET" && url.pathname === "/nbbo/options") {
+        const limit = parseLimit(url.searchParams.get("limit"));
+        const data = await fetchRecentOptionNBBO(clickhouse, limit);
         return jsonResponse({ data });
       }
 
@@ -392,6 +441,14 @@ const run = async () => {
         return jsonResponse({ data, next });
       }
 
+      if (req.method === "GET" && url.pathname === "/replay/nbbo") {
+        const { afterTs, afterSeq, limit } = parseReplayParams(url);
+        const data = await fetchOptionNBBOAfter(clickhouse, afterTs, afterSeq, limit);
+        const last = data.at(-1);
+        const next = last ? { ts: last.ts, seq: last.seq } : null;
+        return jsonResponse({ data, next });
+      }
+
       if (req.method === "GET" && url.pathname === "/replay/equities") {
         const { afterTs, afterSeq, limit } = parseReplayParams(url);
         const data = await fetchEquityPrintsAfter(clickhouse, afterTs, afterSeq, limit);
@@ -402,6 +459,14 @@ const run = async () => {
 
       if (req.method === "GET" && url.pathname === "/ws/options") {
         if (serverRef.upgrade(req, { data: { channel: "options" } })) {
+          return new Response(null, { status: 101 });
+        }
+
+        return jsonResponse({ error: "websocket upgrade failed" }, 400);
+      }
+
+      if (req.method === "GET" && url.pathname === "/ws/options-nbbo") {
+        if (serverRef.upgrade(req, { data: { channel: "options-nbbo" } })) {
           return new Response(null, { status: 101 });
         }
 
@@ -446,6 +511,8 @@ const run = async () => {
       open: (socket) => {
         if (socket.data.channel === "options") {
           optionSockets.add(socket);
+        } else if (socket.data.channel === "options-nbbo") {
+          optionNbboSockets.add(socket);
         } else if (socket.data.channel === "equities") {
           equitySockets.add(socket);
         } else if (socket.data.channel === "flow") {
@@ -461,6 +528,8 @@ const run = async () => {
       close: (socket) => {
         if (socket.data.channel === "options") {
           optionSockets.delete(socket);
+        } else if (socket.data.channel === "options-nbbo") {
+          optionNbboSockets.delete(socket);
         } else if (socket.data.channel === "equities") {
           equitySockets.delete(socket);
         } else if (socket.data.channel === "flow") {

@@ -1,16 +1,32 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { AlertEvent, ClassifierHitEvent, EquityPrint, FlowPacket, OptionPrint } from "@islandflow/types";
+import type {
+  AlertEvent,
+  ClassifierHitEvent,
+  EquityPrint,
+  FlowPacket,
+  OptionNBBO,
+  OptionPrint
+} from "@islandflow/types";
 
 const MAX_ITEMS = 500;
+const NBBO_MAX_AGE_MS = Number(process.env.NEXT_PUBLIC_NBBO_MAX_AGE_MS);
+const NBBO_MAX_AGE_MS_SAFE =
+  Number.isFinite(NBBO_MAX_AGE_MS) && NBBO_MAX_AGE_MS > 0 ? NBBO_MAX_AGE_MS : 1000;
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"]);
 
 type WsStatus = "connecting" | "connected" | "disconnected";
 
 type TapeMode = "live" | "replay";
 
-type MessageType = "option-print" | "equity-print" | "flow-packet" | "classifier-hit" | "alert";
+type MessageType =
+  | "option-print"
+  | "option-nbbo"
+  | "equity-print"
+  | "flow-packet"
+  | "classifier-hit"
+  | "alert";
 
 type StreamMessage<T> = {
   type: MessageType;
@@ -218,6 +234,39 @@ const parseNumber = (value: unknown, fallback: number): number => {
   }
 
   return fallback;
+};
+
+type NbboSide = "AA" | "A" | "B" | "BB";
+
+const classifyNbboSide = (price: number, quote: OptionNBBO | null | undefined): NbboSide | null => {
+  if (!quote || !Number.isFinite(price)) {
+    return null;
+  }
+
+  const bid = quote.bid;
+  const ask = quote.ask;
+  if (!Number.isFinite(bid) || !Number.isFinite(ask) || ask <= 0) {
+    return null;
+  }
+
+  const spread = Math.max(0, ask - bid);
+  const epsilon = Math.max(0.01, spread * 0.05);
+
+  if (price > ask + epsilon) {
+    return "AA";
+  }
+  if (price >= ask - epsilon) {
+    return "A";
+  }
+  if (price < bid - epsilon) {
+    return "BB";
+  }
+  if (price <= bid + epsilon) {
+    return "B";
+  }
+
+  const mid = (bid + ask) / 2;
+  return price >= mid ? "A" : "B";
 };
 
 type ListScrollState = {
@@ -1242,6 +1291,16 @@ export default function HomePage() {
     onNewItems: equitiesScroll.onNewItems
   });
 
+  const nbbo = useTape<OptionNBBO>({
+    mode,
+    wsPath: "/ws/options-nbbo",
+    replayPath: "/replay/nbbo",
+    latestPath: "/nbbo/options",
+    expectedType: "option-nbbo",
+    batchSize: mode === "replay" ? 120 : undefined,
+    pollMs: mode === "replay" ? 200 : undefined
+  });
+
   const flow = useFlowStream(mode === "live", flowScroll.onNewItems, flowAnchor.capture);
   const alerts = useLiveStream<AlertEvent>({
     enabled: mode === "live",
@@ -1287,6 +1346,21 @@ export default function HomePage() {
   }, [filterInput]);
 
   const tickerSet = useMemo(() => new Set(activeTickers), [activeTickers]);
+
+  const nbboMap = useMemo(() => {
+    const map = new Map<string, OptionNBBO>();
+    for (const quote of nbbo.items) {
+      const existing = map.get(quote.option_contract_id);
+      if (
+        !existing ||
+        quote.ts > existing.ts ||
+        (quote.ts === existing.ts && quote.seq >= existing.seq)
+      ) {
+        map.set(quote.option_contract_id, quote);
+      }
+    }
+    return map;
+  }, [nbbo.items]);
 
   const optionPrintMap = useMemo(() => {
     const map = new Map<string, OptionPrint>();
@@ -1541,22 +1615,68 @@ export default function HomePage() {
                     : "Replay queue empty. Ensure ClickHouse has data."}
               </div>
             ) : (
-              filteredOptions.map((print) => (
-                <div className="row" key={`${print.trace_id}-${print.seq}`}>
-                  <div>
-                    <div className="contract">{print.option_contract_id}</div>
-                    <div className="meta">
-                      <span>${formatPrice(print.price)}</span>
-                      <span>{formatSize(print.size)}x</span>
-                      <span>{print.exchange}</span>
-                      {print.conditions?.length ? (
-                        <span>{print.conditions.join(", ")}</span>
-                      ) : null}
+              filteredOptions.map((print) => {
+                const quote = nbboMap.get(print.option_contract_id);
+                const nbboAge = quote ? Math.abs(print.ts - quote.ts) : null;
+                const nbboStale = nbboAge !== null && nbboAge > NBBO_MAX_AGE_MS_SAFE;
+                const nbboMid = quote ? (quote.bid + quote.ask) / 2 : null;
+                const nbboSide = classifyNbboSide(print.price, quote);
+
+                return (
+                  <div className="row" key={`${print.trace_id}-${print.seq}`}>
+                    <div>
+                      <div className="contract">{print.option_contract_id}</div>
+                      <div className="meta">
+                        <span>${formatPrice(print.price)}</span>
+                        <span>{formatSize(print.size)}x</span>
+                        <span>{print.exchange}</span>
+                        {print.conditions?.length ? (
+                          <span>{print.conditions.join(", ")}</span>
+                        ) : null}
+                      </div>
+                      {quote ? (
+                        <div className="meta nbbo-meta">
+                          <span>Bid ${formatPrice(quote.bid)}</span>
+                          <span>Ask ${formatPrice(quote.ask)}</span>
+                          <span>Mid ${formatPrice(nbboMid ?? 0)}</span>
+                          <span>{Math.round(nbboAge ?? 0)}ms</span>
+                          {nbboSide ? (
+                            <span className="nbbo-side" tabIndex={0} aria-label="NBBO side legend">
+                              <span className={`nbbo-tag nbbo-tag-${nbboSide.toLowerCase()}`}>
+                                {nbboSide}
+                              </span>
+                              <span className="nbbo-tooltip" role="tooltip">
+                                <span className="nbbo-tooltip-row">
+                                  <span className="nbbo-tag nbbo-tag-a">A</span>
+                                  <span>Ask</span>
+                                </span>
+                                <span className="nbbo-tooltip-row">
+                                  <span className="nbbo-tag nbbo-tag-aa">AA</span>
+                                  <span>Above Ask</span>
+                                </span>
+                                <span className="nbbo-tooltip-row">
+                                  <span className="nbbo-tag nbbo-tag-b">B</span>
+                                  <span>Bid</span>
+                                </span>
+                                <span className="nbbo-tooltip-row">
+                                  <span className="nbbo-tag nbbo-tag-bb">BB</span>
+                                  <span>Below Bid</span>
+                                </span>
+                              </span>
+                            </span>
+                          ) : null}
+                          {nbboStale ? <span className="pill nbbo-stale">Stale</span> : null}
+                        </div>
+                      ) : (
+                        <div className="meta nbbo-meta">
+                          <span className="pill nbbo-missing">NBBO missing</span>
+                        </div>
+                      )}
                     </div>
+                    <div className="time">{formatTime(print.ts)}</div>
                   </div>
-                  <div className="time">{formatTime(print.ts)}</div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </section>
@@ -1658,27 +1778,52 @@ export default function HomePage() {
                   const features = packet.features ?? {};
                   const contract = String(features.option_contract_id ?? packet.id ?? "unknown");
                   const count = parseNumber(features.count, packet.members.length);
-                  const totalSize = parseNumber(features.total_size, 0);
-                  const totalPremium = parseNumber(features.total_premium, 0);
-                  const notional = totalPremium * 100;
-                  const startTs = parseNumber(features.start_ts, packet.source_ts);
-                  const endTs = parseNumber(features.end_ts, startTs);
-                  const windowMs = parseNumber(features.window_ms, 0);
+                const totalSize = parseNumber(features.total_size, 0);
+                const totalPremium = parseNumber(features.total_premium, 0);
+                const notional = totalPremium * 100;
+                const startTs = parseNumber(features.start_ts, packet.source_ts);
+                const endTs = parseNumber(features.end_ts, startTs);
+                const windowMs = parseNumber(features.window_ms, 0);
+                const nbboBid = parseNumber(features.nbbo_bid, Number.NaN);
+                const nbboAsk = parseNumber(features.nbbo_ask, Number.NaN);
+                const nbboMid = parseNumber(features.nbbo_mid, Number.NaN);
+                const nbboSpread = parseNumber(features.nbbo_spread, Number.NaN);
+                const nbboAge = parseNumber(packet.join_quality.nbbo_age_ms, Number.NaN);
+                const nbboStale = parseNumber(packet.join_quality.nbbo_stale, 0) > 0;
+                const nbboMissing = parseNumber(packet.join_quality.nbbo_missing, 0) > 0;
 
-                  return (
-                    <div className="row" key={packet.id}>
-                      <div>
-                        <div className="contract">{contract}</div>
-                        <div className="meta flow-meta">
-                          <span>{formatFlowMetric(count)} prints</span>
-                          <span>{formatFlowMetric(totalSize)} size</span>
-                          <span>Premium ${formatPrice(totalPremium)}</span>
-                          <span>Notional ${formatUsd(notional)}</span>
-                          {windowMs > 0 ? (
-                            <span>{formatFlowMetric(windowMs, "ms")}</span>
-                          ) : null}
-                        </div>
+                return (
+                  <div className="row" key={packet.id}>
+                    <div>
+                      <div className="contract">{contract}</div>
+                      <div className="meta flow-meta">
+                        <span>{formatFlowMetric(count)} prints</span>
+                        <span>{formatFlowMetric(totalSize)} size</span>
+                        <span>Premium ${formatPrice(totalPremium)}</span>
+                        <span>Notional ${formatUsd(notional)}</span>
+                        {windowMs > 0 ? (
+                          <span>{formatFlowMetric(windowMs, "ms")}</span>
+                        ) : null}
+                        {Number.isFinite(nbboBid) && Number.isFinite(nbboAsk) ? (
+                          <span>
+                            NBBO ${formatPrice(nbboBid)} x ${formatPrice(nbboAsk)}
+                          </span>
+                        ) : null}
+                        {Number.isFinite(nbboMid) ? (
+                          <span>Mid ${formatPrice(nbboMid)}</span>
+                        ) : null}
+                        {Number.isFinite(nbboSpread) ? (
+                          <span>Spread ${formatPrice(nbboSpread)}</span>
+                        ) : null}
+                        {Number.isFinite(nbboAge) ? (
+                          <span>{Math.round(nbboAge)}ms</span>
+                        ) : null}
+                        {nbboStale ? <span className="pill nbbo-stale">NBBO stale</span> : null}
+                        {nbboMissing ? (
+                          <span className="pill nbbo-missing">NBBO missing</span>
+                        ) : null}
                       </div>
+                    </div>
                       <div className="time">
                         {formatTime(startTs)} → {formatTime(endTs)}
                       </div>
