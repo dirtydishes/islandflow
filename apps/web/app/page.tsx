@@ -1782,7 +1782,10 @@ export default function HomePage() {
                   const count = parseNumber(features.count, packet.members.length);
                   const totalSize = parseNumber(features.total_size, 0);
                   const totalPremium = parseNumber(features.total_premium, 0);
-                  const notional = totalPremium * 100;
+                  const totalNotional = parseNumber(features.total_notional, Number.NaN);
+                  const notional = Number.isFinite(totalNotional)
+                    ? totalNotional
+                    : totalPremium * 100;
                   const startTs = parseNumber(features.start_ts, packet.source_ts);
                   const endTs = parseNumber(features.end_ts, startTs);
                   const windowMs = parseNumber(features.window_ms, 0);

@@ -399,12 +399,14 @@ const flushCluster = async (
   const nbboJoin = selectNbbo(cluster.contractId, cluster.endTs);
 
   const totalPremium = roundTo(cluster.totalPremium);
+  const totalNotional = roundTo(totalPremium * 100, 2);
 
   const features: Record<string, string | number | boolean> = {
     option_contract_id: cluster.contractId,
     count: cluster.members.length,
     total_size: cluster.totalSize,
     total_premium: totalPremium,
+    total_notional: totalNotional,
     first_price: cluster.firstPrice,
     last_price: cluster.lastPrice,
     start_ts: cluster.startTs,
