@@ -163,6 +163,16 @@ const formatTime = (ts: number): string => {
 
 const formatConfidence = (value: number): string => `${Math.round(value * 100)}%`;
 
+const formatUsd = (value: number): string => {
+  if (!Number.isFinite(value)) {
+    return "0.00";
+  }
+  return value.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+};
+
 const formatDateTime = (ts: number): string => {
   const date = new Date(ts);
   return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
@@ -1630,6 +1640,7 @@ export default function HomePage() {
                 const count = parseNumber(features.count, packet.members.length);
                 const totalSize = parseNumber(features.total_size, 0);
                 const totalPremium = parseNumber(features.total_premium, 0);
+                const notional = totalPremium * 100;
                 const startTs = parseNumber(features.start_ts, packet.source_ts);
                 const endTs = parseNumber(features.end_ts, startTs);
                 const windowMs = parseNumber(features.window_ms, 0);
@@ -1641,7 +1652,8 @@ export default function HomePage() {
                       <div className="meta flow-meta">
                         <span>{formatFlowMetric(count)} prints</span>
                         <span>{formatFlowMetric(totalSize)} size</span>
-                        <span>${formatPrice(totalPremium)}</span>
+                        <span>Premium ${formatPrice(totalPremium)}</span>
+                        <span>Notional ${formatUsd(notional)}</span>
                         {windowMs > 0 ? (
                           <span>{formatFlowMetric(windowMs, "ms")}</span>
                         ) : null}

@@ -270,6 +270,7 @@ h1 {
   gap: 12px;
   width: 100%;
   margin-bottom: 20px;
+  flex: 0 0 auto;
 }
 
 .tape-controls {
@@ -740,7 +741,7 @@ h1 {
   }
 
   .list {
-    height: 360px;
+    min-height: 360px;
   }
 }
 
@@ -769,5 +770,54 @@ h1 {
   .card-alerts,
   .card-classifiers {
     grid-column: span 1;
+  }
+}
+.card-flow .row,
+.card-alerts .row,
+.card-classifiers .row {
+  padding: 12px 14px;
+}
+
+.card-flow .meta,
+.card-alerts .meta,
+.card-classifiers .meta {
+  font-size: 0.78rem;
+}
+
+.card-flow .note,
+.card-alerts .note,
+.card-classifiers .note {
+  font-size: 0.72rem;
+}
+
+.card-flow,
+.card-alerts,
+.card-classifiers {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  height: 760px;
+}
+
+.card-flow,
+.card-classifiers {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.card-alerts {
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+}
+
+.card-flow .list,
+.card-alerts .list,
+.card-classifiers .list {
+  height: 100%;
+  min-height: 0;
+}
+
+@media (max-width: 720px) {
+  .card-flow,
+  .card-alerts,
+  .card-classifiers {
+    height: 600px;
   }
 }
