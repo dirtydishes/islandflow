@@ -6,24 +6,26 @@ The system ingests real-time options trades/quotes and equity prints, clusters r
 
 ## CURRENT STATE (Plan Progress)
 
-Plan progress (rough): [####------]
+Plan progress (rough): [#####-----]
 
 Done now (in repo):
 - Bun monorepo + infra docker compose (ClickHouse, Redis, NATS JetStream)
 - Shared event schemas + logging + config helpers
-- Synthetic options/equity prints published to NATS and persisted to ClickHouse
+- Synthetic options/equity prints (full S&P 500) published to NATS and persisted to ClickHouse
 - Deterministic option FlowPacket clustering (time window) + persistence
-- API: REST for prints/flow packets, WS for live options/equities/flow, replay endpoints
+- Rule-first classifiers + alert scoring with ClickHouse persistence + WS/REST endpoints
+- API: REST for prints/flow packets/classifier hits/alerts, WS for live options/equities/flow/alerts/hits, replay endpoints
 - UI: live tapes for options/equities/flow + replay toggle + pause controls + replay time/completion
+- UI: alerts + classifier hits panels, ticker filter, evidence drawer, severity strip
 - Databento historical replay adapter (options) with symbol mapping
 - Alpaca options adapter (dev-only, bounded contract list)
+- Testing-mode throttling for ingest to reduce CPU during local dev
 
 In progress / blocked:
 - Live data adapters beyond dev-only feeds (requires licensed data source)
 - Rolling stats and advanced clustering
 
 Not started:
-- Classifiers + alert scoring
 - Dark pool inference
 - Candle service and chart overlays
 - Auth / secure deployment
@@ -37,19 +39,19 @@ Not started:
 
 ## Current Capabilities
 
-- Synthetic options/equity prints with deterministic sequencing
+- Synthetic options/equity prints with deterministic sequencing across the S&P 500
 - Ingest adapter seam (env-selected; options default `alpaca`, equities default `synthetic`)
 - Raw event persistence in ClickHouse + streaming via NATS JetStream
 - Deterministic option FlowPacket clustering (time-window)
+- Classifiers + alert scoring (rule-first) with WS/REST endpoints
 - API gateway with REST, WS, and replay endpoints
-- UI tapes for options/equities/flow packets with live/replay toggle and pause controls
+- UI tapes for options/equities/flow packets + alerts/hits with live/replay toggle and pause controls
 - Alpaca options adapter (dev-only) with bounded contract selection
 - Databento historical replay adapter (options, Python sidecar)
 
 ## Planned Capabilities (from PLAN.md)
 
 - Real-time licensed market data ingestors (options + equities)
-- Rule-first classifiers and alert scoring
 - Dark pool inference and evidence linking
 - Candle aggregation + chart overlays
 - Replay/backtesting metrics and calibration
@@ -92,8 +94,8 @@ Create env file:
 Start everything (infra + services + web):
 - `bun run dev`
 
-Run just the web app (auto-picks a free port in 3001-3005):
-- `bun --cwd apps/web run dev`
+Run just the web app (fixed to port 3000):
+- `bun run dev:web`
 
 Run just the API:
 - `bun --cwd services/api run dev`
@@ -102,6 +104,10 @@ Adapter selection (env):
 - Options: `OPTIONS_INGEST_ADAPTER` (defaults to `alpaca`)
 - Equities: `EQUITIES_INGEST_ADAPTER` (defaults to `synthetic`)
 - Compute: `COMPUTE_DELIVER_POLICY` (`new` default), `COMPUTE_CONSUMER_RESET` (force skip backlog)
+
+Testing mode (throttles ingest to reduce CPU):
+- `TESTING_MODE=true` enables throttling
+- `TESTING_THROTTLE_MS=200` minimum spacing between emitted prints (per ingest service)
 
 IBKR adapter (options, via Python `ib_insync`):
 - Install Python deps: `python3 -m pip install -r services/ingest-options/py/requirements.txt`

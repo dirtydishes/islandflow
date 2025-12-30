@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { AlertEvent, ClassifierHitEvent, EquityPrint, FlowPacket, OptionPrint } from "@islandflow/types";
 
 const MAX_ITEMS = 500;
@@ -213,6 +213,7 @@ const parseNumber = (value: unknown, fallback: number): number => {
 type ListScrollState = {
   listRef: React.RefObject<HTMLDivElement>;
   isAtTop: boolean;
+  isAtTopRef: React.MutableRefObject<boolean>;
   missed: number;
   onNewItems: (count: number) => void;
   jumpToTop: () => void;
@@ -236,6 +237,7 @@ const useListScroll = (): ListScrollState => {
 
     const onScroll = () => {
       const atTop = el.scrollTop <= 2;
+      isAtTopRef.current = atTop;
       setIsAtTop(atTop);
       if (atTop) {
         setMissed(0);
@@ -273,7 +275,55 @@ const useListScroll = (): ListScrollState => {
     setMissed(0);
   }, []);
 
-  return { listRef, isAtTop, missed, onNewItems, jumpToTop };
+  return {
+    listRef,
+    isAtTop,
+    isAtTopRef,
+    missed,
+    onNewItems,
+    jumpToTop
+  };
+};
+
+const useScrollAnchor = (
+  listRef: React.RefObject<HTMLDivElement>,
+  isAtTopRef: React.MutableRefObject<boolean>
+) => {
+  const pendingRef = useRef<{ top: number; height: number } | null>(null);
+
+  const capture = useCallback(() => {
+    if (isAtTopRef.current) {
+      return;
+    }
+
+    const el = listRef.current;
+    if (!el) {
+      return;
+    }
+
+    pendingRef.current = {
+      top: el.scrollTop,
+      height: el.scrollHeight
+    };
+  }, [isAtTopRef, listRef]);
+
+  const apply = useCallback(() => {
+    const pending = pendingRef.current;
+    if (!pending) {
+      return;
+    }
+
+    const el = listRef.current;
+    if (!el) {
+      return;
+    }
+
+    const delta = el.scrollHeight - pending.height;
+    el.scrollTop = pending.top + delta;
+    pendingRef.current = null;
+  }, [listRef]);
+
+  return { capture, apply };
 };
 
 const statusLabel = (status: WsStatus, paused: boolean, mode: TapeMode): string => {
@@ -304,13 +354,14 @@ type TapeConfig<T> = {
   expectedType: MessageType;
   batchSize?: number;
   pollMs?: number;
+  captureScroll?: () => void;
   onNewItems?: (count: number) => void;
 };
 
 const useTape = <T extends { ts: number; seq: number }>(
   config: TapeConfig<T>
 ): TapeState<T> => {
-  const { mode, wsPath, replayPath, expectedType, latestPath, onNewItems } = config;
+  const { mode, wsPath, replayPath, expectedType, latestPath, onNewItems, captureScroll } = config;
   const batchSize = config.batchSize ?? 40;
   const pollMs = config.pollMs ?? 1000;
   const [status, setStatus] = useState<WsStatus>("connecting");
@@ -328,10 +379,49 @@ const useTape = <T extends { ts: number; seq: number }>(
   const replaySourceRef = useRef<string | null>(null);
   const emptyPollsRef = useRef<number>(0);
   const pausedRef = useRef(paused);
+  const pendingRef = useRef<T[]>([]);
+  const pendingCountRef = useRef(0);
+  const flushHandleRef = useRef<number | null>(null);
 
   useEffect(() => {
     pausedRef.current = paused;
   }, [paused]);
+
+  const cancelFlush = useCallback(() => {
+    if (flushHandleRef.current !== null) {
+      cancelAnimationFrame(flushHandleRef.current);
+      flushHandleRef.current = null;
+    }
+  }, []);
+
+  const scheduleFlush = useCallback(() => {
+    if (flushHandleRef.current !== null) {
+      return;
+    }
+
+    flushHandleRef.current = requestAnimationFrame(() => {
+      flushHandleRef.current = null;
+      const buffered = pendingRef.current;
+      if (buffered.length === 0) {
+        return;
+      }
+      pendingRef.current = [];
+
+      const pendingCount = pendingCountRef.current;
+      pendingCountRef.current = 0;
+
+      if (onNewItems && pendingCount > 0) {
+        onNewItems(pendingCount);
+      }
+
+      if (captureScroll) {
+        captureScroll();
+      }
+
+      setItems((prev) => mergeNewest(buffered, prev));
+      setLastUpdate(Date.now());
+    });
+  }, [captureScroll, onNewItems]);
 
   const togglePause = useCallback(() => {
     setPaused((prev) => {
@@ -354,7 +444,10 @@ const useTape = <T extends { ts: number; seq: number }>(
     setDropped(0);
     setStatus("connecting");
     cursorRef.current = { ts: 0, seq: 0 };
-  }, [mode]);
+    pendingRef.current = [];
+    pendingCountRef.current = 0;
+    cancelFlush();
+  }, [mode, cancelFlush]);
 
   useEffect(() => {
     if (mode !== "replay" || !latestPath) {
@@ -434,12 +527,9 @@ const useTape = <T extends { ts: number; seq: number }>(
             return;
           }
 
-          if (onNewItems) {
-            onNewItems(1);
-          }
-
-          setItems((prev) => mergeNewest([message.payload], prev));
-          setLastUpdate(Date.now());
+          pendingRef.current.push(message.payload);
+          pendingCountRef.current += 1;
+          scheduleFlush();
         } catch (error) {
           console.warn("Failed to parse websocket payload", error);
         }
@@ -470,6 +560,7 @@ const useTape = <T extends { ts: number; seq: number }>(
 
     return () => {
       active = false;
+      cancelFlush();
       if (reconnectRef.current !== null) {
         window.clearTimeout(reconnectRef.current);
       }
@@ -477,7 +568,7 @@ const useTape = <T extends { ts: number; seq: number }>(
         socketRef.current.close();
       }
     };
-  }, [mode, wsPath, expectedType]);
+  }, [mode, wsPath, expectedType, scheduleFlush, cancelFlush]);
 
   useEffect(() => {
     if (mode !== "replay") {
@@ -543,11 +634,9 @@ const useTape = <T extends { ts: number; seq: number }>(
 
           if (filtered.length > 0) {
             const nextItems = [...filtered].reverse();
-            if (onNewItems) {
-              onNewItems(nextItems.length);
-            }
-            setItems((prev) => mergeNewest(nextItems, prev));
-            setLastUpdate(Date.now());
+            pendingRef.current.push(...nextItems);
+            pendingCountRef.current += nextItems.length;
+            scheduleFlush();
             const last = filtered.at(-1);
             if (last) {
               setReplayTime(last.ts);
@@ -601,8 +690,9 @@ const useTape = <T extends { ts: number; seq: number }>(
     return () => {
       active = false;
       window.clearInterval(interval);
+      cancelFlush();
     };
-  }, [mode, replayPath, batchSize, pollMs]);
+  }, [mode, replayPath, batchSize, pollMs, scheduleFlush, cancelFlush]);
 
   return {
     status,
@@ -617,12 +707,17 @@ const useTape = <T extends { ts: number; seq: number }>(
 };
 
 const useLiveStream = <T extends SortableItem>(
-  enabled: boolean,
-  wsPath: string,
-  expectedType: MessageType,
-  onNewItems?: (count: number) => void
+  config: {
+    enabled: boolean;
+    wsPath: string;
+    expectedType: MessageType;
+    onNewItems?: (count: number) => void;
+    captureScroll?: () => void;
+  }
 ): TapeState<T> => {
-  const [status, setStatus] = useState<WsStatus>(enabled ? "connecting" : "disconnected");
+  const [status, setStatus] = useState<WsStatus>(
+    config.enabled ? "connecting" : "disconnected"
+  );
   const [items, setItems] = useState<T[]>([]);
   const [lastUpdate, setLastUpdate] = useState<number | null>(null);
   const [replayTime] = useState<number | null>(null);
@@ -632,10 +727,49 @@ const useLiveStream = <T extends SortableItem>(
   const reconnectRef = useRef<number | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const pausedRef = useRef(paused);
+  const pendingRef = useRef<T[]>([]);
+  const pendingCountRef = useRef(0);
+  const flushHandleRef = useRef<number | null>(null);
 
   useEffect(() => {
     pausedRef.current = paused;
   }, [paused]);
+
+  const cancelFlush = useCallback(() => {
+    if (flushHandleRef.current !== null) {
+      cancelAnimationFrame(flushHandleRef.current);
+      flushHandleRef.current = null;
+    }
+  }, []);
+
+  const scheduleFlush = useCallback(() => {
+    if (flushHandleRef.current !== null) {
+      return;
+    }
+
+    flushHandleRef.current = requestAnimationFrame(() => {
+      flushHandleRef.current = null;
+      const buffered = pendingRef.current;
+      if (buffered.length === 0) {
+        return;
+      }
+      pendingRef.current = [];
+
+      const pendingCount = pendingCountRef.current;
+      pendingCountRef.current = 0;
+
+      if (config.onNewItems && pendingCount > 0) {
+        config.onNewItems(pendingCount);
+      }
+
+      if (config.captureScroll) {
+        config.captureScroll();
+      }
+
+      setItems((prev) => mergeNewest(buffered, prev));
+      setLastUpdate(Date.now());
+    });
+  }, [config.captureScroll, config.onNewItems]);
 
   const togglePause = useCallback(() => {
     setPaused((prev) => {
@@ -648,10 +782,13 @@ const useLiveStream = <T extends SortableItem>(
   }, []);
 
   useEffect(() => {
-    if (!enabled) {
+    if (!config.enabled) {
       setStatus("disconnected");
       setItems([]);
       setLastUpdate(null);
+      pendingRef.current = [];
+      pendingCountRef.current = 0;
+      cancelFlush();
       return;
     }
 
@@ -664,7 +801,7 @@ const useLiveStream = <T extends SortableItem>(
 
       setStatus("connecting");
 
-      const socket = new WebSocket(buildWsUrl(wsPath));
+      const socket = new WebSocket(buildWsUrl(config.wsPath));
       socketRef.current = socket;
 
       socket.onopen = () => {
@@ -681,7 +818,7 @@ const useLiveStream = <T extends SortableItem>(
 
         try {
           const message = JSON.parse(event.data) as StreamMessage<T>;
-          if (!message || message.type !== expectedType) {
+          if (!message || message.type !== config.expectedType) {
             return;
           }
 
@@ -691,12 +828,9 @@ const useLiveStream = <T extends SortableItem>(
             return;
           }
 
-          if (onNewItems) {
-            onNewItems(1);
-          }
-
-          setItems((prev) => mergeNewest([message.payload], prev));
-          setLastUpdate(Date.now());
+          pendingRef.current.push(message.payload);
+          pendingCountRef.current += 1;
+          scheduleFlush();
         } catch (error) {
           console.warn("Failed to parse live stream payload", error);
         }
@@ -727,6 +861,7 @@ const useLiveStream = <T extends SortableItem>(
 
     return () => {
       active = false;
+      cancelFlush();
       if (reconnectRef.current !== null) {
         window.clearTimeout(reconnectRef.current);
       }
@@ -734,7 +869,7 @@ const useLiveStream = <T extends SortableItem>(
         socketRef.current.close();
       }
     };
-  }, [enabled, expectedType, wsPath, onNewItems]);
+  }, [config.enabled, config.expectedType, config.wsPath, scheduleFlush, cancelFlush]);
 
   return {
     status,
@@ -750,9 +885,16 @@ const useLiveStream = <T extends SortableItem>(
 
 const useFlowStream = (
   enabled: boolean,
-  onNewItems?: (count: number) => void
+  onNewItems?: (count: number) => void,
+  captureScroll?: () => void
 ): TapeState<FlowPacket> => {
-  return useLiveStream<FlowPacket>(enabled, "/ws/flow", "flow-packet", onNewItems);
+  return useLiveStream<FlowPacket>({
+    enabled,
+    wsPath: "/ws/flow",
+    expectedType: "flow-packet",
+    onNewItems,
+    captureScroll
+  });
 };
 
 type TapeStatusProps = {
@@ -1001,6 +1143,15 @@ export default function HomePage() {
   const alertsScroll = useListScroll();
   const classifierScroll = useListScroll();
 
+  const optionsAnchor = useScrollAnchor(optionsScroll.listRef, optionsScroll.isAtTopRef);
+  const equitiesAnchor = useScrollAnchor(equitiesScroll.listRef, equitiesScroll.isAtTopRef);
+  const flowAnchor = useScrollAnchor(flowScroll.listRef, flowScroll.isAtTopRef);
+  const alertsAnchor = useScrollAnchor(alertsScroll.listRef, alertsScroll.isAtTopRef);
+  const classifierAnchor = useScrollAnchor(
+    classifierScroll.listRef,
+    classifierScroll.isAtTopRef
+  );
+
   const options = useTape<OptionPrint>({
     mode,
     wsPath: "/ws/options",
@@ -1009,6 +1160,7 @@ export default function HomePage() {
     expectedType: "option-print",
     batchSize: mode === "replay" ? 120 : undefined,
     pollMs: mode === "replay" ? 200 : undefined,
+    captureScroll: optionsAnchor.capture,
     onNewItems: optionsScroll.onNewItems
   });
 
@@ -1020,22 +1172,45 @@ export default function HomePage() {
     expectedType: "equity-print",
     batchSize: mode === "replay" ? 120 : undefined,
     pollMs: mode === "replay" ? 200 : undefined,
+    captureScroll: equitiesAnchor.capture,
     onNewItems: equitiesScroll.onNewItems
   });
 
-  const flow = useFlowStream(mode === "live", flowScroll.onNewItems);
-  const alerts = useLiveStream<AlertEvent>(
-    mode === "live",
-    "/ws/alerts",
-    "alert",
-    alertsScroll.onNewItems
-  );
-  const classifierHits = useLiveStream<ClassifierHitEvent>(
-    mode === "live",
-    "/ws/classifier-hits",
-    "classifier-hit",
-    classifierScroll.onNewItems
-  );
+  const flow = useFlowStream(mode === "live", flowScroll.onNewItems, flowAnchor.capture);
+  const alerts = useLiveStream<AlertEvent>({
+    enabled: mode === "live",
+    wsPath: "/ws/alerts",
+    expectedType: "alert",
+    onNewItems: alertsScroll.onNewItems,
+    captureScroll: alertsAnchor.capture
+  });
+  const classifierHits = useLiveStream<ClassifierHitEvent>({
+    enabled: mode === "live",
+    wsPath: "/ws/classifier-hits",
+    expectedType: "classifier-hit",
+    onNewItems: classifierScroll.onNewItems,
+    captureScroll: classifierAnchor.capture
+  });
+
+  useLayoutEffect(() => {
+    optionsAnchor.apply();
+  }, [options.items, optionsAnchor.apply]);
+
+  useLayoutEffect(() => {
+    equitiesAnchor.apply();
+  }, [equities.items, equitiesAnchor.apply]);
+
+  useLayoutEffect(() => {
+    flowAnchor.apply();
+  }, [flow.items, flowAnchor.apply]);
+
+  useLayoutEffect(() => {
+    alertsAnchor.apply();
+  }, [alerts.items, alertsAnchor.apply]);
+
+  useLayoutEffect(() => {
+    classifierAnchor.apply();
+  }, [classifierHits.items, classifierAnchor.apply]);
 
   const activeTickers = useMemo(() => {
     const parts = filterInput

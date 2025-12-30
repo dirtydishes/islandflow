@@ -25,13 +25,56 @@ const envSchema = z.object({
   CLICKHOUSE_URL: z.string().default("http://localhost:8123"),
   CLICKHOUSE_DATABASE: z.string().default("default"),
   EQUITIES_INGEST_ADAPTER: z.string().min(1).default("synthetic"),
-  EMIT_INTERVAL_MS: z.coerce.number().int().positive().default(1000)
+  EMIT_INTERVAL_MS: z.coerce.number().int().positive().default(1000),
+  TESTING_MODE: z
+    .preprocess((value) => {
+      if (typeof value === "string") {
+        const normalized = value.trim().toLowerCase();
+        if (["1", "true", "yes", "on"].includes(normalized)) {
+          return true;
+        }
+        if (["0", "false", "no", "off"].includes(normalized)) {
+          return false;
+        }
+      }
+      return value;
+    }, z.boolean())
+    .default(false),
+  TESTING_THROTTLE_MS: z.coerce.number().int().nonnegative().default(200)
 });
 
 const env = readEnv(envSchema);
 
 const state = {
   shuttingDown: false
+};
+
+const buildThrottle = (enabled: boolean, throttleMs: number) => {
+  if (!enabled || throttleMs <= 0) {
+    return () => true;
+  }
+
+  let lastEmit = 0;
+  let dropped = 0;
+  let lastLog = Date.now();
+
+  return (now: number) => {
+    if (now - lastEmit < throttleMs) {
+      dropped += 1;
+      if (now - lastLog > 5000) {
+        logger.warn("testing mode throttling equity prints", {
+          dropped,
+          throttle_ms: throttleMs
+        });
+        dropped = 0;
+        lastLog = now;
+      }
+      return false;
+    }
+
+    lastEmit = now;
+    return true;
+  };
 };
 
 const retry = async <T>(
@@ -104,10 +147,16 @@ const run = async () => {
 
   const adapter = selectAdapter(env.EQUITIES_INGEST_ADAPTER);
   logger.info("ingest adapter selected", { adapter: adapter.name });
+  const allowPublish = buildThrottle(env.TESTING_MODE, env.TESTING_THROTTLE_MS);
 
   const stopAdapter: StopHandler = await adapter.start({
     onTrade: async (candidate: EquityPrint) => {
       if (state.shuttingDown) {
+        return;
+      }
+
+      const now = Date.now();
+      if (!allowPublish(now)) {
         return;
       }
 
