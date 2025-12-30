@@ -586,9 +586,9 @@ h1 {
   color: #6f5b39;
 }
 
-.severity-strip {
+.alert-strips {
   display: grid;
-  gap: 8px;
+  gap: 12px;
   margin-bottom: 16px;
   padding: 12px 14px;
   border-radius: 14px;
@@ -596,16 +596,21 @@ h1 {
   background: rgba(255, 255, 255, 0.7);
 }
 
-.severity-strip-header {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.75rem;
-  color: #6f5b39;
-  text-transform: uppercase;
-  letter-spacing: 0.2em;
+.alert-strip-section {
+  display: grid;
+  gap: 6px;
 }
 
-.severity-strip-bar {
+.alert-strip-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: #6f5b39;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+}
+
+.alert-strip-bar {
   display: flex;
   height: 26px;
   border-radius: 999px;
@@ -614,26 +619,40 @@ h1 {
   background: rgba(111, 91, 57, 0.08);
 }
 
-.severity-segment {
+.strip-segment {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   color: #fffdf7;
   letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.severity-strip .severity-high {
+.alert-strip-bar .severity-high {
   background: rgba(196, 111, 42, 0.85);
   color: #3b1a09;
 }
 
-.severity-strip .severity-medium {
+.alert-strip-bar .severity-medium {
   background: rgba(31, 74, 123, 0.8);
 }
 
-.severity-strip .severity-low {
+.alert-strip-bar .severity-low {
   background: rgba(47, 109, 79, 0.8);
+}
+
+.alert-strip-bar .direction-bullish {
+  background: rgba(47, 109, 79, 0.85);
+}
+
+.alert-strip-bar .direction-bearish {
+  background: rgba(196, 111, 42, 0.85);
+  color: #3b1a09;
+}
+
+.alert-strip-bar .direction-neutral {
+  background: rgba(111, 91, 57, 0.65);
 }
 
 .flow-meta span {

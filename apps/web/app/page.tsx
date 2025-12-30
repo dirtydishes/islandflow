@@ -971,7 +971,7 @@ type AlertSeverityStripProps = {
 const AlertSeverityStrip = ({ alerts }: AlertSeverityStripProps) => {
   const windowMs = 30 * 60 * 1000;
   const now = Date.now();
-  const counts = alerts.reduce(
+  const severityCounts = alerts.reduce(
     (acc, alert) => {
       if (now - alert.source_ts > windowMs) {
         return acc;
@@ -988,26 +988,63 @@ const AlertSeverityStrip = ({ alerts }: AlertSeverityStripProps) => {
     { high: 0, medium: 0, low: 0 }
   );
 
-  const total = counts.high + counts.medium + counts.low;
-  const highPct = total > 0 ? (counts.high / total) * 100 : 0;
-  const mediumPct = total > 0 ? (counts.medium / total) * 100 : 0;
-  const lowPct = total > 0 ? (counts.low / total) * 100 : 0;
+  const directionCounts = alerts.reduce(
+    (acc, alert) => {
+      if (now - alert.source_ts > windowMs) {
+        return acc;
+      }
+      const direction = normalizeDirection(alert.hits[0]?.direction ?? "neutral");
+      acc[direction] += 1;
+      return acc;
+    },
+    { bullish: 0, bearish: 0, neutral: 0 }
+  );
+
+  const severityTotal = severityCounts.high + severityCounts.medium + severityCounts.low;
+  const highPct = severityTotal > 0 ? (severityCounts.high / severityTotal) * 100 : 0;
+  const mediumPct = severityTotal > 0 ? (severityCounts.medium / severityTotal) * 100 : 0;
+  const lowPct = severityTotal > 0 ? (severityCounts.low / severityTotal) * 100 : 0;
+
+  const directionTotal =
+    directionCounts.bullish + directionCounts.bearish + directionCounts.neutral;
+  const bullishPct = directionTotal > 0 ? (directionCounts.bullish / directionTotal) * 100 : 0;
+  const bearishPct = directionTotal > 0 ? (directionCounts.bearish / directionTotal) * 100 : 0;
+  const neutralPct = directionTotal > 0 ? (directionCounts.neutral / directionTotal) * 100 : 0;
 
   return (
-    <div className="severity-strip">
-      <div className="severity-strip-header">
-        <span>Last 30m</span>
-        <span>{total} alerts</span>
+    <div className="alert-strips">
+      <div className="alert-strip-section">
+        <div className="alert-strip-header">
+          <span>Severity (last 30m)</span>
+          <span>{severityTotal} alerts</span>
+        </div>
+        <div className="alert-strip-bar">
+          <div className="strip-segment severity-high" style={{ width: `${highPct}%` }}>
+            {severityCounts.high > 0 ? `High ${severityCounts.high}` : ""}
+          </div>
+          <div className="strip-segment severity-medium" style={{ width: `${mediumPct}%` }}>
+            {severityCounts.medium > 0 ? `Med ${severityCounts.medium}` : ""}
+          </div>
+          <div className="strip-segment severity-low" style={{ width: `${lowPct}%` }}>
+            {severityCounts.low > 0 ? `Low ${severityCounts.low}` : ""}
+          </div>
+        </div>
       </div>
-      <div className="severity-strip-bar">
-        <div className="severity-segment severity-high" style={{ width: `${highPct}%` }}>
-          {counts.high > 0 ? counts.high : ""}
+      <div className="alert-strip-section">
+        <div className="alert-strip-header">
+          <span>Direction (last 30m)</span>
+          <span>{directionTotal} alerts</span>
         </div>
-        <div className="severity-segment severity-medium" style={{ width: `${mediumPct}%` }}>
-          {counts.medium > 0 ? counts.medium : ""}
-        </div>
-        <div className="severity-segment severity-low" style={{ width: `${lowPct}%` }}>
-          {counts.low > 0 ? counts.low : ""}
+        <div className="alert-strip-bar">
+          <div className="strip-segment direction-bullish" style={{ width: `${bullishPct}%` }}>
+            {directionCounts.bullish > 0 ? `Bull ${directionCounts.bullish}` : ""}
+          </div>
+          <div className="strip-segment direction-bearish" style={{ width: `${bearishPct}%` }}>
+            {directionCounts.bearish > 0 ? `Bear ${directionCounts.bearish}` : ""}
+          </div>
+          <div className="strip-segment direction-neutral" style={{ width: `${neutralPct}%` }}>
+            {directionCounts.neutral > 0 ? `Neut ${directionCounts.neutral}` : ""}
+          </div>
         </div>
       </div>
     </div>
