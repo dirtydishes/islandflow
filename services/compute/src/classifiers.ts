@@ -10,8 +10,12 @@ type ParsedContract = {
 export type ClassifierConfig = {
   sweepMinPremium: number;
   sweepMinCount: number;
+  sweepMinPremiumZ: number;
   spikeMinPremium: number;
   spikeMinSize: number;
+  spikeMinPremiumZ: number;
+  spikeMinSizeZ: number;
+  zMinSamples: number;
 };
 
 const clamp = (value: number, min = 0, max = 1): number => {
@@ -120,8 +124,14 @@ const buildSweepHit = (
   const firstPrice = getNumberFeature(packet, "first_price");
   const lastPrice = getNumberFeature(packet, "last_price");
   const windowMs = getNumberFeature(packet, "window_ms");
+  const premiumZ = getNumberFeature(packet, "total_premium_z");
+  const premiumBaseline = getNumberFeature(packet, "total_premium_baseline_n");
 
-  if (count < config.sweepMinCount || totalPremium < config.sweepMinPremium) {
+  const baselineReady = premiumBaseline >= config.zMinSamples;
+  const passesAbsolute = totalPremium >= config.sweepMinPremium;
+  const passesZ = baselineReady && premiumZ >= config.sweepMinPremiumZ;
+
+  if (count < config.sweepMinCount || (!passesAbsolute && !passesZ)) {
     return null;
   }
 
@@ -138,8 +148,18 @@ const buildSweepHit = (
   if (totalPremium >= config.sweepMinPremium * 2) {
     confidence += 0.15;
   }
+  if (passesZ) {
+    confidence += 0.1;
+    if (premiumZ >= config.sweepMinPremiumZ + 1) {
+      confidence += 0.05;
+    }
+  }
 
   confidence = clamp(confidence, 0, 0.95);
+
+  const baselineNote = baselineReady
+    ? `Baseline premium z-score ${premiumZ.toFixed(2)} over ${Math.round(premiumBaseline)} samples.`
+    : "Baseline premium z-score unavailable.";
 
   return {
     classifier_id: direction === "bullish" ? "large_bullish_call_sweep" : "large_bearish_put_sweep",
@@ -148,7 +168,8 @@ const buildSweepHit = (
     explanations: [
       `Likely ${direction === "bullish" ? "call" : "put"} sweep: ${count} prints in ${Math.round(windowMs)}ms for ${packet.features.option_contract_id ?? packet.id}.`,
       `Premium ${formatUsd(totalPremium)} across ${Math.round(totalSize)} contracts; price ${priceTrend}.`,
-      `Thresholds: >=${config.sweepMinCount} prints and >=${formatUsd(config.sweepMinPremium)} premium.`
+      `Thresholds: >=${config.sweepMinCount} prints and >=${formatUsd(config.sweepMinPremium)} premium or z>=${config.sweepMinPremiumZ.toFixed(1)}.`,
+      baselineNote
     ]
   };
 };
@@ -158,8 +179,19 @@ const buildSpikeHit = (packet: FlowPacket, config: ClassifierConfig): Classifier
   const totalPremium = getNumberFeature(packet, "total_premium");
   const totalSize = getNumberFeature(packet, "total_size");
   const windowMs = getNumberFeature(packet, "window_ms");
+  const premiumZ = getNumberFeature(packet, "total_premium_z");
+  const sizeZ = getNumberFeature(packet, "total_size_z");
+  const premiumBaseline = getNumberFeature(packet, "total_premium_baseline_n");
+  const sizeBaseline = getNumberFeature(packet, "total_size_baseline_n");
 
-  if (totalSize < config.spikeMinSize || totalPremium < config.spikeMinPremium) {
+  const premiumBaselineReady = premiumBaseline >= config.zMinSamples;
+  const sizeBaselineReady = sizeBaseline >= config.zMinSamples;
+  const passesAbsolute = totalSize >= config.spikeMinSize && totalPremium >= config.spikeMinPremium;
+  const passesZ =
+    (premiumBaselineReady && premiumZ >= config.spikeMinPremiumZ) ||
+    (sizeBaselineReady && sizeZ >= config.spikeMinSizeZ);
+
+  if (!passesAbsolute && !passesZ) {
     return null;
   }
 
@@ -173,8 +205,19 @@ const buildSpikeHit = (packet: FlowPacket, config: ClassifierConfig): Classifier
   if (count >= 3) {
     confidence += 0.1;
   }
+  if (passesZ) {
+    confidence += 0.1;
+    if (premiumZ >= config.spikeMinPremiumZ + 1 || sizeZ >= config.spikeMinSizeZ + 1) {
+      confidence += 0.05;
+    }
+  }
 
   confidence = clamp(confidence, 0, 0.9);
+
+  const baselineNote =
+    premiumBaselineReady || sizeBaselineReady
+      ? `Baseline z-scores: premium ${premiumZ.toFixed(2)}, size ${sizeZ.toFixed(2)}.`
+      : "Baseline z-scores unavailable.";
 
   return {
     classifier_id: "unusual_contract_spike",
@@ -183,7 +226,8 @@ const buildSpikeHit = (packet: FlowPacket, config: ClassifierConfig): Classifier
     explanations: [
       `Unusual contract spike: ${count} prints in ${Math.round(windowMs)}ms for ${packet.features.option_contract_id ?? packet.id}.`,
       `Premium ${formatUsd(totalPremium)} across ${Math.round(totalSize)} contracts.`,
-      `Thresholds: >=${config.spikeMinSize} contracts and >=${formatUsd(config.spikeMinPremium)} premium.`
+      `Thresholds: >=${config.spikeMinSize} contracts and >=${formatUsd(config.spikeMinPremium)} premium or z>=${config.spikeMinPremiumZ.toFixed(1)}.`,
+      baselineNote
     ]
   };
 };

@@ -255,40 +255,78 @@ const run = async () => {
     await ensureAlertsTable(clickhouse);
   });
 
-  const optionSubscription = await subscribeJson(
-    js,
+  const subscribeWithReset = async <T>(
+    subject: string,
+    stream: string,
+    durableName: string
+  ) => {
+    const opts = buildDurableConsumer(durableName);
+    try {
+      return await subscribeJson<T>(js, subject, opts);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const shouldReset =
+        message.includes("duplicate subscription") ||
+        message.includes("durable requires") ||
+        message.includes("subject does not match consumer");
+
+      if (!shouldReset) {
+        throw error;
+      }
+
+      logger.warn("resetting jetstream consumer", { durable: durableName, error: message });
+
+      try {
+        await jsm.consumers.delete(stream, durableName);
+      } catch (deleteError) {
+        const deleteMessage = deleteError instanceof Error ? deleteError.message : String(deleteError);
+        if (!deleteMessage.includes("not found")) {
+          logger.warn("failed to delete jetstream consumer", {
+            durable: durableName,
+            error: deleteMessage
+          });
+        }
+      }
+
+      const resetOpts = buildDurableConsumer(durableName);
+      return await subscribeJson<T>(js, subject, resetOpts);
+    }
+  };
+
+  const optionSubscription = await subscribeWithReset(
     SUBJECT_OPTION_PRINTS,
-    buildDurableConsumer("api-option-prints")
+    STREAM_OPTION_PRINTS,
+    "api-option-prints"
   );
 
-  const optionNbboSubscription = await subscribeJson(
-    js,
+  const optionNbboSubscription = await subscribeWithReset(
     SUBJECT_OPTION_NBBO,
-    buildDurableConsumer("api-option-nbbo")
+    STREAM_OPTION_NBBO,
+    "api-option-nbbo"
   );
 
-  const equitySubscription = await subscribeJson(
-    js,
+  const equitySubscription = await subscribeWithReset(
     SUBJECT_EQUITY_PRINTS,
-    buildDurableConsumer("api-equity-prints")
+    STREAM_EQUITY_PRINTS,
+    "api-equity-prints"
   );
 
-  const flowSubscription = await subscribeJson(
-    js,
+  const flowSubscription = await subscribeWithReset(
     SUBJECT_FLOW_PACKETS,
-    buildDurableConsumer("api-flow-packets")
+    STREAM_FLOW_PACKETS,
+    "api-flow-packets"
   );
 
-  const classifierHitSubscription = await subscribeJson(
-    js,
+  const classifierHitSubscription = await subscribeWithReset(
     SUBJECT_CLASSIFIER_HITS,
-    buildDurableConsumer("api-classifier-hits")
+    STREAM_CLASSIFIER_HITS,
+    "api-classifier-hits"
   );
 
-  const alertSubscription = await subscribeJson(
-    js,
+  const alertSubscription = await subscribeWithReset(
     SUBJECT_ALERTS,
-    buildDurableConsumer("api-alerts")
+    STREAM_ALERTS,
+    "api-alerts"
   );
 
   const pumpOptions = async () => {

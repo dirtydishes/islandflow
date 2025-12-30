@@ -13,6 +13,7 @@ Done now (in repo):
 - Shared event schemas + logging + config helpers
 - Synthetic options/equity prints (full S&P 500) published to NATS and persisted to ClickHouse
 - Deterministic option FlowPacket clustering (time window) + persistence
+- Rolling stats in Redis (premium/size/spread) with z-score features on FlowPackets
 - Rule-first classifiers + alert scoring with ClickHouse persistence + WS/REST endpoints
 - API: REST for prints/flow packets/classifier hits/alerts, WS for live options/equities/flow/alerts/hits, replay endpoints
 - UI: live tapes for options/equities/flow + replay toggle + pause controls + replay time/completion
@@ -23,7 +24,7 @@ Done now (in repo):
 
 In progress / blocked:
 - Live data adapters beyond dev-only feeds (requires licensed data source)
-- Rolling stats and advanced clustering
+- Advanced clustering
 
 Not started:
 - Dark pool inference
@@ -43,6 +44,7 @@ Not started:
 - Ingest adapter seam (env-selected; options default `alpaca`, equities default `synthetic`)
 - Raw event persistence in ClickHouse + streaming via NATS JetStream
 - Deterministic option FlowPacket clustering (time-window)
+- Rolling stats baselines in Redis with z-score features on FlowPackets
 - Classifiers + alert scoring (rule-first) with WS/REST endpoints
 - API gateway with REST, WS, and replay endpoints
 - UI tapes for options/equities/flow packets + alerts/hits with live/replay toggle and pause controls
@@ -104,6 +106,8 @@ Adapter selection (env):
 - Options: `OPTIONS_INGEST_ADAPTER` (defaults to `alpaca`)
 - Equities: `EQUITIES_INGEST_ADAPTER` (defaults to `synthetic`)
 - Compute: `COMPUTE_DELIVER_POLICY` (`new` default), `COMPUTE_CONSUMER_RESET` (force skip backlog)
+- Rolling stats: `REDIS_URL`, `ROLLING_WINDOW_SIZE`, `ROLLING_TTL_SEC`
+- Classifier tuning: `CLASSIFIER_SWEEP_MIN_PREMIUM_Z`, `CLASSIFIER_SPIKE_MIN_PREMIUM_Z`, `CLASSIFIER_SPIKE_MIN_SIZE_Z`, `CLASSIFIER_Z_MIN_SAMPLES`
 
 Testing mode (throttles ingest to reduce CPU):
 - `TESTING_MODE=true` enables throttling

@@ -40,6 +40,7 @@ import {
 } from "@islandflow/types";
 import { z } from "zod";
 import { evaluateClassifiers, type ClassifierConfig } from "./classifiers";
+import { createRedisClient, updateRollingStats, type RollingStatsConfig } from "./rolling-stats";
 
 const service = "compute";
 const logger = createLogger({ service });
@@ -48,7 +49,10 @@ const envSchema = z.object({
   NATS_URL: z.string().default("nats://localhost:4222"),
   CLICKHOUSE_URL: z.string().default("http://localhost:8123"),
   CLICKHOUSE_DATABASE: z.string().default("default"),
+  REDIS_URL: z.string().default("redis://localhost:6379"),
   CLUSTER_WINDOW_MS: z.coerce.number().int().positive().default(500),
+  ROLLING_WINDOW_SIZE: z.coerce.number().int().positive().default(50),
+  ROLLING_TTL_SEC: z.coerce.number().int().nonnegative().default(86400),
   COMPUTE_DELIVER_POLICY: z.enum(["new", "all", "last", "last_per_subject"]).default("new"),
   COMPUTE_CONSUMER_RESET: z
     .preprocess((value) => {
@@ -67,8 +71,12 @@ const envSchema = z.object({
   NBBO_MAX_AGE_MS: z.coerce.number().int().positive().default(1000),
   CLASSIFIER_SWEEP_MIN_PREMIUM: z.coerce.number().positive().default(40_000),
   CLASSIFIER_SWEEP_MIN_COUNT: z.coerce.number().int().positive().default(3),
+  CLASSIFIER_SWEEP_MIN_PREMIUM_Z: z.coerce.number().nonnegative().default(2),
   CLASSIFIER_SPIKE_MIN_PREMIUM: z.coerce.number().positive().default(20_000),
-  CLASSIFIER_SPIKE_MIN_SIZE: z.coerce.number().int().positive().default(400)
+  CLASSIFIER_SPIKE_MIN_SIZE: z.coerce.number().int().positive().default(400),
+  CLASSIFIER_SPIKE_MIN_PREMIUM_Z: z.coerce.number().nonnegative().default(2.5),
+  CLASSIFIER_SPIKE_MIN_SIZE_Z: z.coerce.number().nonnegative().default(2),
+  CLASSIFIER_Z_MIN_SAMPLES: z.coerce.number().int().nonnegative().default(12)
 });
 
 const env = readEnv(envSchema);
@@ -76,8 +84,12 @@ const env = readEnv(envSchema);
 const classifierConfig: ClassifierConfig = {
   sweepMinPremium: env.CLASSIFIER_SWEEP_MIN_PREMIUM,
   sweepMinCount: env.CLASSIFIER_SWEEP_MIN_COUNT,
+  sweepMinPremiumZ: env.CLASSIFIER_SWEEP_MIN_PREMIUM_Z,
   spikeMinPremium: env.CLASSIFIER_SPIKE_MIN_PREMIUM,
-  spikeMinSize: env.CLASSIFIER_SPIKE_MIN_SIZE
+  spikeMinSize: env.CLASSIFIER_SPIKE_MIN_SIZE,
+  spikeMinPremiumZ: env.CLASSIFIER_SPIKE_MIN_PREMIUM_Z,
+  spikeMinSizeZ: env.CLASSIFIER_SPIKE_MIN_SIZE_Z,
+  zMinSamples: env.CLASSIFIER_Z_MIN_SAMPLES
 };
 
 const retry = async <T>(
@@ -107,6 +119,13 @@ const retry = async <T>(
   throw lastError ?? new Error(`${label} failed after retries`);
 };
 
+const roundTo = (value: number, digits = 4): number => {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Number(value.toFixed(digits));
+};
+
 type ClusterState = {
   contractId: string;
   startTs: number;
@@ -123,6 +142,10 @@ type ClusterState = {
 
 const clusters = new Map<string, ClusterState>();
 const nbboCache = new Map<string, OptionNBBO>();
+
+const rollingKey = (metric: string, contractId: string): string => {
+  return `rolling:${metric}:${contractId}`;
+};
 
 const applyDeliverPolicy = (
   opts: ReturnType<typeof buildDurableConsumer>,
@@ -203,22 +226,54 @@ const selectNbbo = (contractId: string, ts: number): NbboJoin => {
 const flushCluster = async (
   clickhouse: ReturnType<typeof createClickHouseClient>,
   js: Awaited<ReturnType<typeof connectJetStreamWithRetry>>["js"],
+  redis: ReturnType<typeof createRedisClient>,
+  rollingConfig: RollingStatsConfig,
   cluster: ClusterState
 ): Promise<void> => {
   const joinQuality: Record<string, number> = {};
   const nbboJoin = selectNbbo(cluster.contractId, cluster.endTs);
 
+  const totalPremium = roundTo(cluster.totalPremium);
+
   const features: Record<string, string | number | boolean> = {
     option_contract_id: cluster.contractId,
     count: cluster.members.length,
     total_size: cluster.totalSize,
-    total_premium: Number(cluster.totalPremium.toFixed(4)),
+    total_premium: totalPremium,
     first_price: cluster.firstPrice,
     last_price: cluster.lastPrice,
     start_ts: cluster.startTs,
     end_ts: cluster.endTs,
     window_ms: env.CLUSTER_WINDOW_MS
   };
+
+  const addRollingSnapshot = async (
+    metric: string,
+    value: number,
+    prefix: string
+  ): Promise<void> => {
+    try {
+      const snapshot = await updateRollingStats(
+        redis,
+        rollingKey(metric, cluster.contractId),
+        value,
+        rollingConfig
+      );
+      features[`${prefix}_mean`] = roundTo(snapshot.mean);
+      features[`${prefix}_std`] = roundTo(snapshot.stddev);
+      features[`${prefix}_z`] = roundTo(snapshot.zscore);
+      features[`${prefix}_baseline_n`] = snapshot.baselineCount;
+    } catch (error) {
+      logger.warn("rolling stats update failed", {
+        metric,
+        contract: cluster.contractId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  };
+
+  await addRollingSnapshot("premium", totalPremium, "total_premium");
+  await addRollingSnapshot("size", cluster.totalSize, "total_size");
 
   if (!nbboJoin.nbbo) {
     joinQuality.nbbo_missing = 1;
@@ -228,12 +283,14 @@ const flushCluster = async (
       joinQuality.nbbo_stale = 1;
     } else {
       const mid = (nbboJoin.nbbo.bid + nbboJoin.nbbo.ask) / 2;
+      const spread = nbboJoin.nbbo.ask - nbboJoin.nbbo.bid;
       features.nbbo_bid = nbboJoin.nbbo.bid;
       features.nbbo_ask = nbboJoin.nbbo.ask;
-      features.nbbo_mid = Number(mid.toFixed(4));
-      features.nbbo_spread = Number((nbboJoin.nbbo.ask - nbboJoin.nbbo.bid).toFixed(4));
+      features.nbbo_mid = roundTo(mid);
+      features.nbbo_spread = roundTo(spread);
       features.nbbo_bid_size = nbboJoin.nbbo.bidSize;
       features.nbbo_ask_size = nbboJoin.nbbo.askSize;
+      await addRollingSnapshot("spread", roundTo(spread), "nbbo_spread");
     }
   }
 
@@ -338,6 +395,8 @@ const emitClassifiers = async (
 const flushEligibleClusters = async (
   clickhouse: ReturnType<typeof createClickHouseClient>,
   js: Awaited<ReturnType<typeof connectJetStreamWithRetry>>["js"],
+  redis: ReturnType<typeof createRedisClient>,
+  rollingConfig: RollingStatsConfig,
   currentTs: number,
   skipContractId: string
 ): Promise<void> => {
@@ -348,7 +407,7 @@ const flushEligibleClusters = async (
 
     if (currentTs - cluster.endTs > env.CLUSTER_WINDOW_MS) {
       clusters.delete(contractId);
-      await flushCluster(clickhouse, js, cluster);
+      await flushCluster(clickhouse, js, redis, rollingConfig, cluster);
     }
   }
 };
@@ -433,6 +492,20 @@ const run = async () => {
     url: env.CLICKHOUSE_URL,
     database: env.CLICKHOUSE_DATABASE
   });
+
+  const redis = createRedisClient(env.REDIS_URL);
+  redis.on("error", (error) => {
+    logger.warn("redis client error", { error: error instanceof Error ? error.message : String(error) });
+  });
+
+  await retry("redis connect", 20, 500, async () => {
+    await redis.connect();
+  });
+
+  const rollingConfig: RollingStatsConfig = {
+    windowSize: env.ROLLING_WINDOW_SIZE,
+    ttlSeconds: env.ROLLING_TTL_SEC
+  };
 
   await retry("clickhouse table init", 20, 500, async () => {
     await ensureFlowPacketsTable(clickhouse);
@@ -594,12 +667,13 @@ const run = async () => {
     logger.info("service stopping", { signal });
 
     for (const cluster of clusters.values()) {
-      await flushCluster(clickhouse, js, cluster);
+      await flushCluster(clickhouse, js, redis, rollingConfig, cluster);
     }
     clusters.clear();
 
     await nc.drain();
     await clickhouse.close();
+    await redis.quit();
     process.exit(0);
   };
 
@@ -609,7 +683,14 @@ const run = async () => {
   for await (const msg of subscription.messages) {
     try {
       const print = OptionPrintSchema.parse(subscription.decode(msg));
-      await flushEligibleClusters(clickhouse, js, print.ts, print.option_contract_id);
+      await flushEligibleClusters(
+        clickhouse,
+        js,
+        redis,
+        rollingConfig,
+        print.ts,
+        print.option_contract_id
+      );
 
       const existing = clusters.get(print.option_contract_id);
       if (!existing) {
@@ -618,7 +699,7 @@ const run = async () => {
         updateCluster(existing, print);
       } else {
         clusters.delete(print.option_contract_id);
-        await flushCluster(clickhouse, js, existing);
+        await flushCluster(clickhouse, js, redis, rollingConfig, existing);
         clusters.set(print.option_contract_id, buildCluster(print));
       }
 
