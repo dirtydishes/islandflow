@@ -432,6 +432,12 @@ h1 {
   background: rgba(39, 84, 138, 0.12);
 }
 
+.aggressor-tag {
+  border-color: rgba(93, 70, 144, 0.45);
+  color: #5d4690;
+  background: rgba(93, 70, 144, 0.12);
+}
+
 .nbbo-meta {
   font-size: 0.72rem;
   color: #6f5b39;

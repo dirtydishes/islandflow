@@ -179,6 +179,8 @@ const formatTime = (ts: number): string => {
 
 const formatConfidence = (value: number): string => `${Math.round(value * 100)}%`;
 
+const formatPct = (value: number): string => `${Math.round(value * 100)}%`;
+
 const formatUsd = (value: number): string => {
   if (!Number.isFinite(value)) {
     return "0.00";
@@ -1790,10 +1792,20 @@ export default function HomePage() {
                   const structureRights =
                     typeof features.structure_rights === "string" ? features.structure_rights : "";
                   const structureStrikes = parseNumber(features.structure_strikes, 0);
-                  const nbboBid = parseNumber(features.nbbo_bid, Number.NaN);
-                  const nbboAsk = parseNumber(features.nbbo_ask, Number.NaN);
-                  const nbboMid = parseNumber(features.nbbo_mid, Number.NaN);
-                  const nbboSpread = parseNumber(features.nbbo_spread, Number.NaN);
+                const nbboBid = parseNumber(features.nbbo_bid, Number.NaN);
+                const nbboAsk = parseNumber(features.nbbo_ask, Number.NaN);
+                const nbboMid = parseNumber(features.nbbo_mid, Number.NaN);
+                const nbboSpread = parseNumber(features.nbbo_spread, Number.NaN);
+                const aggressiveBuyRatio = parseNumber(
+                  features.nbbo_aggressive_buy_ratio,
+                  Number.NaN
+                );
+                const aggressiveSellRatio = parseNumber(
+                  features.nbbo_aggressive_sell_ratio,
+                  Number.NaN
+                );
+                const aggressiveCoverage = parseNumber(features.nbbo_coverage_ratio, Number.NaN);
+                const insideRatio = parseNumber(features.nbbo_inside_ratio, Number.NaN);
                 const nbboAge = parseNumber(packet.join_quality.nbbo_age_ms, Number.NaN);
                 const nbboStale = parseNumber(packet.join_quality.nbbo_stale, 0) > 0;
                 const nbboMissing = parseNumber(packet.join_quality.nbbo_missing, 0) > 0;
@@ -1816,6 +1828,15 @@ export default function HomePage() {
                             {structureRights ? ` ${structureRights}` : ""}
                             {structureLegs > 0 ? ` ${structureLegs}L` : ""}
                             {structureStrikes > 0 ? ` ${structureStrikes}K` : ""}
+                          </span>
+                        ) : null}
+                        {Number.isFinite(aggressiveCoverage) && aggressiveCoverage > 0 ? (
+                          <span className="pill aggressor-tag">
+                            Agg {formatPct(aggressiveBuyRatio)} / {formatPct(aggressiveSellRatio)}
+                            {Number.isFinite(insideRatio) && insideRatio > 0
+                              ? ` · In ${formatPct(insideRatio)}`
+                              : ""}
+                            {` · ${formatPct(aggressiveCoverage)} cov`}
                           </span>
                         ) : null}
                         {Number.isFinite(nbboBid) && Number.isFinite(nbboAsk) ? (

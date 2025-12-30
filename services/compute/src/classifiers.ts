@@ -10,6 +10,8 @@ export type ClassifierConfig = {
   spikeMinPremiumZ: number;
   spikeMinSizeZ: number;
   zMinSamples: number;
+  minNbboCoverage: number;
+  minAggressorRatio: number;
 };
 
 const clamp = (value: number, min = 0, max = 1): number => {
@@ -31,6 +33,34 @@ const getNumberFeature = (packet: FlowPacket, key: string): number => {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 };
 
+const formatPct = (value: number): string => `${Math.round(value * 100)}%`;
+
+const applyAggressorAdjustment = (
+  confidence: number,
+  coverage: number,
+  aggressiveRatio: number,
+  config: ClassifierConfig
+): { confidence: number; note: string } => {
+  if (!Number.isFinite(coverage) || coverage <= 0) {
+    return { confidence, note: "Aggressor mix unavailable (no NBBO coverage)." };
+  }
+
+  let adjusted = confidence;
+  if (coverage >= config.minNbboCoverage) {
+    if (aggressiveRatio >= config.minAggressorRatio) {
+      adjusted += 0.05;
+    } else {
+      adjusted -= 0.1;
+    }
+  }
+
+  const note = `Aggressor mix ${formatPct(aggressiveRatio)} aggressive, NBBO coverage ${formatPct(
+    coverage
+  )}.`;
+
+  return { confidence: adjusted, note };
+};
+
 const buildSweepHit = (
   packet: FlowPacket,
   contract: ParsedContract,
@@ -45,6 +75,10 @@ const buildSweepHit = (
   const windowMs = getNumberFeature(packet, "window_ms");
   const premiumZ = getNumberFeature(packet, "total_premium_z");
   const premiumBaseline = getNumberFeature(packet, "total_premium_baseline_n");
+  const coverage = getNumberFeature(packet, "nbbo_coverage_ratio");
+  const aggressiveBuyRatio = getNumberFeature(packet, "nbbo_aggressive_buy_ratio");
+  const aggressiveSellRatio = getNumberFeature(packet, "nbbo_aggressive_sell_ratio");
+  const aggressiveRatio = Math.max(aggressiveBuyRatio, aggressiveSellRatio);
 
   const baselineReady = premiumBaseline >= config.zMinSamples;
   const passesAbsolute = totalPremium >= config.sweepMinPremium;
@@ -74,7 +108,8 @@ const buildSweepHit = (
     }
   }
 
-  confidence = clamp(confidence, 0, 0.95);
+  const aggressor = applyAggressorAdjustment(confidence, coverage, aggressiveRatio, config);
+  confidence = clamp(aggressor.confidence, 0, 0.95);
 
   const baselineNote = baselineReady
     ? `Baseline premium z-score ${premiumZ.toFixed(2)} over ${Math.round(premiumBaseline)} samples.`
@@ -88,7 +123,8 @@ const buildSweepHit = (
       `Likely ${direction === "bullish" ? "call" : "put"} sweep: ${count} prints in ${Math.round(windowMs)}ms for ${packet.features.option_contract_id ?? packet.id}.`,
       `Premium ${formatUsd(totalPremium)} across ${Math.round(totalSize)} contracts; price ${priceTrend}.`,
       `Thresholds: >=${config.sweepMinCount} prints and >=${formatUsd(config.sweepMinPremium)} premium or z>=${config.sweepMinPremiumZ.toFixed(1)}.`,
-      baselineNote
+      baselineNote,
+      aggressor.note
     ]
   };
 };
@@ -102,6 +138,10 @@ const buildSpikeHit = (packet: FlowPacket, config: ClassifierConfig): Classifier
   const sizeZ = getNumberFeature(packet, "total_size_z");
   const premiumBaseline = getNumberFeature(packet, "total_premium_baseline_n");
   const sizeBaseline = getNumberFeature(packet, "total_size_baseline_n");
+  const coverage = getNumberFeature(packet, "nbbo_coverage_ratio");
+  const aggressiveBuyRatio = getNumberFeature(packet, "nbbo_aggressive_buy_ratio");
+  const aggressiveSellRatio = getNumberFeature(packet, "nbbo_aggressive_sell_ratio");
+  const aggressiveRatio = Math.max(aggressiveBuyRatio, aggressiveSellRatio);
 
   const premiumBaselineReady = premiumBaseline >= config.zMinSamples;
   const sizeBaselineReady = sizeBaseline >= config.zMinSamples;
@@ -131,7 +171,8 @@ const buildSpikeHit = (packet: FlowPacket, config: ClassifierConfig): Classifier
     }
   }
 
-  confidence = clamp(confidence, 0, 0.9);
+  const aggressor = applyAggressorAdjustment(confidence, coverage, aggressiveRatio, config);
+  confidence = clamp(aggressor.confidence, 0, 0.9);
 
   const baselineNote =
     premiumBaselineReady || sizeBaselineReady
@@ -146,7 +187,8 @@ const buildSpikeHit = (packet: FlowPacket, config: ClassifierConfig): Classifier
       `Unusual contract spike: ${count} prints in ${Math.round(windowMs)}ms for ${packet.features.option_contract_id ?? packet.id}.`,
       `Premium ${formatUsd(totalPremium)} across ${Math.round(totalSize)} contracts.`,
       `Thresholds: >=${config.spikeMinSize} contracts and >=${formatUsd(config.spikeMinPremium)} premium or z>=${config.spikeMinPremiumZ.toFixed(1)}.`,
-      baselineNote
+      baselineNote,
+      aggressor.note
     ]
   };
 };

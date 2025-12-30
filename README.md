@@ -15,6 +15,7 @@ Done now (in repo):
 - Deterministic option FlowPacket clustering (time window) + persistence
 - Rolling stats in Redis (premium/size/spread) with z-score features on FlowPackets
 - FlowPacket structure tags (vertical/ladder/straddle/strangle) for multi-leg bursts
+- Aggressor mix features (NBBO placement ratios) on FlowPackets
 - Rule-first classifiers + alert scoring with ClickHouse persistence + WS/REST endpoints
 - API: REST for prints/flow packets/classifier hits/alerts, WS for live options/equities/flow/alerts/hits, replay endpoints
 - UI: live tapes for options/equities/flow + replay toggle + pause controls + replay time/completion
@@ -47,6 +48,7 @@ Not started:
 - Deterministic option FlowPacket clustering (time-window)
 - Rolling stats baselines in Redis with z-score features on FlowPackets
 - Basic multi-leg structure tagging on FlowPackets
+- Aggressor mix features from NBBO placement on FlowPackets
 - Classifiers + alert scoring (rule-first) with WS/REST endpoints
 - API gateway with REST, WS, and replay endpoints
 - UI tapes for options/equities/flow packets + alerts/hits with live/replay toggle and pause controls
@@ -110,6 +112,7 @@ Adapter selection (env):
 - Compute: `COMPUTE_DELIVER_POLICY` (`new` default), `COMPUTE_CONSUMER_RESET` (force skip backlog)
 - Rolling stats: `REDIS_URL`, `ROLLING_WINDOW_SIZE`, `ROLLING_TTL_SEC`
 - Classifier tuning: `CLASSIFIER_SWEEP_MIN_PREMIUM_Z`, `CLASSIFIER_SPIKE_MIN_PREMIUM_Z`, `CLASSIFIER_SPIKE_MIN_SIZE_Z`, `CLASSIFIER_Z_MIN_SAMPLES`
+- Aggressor gating: `CLASSIFIER_MIN_NBBO_COVERAGE`, `CLASSIFIER_MIN_AGGRESSOR_RATIO`
 
 Testing mode (throttles ingest to reduce CPU):
 - `TESTING_MODE=true` enables throttling

@@ -10,7 +10,9 @@ const baseConfig: ClassifierConfig = {
   spikeMinSize: 400,
   spikeMinPremiumZ: 2.5,
   spikeMinSizeZ: 2,
-  zMinSamples: 12
+  zMinSamples: 12,
+  minNbboCoverage: 0.5,
+  minAggressorRatio: 0.55
 };
 
 const buildPacket = (
@@ -65,5 +67,36 @@ describe("classifier z-score behavior", () => {
     });
     const hits = evaluateClassifiers(packet, baseConfig);
     expect(hits.some((hit) => hit.classifier_id === "large_bullish_call_sweep")).toBe(false);
+  });
+
+  test("aggressor mix adjusts sweep confidence", () => {
+    const basePacket = {
+      total_premium: 120_000,
+      total_size: 900,
+      count: 4,
+      nbbo_coverage_ratio: 0.8
+    };
+
+    const lowAgg = buildPacket({
+      ...basePacket,
+      nbbo_aggressive_buy_ratio: 0.2,
+      nbbo_aggressive_sell_ratio: 0.2
+    });
+    const highAgg = buildPacket({
+      ...basePacket,
+      nbbo_aggressive_buy_ratio: 0.7,
+      nbbo_aggressive_sell_ratio: 0.3
+    });
+
+    const lowHit = evaluateClassifiers(lowAgg, baseConfig).find(
+      (hit) => hit.classifier_id === "large_bullish_call_sweep"
+    );
+    const highHit = evaluateClassifiers(highAgg, baseConfig).find(
+      (hit) => hit.classifier_id === "large_bullish_call_sweep"
+    );
+
+    expect(lowHit).toBeTruthy();
+    expect(highHit).toBeTruthy();
+    expect((highHit?.confidence ?? 0)).toBeGreaterThan(lowHit?.confidence ?? 0);
   });
 });
