@@ -365,9 +365,11 @@ h1 {
 .list {
   display: grid;
   gap: 14px;
-  max-height: 480px;
+  height: 480px;
   overflow: auto;
   padding-right: 6px;
+  overflow-anchor: none;
+  scrollbar-gutter: stable;
 }
 
 .row {
@@ -716,6 +718,10 @@ h1 {
     position: static;
     width: 100%;
     max-height: none;
+  }
+
+  .list {
+    height: 360px;
   }
 }
 
