@@ -14,6 +14,7 @@ Done now (in repo):
 - Synthetic options/equity prints (full S&P 500) published to NATS and persisted to ClickHouse
 - Deterministic option FlowPacket clustering (time window) + persistence
 - Rolling stats in Redis (premium/size/spread) with z-score features on FlowPackets
+- FlowPacket structure tags (vertical/ladder/straddle/strangle) for multi-leg bursts
 - Rule-first classifiers + alert scoring with ClickHouse persistence + WS/REST endpoints
 - API: REST for prints/flow packets/classifier hits/alerts, WS for live options/equities/flow/alerts/hits, replay endpoints
 - UI: live tapes for options/equities/flow + replay toggle + pause controls + replay time/completion
@@ -24,7 +25,7 @@ Done now (in repo):
 
 In progress / blocked:
 - Live data adapters beyond dev-only feeds (requires licensed data source)
-- Advanced clustering
+- Advanced clustering (spreads/rolls beyond basic structure tags)
 
 Not started:
 - Dark pool inference
@@ -45,6 +46,7 @@ Not started:
 - Raw event persistence in ClickHouse + streaming via NATS JetStream
 - Deterministic option FlowPacket clustering (time-window)
 - Rolling stats baselines in Redis with z-score features on FlowPackets
+- Basic multi-leg structure tagging on FlowPackets
 - Classifiers + alert scoring (rule-first) with WS/REST endpoints
 - API gateway with REST, WS, and replay endpoints
 - UI tapes for options/equities/flow packets + alerts/hits with live/replay toggle and pause controls

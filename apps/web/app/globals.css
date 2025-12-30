@@ -426,6 +426,12 @@ h1 {
   background: rgba(111, 91, 57, 0.12);
 }
 
+.structure-tag {
+  border-color: rgba(39, 84, 138, 0.45);
+  color: #27548a;
+  background: rgba(39, 84, 138, 0.12);
+}
+
 .nbbo-meta {
   font-size: 0.72rem;
   color: #6f5b39;

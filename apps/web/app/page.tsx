@@ -1778,16 +1778,22 @@ export default function HomePage() {
                   const features = packet.features ?? {};
                   const contract = String(features.option_contract_id ?? packet.id ?? "unknown");
                   const count = parseNumber(features.count, packet.members.length);
-                const totalSize = parseNumber(features.total_size, 0);
-                const totalPremium = parseNumber(features.total_premium, 0);
-                const notional = totalPremium * 100;
-                const startTs = parseNumber(features.start_ts, packet.source_ts);
-                const endTs = parseNumber(features.end_ts, startTs);
-                const windowMs = parseNumber(features.window_ms, 0);
-                const nbboBid = parseNumber(features.nbbo_bid, Number.NaN);
-                const nbboAsk = parseNumber(features.nbbo_ask, Number.NaN);
-                const nbboMid = parseNumber(features.nbbo_mid, Number.NaN);
-                const nbboSpread = parseNumber(features.nbbo_spread, Number.NaN);
+                  const totalSize = parseNumber(features.total_size, 0);
+                  const totalPremium = parseNumber(features.total_premium, 0);
+                  const notional = totalPremium * 100;
+                  const startTs = parseNumber(features.start_ts, packet.source_ts);
+                  const endTs = parseNumber(features.end_ts, startTs);
+                  const windowMs = parseNumber(features.window_ms, 0);
+                  const structureType =
+                    typeof features.structure_type === "string" ? features.structure_type : "";
+                  const structureLegs = parseNumber(features.structure_legs, 0);
+                  const structureRights =
+                    typeof features.structure_rights === "string" ? features.structure_rights : "";
+                  const structureStrikes = parseNumber(features.structure_strikes, 0);
+                  const nbboBid = parseNumber(features.nbbo_bid, Number.NaN);
+                  const nbboAsk = parseNumber(features.nbbo_ask, Number.NaN);
+                  const nbboMid = parseNumber(features.nbbo_mid, Number.NaN);
+                  const nbboSpread = parseNumber(features.nbbo_spread, Number.NaN);
                 const nbboAge = parseNumber(packet.join_quality.nbbo_age_ms, Number.NaN);
                 const nbboStale = parseNumber(packet.join_quality.nbbo_stale, 0) > 0;
                 const nbboMissing = parseNumber(packet.join_quality.nbbo_missing, 0) > 0;
@@ -1803,6 +1809,14 @@ export default function HomePage() {
                         <span>Notional ${formatUsd(notional)}</span>
                         {windowMs > 0 ? (
                           <span>{formatFlowMetric(windowMs, "ms")}</span>
+                        ) : null}
+                        {structureType ? (
+                          <span className="pill structure-tag">
+                            {structureType.replace(/_/g, " ")}
+                            {structureRights ? ` ${structureRights}` : ""}
+                            {structureLegs > 0 ? ` ${structureLegs}L` : ""}
+                            {structureStrikes > 0 ? ` ${structureStrikes}K` : ""}
+                          </span>
                         ) : null}
                         {Number.isFinite(nbboBid) && Number.isFinite(nbboAsk) ? (
                           <span>
