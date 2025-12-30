@@ -239,6 +239,22 @@ const useListScroll = (): ListScrollState => {
     isAtTopRef.current = isAtTop;
   }, [isAtTop]);
 
+  const updateScrollState = useCallback(() => {
+    const el = listRef.current;
+    if (!el) {
+      return;
+    }
+
+    const atTop = el.scrollTop <= 2;
+
+    isAtTopRef.current = atTop;
+    setIsAtTop(atTop);
+
+    if (atTop) {
+      setMissed(0);
+    }
+  }, [isAtTopRef]);
+
   useEffect(() => {
     const el = listRef.current;
     if (!el) {
@@ -246,21 +262,16 @@ const useListScroll = (): ListScrollState => {
     }
 
     const onScroll = () => {
-      const atTop = el.scrollTop <= 2;
-      isAtTopRef.current = atTop;
-      setIsAtTop(atTop);
-      if (atTop) {
-        setMissed(0);
-      }
+      updateScrollState();
     };
 
-    onScroll();
+    updateScrollState();
     el.addEventListener("scroll", onScroll);
 
     return () => {
       el.removeEventListener("scroll", onScroll);
     };
-  }, []);
+  }, [updateScrollState]);
 
   const onNewItems = useCallback((count: number) => {
     if (count <= 0) {
@@ -281,9 +292,10 @@ const useListScroll = (): ListScrollState => {
       return;
     }
 
-    el.scrollTo({ top: 0, behavior: "smooth" });
-    setMissed(0);
-  }, []);
+    isAtTopRef.current = true;
+    el.scrollTop = 0;
+    updateScrollState();
+  }, [isAtTopRef, listRef, updateScrollState]);
 
   return {
     listRef,
@@ -299,10 +311,11 @@ const useScrollAnchor = (
   listRef: React.RefObject<HTMLDivElement>,
   isAtTopRef: React.MutableRefObject<boolean>
 ) => {
-  const pendingRef = useRef<{ top: number; height: number } | null>(null);
+  const pendingRef = useRef<{ height: number } | null>(null);
 
   const capture = useCallback(() => {
     if (isAtTopRef.current) {
+      pendingRef.current = null;
       return;
     }
 
@@ -312,7 +325,6 @@ const useScrollAnchor = (
     }
 
     pendingRef.current = {
-      top: el.scrollTop,
       height: el.scrollHeight
     };
   }, [isAtTopRef, listRef]);
@@ -328,10 +340,17 @@ const useScrollAnchor = (
       return;
     }
 
+    if (isAtTopRef.current) {
+      pendingRef.current = null;
+      return;
+    }
+
     const delta = el.scrollHeight - pending.height;
-    el.scrollTop = pending.top + delta;
+    if (delta !== 0) {
+      el.scrollTop = Math.max(0, el.scrollTop + delta);
+    }
     pendingRef.current = null;
-  }, [listRef]);
+  }, [isAtTopRef, listRef]);
 
   return { capture, apply };
 };
@@ -1624,48 +1643,50 @@ export default function HomePage() {
             />
           </div>
 
-          <div className="list" ref={flowScroll.listRef}>
-            {mode !== "live" ? (
-              <div className="empty">Flow packets are live-only in this build.</div>
-            ) : filteredFlow.length === 0 ? (
-              <div className="empty">
-                {tickerSet.size > 0
-                  ? "No flow packets match the current filter."
-                  : "No flow packets yet. Start compute."}
-              </div>
-            ) : (
-              filteredFlow.map((packet) => {
-                const features = packet.features ?? {};
-                const contract = String(features.option_contract_id ?? packet.id ?? "unknown");
-                const count = parseNumber(features.count, packet.members.length);
-                const totalSize = parseNumber(features.total_size, 0);
-                const totalPremium = parseNumber(features.total_premium, 0);
-                const notional = totalPremium * 100;
-                const startTs = parseNumber(features.start_ts, packet.source_ts);
-                const endTs = parseNumber(features.end_ts, startTs);
-                const windowMs = parseNumber(features.window_ms, 0);
+          <div className="card-body">
+            <div className="list" ref={flowScroll.listRef}>
+              {mode !== "live" ? (
+                <div className="empty">Flow packets are live-only in this build.</div>
+              ) : filteredFlow.length === 0 ? (
+                <div className="empty">
+                  {tickerSet.size > 0
+                    ? "No flow packets match the current filter."
+                    : "No flow packets yet. Start compute."}
+                </div>
+              ) : (
+                filteredFlow.map((packet) => {
+                  const features = packet.features ?? {};
+                  const contract = String(features.option_contract_id ?? packet.id ?? "unknown");
+                  const count = parseNumber(features.count, packet.members.length);
+                  const totalSize = parseNumber(features.total_size, 0);
+                  const totalPremium = parseNumber(features.total_premium, 0);
+                  const notional = totalPremium * 100;
+                  const startTs = parseNumber(features.start_ts, packet.source_ts);
+                  const endTs = parseNumber(features.end_ts, startTs);
+                  const windowMs = parseNumber(features.window_ms, 0);
 
-                return (
-                  <div className="row" key={packet.id}>
-                    <div>
-                      <div className="contract">{contract}</div>
-                      <div className="meta flow-meta">
-                        <span>{formatFlowMetric(count)} prints</span>
-                        <span>{formatFlowMetric(totalSize)} size</span>
-                        <span>Premium ${formatPrice(totalPremium)}</span>
-                        <span>Notional ${formatUsd(notional)}</span>
-                        {windowMs > 0 ? (
-                          <span>{formatFlowMetric(windowMs, "ms")}</span>
-                        ) : null}
+                  return (
+                    <div className="row" key={packet.id}>
+                      <div>
+                        <div className="contract">{contract}</div>
+                        <div className="meta flow-meta">
+                          <span>{formatFlowMetric(count)} prints</span>
+                          <span>{formatFlowMetric(totalSize)} size</span>
+                          <span>Premium ${formatPrice(totalPremium)}</span>
+                          <span>Notional ${formatUsd(notional)}</span>
+                          {windowMs > 0 ? (
+                            <span>{formatFlowMetric(windowMs, "ms")}</span>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="time">
+                        {formatTime(startTs)} → {formatTime(endTs)}
                       </div>
                     </div>
-                    <div className="time">
-                      {formatTime(startTs)} → {formatTime(endTs)}
-                    </div>
-                  </div>
-                );
-              })
-            )}
+                  );
+                })
+              )}
+            </div>
           </div>
         </section>
 
@@ -1694,50 +1715,51 @@ export default function HomePage() {
             />
           </div>
 
-          <AlertSeverityStrip alerts={filteredAlerts} />
+          <div className="card-body">
+            <AlertSeverityStrip alerts={filteredAlerts} />
+            <div className="list" ref={alertsScroll.listRef}>
+              {mode !== "live" ? (
+                <div className="empty">Alerts are live-only in this build.</div>
+              ) : filteredAlerts.length === 0 ? (
+                <div className="empty">
+                  {tickerSet.size > 0
+                    ? "No alerts match the current filter."
+                    : "No alerts yet. Start compute."}
+                </div>
+              ) : (
+                filteredAlerts.map((alert) => {
+                  const primary = alert.hits[0];
+                  const direction = primary ? normalizeDirection(primary.direction) : "neutral";
 
-          <div className="list" ref={alertsScroll.listRef}>
-            {mode !== "live" ? (
-              <div className="empty">Alerts are live-only in this build.</div>
-            ) : filteredAlerts.length === 0 ? (
-              <div className="empty">
-                {tickerSet.size > 0
-                  ? "No alerts match the current filter."
-                  : "No alerts yet. Start compute."}
-              </div>
-            ) : (
-              filteredAlerts.map((alert) => {
-                const primary = alert.hits[0];
-                const direction = primary ? normalizeDirection(primary.direction) : "neutral";
-
-                return (
-                  <button
-                    className="row row-button"
-                    key={`${alert.trace_id}-${alert.seq}`}
-                    type="button"
-                    onClick={() => setSelectedAlert(alert)}
-                  >
-                    <div>
-                      <div className="contract">
-                        {primary ? humanizeClassifierId(primary.classifier_id) : "Alert"}
-                      </div>
-                      <div className="meta">
-                        <span className={`pill severity-${alert.severity}`}>{alert.severity}</span>
-                        <span>Score {Math.round(alert.score)}</span>
-                        <span>{alert.hits.length} hits</span>
-                        {primary ? (
-                          <span className={`pill direction-${direction}`}>{direction}</span>
+                  return (
+                    <button
+                      className="row row-button"
+                      key={`${alert.trace_id}-${alert.seq}`}
+                      type="button"
+                      onClick={() => setSelectedAlert(alert)}
+                    >
+                      <div>
+                        <div className="contract">
+                          {primary ? humanizeClassifierId(primary.classifier_id) : "Alert"}
+                        </div>
+                        <div className="meta">
+                          <span className={`pill severity-${alert.severity}`}>{alert.severity}</span>
+                          <span>Score {Math.round(alert.score)}</span>
+                          <span>{alert.hits.length} hits</span>
+                          {primary ? (
+                            <span className={`pill direction-${direction}`}>{direction}</span>
+                          ) : null}
+                        </div>
+                        {primary?.explanations?.[0] ? (
+                          <div className="note">{primary.explanations[0]}</div>
                         ) : null}
                       </div>
-                      {primary?.explanations?.[0] ? (
-                        <div className="note">{primary.explanations[0]}</div>
-                      ) : null}
-                    </div>
-                    <div className="time">{formatTime(alert.source_ts)}</div>
-                  </button>
-                );
-              })
-            )}
+                      <div className="time">{formatTime(alert.source_ts)}</div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
           </div>
         </section>
 
@@ -1766,35 +1788,37 @@ export default function HomePage() {
             />
           </div>
 
-          <div className="list" ref={classifierScroll.listRef}>
-            {mode !== "live" ? (
-              <div className="empty">Classifier hits are live-only in this build.</div>
-            ) : filteredClassifierHits.length === 0 ? (
-              <div className="empty">
-                {tickerSet.size > 0
-                  ? "No classifier hits match the current filter."
-                  : "No classifier hits yet. Start compute."}
-              </div>
-            ) : (
-              filteredClassifierHits.map((hit) => {
-                const direction = normalizeDirection(hit.direction);
-                return (
-                  <div className="row" key={`${hit.trace_id}-${hit.seq}`}>
-                    <div>
-                      <div className="contract">{humanizeClassifierId(hit.classifier_id)}</div>
-                      <div className="meta">
-                        <span className={`pill direction-${direction}`}>{direction}</span>
-                        <span>Confidence {formatConfidence(hit.confidence)}</span>
+          <div className="card-body">
+            <div className="list" ref={classifierScroll.listRef}>
+              {mode !== "live" ? (
+                <div className="empty">Classifier hits are live-only in this build.</div>
+              ) : filteredClassifierHits.length === 0 ? (
+                <div className="empty">
+                  {tickerSet.size > 0
+                    ? "No classifier hits match the current filter."
+                    : "No classifier hits yet. Start compute."}
+                </div>
+              ) : (
+                filteredClassifierHits.map((hit) => {
+                  const direction = normalizeDirection(hit.direction);
+                  return (
+                    <div className="row" key={`${hit.trace_id}-${hit.seq}`}>
+                      <div>
+                        <div className="contract">{humanizeClassifierId(hit.classifier_id)}</div>
+                        <div className="meta">
+                          <span className={`pill direction-${direction}`}>{direction}</span>
+                          <span>Confidence {formatConfidence(hit.confidence)}</span>
+                        </div>
+                        {hit.explanations?.[0] ? (
+                          <div className="note">{hit.explanations[0]}</div>
+                        ) : null}
                       </div>
-                      {hit.explanations?.[0] ? (
-                        <div className="note">{hit.explanations[0]}</div>
-                      ) : null}
+                      <div className="time">{formatTime(hit.source_ts)}</div>
                     </div>
-                    <div className="time">{formatTime(hit.source_ts)}</div>
-                  </div>
-                );
-              })
-            )}
+                  );
+                })
+              )}
+            </div>
           </div>
         </section>
       </div>

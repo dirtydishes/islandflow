@@ -11,16 +11,100 @@ type Burst = {
   baseSize: number;
   exchange: string;
   conditions?: string[];
-  burstSize: number;
+  printCount: number;
+  priceStep: number;
 };
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
-const EXPIRY_OFFSETS = [7, 14, 28, 45, 60, 90];
+const EXPIRY_OFFSETS = [0, 1, 7, 14, 28, 45, 60, 90];
 const EXCHANGES = ["CBOE", "PHLX", "ISE", "ARCA", "BOX", "MIAX"];
 const CONDITIONS = ["SWEEP", "ISO", "FILL", "TEST"];
+const BURST_RUN_RANGE: [number, number] = [2, 4];
+
+type Scenario = {
+  id: string;
+  weight: number;
+  right: "C" | "P" | "either";
+  countRange: [number, number];
+  sizeRange: [number, number];
+  premiumRange: [number, number];
+  priceTrend: "up" | "down" | "flat";
+  conditions?: string[];
+};
+
+const SCENARIOS: Scenario[] = [
+  {
+    id: "bullish_sweep",
+    weight: 35,
+    right: "C",
+    countRange: [7, 10],
+    sizeRange: [600, 1800],
+    premiumRange: [120_000, 240_000],
+    priceTrend: "up",
+    conditions: ["SWEEP"]
+  },
+  {
+    id: "bearish_sweep",
+    weight: 35,
+    right: "P",
+    countRange: [7, 10],
+    sizeRange: [600, 1800],
+    premiumRange: [120_000, 240_000],
+    priceTrend: "up",
+    conditions: ["SWEEP"]
+  },
+  {
+    id: "contract_spike",
+    weight: 20,
+    right: "either",
+    countRange: [5, 8],
+    sizeRange: [1200, 3200],
+    premiumRange: [60_000, 140_000],
+    priceTrend: "flat",
+    conditions: ["ISO"]
+  },
+  {
+    id: "noise",
+    weight: 10,
+    right: "either",
+    countRange: [2, 4],
+    sizeRange: [10, 200],
+    premiumRange: [500, 5000],
+    priceTrend: "flat",
+    conditions: ["FILL"]
+  }
+];
 
 const pick = <T,>(items: T[], seed: number): T => {
   return items[Math.abs(seed) % items.length];
+};
+
+const pickInt = (min: number, max: number, seed: number): number => {
+  if (max <= min) {
+    return min;
+  }
+  const span = max - min + 1;
+  return min + (Math.abs(seed) % span);
+};
+
+const pickFloat = (min: number, max: number, seed: number): number => {
+  if (max <= min) {
+    return min;
+  }
+  const offset = (Math.abs(seed) % 1000) / 1000;
+  return min + (max - min) * offset;
+};
+
+const pickWeighted = <T extends { weight: number }>(items: T[], seed: number): T => {
+  const totalWeight = items.reduce((sum, item) => sum + item.weight, 0);
+  let target = Math.abs(seed) % totalWeight;
+  for (const item of items) {
+    if (target < item.weight) {
+      return item;
+    }
+    target -= item.weight;
+  }
+  return items[0];
 };
 
 const hashSymbol = (value: string): number => {
@@ -44,21 +128,36 @@ const formatExpiry = (now: number, offsetDays: number): string => {
 const buildBurst = (burstIndex: number, now: number): Burst => {
   const symbol = SP500_SYMBOLS[burstIndex % SP500_SYMBOLS.length];
   const symbolHash = hashSymbol(symbol);
-  const basePrice = 30 + (symbolHash % 470);
+  const scenario = pickWeighted(SCENARIOS, symbolHash + burstIndex * 7);
+  const baseUnderlying = 30 + (symbolHash % 470);
   const expiryOffset = pick(EXPIRY_OFFSETS, symbolHash + burstIndex);
   const expiry = formatExpiry(now, expiryOffset);
-  const strikeStep = basePrice >= 200 ? 10 : 5;
-  const strikeOffset = ((burstIndex % 7) - 3) * strikeStep;
-  const strike = Math.max(1, Math.round(basePrice / strikeStep) * strikeStep + strikeOffset);
-  const right = burstIndex % 2 === 0 ? "C" : "P";
+  const strikeStep = baseUnderlying >= 200 ? 10 : baseUnderlying >= 100 ? 5 : 2.5;
+  const moneynessSteps = scenario.id === "noise" ? 5 : 2;
+  const strikeOffset = pickInt(-moneynessSteps, moneynessSteps, symbolHash + burstIndex * 11);
+  const strike = Math.max(
+    1,
+    Math.round(baseUnderlying / strikeStep) * strikeStep + strikeOffset * strikeStep
+  );
+  const right =
+    scenario.right === "either"
+      ? (symbolHash + burstIndex) % 2 === 0
+        ? "C"
+        : "P"
+      : scenario.right;
   const contractId = `${symbol}-${expiry}-${formatStrike(strike)}-${right}`;
   const exchange = pick(EXCHANGES, burstIndex + symbolHash);
-  const isBlock = burstIndex % 4 === 0;
-  const burstSize = isBlock ? 4 : burstIndex % 3 === 0 ? 2 : 1;
-  const baseSize = isBlock ? 1200 + (symbolHash % 1800) : 5 + (symbolHash % 180);
-  const distance = Math.abs(strike - basePrice);
-  const basePricePer = isBlock ? 12 + distance / strikeStep : 0.5 + distance / 30;
-  const conditions = isBlock ? [pick(CONDITIONS, burstIndex)] : undefined;
+  const printCount = pickInt(scenario.countRange[0], scenario.countRange[1], symbolHash + burstIndex * 13);
+  const baseSize = pickInt(scenario.sizeRange[0], scenario.sizeRange[1], symbolHash + burstIndex * 17);
+  const premiumTarget = pickFloat(
+    scenario.premiumRange[0],
+    scenario.premiumRange[1],
+    symbolHash + burstIndex * 19
+  );
+  const basePricePer = Math.max(0.05, Number((premiumTarget / (baseSize * printCount)).toFixed(2)));
+  const conditions = scenario.conditions?.length ? scenario.conditions : [pick(CONDITIONS, burstIndex)];
+  const priceStep =
+    scenario.priceTrend === "up" ? 0.01 : scenario.priceTrend === "down" ? -0.01 : 0;
 
   return {
     contractId,
@@ -66,7 +165,8 @@ const buildBurst = (burstIndex: number, now: number): Burst => {
     baseSize,
     exchange,
     conditions,
-    burstSize
+    printCount,
+    priceStep
   };
 };
 
@@ -79,7 +179,7 @@ export const createSyntheticOptionsAdapter = (
       let seq = 0;
       let burstIndex = 0;
       let currentBurst: Burst | null = null;
-      let remaining = 0;
+      let remainingRuns = 0;
       let timer: ReturnType<typeof setInterval> | null = null;
       let stopped = false;
 
@@ -89,19 +189,20 @@ export const createSyntheticOptionsAdapter = (
         }
 
         const now = Date.now();
-        if (!currentBurst || remaining <= 0) {
+        if (!currentBurst || remainingRuns <= 0) {
           burstIndex += 1;
           currentBurst = buildBurst(burstIndex, now);
-          remaining = currentBurst.burstSize;
+          remainingRuns = pickInt(BURST_RUN_RANGE[0], BURST_RUN_RANGE[1], burstIndex * 23);
         }
 
         const burst = currentBurst;
-        const printsToEmit = remaining;
+        const printsToEmit = burst.printCount;
 
         for (let i = 0; i < printsToEmit; i += 1) {
           seq += 1;
-          const priceJitter = (i % 3) - 1;
-          const sizeJitter = (i % 4) - 1;
+          const priceJitter = ((i % 3) - 1) * 0.004;
+          const sizeJitter = ((i % 3) - 1) * 0.08;
+          const priceMultiplier = 1 + burst.priceStep * i + priceJitter;
           const print: OptionPrint = {
             source_ts: now + i * 5,
             ingest_ts: now + i * 5,
@@ -109,8 +210,8 @@ export const createSyntheticOptionsAdapter = (
             trace_id: `synthetic-options-${seq}`,
             ts: now + i * 5,
             option_contract_id: burst.contractId,
-            price: Math.max(0.05, Number((burst.basePrice * (1 + priceJitter * 0.02)).toFixed(2))),
-            size: Math.max(1, Math.round(burst.baseSize * (1 + sizeJitter * 0.05))),
+            price: Math.max(0.05, Number((burst.basePrice * priceMultiplier).toFixed(2))),
+            size: Math.max(1, Math.round(burst.baseSize * (1 + sizeJitter))),
             exchange: burst.exchange,
             conditions: burst.conditions
           };
@@ -118,7 +219,7 @@ export const createSyntheticOptionsAdapter = (
           void handlers.onTrade(print);
         }
 
-        remaining = 0;
+        remainingRuns -= 1;
       };
 
       timer = setInterval(emit, config.emitIntervalMs);

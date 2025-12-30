@@ -60,10 +60,10 @@ const envSchema = z.object({
       return value;
     }, z.boolean())
     .default(false),
-  CLASSIFIER_SWEEP_MIN_PREMIUM: z.coerce.number().positive().default(50_000),
+  CLASSIFIER_SWEEP_MIN_PREMIUM: z.coerce.number().positive().default(40_000),
   CLASSIFIER_SWEEP_MIN_COUNT: z.coerce.number().int().positive().default(3),
-  CLASSIFIER_SPIKE_MIN_PREMIUM: z.coerce.number().positive().default(25_000),
-  CLASSIFIER_SPIKE_MIN_SIZE: z.coerce.number().int().positive().default(500)
+  CLASSIFIER_SPIKE_MIN_PREMIUM: z.coerce.number().positive().default(20_000),
+  CLASSIFIER_SPIKE_MIN_SIZE: z.coerce.number().int().positive().default(400)
 });
 
 const env = readEnv(envSchema);

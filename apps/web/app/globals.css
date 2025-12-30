@@ -373,6 +373,7 @@ h1 {
   scrollbar-gutter: stable;
 }
 
+
 .row {
   display: flex;
   justify-content: space-between;
@@ -793,31 +794,30 @@ h1 {
 .card-flow,
 .card-alerts,
 .card-classifiers {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  height: 760px;
+  display: flex;
+  flex-direction: column;
+  height: 960px;
+  overflow: hidden;
 }
 
-.card-flow,
-.card-classifiers {
-  grid-template-rows: auto auto minmax(0, 1fr);
-}
-
-.card-alerts {
-  grid-template-rows: auto auto auto minmax(0, 1fr);
-}
-
-.card-flow .list,
-.card-alerts .list,
-.card-classifiers .list {
-  height: 100%;
+.card-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
   min-height: 0;
+  gap: 16px;
+}
+
+.card-body .list {
+  flex: 1 1 0;
+  min-height: 0;
+  height: auto;
 }
 
 @media (max-width: 720px) {
   .card-flow,
   .card-alerts,
   .card-classifiers {
-    height: 600px;
+    height: 780px;
   }
 }
