@@ -3,5 +3,7 @@ export * from "./classifier-hits";
 export * from "./alerts";
 export * from "./flow-packets";
 export * from "./equity-prints";
+export * from "./equity-quotes";
+export * from "./equity-print-joins";
 export * from "./option-prints";
 export * from "./option-nbbo";

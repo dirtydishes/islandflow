@@ -1,4 +1,4 @@
-import { SP500_SYMBOLS, type EquityPrint } from "@islandflow/types";
+import { SP500_SYMBOLS, type EquityPrint, type EquityQuote } from "@islandflow/types";
 import type { EquityIngestAdapter, EquityIngestHandlers } from "./types";
 
 type SyntheticEquitiesAdapterConfig = {
@@ -38,6 +38,25 @@ const buildSyntheticPrint = (
   };
 };
 
+const buildSyntheticQuote = (
+  seq: number,
+  now: number,
+  symbol: string,
+  bid: number,
+  ask: number
+): EquityQuote => {
+  return {
+    source_ts: now,
+    ingest_ts: now,
+    seq,
+    trace_id: `synthetic-equity-quote-${seq}`,
+    ts: now,
+    underlying_id: symbol,
+    bid,
+    ask
+  };
+};
+
 export const createSyntheticEquitiesAdapter = (
   config: SyntheticEquitiesAdapterConfig
 ): EquityIngestAdapter => {
@@ -45,6 +64,7 @@ export const createSyntheticEquitiesAdapter = (
     name: "synthetic",
     start: (handlers: EquityIngestHandlers) => {
       let seq = 0;
+      let quoteSeq = 0;
       let timer: ReturnType<typeof setInterval> | null = null;
       let stopped = false;
 
@@ -65,8 +85,18 @@ export const createSyntheticEquitiesAdapter = (
           const size = 10 + (seq % 600);
           const exchange = EXCHANGES[(seq + symbolHash) % EXCHANGES.length];
           const offExchangeFlag = (seq + i) % 6 === 0;
-          const print = buildSyntheticPrint(seq, now + i * 4, symbol, price, size, exchange, offExchangeFlag);
+          const eventTs = now + i * 4;
+          const print = buildSyntheticPrint(seq, eventTs, symbol, price, size, exchange, offExchangeFlag);
           void handlers.onTrade(print);
+
+          if (handlers.onQuote) {
+            quoteSeq += 1;
+            const spread = Math.max(0.02, Number((price * 0.002).toFixed(2)));
+            const bid = Math.max(0.01, Number((price - spread / 2).toFixed(2)));
+            const ask = Math.max(bid + 0.01, Number((price + spread / 2).toFixed(2)));
+            const quote = buildSyntheticQuote(quoteSeq, eventTs, symbol, bid, ask);
+            void handlers.onQuote(quote);
+          }
         }
       };
 

@@ -3,6 +3,8 @@ import {
   AlertEventSchema,
   ClassifierHitEventSchema,
   EquityPrintSchema,
+  EquityQuoteSchema,
+  EquityPrintJoinSchema,
   FlowPacketSchema,
   OptionNBBOSchema,
   OptionPrintSchema
@@ -11,6 +13,8 @@ import type {
   AlertEvent,
   ClassifierHitEvent,
   EquityPrint,
+  EquityQuote,
+  EquityPrintJoin,
   FlowPacket,
   OptionNBBO,
   OptionPrint
@@ -26,6 +30,18 @@ import {
   EQUITY_PRINTS_TABLE,
   normalizeEquityPrint
 } from "./equity-prints";
+import {
+  equityQuotesTableDDL,
+  EQUITY_QUOTES_TABLE,
+  normalizeEquityQuote
+} from "./equity-quotes";
+import {
+  equityPrintJoinsTableDDL,
+  EQUITY_PRINT_JOINS_TABLE,
+  fromEquityPrintJoinRecord,
+  toEquityPrintJoinRecord,
+  type EquityPrintJoinRecord
+} from "./equity-print-joins";
 import {
   FLOW_PACKETS_TABLE,
   flowPacketsTableDDL,
@@ -88,6 +104,22 @@ export const ensureEquityPrintsTable = async (
   });
 };
 
+export const ensureEquityQuotesTable = async (
+  client: ClickHouseClient
+): Promise<void> => {
+  await client.exec({
+    query: equityQuotesTableDDL()
+  });
+};
+
+export const ensureEquityPrintJoinsTable = async (
+  client: ClickHouseClient
+): Promise<void> => {
+  await client.exec({
+    query: equityPrintJoinsTableDDL()
+  });
+};
+
 export const ensureFlowPacketsTable = async (
   client: ClickHouseClient
 ): Promise<void> => {
@@ -141,6 +173,30 @@ export const insertEquityPrint = async (
   const record = normalizeEquityPrint(print);
   await client.insert({
     table: EQUITY_PRINTS_TABLE,
+    values: [record],
+    format: "JSONEachRow"
+  });
+};
+
+export const insertEquityQuote = async (
+  client: ClickHouseClient,
+  quote: EquityQuote
+): Promise<void> => {
+  const record = normalizeEquityQuote(quote);
+  await client.insert({
+    table: EQUITY_QUOTES_TABLE,
+    values: [record],
+    format: "JSONEachRow"
+  });
+};
+
+export const insertEquityPrintJoin = async (
+  client: ClickHouseClient,
+  join: EquityPrintJoin
+): Promise<void> => {
+  const record = toEquityPrintJoinRecord(join);
+  await client.insert({
+    table: EQUITY_PRINT_JOINS_TABLE,
     values: [record],
     format: "JSONEachRow"
   });
@@ -253,6 +309,20 @@ const normalizeOptionNbboRow = (row: unknown): unknown => {
   return row;
 };
 
+const normalizeEquityQuoteRow = (row: unknown): unknown => {
+  if (row && typeof row === "object") {
+    return normalizeNumericFields(row as Record<string, unknown>, [
+      "source_ts",
+      "ingest_ts",
+      "seq",
+      "ts",
+      "bid",
+      "ask"
+    ]);
+  }
+
+  return row;
+};
 
 const normalizeEquityRow = (row: unknown): unknown => {
   if (row && typeof row === "object") {
@@ -276,6 +346,25 @@ const normalizeEquityRow = (row: unknown): unknown => {
   }
 
   return row;
+};
+
+const normalizeEquityPrintJoinRow = (row: unknown): EquityPrintJoinRecord | null => {
+  if (!row || typeof row !== "object") {
+    return null;
+  }
+
+  const record = row as Record<string, unknown>;
+  return {
+    source_ts: coerceNumber(record.source_ts) as number,
+    ingest_ts: coerceNumber(record.ingest_ts) as number,
+    seq: coerceNumber(record.seq) as number,
+    trace_id: String(record.trace_id ?? ""),
+    id: String(record.id ?? ""),
+    print_trace_id: String(record.print_trace_id ?? ""),
+    quote_trace_id: String(record.quote_trace_id ?? ""),
+    features_json: String(record.features_json ?? "{}"),
+    join_quality_json: String(record.join_quality_json ?? "{}")
+  };
 };
 
 const normalizeFlowPacketRow = (row: unknown): FlowPacketRecord | null => {
@@ -374,6 +463,38 @@ export const fetchRecentEquityPrints = async (
 
   const rows = await result.json<unknown[]>();
   return EquityPrintSchema.array().parse(rows.map(normalizeEquityRow));
+};
+
+export const fetchRecentEquityQuotes = async (
+  client: ClickHouseClient,
+  limit: number
+): Promise<EquityQuote[]> => {
+  const safeLimit = clampLimit(limit);
+  const result = await client.query({
+    query: `SELECT * FROM ${EQUITY_QUOTES_TABLE} ORDER BY ts DESC, seq DESC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  return EquityQuoteSchema.array().parse(rows.map(normalizeEquityQuoteRow));
+};
+
+export const fetchRecentEquityPrintJoins = async (
+  client: ClickHouseClient,
+  limit: number
+): Promise<EquityPrintJoin[]> => {
+  const safeLimit = clampLimit(limit);
+  const result = await client.query({
+    query: `SELECT * FROM ${EQUITY_PRINT_JOINS_TABLE} ORDER BY source_ts DESC, seq DESC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  const records = rows
+    .map(normalizeEquityPrintJoinRow)
+    .filter((record): record is EquityPrintJoinRecord => record !== null);
+  const joins = records.map(fromEquityPrintJoinRecord);
+  return EquityPrintJoinSchema.array().parse(joins);
 };
 
 export const fetchRecentFlowPackets = async (
@@ -485,4 +606,46 @@ export const fetchEquityPrintsAfter = async (
 
   const rows = await result.json<unknown[]>();
   return EquityPrintSchema.array().parse(rows.map(normalizeEquityRow));
+};
+
+export const fetchEquityQuotesAfter = async (
+  client: ClickHouseClient,
+  afterTs: number,
+  afterSeq: number,
+  limit: number
+): Promise<EquityQuote[]> => {
+  const safeLimit = clampLimit(limit);
+  const safeAfterTs = clampCursor(afterTs);
+  const safeAfterSeq = clampCursor(afterSeq);
+
+  const result = await client.query({
+    query: `SELECT * FROM ${EQUITY_QUOTES_TABLE} WHERE (ts, seq) > (${safeAfterTs}, ${safeAfterSeq}) ORDER BY ts ASC, seq ASC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  return EquityQuoteSchema.array().parse(rows.map(normalizeEquityQuoteRow));
+};
+
+export const fetchEquityPrintJoinsAfter = async (
+  client: ClickHouseClient,
+  afterTs: number,
+  afterSeq: number,
+  limit: number
+): Promise<EquityPrintJoin[]> => {
+  const safeLimit = clampLimit(limit);
+  const safeAfterTs = clampCursor(afterTs);
+  const safeAfterSeq = clampCursor(afterSeq);
+
+  const result = await client.query({
+    query: `SELECT * FROM ${EQUITY_PRINT_JOINS_TABLE} WHERE (source_ts, seq) > (${safeAfterTs}, ${safeAfterSeq}) ORDER BY source_ts ASC, seq ASC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  const records = rows
+    .map(normalizeEquityPrintJoinRow)
+    .filter((record): record is EquityPrintJoinRecord => record !== null);
+  const joins = records.map(fromEquityPrintJoinRecord);
+  return EquityPrintJoinSchema.array().parse(joins);
 };

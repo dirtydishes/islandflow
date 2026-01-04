@@ -2,7 +2,9 @@ import { readEnv } from "@islandflow/config";
 import { createLogger } from "@islandflow/observability";
 import {
   SUBJECT_EQUITY_PRINTS,
+  SUBJECT_EQUITY_QUOTES,
   STREAM_EQUITY_PRINTS,
+  STREAM_EQUITY_QUOTES,
   connectJetStreamWithRetry,
   ensureStream,
   publishJson
@@ -10,9 +12,16 @@ import {
 import {
   createClickHouseClient,
   ensureEquityPrintsTable,
-  insertEquityPrint
+  ensureEquityQuotesTable,
+  insertEquityPrint,
+  insertEquityQuote
 } from "@islandflow/storage";
-import { EquityPrintSchema, type EquityPrint } from "@islandflow/types";
+import {
+  EquityPrintSchema,
+  EquityQuoteSchema,
+  type EquityPrint,
+  type EquityQuote
+} from "@islandflow/types";
 import { createSyntheticEquitiesAdapter } from "./adapters/synthetic";
 import type { EquityIngestAdapter, StopHandler } from "./adapters/types";
 import { z } from "zod";
@@ -136,6 +145,19 @@ const run = async () => {
     num_replicas: 1
   });
 
+  await ensureStream(jsm, {
+    name: STREAM_EQUITY_QUOTES,
+    subjects: [SUBJECT_EQUITY_QUOTES],
+    retention: "limits",
+    storage: "file",
+    discard: "old",
+    max_msgs_per_subject: -1,
+    max_msgs: -1,
+    max_bytes: -1,
+    max_age: 0,
+    num_replicas: 1
+  });
+
   const clickhouse = createClickHouseClient({
     url: env.CLICKHOUSE_URL,
     database: env.CLICKHOUSE_DATABASE
@@ -143,11 +165,13 @@ const run = async () => {
 
   await retry("clickhouse table init", 20, 500, async () => {
     await ensureEquityPrintsTable(clickhouse);
+    await ensureEquityQuotesTable(clickhouse);
   });
 
   const adapter = selectAdapter(env.EQUITIES_INGEST_ADAPTER);
   logger.info("ingest adapter selected", { adapter: adapter.name });
   const allowPublish = buildThrottle(env.TESTING_MODE, env.TESTING_THROTTLE_MS);
+  const allowQuotePublish = buildThrottle(env.TESTING_MODE, env.TESTING_THROTTLE_MS);
 
   const stopAdapter: StopHandler = await adapter.start({
     onTrade: async (candidate: EquityPrint) => {
@@ -174,6 +198,28 @@ const run = async () => {
         logger.error("failed to publish equity print", {
           error: error instanceof Error ? error.message : String(error),
           trace_id: print.trace_id
+        });
+      }
+    },
+    onQuote: async (candidate: EquityQuote) => {
+      if (state.shuttingDown) {
+        return;
+      }
+
+      const now = Date.now();
+      if (!allowQuotePublish(now)) {
+        return;
+      }
+
+      const quote = EquityQuoteSchema.parse(candidate);
+
+      try {
+        await insertEquityQuote(clickhouse, quote);
+        await publishJson(js, SUBJECT_EQUITY_QUOTES, quote);
+      } catch (error) {
+        logger.error("failed to publish equity quote", {
+          error: error instanceof Error ? error.message : String(error),
+          trace_id: quote.trace_id
         });
       }
     }

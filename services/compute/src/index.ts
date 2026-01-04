@@ -3,11 +3,17 @@ import { createLogger } from "@islandflow/observability";
 import {
   SUBJECT_ALERTS,
   SUBJECT_CLASSIFIER_HITS,
+  SUBJECT_EQUITY_JOINS,
+  SUBJECT_EQUITY_PRINTS,
+  SUBJECT_EQUITY_QUOTES,
   SUBJECT_FLOW_PACKETS,
   SUBJECT_OPTION_NBBO,
   SUBJECT_OPTION_PRINTS,
   STREAM_ALERTS,
   STREAM_CLASSIFIER_HITS,
+  STREAM_EQUITY_JOINS,
+  STREAM_EQUITY_PRINTS,
+  STREAM_EQUITY_QUOTES,
   STREAM_FLOW_PACKETS,
   STREAM_OPTION_NBBO,
   STREAM_OPTION_PRINTS,
@@ -21,19 +27,27 @@ import {
   createClickHouseClient,
   ensureAlertsTable,
   ensureClassifierHitsTable,
+  ensureEquityPrintJoinsTable,
   ensureFlowPacketsTable,
   insertAlert,
   insertClassifierHit,
+  insertEquityPrintJoin,
   insertFlowPacket
 } from "@islandflow/storage";
 import {
   AlertEventSchema,
   ClassifierHitEventSchema,
+  EquityPrintJoinSchema,
+  EquityPrintSchema,
+  EquityQuoteSchema,
   FlowPacketSchema,
   OptionNBBOSchema,
   OptionPrintSchema,
   type AlertEvent,
   type ClassifierHitEvent,
+  type EquityPrint,
+  type EquityQuote,
+  type EquityPrintJoin,
   type FlowPacket,
   type OptionNBBO,
   type OptionPrint
@@ -41,6 +55,7 @@ import {
 import { z } from "zod";
 import { evaluateClassifiers, type ClassifierConfig } from "./classifiers";
 import { parseContractId } from "./contracts";
+import { buildEquityPrintJoin, type EquityQuoteJoin } from "./equity-joins";
 import { createRedisClient, updateRollingStats, type RollingStatsConfig } from "./rolling-stats";
 import { summarizeStructure, type ContractLeg } from "./structures";
 
@@ -71,6 +86,7 @@ const envSchema = z.object({
     }, z.boolean())
     .default(false),
   NBBO_MAX_AGE_MS: z.coerce.number().int().positive().default(1000),
+  EQUITY_QUOTE_MAX_AGE_MS: z.coerce.number().int().positive().default(1000),
   CLASSIFIER_SWEEP_MIN_PREMIUM: z.coerce.number().positive().default(40_000),
   CLASSIFIER_SWEEP_MIN_COUNT: z.coerce.number().int().positive().default(3),
   CLASSIFIER_SWEEP_MIN_PREMIUM_Z: z.coerce.number().nonnegative().default(2),
@@ -161,6 +177,7 @@ type ClusterState = {
 
 const clusters = new Map<string, ClusterState>();
 const nbboCache = new Map<string, OptionNBBO>();
+const equityQuoteCache = new Map<string, EquityQuote>();
 const recentLegsByKey = new Map<string, ContractLeg[]>();
 
 const MAX_RECENT_LEGS = 20;
@@ -341,6 +358,17 @@ const updateNbboCache = (nbbo: OptionNBBO): void => {
   }
 };
 
+const updateEquityQuoteCache = (quote: EquityQuote): void => {
+  const existing = equityQuoteCache.get(quote.underlying_id);
+  if (
+    !existing ||
+    quote.ts > existing.ts ||
+    (quote.ts === existing.ts && quote.seq >= existing.seq)
+  ) {
+    equityQuoteCache.set(quote.underlying_id, quote);
+  }
+};
+
 const selectNbbo = (contractId: string, ts: number): NbboJoin => {
   const nbbo = nbboCache.get(contractId) ?? null;
   if (!nbbo) {
@@ -350,6 +378,17 @@ const selectNbbo = (contractId: string, ts: number): NbboJoin => {
   const ageMs = Math.abs(ts - nbbo.ts);
   const stale = ageMs > env.NBBO_MAX_AGE_MS;
   return { nbbo, ageMs, stale };
+};
+
+const selectEquityQuote = (underlyingId: string, ts: number): EquityQuoteJoin => {
+  const quote = equityQuoteCache.get(underlyingId) ?? null;
+  if (!quote) {
+    return { quote: null, ageMs: env.EQUITY_QUOTE_MAX_AGE_MS + 1, stale: true };
+  }
+
+  const ageMs = Math.abs(ts - quote.ts);
+  const stale = ageMs > env.EQUITY_QUOTE_MAX_AGE_MS;
+  return { quote, ageMs, stale };
 };
 
 const classifyPlacement = (price: number, join: NbboJoin): NbboPlacement => {
@@ -609,6 +648,25 @@ const emitClassifiers = async (
   }
 };
 
+const emitEquityJoin = async (
+  clickhouse: ReturnType<typeof createClickHouseClient>,
+  js: Awaited<ReturnType<typeof connectJetStreamWithRetry>>["js"],
+  print: EquityPrint
+): Promise<void> => {
+  const join = selectEquityQuote(print.underlying_id, print.ts);
+  const payload: EquityPrintJoin = EquityPrintJoinSchema.parse(buildEquityPrintJoin(print, join));
+
+  try {
+    await insertEquityPrintJoin(clickhouse, payload);
+    await publishJson(js, SUBJECT_EQUITY_JOINS, payload);
+  } catch (error) {
+    logger.error("failed to emit equity print join", {
+      error: error instanceof Error ? error.message : String(error),
+      trace_id: payload.trace_id
+    });
+  }
+};
+
 const flushEligibleClusters = async (
   clickhouse: ReturnType<typeof createClickHouseClient>,
   js: Awaited<ReturnType<typeof connectJetStreamWithRetry>>["js"],
@@ -667,8 +725,47 @@ const run = async () => {
   });
 
   await ensureStream(jsm, {
+    name: STREAM_EQUITY_PRINTS,
+    subjects: [SUBJECT_EQUITY_PRINTS],
+    retention: "limits",
+    storage: "file",
+    discard: "old",
+    max_msgs_per_subject: -1,
+    max_msgs: -1,
+    max_bytes: -1,
+    max_age: 0,
+    num_replicas: 1
+  });
+
+  await ensureStream(jsm, {
+    name: STREAM_EQUITY_QUOTES,
+    subjects: [SUBJECT_EQUITY_QUOTES],
+    retention: "limits",
+    storage: "file",
+    discard: "old",
+    max_msgs_per_subject: -1,
+    max_msgs: -1,
+    max_bytes: -1,
+    max_age: 0,
+    num_replicas: 1
+  });
+
+  await ensureStream(jsm, {
     name: STREAM_FLOW_PACKETS,
     subjects: [SUBJECT_FLOW_PACKETS],
+    retention: "limits",
+    storage: "file",
+    discard: "old",
+    max_msgs_per_subject: -1,
+    max_msgs: -1,
+    max_bytes: -1,
+    max_age: 0,
+    num_replicas: 1
+  });
+
+  await ensureStream(jsm, {
+    name: STREAM_EQUITY_JOINS,
+    subjects: [SUBJECT_EQUITY_JOINS],
     retention: "limits",
     storage: "file",
     discard: "old",
@@ -726,12 +823,15 @@ const run = async () => {
 
   await retry("clickhouse table init", 20, 500, async () => {
     await ensureFlowPacketsTable(clickhouse);
+    await ensureEquityPrintJoinsTable(clickhouse);
     await ensureClassifierHitsTable(clickhouse);
     await ensureAlertsTable(clickhouse);
   });
 
   const durableName = "compute-option-prints";
   const nbboDurableName = "compute-option-nbbo";
+  const equityPrintDurableName = "compute-equity-prints";
+  const equityQuoteDurableName = "compute-equity-quotes";
 
   if (env.COMPUTE_CONSUMER_RESET) {
     try {
@@ -787,6 +887,76 @@ const run = async () => {
       const message = error instanceof Error ? error.message : String(error);
       if (!message.includes("not found")) {
         logger.warn("failed to inspect jetstream consumer", { durable: nbboDurableName, error: message });
+      }
+    }
+  }
+
+  if (env.COMPUTE_CONSUMER_RESET) {
+    try {
+      await jsm.consumers.delete(STREAM_EQUITY_PRINTS, equityPrintDurableName);
+      logger.warn("reset jetstream consumer", { durable: equityPrintDurableName });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes("not found")) {
+        logger.warn("failed to reset jetstream consumer", {
+          durable: equityPrintDurableName,
+          error: message
+        });
+      }
+    }
+  } else {
+    try {
+      const info = await jsm.consumers.info(STREAM_EQUITY_PRINTS, equityPrintDurableName);
+      if (info?.config?.deliver_policy && info.config.deliver_policy !== env.COMPUTE_DELIVER_POLICY) {
+        logger.warn("resetting consumer due to deliver policy change", {
+          durable: equityPrintDurableName,
+          current: info.config.deliver_policy,
+          desired: env.COMPUTE_DELIVER_POLICY
+        });
+        await jsm.consumers.delete(STREAM_EQUITY_PRINTS, equityPrintDurableName);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes("not found")) {
+        logger.warn("failed to inspect jetstream consumer", {
+          durable: equityPrintDurableName,
+          error: message
+        });
+      }
+    }
+  }
+
+  if (env.COMPUTE_CONSUMER_RESET) {
+    try {
+      await jsm.consumers.delete(STREAM_EQUITY_QUOTES, equityQuoteDurableName);
+      logger.warn("reset jetstream consumer", { durable: equityQuoteDurableName });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes("not found")) {
+        logger.warn("failed to reset jetstream consumer", {
+          durable: equityQuoteDurableName,
+          error: message
+        });
+      }
+    }
+  } else {
+    try {
+      const info = await jsm.consumers.info(STREAM_EQUITY_QUOTES, equityQuoteDurableName);
+      if (info?.config?.deliver_policy && info.config.deliver_policy !== env.COMPUTE_DELIVER_POLICY) {
+        logger.warn("resetting consumer due to deliver policy change", {
+          durable: equityQuoteDurableName,
+          current: info.config.deliver_policy,
+          desired: env.COMPUTE_DELIVER_POLICY
+        });
+        await jsm.consumers.delete(STREAM_EQUITY_QUOTES, equityQuoteDurableName);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes("not found")) {
+        logger.warn("failed to inspect jetstream consumer", {
+          durable: equityQuoteDurableName,
+          error: message
+        });
       }
     }
   }
@@ -863,6 +1033,81 @@ const run = async () => {
     }
   })();
 
+  const equitySubscription = await (async () => {
+    const opts = buildDurableConsumer(equityPrintDurableName);
+    applyDeliverPolicy(opts, env.COMPUTE_DELIVER_POLICY);
+    try {
+      return await subscribeJson(js, SUBJECT_EQUITY_PRINTS, opts);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const shouldReset =
+        message.includes("duplicate subscription") ||
+        message.includes("durable requires") ||
+        message.includes("subject does not match consumer");
+
+      if (!shouldReset) {
+        throw error;
+      }
+
+      logger.warn("resetting jetstream consumer", { durable: equityPrintDurableName, error: message });
+
+      try {
+        await jsm.consumers.delete(STREAM_EQUITY_PRINTS, equityPrintDurableName);
+      } catch (deleteError) {
+        const deleteMessage = deleteError instanceof Error ? deleteError.message : String(deleteError);
+        if (!deleteMessage.includes("not found")) {
+          logger.warn("failed to delete jetstream consumer", {
+            durable: equityPrintDurableName,
+            error: deleteMessage
+          });
+        }
+      }
+
+      const resetOpts = buildDurableConsumer(equityPrintDurableName);
+      applyDeliverPolicy(resetOpts, env.COMPUTE_DELIVER_POLICY);
+      return await subscribeJson(js, SUBJECT_EQUITY_PRINTS, resetOpts);
+    }
+  })();
+
+  const equityQuoteSubscription = await (async () => {
+    const opts = buildDurableConsumer(equityQuoteDurableName);
+    applyDeliverPolicy(opts, env.COMPUTE_DELIVER_POLICY);
+    try {
+      return await subscribeJson(js, SUBJECT_EQUITY_QUOTES, opts);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const shouldReset =
+        message.includes("duplicate subscription") ||
+        message.includes("durable requires") ||
+        message.includes("subject does not match consumer");
+
+      if (!shouldReset) {
+        throw error;
+      }
+
+      logger.warn("resetting jetstream consumer", {
+        durable: equityQuoteDurableName,
+        error: message
+      });
+
+      try {
+        await jsm.consumers.delete(STREAM_EQUITY_QUOTES, equityQuoteDurableName);
+      } catch (deleteError) {
+        const deleteMessage = deleteError instanceof Error ? deleteError.message : String(deleteError);
+        if (!deleteMessage.includes("not found")) {
+          logger.warn("failed to delete jetstream consumer", {
+            durable: equityQuoteDurableName,
+            error: deleteMessage
+          });
+        }
+      }
+
+      const resetOpts = buildDurableConsumer(equityQuoteDurableName);
+      applyDeliverPolicy(resetOpts, env.COMPUTE_DELIVER_POLICY);
+      return await subscribeJson(js, SUBJECT_EQUITY_QUOTES, resetOpts);
+    }
+  })();
+
   const nbboLoop = async () => {
     for await (const msg of nbboSubscription.messages) {
       try {
@@ -878,7 +1123,39 @@ const run = async () => {
     }
   };
 
+  const equityQuoteLoop = async () => {
+    for await (const msg of equityQuoteSubscription.messages) {
+      try {
+        const quote = EquityQuoteSchema.parse(equityQuoteSubscription.decode(msg));
+        updateEquityQuoteCache(quote);
+        msg.ack();
+      } catch (error) {
+        logger.error("failed to process equity quote", {
+          error: error instanceof Error ? error.message : String(error)
+        });
+        msg.term();
+      }
+    }
+  };
+
+  const equityPrintLoop = async () => {
+    for await (const msg of equitySubscription.messages) {
+      try {
+        const print = EquityPrintSchema.parse(equitySubscription.decode(msg));
+        await emitEquityJoin(clickhouse, js, print);
+        msg.ack();
+      } catch (error) {
+        logger.error("failed to process equity print", {
+          error: error instanceof Error ? error.message : String(error)
+        });
+        msg.term();
+      }
+    }
+  };
+
   void nbboLoop();
+  void equityQuoteLoop();
+  void equityPrintLoop();
 
   const shutdown = async (signal: string) => {
     logger.info("service stopping", { signal });

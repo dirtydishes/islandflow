@@ -59,6 +59,18 @@ export const EquityQuoteSchema = EventMetaSchema.merge(
 
 export type EquityQuote = z.infer<typeof EquityQuoteSchema>;
 
+export const EquityPrintJoinSchema = EventMetaSchema.merge(
+  z.object({
+    id: z.string().min(1),
+    print_trace_id: z.string().min(1),
+    quote_trace_id: z.string(),
+    features: z.record(z.union([z.string(), z.number(), z.boolean()])),
+    join_quality: z.record(z.number())
+  })
+);
+
+export type EquityPrintJoin = z.infer<typeof EquityPrintJoinSchema>;
+
 export const FlowPacketSchema = EventMetaSchema.merge(
   z.object({
     id: z.string().min(1),

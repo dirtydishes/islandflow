@@ -3,13 +3,17 @@ import { createLogger } from "@islandflow/observability";
 import {
   SUBJECT_ALERTS,
   SUBJECT_CLASSIFIER_HITS,
+  SUBJECT_EQUITY_JOINS,
   SUBJECT_EQUITY_PRINTS,
+  SUBJECT_EQUITY_QUOTES,
   SUBJECT_FLOW_PACKETS,
   SUBJECT_OPTION_NBBO,
   SUBJECT_OPTION_PRINTS,
   STREAM_ALERTS,
   STREAM_CLASSIFIER_HITS,
+  STREAM_EQUITY_JOINS,
   STREAM_EQUITY_PRINTS,
+  STREAM_EQUITY_QUOTES,
   STREAM_FLOW_PACKETS,
   STREAM_OPTION_NBBO,
   STREAM_OPTION_PRINTS,
@@ -22,15 +26,21 @@ import {
   createClickHouseClient,
   ensureAlertsTable,
   ensureClassifierHitsTable,
+  ensureEquityPrintJoinsTable,
   ensureEquityPrintsTable,
+  ensureEquityQuotesTable,
   ensureFlowPacketsTable,
   ensureOptionNBBOTable,
   ensureOptionPrintsTable,
   fetchRecentAlerts,
   fetchRecentClassifierHits,
+  fetchRecentEquityPrintJoins,
   fetchRecentFlowPackets,
+  fetchRecentEquityQuotes,
   fetchRecentOptionNBBO,
   fetchEquityPrintsAfter,
+  fetchEquityPrintJoinsAfter,
+  fetchEquityQuotesAfter,
   fetchRecentEquityPrints,
   fetchOptionNBBOAfter,
   fetchOptionPrintsAfter,
@@ -40,6 +50,8 @@ import {
   AlertEventSchema,
   ClassifierHitEventSchema,
   EquityPrintSchema,
+  EquityPrintJoinSchema,
+  EquityQuoteSchema,
   FlowPacketSchema,
   OptionNBBOSchema,
   OptionPrintSchema
@@ -93,7 +105,15 @@ const replayParamsSchema = z.object({
   limit: z.coerce.number().int().positive().max(1000).default(200)
 });
 
-type Channel = "options" | "options-nbbo" | "equities" | "flow" | "classifier-hits" | "alerts";
+type Channel =
+  | "options"
+  | "options-nbbo"
+  | "equities"
+  | "equity-quotes"
+  | "equity-joins"
+  | "flow"
+  | "classifier-hits"
+  | "alerts";
 
 type WsData = {
   channel: Channel;
@@ -102,6 +122,8 @@ type WsData = {
 const optionSockets = new Set<WebSocket<WsData>>();
 const optionNbboSockets = new Set<WebSocket<WsData>>();
 const equitySockets = new Set<WebSocket<WsData>>();
+const equityQuoteSockets = new Set<WebSocket<WsData>>();
+const equityJoinSockets = new Set<WebSocket<WsData>>();
 const flowSockets = new Set<WebSocket<WsData>>();
 const classifierHitSockets = new Set<WebSocket<WsData>>();
 const alertSockets = new Set<WebSocket<WsData>>();
@@ -203,6 +225,32 @@ const run = async () => {
   });
 
   await ensureStream(jsm, {
+    name: STREAM_EQUITY_QUOTES,
+    subjects: [SUBJECT_EQUITY_QUOTES],
+    retention: "limits",
+    storage: "file",
+    discard: "old",
+    max_msgs_per_subject: -1,
+    max_msgs: -1,
+    max_bytes: -1,
+    max_age: 0,
+    num_replicas: 1
+  });
+
+  await ensureStream(jsm, {
+    name: STREAM_EQUITY_JOINS,
+    subjects: [SUBJECT_EQUITY_JOINS],
+    retention: "limits",
+    storage: "file",
+    discard: "old",
+    max_msgs_per_subject: -1,
+    max_msgs: -1,
+    max_bytes: -1,
+    max_age: 0,
+    num_replicas: 1
+  });
+
+  await ensureStream(jsm, {
     name: STREAM_FLOW_PACKETS,
     subjects: [SUBJECT_FLOW_PACKETS],
     retention: "limits",
@@ -250,6 +298,8 @@ const run = async () => {
     await ensureOptionPrintsTable(clickhouse);
     await ensureOptionNBBOTable(clickhouse);
     await ensureEquityPrintsTable(clickhouse);
+    await ensureEquityQuotesTable(clickhouse);
+    await ensureEquityPrintJoinsTable(clickhouse);
     await ensureFlowPacketsTable(clickhouse);
     await ensureClassifierHitsTable(clickhouse);
     await ensureAlertsTable(clickhouse);
@@ -309,6 +359,18 @@ const run = async () => {
     SUBJECT_EQUITY_PRINTS,
     STREAM_EQUITY_PRINTS,
     "api-equity-prints"
+  );
+
+  const equityQuoteSubscription = await subscribeWithReset(
+    SUBJECT_EQUITY_QUOTES,
+    STREAM_EQUITY_QUOTES,
+    "api-equity-quotes"
+  );
+
+  const equityJoinSubscription = await subscribeWithReset(
+    SUBJECT_EQUITY_JOINS,
+    STREAM_EQUITY_JOINS,
+    "api-equity-joins"
   );
 
   const flowSubscription = await subscribeWithReset(
@@ -374,6 +436,36 @@ const run = async () => {
     }
   };
 
+  const pumpEquityQuotes = async () => {
+    for await (const msg of equityQuoteSubscription.messages) {
+      try {
+        const payload = EquityQuoteSchema.parse(equityQuoteSubscription.decode(msg));
+        broadcast(equityQuoteSockets, { type: "equity-quote", payload });
+        msg.ack();
+      } catch (error) {
+        logger.error("failed to process equity quote", {
+          error: error instanceof Error ? error.message : String(error)
+        });
+        msg.term();
+      }
+    }
+  };
+
+  const pumpEquityJoins = async () => {
+    for await (const msg of equityJoinSubscription.messages) {
+      try {
+        const payload = EquityPrintJoinSchema.parse(equityJoinSubscription.decode(msg));
+        broadcast(equityJoinSockets, { type: "equity-join", payload });
+        msg.ack();
+      } catch (error) {
+        logger.error("failed to process equity join", {
+          error: error instanceof Error ? error.message : String(error)
+        });
+        msg.term();
+      }
+    }
+  };
+
   const pumpFlow = async () => {
     for await (const msg of flowSubscription.messages) {
       try {
@@ -422,6 +514,8 @@ const run = async () => {
   void pumpOptions();
   void pumpOptionNbbo();
   void pumpEquities();
+  void pumpEquityQuotes();
+  void pumpEquityJoins();
   void pumpFlow();
   void pumpClassifierHits();
   void pumpAlerts();
@@ -450,6 +544,18 @@ const run = async () => {
       if (req.method === "GET" && url.pathname === "/prints/equities") {
         const limit = parseLimit(url.searchParams.get("limit"));
         const data = await fetchRecentEquityPrints(clickhouse, limit);
+        return jsonResponse({ data });
+      }
+
+      if (req.method === "GET" && url.pathname === "/quotes/equities") {
+        const limit = parseLimit(url.searchParams.get("limit"));
+        const data = await fetchRecentEquityQuotes(clickhouse, limit);
+        return jsonResponse({ data });
+      }
+
+      if (req.method === "GET" && url.pathname === "/joins/equities") {
+        const limit = parseLimit(url.searchParams.get("limit"));
+        const data = await fetchRecentEquityPrintJoins(clickhouse, limit);
         return jsonResponse({ data });
       }
 
@@ -495,6 +601,22 @@ const run = async () => {
         return jsonResponse({ data, next });
       }
 
+      if (req.method === "GET" && url.pathname === "/replay/equity-quotes") {
+        const { afterTs, afterSeq, limit } = parseReplayParams(url);
+        const data = await fetchEquityQuotesAfter(clickhouse, afterTs, afterSeq, limit);
+        const last = data.at(-1);
+        const next = last ? { ts: last.ts, seq: last.seq } : null;
+        return jsonResponse({ data, next });
+      }
+
+      if (req.method === "GET" && url.pathname === "/replay/equity-joins") {
+        const { afterTs, afterSeq, limit } = parseReplayParams(url);
+        const data = await fetchEquityPrintJoinsAfter(clickhouse, afterTs, afterSeq, limit);
+        const last = data.at(-1);
+        const next = last ? { ts: last.source_ts, seq: last.seq } : null;
+        return jsonResponse({ data, next });
+      }
+
       if (req.method === "GET" && url.pathname === "/ws/options") {
         if (serverRef.upgrade(req, { data: { channel: "options" } })) {
           return new Response(null, { status: 101 });
@@ -513,6 +635,22 @@ const run = async () => {
 
       if (req.method === "GET" && url.pathname === "/ws/equities") {
         if (serverRef.upgrade(req, { data: { channel: "equities" } })) {
+          return new Response(null, { status: 101 });
+        }
+
+        return jsonResponse({ error: "websocket upgrade failed" }, 400);
+      }
+
+      if (req.method === "GET" && url.pathname === "/ws/equity-quotes") {
+        if (serverRef.upgrade(req, { data: { channel: "equity-quotes" } })) {
+          return new Response(null, { status: 101 });
+        }
+
+        return jsonResponse({ error: "websocket upgrade failed" }, 400);
+      }
+
+      if (req.method === "GET" && url.pathname === "/ws/equity-joins") {
+        if (serverRef.upgrade(req, { data: { channel: "equity-joins" } })) {
           return new Response(null, { status: 101 });
         }
 
@@ -553,6 +691,10 @@ const run = async () => {
           optionNbboSockets.add(socket);
         } else if (socket.data.channel === "equities") {
           equitySockets.add(socket);
+        } else if (socket.data.channel === "equity-quotes") {
+          equityQuoteSockets.add(socket);
+        } else if (socket.data.channel === "equity-joins") {
+          equityJoinSockets.add(socket);
         } else if (socket.data.channel === "flow") {
           flowSockets.add(socket);
         } else if (socket.data.channel === "classifier-hits") {
@@ -570,6 +712,10 @@ const run = async () => {
           optionNbboSockets.delete(socket);
         } else if (socket.data.channel === "equities") {
           equitySockets.delete(socket);
+        } else if (socket.data.channel === "equity-quotes") {
+          equityQuoteSockets.delete(socket);
+        } else if (socket.data.channel === "equity-joins") {
+          equityJoinSockets.delete(socket);
         } else if (socket.data.channel === "flow") {
           flowSockets.delete(socket);
         } else if (socket.data.channel === "classifier-hits") {
