@@ -5,6 +5,7 @@ import {
   EquityPrintSchema,
   EquityQuoteSchema,
   EquityPrintJoinSchema,
+  InferredDarkEventSchema,
   FlowPacketSchema,
   OptionNBBOSchema,
   OptionPrintSchema
@@ -15,6 +16,7 @@ import type {
   EquityPrint,
   EquityQuote,
   EquityPrintJoin,
+  InferredDarkEvent,
   FlowPacket,
   OptionNBBO,
   OptionPrint
@@ -42,6 +44,13 @@ import {
   toEquityPrintJoinRecord,
   type EquityPrintJoinRecord
 } from "./equity-print-joins";
+import {
+  inferredDarkTableDDL,
+  INFERRED_DARK_TABLE,
+  fromInferredDarkRecord,
+  toInferredDarkRecord,
+  type InferredDarkRecord
+} from "./inferred-dark";
 import {
   FLOW_PACKETS_TABLE,
   flowPacketsTableDDL,
@@ -117,6 +126,14 @@ export const ensureEquityPrintJoinsTable = async (
 ): Promise<void> => {
   await client.exec({
     query: equityPrintJoinsTableDDL()
+  });
+};
+
+export const ensureInferredDarkTable = async (
+  client: ClickHouseClient
+): Promise<void> => {
+  await client.exec({
+    query: inferredDarkTableDDL()
   });
 };
 
@@ -197,6 +214,18 @@ export const insertEquityPrintJoin = async (
   const record = toEquityPrintJoinRecord(join);
   await client.insert({
     table: EQUITY_PRINT_JOINS_TABLE,
+    values: [record],
+    format: "JSONEachRow"
+  });
+};
+
+export const insertInferredDark = async (
+  client: ClickHouseClient,
+  event: InferredDarkEvent
+): Promise<void> => {
+  const record = toInferredDarkRecord(event);
+  await client.insert({
+    table: INFERRED_DARK_TABLE,
     values: [record],
     format: "JSONEachRow"
   });
@@ -367,6 +396,23 @@ const normalizeEquityPrintJoinRow = (row: unknown): EquityPrintJoinRecord | null
   };
 };
 
+const normalizeInferredDarkRow = (row: unknown): InferredDarkRecord | null => {
+  if (!row || typeof row !== "object") {
+    return null;
+  }
+
+  const record = row as Record<string, unknown>;
+  return {
+    source_ts: coerceNumber(record.source_ts) as number,
+    ingest_ts: coerceNumber(record.ingest_ts) as number,
+    seq: coerceNumber(record.seq) as number,
+    trace_id: String(record.trace_id ?? ""),
+    type: String(record.type ?? ""),
+    confidence: Number(coerceNumber(record.confidence) ?? 0),
+    evidence_refs_json: String(record.evidence_refs_json ?? "[]")
+  };
+};
+
 const normalizeFlowPacketRow = (row: unknown): FlowPacketRecord | null => {
   if (!row || typeof row !== "object") {
     return null;
@@ -495,6 +541,24 @@ export const fetchRecentEquityPrintJoins = async (
     .filter((record): record is EquityPrintJoinRecord => record !== null);
   const joins = records.map(fromEquityPrintJoinRecord);
   return EquityPrintJoinSchema.array().parse(joins);
+};
+
+export const fetchRecentInferredDark = async (
+  client: ClickHouseClient,
+  limit: number
+): Promise<InferredDarkEvent[]> => {
+  const safeLimit = clampLimit(limit);
+  const result = await client.query({
+    query: `SELECT * FROM ${INFERRED_DARK_TABLE} ORDER BY source_ts DESC, seq DESC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  const records = rows
+    .map(normalizeInferredDarkRow)
+    .filter((record): record is InferredDarkRecord => record !== null);
+  const events = records.map(fromInferredDarkRecord);
+  return InferredDarkEventSchema.array().parse(events);
 };
 
 export const fetchRecentFlowPackets = async (
@@ -648,4 +712,27 @@ export const fetchEquityPrintJoinsAfter = async (
     .filter((record): record is EquityPrintJoinRecord => record !== null);
   const joins = records.map(fromEquityPrintJoinRecord);
   return EquityPrintJoinSchema.array().parse(joins);
+};
+
+export const fetchInferredDarkAfter = async (
+  client: ClickHouseClient,
+  afterTs: number,
+  afterSeq: number,
+  limit: number
+): Promise<InferredDarkEvent[]> => {
+  const safeLimit = clampLimit(limit);
+  const safeAfterTs = clampCursor(afterTs);
+  const safeAfterSeq = clampCursor(afterSeq);
+
+  const result = await client.query({
+    query: `SELECT * FROM ${INFERRED_DARK_TABLE} WHERE (source_ts, seq) > (${safeAfterTs}, ${safeAfterSeq}) ORDER BY source_ts ASC, seq ASC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  const records = rows
+    .map(normalizeInferredDarkRow)
+    .filter((record): record is InferredDarkRecord => record !== null);
+  const events = records.map(fromInferredDarkRecord);
+  return InferredDarkEventSchema.array().parse(events);
 };

@@ -5,5 +5,6 @@ export * from "./flow-packets";
 export * from "./equity-prints";
 export * from "./equity-quotes";
 export * from "./equity-print-joins";
+export * from "./inferred-dark";
 export * from "./option-prints";
 export * from "./option-nbbo";

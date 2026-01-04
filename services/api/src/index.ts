@@ -6,6 +6,7 @@ import {
   SUBJECT_EQUITY_JOINS,
   SUBJECT_EQUITY_PRINTS,
   SUBJECT_EQUITY_QUOTES,
+  SUBJECT_INFERRED_DARK,
   SUBJECT_FLOW_PACKETS,
   SUBJECT_OPTION_NBBO,
   SUBJECT_OPTION_PRINTS,
@@ -14,6 +15,7 @@ import {
   STREAM_EQUITY_JOINS,
   STREAM_EQUITY_PRINTS,
   STREAM_EQUITY_QUOTES,
+  STREAM_INFERRED_DARK,
   STREAM_FLOW_PACKETS,
   STREAM_OPTION_NBBO,
   STREAM_OPTION_PRINTS,
@@ -29,6 +31,7 @@ import {
   ensureEquityPrintJoinsTable,
   ensureEquityPrintsTable,
   ensureEquityQuotesTable,
+  ensureInferredDarkTable,
   ensureFlowPacketsTable,
   ensureOptionNBBOTable,
   ensureOptionPrintsTable,
@@ -36,11 +39,13 @@ import {
   fetchRecentClassifierHits,
   fetchRecentEquityPrintJoins,
   fetchRecentFlowPackets,
+  fetchRecentInferredDark,
   fetchRecentEquityQuotes,
   fetchRecentOptionNBBO,
   fetchEquityPrintsAfter,
   fetchEquityPrintJoinsAfter,
   fetchEquityQuotesAfter,
+  fetchInferredDarkAfter,
   fetchRecentEquityPrints,
   fetchOptionNBBOAfter,
   fetchOptionPrintsAfter,
@@ -52,6 +57,7 @@ import {
   EquityPrintSchema,
   EquityPrintJoinSchema,
   EquityQuoteSchema,
+  InferredDarkEventSchema,
   FlowPacketSchema,
   OptionNBBOSchema,
   OptionPrintSchema
@@ -111,6 +117,7 @@ type Channel =
   | "equities"
   | "equity-quotes"
   | "equity-joins"
+  | "inferred-dark"
   | "flow"
   | "classifier-hits"
   | "alerts";
@@ -124,6 +131,7 @@ const optionNbboSockets = new Set<WebSocket<WsData>>();
 const equitySockets = new Set<WebSocket<WsData>>();
 const equityQuoteSockets = new Set<WebSocket<WsData>>();
 const equityJoinSockets = new Set<WebSocket<WsData>>();
+const inferredDarkSockets = new Set<WebSocket<WsData>>();
 const flowSockets = new Set<WebSocket<WsData>>();
 const classifierHitSockets = new Set<WebSocket<WsData>>();
 const alertSockets = new Set<WebSocket<WsData>>();
@@ -251,6 +259,19 @@ const run = async () => {
   });
 
   await ensureStream(jsm, {
+    name: STREAM_INFERRED_DARK,
+    subjects: [SUBJECT_INFERRED_DARK],
+    retention: "limits",
+    storage: "file",
+    discard: "old",
+    max_msgs_per_subject: -1,
+    max_msgs: -1,
+    max_bytes: -1,
+    max_age: 0,
+    num_replicas: 1
+  });
+
+  await ensureStream(jsm, {
     name: STREAM_FLOW_PACKETS,
     subjects: [SUBJECT_FLOW_PACKETS],
     retention: "limits",
@@ -300,6 +321,7 @@ const run = async () => {
     await ensureEquityPrintsTable(clickhouse);
     await ensureEquityQuotesTable(clickhouse);
     await ensureEquityPrintJoinsTable(clickhouse);
+    await ensureInferredDarkTable(clickhouse);
     await ensureFlowPacketsTable(clickhouse);
     await ensureClassifierHitsTable(clickhouse);
     await ensureAlertsTable(clickhouse);
@@ -371,6 +393,12 @@ const run = async () => {
     SUBJECT_EQUITY_JOINS,
     STREAM_EQUITY_JOINS,
     "api-equity-joins"
+  );
+
+  const inferredDarkSubscription = await subscribeWithReset(
+    SUBJECT_INFERRED_DARK,
+    STREAM_INFERRED_DARK,
+    "api-inferred-dark"
   );
 
   const flowSubscription = await subscribeWithReset(
@@ -466,6 +494,21 @@ const run = async () => {
     }
   };
 
+  const pumpInferredDark = async () => {
+    for await (const msg of inferredDarkSubscription.messages) {
+      try {
+        const payload = InferredDarkEventSchema.parse(inferredDarkSubscription.decode(msg));
+        broadcast(inferredDarkSockets, { type: "inferred-dark", payload });
+        msg.ack();
+      } catch (error) {
+        logger.error("failed to process inferred dark event", {
+          error: error instanceof Error ? error.message : String(error)
+        });
+        msg.term();
+      }
+    }
+  };
+
   const pumpFlow = async () => {
     for await (const msg of flowSubscription.messages) {
       try {
@@ -516,6 +559,7 @@ const run = async () => {
   void pumpEquities();
   void pumpEquityQuotes();
   void pumpEquityJoins();
+  void pumpInferredDark();
   void pumpFlow();
   void pumpClassifierHits();
   void pumpAlerts();
@@ -556,6 +600,12 @@ const run = async () => {
       if (req.method === "GET" && url.pathname === "/joins/equities") {
         const limit = parseLimit(url.searchParams.get("limit"));
         const data = await fetchRecentEquityPrintJoins(clickhouse, limit);
+        return jsonResponse({ data });
+      }
+
+      if (req.method === "GET" && url.pathname === "/dark/inferred") {
+        const limit = parseLimit(url.searchParams.get("limit"));
+        const data = await fetchRecentInferredDark(clickhouse, limit);
         return jsonResponse({ data });
       }
 
@@ -617,6 +667,14 @@ const run = async () => {
         return jsonResponse({ data, next });
       }
 
+      if (req.method === "GET" && url.pathname === "/replay/inferred-dark") {
+        const { afterTs, afterSeq, limit } = parseReplayParams(url);
+        const data = await fetchInferredDarkAfter(clickhouse, afterTs, afterSeq, limit);
+        const last = data.at(-1);
+        const next = last ? { ts: last.source_ts, seq: last.seq } : null;
+        return jsonResponse({ data, next });
+      }
+
       if (req.method === "GET" && url.pathname === "/ws/options") {
         if (serverRef.upgrade(req, { data: { channel: "options" } })) {
           return new Response(null, { status: 101 });
@@ -651,6 +709,14 @@ const run = async () => {
 
       if (req.method === "GET" && url.pathname === "/ws/equity-joins") {
         if (serverRef.upgrade(req, { data: { channel: "equity-joins" } })) {
+          return new Response(null, { status: 101 });
+        }
+
+        return jsonResponse({ error: "websocket upgrade failed" }, 400);
+      }
+
+      if (req.method === "GET" && url.pathname === "/ws/inferred-dark") {
+        if (serverRef.upgrade(req, { data: { channel: "inferred-dark" } })) {
           return new Response(null, { status: 101 });
         }
 
@@ -695,6 +761,8 @@ const run = async () => {
           equityQuoteSockets.add(socket);
         } else if (socket.data.channel === "equity-joins") {
           equityJoinSockets.add(socket);
+        } else if (socket.data.channel === "inferred-dark") {
+          inferredDarkSockets.add(socket);
         } else if (socket.data.channel === "flow") {
           flowSockets.add(socket);
         } else if (socket.data.channel === "classifier-hits") {
@@ -716,6 +784,8 @@ const run = async () => {
           equityQuoteSockets.delete(socket);
         } else if (socket.data.channel === "equity-joins") {
           equityJoinSockets.delete(socket);
+        } else if (socket.data.channel === "inferred-dark") {
+          inferredDarkSockets.delete(socket);
         } else if (socket.data.channel === "flow") {
           flowSockets.delete(socket);
         } else if (socket.data.channel === "classifier-hits") {

@@ -6,6 +6,7 @@ import {
   SUBJECT_EQUITY_JOINS,
   SUBJECT_EQUITY_PRINTS,
   SUBJECT_EQUITY_QUOTES,
+  SUBJECT_INFERRED_DARK,
   SUBJECT_FLOW_PACKETS,
   SUBJECT_OPTION_NBBO,
   SUBJECT_OPTION_PRINTS,
@@ -14,6 +15,7 @@ import {
   STREAM_EQUITY_JOINS,
   STREAM_EQUITY_PRINTS,
   STREAM_EQUITY_QUOTES,
+  STREAM_INFERRED_DARK,
   STREAM_FLOW_PACKETS,
   STREAM_OPTION_NBBO,
   STREAM_OPTION_PRINTS,
@@ -28,10 +30,12 @@ import {
   ensureAlertsTable,
   ensureClassifierHitsTable,
   ensureEquityPrintJoinsTable,
+  ensureInferredDarkTable,
   ensureFlowPacketsTable,
   insertAlert,
   insertClassifierHit,
   insertEquityPrintJoin,
+  insertInferredDark,
   insertFlowPacket
 } from "@islandflow/storage";
 import {
@@ -40,6 +44,7 @@ import {
   EquityPrintJoinSchema,
   EquityPrintSchema,
   EquityQuoteSchema,
+  InferredDarkEventSchema,
   FlowPacketSchema,
   OptionNBBOSchema,
   OptionPrintSchema,
@@ -48,6 +53,7 @@ import {
   type EquityPrint,
   type EquityQuote,
   type EquityPrintJoin,
+  type InferredDarkEvent,
   type FlowPacket,
   type OptionNBBO,
   type OptionPrint
@@ -55,6 +61,11 @@ import {
 import { z } from "zod";
 import { evaluateClassifiers, type ClassifierConfig } from "./classifiers";
 import { parseContractId } from "./contracts";
+import {
+  createDarkInferenceState,
+  evaluateDarkInferences,
+  type DarkInferenceConfig
+} from "./dark-inference";
 import { buildEquityPrintJoin, type EquityQuoteJoin } from "./equity-joins";
 import { createRedisClient, updateRollingStats, type RollingStatsConfig } from "./rolling-stats";
 import { summarizeStructure, type ContractLeg } from "./structures";
@@ -87,6 +98,14 @@ const envSchema = z.object({
     .default(false),
   NBBO_MAX_AGE_MS: z.coerce.number().int().positive().default(1000),
   EQUITY_QUOTE_MAX_AGE_MS: z.coerce.number().int().positive().default(1000),
+  DARK_INFER_WINDOW_MS: z.coerce.number().int().positive().default(60000),
+  DARK_INFER_COOLDOWN_MS: z.coerce.number().int().nonnegative().default(30000),
+  DARK_INFER_MIN_BLOCK_SIZE: z.coerce.number().int().positive().default(2000),
+  DARK_INFER_MIN_ACCUM_SIZE: z.coerce.number().int().positive().default(3000),
+  DARK_INFER_MIN_ACCUM_COUNT: z.coerce.number().int().positive().default(4),
+  DARK_INFER_MIN_PRINT_SIZE: z.coerce.number().int().positive().default(200),
+  DARK_INFER_MAX_EVIDENCE: z.coerce.number().int().positive().default(20),
+  DARK_INFER_MAX_SPREAD_PCT: z.coerce.number().positive().default(0.005),
   CLASSIFIER_SWEEP_MIN_PREMIUM: z.coerce.number().positive().default(40_000),
   CLASSIFIER_SWEEP_MIN_COUNT: z.coerce.number().int().positive().default(3),
   CLASSIFIER_SWEEP_MIN_PREMIUM_Z: z.coerce.number().nonnegative().default(2),
@@ -112,6 +131,18 @@ const classifierConfig: ClassifierConfig = {
   zMinSamples: env.CLASSIFIER_Z_MIN_SAMPLES,
   minNbboCoverage: env.CLASSIFIER_MIN_NBBO_COVERAGE,
   minAggressorRatio: env.CLASSIFIER_MIN_AGGRESSOR_RATIO
+};
+
+const darkInferenceConfig: DarkInferenceConfig = {
+  windowMs: env.DARK_INFER_WINDOW_MS,
+  cooldownMs: env.DARK_INFER_COOLDOWN_MS,
+  minBlockSize: env.DARK_INFER_MIN_BLOCK_SIZE,
+  minAccumulationSize: env.DARK_INFER_MIN_ACCUM_SIZE,
+  minAccumulationCount: env.DARK_INFER_MIN_ACCUM_COUNT,
+  minPrintSize: env.DARK_INFER_MIN_PRINT_SIZE,
+  maxEvidence: env.DARK_INFER_MAX_EVIDENCE,
+  maxSpreadPct: env.DARK_INFER_MAX_SPREAD_PCT,
+  maxQuoteAgeMs: env.EQUITY_QUOTE_MAX_AGE_MS
 };
 
 const retry = async <T>(
@@ -178,6 +209,7 @@ type ClusterState = {
 const clusters = new Map<string, ClusterState>();
 const nbboCache = new Map<string, OptionNBBO>();
 const equityQuoteCache = new Map<string, EquityQuote>();
+const darkInferenceState = createDarkInferenceState();
 const recentLegsByKey = new Map<string, ContractLeg[]>();
 
 const MAX_RECENT_LEGS = 20;
@@ -658,12 +690,43 @@ const emitEquityJoin = async (
 
   try {
     await insertEquityPrintJoin(clickhouse, payload);
-    await publishJson(js, SUBJECT_EQUITY_JOINS, payload);
   } catch (error) {
     logger.error("failed to emit equity print join", {
       error: error instanceof Error ? error.message : String(error),
       trace_id: payload.trace_id
     });
+    return;
+  }
+
+  try {
+    await publishJson(js, SUBJECT_EQUITY_JOINS, payload);
+  } catch (error) {
+    logger.error("failed to publish equity print join", {
+      error: error instanceof Error ? error.message : String(error),
+      trace_id: payload.trace_id
+    });
+  }
+
+  await emitDarkInferences(clickhouse, js, payload);
+};
+
+const emitDarkInferences = async (
+  clickhouse: ReturnType<typeof createClickHouseClient>,
+  js: Awaited<ReturnType<typeof connectJetStreamWithRetry>>["js"],
+  join: EquityPrintJoin
+): Promise<void> => {
+  const events = evaluateDarkInferences(join, darkInferenceConfig, darkInferenceState);
+  for (const event of events) {
+    const validated: InferredDarkEvent = InferredDarkEventSchema.parse(event);
+    try {
+      await insertInferredDark(clickhouse, validated);
+      await publishJson(js, SUBJECT_INFERRED_DARK, validated);
+    } catch (error) {
+      logger.error("failed to emit inferred dark event", {
+        error: error instanceof Error ? error.message : String(error),
+        trace_id: validated.trace_id
+      });
+    }
   }
 };
 
@@ -777,6 +840,19 @@ const run = async () => {
   });
 
   await ensureStream(jsm, {
+    name: STREAM_INFERRED_DARK,
+    subjects: [SUBJECT_INFERRED_DARK],
+    retention: "limits",
+    storage: "file",
+    discard: "old",
+    max_msgs_per_subject: -1,
+    max_msgs: -1,
+    max_bytes: -1,
+    max_age: 0,
+    num_replicas: 1
+  });
+
+  await ensureStream(jsm, {
     name: STREAM_CLASSIFIER_HITS,
     subjects: [SUBJECT_CLASSIFIER_HITS],
     retention: "limits",
@@ -824,6 +900,7 @@ const run = async () => {
   await retry("clickhouse table init", 20, 500, async () => {
     await ensureFlowPacketsTable(clickhouse);
     await ensureEquityPrintJoinsTable(clickhouse);
+    await ensureInferredDarkTable(clickhouse);
     await ensureClassifierHitsTable(clickhouse);
     await ensureAlertsTable(clickhouse);
   });
