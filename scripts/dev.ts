@@ -30,6 +30,11 @@ const spawnChild = ({ name, cmd, cwd }: ChildSpec): void => {
     const exitCode = code ?? 0;
     const statusLabel = exitCode === 0 ? "exited" : "failed";
     console.error(`[dev] ${name} ${statusLabel} (${exitCode})`);
+    if (name === "infra" && exitCode !== 0) {
+      console.error(
+        "[dev] Infra failed. Ensure Docker is installed and the daemon is running (OrbStack or Docker Desktop), then retry."
+      );
+    }
     shutdown(exitCode);
   });
 };

@@ -186,7 +186,8 @@ h1 {
 
 .card-flow,
 .card-alerts,
-.card-classifiers {
+.card-classifiers,
+.card-dark {
   grid-column: span 2;
 }
 
@@ -857,7 +858,8 @@ h1 {
   .card-equities,
   .card-flow,
   .card-alerts,
-  .card-classifiers {
+  .card-classifiers,
+  .card-dark {
     grid-column: span 2;
   }
 }
@@ -871,31 +873,36 @@ h1 {
   .card-equities,
   .card-flow,
   .card-alerts,
-  .card-classifiers {
+  .card-classifiers,
+  .card-dark {
     grid-column: span 1;
   }
 }
 .card-flow .row,
 .card-alerts .row,
-.card-classifiers .row {
+.card-classifiers .row,
+.card-dark .row {
   padding: 12px 14px;
 }
 
 .card-flow .meta,
 .card-alerts .meta,
-.card-classifiers .meta {
+.card-classifiers .meta,
+.card-dark .meta {
   font-size: 0.78rem;
 }
 
 .card-flow .note,
 .card-alerts .note,
-.card-classifiers .note {
+.card-classifiers .note,
+.card-dark .note {
   font-size: 0.72rem;
 }
 
 .card-flow,
 .card-alerts,
-.card-classifiers {
+.card-classifiers,
+.card-dark {
   display: flex;
   flex-direction: column;
   height: 960px;
@@ -919,7 +926,8 @@ h1 {
 @media (max-width: 720px) {
   .card-flow,
   .card-alerts,
-  .card-classifiers {
+  .card-classifiers,
+  .card-dark {
     height: 780px;
   }
 }

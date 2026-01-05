@@ -5,7 +5,9 @@ import type {
   AlertEvent,
   ClassifierHitEvent,
   EquityPrint,
+  EquityPrintJoin,
   FlowPacket,
+  InferredDarkEvent,
   OptionNBBO,
   OptionPrint
 } from "@islandflow/types";
@@ -24,7 +26,9 @@ type MessageType =
   | "option-print"
   | "option-nbbo"
   | "equity-print"
+  | "equity-join"
   | "flow-packet"
+  | "inferred-dark"
   | "classifier-hit"
   | "alert";
 
@@ -223,6 +227,46 @@ const extractUnderlying = (contractId: string): string => {
   return contractId.split("-")[0]?.toUpperCase() ?? contractId.toUpperCase();
 };
 
+const extractEquityTraceFromJoin = (joinId: string): string | null => {
+  const match = joinId.match(/^equityjoin:(.+)$/);
+  return match?.[1] ?? null;
+};
+
+const inferDarkUnderlying = (
+  event: InferredDarkEvent,
+  equityPrints: Map<string, EquityPrint>,
+  equityJoins: Map<string, EquityPrintJoin>
+): string | null => {
+  for (const ref of event.evidence_refs) {
+    const join = equityJoins.get(ref);
+    if (!join) {
+      continue;
+    }
+    const underlying = join.features.underlying_id;
+    if (typeof underlying === "string" && underlying.length > 0) {
+      return underlying.toUpperCase();
+    }
+  }
+
+  const match = event.trace_id.match(/^dark:(?:stealth_accumulation|distribution):([^:]+):/);
+  if (match?.[1]) {
+    return match[1].toUpperCase();
+  }
+
+  for (const ref of event.evidence_refs) {
+    const traceId = extractEquityTraceFromJoin(ref);
+    if (!traceId) {
+      continue;
+    }
+    const print = equityPrints.get(traceId);
+    if (print) {
+      return print.underlying_id.toUpperCase();
+    }
+  }
+
+  return null;
+};
+
 const parseNumber = (value: unknown, fallback: number): number => {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value;
@@ -236,6 +280,38 @@ const parseNumber = (value: unknown, fallback: number): number => {
   }
 
   return fallback;
+};
+
+const parseBoolean = (value: unknown, fallback = false): boolean => {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "number") {
+    return value !== 0;
+  }
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "1", "yes", "on"].includes(normalized)) {
+      return true;
+    }
+    if (["false", "0", "no", "off"].includes(normalized)) {
+      return false;
+    }
+  }
+  return fallback;
+};
+
+const getJoinString = (join: EquityPrintJoin, key: string): string | null => {
+  const value = join.features[key];
+  return typeof value === "string" ? value : null;
+};
+
+const getJoinNumber = (join: EquityPrintJoin, key: string, fallback = Number.NaN): number => {
+  return parseNumber(join.features[key], fallback);
+};
+
+const getJoinBoolean = (join: EquityPrintJoin, key: string): boolean => {
+  return parseBoolean(join.features[key], false);
 };
 
 type NbboSide = "AA" | "A" | "B" | "BB";
@@ -445,14 +521,18 @@ type TapeConfig<T> = {
   pollMs?: number;
   captureScroll?: () => void;
   onNewItems?: (count: number) => void;
+  getItemTs?: (item: T) => number;
+  getReplayKey?: (item: T) => string | null;
 };
 
-const useTape = <T extends { ts: number; seq: number }>(
+const useTape = <T extends SortableItem & { seq: number }>(
   config: TapeConfig<T>
 ): TapeState<T> => {
   const { mode, wsPath, replayPath, expectedType, latestPath, onNewItems, captureScroll } = config;
   const batchSize = config.batchSize ?? 40;
   const pollMs = config.pollMs ?? 1000;
+  const getItemTs = config.getItemTs ?? extractSortTs;
+  const getReplayKey = config.getReplayKey ?? extractTracePrefix;
   const [status, setStatus] = useState<WsStatus>("connecting");
   const [items, setItems] = useState<T[]>([]);
   const [lastUpdate, setLastUpdate] = useState<number | null>(null);
@@ -561,7 +641,7 @@ const useTape = <T extends { ts: number; seq: number }>(
         const payload = (await response.json()) as { data?: T[] };
         const latest = payload.data?.[0];
         if (active && latest) {
-          replayEndRef.current = latest.ts;
+          replayEndRef.current = getItemTs(latest);
         }
       } catch (error) {
         console.warn("Failed to load replay end cursor", error);
@@ -573,7 +653,7 @@ const useTape = <T extends { ts: number; seq: number }>(
     return () => {
       active = false;
     };
-  }, [mode, latestPath]);
+  }, [mode, latestPath, getItemTs]);
 
   useEffect(() => {
     if (mode !== "live") {
@@ -703,21 +783,21 @@ const useTape = <T extends { ts: number; seq: number }>(
 
           let sourcePrefix = replaySourceRef.current;
           if (!sourcePrefix) {
-            const firstWithTrace = payload.data.find((item) => extractTracePrefix(item));
+            const firstWithTrace = payload.data.find((item) => getReplayKey(item));
             if (firstWithTrace) {
-              sourcePrefix = extractTracePrefix(firstWithTrace);
+              sourcePrefix = getReplayKey(firstWithTrace);
               replaySourceRef.current = sourcePrefix ?? null;
             }
           }
 
           const filtered = sourcePrefix
-            ? payload.data.filter((item) => extractTracePrefix(item) === sourcePrefix)
+            ? payload.data.filter((item) => getReplayKey(item) === sourcePrefix)
             : payload.data;
 
           const hasForeign =
             sourcePrefix &&
             payload.data.some((item) => {
-              const prefix = extractTracePrefix(item);
+              const prefix = getReplayKey(item);
               return prefix !== null && prefix !== sourcePrefix;
             });
 
@@ -728,9 +808,10 @@ const useTape = <T extends { ts: number; seq: number }>(
             scheduleFlush();
             const last = filtered.at(-1);
             if (last) {
-              setReplayTime(last.ts);
-              if (replayEnd !== null && last.ts >= replayEnd) {
-                cursorRef.current = { ts: last.ts, seq: last.seq };
+              const lastTs = getItemTs(last);
+              setReplayTime(lastTs);
+              if (replayEnd !== null && lastTs >= replayEnd) {
+                cursorRef.current = { ts: lastTs, seq: last.seq };
                 replayCompleteRef.current = true;
                 setReplayComplete(true);
                 setStatus("disconnected");
@@ -781,7 +862,7 @@ const useTape = <T extends { ts: number; seq: number }>(
       window.clearInterval(interval);
       cancelFlush();
     };
-  }, [mode, replayPath, batchSize, pollMs, scheduleFlush, cancelFlush]);
+  }, [mode, replayPath, batchSize, pollMs, scheduleFlush, cancelFlush, getItemTs, getReplayKey]);
 
   return {
     status,
@@ -1179,6 +1260,10 @@ type EvidenceItem =
   | { kind: "print"; id: string; print: OptionPrint }
   | { kind: "unknown"; id: string };
 
+type DarkEvidenceItem =
+  | { kind: "join"; id: string; join: EquityPrintJoin }
+  | { kind: "unknown"; id: string };
+
 type AlertDrawerProps = {
   alert: AlertEvent;
   flowPacket: FlowPacket | null;
@@ -1293,6 +1378,118 @@ const AlertDrawer = ({ alert, flowPacket, evidence, onClose }: AlertDrawerProps)
   );
 };
 
+type DarkDrawerProps = {
+  event: InferredDarkEvent;
+  evidence: DarkEvidenceItem[];
+  underlying: string | null;
+  onClose: () => void;
+};
+
+const DarkDrawer = ({ event, evidence, underlying, onClose }: DarkDrawerProps) => {
+  const joinEvidence = evidence.filter(
+    (item): item is { kind: "join"; id: string; join: EquityPrintJoin } => item.kind === "join"
+  );
+  const unknownCount = evidence.filter((item) => item.kind === "unknown").length;
+  const traceRefs = event.evidence_refs.slice(0, 6);
+  const extraRefs = Math.max(0, event.evidence_refs.length - traceRefs.length);
+
+  return (
+    <aside className="drawer">
+      <div className="drawer-header">
+        <div>
+          <p className="drawer-eyebrow">Inferred dark</p>
+          <h3>{humanizeClassifierId(event.type)}</h3>
+          <p className="drawer-subtitle">{formatDateTime(event.source_ts)}</p>
+        </div>
+        <button className="drawer-close" type="button" onClick={onClose}>
+          Close
+        </button>
+      </div>
+
+      <div className="drawer-meta">
+        <span className="drawer-chip">Confidence {formatConfidence(event.confidence)}</span>
+        {underlying ? <span className="drawer-chip">{underlying}</span> : null}
+        <span className="drawer-chip">Evidence {event.evidence_refs.length}</span>
+      </div>
+
+      <div className="drawer-section">
+        <h4>Trace path</h4>
+        <div className="drawer-row">
+          <div className="drawer-row-title">Event trace</div>
+          <p className="drawer-note">{event.trace_id}</p>
+        </div>
+        {traceRefs.length === 0 ? (
+          <p className="drawer-empty">No evidence references attached.</p>
+        ) : (
+          <div className="drawer-list">
+            {traceRefs.map((ref) => (
+              <div className="drawer-row" key={ref}>
+                <div className="drawer-row-title">Evidence ref</div>
+                <p className="drawer-note">{ref}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        {extraRefs > 0 ? <p className="drawer-empty">+{extraRefs} more evidence refs.</p> : null}
+      </div>
+
+      <div className="drawer-section">
+        <h4>Evidence joins</h4>
+        {joinEvidence.length === 0 ? (
+          <p className="drawer-empty">No evidence joins in the current cache.</p>
+        ) : (
+          <div className="drawer-list">
+            {joinEvidence.slice(0, 6).map((item) => {
+              const joinUnderlying = getJoinString(item.join, "underlying_id") ?? "Unknown";
+              const price = getJoinNumber(item.join, "price");
+              const size = getJoinNumber(item.join, "size");
+              const placement = getJoinString(item.join, "quote_placement") ?? "MISSING";
+              const offExchange = getJoinBoolean(item.join, "off_exchange_flag");
+              const bid = getJoinNumber(item.join, "quote_bid");
+              const ask = getJoinNumber(item.join, "quote_ask");
+              const mid = getJoinNumber(item.join, "quote_mid");
+              const spread = getJoinNumber(item.join, "quote_spread");
+              const quoteAge = parseNumber(item.join.join_quality.quote_age_ms, Number.NaN);
+              const quoteStale = parseNumber(item.join.join_quality.quote_stale, 0) > 0;
+              const quoteMissing = parseNumber(item.join.join_quality.quote_missing, 0) > 0;
+
+              return (
+                <div className="drawer-row" key={item.id}>
+                  <div className="drawer-row-title">{joinUnderlying}</div>
+                  <div className="drawer-row-meta">
+                    {Number.isFinite(price) ? <span>${formatPrice(price)}</span> : null}
+                    {Number.isFinite(size) ? <span>{formatSize(size)}x</span> : null}
+                    <span className="pill">{placement}</span>
+                    {offExchange ? (
+                      <span className="flag">Off-Ex</span>
+                    ) : (
+                      <span className="flag flag-muted">Lit</span>
+                    )}
+                    {Number.isFinite(quoteAge) ? <span>{Math.round(quoteAge)}ms</span> : null}
+                    {quoteStale ? <span className="pill nbbo-stale">Quote stale</span> : null}
+                    {quoteMissing ? <span className="pill nbbo-missing">Quote missing</span> : null}
+                  </div>
+                  <p className="drawer-note">{item.join.trace_id}</p>
+                  {Number.isFinite(bid) && Number.isFinite(ask) ? (
+                    <p className="drawer-note">
+                      Quote ${formatPrice(bid)} x ${formatPrice(ask)}
+                      {Number.isFinite(mid) ? ` · Mid ${formatPrice(mid)}` : ""}
+                      {Number.isFinite(spread) ? ` · Spr ${formatPrice(spread)}` : ""}
+                    </p>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {unknownCount > 0 ? (
+          <p className="drawer-empty">+{unknownCount} evidence refs not in cache.</p>
+        ) : null}
+      </div>
+    </aside>
+  );
+};
+
 const formatFlowMetric = (value: number, suffix?: string): string => {
   if (suffix) {
     return `${value}${suffix}`;
@@ -1304,21 +1501,25 @@ const formatFlowMetric = (value: number, suffix?: string): string => {
 export default function HomePage() {
   const [mode, setMode] = useState<TapeMode>("live");
   const [selectedAlert, setSelectedAlert] = useState<AlertEvent | null>(null);
+  const [selectedDarkEvent, setSelectedDarkEvent] = useState<InferredDarkEvent | null>(null);
   const [filterInput, setFilterInput] = useState<string>("");
   const optionsScroll = useListScroll();
   const equitiesScroll = useListScroll();
   const flowScroll = useListScroll();
+  const darkScroll = useListScroll();
   const alertsScroll = useListScroll();
   const classifierScroll = useListScroll();
 
   const optionsAnchor = useScrollAnchor(optionsScroll.listRef, optionsScroll.isAtTopRef);
   const equitiesAnchor = useScrollAnchor(equitiesScroll.listRef, equitiesScroll.isAtTopRef);
   const flowAnchor = useScrollAnchor(flowScroll.listRef, flowScroll.isAtTopRef);
+  const darkAnchor = useScrollAnchor(darkScroll.listRef, darkScroll.isAtTopRef);
   const alertsAnchor = useScrollAnchor(alertsScroll.listRef, alertsScroll.isAtTopRef);
   const classifierAnchor = useScrollAnchor(
     classifierScroll.listRef,
     classifierScroll.isAtTopRef
   );
+  const disableReplayGrouping = useCallback(() => null, []);
 
   const options = useTape<OptionPrint>({
     mode,
@@ -1344,6 +1545,17 @@ export default function HomePage() {
     onNewItems: equitiesScroll.onNewItems
   });
 
+  const equityJoins = useTape<EquityPrintJoin>({
+    mode,
+    wsPath: "/ws/equity-joins",
+    replayPath: "/replay/equity-joins",
+    latestPath: "/joins/equities",
+    expectedType: "equity-join",
+    batchSize: mode === "replay" ? 120 : undefined,
+    pollMs: mode === "replay" ? 200 : undefined,
+    getReplayKey: disableReplayGrouping
+  });
+
   const nbbo = useTape<OptionNBBO>({
     mode,
     wsPath: "/ws/options-nbbo",
@@ -1352,6 +1564,19 @@ export default function HomePage() {
     expectedType: "option-nbbo",
     batchSize: mode === "replay" ? 120 : undefined,
     pollMs: mode === "replay" ? 200 : undefined
+  });
+
+  const inferredDark = useTape<InferredDarkEvent>({
+    mode,
+    wsPath: "/ws/inferred-dark",
+    replayPath: "/replay/inferred-dark",
+    latestPath: "/dark/inferred",
+    expectedType: "inferred-dark",
+    batchSize: mode === "replay" ? 120 : undefined,
+    pollMs: mode === "replay" ? 200 : undefined,
+    captureScroll: darkAnchor.capture,
+    onNewItems: darkScroll.onNewItems,
+    getReplayKey: disableReplayGrouping
   });
 
   const flowHold = useCallback(() => !flowScroll.isAtTopRef.current, [flowScroll.isAtTopRef]);
@@ -1388,6 +1613,10 @@ export default function HomePage() {
   useLayoutEffect(() => {
     flowAnchor.apply();
   }, [flow.items, flowAnchor.apply]);
+
+  useLayoutEffect(() => {
+    darkAnchor.apply();
+  }, [inferredDark.items, darkAnchor.apply]);
 
   useLayoutEffect(() => {
     alertsAnchor.apply();
@@ -1432,6 +1661,24 @@ export default function HomePage() {
     return map;
   }, [options.items]);
 
+  const equityPrintMap = useMemo(() => {
+    const map = new Map<string, EquityPrint>();
+    for (const print of equities.items) {
+      if (print.trace_id) {
+        map.set(print.trace_id, print);
+      }
+    }
+    return map;
+  }, [equities.items]);
+
+  const equityJoinMap = useMemo(() => {
+    const map = new Map<string, EquityPrintJoin>();
+    for (const join of equityJoins.items) {
+      map.set(join.id, join);
+    }
+    return map;
+  }, [equityJoins.items]);
+
   const flowPacketMap = useMemo(() => {
     const map = new Map<string, FlowPacket>();
     for (const packet of flow.items) {
@@ -1466,10 +1713,32 @@ export default function HomePage() {
     return packetId ? flowPacketMap.get(packetId) ?? null : null;
   }, [selectedAlert, flowPacketMap]);
 
+  const selectedDarkEvidence = useMemo((): DarkEvidenceItem[] => {
+    if (!selectedDarkEvent) {
+      return [];
+    }
+
+    return selectedDarkEvent.evidence_refs.map((id) => {
+      const join = equityJoinMap.get(id);
+      if (join) {
+        return { kind: "join", id, join };
+      }
+      return { kind: "unknown", id };
+    });
+  }, [selectedDarkEvent, equityJoinMap]);
+
+  const selectedDarkUnderlying = useMemo(() => {
+    if (!selectedDarkEvent) {
+      return null;
+    }
+    return inferDarkUnderlying(selectedDarkEvent, equityPrintMap, equityJoinMap);
+  }, [selectedDarkEvent, equityJoinMap, equityPrintMap]);
+
   useEffect(() => {
     if (mode !== "live") {
       setSelectedAlert(null);
     }
+    setSelectedDarkEvent(null);
   }, [mode]);
 
   const extractPacketContract = useCallback((packet: FlowPacket): string => {
@@ -1545,6 +1814,16 @@ export default function HomePage() {
     return equities.items.filter((print) => matchesTicker(print.underlying_id));
   }, [equities.items, matchesTicker, tickerSet]);
 
+  const filteredInferredDark = useMemo(() => {
+    if (tickerSet.size === 0) {
+      return inferredDark.items;
+    }
+    return inferredDark.items.filter((event) => {
+      const underlying = inferDarkUnderlying(event, equityPrintMap, equityJoinMap);
+      return matchesTicker(underlying);
+    });
+  }, [equityJoinMap, equityPrintMap, inferredDark.items, matchesTicker, tickerSet]);
+
   const filteredFlow = useMemo(() => {
     if (tickerSet.size === 0) {
       return flow.items;
@@ -1575,6 +1854,7 @@ export default function HomePage() {
     return [
       options.lastUpdate,
       equities.lastUpdate,
+      inferredDark.lastUpdate,
       flow.lastUpdate,
       alerts.lastUpdate,
       classifierHits.lastUpdate
@@ -1584,6 +1864,7 @@ export default function HomePage() {
   }, [
     options.lastUpdate,
     equities.lastUpdate,
+    inferredDark.lastUpdate,
     flow.lastUpdate,
     alerts.lastUpdate,
     classifierHits.lastUpdate
@@ -1975,7 +2256,10 @@ export default function HomePage() {
                       className="row row-button"
                       key={`${alert.trace_id}-${alert.seq}`}
                       type="button"
-                      onClick={() => setSelectedAlert(alert)}
+                      onClick={() => {
+                        setSelectedDarkEvent(null);
+                        setSelectedAlert(alert);
+                      }}
                     >
                       <div>
                         <div className="contract">
@@ -2060,6 +2344,75 @@ export default function HomePage() {
             </div>
           </div>
         </section>
+
+        <section className="card card-dark">
+          <div className="card-header">
+            <div>
+              <h2>Inferred Dark</h2>
+              <p className="card-subtitle">Off-exchange patterns inferred from equity joins.</p>
+            </div>
+          </div>
+          <div className="card-controls">
+            <TapeStatus
+              status={inferredDark.status}
+              lastUpdate={inferredDark.lastUpdate}
+              replayTime={inferredDark.replayTime}
+              replayComplete={inferredDark.replayComplete}
+              paused={inferredDark.paused}
+              dropped={inferredDark.dropped}
+              mode={mode}
+              onTogglePause={inferredDark.togglePause}
+            />
+            <TapeControls
+              isAtTop={darkScroll.isAtTop}
+              missed={darkScroll.missed}
+              onJump={darkScroll.jumpToTop}
+            />
+          </div>
+
+          <div className="card-body">
+            <div className="list" ref={darkScroll.listRef}>
+              {filteredInferredDark.length === 0 ? (
+                <div className="empty">
+                  {tickerSet.size > 0
+                    ? "No inferred dark events match the current filter."
+                    : mode === "live"
+                      ? "No inferred dark events yet. Start compute."
+                      : "Replay queue empty. Ensure ClickHouse has data."}
+                </div>
+              ) : (
+                filteredInferredDark.map((event) => {
+                  const underlying = inferDarkUnderlying(event, equityPrintMap, equityJoinMap);
+                  const evidenceCount = event.evidence_refs.length;
+                  return (
+                    <button
+                      className="row row-button"
+                      key={`${event.trace_id}-${event.seq}`}
+                      type="button"
+                      onClick={() => {
+                        setSelectedAlert(null);
+                        setSelectedDarkEvent(event);
+                      }}
+                    >
+                      <div>
+                        <div className="contract">{humanizeClassifierId(event.type)}</div>
+                        <div className="meta">
+                          {underlying ? <span>{underlying}</span> : <span className="pill">Unknown</span>}
+                          <span>Confidence {formatConfidence(event.confidence)}</span>
+                          <span>Evidence {evidenceCount}</span>
+                        </div>
+                        {underlying ? null : (
+                          <div className="note">Underlying not in current equity cache.</div>
+                        )}
+                      </div>
+                      <div className="time">{formatTime(event.source_ts)}</div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </section>
       </div>
 
       {selectedAlert ? (
@@ -2068,6 +2421,15 @@ export default function HomePage() {
           flowPacket={selectedFlowPacket}
           evidence={selectedEvidence}
           onClose={() => setSelectedAlert(null)}
+        />
+      ) : null}
+
+      {selectedDarkEvent ? (
+        <DarkDrawer
+          event={selectedDarkEvent}
+          evidence={selectedDarkEvidence}
+          underlying={selectedDarkUnderlying}
+          onClose={() => setSelectedDarkEvent(null)}
         />
       ) : null}
     </main>
