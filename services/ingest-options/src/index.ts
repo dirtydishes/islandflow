@@ -31,7 +31,7 @@ const envSchema = z.object({
   NATS_URL: z.string().default("nats://localhost:4222"),
   CLICKHOUSE_URL: z.string().default("http://localhost:8123"),
   CLICKHOUSE_DATABASE: z.string().default("default"),
-  OPTIONS_INGEST_ADAPTER: z.string().min(1).default("alpaca"),
+  OPTIONS_INGEST_ADAPTER: z.string().min(1).default("synthetic"),
   ALPACA_KEY_ID: z.string().default(""),
   ALPACA_SECRET_KEY: z.string().default(""),
   ALPACA_REST_URL: z.string().default("https://data.alpaca.markets"),
