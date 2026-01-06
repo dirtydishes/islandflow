@@ -22,15 +22,17 @@ Done now (in repo):
 - UI: alerts + classifier hits panels, ticker filter, evidence drawer, severity strip
 - Databento historical replay adapter (options) with symbol mapping
 - Alpaca options adapter (dev-only, bounded contract list)
+- IBKR options adapter (single-underlying bridge via `ib_insync`)
+- Dark-pool-style inference (absorbed blocks, stealth accumulation, distribution) with WS/REST surfaces and UI list
 - Testing-mode throttling for ingest to reduce CPU during local dev
 
 In progress / blocked:
-- Live data adapters beyond dev-only feeds (requires licensed data source)
+- Production-grade licensed live data feeds (beyond current dev/test bridges)
 - Advanced clustering (spreads/rolls beyond basic structure tags)
+- Candles/overlays service (scaffolded, not yet emitting data)
 
 Not started:
-- Dark pool inference
-- Candle service and chart overlays
+- Reference data/corporate action enrichment
 - Auth / secure deployment
 
 ## Core Principles
@@ -43,7 +45,7 @@ Not started:
 ## Current Capabilities
 
 - Synthetic options/equity prints with deterministic sequencing across the S&P 500
-- Ingest adapter seam (env-selected; options default `alpaca`, equities default `synthetic`)
+- Ingest adapter seam (env-selected; options default `synthetic`, equities default `synthetic`)
 - Raw event persistence in ClickHouse + streaming via NATS JetStream
 - Deterministic option FlowPacket clustering (time-window)
 - Rolling stats baselines in Redis with z-score features on FlowPackets
@@ -53,14 +55,16 @@ Not started:
 - API gateway with REST, WS, and replay endpoints
 - UI tapes for options/equities/flow packets + alerts/hits with live/replay toggle and pause controls
 - Alpaca options adapter (dev-only) with bounded contract selection
+- IBKR options adapter (single-underlying bridge via Python sidecar)
 - Databento historical replay adapter (options, Python sidecar)
+- Dark-pool-style inference (absorbed blocks, stealth accumulation, distribution) with evidence links and replay
 
 ## Planned Capabilities (from PLAN.md)
 
 - Real-time licensed market data ingestors (options + equities)
-- Dark pool inference and evidence linking
 - Candle aggregation + chart overlays
 - Replay/backtesting metrics and calibration
+- Reference data, symbology, and corporate-action handling
 
 ## Tech Stack
 
@@ -107,7 +111,7 @@ Run just the API:
 - `bun --cwd services/api run dev`
 
 Adapter selection (env):
-- Options: `OPTIONS_INGEST_ADAPTER` (defaults to `alpaca`)
+- Options: `OPTIONS_INGEST_ADAPTER` (defaults to `synthetic`; supported: `synthetic`, `alpaca`, `ibkr`, `databento`)
 - Equities: `EQUITIES_INGEST_ADAPTER` (defaults to `synthetic`)
 - Compute: `COMPUTE_DELIVER_POLICY` (`new` default), `COMPUTE_CONSUMER_RESET` (force skip backlog)
 - Rolling stats: `REDIS_URL`, `ROLLING_WINDOW_SIZE`, `ROLLING_TTL_SEC`
