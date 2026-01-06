@@ -78,6 +78,40 @@ h1 {
   min-width: 220px;
 }
 
+.header-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.theme-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.theme-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #6f5b39;
+}
+
+.theme-select {
+  border: 1px solid rgba(111, 91, 57, 0.35);
+  border-radius: 12px;
+  padding: 6px 10px;
+  background: #fffdf7;
+  color: #1d1d1b;
+  font-size: 0.9rem;
+}
+
+.theme-select:focus-visible {
+  outline: 2px solid rgba(47, 109, 79, 0.3);
+  outline-offset: 2px;
+}
+
 .filter-bar {
   display: flex;
   align-items: center;

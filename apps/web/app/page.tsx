@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent
+} from "react";
 import type {
   AlertEvent,
   ClassifierHitEvent,
@@ -11,6 +19,7 @@ import type {
   OptionNBBO,
   OptionPrint
 } from "@islandflow/types";
+import { useTheme, type Theme } from "./providers/theme";
 
 const MAX_ITEMS = 500;
 const NBBO_MAX_AGE_MS = Number(process.env.NEXT_PUBLIC_NBBO_MAX_AGE_MS);
@@ -1503,6 +1512,7 @@ export default function HomePage() {
   const [selectedAlert, setSelectedAlert] = useState<AlertEvent | null>(null);
   const [selectedDarkEvent, setSelectedDarkEvent] = useState<InferredDarkEvent | null>(null);
   const [filterInput, setFilterInput] = useState<string>("");
+  const { theme, setTheme } = useTheme();
   const optionsScroll = useListScroll();
   const equitiesScroll = useListScroll();
   const flowScroll = useListScroll();
@@ -1874,6 +1884,11 @@ export default function HomePage() {
     setMode((prev) => (prev === "live" ? "replay" : "live"));
   };
 
+  const handleThemeChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    const nextTheme = event.target.value as Theme;
+    setTheme(nextTheme);
+  };
+
   return (
     <main className="dashboard">
       <header className="header">
@@ -1889,9 +1904,19 @@ export default function HomePage() {
           <span className="summary-value">
             {lastSeen ? formatTime(lastSeen) : "Waiting for data"}
           </span>
-          <button className="mode-button" type="button" onClick={toggleMode}>
-            Switch to {mode === "live" ? "Replay" : "Live"}
-          </button>
+          <div className="header-controls">
+            <label className="theme-picker">
+              <span className="theme-label">Theme</span>
+              <select className="theme-select" value={theme} onChange={handleThemeChange}>
+                <option value="default">Default</option>
+                <option value="bbg">BBG</option>
+                <option value="system">System (placeholder)</option>
+              </select>
+            </label>
+            <button className="mode-button" type="button" onClick={toggleMode}>
+              Switch to {mode === "live" ? "Replay" : "Live"}
+            </button>
+          </div>
         </div>
       </header>
 
