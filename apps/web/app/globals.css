@@ -180,6 +180,10 @@ h1 {
   grid-column: span 4;
 }
 
+.card-chart {
+  grid-column: span 6;
+}
+
 .card-equities {
   grid-column: span 2;
 }
@@ -272,6 +276,108 @@ h1 {
   width: 100%;
   margin-bottom: 20px;
   flex: 0 0 auto;
+}
+
+.chart-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.chart-intervals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.interval-button {
+  border: 1px solid rgba(111, 91, 57, 0.35);
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: rgba(111, 91, 57, 0.08);
+  color: #6f5b39;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.interval-button.active {
+  border-color: rgba(47, 109, 79, 0.6);
+  background: rgba(47, 109, 79, 0.1);
+  color: #2f6d4f;
+  box-shadow: 0 0 0 2px rgba(47, 109, 79, 0.12);
+}
+
+.interval-button:focus-visible {
+  outline: 2px solid rgba(47, 109, 79, 0.4);
+  outline-offset: 2px;
+}
+
+.chart-hint {
+  font-size: 0.8rem;
+  color: #6f5b39;
+}
+
+.chart-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.chart-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  color: #5b4c34;
+}
+
+.chart-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.chart-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(111, 91, 57, 0.4);
+}
+
+.chart-status-connected .chart-dot {
+  background: rgba(47, 109, 79, 0.8);
+}
+
+.chart-status-connecting .chart-dot {
+  background: rgba(31, 74, 123, 0.8);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.chart-status-disconnected .chart-dot {
+  background: rgba(196, 111, 42, 0.8);
+}
+
+.chart-meta-time {
+  color: #6f5b39;
+}
+
+.chart-surface {
+  width: 100%;
+  height: 360px;
+  border-radius: 18px;
+  border: 1px solid rgba(217, 205, 184, 0.6);
+  background: #fffdf7;
+  overflow: hidden;
+}
+
+.chart-empty {
+  margin-top: -4px;
 }
 
 .tape-controls {
@@ -854,6 +960,7 @@ h1 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .card-chart,
   .card-options,
   .card-equities,
   .card-flow,
@@ -869,6 +976,7 @@ h1 {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .card-chart,
   .card-options,
   .card-equities,
   .card-flow,
@@ -929,5 +1037,9 @@ h1 {
   .card-classifiers,
   .card-dark {
     height: 780px;
+  }
+
+  .chart-surface {
+    height: 280px;
   }
 }

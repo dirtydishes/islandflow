@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type {
   AlertEvent,
   ClassifierHitEvent,
+  EquityCandle,
   EquityPrint,
   EquityPrintJoin,
   FlowPacket,
@@ -11,12 +12,56 @@ import type {
   OptionNBBO,
   OptionPrint
 } from "@islandflow/types";
+import { createChart, type IChartApi, type UTCTimestamp } from "lightweight-charts";
 
 const MAX_ITEMS = 500;
 const NBBO_MAX_AGE_MS = Number(process.env.NEXT_PUBLIC_NBBO_MAX_AGE_MS);
 const NBBO_MAX_AGE_MS_SAFE =
   Number.isFinite(NBBO_MAX_AGE_MS) && NBBO_MAX_AGE_MS > 0 ? NBBO_MAX_AGE_MS : 1000;
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"]);
+const CANDLE_INTERVALS = [
+  { label: "1s", ms: 1000 },
+  { label: "5s", ms: 5000 },
+  { label: "1m", ms: 60000 }
+];
+
+type CandlestickSeries = ReturnType<IChartApi["addCandlestickSeries"]>;
+
+type ChartCandle = {
+  time: UTCTimestamp;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+};
+
+const formatIntervalLabel = (intervalMs: number): string => {
+  const match = CANDLE_INTERVALS.find((interval) => interval.ms === intervalMs);
+  if (match) {
+    return match.label;
+  }
+  if (intervalMs >= 60000) {
+    return `${Math.round(intervalMs / 60000)}m`;
+  }
+  if (intervalMs >= 1000) {
+    return `${Math.round(intervalMs / 1000)}s`;
+  }
+  return `${intervalMs}ms`;
+};
+
+const toChartTime = (ts: number): UTCTimestamp => {
+  return Math.floor(ts / 1000) as UTCTimestamp;
+};
+
+const toChartCandle = (candle: EquityCandle): ChartCandle => {
+  return {
+    time: toChartTime(candle.ts),
+    open: candle.open,
+    high: candle.high,
+    low: candle.low,
+    close: candle.close
+  };
+};
 
 type WsStatus = "connecting" | "connected" | "disconnected";
 
@@ -26,6 +71,7 @@ type MessageType =
   | "option-print"
   | "option-nbbo"
   | "equity-print"
+  | "equity-candle"
   | "equity-join"
   | "flow-packet"
   | "inferred-dark"
@@ -1168,6 +1214,289 @@ const TapeControls = ({ isAtTop, missed, onJump }: TapeControlsProps) => {
   );
 };
 
+type CandleChartProps = {
+  ticker: string;
+  intervalMs: number;
+  mode: TapeMode;
+};
+
+const CandleChart = ({ ticker, intervalMs, mode }: CandleChartProps) => {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const seriesRef = useRef<CandlestickSeries | null>(null);
+  const socketRef = useRef<WebSocket | null>(null);
+  const reconnectRef = useRef<number | null>(null);
+  const lastCandleRef = useRef<{ time: UTCTimestamp; seq: number } | null>(null);
+  const [ready, setReady] = useState(false);
+  const [status, setStatus] = useState<WsStatus>(mode === "live" ? "connecting" : "connected");
+  const [lastUpdate, setLastUpdate] = useState<number | null>(null);
+  const [hasData, setHasData] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) {
+      return;
+    }
+
+    const width = container.clientWidth || 600;
+    const height = container.clientHeight || 360;
+    const chart = createChart(container, {
+      width,
+      height,
+      layout: {
+        background: { color: "#fffdf7" },
+        textColor: "#4e3e25"
+      },
+      grid: {
+        vertLines: { color: "rgba(82, 64, 36, 0.12)" },
+        horzLines: { color: "rgba(82, 64, 36, 0.12)" }
+      },
+      crosshair: {
+        vertLine: { color: "rgba(47, 109, 79, 0.35)" },
+        horzLine: { color: "rgba(47, 109, 79, 0.35)" }
+      },
+      timeScale: {
+        borderColor: "rgba(111, 91, 57, 0.35)",
+        timeVisible: true,
+        secondsVisible: intervalMs < 60000
+      },
+      rightPriceScale: {
+        borderColor: "rgba(111, 91, 57, 0.35)"
+      }
+    });
+
+    const series = chart.addCandlestickSeries({
+      upColor: "#2f6d4f",
+      downColor: "#c46f2a",
+      borderVisible: false,
+      wickUpColor: "#2f6d4f",
+      wickDownColor: "#c46f2a"
+    });
+
+    chartRef.current = chart;
+    seriesRef.current = series;
+    setReady(true);
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) {
+        return;
+      }
+      const { width: nextWidth, height: nextHeight } = entry.contentRect;
+      if (Number.isFinite(nextWidth) && Number.isFinite(nextHeight)) {
+        chart.applyOptions({
+          width: Math.max(1, Math.floor(nextWidth)),
+          height: Math.max(1, Math.floor(nextHeight))
+        });
+      }
+    });
+
+    resizeObserver.observe(container);
+
+    return () => {
+      resizeObserver.disconnect();
+      chart.remove();
+      chartRef.current = null;
+      seriesRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!ready || !seriesRef.current) {
+      return;
+    }
+
+    let active = true;
+    setError(null);
+    setHasData(false);
+    setLastUpdate(null);
+    lastCandleRef.current = null;
+    seriesRef.current.setData([]);
+    setStatus(mode === "live" ? "connecting" : "connected");
+
+    const fetchCandles = async () => {
+      try {
+        const url = new URL(buildApiUrl("/candles/equities"));
+        url.searchParams.set("underlying_id", ticker);
+        url.searchParams.set("interval_ms", intervalMs.toString());
+        url.searchParams.set("limit", "300");
+        url.searchParams.set("cache", "1");
+        const response = await fetch(url.toString());
+        if (!response.ok) {
+          throw new Error(`Candle fetch failed (${response.status})`);
+        }
+        const payload = (await response.json()) as { data?: EquityCandle[] };
+        if (!active || !seriesRef.current) {
+          return;
+        }
+        const sorted = [...(payload.data ?? [])].sort((a, b) => {
+          if (a.ts !== b.ts) {
+            return a.ts - b.ts;
+          }
+          return a.seq - b.seq;
+        });
+        const chartData = sorted.map(toChartCandle);
+        seriesRef.current.setData(chartData);
+        chartRef.current?.timeScale().fitContent();
+
+        if (sorted.length > 0) {
+          const last = sorted[sorted.length - 1];
+          lastCandleRef.current = { time: toChartTime(last.ts), seq: last.seq };
+          setHasData(true);
+          setLastUpdate(last.ingest_ts ?? last.ts);
+        }
+      } catch (error) {
+        if (!active) {
+          return;
+        }
+        setError(error instanceof Error ? error.message : String(error));
+        setStatus("disconnected");
+        setHasData(false);
+      }
+    };
+
+    void fetchCandles();
+
+    return () => {
+      active = false;
+    };
+  }, [ready, ticker, intervalMs, mode]);
+
+  useEffect(() => {
+    if (!ready || mode !== "live" || !seriesRef.current) {
+      if (socketRef.current) {
+        socketRef.current.close();
+      }
+      if (reconnectRef.current !== null) {
+        window.clearTimeout(reconnectRef.current);
+        reconnectRef.current = null;
+      }
+      return;
+    }
+
+    let active = true;
+
+    const connect = () => {
+      if (!active) {
+        return;
+      }
+
+      setStatus("connecting");
+      const socket = new WebSocket(buildWsUrl("/ws/equity-candles"));
+      socketRef.current = socket;
+
+      socket.onopen = () => {
+        if (!active) {
+          return;
+        }
+        setStatus("connected");
+      };
+
+      socket.onmessage = (event) => {
+        if (!active || !seriesRef.current) {
+          return;
+        }
+
+        try {
+          const message = JSON.parse(event.data) as StreamMessage<EquityCandle>;
+          if (!message || message.type !== "equity-candle") {
+            return;
+          }
+
+          const candle = message.payload;
+          if (candle.underlying_id !== ticker || candle.interval_ms !== intervalMs) {
+            return;
+          }
+
+          const chartCandle = toChartCandle(candle);
+          const last = lastCandleRef.current;
+          if (last) {
+            if (chartCandle.time < last.time) {
+              return;
+            }
+            if (chartCandle.time === last.time && candle.seq <= last.seq) {
+              return;
+            }
+          }
+
+          seriesRef.current.update(chartCandle);
+          lastCandleRef.current = { time: chartCandle.time, seq: candle.seq };
+          setHasData(true);
+          setLastUpdate(candle.ingest_ts ?? candle.ts);
+        } catch (error) {
+          console.warn("Failed to parse candle payload", error);
+        }
+      };
+
+      socket.onclose = () => {
+        if (!active) {
+          return;
+        }
+        setStatus("disconnected");
+        reconnectRef.current = window.setTimeout(connect, 1000);
+      };
+
+      socket.onerror = () => {
+        if (!active) {
+          return;
+        }
+        setStatus("disconnected");
+        socket.close();
+      };
+    };
+
+    connect();
+
+    return () => {
+      active = false;
+      if (reconnectRef.current !== null) {
+        window.clearTimeout(reconnectRef.current);
+        reconnectRef.current = null;
+      }
+      if (socketRef.current) {
+        socketRef.current.close();
+      }
+    };
+  }, [ready, mode, ticker, intervalMs]);
+
+  useEffect(() => {
+    if (!chartRef.current) {
+      return;
+    }
+    chartRef.current.timeScale().applyOptions({
+      timeVisible: true,
+      secondsVisible: intervalMs < 60000
+    });
+  }, [intervalMs]);
+
+  const statusText = statusLabel(status, false, mode);
+
+  return (
+    <div className="chart-panel">
+      <div className="chart-meta">
+        <div className={`chart-status chart-status-${status}`}>
+          <span className="chart-dot" />
+          <span>{statusText}</span>
+        </div>
+        <span className="chart-meta-time">
+          {lastUpdate ? `Updated ${formatTime(lastUpdate)}` : "Waiting for data"}
+        </span>
+      </div>
+      <div className="chart-surface" ref={containerRef} />
+      {error ? (
+        <div className="empty chart-empty">Chart error: {error}</div>
+      ) : !hasData ? (
+        <div className="empty chart-empty">
+          {mode === "live"
+            ? "No candles yet. Start candles service."
+            : "No candles for this replay window."}
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
 type AlertSeverityStripProps = {
   alerts: AlertEvent[];
 };
@@ -1503,6 +1832,7 @@ export default function HomePage() {
   const [selectedAlert, setSelectedAlert] = useState<AlertEvent | null>(null);
   const [selectedDarkEvent, setSelectedDarkEvent] = useState<InferredDarkEvent | null>(null);
   const [filterInput, setFilterInput] = useState<string>("");
+  const [chartIntervalMs, setChartIntervalMs] = useState<number>(CANDLE_INTERVALS[0].ms);
   const optionsScroll = useListScroll();
   const equitiesScroll = useListScroll();
   const flowScroll = useListScroll();
@@ -1635,6 +1965,7 @@ export default function HomePage() {
   }, [filterInput]);
 
   const tickerSet = useMemo(() => new Set(activeTickers), [activeTickers]);
+  const chartTicker = useMemo(() => activeTickers[0] ?? "SPY", [activeTickers]);
 
   const nbboMap = useMemo(() => {
     const map = new Map<string, OptionNBBO>();
@@ -1921,6 +2252,37 @@ export default function HomePage() {
       </div>
 
       <div className="cards">
+        <section className="card card-chart">
+          <div className="card-header">
+            <div>
+              <h2>Equity Chart</h2>
+              <p className="card-subtitle">
+                Server-built {formatIntervalLabel(chartIntervalMs)} candles for {chartTicker}.
+              </p>
+            </div>
+          </div>
+          <div className="chart-controls">
+            <div className="chart-intervals">
+              {CANDLE_INTERVALS.map((interval) => (
+                <button
+                  key={interval.ms}
+                  className={`interval-button${interval.ms === chartIntervalMs ? " active" : ""}`}
+                  type="button"
+                  onClick={() => setChartIntervalMs(interval.ms)}
+                >
+                  {interval.label}
+                </button>
+              ))}
+            </div>
+            {activeTickers.length > 1 ? (
+              <span className="chart-hint">Charting first of {activeTickers.length} tickers</span>
+            ) : (
+              <span className="chart-hint">Charting {chartTicker}</span>
+            )}
+          </div>
+          <CandleChart ticker={chartTicker} intervalMs={chartIntervalMs} mode={mode} />
+        </section>
+
         <section className="card card-options">
           <div className="card-header">
             <div>
