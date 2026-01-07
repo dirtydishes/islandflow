@@ -110,13 +110,97 @@ Run just the web app (fixed to port 3000):
 Run just the API:
 - `bun --cwd services/api run dev`
 
-Adapter selection (env):
-- Options: `OPTIONS_INGEST_ADAPTER` (defaults to `synthetic`; supported: `synthetic`, `alpaca`, `ibkr`, `databento`)
-- Equities: `EQUITIES_INGEST_ADAPTER` (defaults to `synthetic`)
-- Compute: `COMPUTE_DELIVER_POLICY` (`new` default), `COMPUTE_CONSUMER_RESET` (force skip backlog)
-- Rolling stats: `REDIS_URL`, `ROLLING_WINDOW_SIZE`, `ROLLING_TTL_SEC`
-- Classifier tuning: `CLASSIFIER_SWEEP_MIN_PREMIUM_Z`, `CLASSIFIER_SPIKE_MIN_PREMIUM_Z`, `CLASSIFIER_SPIKE_MIN_SIZE_Z`, `CLASSIFIER_Z_MIN_SAMPLES`
-- Aggressor gating: `CLASSIFIER_MIN_NBBO_COVERAGE`, `CLASSIFIER_MIN_AGGRESSOR_RATIO`
+## Environment Configuration
+
+All runtime configuration is driven by `.env`. Start by copying `.env.example` and edit the values you need. Defaults below match `.env.example` unless otherwise noted.
+
+### Core infrastructure
+
+These define how services connect to the event bus and storage backends. Documentation links are provided for convenience.
+
+- `NATS_URL` (default `nats://localhost:4222`) — NATS JetStream endpoint. See [NATS](https://nats.io/) and [JetStream](https://docs.nats.io/nats-concepts/jetstream).  
+- `CLICKHOUSE_URL` (default `http://localhost:8123`) — ClickHouse HTTP endpoint. See [ClickHouse](https://clickhouse.com/).  
+- `CLICKHOUSE_DATABASE` (default `default`) — ClickHouse database name.  
+- `REDIS_URL` (default `redis://localhost:6379`) — Redis endpoint for rolling stats. See [Redis](https://redis.io/).  
+
+### Adapter selection
+
+- `OPTIONS_INGEST_ADAPTER` (default `synthetic`) — options ingest adapter: `synthetic`, `alpaca`, `ibkr`, `databento`.  
+- `EQUITIES_INGEST_ADAPTER` (default `synthetic`) — equities ingest adapter.  
+- `EMIT_INTERVAL_MS` (default `1000`) — synthetic equities emit cadence.  
+
+### Alpaca options adapter (dev-only)
+
+Provider links: [Alpaca](https://alpaca.markets/), [Alpaca Market Data API](https://alpaca.markets/docs/api-references/market-data-api/).
+
+- `ALPACA_KEY_ID`, `ALPACA_SECRET_KEY` — credentials.  
+- `ALPACA_REST_URL` (default `https://data.alpaca.markets`) — REST endpoint.  
+- `ALPACA_WS_BASE_URL` (default `wss://stream.data.alpaca.markets/v1beta1`) — streaming endpoint.  
+- `ALPACA_FEED` (default `indicative`) — use `opra` when you have a subscription.  
+- `ALPACA_UNDERLYINGS` (default `SPY,NVDA,AAPL`) — comma-separated list of symbols.  
+- `ALPACA_STRIKES_PER_SIDE` (default `8`) — strikes per side around ATM.  
+- `ALPACA_MAX_DTE_DAYS` (default `30`) — expiry horizon.  
+- `ALPACA_MONEYNESS_PCT` (default `0.06`) — ATM band for strike selection.  
+- `ALPACA_MONEYNESS_FALLBACK_PCT` (default `0.1`) — fallback band if strikes are sparse.  
+- `ALPACA_MAX_QUOTES` (default `200`) — subscription size guardrail.  
+
+### Databento historical replay adapter
+
+Provider links: [Databento](https://databento.com/), [Databento API](https://databento.com/docs/api-reference).
+
+- `DATABENTO_API_KEY` — API key.  
+- `DATABENTO_DATASET` (default `OPRA.PILLAR`) — dataset.  
+- `DATABENTO_SCHEMA` (default `trades`) — schema.  
+- `DATABENTO_START` — ISO date/time start for replay.  
+- `DATABENTO_END` — ISO date/time end (optional).  
+- `DATABENTO_SYMBOLS` (default `SPY.OPT`) — comma list or dataset symbols.  
+- `DATABENTO_STYPE_IN` (default `parent`) — input symbology type.  
+- `DATABENTO_STYPE_OUT` (default `instrument_id`) — output symbology type.  
+- `DATABENTO_LIMIT` (default `0`) — record cap (0 means no cap).  
+- `DATABENTO_PRICE_SCALE` (default `1`) — divide raw price by this value.  
+- `DATABENTO_PYTHON_BIN` (default `py/.venv/bin/python`) — Python executable for replay sidecar.  
+
+### IBKR options adapter (Python sidecar)
+
+Provider links: [Interactive Brokers](https://www.interactivebrokers.com/), [IBKR API docs](https://interactivebrokers.github.io/).
+
+- `IBKR_HOST` (default `127.0.0.1`) — TWS/Gateway host.  
+- `IBKR_PORT` (default `7497`) — TWS/Gateway port.  
+- `IBKR_CLIENT_ID` (default `0`) — API client ID.  
+- `IBKR_SYMBOL` (default `SPY`) — underlying symbol.  
+- `IBKR_EXPIRY` (default `20250117`) — expiry in `YYYYMMDD`.  
+- `IBKR_STRIKE` (default `450`) — strike price.  
+- `IBKR_RIGHT` (default `C`) — option right (`C` or `P`).  
+- `IBKR_EXCHANGE` (default `SMART`) — exchange route.  
+- `IBKR_CURRENCY` (default `USD`) — currency.  
+- `IBKR_PYTHON_BIN` (default `python3`) — Python executable for sidecar.  
+
+### Compute + market-structure tuning
+
+- `COMPUTE_DELIVER_POLICY` (default `new`) — consumer start behavior (`new` or `all`).  
+- `COMPUTE_CONSUMER_RESET` (default `false`) — force consumer reset (skip backlog).  
+- `NBBO_MAX_AGE_MS` (default `1000`) — max allowed NBBO age for joins.  
+- `NEXT_PUBLIC_NBBO_MAX_AGE_MS` (default `1000`) — UI-visible NBBO age for display gating.  
+- `ROLLING_WINDOW_SIZE` (default `50`) — rolling stats window length.  
+- `ROLLING_TTL_SEC` (default `86400`) — rolling stats TTL in seconds.  
+
+### Classifier thresholds
+
+- `CLASSIFIER_SWEEP_MIN_PREMIUM` (default `40000`) — absolute sweep premium floor.  
+- `CLASSIFIER_SWEEP_MIN_COUNT` (default `3`) — minimum leg count for sweeps.  
+- `CLASSIFIER_SWEEP_MIN_PREMIUM_Z` (default `2`) — sweep premium z-score threshold.  
+- `CLASSIFIER_SPIKE_MIN_PREMIUM` (default `20000`) — absolute spike premium floor.  
+- `CLASSIFIER_SPIKE_MIN_SIZE` (default `400`) — absolute spike size floor.  
+- `CLASSIFIER_SPIKE_MIN_PREMIUM_Z` (default `2.5`) — spike premium z-score threshold.  
+- `CLASSIFIER_SPIKE_MIN_SIZE_Z` (default `2`) — spike size z-score threshold.  
+- `CLASSIFIER_Z_MIN_SAMPLES` (default `12`) — minimum samples before z-scores apply.  
+- `CLASSIFIER_MIN_NBBO_COVERAGE` (default `0.5`) — NBBO coverage ratio gate.  
+- `CLASSIFIER_MIN_AGGRESSOR_RATIO` (default `0.55`) — aggressor ratio gate.  
+
+### Testing + throttling
+
+- `TESTING_MODE` (default `false`) — enable ingest throttling for local dev.  
+- `TESTING_THROTTLE_MS` (default `200`) — minimum spacing between emitted prints.  
 
 Testing mode (throttles ingest to reduce CPU):
 - `TESTING_MODE=true` enables throttling
