@@ -2,6 +2,7 @@ import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import {
   AlertEventSchema,
   ClassifierHitEventSchema,
+  EquityCandleSchema,
   EquityPrintSchema,
   EquityQuoteSchema,
   EquityPrintJoinSchema,
@@ -13,6 +14,7 @@ import {
 import type {
   AlertEvent,
   ClassifierHitEvent,
+  EquityCandle,
   EquityPrint,
   EquityQuote,
   EquityPrintJoin,
@@ -37,6 +39,11 @@ import {
   EQUITY_QUOTES_TABLE,
   normalizeEquityQuote
 } from "./equity-quotes";
+import {
+  equityCandlesTableDDL,
+  EQUITY_CANDLES_TABLE,
+  normalizeEquityCandle
+} from "./equity-candles";
 import {
   equityPrintJoinsTableDDL,
   EQUITY_PRINT_JOINS_TABLE,
@@ -118,6 +125,14 @@ export const ensureEquityQuotesTable = async (
 ): Promise<void> => {
   await client.exec({
     query: equityQuotesTableDDL()
+  });
+};
+
+export const ensureEquityCandlesTable = async (
+  client: ClickHouseClient
+): Promise<void> => {
+  await client.exec({
+    query: equityCandlesTableDDL()
   });
 };
 
@@ -207,6 +222,18 @@ export const insertEquityQuote = async (
   });
 };
 
+export const insertEquityCandle = async (
+  client: ClickHouseClient,
+  candle: EquityCandle
+): Promise<void> => {
+  const record = normalizeEquityCandle(candle);
+  await client.insert({
+    table: EQUITY_CANDLES_TABLE,
+    values: [record],
+    format: "JSONEachRow"
+  });
+};
+
 export const insertEquityPrintJoin = async (
   client: ClickHouseClient,
   join: EquityPrintJoin
@@ -272,6 +299,14 @@ const clampLimit = (limit: number): number => {
   return Math.max(1, Math.min(1000, Math.floor(limit)));
 };
 
+const clampPositiveInt = (value: number, fallback = 1): number => {
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+
+  return Math.max(1, Math.floor(value));
+};
+
 const clampCursor = (value: number): number => {
   if (!Number.isFinite(value)) {
     return 0;
@@ -289,6 +324,10 @@ const coerceNumber = (value: unknown): unknown => {
   }
 
   return value;
+};
+
+const quoteString = (value: string): string => {
+  return JSON.stringify(value);
 };
 
 const normalizeNumericFields = (
@@ -347,6 +386,26 @@ const normalizeEquityQuoteRow = (row: unknown): unknown => {
       "ts",
       "bid",
       "ask"
+    ]);
+  }
+
+  return row;
+};
+
+const normalizeEquityCandleRow = (row: unknown): unknown => {
+  if (row && typeof row === "object") {
+    return normalizeNumericFields(row as Record<string, unknown>, [
+      "source_ts",
+      "ingest_ts",
+      "seq",
+      "ts",
+      "interval_ms",
+      "open",
+      "high",
+      "low",
+      "close",
+      "volume",
+      "trade_count"
     ]);
   }
 
@@ -525,6 +584,24 @@ export const fetchRecentEquityQuotes = async (
   return EquityQuoteSchema.array().parse(rows.map(normalizeEquityQuoteRow));
 };
 
+export const fetchRecentEquityCandles = async (
+  client: ClickHouseClient,
+  underlyingId: string,
+  intervalMs: number,
+  limit: number
+): Promise<EquityCandle[]> => {
+  const safeLimit = clampLimit(limit);
+  const safeInterval = clampPositiveInt(intervalMs, 1000);
+  const safeUnderlying = quoteString(underlyingId);
+  const result = await client.query({
+    query: `SELECT * FROM ${EQUITY_CANDLES_TABLE} WHERE underlying_id = ${safeUnderlying} AND interval_ms = ${safeInterval} ORDER BY ts DESC, seq DESC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  return EquityCandleSchema.array().parse(rows.map(normalizeEquityCandleRow));
+};
+
 export const fetchRecentEquityPrintJoins = async (
   client: ClickHouseClient,
   limit: number
@@ -689,6 +766,52 @@ export const fetchEquityQuotesAfter = async (
 
   const rows = await result.json<unknown[]>();
   return EquityQuoteSchema.array().parse(rows.map(normalizeEquityQuoteRow));
+};
+
+export const fetchEquityCandlesAfter = async (
+  client: ClickHouseClient,
+  underlyingId: string,
+  intervalMs: number,
+  afterTs: number,
+  afterSeq: number,
+  limit: number
+): Promise<EquityCandle[]> => {
+  const safeLimit = clampLimit(limit);
+  const safeAfterTs = clampCursor(afterTs);
+  const safeAfterSeq = clampCursor(afterSeq);
+  const safeInterval = clampPositiveInt(intervalMs, 1000);
+  const safeUnderlying = quoteString(underlyingId);
+
+  const result = await client.query({
+    query: `SELECT * FROM ${EQUITY_CANDLES_TABLE} WHERE underlying_id = ${safeUnderlying} AND interval_ms = ${safeInterval} AND (ts, seq) > (${safeAfterTs}, ${safeAfterSeq}) ORDER BY ts ASC, seq ASC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  return EquityCandleSchema.array().parse(rows.map(normalizeEquityCandleRow));
+};
+
+export const fetchEquityCandlesRange = async (
+  client: ClickHouseClient,
+  underlyingId: string,
+  intervalMs: number,
+  startTs: number,
+  endTs: number,
+  limit: number
+): Promise<EquityCandle[]> => {
+  const safeLimit = clampLimit(limit);
+  const safeStart = clampCursor(startTs);
+  const safeEnd = clampCursor(endTs);
+  const safeInterval = clampPositiveInt(intervalMs, 1000);
+  const safeUnderlying = quoteString(underlyingId);
+
+  const result = await client.query({
+    query: `SELECT * FROM ${EQUITY_CANDLES_TABLE} WHERE underlying_id = ${safeUnderlying} AND interval_ms = ${safeInterval} AND ts >= ${safeStart} AND ts <= ${safeEnd} ORDER BY ts ASC, seq ASC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  return EquityCandleSchema.array().parse(rows.map(normalizeEquityCandleRow));
 };
 
 export const fetchEquityPrintJoinsAfter = async (

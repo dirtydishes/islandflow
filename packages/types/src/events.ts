@@ -59,6 +59,22 @@ export const EquityQuoteSchema = EventMetaSchema.merge(
 
 export type EquityQuote = z.infer<typeof EquityQuoteSchema>;
 
+export const EquityCandleSchema = EventMetaSchema.merge(
+  z.object({
+    ts: z.number().int().nonnegative(),
+    interval_ms: z.number().int().positive(),
+    underlying_id: z.string().min(1),
+    open: z.number().nonnegative(),
+    high: z.number().nonnegative(),
+    low: z.number().nonnegative(),
+    close: z.number().nonnegative(),
+    volume: z.number().int().nonnegative(),
+    trade_count: z.number().int().nonnegative()
+  })
+);
+
+export type EquityCandle = z.infer<typeof EquityCandleSchema>;
+
 export const EquityPrintJoinSchema = EventMetaSchema.merge(
   z.object({
     id: z.string().min(1),

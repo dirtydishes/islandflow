@@ -3,6 +3,7 @@ import { createLogger } from "@islandflow/observability";
 import {
   SUBJECT_ALERTS,
   SUBJECT_CLASSIFIER_HITS,
+  SUBJECT_EQUITY_CANDLES,
   SUBJECT_EQUITY_JOINS,
   SUBJECT_EQUITY_PRINTS,
   SUBJECT_EQUITY_QUOTES,
@@ -12,6 +13,7 @@ import {
   SUBJECT_OPTION_PRINTS,
   STREAM_ALERTS,
   STREAM_CLASSIFIER_HITS,
+  STREAM_EQUITY_CANDLES,
   STREAM_EQUITY_JOINS,
   STREAM_EQUITY_PRINTS,
   STREAM_EQUITY_QUOTES,
@@ -28,6 +30,7 @@ import {
   createClickHouseClient,
   ensureAlertsTable,
   ensureClassifierHitsTable,
+  ensureEquityCandlesTable,
   ensureEquityPrintJoinsTable,
   ensureEquityPrintsTable,
   ensureEquityQuotesTable,
@@ -41,6 +44,8 @@ import {
   fetchRecentFlowPackets,
   fetchRecentInferredDark,
   fetchRecentEquityQuotes,
+  fetchEquityCandlesAfter,
+  fetchEquityCandlesRange,
   fetchRecentOptionNBBO,
   fetchEquityPrintsAfter,
   fetchEquityPrintJoinsAfter,
@@ -54,6 +59,7 @@ import {
 import {
   AlertEventSchema,
   ClassifierHitEventSchema,
+  EquityCandleSchema,
   EquityPrintSchema,
   EquityPrintJoinSchema,
   EquityQuoteSchema,
@@ -62,6 +68,7 @@ import {
   OptionNBBOSchema,
   OptionPrintSchema
 } from "@islandflow/types";
+import { createClient } from "redis";
 import { z } from "zod";
 
 const service = "api";
@@ -72,6 +79,7 @@ const envSchema = z.object({
   NATS_URL: z.string().default("nats://localhost:4222"),
   CLICKHOUSE_URL: z.string().default("http://localhost:8123"),
   CLICKHOUSE_DATABASE: z.string().default("default"),
+  REDIS_URL: z.string().default("redis://localhost:6379"),
   REST_DEFAULT_LIMIT: z.coerce.number().int().positive().default(200)
 });
 
@@ -105,16 +113,30 @@ const retry = async <T>(
 };
 
 const limitSchema = z.coerce.number().int().positive().max(1000);
+const candleLimitSchema = z.coerce.number().int().positive().max(5000);
 const replayParamsSchema = z.object({
   after_ts: z.coerce.number().int().nonnegative().default(0),
   after_seq: z.coerce.number().int().nonnegative().default(0),
   limit: z.coerce.number().int().positive().max(1000).default(200)
+});
+const candleQuerySchema = z.object({
+  underlying_id: z.string().min(1),
+  interval_ms: z.coerce.number().int().positive(),
+  start_ts: z.coerce.number().int().nonnegative().optional(),
+  end_ts: z.coerce.number().int().nonnegative().optional(),
+  limit: candleLimitSchema.optional(),
+  cache: z.string().optional()
+});
+const candleReplaySchema = replayParamsSchema.extend({
+  underlying_id: z.string().min(1),
+  interval_ms: z.coerce.number().int().positive()
 });
 
 type Channel =
   | "options"
   | "options-nbbo"
   | "equities"
+  | "equity-candles"
   | "equity-quotes"
   | "equity-joins"
   | "inferred-dark"
@@ -129,6 +151,7 @@ type WsData = {
 const optionSockets = new Set<WebSocket<WsData>>();
 const optionNbboSockets = new Set<WebSocket<WsData>>();
 const equitySockets = new Set<WebSocket<WsData>>();
+const equityCandleSockets = new Set<WebSocket<WsData>>();
 const equityQuoteSockets = new Set<WebSocket<WsData>>();
 const equityJoinSockets = new Set<WebSocket<WsData>>();
 const inferredDarkSockets = new Set<WebSocket<WsData>>();
@@ -167,6 +190,70 @@ const parseReplayParams = (url: URL): { afterTs: number; afterSeq: number; limit
   };
 };
 
+const parseBooleanParam = (value: string | null | undefined): boolean => {
+  if (!value) {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  return ["1", "true", "yes", "on"].includes(normalized);
+};
+
+const parseCandleParams = (
+  url: URL
+): {
+  underlyingId: string;
+  intervalMs: number;
+  startTs: number;
+  endTs: number;
+  limit: number;
+  useCache: boolean;
+} => {
+  const params = candleQuerySchema.parse({
+    underlying_id: url.searchParams.get("underlying_id") ?? undefined,
+    interval_ms: url.searchParams.get("interval_ms") ?? undefined,
+    start_ts: url.searchParams.get("start_ts") ?? undefined,
+    end_ts: url.searchParams.get("end_ts") ?? undefined,
+    limit: url.searchParams.get("limit") ?? undefined,
+    cache: url.searchParams.get("cache") ?? undefined
+  });
+
+  const endTs = params.end_ts ?? Date.now();
+  const limit = params.limit ?? env.REST_DEFAULT_LIMIT;
+  const startTs =
+    params.start_ts ?? Math.max(0, Math.floor(endTs - params.interval_ms * limit));
+  const rangeStart = Math.min(startTs, endTs);
+  const rangeEnd = Math.max(startTs, endTs);
+
+  return {
+    underlyingId: params.underlying_id,
+    intervalMs: params.interval_ms,
+    startTs: rangeStart,
+    endTs: rangeEnd,
+    limit,
+    useCache: parseBooleanParam(params.cache)
+  };
+};
+
+const parseCandleReplayParams = (
+  url: URL
+): { underlyingId: string; intervalMs: number; afterTs: number; afterSeq: number; limit: number } => {
+  const params = candleReplaySchema.parse({
+    underlying_id: url.searchParams.get("underlying_id") ?? undefined,
+    interval_ms: url.searchParams.get("interval_ms") ?? undefined,
+    after_ts: url.searchParams.get("after_ts") ?? undefined,
+    after_seq: url.searchParams.get("after_seq") ?? undefined,
+    limit: url.searchParams.get("limit") ?? undefined
+  });
+
+  return {
+    underlyingId: params.underlying_id,
+    intervalMs: params.interval_ms,
+    afterTs: params.after_ts,
+    afterSeq: params.after_seq,
+    limit: params.limit
+  };
+};
+
 const broadcast = (sockets: Set<WebSocket<WsData>>, payload: unknown): void => {
   const message = JSON.stringify(payload);
 
@@ -180,6 +267,40 @@ const broadcast = (sockets: Set<WebSocket<WsData>>, payload: unknown): void => {
       sockets.delete(socket);
     }
   }
+};
+
+const buildCandleCacheKey = (underlyingId: string, intervalMs: number): string => {
+  return `candles:equity:${intervalMs}:${underlyingId}`;
+};
+
+const fetchEquityCandlesFromCache = async (
+  client: ReturnType<typeof createClient>,
+  underlyingId: string,
+  intervalMs: number,
+  startTs: number,
+  endTs: number
+): Promise<unknown[]> => {
+  const key = buildCandleCacheKey(underlyingId, intervalMs);
+  const payloads = await client.zRangeByScore(key, startTs, endTs);
+  const parsed = payloads
+    .map((payload) => {
+      try {
+        return JSON.parse(payload) as unknown;
+      } catch {
+        return null;
+      }
+    })
+    .filter((value): value is unknown => value !== null);
+
+  const validated: unknown[] = [];
+  for (const entry of parsed) {
+    const result = EquityCandleSchema.safeParse(entry);
+    if (result.success) {
+      validated.push(result.data);
+    }
+  }
+
+  return validated;
 };
 
 const run = async () => {
@@ -235,6 +356,19 @@ const run = async () => {
   await ensureStream(jsm, {
     name: STREAM_EQUITY_QUOTES,
     subjects: [SUBJECT_EQUITY_QUOTES],
+    retention: "limits",
+    storage: "file",
+    discard: "old",
+    max_msgs_per_subject: -1,
+    max_msgs: -1,
+    max_bytes: -1,
+    max_age: 0,
+    num_replicas: 1
+  });
+
+  await ensureStream(jsm, {
+    name: STREAM_EQUITY_CANDLES,
+    subjects: [SUBJECT_EQUITY_CANDLES],
     retention: "limits",
     storage: "file",
     discard: "old",
@@ -320,12 +454,34 @@ const run = async () => {
     await ensureOptionNBBOTable(clickhouse);
     await ensureEquityPrintsTable(clickhouse);
     await ensureEquityQuotesTable(clickhouse);
+    await ensureEquityCandlesTable(clickhouse);
     await ensureEquityPrintJoinsTable(clickhouse);
     await ensureInferredDarkTable(clickhouse);
     await ensureFlowPacketsTable(clickhouse);
     await ensureClassifierHitsTable(clickhouse);
     await ensureAlertsTable(clickhouse);
   });
+
+  let redis: ReturnType<typeof createClient> | null = null;
+  try {
+    redis = createClient({ url: env.REDIS_URL });
+    redis.on("error", (error) => {
+      logger.warn("redis client error", {
+        error: error instanceof Error ? error.message : String(error)
+      });
+    });
+    await retry("redis connect", 5, 500, async () => {
+      if (!redis) {
+        return;
+      }
+      await redis.connect();
+    });
+  } catch (error) {
+    logger.warn("redis unavailable, skipping candle cache", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+    redis = null;
+  }
 
   const subscribeWithReset = async <T>(
     subject: string,
@@ -387,6 +543,12 @@ const run = async () => {
     SUBJECT_EQUITY_QUOTES,
     STREAM_EQUITY_QUOTES,
     "api-equity-quotes"
+  );
+
+  const equityCandleSubscription = await subscribeWithReset(
+    SUBJECT_EQUITY_CANDLES,
+    STREAM_EQUITY_CANDLES,
+    "api-equity-candles"
   );
 
   const equityJoinSubscription = await subscribeWithReset(
@@ -479,6 +641,21 @@ const run = async () => {
     }
   };
 
+  const pumpEquityCandles = async () => {
+    for await (const msg of equityCandleSubscription.messages) {
+      try {
+        const payload = EquityCandleSchema.parse(equityCandleSubscription.decode(msg));
+        broadcast(equityCandleSockets, { type: "equity-candle", payload });
+        msg.ack();
+      } catch (error) {
+        logger.error("failed to process equity candle", {
+          error: error instanceof Error ? error.message : String(error)
+        });
+        msg.term();
+      }
+    }
+  };
+
   const pumpEquityJoins = async () => {
     for await (const msg of equityJoinSubscription.messages) {
       try {
@@ -558,6 +735,7 @@ const run = async () => {
   void pumpOptionNbbo();
   void pumpEquities();
   void pumpEquityQuotes();
+  void pumpEquityCandles();
   void pumpEquityJoins();
   void pumpInferredDark();
   void pumpFlow();
@@ -595,6 +773,43 @@ const run = async () => {
         const limit = parseLimit(url.searchParams.get("limit"));
         const data = await fetchRecentEquityQuotes(clickhouse, limit);
         return jsonResponse({ data });
+      }
+
+      if (req.method === "GET" && url.pathname === "/candles/equities") {
+        try {
+          const { underlyingId, intervalMs, startTs, endTs, limit, useCache } =
+            parseCandleParams(url);
+          if (useCache && redis && redis.isOpen) {
+            const cached = await fetchEquityCandlesFromCache(
+              redis,
+              underlyingId,
+              intervalMs,
+              startTs,
+              endTs
+            );
+            if (cached.length > 0) {
+              return jsonResponse({ data: cached });
+            }
+          }
+
+          const data = await fetchEquityCandlesRange(
+            clickhouse,
+            underlyingId,
+            intervalMs,
+            startTs,
+            endTs,
+            limit
+          );
+          return jsonResponse({ data });
+        } catch (error) {
+          return jsonResponse(
+            {
+              error: "invalid candle query",
+              detail: error instanceof Error ? error.message : String(error)
+            },
+            400
+          );
+        }
       }
 
       if (req.method === "GET" && url.pathname === "/joins/equities") {
@@ -659,6 +874,32 @@ const run = async () => {
         return jsonResponse({ data, next });
       }
 
+      if (req.method === "GET" && url.pathname === "/replay/equity-candles") {
+        try {
+          const { underlyingId, intervalMs, afterTs, afterSeq, limit } =
+            parseCandleReplayParams(url);
+          const data = await fetchEquityCandlesAfter(
+            clickhouse,
+            underlyingId,
+            intervalMs,
+            afterTs,
+            afterSeq,
+            limit
+          );
+          const last = data.at(-1);
+          const next = last ? { ts: last.ts, seq: last.seq } : null;
+          return jsonResponse({ data, next });
+        } catch (error) {
+          return jsonResponse(
+            {
+              error: "invalid candle replay query",
+              detail: error instanceof Error ? error.message : String(error)
+            },
+            400
+          );
+        }
+      }
+
       if (req.method === "GET" && url.pathname === "/replay/equity-joins") {
         const { afterTs, afterSeq, limit } = parseReplayParams(url);
         const data = await fetchEquityPrintJoinsAfter(clickhouse, afterTs, afterSeq, limit);
@@ -693,6 +934,14 @@ const run = async () => {
 
       if (req.method === "GET" && url.pathname === "/ws/equities") {
         if (serverRef.upgrade(req, { data: { channel: "equities" } })) {
+          return new Response(null, { status: 101 });
+        }
+
+        return jsonResponse({ error: "websocket upgrade failed" }, 400);
+      }
+
+      if (req.method === "GET" && url.pathname === "/ws/equity-candles") {
+        if (serverRef.upgrade(req, { data: { channel: "equity-candles" } })) {
           return new Response(null, { status: 101 });
         }
 
@@ -757,6 +1006,8 @@ const run = async () => {
           optionNbboSockets.add(socket);
         } else if (socket.data.channel === "equities") {
           equitySockets.add(socket);
+        } else if (socket.data.channel === "equity-candles") {
+          equityCandleSockets.add(socket);
         } else if (socket.data.channel === "equity-quotes") {
           equityQuoteSockets.add(socket);
         } else if (socket.data.channel === "equity-joins") {
@@ -780,6 +1031,8 @@ const run = async () => {
           optionNbboSockets.delete(socket);
         } else if (socket.data.channel === "equities") {
           equitySockets.delete(socket);
+        } else if (socket.data.channel === "equity-candles") {
+          equityCandleSockets.delete(socket);
         } else if (socket.data.channel === "equity-quotes") {
           equityQuoteSockets.delete(socket);
         } else if (socket.data.channel === "equity-joins") {
@@ -804,6 +1057,9 @@ const run = async () => {
   const shutdown = async (signal: string) => {
     logger.info("service stopping", { signal });
     server.stop();
+    if (redis && redis.isOpen) {
+      await redis.quit();
+    }
     await nc.drain();
     await clickhouse.close();
     process.exit(0);
