@@ -80,7 +80,8 @@ const envSchema = z.object({
   CLICKHOUSE_URL: z.string().default("http://localhost:8123"),
   CLICKHOUSE_DATABASE: z.string().default("default"),
   REDIS_URL: z.string().default("redis://localhost:6379"),
-  REST_DEFAULT_LIMIT: z.coerce.number().int().positive().default(200)
+  REST_DEFAULT_LIMIT: z.coerce.number().int().positive().default(200),
+  CANDLE_CACHE_LIMIT: z.coerce.number().int().nonnegative().default(2000)
 });
 
 const env = readEnv(envSchema);
@@ -278,10 +279,16 @@ const fetchEquityCandlesFromCache = async (
   underlyingId: string,
   intervalMs: number,
   startTs: number,
-  endTs: number
+  endTs: number,
+  limit: number
 ): Promise<unknown[]> => {
   const key = buildCandleCacheKey(underlyingId, intervalMs);
-  const payloads = await client.zRangeByScore(key, startTs, endTs);
+  const payloads = await client.zRangeByScore(key, startTs, endTs, {
+    LIMIT: {
+      offset: 0,
+      count: limit
+    }
+  });
   const parsed = payloads
     .map((payload) => {
       try {
@@ -301,6 +308,14 @@ const fetchEquityCandlesFromCache = async (
   }
 
   return validated;
+};
+
+const isHotCandleRange = (intervalMs: number, startTs: number, endTs: number): boolean => {
+  if (env.CANDLE_CACHE_LIMIT <= 0) {
+    return false;
+  }
+  const rangeMs = Math.max(0, endTs - startTs);
+  return rangeMs <= intervalMs * env.CANDLE_CACHE_LIMIT;
 };
 
 const run = async () => {
@@ -779,13 +794,14 @@ const run = async () => {
         try {
           const { underlyingId, intervalMs, startTs, endTs, limit, useCache } =
             parseCandleParams(url);
-          if (useCache && redis && redis.isOpen) {
+          if (useCache && redis && redis.isOpen && isHotCandleRange(intervalMs, startTs, endTs)) {
             const cached = await fetchEquityCandlesFromCache(
               redis,
               underlyingId,
               intervalMs,
               startTs,
-              endTs
+              endTs,
+              limit
             );
             if (cached.length > 0) {
               return jsonResponse({ data: cached });
