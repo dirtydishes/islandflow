@@ -115,7 +115,10 @@ const envSchema = z.object({
   CLASSIFIER_SPIKE_MIN_SIZE_Z: z.coerce.number().nonnegative().default(2),
   CLASSIFIER_Z_MIN_SAMPLES: z.coerce.number().int().nonnegative().default(12),
   CLASSIFIER_MIN_NBBO_COVERAGE: z.coerce.number().min(0).max(1).default(0.5),
-  CLASSIFIER_MIN_AGGRESSOR_RATIO: z.coerce.number().min(0).max(1).default(0.55)
+  CLASSIFIER_MIN_AGGRESSOR_RATIO: z.coerce.number().min(0).max(1).default(0.55),
+  CLASSIFIER_0DTE_MAX_ATM_PCT: z.coerce.number().min(0).max(1).default(0.01),
+  CLASSIFIER_0DTE_MIN_PREMIUM: z.coerce.number().positive().default(20_000),
+  CLASSIFIER_0DTE_MIN_SIZE: z.coerce.number().int().positive().default(400)
 });
 
 const env = readEnv(envSchema);
@@ -130,7 +133,10 @@ const classifierConfig: ClassifierConfig = {
   spikeMinSizeZ: env.CLASSIFIER_SPIKE_MIN_SIZE_Z,
   zMinSamples: env.CLASSIFIER_Z_MIN_SAMPLES,
   minNbboCoverage: env.CLASSIFIER_MIN_NBBO_COVERAGE,
-  minAggressorRatio: env.CLASSIFIER_MIN_AGGRESSOR_RATIO
+  minAggressorRatio: env.CLASSIFIER_MIN_AGGRESSOR_RATIO,
+  zeroDteMaxAtmPct: env.CLASSIFIER_0DTE_MAX_ATM_PCT,
+  zeroDteMinPremium: env.CLASSIFIER_0DTE_MIN_PREMIUM,
+  zeroDteMinSize: env.CLASSIFIER_0DTE_MIN_SIZE
 };
 
 const darkInferenceConfig: DarkInferenceConfig = {
@@ -484,6 +490,34 @@ const flushCluster = async (
     end_ts: cluster.endTs,
     window_ms: env.CLUSTER_WINDOW_MS
   };
+
+  const parsedContract = parseContractId(cluster.contractId);
+  if (parsedContract?.root) {
+    features.underlying_id = parsedContract.root;
+    const quoteJoin = selectEquityQuote(parsedContract.root, cluster.endTs);
+    if (!quoteJoin.quote) {
+      joinQuality.underlying_quote_missing = 1;
+    } else {
+      joinQuality.underlying_quote_age_ms = quoteJoin.ageMs;
+      if (quoteJoin.stale) {
+        joinQuality.underlying_quote_stale = 1;
+      } else {
+        const bid = quoteJoin.quote.bid;
+        const ask = quoteJoin.quote.ask;
+        if (Number.isFinite(bid) && Number.isFinite(ask) && ask > 0) {
+          const mid = (bid + ask) / 2;
+          const spread = ask - bid;
+          features.underlying_quote_ts = quoteJoin.quote.ts;
+          features.underlying_bid = bid;
+          features.underlying_ask = ask;
+          features.underlying_mid = roundTo(mid);
+          features.underlying_spread = roundTo(spread);
+        } else {
+          joinQuality.underlying_quote_missing = 1;
+        }
+      }
+    }
+  }
 
   const placementTotal =
     cluster.placements.aa +

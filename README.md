@@ -196,6 +196,9 @@ Provider links: [Interactive Brokers](https://www.interactivebrokers.com/), [IBK
 - `CLASSIFIER_Z_MIN_SAMPLES` (default `12`) — minimum samples before z-scores apply.  
 - `CLASSIFIER_MIN_NBBO_COVERAGE` (default `0.5`) — NBBO coverage ratio gate.  
 - `CLASSIFIER_MIN_AGGRESSOR_RATIO` (default `0.55`) — aggressor ratio gate.  
+- `CLASSIFIER_0DTE_MAX_ATM_PCT` (default `0.01`) — max ATM distance as pct of underlying for 0DTE gamma punch.  
+- `CLASSIFIER_0DTE_MIN_PREMIUM` (default `20000`) — 0DTE gamma punch premium floor.  
+- `CLASSIFIER_0DTE_MIN_SIZE` (default `400`) — 0DTE gamma punch size floor.  
 
 ### Testing + throttling
 

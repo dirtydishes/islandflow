@@ -12,6 +12,9 @@ export type ClassifierConfig = {
   zMinSamples: number;
   minNbboCoverage: number;
   minAggressorRatio: number;
+  zeroDteMaxAtmPct: number;
+  zeroDteMinPremium: number;
+  zeroDteMinSize: number;
 };
 
 const MS_PER_DAY = 86_400_000;
@@ -41,6 +44,13 @@ const getStringFeature = (packet: FlowPacket, key: string): string => {
 };
 
 const formatPct = (value: number): string => `${Math.round(value * 100)}%`;
+
+const formatPctPrecise = (value: number, digits = 2): string => {
+  if (!Number.isFinite(value)) {
+    return "0%";
+  }
+  return `${(value * 100).toFixed(digits)}%`;
+};
 
 const getAggressorContext = (
   packet: FlowPacket
@@ -181,6 +191,14 @@ const getReferenceTs = (packet: FlowPacket): number | null => {
   }
 
   return null;
+};
+
+const getReferenceDay = (packet: FlowPacket): string | null => {
+  const referenceTs = getReferenceTs(packet);
+  if (!referenceTs) {
+    return null;
+  }
+  return new Date(referenceTs).toISOString().slice(0, 10);
 };
 
 const getDteDays = (packet: FlowPacket, contract: ParsedContract): number | null => {
@@ -666,6 +684,67 @@ const buildFarDatedHit = (
   };
 };
 
+const buildZeroDteGammaPunchHit = (
+  packet: FlowPacket,
+  contract: ParsedContract,
+  config: ClassifierConfig
+): ClassifierHit | null => {
+  const referenceDay = getReferenceDay(packet);
+  if (!referenceDay || contract.expiry !== referenceDay) {
+    return null;
+  }
+
+  const activity = getLargeActivity(packet, config);
+  if (
+    activity.totalPremium < config.zeroDteMinPremium ||
+    activity.totalSize < config.zeroDteMinSize
+  ) {
+    return null;
+  }
+
+  const underlyingMid = getNumberFeature(packet, "underlying_mid");
+  if (!Number.isFinite(underlyingMid) || underlyingMid <= 0) {
+    return null;
+  }
+
+  const strike = contract.strike;
+  const atmPct = Math.abs(strike - underlyingMid) / underlyingMid;
+  if (atmPct > config.zeroDteMaxAtmPct) {
+    return null;
+  }
+
+  const { coverage, aggressiveRatio } = getAggressorContext(packet);
+  let confidence = 0.55;
+  if (atmPct <= config.zeroDteMaxAtmPct * 0.5) {
+    confidence += 0.05;
+  }
+  if (activity.totalPremium >= config.zeroDteMinPremium * 2) {
+    confidence += 0.1;
+  }
+  if (activity.totalSize >= config.zeroDteMinSize * 2) {
+    confidence += 0.05;
+  }
+
+  const aggressor = applyAggressorAdjustment(confidence, coverage, aggressiveRatio, config);
+  confidence = clamp(aggressor.confidence, 0, 0.9);
+
+  return {
+    classifier_id: "zero_dte_gamma_punch",
+    confidence,
+    direction: contract.right === "C" ? "bullish" : "bearish",
+    explanations: [
+      `Likely 0DTE gamma punch: ${packet.features.option_contract_id ?? packet.id} near ATM.`,
+      `Underlying mid ${formatUsd(underlyingMid)}, strike ${formatUsd(strike)} (${formatPctPrecise(atmPct)} from ATM).`,
+      `Premium ${formatUsd(activity.totalPremium)} across ${Math.round(activity.totalSize)} contracts.`,
+      `Thresholds: DTE=0, ATM <=${formatPctPrecise(config.zeroDteMaxAtmPct)}, >=${formatUsd(
+        config.zeroDteMinPremium
+      )} premium, >=${config.zeroDteMinSize} contracts.`,
+      activity.baselineNote,
+      aggressor.note
+    ]
+  };
+};
+
 export const evaluateClassifiers = (
   packet: FlowPacket,
   config: ClassifierConfig
@@ -709,6 +788,11 @@ export const evaluateClassifiers = (
     const farDatedHit = buildFarDatedHit(packet, contract, config);
     if (farDatedHit) {
       hits.push(farDatedHit);
+    }
+
+    const zeroDteHit = buildZeroDteGammaPunchHit(packet, contract, config);
+    if (zeroDteHit) {
+      hits.push(zeroDteHit);
     }
   }
 

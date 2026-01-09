@@ -12,7 +12,10 @@ const baseConfig: ClassifierConfig = {
   spikeMinSizeZ: 2,
   zMinSamples: 12,
   minNbboCoverage: 0.5,
-  minAggressorRatio: 0.55
+  minAggressorRatio: 0.55,
+  zeroDteMaxAtmPct: 0.01,
+  zeroDteMinPremium: 20_000,
+  zeroDteMinSize: 400
 };
 
 const DEFAULT_TS = Date.UTC(2024, 0, 2);
@@ -185,6 +188,21 @@ describe("classifier structure and positioning signals", () => {
     });
     const hits = evaluateClassifiers(packet, baseConfig);
     const hit = hits.find((candidate) => candidate.classifier_id === "far_dated_conviction");
+    expect(hit?.direction).toBe("bullish");
+  });
+
+  test("zero dte gamma punch triggers when ATM and large", () => {
+    const packet = buildPacket({
+      option_contract_id: "SPY-2024-01-02-450-C",
+      total_premium: 35_000,
+      total_size: 600,
+      underlying_mid: 450,
+      nbbo_coverage_ratio: 0.8,
+      nbbo_aggressive_buy_ratio: 0.7,
+      nbbo_aggressive_sell_ratio: 0.3
+    });
+    const hits = evaluateClassifiers(packet, baseConfig);
+    const hit = hits.find((candidate) => candidate.classifier_id === "zero_dte_gamma_punch");
     expect(hit?.direction).toBe("bullish");
   });
 });
