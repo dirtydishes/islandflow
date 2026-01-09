@@ -327,7 +327,8 @@ const coerceNumber = (value: unknown): unknown => {
 };
 
 const quoteString = (value: string): string => {
-  return JSON.stringify(value);
+  const escaped = value.replace(/'/g, "''");
+  return `'${escaped}'`;
 };
 
 const normalizeNumericFields = (

@@ -20,9 +20,8 @@ const NBBO_MAX_AGE_MS_SAFE =
   Number.isFinite(NBBO_MAX_AGE_MS) && NBBO_MAX_AGE_MS > 0 ? NBBO_MAX_AGE_MS : 1000;
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"]);
 const CANDLE_INTERVALS = [
-  { label: "1s", ms: 1000 },
-  { label: "5s", ms: 5000 },
-  { label: "1m", ms: 60000 }
+  { label: "1m", ms: 60000 },
+  { label: "5m", ms: 300000 }
 ];
 
 type CandlestickSeries = ReturnType<IChartApi["addCandlestickSeries"]>;
@@ -61,6 +60,23 @@ const toChartCandle = (candle: EquityCandle): ChartCandle => {
     low: candle.low,
     close: candle.close
   };
+};
+
+const readErrorDetail = async (response: Response): Promise<string> => {
+  const text = await response.text();
+  if (!text) {
+    return "";
+  }
+  try {
+    const payload = JSON.parse(text) as {
+      detail?: string;
+      error?: string;
+      message?: string;
+    };
+    return payload.detail ?? payload.error ?? payload.message ?? text;
+  } catch {
+    return text;
+  }
 };
 
 type WsStatus = "connecting" | "connected" | "disconnected";
@@ -1218,15 +1234,28 @@ type CandleChartProps = {
   ticker: string;
   intervalMs: number;
   mode: TapeMode;
+  replayTime?: number | null;
 };
 
-const CandleChart = ({ ticker, intervalMs, mode }: CandleChartProps) => {
+const CandleChart = ({ ticker, intervalMs, mode, replayTime = null }: CandleChartProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<CandlestickSeries | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<number | null>(null);
   const lastCandleRef = useRef<{ time: UTCTimestamp; seq: number } | null>(null);
+  const replayBucket = useMemo(() => {
+    if (mode !== "replay" || replayTime === null) {
+      return null;
+    }
+    return Math.floor(replayTime / intervalMs);
+  }, [mode, replayTime, intervalMs]);
+  const replayEndTs = useMemo(() => {
+    if (replayBucket === null) {
+      return null;
+    }
+    return (replayBucket + 1) * intervalMs - 1;
+  }, [replayBucket, intervalMs]);
   const [ready, setReady] = useState(false);
   const [status, setStatus] = useState<WsStatus>(mode === "live" ? "connecting" : "connected");
   const [lastUpdate, setLastUpdate] = useState<number | null>(null);
@@ -1307,6 +1336,16 @@ const CandleChart = ({ ticker, intervalMs, mode }: CandleChartProps) => {
       return;
     }
 
+    if (mode === "replay" && replayBucket === null) {
+      setError(null);
+      setHasData(false);
+      setLastUpdate(null);
+      lastCandleRef.current = null;
+      seriesRef.current.setData([]);
+      setStatus("connected");
+      return;
+    }
+
     let active = true;
     setError(null);
     setHasData(false);
@@ -1322,9 +1361,15 @@ const CandleChart = ({ ticker, intervalMs, mode }: CandleChartProps) => {
         url.searchParams.set("interval_ms", intervalMs.toString());
         url.searchParams.set("limit", "300");
         url.searchParams.set("cache", "1");
+        if (mode === "replay" && replayEndTs !== null) {
+          url.searchParams.set("end_ts", replayEndTs.toString());
+        }
         const response = await fetch(url.toString());
         if (!response.ok) {
-          throw new Error(`Candle fetch failed (${response.status})`);
+          const detail = await readErrorDetail(response);
+          throw new Error(
+            `Candle fetch failed (${response.status})${detail ? `: ${detail}` : ""}`
+          );
         }
         const payload = (await response.json()) as { data?: EquityCandle[] };
         if (!active || !seriesRef.current) {
@@ -1361,7 +1406,7 @@ const CandleChart = ({ ticker, intervalMs, mode }: CandleChartProps) => {
     return () => {
       active = false;
     };
-  }, [ready, ticker, intervalMs, mode]);
+  }, [ready, ticker, intervalMs, mode, replayBucket, replayEndTs]);
 
   useEffect(() => {
     if (!ready || mode !== "live" || !seriesRef.current) {
@@ -1471,6 +1516,13 @@ const CandleChart = ({ ticker, intervalMs, mode }: CandleChartProps) => {
   }, [intervalMs]);
 
   const statusText = statusLabel(status, false, mode);
+  const intervalLabel = formatIntervalLabel(intervalMs);
+  const emptyLabel =
+    mode === "live"
+      ? status === "connected"
+        ? `No candles yet. First ${intervalLabel} candle appears after the window closes.`
+        : "Chart offline. Start candles service."
+      : "No candles for this replay window.";
 
   return (
     <div className="chart-panel">
@@ -1487,11 +1539,7 @@ const CandleChart = ({ ticker, intervalMs, mode }: CandleChartProps) => {
       {error ? (
         <div className="empty chart-empty">Chart error: {error}</div>
       ) : !hasData ? (
-        <div className="empty chart-empty">
-          {mode === "live"
-            ? "No candles yet. Start candles service."
-            : "No candles for this replay window."}
-        </div>
+        <div className="empty chart-empty">{emptyLabel}</div>
       ) : null}
     </div>
   );
@@ -2280,7 +2328,12 @@ export default function HomePage() {
               <span className="chart-hint">Charting {chartTicker}</span>
             )}
           </div>
-          <CandleChart ticker={chartTicker} intervalMs={chartIntervalMs} mode={mode} />
+          <CandleChart
+            ticker={chartTicker}
+            intervalMs={chartIntervalMs}
+            mode={mode}
+            replayTime={equities.replayTime}
+          />
         </section>
 
         <section className="card card-options">

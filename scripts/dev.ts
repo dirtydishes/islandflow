@@ -1,3 +1,5 @@
+import net from "node:net";
+
 type ChildSpec = {
   name: string;
   cmd: string[];
@@ -11,6 +13,54 @@ type Child = {
 
 const children: Child[] = [];
 let shuttingDown = false;
+
+const sleep = (delayMs: number): Promise<void> => {
+  return new Promise((resolve) => setTimeout(resolve, delayMs));
+};
+
+const parseUrlHostPort = (
+  value: string,
+  fallbackHost: string,
+  fallbackPort: number
+): { host: string; port: number } => {
+  const candidate = value.split(",")[0]?.trim() ?? "";
+  if (!candidate) {
+    return { host: fallbackHost, port: fallbackPort };
+  }
+
+  try {
+    const url = new URL(candidate.includes("://") ? candidate : `tcp://${candidate}`);
+    const port = url.port ? Number(url.port) : fallbackPort;
+    return { host: url.hostname || fallbackHost, port };
+  } catch {
+    return { host: fallbackHost, port: fallbackPort };
+  }
+};
+
+const checkTcp = (host: string, port: number, timeoutMs = 1000): Promise<boolean> => {
+  return new Promise((resolve) => {
+    const socket = net.connect({ host, port });
+    const finalize = (ok: boolean) => {
+      socket.removeAllListeners();
+      socket.destroy();
+      resolve(ok);
+    };
+
+    socket.setTimeout(timeoutMs);
+    socket.once("connect", () => finalize(true));
+    socket.once("error", () => finalize(false));
+    socket.once("timeout", () => finalize(false));
+  });
+};
+
+const checkHttp = async (url: string): Promise<boolean> => {
+  try {
+    const response = await fetch(url);
+    return response.ok;
+  } catch {
+    return false;
+  }
+};
 
 const spawnChild = ({ name, cmd, cwd }: ChildSpec): void => {
   const proc = Bun.spawn(cmd, {
@@ -56,8 +106,44 @@ const shutdown = (code: number): void => {
 process.on("SIGINT", () => shutdown(0));
 process.on("SIGTERM", () => shutdown(0));
 
-const tasks: ChildSpec[] = [
-  { name: "infra", cmd: ["docker", "compose", "up"] },
+const waitForInfra = async (): Promise<void> => {
+  const natsTarget = parseUrlHostPort(process.env.NATS_URL ?? "", "127.0.0.1", 4222);
+  const redisTarget = parseUrlHostPort(process.env.REDIS_URL ?? "", "127.0.0.1", 6379);
+  const clickhouseUrl = process.env.CLICKHOUSE_URL ?? "http://127.0.0.1:8123";
+  const deadline = Date.now() + 90_000;
+  let lastLog = 0;
+
+  while (Date.now() < deadline) {
+    const [natsOk, redisOk, clickhouseOk] = await Promise.all([
+      checkTcp(natsTarget.host, natsTarget.port),
+      checkTcp(redisTarget.host, redisTarget.port),
+      checkHttp(`${clickhouseUrl.replace(/\/$/, "")}/ping`)
+    ]);
+
+    if (natsOk && redisOk && clickhouseOk) {
+      console.log("[dev] Infra ready");
+      return;
+    }
+
+    const now = Date.now();
+    if (now - lastLog > 5000) {
+      console.log(
+        `[dev] Waiting for infra... nats=${natsOk ? "up" : "down"} redis=${
+          redisOk ? "up" : "down"
+        } clickhouse=${clickhouseOk ? "up" : "down"}`
+      );
+      lastLog = now;
+    }
+
+    await sleep(1000);
+  }
+
+  console.error("[dev] Infra not ready after 90s. Check Docker/ports and retry.");
+  shutdown(1);
+};
+
+const infraTask: ChildSpec = { name: "infra", cmd: ["docker", "compose", "up"] };
+const serviceTasks: ChildSpec[] = [
   { name: "web", cmd: ["bun", "run", "dev"], cwd: "apps/web" },
   { name: "ingest-options", cmd: ["bun", "run", "dev"], cwd: "services/ingest-options" },
   { name: "ingest-equities", cmd: ["bun", "run", "dev"], cwd: "services/ingest-equities" },
@@ -68,7 +154,10 @@ const tasks: ChildSpec[] = [
   { name: "api", cmd: ["bun", "run", "dev"], cwd: "services/api" }
 ];
 
-for (const task of tasks) {
+spawnChild(infraTask);
+await waitForInfra();
+
+for (const task of serviceTasks) {
   spawnChild(task);
 }
 

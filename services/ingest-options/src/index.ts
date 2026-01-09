@@ -28,8 +28,8 @@ const service = "ingest-options";
 const logger = createLogger({ service });
 
 const envSchema = z.object({
-  NATS_URL: z.string().default("nats://localhost:4222"),
-  CLICKHOUSE_URL: z.string().default("http://localhost:8123"),
+  NATS_URL: z.string().default("nats://127.0.0.1:4222"),
+  CLICKHOUSE_URL: z.string().default("http://127.0.0.1:8123"),
   CLICKHOUSE_DATABASE: z.string().default("default"),
   OPTIONS_INGEST_ADAPTER: z.string().min(1).default("synthetic"),
   ALPACA_KEY_ID: z.string().default(""),
@@ -225,7 +225,7 @@ const run = async () => {
       servers: env.NATS_URL,
       name: service
     },
-    { attempts: 20, delayMs: 500 }
+    { attempts: 120, delayMs: 500 }
   );
 
   await ensureStream(jsm, {

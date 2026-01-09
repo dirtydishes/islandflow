@@ -17,6 +17,10 @@ type Burst = {
   seed: number;
 };
 
+const SYNTHETIC_SYMBOLS = [
+  "SPY",
+  ...SP500_SYMBOLS.filter((symbol) => symbol !== "SPY")
+];
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const EXPIRY_OFFSETS = [0, 1, 7, 14, 28, 45, 60, 90];
 const EXCHANGES = ["CBOE", "PHLX", "ISE", "ARCA", "BOX", "MIAX"];
@@ -177,7 +181,7 @@ const formatExpiry = (now: number, offsetDays: number): string => {
 };
 
 const buildBurst = (burstIndex: number, now: number): Burst => {
-  const symbol = SP500_SYMBOLS[burstIndex % SP500_SYMBOLS.length];
+  const symbol = SYNTHETIC_SYMBOLS[burstIndex % SYNTHETIC_SYMBOLS.length];
   const symbolHash = hashSymbol(symbol);
   const seed = symbolHash + burstIndex * 7;
   const scenario = pickWeighted(SCENARIOS, seed);

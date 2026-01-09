@@ -26,11 +26,11 @@ const logger = createLogger({ service });
 const metrics = createMetrics({ service });
 
 const envSchema = z.object({
-  NATS_URL: z.string().default("nats://localhost:4222"),
-  CLICKHOUSE_URL: z.string().default("http://localhost:8123"),
+  NATS_URL: z.string().default("nats://127.0.0.1:4222"),
+  CLICKHOUSE_URL: z.string().default("http://127.0.0.1:8123"),
   CLICKHOUSE_DATABASE: z.string().default("default"),
-  REDIS_URL: z.string().default("redis://localhost:6379"),
-  CANDLE_INTERVALS_MS: z.string().default("1000,5000,60000"),
+  REDIS_URL: z.string().default("redis://127.0.0.1:6379"),
+  CANDLE_INTERVALS_MS: z.string().default("60000,300000"),
   CANDLE_MAX_LATE_MS: z.coerce.number().int().nonnegative().default(0),
   CANDLE_CACHE_LIMIT: z.coerce.number().int().nonnegative().default(2000),
   CANDLE_DELIVER_POLICY: z
@@ -185,7 +185,7 @@ const emitCandle = async (
 const run = async () => {
   logger.info("service starting");
 
-  const intervalsMs = parseIntervals(env.CANDLE_INTERVALS_MS, [1000, 5000, 60000]);
+  const intervalsMs = parseIntervals(env.CANDLE_INTERVALS_MS, [60000, 300000]);
   if (intervalsMs.length === 0) {
     throw new Error("CANDLE_INTERVALS_MS produced no valid intervals");
   }
@@ -200,7 +200,7 @@ const run = async () => {
       servers: env.NATS_URL,
       name: service
     },
-    { attempts: 20, delayMs: 500 }
+    { attempts: 120, delayMs: 500 }
   );
 
   await ensureStream(jsm, {

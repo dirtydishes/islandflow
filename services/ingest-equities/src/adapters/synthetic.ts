@@ -22,6 +22,10 @@ const DARK_SEQUENCE: DarkScenario[] = [
   "sell",
   "sell"
 ];
+const SYNTHETIC_SYMBOLS = [
+  "SPY",
+  ...SP500_SYMBOLS.filter((symbol) => symbol !== "SPY")
+];
 
 const hashSymbol = (value: string): number => {
   let hash = 0;
@@ -138,7 +142,7 @@ export const createSyntheticEquitiesAdapter = (
         const now = Date.now();
         const batchSize = 3;
 
-        const darkSymbol = SP500_SYMBOLS[darkSymbolIndex % SP500_SYMBOLS.length];
+        const darkSymbol = SYNTHETIC_SYMBOLS[darkSymbolIndex % SYNTHETIC_SYMBOLS.length];
         const darkHash = hashSymbol(darkSymbol);
         const darkBase = 25 + (darkHash % 475);
         const darkDrift = ((darkStep % 24) - 12) * 0.08;
@@ -189,7 +193,7 @@ export const createSyntheticEquitiesAdapter = (
 
         for (let i = 0; i < batchSize; i += 1) {
           seq += 1;
-          const symbol = SP500_SYMBOLS[(seq + i) % SP500_SYMBOLS.length];
+          const symbol = SYNTHETIC_SYMBOLS[(seq + i) % SYNTHETIC_SYMBOLS.length];
           const symbolHash = hashSymbol(symbol);
           const basePrice = 25 + (symbolHash % 475);
           const mid = formatPrice(basePrice + ((seq % 40) - 20) * 0.05);

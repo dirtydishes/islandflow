@@ -76,10 +76,10 @@ const logger = createLogger({ service });
 
 const envSchema = z.object({
   API_PORT: z.coerce.number().int().positive().default(4000),
-  NATS_URL: z.string().default("nats://localhost:4222"),
-  CLICKHOUSE_URL: z.string().default("http://localhost:8123"),
+  NATS_URL: z.string().default("nats://127.0.0.1:4222"),
+  CLICKHOUSE_URL: z.string().default("http://127.0.0.1:8123"),
   CLICKHOUSE_DATABASE: z.string().default("default"),
-  REDIS_URL: z.string().default("redis://localhost:6379"),
+  REDIS_URL: z.string().default("redis://127.0.0.1:6379"),
   REST_DEFAULT_LIMIT: z.coerce.number().int().positive().default(200)
 });
 
@@ -311,7 +311,7 @@ const run = async () => {
       servers: env.NATS_URL,
       name: service
     },
-    { attempts: 20, delayMs: 500 }
+    { attempts: 120, delayMs: 500 }
   );
 
   await ensureStream(jsm, {

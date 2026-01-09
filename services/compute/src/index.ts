@@ -74,10 +74,10 @@ const service = "compute";
 const logger = createLogger({ service });
 
 const envSchema = z.object({
-  NATS_URL: z.string().default("nats://localhost:4222"),
-  CLICKHOUSE_URL: z.string().default("http://localhost:8123"),
+  NATS_URL: z.string().default("nats://127.0.0.1:4222"),
+  CLICKHOUSE_URL: z.string().default("http://127.0.0.1:8123"),
   CLICKHOUSE_DATABASE: z.string().default("default"),
-  REDIS_URL: z.string().default("redis://localhost:6379"),
+  REDIS_URL: z.string().default("redis://127.0.0.1:6379"),
   CLUSTER_WINDOW_MS: z.coerce.number().int().positive().default(500),
   ROLLING_WINDOW_SIZE: z.coerce.number().int().positive().default(50),
   ROLLING_TTL_SEC: z.coerce.number().int().nonnegative().default(86400),
@@ -758,7 +758,7 @@ const run = async () => {
       servers: env.NATS_URL,
       name: service
     },
-    { attempts: 20, delayMs: 500 }
+    { attempts: 120, delayMs: 500 }
   );
 
   await ensureStream(jsm, {
