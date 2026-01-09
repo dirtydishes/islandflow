@@ -1957,27 +1957,41 @@ export default function HomePage() {
     getReplayKey: disableReplayGrouping
   });
 
-  const flowHold = useCallback(() => !flowScroll.isAtTopRef.current, [flowScroll.isAtTopRef]);
-  const flow = useFlowStream(
-    mode === "live",
-    flowScroll.onNewItems,
-    flowAnchor.capture,
-    flowHold,
-    flowScroll.resumeTick
-  );
-  const alerts = useLiveStream<AlertEvent>({
-    enabled: mode === "live",
-    wsPath: "/ws/alerts",
-    expectedType: "alert",
-    onNewItems: alertsScroll.onNewItems,
-    captureScroll: alertsAnchor.capture
+  const flow = useTape<FlowPacket>({
+    mode,
+    wsPath: "/ws/flow",
+    replayPath: "/replay/flow",
+    latestPath: "/flow/packets",
+    expectedType: "flow-packet",
+    batchSize: mode === "replay" ? 120 : undefined,
+    pollMs: mode === "replay" ? 200 : undefined,
+    captureScroll: flowAnchor.capture,
+    onNewItems: flowScroll.onNewItems,
+    getReplayKey: disableReplayGrouping
   });
-  const classifierHits = useLiveStream<ClassifierHitEvent>({
-    enabled: mode === "live",
+  const alerts = useTape<AlertEvent>({
+    mode,
+    wsPath: "/ws/alerts",
+    replayPath: "/replay/alerts",
+    latestPath: "/flow/alerts",
+    expectedType: "alert",
+    batchSize: mode === "replay" ? 120 : undefined,
+    pollMs: mode === "replay" ? 200 : undefined,
+    captureScroll: alertsAnchor.capture,
+    onNewItems: alertsScroll.onNewItems,
+    getReplayKey: disableReplayGrouping
+  });
+  const classifierHits = useTape<ClassifierHitEvent>({
+    mode,
     wsPath: "/ws/classifier-hits",
+    replayPath: "/replay/classifier-hits",
+    latestPath: "/flow/classifier-hits",
     expectedType: "classifier-hit",
+    batchSize: mode === "replay" ? 120 : undefined,
+    pollMs: mode === "replay" ? 200 : undefined,
+    captureScroll: classifierAnchor.capture,
     onNewItems: classifierScroll.onNewItems,
-    captureScroll: classifierAnchor.capture
+    getReplayKey: disableReplayGrouping
   });
 
   useLayoutEffect(() => {
@@ -2498,7 +2512,7 @@ export default function HomePage() {
           <div className="card-header">
             <div>
               <h2>Flow Packets</h2>
-              <p className="card-subtitle">Deterministic clusters (live only).</p>
+              <p className="card-subtitle">Deterministic clusters.</p>
             </div>
           </div>
           <div className="card-controls">
@@ -2521,13 +2535,13 @@ export default function HomePage() {
 
           <div className="card-body">
             <div className="list" ref={flowScroll.listRef}>
-              {mode !== "live" ? (
-                <div className="empty">Flow packets are live-only in this build.</div>
-              ) : filteredFlow.length === 0 ? (
+              {filteredFlow.length === 0 ? (
                 <div className="empty">
                   {tickerSet.size > 0
                     ? "No flow packets match the current filter."
-                    : "No flow packets yet. Start compute."}
+                    : mode === "live"
+                      ? "No flow packets yet. Start compute."
+                      : "Replay queue empty. Ensure ClickHouse has data."}
                 </div>
               ) : (
                 filteredFlow.map((packet) => {
@@ -2640,7 +2654,7 @@ export default function HomePage() {
               replayComplete={alerts.replayComplete}
               paused={alerts.paused}
               dropped={alerts.dropped}
-              mode="live"
+              mode={mode}
               onTogglePause={alerts.togglePause}
             />
             <TapeControls
@@ -2653,13 +2667,13 @@ export default function HomePage() {
           <div className="card-body">
             <AlertSeverityStrip alerts={filteredAlerts} />
             <div className="list" ref={alertsScroll.listRef}>
-              {mode !== "live" ? (
-                <div className="empty">Alerts are live-only in this build.</div>
-              ) : filteredAlerts.length === 0 ? (
+              {filteredAlerts.length === 0 ? (
                 <div className="empty">
                   {tickerSet.size > 0
                     ? "No alerts match the current filter."
-                    : "No alerts yet. Start compute."}
+                    : mode === "live"
+                      ? "No alerts yet. Start compute."
+                      : "Replay queue empty. Ensure ClickHouse has data."}
                 </div>
               ) : (
                 filteredAlerts.map((alert) => {
@@ -2716,7 +2730,7 @@ export default function HomePage() {
               replayComplete={classifierHits.replayComplete}
               paused={classifierHits.paused}
               dropped={classifierHits.dropped}
-              mode="live"
+              mode={mode}
               onTogglePause={classifierHits.togglePause}
             />
             <TapeControls
@@ -2728,13 +2742,13 @@ export default function HomePage() {
 
           <div className="card-body">
             <div className="list" ref={classifierScroll.listRef}>
-              {mode !== "live" ? (
-                <div className="empty">Classifier hits are live-only in this build.</div>
-              ) : filteredClassifierHits.length === 0 ? (
+              {filteredClassifierHits.length === 0 ? (
                 <div className="empty">
                   {tickerSet.size > 0
                     ? "No classifier hits match the current filter."
-                    : "No classifier hits yet. Start compute."}
+                    : mode === "live"
+                      ? "No classifier hits yet. Start compute."
+                      : "Replay queue empty. Ensure ClickHouse has data."}
                 </div>
               ) : (
                 filteredClassifierHits.map((hit) => {

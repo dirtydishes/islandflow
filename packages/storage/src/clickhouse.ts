@@ -860,3 +860,72 @@ export const fetchInferredDarkAfter = async (
   const events = records.map(fromInferredDarkRecord);
   return InferredDarkEventSchema.array().parse(events);
 };
+
+export const fetchFlowPacketsAfter = async (
+  client: ClickHouseClient,
+  afterTs: number,
+  afterSeq: number,
+  limit: number
+): Promise<FlowPacket[]> => {
+  const safeLimit = clampLimit(limit);
+  const safeAfterTs = clampCursor(afterTs);
+  const safeAfterSeq = clampCursor(afterSeq);
+
+  const result = await client.query({
+    query: `SELECT * FROM ${FLOW_PACKETS_TABLE} WHERE (source_ts, seq) > (${safeAfterTs}, ${safeAfterSeq}) ORDER BY source_ts ASC, seq ASC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  const records = rows
+    .map(normalizeFlowPacketRow)
+    .filter((record): record is FlowPacketRecord => record !== null);
+  const packets = records.map(fromFlowPacketRecord);
+  return FlowPacketSchema.array().parse(packets);
+};
+
+export const fetchClassifierHitsAfter = async (
+  client: ClickHouseClient,
+  afterTs: number,
+  afterSeq: number,
+  limit: number
+): Promise<ClassifierHitEvent[]> => {
+  const safeLimit = clampLimit(limit);
+  const safeAfterTs = clampCursor(afterTs);
+  const safeAfterSeq = clampCursor(afterSeq);
+
+  const result = await client.query({
+    query: `SELECT * FROM ${CLASSIFIER_HITS_TABLE} WHERE (source_ts, seq) > (${safeAfterTs}, ${safeAfterSeq}) ORDER BY source_ts ASC, seq ASC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  const records = rows
+    .map(normalizeClassifierHitRow)
+    .filter((record): record is ClassifierHitRecord => record !== null);
+  const hits = records.map(fromClassifierHitRecord);
+  return ClassifierHitEventSchema.array().parse(hits);
+};
+
+export const fetchAlertsAfter = async (
+  client: ClickHouseClient,
+  afterTs: number,
+  afterSeq: number,
+  limit: number
+): Promise<AlertEvent[]> => {
+  const safeLimit = clampLimit(limit);
+  const safeAfterTs = clampCursor(afterTs);
+  const safeAfterSeq = clampCursor(afterSeq);
+
+  const result = await client.query({
+    query: `SELECT * FROM ${ALERTS_TABLE} WHERE (source_ts, seq) > (${safeAfterTs}, ${safeAfterSeq}) ORDER BY source_ts ASC, seq ASC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  const records = rows
+    .map(normalizeAlertRow)
+    .filter((record): record is AlertRecord => record !== null);
+  const alerts = records.map(fromAlertRecord);
+  return AlertEventSchema.array().parse(alerts);
+};

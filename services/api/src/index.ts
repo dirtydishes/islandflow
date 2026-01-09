@@ -38,6 +38,9 @@ import {
   ensureFlowPacketsTable,
   ensureOptionNBBOTable,
   ensureOptionPrintsTable,
+  fetchAlertsAfter,
+  fetchClassifierHitsAfter,
+  fetchFlowPacketsAfter,
   fetchRecentAlerts,
   fetchRecentClassifierHits,
   fetchRecentEquityPrintJoins,
@@ -911,6 +914,30 @@ const run = async () => {
       if (req.method === "GET" && url.pathname === "/replay/inferred-dark") {
         const { afterTs, afterSeq, limit } = parseReplayParams(url);
         const data = await fetchInferredDarkAfter(clickhouse, afterTs, afterSeq, limit);
+        const last = data.at(-1);
+        const next = last ? { ts: last.source_ts, seq: last.seq } : null;
+        return jsonResponse({ data, next });
+      }
+
+      if (req.method === "GET" && url.pathname === "/replay/flow") {
+        const { afterTs, afterSeq, limit } = parseReplayParams(url);
+        const data = await fetchFlowPacketsAfter(clickhouse, afterTs, afterSeq, limit);
+        const last = data.at(-1);
+        const next = last ? { ts: last.source_ts, seq: last.seq } : null;
+        return jsonResponse({ data, next });
+      }
+
+      if (req.method === "GET" && url.pathname === "/replay/classifier-hits") {
+        const { afterTs, afterSeq, limit } = parseReplayParams(url);
+        const data = await fetchClassifierHitsAfter(clickhouse, afterTs, afterSeq, limit);
+        const last = data.at(-1);
+        const next = last ? { ts: last.source_ts, seq: last.seq } : null;
+        return jsonResponse({ data, next });
+      }
+
+      if (req.method === "GET" && url.pathname === "/replay/alerts") {
+        const { afterTs, afterSeq, limit } = parseReplayParams(url);
+        const data = await fetchAlertsAfter(clickhouse, afterTs, afterSeq, limit);
         const last = data.at(-1);
         const next = last ? { ts: last.source_ts, seq: last.seq } : null;
         return jsonResponse({ data, next });
