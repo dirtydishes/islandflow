@@ -18,6 +18,14 @@ const sleep = (delayMs: number): Promise<void> => {
   return new Promise((resolve) => setTimeout(resolve, delayMs));
 };
 
+const parseBool = (value: string | undefined): boolean => {
+  if (!value) {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  return ["1", "true", "yes", "on"].includes(normalized);
+};
+
 const parseUrlHostPort = (
   value: string,
   fallbackHost: string,
@@ -153,6 +161,10 @@ const serviceTasks: ChildSpec[] = [
   { name: "eod-enricher", cmd: ["bun", "run", "dev"], cwd: "services/eod-enricher" },
   { name: "api", cmd: ["bun", "run", "dev"], cwd: "services/api" }
 ];
+
+if (parseBool(process.env.REPLAY_ENABLED)) {
+  serviceTasks.push({ name: "replay", cmd: ["bun", "run", "dev"], cwd: "services/replay" });
+}
 
 spawnChild(infraTask);
 await waitForInfra();

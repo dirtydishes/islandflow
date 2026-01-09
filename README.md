@@ -200,6 +200,16 @@ Provider links: [Interactive Brokers](https://www.interactivebrokers.com/), [IBK
 - `CLASSIFIER_0DTE_MIN_PREMIUM` (default `20000`) — 0DTE gamma punch premium floor.  
 - `CLASSIFIER_0DTE_MIN_SIZE` (default `400`) — 0DTE gamma punch size floor.  
 
+### Replay service
+
+- `REPLAY_ENABLED` (default `false`) — start the replay streamer when running `bun run dev`.  
+- `REPLAY_STREAMS` (default `options,nbbo,equities,equity-quotes`) — comma list of streams to re-publish.  
+- `REPLAY_START_TS` (default `0`) — start timestamp in ms since epoch (0 means beginning).  
+- `REPLAY_END_TS` (default `0`) — end timestamp in ms since epoch (0 means no end).  
+- `REPLAY_SPEED` (default `1`) — playback speed (1 = real-time, 2 = 2x, 0 = as fast as possible).  
+- `REPLAY_BATCH_SIZE` (default `200`) — batch size per ClickHouse fetch.  
+- `REPLAY_LOG_EVERY` (default `1000`) — log progress every N events.  
+
 ### Testing + throttling
 
 - `TESTING_MODE` (default `false`) — enable ingest throttling for local dev.  
