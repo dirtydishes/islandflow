@@ -15,12 +15,14 @@ const baseConfig: ClassifierConfig = {
   minAggressorRatio: 0.55
 };
 
+const DEFAULT_TS = Date.UTC(2024, 0, 2);
+
 const buildPacket = (
   overrides: Record<string, string | number | boolean>
 ): FlowPacket => {
   return {
-    source_ts: 1,
-    ingest_ts: 1,
+    source_ts: DEFAULT_TS,
+    ingest_ts: DEFAULT_TS,
     seq: 1,
     trace_id: "trace",
     id: "packet",
@@ -32,6 +34,8 @@ const buildPacket = (
       total_size: 20,
       first_price: 1,
       last_price: 1.01,
+      start_ts: DEFAULT_TS - 500,
+      end_ts: DEFAULT_TS,
       window_ms: 500,
       ...overrides
     },
@@ -98,5 +102,89 @@ describe("classifier z-score behavior", () => {
     expect(lowHit).toBeTruthy();
     expect(highHit).toBeTruthy();
     expect((highHit?.confidence ?? 0)).toBeGreaterThan(lowHit?.confidence ?? 0);
+  });
+});
+
+describe("classifier structure and positioning signals", () => {
+  test("call overwrite triggers on sell-side aggressor mix", () => {
+    const packet = buildPacket({
+      option_contract_id: "SPY-2024-03-15-450-C",
+      total_premium: 80_000,
+      total_size: 800,
+      nbbo_coverage_ratio: 0.9,
+      nbbo_aggressive_sell_ratio: 0.7,
+      nbbo_aggressive_buy_ratio: 0.3
+    });
+    const hits = evaluateClassifiers(packet, baseConfig);
+    expect(hits.some((hit) => hit.classifier_id === "large_call_sell_overwrite")).toBe(true);
+  });
+
+  test("put write triggers on sell-side aggressor mix", () => {
+    const packet = buildPacket({
+      option_contract_id: "SPY-2024-03-15-450-P",
+      total_premium: 75_000,
+      total_size: 700,
+      nbbo_coverage_ratio: 0.85,
+      nbbo_aggressive_sell_ratio: 0.68,
+      nbbo_aggressive_buy_ratio: 0.32
+    });
+    const hits = evaluateClassifiers(packet, baseConfig);
+    expect(hits.some((hit) => hit.classifier_id === "large_put_sell_write")).toBe(true);
+  });
+
+  test("straddle classifier triggers on structure tag", () => {
+    const packet = buildPacket({
+      structure_type: "straddle",
+      structure_legs: 2,
+      structure_strikes: 1,
+      structure_rights: "C/P",
+      structure_strike_span: 0
+    });
+    const hits = evaluateClassifiers(packet, baseConfig);
+    expect(hits.some((hit) => hit.classifier_id === "straddle")).toBe(true);
+  });
+
+  test("vertical spread infers direction from aggressor skew", () => {
+    const packet = buildPacket({
+      structure_type: "vertical",
+      structure_legs: 2,
+      structure_strikes: 2,
+      structure_rights: "C",
+      structure_strike_span: 5,
+      total_premium: 55_000,
+      total_size: 600,
+      nbbo_coverage_ratio: 0.85,
+      nbbo_aggressive_buy_ratio: 0.7,
+      nbbo_aggressive_sell_ratio: 0.3
+    });
+    const hits = evaluateClassifiers(packet, baseConfig);
+    const hit = hits.find((candidate) => candidate.classifier_id === "vertical_spread");
+    expect(hit?.direction).toBe("bullish");
+  });
+
+  test("ladder accumulation triggers on multi-strike structures", () => {
+    const packet = buildPacket({
+      structure_type: "ladder",
+      structure_legs: 3,
+      structure_strikes: 3,
+      structure_rights: "C",
+      structure_strike_span: 10,
+      total_premium: 60_000,
+      total_size: 650
+    });
+    const hits = evaluateClassifiers(packet, baseConfig);
+    expect(hits.some((hit) => hit.classifier_id === "ladder_accumulation")).toBe(true);
+  });
+
+  test("far-dated conviction triggers on 60DTE threshold", () => {
+    const packet = buildPacket({
+      option_contract_id: "SPY-2024-04-19-450-C",
+      end_ts: DEFAULT_TS,
+      total_premium: 70_000,
+      total_size: 800
+    });
+    const hits = evaluateClassifiers(packet, baseConfig);
+    const hit = hits.find((candidate) => candidate.classifier_id === "far_dated_conviction");
+    expect(hit?.direction).toBe("bullish");
   });
 });
