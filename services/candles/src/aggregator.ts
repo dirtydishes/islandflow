@@ -233,6 +233,18 @@ export class CandleAggregator {
     return { emitted, droppedLate };
   }
 
+  flushExpired(now: number): EquityCandle[] {
+    const watermark = Math.max(0, Math.floor(now) - this.maxLateMs);
+    const emitted: EquityCandle[] = [];
+
+    for (const state of this.stateByKey.values()) {
+      state.lastTsSeen = Math.max(state.lastTsSeen, watermark);
+      emitted.push(...flushState(state, watermark));
+    }
+
+    return emitted;
+  }
+
   drain(): EquityCandle[] {
     const emitted: EquityCandle[] = [];
 

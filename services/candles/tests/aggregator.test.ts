@@ -78,4 +78,19 @@ describe("CandleAggregator", () => {
     expect(lateResult.emitted).toHaveLength(0);
     expect(lateResult.droppedLate).toBe(1);
   });
+
+  test("flushes expired windows without new prints", () => {
+    const aggregator = new CandleAggregator({ intervalsMs: [1000], maxLateMs: 0 });
+
+    const first = buildPrint({ ts: 1000, price: 10, size: 100, seq: 1 });
+    const second = buildPrint({ ts: 1500, price: 12, size: 50, seq: 2 });
+
+    aggregator.ingest(first);
+    aggregator.ingest(second);
+
+    const emitted = aggregator.flushExpired(2500);
+    expect(emitted).toHaveLength(1);
+    expect(emitted[0].ts).toBe(1000);
+    expect(emitted[0].close).toBe(12);
+  });
 });

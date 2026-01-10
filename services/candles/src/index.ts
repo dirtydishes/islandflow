@@ -329,6 +329,18 @@ const run = async () => {
   let droppedLate = 0;
   let lastLateLog = Date.now();
 
+  const flushExpired = async () => {
+    const expired = aggregator.flushExpired(Date.now());
+    for (const candle of expired) {
+      const validated = EquityCandleSchema.parse(candle);
+      await emitCandle(clickhouse, js, redis, validated, env.CANDLE_CACHE_LIMIT);
+    }
+  };
+
+  const flushTimer = setInterval(() => {
+    void flushExpired();
+  }, 1000);
+
   const loop = async () => {
     for await (const msg of subscription.messages) {
       try {
@@ -365,6 +377,8 @@ const run = async () => {
 
   const shutdown = async (signal: string) => {
     logger.info("service stopping", { signal });
+    clearInterval(flushTimer);
+    await flushExpired();
     const remaining = aggregator.drain();
     for (const candle of remaining) {
       const validated = EquityCandleSchema.parse(candle);
