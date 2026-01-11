@@ -232,7 +232,13 @@ const buildApiUrl = (path: string): string => {
 };
 
 const formatPrice = (price: number): string => {
-  return price.toFixed(2);
+  if (!Number.isFinite(price)) {
+    return "0.00";
+  }
+  return price.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
 };
 
 const formatSize = (size: number): string => {
@@ -255,6 +261,19 @@ const formatUsd = (value: number): string => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
+};
+
+const normalizeContractId = (value: string): string => value.trim();
+
+const formatContractLabel = (value: string): string => {
+  const normalized = normalizeContractId(value);
+  if (!normalized) {
+    return "Unknown contract";
+  }
+  if (/^\d+$/.test(normalized)) {
+    return `Instrument ${normalized}`;
+  }
+  return normalized;
 };
 
 const formatDateTime = (ts: number): string => {
@@ -2032,13 +2051,14 @@ export default function HomePage() {
   const nbboMap = useMemo(() => {
     const map = new Map<string, OptionNBBO>();
     for (const quote of nbbo.items) {
-      const existing = map.get(quote.option_contract_id);
+      const contractId = normalizeContractId(quote.option_contract_id);
+      const existing = map.get(contractId);
       if (
         !existing ||
         quote.ts > existing.ts ||
         (quote.ts === existing.ts && quote.seq >= existing.seq)
       ) {
-        map.set(quote.option_contract_id, quote);
+        map.set(contractId, quote);
       }
     }
     return map;
@@ -2196,7 +2216,7 @@ export default function HomePage() {
       return options.items;
     }
     return options.items.filter((print) =>
-      matchesTicker(extractUnderlying(print.option_contract_id))
+      matchesTicker(extractUnderlying(normalizeContractId(print.option_contract_id)))
     );
   }, [options.items, matchesTicker, tickerSet]);
 
@@ -2386,20 +2406,23 @@ export default function HomePage() {
               </div>
             ) : (
               filteredOptions.map((print) => {
-                const quote = nbboMap.get(print.option_contract_id);
+                const contractId = normalizeContractId(print.option_contract_id);
+                const quote = nbboMap.get(contractId);
                 const nbboAge = quote ? Math.abs(print.ts - quote.ts) : null;
                 const nbboStale = nbboAge !== null && nbboAge > NBBO_MAX_AGE_MS_SAFE;
                 const nbboMid = quote ? (quote.bid + quote.ask) / 2 : null;
                 const nbboSide = classifyNbboSide(print.price, quote);
+                const notional = print.price * print.size * 100;
 
                 return (
                   <div className="row" key={`${print.trace_id}-${print.seq}`}>
                     <div>
-                      <div className="contract">{print.option_contract_id}</div>
+                      <div className="contract">{formatContractLabel(contractId)}</div>
                       <div className="meta">
                         <span>${formatPrice(print.price)}</span>
                         <span>{formatSize(print.size)}x</span>
                         <span>{print.exchange}</span>
+                        <span>Notional ${formatUsd(notional)}</span>
                         {print.conditions?.length ? (
                           <span>{print.conditions.join(", ")}</span>
                         ) : null}
