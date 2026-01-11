@@ -331,6 +331,17 @@ const quoteString = (value: string): string => {
   return `'${escaped}'`;
 };
 
+const buildTracePrefixCondition = (tracePrefix: string | undefined): string | null => {
+  if (!tracePrefix) {
+    return null;
+  }
+  const normalized = tracePrefix.trim();
+  if (!normalized) {
+    return null;
+  }
+  return `startsWith(trace_id, ${quoteString(normalized)})`;
+};
+
 const normalizeNumericFields = (
   row: Record<string, unknown>,
   fields: string[]
@@ -531,11 +542,14 @@ const normalizeAlertRow = (row: unknown): AlertRecord | null => {
 
 export const fetchRecentOptionPrints = async (
   client: ClickHouseClient,
-  limit: number
+  limit: number,
+  tracePrefix?: string
 ): Promise<OptionPrint[]> => {
   const safeLimit = clampLimit(limit);
+  const condition = buildTracePrefixCondition(tracePrefix);
+  const whereClause = condition ? ` WHERE ${condition}` : "";
   const result = await client.query({
-    query: `SELECT * FROM ${OPTION_PRINTS_TABLE} ORDER BY ts DESC, seq DESC LIMIT ${safeLimit}`,
+    query: `SELECT * FROM ${OPTION_PRINTS_TABLE}${whereClause} ORDER BY ts DESC, seq DESC LIMIT ${safeLimit}`,
     format: "JSONEachRow"
   });
 
@@ -545,11 +559,14 @@ export const fetchRecentOptionPrints = async (
 
 export const fetchRecentOptionNBBO = async (
   client: ClickHouseClient,
-  limit: number
+  limit: number,
+  tracePrefix?: string
 ): Promise<OptionNBBO[]> => {
   const safeLimit = clampLimit(limit);
+  const condition = buildTracePrefixCondition(tracePrefix);
+  const whereClause = condition ? ` WHERE ${condition}` : "";
   const result = await client.query({
-    query: `SELECT * FROM ${OPTION_NBBO_TABLE} ORDER BY ts DESC, seq DESC LIMIT ${safeLimit}`,
+    query: `SELECT * FROM ${OPTION_NBBO_TABLE}${whereClause} ORDER BY ts DESC, seq DESC LIMIT ${safeLimit}`,
     format: "JSONEachRow"
   });
 
@@ -697,14 +714,17 @@ export const fetchOptionPrintsAfter = async (
   client: ClickHouseClient,
   afterTs: number,
   afterSeq: number,
-  limit: number
+  limit: number,
+  tracePrefix?: string
 ): Promise<OptionPrint[]> => {
   const safeLimit = clampLimit(limit);
   const safeAfterTs = clampCursor(afterTs);
   const safeAfterSeq = clampCursor(afterSeq);
+  const traceCondition = buildTracePrefixCondition(tracePrefix);
+  const traceClause = traceCondition ? ` AND ${traceCondition}` : "";
 
   const result = await client.query({
-    query: `SELECT * FROM ${OPTION_PRINTS_TABLE} WHERE (ts, seq) > (${safeAfterTs}, ${safeAfterSeq}) ORDER BY ts ASC, seq ASC LIMIT ${safeLimit}`,
+    query: `SELECT * FROM ${OPTION_PRINTS_TABLE} WHERE (ts, seq) > (${safeAfterTs}, ${safeAfterSeq})${traceClause} ORDER BY ts ASC, seq ASC LIMIT ${safeLimit}`,
     format: "JSONEachRow"
   });
 
@@ -716,14 +736,17 @@ export const fetchOptionNBBOAfter = async (
   client: ClickHouseClient,
   afterTs: number,
   afterSeq: number,
-  limit: number
+  limit: number,
+  tracePrefix?: string
 ): Promise<OptionNBBO[]> => {
   const safeLimit = clampLimit(limit);
   const safeAfterTs = clampCursor(afterTs);
   const safeAfterSeq = clampCursor(afterSeq);
+  const traceCondition = buildTracePrefixCondition(tracePrefix);
+  const traceClause = traceCondition ? ` AND ${traceCondition}` : "";
 
   const result = await client.query({
-    query: `SELECT * FROM ${OPTION_NBBO_TABLE} WHERE (ts, seq) > (${safeAfterTs}, ${safeAfterSeq}) ORDER BY ts ASC, seq ASC LIMIT ${safeLimit}`,
+    query: `SELECT * FROM ${OPTION_NBBO_TABLE} WHERE (ts, seq) > (${safeAfterTs}, ${safeAfterSeq})${traceClause} ORDER BY ts ASC, seq ASC LIMIT ${safeLimit}`,
     format: "JSONEachRow"
   });
 

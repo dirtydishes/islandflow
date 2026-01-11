@@ -122,6 +122,14 @@ const replayParamsSchema = z.object({
   after_seq: z.coerce.number().int().nonnegative().default(0),
   limit: z.coerce.number().int().positive().max(1000).default(200)
 });
+
+const replaySourceSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(64)
+  .regex(/^[A-Za-z0-9][A-Za-z0-9_-]*$/)
+  .transform((value) => value.toLowerCase());
 const candleQuerySchema = z.object({
   underlying_id: z.string().min(1),
   interval_ms: z.coerce.number().int().positive(),
@@ -191,6 +199,20 @@ const parseReplayParams = (url: URL): { afterTs: number; afterSeq: number; limit
     afterSeq: params.after_seq,
     limit: params.limit
   };
+};
+
+const parseReplaySource = (url: URL): string | null => {
+  const raw = url.searchParams.get("source");
+  if (!raw) {
+    return null;
+  }
+
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  return replaySourceSchema.parse(trimmed);
 };
 
 const parseBooleanParam = (value: string | null | undefined): boolean => {
@@ -756,13 +778,15 @@ const run = async () => {
 
       if (req.method === "GET" && url.pathname === "/prints/options") {
         const limit = parseLimit(url.searchParams.get("limit"));
-        const data = await fetchRecentOptionPrints(clickhouse, limit);
+        const source = parseReplaySource(url) ?? undefined;
+        const data = await fetchRecentOptionPrints(clickhouse, limit, source);
         return jsonResponse({ data });
       }
 
       if (req.method === "GET" && url.pathname === "/nbbo/options") {
         const limit = parseLimit(url.searchParams.get("limit"));
-        const data = await fetchRecentOptionNBBO(clickhouse, limit);
+        const source = parseReplaySource(url) ?? undefined;
+        const data = await fetchRecentOptionNBBO(clickhouse, limit, source);
         return jsonResponse({ data });
       }
 
@@ -847,7 +871,8 @@ const run = async () => {
 
       if (req.method === "GET" && url.pathname === "/replay/options") {
         const { afterTs, afterSeq, limit } = parseReplayParams(url);
-        const data = await fetchOptionPrintsAfter(clickhouse, afterTs, afterSeq, limit);
+        const source = parseReplaySource(url) ?? undefined;
+        const data = await fetchOptionPrintsAfter(clickhouse, afterTs, afterSeq, limit, source);
         const last = data.at(-1);
         const next = last ? { ts: last.ts, seq: last.seq } : null;
         return jsonResponse({ data, next });
@@ -855,7 +880,8 @@ const run = async () => {
 
       if (req.method === "GET" && url.pathname === "/replay/nbbo") {
         const { afterTs, afterSeq, limit } = parseReplayParams(url);
-        const data = await fetchOptionNBBOAfter(clickhouse, afterTs, afterSeq, limit);
+        const source = parseReplaySource(url) ?? undefined;
+        const data = await fetchOptionNBBOAfter(clickhouse, afterTs, afterSeq, limit, source);
         const last = data.at(-1);
         const next = last ? { ts: last.ts, seq: last.seq } : null;
         return jsonResponse({ data, next });

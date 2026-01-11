@@ -743,6 +743,9 @@ const useTape = <T extends SortableItem & { seq: number }>(
       try {
         const url = new URL(buildApiUrl(latestPath));
         url.searchParams.set("limit", "1");
+        if (replaySourceKey) {
+          url.searchParams.set("source", replaySourceKey);
+        }
         const response = await fetch(url.toString());
         if (!response.ok) {
           throw new Error(`Replay baseline failed with ${response.status}`);
@@ -763,7 +766,7 @@ const useTape = <T extends SortableItem & { seq: number }>(
     return () => {
       active = false;
     };
-  }, [mode, latestPath, getItemTs]);
+  }, [mode, latestPath, getItemTs, replaySourceKey]);
 
   useEffect(() => {
     if (mode !== "live") {
@@ -883,6 +886,10 @@ const useTape = <T extends SortableItem & { seq: number }>(
           url.searchParams.set("after_ts", cursor.ts.toString());
           url.searchParams.set("after_seq", cursor.seq.toString());
           url.searchParams.set("limit", batchSize.toString());
+          const desiredSource = replaySourceKey ?? replaySourceRef.current;
+          if (desiredSource) {
+            url.searchParams.set("source", desiredSource);
+          }
 
           const response = await fetch(url.toString());
           if (!response.ok) {
