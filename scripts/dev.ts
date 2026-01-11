@@ -18,6 +18,50 @@ const sleep = (delayMs: number): Promise<void> => {
   return new Promise((resolve) => setTimeout(resolve, delayMs));
 };
 
+const waitForExit = async (proc: Bun.Subprocess, timeoutMs: number): Promise<boolean> => {
+  const result = await Promise.race([
+    proc.exited.then(() => true),
+    sleep(timeoutMs).then(() => false)
+  ]);
+  return result;
+};
+
+const signalProcess = (pid: number, signal: NodeJS.Signals): boolean => {
+  try {
+    process.kill(-pid, signal);
+    return true;
+  } catch {
+    try {
+      process.kill(pid, signal);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+};
+
+const stopChild = async (child: Child, timeoutMs = 5000): Promise<void> => {
+  const pid = child.process.pid;
+  if (!pid) {
+    return;
+  }
+
+  if (!signalProcess(pid, "SIGINT")) {
+    return;
+  }
+
+  const exited = await waitForExit(child.process, timeoutMs);
+  if (exited) {
+    return;
+  }
+
+  if (!signalProcess(pid, "SIGKILL")) {
+    return;
+  }
+
+  await waitForExit(child.process, 2000);
+};
+
 const parseBool = (value: string | undefined): boolean => {
   if (!value) {
     return false;
@@ -75,7 +119,8 @@ const spawnChild = ({ name, cmd, cwd }: ChildSpec): void => {
     cwd,
     stdin: "inherit",
     stdout: "inherit",
-    stderr: "inherit"
+    stderr: "inherit",
+    detached: true
   });
 
   children.push({ name, process: proc });
@@ -93,26 +138,33 @@ const spawnChild = ({ name, cmd, cwd }: ChildSpec): void => {
         "[dev] Infra failed. Ensure Docker is installed and the daemon is running (OrbStack or Docker Desktop), then retry."
       );
     }
-    shutdown(exitCode);
+    void shutdown(exitCode);
   });
 };
 
-const shutdown = (code: number): void => {
+const shutdown = async (code: number): Promise<void> => {
   if (shuttingDown) {
     return;
   }
 
   shuttingDown = true;
 
-  for (const child of children) {
-    child.process.kill();
+  const infra = children.find((child) => child.name === "infra") ?? null;
+  const services = children.filter((child) => child.name !== "infra");
+
+  if (services.length > 0) {
+    await Promise.all(services.map((child) => stopChild(child)));
+  }
+
+  if (infra) {
+    await stopChild(infra, 8000);
   }
 
   process.exit(code);
 };
 
-process.on("SIGINT", () => shutdown(0));
-process.on("SIGTERM", () => shutdown(0));
+process.on("SIGINT", () => void shutdown(0));
+process.on("SIGTERM", () => void shutdown(0));
 
 const waitForInfra = async (): Promise<void> => {
   const natsTarget = parseUrlHostPort(process.env.NATS_URL ?? "", "127.0.0.1", 4222);
