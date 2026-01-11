@@ -122,17 +122,32 @@ class SymbolResolver:
         return len(self._pending)
 
 
+def _first_attr(record, names: list[str]):
+    for name in names:
+        if not name:
+            continue
+        value = getattr(record, name, None)
+        if value is not None:
+            return value
+    return None
+
+
+def _to_int(value, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def build_payload(record, symbol_override: str | None = None) -> dict | None:
     ts_event = getattr(record, "ts_event", None)
-    price = getattr(record, "price", None)
-    size = getattr(record, "size", None)
     symbol = symbol_override or (
         getattr(record, "symbol", None)
         or getattr(record, "raw_symbol", None)
         or getattr(record, "instrument_id", None)
     )
 
-    if ts_event is None or price is None or size is None or symbol is None:
+    if ts_event is None or symbol is None:
         return None
 
     ts_ms = normalize_ts(ts_event)
@@ -144,21 +159,49 @@ def build_payload(record, symbol_override: str | None = None) -> dict | None:
         or getattr(record, "publisher_id", None)
         or getattr(record, "exchange_id", None)
     )
-    conditions = getattr(record, "conditions", None) or getattr(record, "condition", None)
-    if isinstance(conditions, str):
-        conditions = [conditions]
+
+    price = getattr(record, "price", None)
+    size = getattr(record, "size", None)
+    if price is not None and size is not None:
+        conditions = getattr(record, "conditions", None) or getattr(record, "condition", None)
+        if isinstance(conditions, str):
+            conditions = [conditions]
+
+        payload = {
+            "type": "trade",
+            "ts": ts_ms,
+            "price": float(price),
+            "size": int(size),
+            "symbol": stringify(symbol),
+        }
+
+        if exchange is not None:
+            payload["exchange"] = stringify(exchange)
+        if conditions:
+            payload["conditions"] = conditions
+
+        return payload
+
+    bid = _first_attr(record, ["bid_px", "bid_price", "bid"])
+    ask = _first_attr(record, ["ask_px", "ask_price", "ask"])
+    if bid is None or ask is None:
+        return None
+
+    bid_size = _first_attr(record, ["bid_sz", "bid_size", "bid_qty", "bid_q"])
+    ask_size = _first_attr(record, ["ask_sz", "ask_size", "ask_qty", "ask_q"])
 
     payload = {
+        "type": "nbbo",
         "ts": ts_ms,
-        "price": float(price),
-        "size": int(size),
+        "bid": float(bid),
+        "ask": float(ask),
+        "bidSize": int(bid_size) if bid_size is not None else 0,
+        "askSize": int(ask_size) if ask_size is not None else 0,
         "symbol": stringify(symbol),
     }
 
     if exchange is not None:
         payload["exchange"] = stringify(exchange)
-    if conditions:
-        payload["conditions"] = conditions
 
     return payload
 
@@ -239,7 +282,10 @@ def main() -> int:
         date = dt.datetime.utcfromtimestamp(ts_ms / 1000).date()
 
         if is_numeric_symbol(symbol):
-            instrument_id = int(symbol)
+            instrument_id = _to_int(symbol, default=-1)
+            if instrument_id < 0:
+                return
+
             mapped = resolver.lookup(instrument_id, date)
             if mapped:
                 emit_payload(build_payload(record, mapped))

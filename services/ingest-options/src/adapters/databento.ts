@@ -5,6 +5,7 @@ type DatabentoOptionsAdapterConfig = {
   apiKey: string;
   dataset: string;
   schema: string;
+  nbboSchema: string;
   start: string;
   end?: string;
   symbols: string;
@@ -16,6 +17,7 @@ type DatabentoOptionsAdapterConfig = {
 };
 
 type DatabentoTradeMessage = {
+  type: "trade";
   ts: number;
   price: number;
   size: number;
@@ -23,6 +25,19 @@ type DatabentoTradeMessage = {
   exchange?: string;
   conditions?: string[] | string;
 };
+
+type DatabentoNbboMessage = {
+  type: "nbbo";
+  ts: number;
+  bid: number;
+  ask: number;
+  bidSize?: number;
+  askSize?: number;
+  symbol: string;
+  exchange?: string;
+};
+
+type DatabentoReplayMessage = DatabentoTradeMessage | DatabentoNbboMessage;
 
 type OptionContract = {
   root: string;
@@ -139,45 +154,39 @@ export const createDatabentoOptionsAdapter = (
       }
 
       const scriptPath = new URL("../../py/databento_replay.py", import.meta.url).pathname;
-      const args = [
-        config.pythonBin,
-        scriptPath,
-        "--dataset",
-        config.dataset,
-        "--schema",
-        config.schema,
-        "--start",
-        config.start,
-        "--symbols",
-        config.symbols,
-        "--stype-in",
-        config.stypeIn,
-        "--stype-out",
-        config.stypeOut
-      ];
 
-      if (config.end) {
-        args.push("--end", config.end);
-      }
+      const buildArgs = (schema: string): string[] => {
+        const args = [
+          config.pythonBin,
+          scriptPath,
+          "--dataset",
+          config.dataset,
+          "--schema",
+          schema,
+          "--start",
+          config.start,
+          "--symbols",
+          config.symbols,
+          "--stype-in",
+          config.stypeIn,
+          "--stype-out",
+          config.stypeOut
+        ];
 
-      if (config.limit > 0) {
-        args.push("--limit", String(config.limit));
-      }
-
-      const child = Bun.spawn(args, {
-        stdout: "pipe",
-        stderr: "inherit",
-        env: {
-          ...Bun.env,
-          DATABENTO_API_KEY: config.apiKey
+        if (config.end) {
+          args.push("--end", config.end);
         }
-      });
 
-      if (!child.stdout) {
-        throw new Error("Databento adapter failed to attach stdout.");
-      }
+        if (config.limit > 0) {
+          args.push("--limit", String(config.limit));
+        }
 
-      let seq = 0;
+        return args;
+      };
+
+      const children: Bun.Subprocess[] = [];
+      let tradeSeq = 0;
+      let nbboSeq = 0;
       const contractIdCache = new Map<string, string>();
       const warnedSymbols = new Set<string>();
 
@@ -201,55 +210,122 @@ export const createDatabentoOptionsAdapter = (
 
       const handleLine = (line: string) => {
         try {
-          const payload = JSON.parse(line) as DatabentoTradeMessage;
-          if (!payload) {
+          const payload = JSON.parse(line) as DatabentoReplayMessage;
+          if (!payload || typeof payload !== "object") {
             return;
           }
 
-          const price = Number(payload.price);
-          const size = Number(payload.size);
-          if (!Number.isFinite(price) || !Number.isFinite(size)) {
-            return;
-          }
-
-          const symbol = String(payload.symbol ?? "").trim();
+          const symbol = String((payload as { symbol?: unknown }).symbol ?? "").trim();
           if (!symbol) {
             return;
           }
 
-          const sourceTs = normalizeTimestamp(Number(payload.ts));
+          const sourceTs = normalizeTimestamp(Number((payload as { ts?: unknown }).ts));
+          if (!Number.isFinite(sourceTs)) {
+            return;
+          }
+
           const ingestTs = Date.now();
-          seq += 1;
+          const contractId = resolveContractId(symbol);
 
-          const scaledPrice = config.priceScale === 1 ? price : price / config.priceScale;
+          if (payload.type === "trade") {
+            const price = Number(payload.price);
+            const size = Number(payload.size);
+            if (!Number.isFinite(price) || !Number.isFinite(size)) {
+              return;
+            }
 
-          const conditions = Array.isArray(payload.conditions)
-            ? payload.conditions.map((entry) => String(entry))
-            : typeof payload.conditions === "string"
-              ? [payload.conditions]
-              : undefined;
+            const scaledPrice =
+              config.priceScale === 1 ? price : price / config.priceScale;
 
-          void handlers.onTrade({
-            source_ts: sourceTs,
-            ingest_ts: ingestTs,
-            seq,
-            trace_id: `databento-${seq}`,
-            ts: sourceTs,
-            option_contract_id: resolveContractId(symbol),
-            price: scaledPrice,
-            size,
-            exchange: payload.exchange ? String(payload.exchange) : "OPRA",
-            conditions
-          });
+            const conditions = Array.isArray(payload.conditions)
+              ? payload.conditions.map((entry) => String(entry))
+              : typeof payload.conditions === "string"
+                ? [payload.conditions]
+                : undefined;
+
+            tradeSeq += 1;
+            void handlers.onTrade({
+              source_ts: sourceTs,
+              ingest_ts: ingestTs,
+              seq: tradeSeq,
+              trace_id: `databento-${tradeSeq}`,
+              ts: sourceTs,
+              option_contract_id: contractId,
+              price: scaledPrice,
+              size,
+              exchange: payload.exchange ? String(payload.exchange) : "OPRA",
+              conditions
+            });
+            return;
+          }
+
+          if (payload.type === "nbbo") {
+            if (!handlers.onNBBO) {
+              return;
+            }
+
+            const bid = Number(payload.bid);
+            const ask = Number(payload.ask);
+            if (!Number.isFinite(bid) || !Number.isFinite(ask)) {
+              return;
+            }
+
+            const scaledBid = config.priceScale === 1 ? bid : bid / config.priceScale;
+            const scaledAsk = config.priceScale === 1 ? ask : ask / config.priceScale;
+
+            const bidSize = Math.max(0, Math.floor(Number(payload.bidSize ?? 0)));
+            const askSize = Math.max(0, Math.floor(Number(payload.askSize ?? 0)));
+
+            nbboSeq += 1;
+            void handlers.onNBBO({
+              source_ts: sourceTs,
+              ingest_ts: ingestTs,
+              seq: nbboSeq,
+              trace_id: `databento-${nbboSeq}`,
+              ts: sourceTs,
+              option_contract_id: contractId,
+              bid: scaledBid,
+              ask: scaledAsk,
+              bidSize,
+              askSize
+            });
+          }
         } catch {
           // Ignore malformed lines to keep replay streaming.
         }
       };
 
-      void readLines(child.stdout, handleLine);
+      const spawnStream = (schema: string): void => {
+        const trimmed = schema.trim();
+        if (!trimmed) {
+          return;
+        }
+
+        const child = Bun.spawn(buildArgs(trimmed), {
+          stdout: "pipe",
+          stderr: "inherit",
+          env: {
+            ...Bun.env,
+            DATABENTO_API_KEY: config.apiKey
+          }
+        });
+
+        if (!child.stdout) {
+          throw new Error("Databento adapter failed to attach stdout.");
+        }
+
+        children.push(child);
+        void readLines(child.stdout, handleLine);
+      };
+
+      spawnStream(config.schema);
+      spawnStream(config.nbboSchema);
 
       return () => {
-        child.kill();
+        for (const child of children) {
+          child.kill();
+        }
       };
     }
   };
