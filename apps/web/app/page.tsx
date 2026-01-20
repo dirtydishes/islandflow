@@ -2388,6 +2388,114 @@ const AlertDrawer = ({ alert, flowPacket, evidence, onClose }: AlertDrawerProps)
   );
 };
 
+type ClassifierHitDrawerProps = {
+  hit: ClassifierHitEvent;
+  flowPacket: FlowPacket | null;
+  evidence: EvidenceItem[];
+  onClose: () => void;
+};
+
+const ClassifierHitDrawer = ({ hit, flowPacket, evidence, onClose }: ClassifierHitDrawerProps) => {
+  const direction = normalizeDirection(hit.direction);
+  const evidencePrints = evidence.filter((item) => item.kind === "print");
+  const unknownCount = evidence.filter((item) => item.kind === "unknown").length;
+
+  return (
+    <aside className="drawer">
+      <div className="drawer-header">
+        <div>
+          <p className="drawer-eyebrow">Classifier hit</p>
+          <h3>{humanizeClassifierId(hit.classifier_id)}</h3>
+          <p className="drawer-subtitle">{formatDateTime(hit.source_ts)}</p>
+        </div>
+        <button className="drawer-close" type="button" onClick={onClose}>
+          Close
+        </button>
+      </div>
+
+      <div className="drawer-meta">
+        <span className={`pill direction-${direction}`}>{direction}</span>
+        <span className="drawer-chip">Confidence {formatConfidence(hit.confidence)}</span>
+      </div>
+
+      <div className="drawer-section">
+        <h4>Explanation</h4>
+        {hit.explanations.length === 0 ? (
+          <p className="drawer-empty">No explanation strings captured for this hit.</p>
+        ) : (
+          <div className="drawer-list">
+            {hit.explanations.slice(0, 6).map((text, idx) => (
+              <div className="drawer-row" key={`${hit.trace_id}-${hit.seq}-ex-${idx}`}>
+                <p className="drawer-note">{text}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        {hit.explanations.length > 6 ? (
+          <p className="drawer-empty">+{hit.explanations.length - 6} more explanations not shown.</p>
+        ) : null}
+      </div>
+
+      <div className="drawer-section">
+        <h4>Flow packet</h4>
+        {flowPacket ? (
+          <div className="drawer-row">
+            <div className="drawer-row-title">
+              {String(flowPacket.features.option_contract_id ?? flowPacket.id ?? "Flow packet")}
+            </div>
+            <div className="drawer-row-meta">
+              <span>
+                {formatFlowMetric(parseNumber(flowPacket.features.count, flowPacket.members.length))} prints
+              </span>
+              <span>{formatFlowMetric(parseNumber(flowPacket.features.total_size, 0))} size</span>
+              <span>
+                Notional $
+                {formatUsd(
+                  parseNumber(
+                    flowPacket.features.total_notional,
+                    parseNumber(flowPacket.features.total_premium, 0) * 100
+                  )
+                )}
+              </span>
+            </div>
+            <p className="drawer-note">
+              Window {formatFlowMetric(parseNumber(flowPacket.features.window_ms, 0), "ms")} ·{" "}
+              {formatTime(parseNumber(flowPacket.features.start_ts, flowPacket.source_ts))} →{" "}
+              {formatTime(parseNumber(flowPacket.features.end_ts, flowPacket.source_ts))}
+            </p>
+          </div>
+        ) : (
+          <p className="drawer-empty">Flow packet not in the current live cache.</p>
+        )}
+      </div>
+
+      <div className="drawer-section">
+        <h4>Evidence prints</h4>
+        {evidencePrints.length === 0 ? (
+          <p className="drawer-empty">No linked option prints in the live cache yet.</p>
+        ) : (
+          <div className="drawer-list">
+            {evidencePrints.slice(0, 6).map((item) => (
+              <div className="drawer-row" key={item.id}>
+                <div className="drawer-row-title">{item.print.option_contract_id}</div>
+                <div className="drawer-row-meta">
+                  <span>${formatPrice(item.print.price)}</span>
+                  <span>{formatSize(item.print.size)}x</span>
+                  <span>{item.print.exchange}</span>
+                </div>
+                <p className="drawer-note">{formatTime(item.print.ts)}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        {unknownCount > 0 ? (
+          <p className="drawer-empty">+{unknownCount} evidence prints not in cache.</p>
+        ) : null}
+      </div>
+    </aside>
+  );
+};
+
 type DarkDrawerProps = {
   event: InferredDarkEvent;
   evidence: DarkEvidenceItem[];
@@ -2513,6 +2621,7 @@ export default function HomePage() {
   const [replaySource, setReplaySource] = useState<string | null>(null);
   const [selectedAlert, setSelectedAlert] = useState<AlertEvent | null>(null);
   const [selectedDarkEvent, setSelectedDarkEvent] = useState<InferredDarkEvent | null>(null);
+  const [selectedClassifierHit, setSelectedClassifierHit] = useState<ClassifierHitEvent | null>(null);
   const [filterInput, setFilterInput] = useState<string>("");
   const [chartIntervalMs, setChartIntervalMs] = useState<number>(CANDLE_INTERVALS[0].ms);
 
@@ -2779,6 +2888,7 @@ export default function HomePage() {
       setSelectedAlert(null);
     }
     setSelectedDarkEvent(null);
+    setSelectedClassifierHit(null);
   }, [mode]);
 
   const extractPacketContract = useCallback((packet: FlowPacket): string => {
@@ -2805,6 +2915,43 @@ export default function HomePage() {
     }
     return traceId.slice(idx);
   }, []);
+
+  const selectedClassifierPacketId = useMemo(() => {
+    if (!selectedClassifierHit) {
+      return null;
+    }
+    return extractPacketIdFromClassifierHitTrace(selectedClassifierHit.trace_id);
+  }, [extractPacketIdFromClassifierHitTrace, selectedClassifierHit]);
+
+  const selectedClassifierFlowPacket = useMemo(() => {
+    if (!selectedClassifierPacketId) {
+      return null;
+    }
+    return flowPacketMap.get(selectedClassifierPacketId) ?? null;
+  }, [flowPacketMap, selectedClassifierPacketId]);
+
+  const selectedClassifierEvidence = useMemo((): EvidenceItem[] => {
+    if (!selectedClassifierHit) {
+      return [];
+    }
+
+    if (!selectedClassifierPacketId) {
+      return [];
+    }
+
+    const packet = flowPacketMap.get(selectedClassifierPacketId);
+    if (!packet) {
+      return [];
+    }
+
+    return packet.members.map((id) => {
+      const print = optionPrintMap.get(id);
+      if (print) {
+        return { kind: "print", id, print };
+      }
+      return { kind: "unknown", id };
+    });
+  }, [flowPacketMap, optionPrintMap, selectedClassifierHit, selectedClassifierPacketId]);
 
   const inferAlertUnderlying = useCallback(
     (alert: AlertEvent): string | null => {
@@ -2924,29 +3071,50 @@ export default function HomePage() {
       });
   }, [chartTicker, inferredDark.items, equityJoinMap, equityPrintMap]);
 
-  const handleClassifierMarkerClick = useCallback(
-    (hit: ClassifierHitEvent) => {
+  const findAlertForClassifierHit = useCallback(
+    (hit: ClassifierHitEvent): AlertEvent | null => {
       const packetId = extractPacketIdFromClassifierHitTrace(hit.trace_id);
       if (!packetId) {
-        return;
+        return null;
       }
 
       const desiredTrace = `alert:${packetId}`;
-      const alert = alerts.items.find(
-        (item) => item.trace_id === desiredTrace || item.evidence_refs[0] === packetId
+      return (
+        alerts.items.find(
+          (item) => item.trace_id === desiredTrace || item.evidence_refs[0] === packetId
+        ) ?? null
       );
-      if (!alert) {
-        return;
-      }
-
-      setSelectedDarkEvent(null);
-      setSelectedAlert(alert);
     },
     [alerts.items, extractPacketIdFromClassifierHitTrace]
   );
 
+  const openFromClassifierHit = useCallback(
+    (hit: ClassifierHitEvent) => {
+      const alert = findAlertForClassifierHit(hit);
+      if (alert) {
+        setSelectedClassifierHit(null);
+        setSelectedDarkEvent(null);
+        setSelectedAlert(alert);
+        return;
+      }
+
+      setSelectedAlert(null);
+      setSelectedDarkEvent(null);
+      setSelectedClassifierHit(hit);
+    },
+    [findAlertForClassifierHit]
+  );
+
+  const handleClassifierMarkerClick = useCallback(
+    (hit: ClassifierHitEvent) => {
+      openFromClassifierHit(hit);
+    },
+    [openFromClassifierHit]
+  );
+
   const handleDarkMarkerClick = useCallback((event: InferredDarkEvent) => {
     setSelectedAlert(null);
+    setSelectedClassifierHit(null);
     setSelectedDarkEvent(event);
   }, []);
 
@@ -3401,6 +3569,7 @@ export default function HomePage() {
                       type="button"
                       onClick={() => {
                         setSelectedDarkEvent(null);
+                        setSelectedClassifierHit(null);
                         setSelectedAlert(alert);
                       }}
                     >
@@ -3468,7 +3637,12 @@ export default function HomePage() {
                 filteredClassifierHits.map((hit) => {
                   const direction = normalizeDirection(hit.direction);
                   return (
-                    <div className="row" key={`${hit.trace_id}-${hit.seq}`}>
+                    <button
+                      className="row row-button"
+                      key={`${hit.trace_id}-${hit.seq}`}
+                      type="button"
+                      onClick={() => openFromClassifierHit(hit)}
+                    >
                       <div>
                         <div className="contract">{humanizeClassifierId(hit.classifier_id)}</div>
                         <div className="meta">
@@ -3480,7 +3654,7 @@ export default function HomePage() {
                         ) : null}
                       </div>
                       <div className="time">{formatTime(hit.source_ts)}</div>
-                    </div>
+                    </button>
                   );
                 })
               )}
@@ -3528,15 +3702,16 @@ export default function HomePage() {
                   const underlying = inferDarkUnderlying(event, equityPrintMap, equityJoinMap);
                   const evidenceCount = event.evidence_refs.length;
                   return (
-                    <button
-                      className="row row-button"
-                      key={`${event.trace_id}-${event.seq}`}
-                      type="button"
-                      onClick={() => {
-                        setSelectedAlert(null);
-                        setSelectedDarkEvent(event);
-                      }}
-                    >
+                  <button
+                    className="row row-button"
+                    key={`${event.trace_id}-${event.seq}`}
+                    type="button"
+                    onClick={() => {
+                      setSelectedAlert(null);
+                      setSelectedClassifierHit(null);
+                      setSelectedDarkEvent(event);
+                    }}
+                  >
                       <div>
                         <div className="contract">{humanizeClassifierId(event.type)}</div>
                         <div className="meta">
@@ -3564,6 +3739,15 @@ export default function HomePage() {
           flowPacket={selectedFlowPacket}
           evidence={selectedEvidence}
           onClose={() => setSelectedAlert(null)}
+        />
+      ) : null}
+
+      {selectedClassifierHit ? (
+        <ClassifierHitDrawer
+          hit={selectedClassifierHit}
+          flowPacket={selectedClassifierFlowPacket}
+          evidence={selectedClassifierEvidence}
+          onClose={() => setSelectedClassifierHit(null)}
         />
       ) : null}
 
