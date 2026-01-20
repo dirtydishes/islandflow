@@ -336,6 +336,39 @@ h1 {
   color: #5b4c34;
 }
 
+.overlay-toggle {
+  border: 1px solid rgba(31, 74, 123, 0.35);
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: rgba(31, 74, 123, 0.12);
+  color: #1f4a7b;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.overlay-toggle.overlay-toggle-on {
+  border-color: rgba(31, 74, 123, 0.6);
+  background: rgba(31, 74, 123, 0.2);
+}
+
+.overlay-toggle:focus-visible {
+  outline: 2px solid rgba(31, 74, 123, 0.4);
+  outline-offset: 2px;
+}
+
+.overlay-legend {
+  color: #6f5b39;
+  font-size: 0.75rem;
+}
+
+@media (max-width: 700px) {
+  .overlay-legend {
+    flex: 1 1 100%;
+  }
+}
+
 .chart-status {
   display: inline-flex;
   align-items: center;

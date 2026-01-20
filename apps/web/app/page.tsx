@@ -26,6 +26,13 @@ const CANDLE_INTERVALS = [
 
 type CandlestickSeries = ReturnType<IChartApi["addCandlestickSeries"]>;
 
+type EquityOverlayPoint = {
+  ts: number;
+  price: number;
+  size: number;
+  offExchangeFlag: boolean;
+};
+
 type ChartCandle = {
   time: UTCTimestamp;
   open: number;
@@ -52,6 +59,37 @@ const toChartTime = (ts: number): UTCTimestamp => {
   return Math.floor(ts / 1000) as UTCTimestamp;
 };
 
+type ChartTimeLike = number | string | { year: number; month: number; day: number };
+
+const chartTimeToMs = (value: ChartTimeLike): number | null => {
+  if (typeof value === "number") {
+    return Math.floor(value * 1000);
+  }
+
+  if (typeof value === "string") {
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  if (value && typeof value === "object") {
+    const { year, month, day } = value;
+    if (
+      Number.isFinite(year) &&
+      Number.isFinite(month) &&
+      Number.isFinite(day) &&
+      year >= 1970 &&
+      month >= 1 &&
+      month <= 12 &&
+      day >= 1 &&
+      day <= 31
+    ) {
+      return Date.UTC(year, month - 1, day);
+    }
+  }
+
+  return null;
+};
+
 const toChartCandle = (candle: EquityCandle): ChartCandle => {
   return {
     time: toChartTime(candle.ts),
@@ -60,6 +98,28 @@ const toChartCandle = (candle: EquityCandle): ChartCandle => {
     low: candle.low,
     close: candle.close
   };
+};
+
+const clamp = (value: number, min: number, max: number): number => {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+  return Math.max(min, Math.min(max, value));
+};
+
+const sampleToLimit = <T,>(items: T[], limit: number): T[] => {
+  if (items.length <= limit) {
+    return items;
+  }
+
+  const safeLimit = Math.max(1, Math.floor(limit));
+  const step = Math.ceil(items.length / safeLimit);
+  const sampled: T[] = [];
+  for (let idx = 0; idx < items.length; idx += step) {
+    sampled.push(items[idx]);
+  }
+
+  return sampled;
 };
 
 const readErrorDetail = async (response: Response): Promise<string> => {
@@ -1319,7 +1379,84 @@ const CandleChart = ({ ticker, intervalMs, mode, replayTime = null }: CandleChar
   const seriesRef = useRef<CandlestickSeries | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<number | null>(null);
+  const overlaySocketRef = useRef<WebSocket | null>(null);
+  const overlayReconnectRef = useRef<number | null>(null);
   const lastCandleRef = useRef<{ time: UTCTimestamp; seq: number } | null>(null);
+
+  const overlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const overlayCtxRef = useRef<CanvasRenderingContext2D | null>(null);
+  const overlayDataRef = useRef<EquityOverlayPoint[]>([]);
+  const overlayLiveRef = useRef<EquityOverlayPoint[]>([]);
+  const overlayLastFetchRef = useRef<{ startTs: number; endTs: number; ticker: string } | null>(
+    null
+  );
+  const overlayFetchAbortRef = useRef<AbortController | null>(null);
+  const overlayTimerRef = useRef<number | null>(null);
+
+  const [overlayEnabled, setOverlayEnabled] = useState(true);
+
+  const drawOverlay = useCallback(
+    (points: EquityOverlayPoint[]) => {
+      const canvas = overlayCanvasRef.current;
+      const ctx = overlayCtxRef.current;
+      const chart = chartRef.current;
+      if (!canvas || !ctx || !chart) {
+        return;
+      }
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (!overlayEnabled || points.length === 0) {
+        canvas.style.opacity = "0";
+        return;
+      }
+
+      const timeScale = chart.timeScale();
+      if (!seriesRef.current) {
+        canvas.style.opacity = "0";
+        return;
+      }
+
+      const filtered = points.filter((point) => point.offExchangeFlag);
+      const sampled = sampleToLimit(filtered, 1400);
+
+      const maxRadius = 10;
+      const minRadius = 2;
+      const maxSize = Math.max(1, ...sampled.map((point) => point.size));
+
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = "rgba(31, 74, 123, 0.55)";
+      ctx.strokeStyle = "rgba(31, 74, 123, 0.95)";
+
+      for (const point of sampled) {
+        const x = timeScale.timeToCoordinate(toChartTime(point.ts));
+        const y = seriesRef.current.priceToCoordinate(point.price);
+        if (x === null || y === null) {
+          continue;
+        }
+
+        const radius = clamp(
+          minRadius + (Math.sqrt(point.size) / Math.sqrt(maxSize)) * (maxRadius - minRadius),
+          minRadius,
+          maxRadius
+        );
+
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      ctx.globalAlpha = 1;
+      canvas.style.opacity = "1";
+    },
+    [overlayEnabled]
+  );
+
+  useEffect(() => {
+    drawOverlay([...overlayDataRef.current, ...overlayLiveRef.current]);
+  }, [drawOverlay, ticker, intervalMs, mode]);
+
   const replayBucket = useMemo(() => {
     if (mode !== "replay" || replayTime === null) {
       return null;
@@ -1371,6 +1508,19 @@ const CandleChart = ({ ticker, intervalMs, mode, replayTime = null }: CandleChar
       }
     });
 
+    const overlayCanvas = document.createElement("canvas");
+    overlayCanvas.width = Math.max(1, Math.floor(width));
+    overlayCanvas.height = Math.max(1, Math.floor(height));
+    overlayCanvas.style.position = "absolute";
+    overlayCanvas.style.inset = "0";
+    overlayCanvas.style.pointerEvents = "none";
+    overlayCanvas.style.zIndex = "2";
+    overlayCanvas.style.opacity = "0";
+    container.style.position = "relative";
+    container.appendChild(overlayCanvas);
+    overlayCanvasRef.current = overlayCanvas;
+    overlayCtxRef.current = overlayCanvas.getContext("2d");
+
     const series = chart.addCandlestickSeries({
       upColor: "#2f6d4f",
       downColor: "#c46f2a",
@@ -1390,10 +1540,18 @@ const CandleChart = ({ ticker, intervalMs, mode, replayTime = null }: CandleChar
       }
       const { width: nextWidth, height: nextHeight } = entry.contentRect;
       if (Number.isFinite(nextWidth) && Number.isFinite(nextHeight)) {
+        const nextW = Math.max(1, Math.floor(nextWidth));
+        const nextH = Math.max(1, Math.floor(nextHeight));
         chart.applyOptions({
-          width: Math.max(1, Math.floor(nextWidth)),
-          height: Math.max(1, Math.floor(nextHeight))
+          width: nextW,
+          height: nextH
         });
+
+        const canvas = overlayCanvasRef.current;
+        if (canvas) {
+          canvas.width = nextW;
+          canvas.height = nextH;
+        }
       }
     });
 
@@ -1404,6 +1562,9 @@ const CandleChart = ({ ticker, intervalMs, mode, replayTime = null }: CandleChar
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
+      overlayCtxRef.current = null;
+      overlayCanvasRef.current?.remove();
+      overlayCanvasRef.current = null;
     };
   }, []);
 
@@ -1418,6 +1579,9 @@ const CandleChart = ({ ticker, intervalMs, mode, replayTime = null }: CandleChar
       setLastUpdate(null);
       lastCandleRef.current = null;
       seriesRef.current.setData([]);
+      overlayDataRef.current = [];
+      overlayLiveRef.current = [];
+      overlayLastFetchRef.current = null;
       setStatus("connected");
       return;
     }
@@ -1428,6 +1592,9 @@ const CandleChart = ({ ticker, intervalMs, mode, replayTime = null }: CandleChar
     setLastUpdate(null);
     lastCandleRef.current = null;
     seriesRef.current.setData([]);
+    overlayDataRef.current = [];
+    overlayLiveRef.current = [];
+    overlayLastFetchRef.current = null;
     setStatus(mode === "live" ? "connecting" : "connected");
 
     const fetchCandles = async () => {
@@ -1460,6 +1627,7 @@ const CandleChart = ({ ticker, intervalMs, mode, replayTime = null }: CandleChar
         const chartData = sorted.map(toChartCandle);
         seriesRef.current.setData(chartData);
         chartRef.current?.timeScale().fitContent();
+        drawOverlay([...overlayDataRef.current, ...overlayLiveRef.current]);
 
         if (sorted.length > 0) {
           const last = sorted[sorted.length - 1];
@@ -1477,10 +1645,125 @@ const CandleChart = ({ ticker, intervalMs, mode, replayTime = null }: CandleChar
       }
     };
 
+
+    const ensureOverlayListener = () => {
+      if (!chartRef.current) {
+        return;
+      }
+
+      const handler = () => {
+        const combined = [...overlayDataRef.current, ...overlayLiveRef.current];
+        drawOverlay(combined);
+        scheduleOverlayFetch();
+      };
+
+      chartRef.current.timeScale().subscribeVisibleTimeRangeChange(handler);
+      return () => {
+        chartRef.current?.timeScale().unsubscribeVisibleTimeRangeChange(handler);
+      };
+    };
+
+    const cancelOverlayFetch = () => {
+      if (overlayFetchAbortRef.current) {
+        overlayFetchAbortRef.current.abort();
+        overlayFetchAbortRef.current = null;
+      }
+    };
+
+    const fetchOverlayRange = async (startTs: number, endTs: number) => {
+      cancelOverlayFetch();
+      const abort = new AbortController();
+      overlayFetchAbortRef.current = abort;
+
+      const url = new URL(buildApiUrl("/prints/equities/range"));
+      url.searchParams.set("underlying_id", ticker);
+      url.searchParams.set("start_ts", Math.floor(startTs).toString());
+      url.searchParams.set("end_ts", Math.floor(endTs).toString());
+      url.searchParams.set("limit", "2500");
+
+      const response = await fetch(url.toString(), { signal: abort.signal });
+      if (!response.ok) {
+        const detail = await readErrorDetail(response);
+        throw new Error(
+          `Equity range fetch failed (${response.status})${detail ? `: ${detail}` : ""}`
+        );
+      }
+
+      const payload = (await response.json()) as { data?: EquityPrint[] };
+      const prints = payload.data ?? [];
+      overlayDataRef.current = prints.map((print) => ({
+        ts: print.ts,
+        price: print.price,
+        size: print.size,
+        offExchangeFlag: print.offExchangeFlag
+      }));
+      overlayLiveRef.current = [];
+      overlayLastFetchRef.current = { startTs, endTs, ticker };
+    };
+
+    function scheduleOverlayFetch() {
+      if (overlayTimerRef.current !== null) {
+        window.clearTimeout(overlayTimerRef.current);
+      }
+
+      overlayTimerRef.current = window.setTimeout(() => {
+        if (!active || !chartRef.current || !seriesRef.current) {
+          return;
+        }
+
+        const timeScale = chartRef.current.timeScale();
+        const range = timeScale.getVisibleRange();
+        if (!range) {
+          return;
+        }
+
+        const startTs = chartTimeToMs(range.from);
+        const endTs = chartTimeToMs(range.to);
+        if (startTs === null || endTs === null) {
+          return;
+        }
+        const last = overlayLastFetchRef.current;
+
+        const needsFetch =
+          !last ||
+          last.ticker !== ticker ||
+          startTs < last.startTs ||
+          endTs > last.endTs ||
+          Math.abs(endTs - last.endTs) > intervalMs * 6;
+
+        if (!needsFetch) {
+          return;
+        }
+
+        void fetchOverlayRange(startTs, endTs)
+          .then(() => {
+            drawOverlay([...overlayDataRef.current, ...overlayLiveRef.current]);
+          })
+          .catch((error) => {
+            if (!active) {
+              return;
+            }
+            if (error instanceof DOMException && error.name === "AbortError") {
+              return;
+            }
+            console.warn("Overlay fetch failed", error);
+          });
+      }, 180);
+    }
+
+    const overlayUnsubscribe = ensureOverlayListener();
+    scheduleOverlayFetch();
+
     void fetchCandles();
 
     return () => {
       active = false;
+      cancelOverlayFetch();
+      if (overlayTimerRef.current !== null) {
+        window.clearTimeout(overlayTimerRef.current);
+        overlayTimerRef.current = null;
+      }
+      overlayUnsubscribe?.();
     };
   }, [ready, ticker, intervalMs, mode, replayBucket, replayEndTs]);
 
@@ -1493,6 +1776,15 @@ const CandleChart = ({ ticker, intervalMs, mode, replayTime = null }: CandleChar
         window.clearTimeout(reconnectRef.current);
         reconnectRef.current = null;
       }
+
+      if (overlaySocketRef.current) {
+        overlaySocketRef.current.close();
+      }
+      if (overlayReconnectRef.current !== null) {
+        window.clearTimeout(overlayReconnectRef.current);
+        overlayReconnectRef.current = null;
+      }
+
       return;
     }
 
@@ -1545,6 +1837,7 @@ const CandleChart = ({ ticker, intervalMs, mode, replayTime = null }: CandleChar
           lastCandleRef.current = { time: chartCandle.time, seq: candle.seq };
           setHasData(true);
           setLastUpdate(candle.ingest_ts ?? candle.ts);
+          drawOverlay([...overlayDataRef.current, ...overlayLiveRef.current]);
         } catch (error) {
           console.warn("Failed to parse candle payload", error);
         }
@@ -1567,7 +1860,64 @@ const CandleChart = ({ ticker, intervalMs, mode, replayTime = null }: CandleChar
       };
     };
 
+    const connectOverlay = () => {
+      if (!active) {
+        return;
+      }
+
+      const socket = new WebSocket(buildWsUrl("/ws/equities"));
+      overlaySocketRef.current = socket;
+
+      socket.onmessage = (event) => {
+        if (!active) {
+          return;
+        }
+
+        try {
+          const message = JSON.parse(event.data) as StreamMessage<EquityPrint>;
+          if (!message || message.type !== "equity-print") {
+            return;
+          }
+
+          const print = message.payload;
+          if (print.underlying_id !== ticker) {
+            return;
+          }
+
+          overlayLiveRef.current.push({
+            ts: print.ts,
+            price: print.price,
+            size: print.size,
+            offExchangeFlag: print.offExchangeFlag
+          });
+
+          if (overlayLiveRef.current.length > 1500) {
+            overlayLiveRef.current = overlayLiveRef.current.slice(-1500);
+          }
+
+          drawOverlay([...overlayDataRef.current, ...overlayLiveRef.current]);
+        } catch (error) {
+          console.warn("Failed to parse equity print payload", error);
+        }
+      };
+
+      socket.onclose = () => {
+        if (!active) {
+          return;
+        }
+        overlayReconnectRef.current = window.setTimeout(connectOverlay, 1500);
+      };
+
+      socket.onerror = () => {
+        if (!active) {
+          return;
+        }
+        socket.close();
+      };
+    };
+
     connect();
+    connectOverlay();
 
     return () => {
       active = false;
@@ -1578,8 +1928,16 @@ const CandleChart = ({ ticker, intervalMs, mode, replayTime = null }: CandleChar
       if (socketRef.current) {
         socketRef.current.close();
       }
+
+      if (overlayReconnectRef.current !== null) {
+        window.clearTimeout(overlayReconnectRef.current);
+        overlayReconnectRef.current = null;
+      }
+      if (overlaySocketRef.current) {
+        overlaySocketRef.current.close();
+      }
     };
-  }, [ready, mode, ticker, intervalMs]);
+  }, [ready, mode, ticker, intervalMs, drawOverlay]);
 
   useEffect(() => {
     if (!chartRef.current) {
@@ -1610,6 +1968,14 @@ const CandleChart = ({ ticker, intervalMs, mode, replayTime = null }: CandleChar
         <span className="chart-meta-time">
           {lastUpdate ? `Updated ${formatTime(lastUpdate)}` : "Waiting for data"}
         </span>
+        <button
+          className={`overlay-toggle${overlayEnabled ? " overlay-toggle-on" : ""}`}
+          type="button"
+          onClick={() => setOverlayEnabled((prev) => !prev)}
+        >
+          Off-Ex {overlayEnabled ? "On" : "Off"}
+        </button>
+        <span className="overlay-legend">Blue circles = off-exchange trades</span>
       </div>
       <div className="chart-surface" ref={containerRef} />
       {error ? (
