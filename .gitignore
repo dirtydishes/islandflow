@@ -11,3 +11,7 @@ coverage/
 logs/
 .tmp/
 apps/web/.next/
+
+# Local assistant artifacts
+session-ses_*.md
+token-usage-output.txt
