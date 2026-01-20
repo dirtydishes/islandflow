@@ -773,6 +773,30 @@ export const fetchEquityPrintsAfter = async (
   return EquityPrintSchema.array().parse(rows.map(normalizeEquityRow));
 };
 
+export const fetchEquityPrintsRange = async (
+  client: ClickHouseClient,
+  underlyingId: string,
+  startTs: number,
+  endTs: number,
+  limit: number
+): Promise<EquityPrint[]> => {
+  const safeLimit = clampLimit(limit);
+  const safeStart = clampCursor(startTs);
+  const safeEnd = clampCursor(endTs);
+  const rangeStart = Math.min(safeStart, safeEnd);
+  const rangeEnd = Math.max(safeStart, safeEnd);
+  const safeUnderlying = quoteString(underlyingId);
+
+  const result = await client.query({
+    query: `SELECT * FROM ${EQUITY_PRINTS_TABLE} WHERE underlying_id = ${safeUnderlying} AND ts >= ${rangeStart} AND ts <= ${rangeEnd} ORDER BY ts DESC, seq DESC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  const parsed = EquityPrintSchema.array().parse(rows.map(normalizeEquityRow));
+  return parsed.reverse();
+};
+
 export const fetchEquityQuotesAfter = async (
   client: ClickHouseClient,
   afterTs: number,
