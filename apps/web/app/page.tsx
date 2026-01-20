@@ -12,7 +12,7 @@ import type {
   OptionNBBO,
   OptionPrint
 } from "@islandflow/types";
-import { createChart, type IChartApi, type UTCTimestamp } from "lightweight-charts";
+import { createChart, type IChartApi, type SeriesMarker, type UTCTimestamp } from "lightweight-charts";
 
 const MAX_ITEMS = 500;
 const NBBO_MAX_AGE_MS = Number(process.env.NEXT_PUBLIC_NBBO_MAX_AGE_MS);
@@ -1371,9 +1371,26 @@ type CandleChartProps = {
   intervalMs: number;
   mode: TapeMode;
   replayTime?: number | null;
+  classifierHits: ClassifierHitEvent[];
+  inferredDark: InferredDarkEvent[];
+  onClassifierHitClick: (hit: ClassifierHitEvent) => void;
+  onInferredDarkClick: (event: InferredDarkEvent) => void;
 };
 
-const CandleChart = ({ ticker, intervalMs, mode, replayTime = null }: CandleChartProps) => {
+type MarkerAction =
+  | { kind: "hit"; hit: ClassifierHitEvent }
+  | { kind: "dark"; event: InferredDarkEvent };
+
+const CandleChart = ({
+  ticker,
+  intervalMs,
+  mode,
+  replayTime = null,
+  classifierHits,
+  inferredDark,
+  onClassifierHitClick,
+  onInferredDarkClick
+}: CandleChartProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<CandlestickSeries | null>(null);
@@ -1382,6 +1399,11 @@ const CandleChart = ({ ticker, intervalMs, mode, replayTime = null }: CandleChar
   const overlaySocketRef = useRef<WebSocket | null>(null);
   const overlayReconnectRef = useRef<number | null>(null);
   const lastCandleRef = useRef<{ time: UTCTimestamp; seq: number } | null>(null);
+
+  const markerLookupRef = useRef<Map<string, MarkerAction>>(new Map());
+  const [visibleRangeMs, setVisibleRangeMs] = useState<{ from: number; to: number } | null>(null);
+  const onHitClickRef = useRef(onClassifierHitClick);
+  const onDarkClickRef = useRef(onInferredDarkClick);
 
   const overlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const overlayCtxRef = useRef<CanvasRenderingContext2D | null>(null);
@@ -1456,6 +1478,132 @@ const CandleChart = ({ ticker, intervalMs, mode, replayTime = null }: CandleChar
   useEffect(() => {
     drawOverlay([...overlayDataRef.current, ...overlayLiveRef.current]);
   }, [drawOverlay, ticker, intervalMs, mode]);
+
+  useEffect(() => {
+    onHitClickRef.current = onClassifierHitClick;
+  }, [onClassifierHitClick]);
+
+  useEffect(() => {
+    onDarkClickRef.current = onInferredDarkClick;
+  }, [onInferredDarkClick]);
+
+  const markerBundle = useMemo(() => {
+    const lookup = new Map<string, MarkerAction>();
+    const markers: SeriesMarker<UTCTimestamp>[] = [];
+
+    if (!visibleRangeMs) {
+      return { markers, lookup };
+    }
+
+    const { from, to } = visibleRangeMs;
+    const inRangeHits = classifierHits
+      .filter((hit) => hit.source_ts >= from && hit.source_ts <= to)
+      .sort((a, b) => {
+        const delta = a.source_ts - b.source_ts;
+        if (delta !== 0) {
+          return delta;
+        }
+        return a.seq - b.seq;
+      });
+    const inRangeDark = inferredDark
+      .filter((event) => event.source_ts >= from && event.source_ts <= to)
+      .sort((a, b) => {
+        const delta = a.source_ts - b.source_ts;
+        if (delta !== 0) {
+          return delta;
+        }
+        return a.seq - b.seq;
+      });
+
+    const MAX_HIT_MARKERS = 220;
+    const MAX_DARK_MARKERS = 120;
+    const MAX_TOTAL_MARKERS = 320;
+
+    const cappedHits =
+      inRangeHits.length > MAX_HIT_MARKERS
+        ? inRangeHits.slice(inRangeHits.length - MAX_HIT_MARKERS)
+        : inRangeHits;
+    const cappedDark =
+      inRangeDark.length > MAX_DARK_MARKERS
+        ? inRangeDark.slice(inRangeDark.length - MAX_DARK_MARKERS)
+        : inRangeDark;
+
+    for (const hit of cappedHits) {
+      const direction = normalizeDirection(hit.direction);
+      const markerId = `hit:${hit.trace_id}:${hit.seq}`;
+      lookup.set(markerId, { kind: "hit", hit });
+
+      markers.push({
+        id: markerId,
+        time: toChartTime(hit.source_ts),
+        position: direction === "bullish" ? "belowBar" : "aboveBar",
+        color:
+          direction === "bullish"
+            ? "#2f6d4f"
+            : direction === "bearish"
+              ? "#c46f2a"
+              : "rgba(111, 91, 57, 0.9)",
+        shape:
+          direction === "bullish"
+            ? "arrowUp"
+            : direction === "bearish"
+              ? "arrowDown"
+              : "circle",
+        text: hit.classifier_id ? hit.classifier_id.slice(0, 3).toUpperCase() : "H"
+      });
+    }
+
+    for (const event of cappedDark) {
+      const markerId = `dark:${event.trace_id}:${event.seq}`;
+      lookup.set(markerId, { kind: "dark", event });
+      markers.push({
+        id: markerId,
+        time: toChartTime(event.source_ts),
+        position: "aboveBar",
+        color: "rgba(31, 74, 123, 0.9)",
+        shape: "square",
+        text: "D"
+      });
+    }
+
+    markers.sort((a, b) => {
+      const delta = Number(a.time) - Number(b.time);
+      if (delta !== 0) {
+        return delta;
+      }
+      return String(a.id ?? "").localeCompare(String(b.id ?? ""));
+    });
+
+    const cappedMarkers =
+      markers.length > MAX_TOTAL_MARKERS
+        ? markers.slice(markers.length - MAX_TOTAL_MARKERS)
+        : markers;
+
+    if (cappedMarkers !== markers) {
+      const nextLookup = new Map<string, MarkerAction>();
+      for (const marker of cappedMarkers) {
+        const id = marker.id;
+        if (typeof id !== "string") {
+          continue;
+        }
+        const action = lookup.get(id);
+        if (action) {
+          nextLookup.set(id, action);
+        }
+      }
+      return { markers: cappedMarkers, lookup: nextLookup };
+    }
+
+    return { markers: cappedMarkers, lookup };
+  }, [classifierHits, inferredDark, visibleRangeMs]);
+
+  useEffect(() => {
+    if (!seriesRef.current) {
+      return;
+    }
+    markerLookupRef.current = markerBundle.lookup;
+    seriesRef.current.setMarkers(markerBundle.markers);
+  }, [markerBundle]);
 
   const replayBucket = useMemo(() => {
     if (mode !== "replay" || replayTime === null) {
@@ -1533,6 +1681,47 @@ const CandleChart = ({ ticker, intervalMs, mode, replayTime = null }: CandleChar
     seriesRef.current = series;
     setReady(true);
 
+    const timeScale = chart.timeScale();
+    const updateVisibleRange = () => {
+      const range = timeScale.getVisibleRange();
+      if (!range) {
+        setVisibleRangeMs(null);
+        return;
+      }
+      const from = chartTimeToMs(range.from);
+      const to = chartTimeToMs(range.to);
+      if (from === null || to === null) {
+        setVisibleRangeMs(null);
+        return;
+      }
+
+      setVisibleRangeMs({
+        from: Math.min(from, to),
+        to: Math.max(from, to)
+      });
+    };
+
+    const clickHandler = (param: { hoveredObjectId?: unknown }) => {
+      const hovered = param.hoveredObjectId;
+      if (hovered === null || hovered === undefined) {
+        return;
+      }
+      const key = typeof hovered === "string" ? hovered : String(hovered);
+      const action = markerLookupRef.current.get(key);
+      if (!action) {
+        return;
+      }
+      if (action.kind === "hit") {
+        onHitClickRef.current(action.hit);
+      } else {
+        onDarkClickRef.current(action.event);
+      }
+    };
+
+    updateVisibleRange();
+    timeScale.subscribeVisibleTimeRangeChange(updateVisibleRange);
+    chart.subscribeClick(clickHandler);
+
     const resizeObserver = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (!entry) {
@@ -1559,6 +1748,8 @@ const CandleChart = ({ ticker, intervalMs, mode, replayTime = null }: CandleChar
 
     return () => {
       resizeObserver.disconnect();
+      timeScale.unsubscribeVisibleTimeRangeChange(updateVisibleRange);
+      chart.unsubscribeClick(clickHandler);
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
@@ -2607,6 +2798,14 @@ export default function HomePage() {
     return extractUnderlying(match[1]);
   }, []);
 
+  const extractPacketIdFromClassifierHitTrace = useCallback((traceId: string): string | null => {
+    const idx = traceId.indexOf("flowpacket:");
+    if (idx < 0) {
+      return null;
+    }
+    return traceId.slice(idx);
+  }, []);
+
   const inferAlertUnderlying = useCallback(
     (alert: AlertEvent): string | null => {
       const fromTrace = extractUnderlyingFromTrace(alert.trace_id);
@@ -2698,6 +2897,58 @@ export default function HomePage() {
       return matchesTicker(underlying);
     });
   }, [classifierHits.items, extractUnderlyingFromTrace, matchesTicker, tickerSet]);
+
+  const chartClassifierHits = useMemo(() => {
+    const desired = chartTicker.toUpperCase();
+    return classifierHits.items
+      .filter((hit) => extractUnderlyingFromTrace(hit.trace_id) === desired)
+      .sort((a, b) => {
+        const delta = a.source_ts - b.source_ts;
+        if (delta !== 0) {
+          return delta;
+        }
+        return a.seq - b.seq;
+      });
+  }, [chartTicker, classifierHits.items, extractUnderlyingFromTrace]);
+
+  const chartInferredDark = useMemo(() => {
+    const desired = chartTicker.toUpperCase();
+    return inferredDark.items
+      .filter((event) => inferDarkUnderlying(event, equityPrintMap, equityJoinMap) === desired)
+      .sort((a, b) => {
+        const delta = a.source_ts - b.source_ts;
+        if (delta !== 0) {
+          return delta;
+        }
+        return a.seq - b.seq;
+      });
+  }, [chartTicker, inferredDark.items, equityJoinMap, equityPrintMap]);
+
+  const handleClassifierMarkerClick = useCallback(
+    (hit: ClassifierHitEvent) => {
+      const packetId = extractPacketIdFromClassifierHitTrace(hit.trace_id);
+      if (!packetId) {
+        return;
+      }
+
+      const desiredTrace = `alert:${packetId}`;
+      const alert = alerts.items.find(
+        (item) => item.trace_id === desiredTrace || item.evidence_refs[0] === packetId
+      );
+      if (!alert) {
+        return;
+      }
+
+      setSelectedDarkEvent(null);
+      setSelectedAlert(alert);
+    },
+    [alerts.items, extractPacketIdFromClassifierHitTrace]
+  );
+
+  const handleDarkMarkerClick = useCallback((event: InferredDarkEvent) => {
+    setSelectedAlert(null);
+    setSelectedDarkEvent(event);
+  }, []);
 
   const lastSeen = useMemo(() => {
     return [
@@ -2803,6 +3054,10 @@ export default function HomePage() {
             intervalMs={chartIntervalMs}
             mode={mode}
             replayTime={equities.replayTime}
+            classifierHits={chartClassifierHits}
+            inferredDark={chartInferredDark}
+            onClassifierHitClick={handleClassifierMarkerClick}
+            onInferredDarkClick={handleDarkMarkerClick}
           />
         </section>
 
