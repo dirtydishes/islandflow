@@ -51,6 +51,7 @@ import {
   fetchEquityCandlesRange,
   fetchRecentOptionNBBO,
   fetchEquityPrintsAfter,
+  fetchEquityPrintsRange,
   fetchEquityPrintJoinsAfter,
   fetchEquityQuotesAfter,
   fetchInferredDarkAfter,
@@ -143,6 +144,13 @@ const candleReplaySchema = replayParamsSchema.extend({
   interval_ms: z.coerce.number().int().positive()
 });
 
+const equityPrintRangeSchema = z.object({
+  underlying_id: z.string().min(1),
+  start_ts: z.coerce.number().int().nonnegative(),
+  end_ts: z.coerce.number().int().nonnegative(),
+  limit: limitSchema.optional()
+});
+
 type Channel =
   | "options"
   | "options-nbbo"
@@ -221,6 +229,24 @@ const parseBooleanParam = (value: string | null | undefined): boolean => {
   }
   const normalized = value.trim().toLowerCase();
   return ["1", "true", "yes", "on"].includes(normalized);
+};
+
+const parseEquityPrintRangeParams = (
+  url: URL
+): { underlyingId: string; startTs: number; endTs: number; limit: number } => {
+  const params = equityPrintRangeSchema.parse({
+    underlying_id: url.searchParams.get("underlying_id") ?? undefined,
+    start_ts: url.searchParams.get("start_ts") ?? undefined,
+    end_ts: url.searchParams.get("end_ts") ?? undefined,
+    limit: url.searchParams.get("limit") ?? undefined
+  });
+
+  return {
+    underlyingId: params.underlying_id,
+    startTs: params.start_ts,
+    endTs: params.end_ts,
+    limit: params.limit ?? env.REST_DEFAULT_LIMIT
+  };
 };
 
 const parseCandleParams = (
@@ -794,6 +820,22 @@ const run = async () => {
         const limit = parseLimit(url.searchParams.get("limit"));
         const data = await fetchRecentEquityPrints(clickhouse, limit);
         return jsonResponse({ data });
+      }
+
+      if (req.method === "GET" && url.pathname === "/prints/equities/range") {
+        try {
+          const { underlyingId, startTs, endTs, limit } = parseEquityPrintRangeParams(url);
+          const data = await fetchEquityPrintsRange(clickhouse, underlyingId, startTs, endTs, limit);
+          return jsonResponse({ data });
+        } catch (error) {
+          return jsonResponse(
+            {
+              error: "invalid equity range query",
+              detail: error instanceof Error ? error.message : String(error)
+            },
+            400
+          );
+        }
       }
 
       if (req.method === "GET" && url.pathname === "/quotes/equities") {
