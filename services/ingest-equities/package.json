@@ -11,6 +11,7 @@
     "@islandflow/observability": "workspace:*",
     "@islandflow/storage": "workspace:*",
     "@islandflow/types": "workspace:*",
+    "ws": "^8.18.3",
     "zod": "^3.23.8"
   }
 }

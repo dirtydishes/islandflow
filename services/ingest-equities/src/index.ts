@@ -22,6 +22,7 @@ import {
   type EquityPrint,
   type EquityQuote
 } from "@islandflow/types";
+import { createAlpacaEquitiesAdapter } from "./adapters/alpaca";
 import { createSyntheticEquitiesAdapter } from "./adapters/synthetic";
 import type { EquityIngestAdapter, StopHandler } from "./adapters/types";
 import { z } from "zod";
@@ -35,6 +36,15 @@ const envSchema = z.object({
   CLICKHOUSE_DATABASE: z.string().default("default"),
   EQUITIES_INGEST_ADAPTER: z.string().min(1).default("synthetic"),
   EMIT_INTERVAL_MS: z.coerce.number().int().positive().default(1000),
+
+  // Alpaca (equities)
+  ALPACA_KEY_ID: z.string().default(""),
+  ALPACA_SECRET_KEY: z.string().default(""),
+  ALPACA_REST_URL: z.string().default("https://data.alpaca.markets"),
+  ALPACA_WS_BASE_URL: z.string().default("wss://stream.data.alpaca.markets"),
+  ALPACA_UNDERLYINGS: z.string().default("SPY,NVDA,AAPL"),
+  ALPACA_EQUITIES_FEED: z.enum(["iex", "sip"]).default("iex"),
+
   TESTING_MODE: z
     .preprocess((value) => {
       if (typeof value === "string") {
@@ -113,9 +123,27 @@ const retry = async <T>(
   throw lastError ?? new Error(`${label} failed after retries`);
 };
 
+const parseSymbolList = (value: string): string[] => {
+  return value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+};
+
 const selectAdapter = (name: string): EquityIngestAdapter => {
   if (name === "synthetic") {
     return createSyntheticEquitiesAdapter({ emitIntervalMs: env.EMIT_INTERVAL_MS });
+  }
+
+  if (name === "alpaca") {
+    return createAlpacaEquitiesAdapter({
+      keyId: env.ALPACA_KEY_ID,
+      secretKey: env.ALPACA_SECRET_KEY,
+      restUrl: env.ALPACA_REST_URL,
+      wsBaseUrl: env.ALPACA_WS_BASE_URL,
+      feed: env.ALPACA_EQUITIES_FEED,
+      symbols: parseSymbolList(env.ALPACA_UNDERLYINGS)
+    });
   }
 
   throw new Error(`Unknown ingest adapter: ${name}`);
