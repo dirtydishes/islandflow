@@ -13,5 +13,8 @@
     "dev:infra:down": "docker compose down",
     "dev:web": "bun --cwd=apps/web run dev",
     "dev:services": "bun run scripts/dev-services.ts"
+  },
+  "devDependencies": {
+    "typescript-language-server": "^5.1.3"
   }
 }
