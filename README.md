@@ -22,6 +22,7 @@ Done now (in repo):
 - UI: alerts + classifier hits panels, ticker filter, evidence drawer, severity strip
 - Databento historical replay adapter (options) with symbol mapping
 - Alpaca options adapter (dev-only, bounded contract list)
+- Alpaca equities adapter (stocks trades/quotes via WS)
 - IBKR options adapter (single-underlying bridge via `ib_insync`)
 - Dark-pool-style inference (absorbed blocks, stealth accumulation, distribution) with WS/REST surfaces and UI list
 - Testing-mode throttling for ingest to reduce CPU during local dev
@@ -29,7 +30,7 @@ Done now (in repo):
 In progress / blocked:
 - Production-grade licensed live data feeds (beyond current dev/test bridges)
 - Advanced clustering (spreads/rolls beyond basic structure tags)
-- Candles/overlays service (scaffolded, not yet emitting data)
+- Chart overlays beyond basic candles (candles service emits data; UI overlays still limited)
 
 Not started:
 - Reference data/corporate action enrichment
@@ -45,7 +46,7 @@ Not started:
 ## Current Capabilities
 
 - Synthetic options/equity prints with deterministic sequencing across the S&P 500
-- Ingest adapter seam (env-selected; options default `synthetic`, equities default `synthetic`)
+- Ingest adapter seam (env-selected; options default `synthetic`, equities: `synthetic` or `alpaca`)
 - Raw event persistence in ClickHouse + streaming via NATS JetStream
 - Deterministic option FlowPacket clustering (time-window)
 - Rolling stats baselines in Redis with z-score features on FlowPackets
@@ -53,6 +54,7 @@ Not started:
 - Aggressor mix features from NBBO placement on FlowPackets
 - Classifiers + alert scoring (rule-first) with WS/REST endpoints
 - API gateway with REST, WS, and replay endpoints
+- Server-built equity candles (service + REST/WS surfaces)
 - UI tapes for options/equities/flow packets + alerts/hits with live/replay toggle and pause controls
 - Alpaca options adapter (dev-only) with bounded contract selection
 - IBKR options adapter (single-underlying bridge via Python sidecar)
@@ -126,7 +128,7 @@ These define how services connect to the event bus and storage backends. Documen
 ### Adapter selection
 
 - `OPTIONS_INGEST_ADAPTER` (default `synthetic`) — options ingest adapter: `synthetic`, `alpaca`, `ibkr`, `databento`.  
-- `EQUITIES_INGEST_ADAPTER` (default `synthetic`) — equities ingest adapter.  
+- `EQUITIES_INGEST_ADAPTER` (default `synthetic`) — equities ingest adapter: `synthetic`, `alpaca`.  
 - `EMIT_INTERVAL_MS` (default `1000`) — synthetic equities emit cadence.  
 
 ### Alpaca options adapter (dev-only)
@@ -137,6 +139,7 @@ Provider links: [Alpaca](https://alpaca.markets/), [Alpaca Market Data API](http
 - `ALPACA_REST_URL` (default `https://data.alpaca.markets`) — REST endpoint.  
 - `ALPACA_WS_BASE_URL` (default `wss://stream.data.alpaca.markets/v1beta1`) — streaming endpoint.  
 - `ALPACA_FEED` (default `indicative`) — use `opra` when you have a subscription.  
+- `ALPACA_EQUITIES_FEED` (default `iex`) — equities feed: `iex` (free) or `sip` (paid).  
 - `ALPACA_UNDERLYINGS` (default `SPY,NVDA,AAPL`) — comma-separated list of symbols.  
 - `ALPACA_STRIKES_PER_SIDE` (default `8`) — strikes per side around ATM.  
 - `ALPACA_MAX_DTE_DAYS` (default `30`) — expiry horizon.  
