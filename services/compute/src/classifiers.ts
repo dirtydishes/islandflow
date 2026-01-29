@@ -636,6 +636,104 @@ const buildLadderHit = (
   };
 };
 
+const buildRollHit = (packet: FlowPacket, config: ClassifierConfig): ClassifierHit | null => {
+  const structureType = getStringFeature(packet, "structure_type");
+  if (structureType !== "roll") {
+    return null;
+  }
+
+  const structureRights = getStringFeature(packet, "structure_rights");
+  if (structureRights !== "C" && structureRights !== "P") {
+    return null;
+  }
+
+  const activity = getLargeActivity(packet, config);
+  const qualifies = activity.totalPremium >= config.spikeMinPremium || activity.totalSize >= config.spikeMinSize;
+  if (!qualifies) {
+    return null;
+  }
+
+  const { coverage, aggressiveBuyRatio, aggressiveSellRatio, aggressiveRatio } =
+    getAggressorContext(packet);
+  const fromExpiry = getStringFeature(packet, "roll_from_expiry") || "";
+  const toExpiry = getStringFeature(packet, "roll_to_expiry") || "";
+
+  const getOptionalNumber = (key: string): number | null => {
+    const value = packet.features[key];
+    return typeof value === "number" && Number.isFinite(value) ? value : null;
+  };
+
+  const fromStrike = getOptionalNumber("roll_from_strike");
+  const toStrike = getOptionalNumber("roll_to_strike");
+  const strikeDelta = getOptionalNumber("roll_strike_delta") ?? 0;
+  const expiryDaysDelta = getOptionalNumber("roll_expiry_days_delta");
+
+  const hasStrikePair = fromStrike !== null && toStrike !== null;
+  const hasExpiryPair = Boolean(fromExpiry) && Boolean(toExpiry);
+
+  let rollFlavor = "roll out";
+  if (hasStrikePair) {
+    if (strikeDelta > 0.0001) {
+      rollFlavor = "roll out and up";
+    } else if (strikeDelta < -0.0001) {
+      rollFlavor = "roll out and down";
+    }
+  }
+
+  let direction: "bullish" | "bearish" | "neutral" = "neutral";
+  if (hasStrikePair) {
+    if (structureRights === "C") {
+      direction = strikeDelta > 0.0001 ? "bullish" : strikeDelta < -0.0001 ? "bearish" : "neutral";
+    } else {
+      direction = strikeDelta > 0.0001 ? "bearish" : strikeDelta < -0.0001 ? "bullish" : "neutral";
+    }
+  }
+
+  let confidence = 0.5;
+  if (activity.totalPremium >= config.spikeMinPremium * 2) {
+    confidence += 0.1;
+  }
+  if (activity.totalSize >= config.spikeMinSize * 2) {
+    confidence += 0.05;
+  }
+  if (hasStrikePair && Math.abs(strikeDelta) > 0.0001) {
+    confidence += 0.05;
+  }
+  if (hasExpiryPair && expiryDaysDelta !== null && expiryDaysDelta >= 7) {
+    confidence += 0.05;
+  }
+
+  const aggressor = applyAggressorAdjustment(confidence, coverage, aggressiveRatio, config);
+  confidence = clamp(aggressor.confidence, 0, 0.85);
+
+  const expiryNote = hasExpiryPair
+    ? `Expiries: ${fromExpiry} -> ${toExpiry}${
+        expiryDaysDelta !== null && expiryDaysDelta !== 0 ? ` (${Math.round(expiryDaysDelta)}d)` : ""
+      }.`
+    : "Expiry pairing unavailable.";
+  const strikeNote = hasStrikePair
+    ? `Strikes: ${fromStrike} -> ${toStrike} (delta ${strikeDelta}).`
+    : "Strike pairing unavailable.";
+  const skewNote = `Aggressor skew: buy ${formatPct(aggressiveBuyRatio)}, sell ${formatPct(
+    aggressiveSellRatio
+  )}.`;
+
+  return {
+    classifier_id: "roll_up_down_out",
+    confidence,
+    direction,
+    explanations: [
+      `Consistent with ${rollFlavor}: ${activity.count} prints in ${Math.round(activity.windowMs)}ms for ${packet.features.underlying_id ?? packet.id}.`,
+      expiryNote,
+      strikeNote,
+      `Premium ${formatUsd(activity.totalPremium)} across ${Math.round(activity.totalSize)} contracts.`,
+      `Thresholds: >=${config.spikeMinSize} contracts or >=${formatUsd(config.spikeMinPremium)} premium.`,
+      skewNote,
+      aggressor.note
+    ]
+  };
+};
+
 const buildFarDatedHit = (
   packet: FlowPacket,
   contract: ParsedContract,
@@ -772,6 +870,11 @@ export const evaluateClassifiers = (
     const ladderHit = buildLadderHit(packet, config);
     if (ladderHit) {
       hits.push(ladderHit);
+    }
+
+    const rollHit = buildRollHit(packet, config);
+    if (rollHit) {
+      hits.push(rollHit);
     }
 
     return hits;

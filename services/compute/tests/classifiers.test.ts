@@ -194,6 +194,32 @@ describe("classifier structure and positioning signals", () => {
     expect(hits.some((hit) => hit.classifier_id === "ladder_accumulation")).toBe(true);
   });
 
+  test("roll classifier triggers on cross-expiry structure packets", () => {
+    const packet = buildPacket({
+      packet_kind: "structure",
+      structure_type: "roll",
+      structure_legs: 2,
+      structure_strikes: 2,
+      structure_rights: "C",
+      structure_strike_span: 5,
+      total_premium: 70_000,
+      total_size: 800,
+      nbbo_coverage_ratio: 0.85,
+      nbbo_aggressive_buy_ratio: 0.7,
+      nbbo_aggressive_sell_ratio: 0.3,
+      roll_from_expiry: "2025-01-17",
+      roll_to_expiry: "2025-02-21",
+      roll_from_strike: 450,
+      roll_to_strike: 455,
+      roll_strike_delta: 5,
+      roll_expiry_days_delta: 35
+    });
+    const hits = evaluateClassifiers(packet, baseConfig);
+    const hit = hits.find((candidate) => candidate.classifier_id === "roll_up_down_out");
+    expect(hit).toBeTruthy();
+    expect(hit?.direction).toBe("bullish");
+  });
+
   test("far-dated conviction triggers on 60DTE threshold", () => {
     const packet = buildPacket({
       option_contract_id: "SPY-2024-04-19-450-C",

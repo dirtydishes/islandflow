@@ -22,7 +22,7 @@ const leg = (input: Partial<LegEvidence> & Pick<LegEvidence, "contractId" | "rig
   return {
     contractId: input.contractId,
     root: "SPY",
-    expiry: "2025-01-17",
+    expiry: input.expiry ?? "2025-01-17",
     right: input.right,
     strike: input.strike,
     startTs: input.startTs ?? 1000,
@@ -133,5 +133,44 @@ describe("structure packet planning", () => {
 
     // 2 aggressive (AA + BB) out of 3 classified (AA + BB + MID)
     expect(packet.features.nbbo_aggressive_ratio).toBeCloseTo(2 / 3, 4);
+  });
+
+  test("includes roll metadata when structure type is roll", () => {
+    const near = leg({
+      contractId: "SPY-2025-01-17-450-C",
+      right: "C",
+      strike: 450,
+      expiry: "2025-01-17",
+      members: ["p1"],
+      totalSize: 10,
+      totalPremium: 2000,
+      placements: placements({ aa: 1 })
+    });
+    const far = leg({
+      contractId: "SPY-2025-02-21-455-C",
+      right: "C",
+      strike: 455,
+      expiry: "2025-02-21",
+      startTs: 1010,
+      endTs: 1120,
+      members: ["p2"],
+      totalSize: 12,
+      totalPremium: 2500,
+      placements: placements({ bb: 1 })
+    });
+
+    const legs = [near, far];
+    const summary = summarizeStructure(legs);
+    expect(summary?.type).toBe("roll");
+
+    const plan = planStructurePacket(legs, summary!, 500);
+    const packet = buildStructureFlowPacket(plan!, summary!);
+
+    expect(packet.features.structure_expiries_count).toBe(2);
+    expect(packet.features.roll_from_expiry).toBe("2025-01-17");
+    expect(packet.features.roll_to_expiry).toBe("2025-02-21");
+    expect(packet.features.roll_from_strike).toBe(450);
+    expect(packet.features.roll_to_strike).toBe(455);
+    expect(packet.features.roll_strike_delta).toBe(5);
   });
 });

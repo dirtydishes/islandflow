@@ -22,17 +22,24 @@ export const summarizeStructure = (legs: ContractLeg[]): StructureSummary | null
 
   const strikes = Array.from(new Set(legs.map((leg) => leg.strike))).sort((a, b) => a - b);
   const rights = new Set(legs.map((leg) => leg.right));
+  const expiries = new Set(legs.map((leg) => leg.expiry));
   const strikeSpan = strikes.length >= 2 ? strikes[strikes.length - 1] - strikes[0] : 0;
 
   let type = "multi_leg";
-  if (rights.size === 2 && strikes.length === 1) {
-    type = "straddle";
-  } else if (rights.size === 2 && strikes.length >= 2) {
-    type = "strangle";
-  } else if (rights.size === 1 && strikes.length === 2) {
-    type = "vertical";
-  } else if (rights.size === 1 && strikes.length >= 3) {
-    type = "ladder";
+  if (expiries.size === 1) {
+    if (rights.size === 2 && strikes.length === 1) {
+      type = "straddle";
+    } else if (rights.size === 2 && strikes.length >= 2) {
+      type = "strangle";
+    } else if (rights.size === 1 && strikes.length === 2) {
+      type = "vertical";
+    } else if (rights.size === 1 && strikes.length >= 3) {
+      type = "ladder";
+    }
+  } else if (rights.size === 1 && expiries.size === 2) {
+    // Conservative roll heuristic: same right, exactly two expiries within the burst window.
+    // We do not attempt to infer the exact strategy beyond roll-style behavior.
+    type = "roll";
   }
 
   return {

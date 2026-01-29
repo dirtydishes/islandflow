@@ -27,6 +27,14 @@ export type StructurePacketPlan = {
   bucketStartTs: number;
   root: string;
   pseudoContractId: string;
+  expiries: string[];
+  strikes: number[];
+  roll_from_expiry: string | null;
+  roll_to_expiry: string | null;
+  roll_from_strike: number | null;
+  roll_to_strike: number | null;
+  roll_strike_delta: number | null;
+  roll_expiry_days_delta: number | null;
   startTs: number;
   endTs: number;
   members: string[];
@@ -90,6 +98,40 @@ const uniqueSorted = (values: string[]): string[] => {
   return Array.from(new Set(values)).sort();
 };
 
+const uniqueSortedNumbers = (values: number[]): number[] => {
+  return Array.from(new Set(values)).sort((a, b) => a - b);
+};
+
+const medianNumber = (values: number[]): number | null => {
+  if (values.length === 0) {
+    return null;
+  }
+  const sorted = values.slice().sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 1) {
+    return sorted[mid] ?? null;
+  }
+  const a = sorted[mid - 1];
+  const b = sorted[mid];
+  if (!Number.isFinite(a) || !Number.isFinite(b)) {
+    return null;
+  }
+  return (a + b) / 2;
+};
+
+const dayDiff = (from: string | null, to: string | null): number | null => {
+  if (!from || !to) {
+    return null;
+  }
+  const fromTs = Date.parse(`${from}T00:00:00Z`);
+  const toTs = Date.parse(`${to}T00:00:00Z`);
+  if (!Number.isFinite(fromTs) || !Number.isFinite(toTs)) {
+    return null;
+  }
+  const diffMs = toTs - fromTs;
+  return Math.round(diffMs / 86_400_000);
+};
+
 export const shouldEmitStructurePacket = (legs: LegEvidence[], currentLegContractId: string): boolean => {
   if (legs.length < 2) {
     return false;
@@ -113,17 +155,55 @@ export const planStructurePacket = (
     return null;
   }
 
-  const root = legs[0]?.root;
-  const expiry = legs[0]?.expiry;
-  if (!root || !expiry) {
+  const rootRaw = legs[0]?.root;
+  if (!rootRaw) {
     return null;
+  }
+
+  const expiries = uniqueSorted(legs.map((leg) => leg.expiry));
+  const expiry = expiries[0];
+  if (!expiry) {
+    return null;
+  }
+
+  const strikes = uniqueSortedNumbers(legs.map((leg) => leg.strike));
+
+  let rollFromExpiry: string | null = null;
+  let rollToExpiry: string | null = null;
+  let rollFromStrike: number | null = null;
+  let rollToStrike: number | null = null;
+  let rollStrikeDelta: number | null = null;
+  let rollExpiryDaysDelta: number | null = null;
+
+  if (summary.type === "roll" && expiries.length >= 2) {
+    rollFromExpiry = expiries[0] ?? null;
+    rollToExpiry = expiries[expiries.length - 1] ?? null;
+
+    const strikesByExpiry = new Map<string, number[]>();
+    for (const leg of legs) {
+      const bucket = strikesByExpiry.get(leg.expiry);
+      if (bucket) {
+        bucket.push(leg.strike);
+      } else {
+        strikesByExpiry.set(leg.expiry, [leg.strike]);
+      }
+    }
+
+    rollFromStrike = medianNumber(strikesByExpiry.get(rollFromExpiry) ?? []) ?? null;
+    rollToStrike = medianNumber(strikesByExpiry.get(rollToExpiry) ?? []) ?? null;
+
+    if (rollFromStrike !== null && rollToStrike !== null) {
+      rollStrikeDelta = roundTo(rollToStrike - rollFromStrike, 4);
+    }
+
+    rollExpiryDaysDelta = dayDiff(rollFromExpiry, rollToExpiry);
   }
 
   const contractIds = uniqueSorted(legs.map((leg) => leg.contractId));
   const startTs = legs.reduce((min, leg) => Math.min(min, leg.startTs), Number.POSITIVE_INFINITY);
   const endTs = legs.reduce((max, leg) => Math.max(max, leg.endTs), 0);
   const bucketStartTs = bucketTs(startTs, clusterWindowMs);
-  const pseudoContractId = buildPseudoContractId(root, expiry, summary.type);
+  const pseudoContractId = buildPseudoContractId(rootRaw, expiry, summary.type);
   const id = `flowpacket:${pseudoContractId}:${bucketStartTs}:${contractIds.join("|")}`;
   const dedupeKey = `${pseudoContractId}:${bucketStartTs}:${contractIds.join("|")}`;
 
@@ -149,8 +229,16 @@ export const planStructurePacket = (
     id,
     dedupeKey,
     bucketStartTs,
-    root: root.trim().toUpperCase(),
+    root: rootRaw.trim().toUpperCase(),
     pseudoContractId,
+    expiries,
+    strikes,
+    roll_from_expiry: rollFromExpiry,
+    roll_to_expiry: rollToExpiry,
+    roll_from_strike: rollFromStrike,
+    roll_to_strike: rollToStrike,
+    roll_strike_delta: rollStrikeDelta,
+    roll_expiry_days_delta: rollExpiryDaysDelta,
     startTs: Number.isFinite(startTs) ? startTs : 0,
     endTs,
     members,
@@ -192,8 +280,32 @@ export const buildStructureFlowPacket = (
     structure_strikes: summary.strikes,
     structure_strike_span: roundTo(summary.strikeSpan),
     structure_rights: summary.rights,
-    structure_contract_ids: summary.contractIds.join(",")
+    structure_contract_ids: summary.contractIds.join(","),
+    structure_expiries_count: plan.expiries.length,
+    structure_expiries: plan.expiries.join(","),
+    structure_strikes_list: plan.strikes.join(",")
   };
+
+  if (summary.type === "roll") {
+    if (plan.roll_from_expiry) {
+      features.roll_from_expiry = plan.roll_from_expiry;
+    }
+    if (plan.roll_to_expiry) {
+      features.roll_to_expiry = plan.roll_to_expiry;
+    }
+    if (plan.roll_from_strike !== null) {
+      features.roll_from_strike = plan.roll_from_strike;
+    }
+    if (plan.roll_to_strike !== null) {
+      features.roll_to_strike = plan.roll_to_strike;
+    }
+    if (plan.roll_strike_delta !== null) {
+      features.roll_strike_delta = plan.roll_strike_delta;
+    }
+    if (plan.roll_expiry_days_delta !== null) {
+      features.roll_expiry_days_delta = plan.roll_expiry_days_delta;
+    }
+  }
 
   // These are aggregate counts across the legs. We do not attach rolling z-scores
   // (baseline is per-contract), so structure packets default to absolute thresholds.

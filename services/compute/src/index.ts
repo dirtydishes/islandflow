@@ -223,6 +223,7 @@ const nbboCache = new Map<string, OptionNBBO>();
 const equityQuoteCache = new Map<string, EquityQuote>();
 const darkInferenceState = createDarkInferenceState();
 const recentLegsByKey = new Map<string, LegEvidence[]>();
+const recentLegsByRoot = new Map<string, LegEvidence[]>();
 const recentStructureEmits = new Map<string, number>();
 
 const MAX_RECENT_LEGS = 20;
@@ -301,6 +302,10 @@ const buildLegKey = (leg: ContractLeg): string => {
   return `${leg.root}:${leg.expiry}`;
 };
 
+const buildRootKey = (leg: ContractLeg): string => {
+  return leg.root;
+};
+
 const isWithinStructureWindow = (anchorTs: number, candidateTs: number): boolean => {
   return Math.abs(anchorTs - candidateTs) <= env.CLUSTER_WINDOW_MS;
 };
@@ -319,6 +324,22 @@ const storeRecentLeg = (leg: LegEvidence, anchorTs: number): void => {
   const recent = collectRecentLegs(key, anchorTs, "");
   const next = [leg, ...recent].slice(0, MAX_RECENT_LEGS);
   recentLegsByKey.set(key, next);
+};
+
+const collectRecentRootLegs = (key: string, anchorTs: number, excludeId: string): LegEvidence[] => {
+  const recent = recentLegsByRoot.get(key) ?? [];
+  const filtered = recent.filter(
+    (leg) => leg.contractId !== excludeId && isWithinStructureWindow(anchorTs, leg.endTs)
+  );
+  recentLegsByRoot.set(key, filtered);
+  return filtered;
+};
+
+const storeRecentRootLeg = (leg: LegEvidence, anchorTs: number): void => {
+  const key = buildRootKey(leg);
+  const recent = collectRecentRootLegs(key, anchorTs, "");
+  const next = [leg, ...recent].slice(0, MAX_RECENT_LEGS);
+  recentLegsByRoot.set(key, next);
 };
 
 const collectActiveLegs = (
@@ -346,7 +367,32 @@ const collectActiveLegs = (
   return legs;
 };
 
-const STRUCTURE_TYPES = new Set(["straddle", "strangle", "vertical", "ladder"]);
+const collectActiveRootLegs = (
+  key: string,
+  anchorTs: number,
+  excludeId: string
+): LegEvidence[] => {
+  const legs: LegEvidence[] = [];
+  for (const [contractId, cluster] of clusters) {
+    if (contractId === excludeId) {
+      continue;
+    }
+    const leg = buildLegFromCluster(cluster);
+    if (!leg) {
+      continue;
+    }
+    if (buildRootKey(leg) !== key) {
+      continue;
+    }
+    if (!isWithinStructureWindow(anchorTs, leg.endTs)) {
+      continue;
+    }
+    legs.push(leg);
+  }
+  return legs;
+};
+
+const STRUCTURE_TYPES = new Set(["straddle", "strangle", "vertical", "ladder", "roll"]);
 const MAX_RECENT_STRUCTURE_EMITS = 2000;
 
 const pruneRecentStructureEmits = (anchorTs: number): void => {
@@ -691,7 +737,20 @@ const flushCluster = async (
     }
 
     await emitStructurePacketIfNeeded(clickhouse, js, legs, summary, currentLeg.contractId);
+
+    const rootKey = buildRootKey(currentLeg);
+    const rootCandidates = [
+      ...collectRecentRootLegs(rootKey, anchorTs, currentLeg.contractId),
+      ...collectActiveRootLegs(rootKey, anchorTs, currentLeg.contractId)
+    ];
+    const rollLegs = [currentLeg, ...rootCandidates];
+    const rollSummary = summarizeStructure(rollLegs);
+    if (rollSummary?.type === "roll") {
+      await emitStructurePacketIfNeeded(clickhouse, js, rollLegs, rollSummary, currentLeg.contractId);
+    }
+
     storeRecentLeg(currentLeg, anchorTs);
+    storeRecentRootLeg(currentLeg, anchorTs);
   }
 
   if (!nbboJoin.nbbo) {

@@ -40,4 +40,20 @@ describe("structure summaries", () => {
     expect(summary?.type).toBe("strangle");
     expect(summary?.strikes).toBe(2);
   });
+
+  test("detects rolls across expiries", () => {
+    const summary = summarizeStructure([
+      {
+        ...leg("c1", "C", 450),
+        expiry: "2025-01-17"
+      },
+      {
+        ...leg("c2", "C", 455),
+        expiry: "2025-02-21"
+      }
+    ]);
+    expect(summary?.type).toBe("roll");
+    expect(summary?.rights).toBe("C");
+    expect(summary?.strikes).toBe(2);
+  });
 });
