@@ -137,6 +137,7 @@ describe("classifier structure and positioning signals", () => {
 
   test("straddle classifier triggers on structure tag", () => {
     const packet = buildPacket({
+      packet_kind: "structure",
       structure_type: "straddle",
       structure_legs: 2,
       structure_strikes: 1,
@@ -147,8 +148,21 @@ describe("classifier structure and positioning signals", () => {
     expect(hits.some((hit) => hit.classifier_id === "straddle")).toBe(true);
   });
 
+  test("structure classifiers are suppressed on per-contract packets", () => {
+    const packet = buildPacket({
+      structure_type: "straddle",
+      structure_legs: 2,
+      structure_strikes: 1,
+      structure_rights: "C/P",
+      structure_strike_span: 0
+    });
+    const hits = evaluateClassifiers(packet, baseConfig);
+    expect(hits.some((hit) => hit.classifier_id === "straddle")).toBe(false);
+  });
+
   test("vertical spread infers direction from aggressor skew", () => {
     const packet = buildPacket({
+      packet_kind: "structure",
       structure_type: "vertical",
       structure_legs: 2,
       structure_strikes: 2,
@@ -167,6 +181,7 @@ describe("classifier structure and positioning signals", () => {
 
   test("ladder accumulation triggers on multi-strike structures", () => {
     const packet = buildPacket({
+      packet_kind: "structure",
       structure_type: "ladder",
       structure_legs: 3,
       structure_strikes: 3,

@@ -749,66 +749,75 @@ export const evaluateClassifiers = (
   packet: FlowPacket,
   config: ClassifierConfig
 ): ClassifierHit[] => {
+  const packetKind = getStringFeature(packet, "packet_kind");
+  const structureOnly = packetKind === "structure";
+
   const contractId = typeof packet.features.option_contract_id === "string"
     ? packet.features.option_contract_id
     : "";
-  const contract = parseContractId(contractId);
+  const contract = structureOnly ? null : parseContractId(contractId);
   const hits: ClassifierHit[] = [];
 
-  if (contract?.right === "C") {
-    const hit = buildSweepHit(packet, contract, "bullish", config);
-    if (hit) {
-      hits.push(hit);
-    }
-  }
-
-  if (contract?.right === "P") {
-    const hit = buildSweepHit(packet, contract, "bearish", config);
-    if (hit) {
-      hits.push(hit);
-    }
-  }
-
-  const spikeHit = buildSpikeHit(packet, config);
-  if (spikeHit) {
-    hits.push(spikeHit);
-  }
-
-  if (contract) {
-    const overwriteHit = buildOverwriteHit(packet, contract, config);
-    if (overwriteHit) {
-      hits.push(overwriteHit);
+  if (structureOnly) {
+    const structureHit = buildStraddleStrangleHit(packet, config);
+    if (structureHit) {
+      hits.push(structureHit);
     }
 
-    const putWriteHit = buildPutWriteHit(packet, contract, config);
-    if (putWriteHit) {
-      hits.push(putWriteHit);
+    const verticalHit = buildVerticalSpreadHit(packet, config);
+    if (verticalHit) {
+      hits.push(verticalHit);
     }
 
-    const farDatedHit = buildFarDatedHit(packet, contract, config);
-    if (farDatedHit) {
-      hits.push(farDatedHit);
+    const ladderHit = buildLadderHit(packet, config);
+    if (ladderHit) {
+      hits.push(ladderHit);
     }
 
-    const zeroDteHit = buildZeroDteGammaPunchHit(packet, contract, config);
-    if (zeroDteHit) {
-      hits.push(zeroDteHit);
+    return hits;
+  }
+
+  if (!structureOnly) {
+    if (contract?.right === "C") {
+      const hit = buildSweepHit(packet, contract, "bullish", config);
+      if (hit) {
+        hits.push(hit);
+      }
     }
-  }
 
-  const structureHit = buildStraddleStrangleHit(packet, config);
-  if (structureHit) {
-    hits.push(structureHit);
-  }
+    if (contract?.right === "P") {
+      const hit = buildSweepHit(packet, contract, "bearish", config);
+      if (hit) {
+        hits.push(hit);
+      }
+    }
 
-  const verticalHit = buildVerticalSpreadHit(packet, config);
-  if (verticalHit) {
-    hits.push(verticalHit);
-  }
+    const spikeHit = buildSpikeHit(packet, config);
+    if (spikeHit) {
+      hits.push(spikeHit);
+    }
 
-  const ladderHit = buildLadderHit(packet, config);
-  if (ladderHit) {
-    hits.push(ladderHit);
+    if (contract) {
+      const overwriteHit = buildOverwriteHit(packet, contract, config);
+      if (overwriteHit) {
+        hits.push(overwriteHit);
+      }
+
+      const putWriteHit = buildPutWriteHit(packet, contract, config);
+      if (putWriteHit) {
+        hits.push(putWriteHit);
+      }
+
+      const farDatedHit = buildFarDatedHit(packet, contract, config);
+      if (farDatedHit) {
+        hits.push(farDatedHit);
+      }
+
+      const zeroDteHit = buildZeroDteGammaPunchHit(packet, contract, config);
+      if (zeroDteHit) {
+        hits.push(zeroDteHit);
+      }
+    }
   }
 
   return hits;

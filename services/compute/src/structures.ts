@@ -41,6 +41,6 @@ export const summarizeStructure = (legs: ContractLeg[]): StructureSummary | null
     strikes: strikes.length,
     strikeSpan,
     rights: rights.size === 2 ? "C/P" : Array.from(rights)[0] ?? "",
-    contractIds: legs.map((leg) => leg.contractId)
+    contractIds: legs.map((leg) => leg.contractId).slice().sort()
   };
 };
