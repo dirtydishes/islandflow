@@ -17,20 +17,25 @@ Done now (in repo):
 - FlowPacket structure tags (vertical/ladder/straddle/strangle) for multi-leg bursts
 - Aggressor mix features (NBBO placement ratios) on FlowPackets
 - Rule-first classifiers + alert scoring with ClickHouse persistence + WS/REST endpoints
+- Structure packet emission with full constituent evidence + roll metadata
+- Roll classifier surfaced from detected multi-leg roll structures
 - API: REST for prints/flow packets/classifier hits/alerts, WS for live options/equities/flow/alerts/hits, replay endpoints
+- API: equities prints range query endpoint for chart overlays and drill-down
 - UI: live tapes for options/equities/flow + replay toggle + pause controls + replay time/completion
 - UI: alerts + classifier hits panels, ticker filter, evidence drawer, severity strip
+- UI chart overlays for off-exchange equity prints + classifier/dark markers with linked evidence drawer behavior
 - Databento historical replay adapter (options) with symbol mapping
 - Alpaca options adapter (dev-only, bounded contract list)
 - Alpaca equities adapter (stocks trades/quotes via WS)
 - IBKR options adapter (single-underlying bridge via `ib_insync`)
 - Dark-pool-style inference (absorbed blocks, stealth accumulation, distribution) with WS/REST surfaces and UI list
 - Testing-mode throttling for ingest to reduce CPU during local dev
+- Alert scoring calibration updates for confidence/coverage-aware severity
 
 In progress / blocked:
 - Production-grade licensed live data feeds (beyond current dev/test bridges)
 - Advanced clustering (spreads/rolls beyond basic structure tags)
-- Chart overlays beyond basic candles (candles service emits data; UI overlays still limited)
+- Expanded chart overlays and annotation density controls
 
 Not started:
 - Reference data/corporate action enrichment
@@ -53,9 +58,13 @@ Not started:
 - Basic multi-leg structure tagging on FlowPackets
 - Aggressor mix features from NBBO placement on FlowPackets
 - Classifiers + alert scoring (rule-first) with WS/REST endpoints
+- Structure packet emission with roll-aware metadata and evidence lists
+- Roll classifier (rule-based, explainable) emitted from structure packets
 - API gateway with REST, WS, and replay endpoints
+- Equities prints range REST endpoint for chart/time-window inspection
 - Server-built equity candles (service + REST/WS surfaces)
 - UI tapes for options/equities/flow packets + alerts/hits with live/replay toggle and pause controls
+- Chart overlays for off-exchange prints, classifier markers, and dark-pool markers with evidence linking
 - Alpaca options adapter (dev-only) with bounded contract selection
 - IBKR options adapter (single-underlying bridge via Python sidecar)
 - Databento historical replay adapter (options, Python sidecar)
