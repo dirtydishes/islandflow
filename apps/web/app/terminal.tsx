@@ -1,0 +1,4190 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode
+} from "react";
+import type {
+  AlertEvent,
+  ClassifierHitEvent,
+  EquityCandle,
+  EquityPrint,
+  EquityPrintJoin,
+  FlowPacket,
+  InferredDarkEvent,
+  OptionNBBO,
+  OptionPrint
+} from "@islandflow/types";
+import { createChart, type IChartApi, type SeriesMarker, type UTCTimestamp } from "lightweight-charts";
+
+const MAX_ITEMS = 500;
+const NBBO_MAX_AGE_MS = Number(process.env.NEXT_PUBLIC_NBBO_MAX_AGE_MS);
+const NBBO_MAX_AGE_MS_SAFE =
+  Number.isFinite(NBBO_MAX_AGE_MS) && NBBO_MAX_AGE_MS > 0 ? NBBO_MAX_AGE_MS : 1000;
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"]);
+const CANDLE_INTERVALS = [
+  { label: "1m", ms: 60000 },
+  { label: "5m", ms: 300000 }
+];
+
+type CandlestickSeries = ReturnType<IChartApi["addCandlestickSeries"]>;
+
+type EquityOverlayPoint = {
+  ts: number;
+  price: number;
+  size: number;
+  offExchangeFlag: boolean;
+};
+
+type ChartCandle = {
+  time: UTCTimestamp;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+};
+
+const formatIntervalLabel = (intervalMs: number): string => {
+  const match = CANDLE_INTERVALS.find((interval) => interval.ms === intervalMs);
+  if (match) {
+    return match.label;
+  }
+  if (intervalMs >= 60000) {
+    return `${Math.round(intervalMs / 60000)}m`;
+  }
+  if (intervalMs >= 1000) {
+    return `${Math.round(intervalMs / 1000)}s`;
+  }
+  return `${intervalMs}ms`;
+};
+
+const toChartTime = (ts: number): UTCTimestamp => {
+  return Math.floor(ts / 1000) as UTCTimestamp;
+};
+
+type ChartTimeLike = number | string | { year: number; month: number; day: number };
+
+const chartTimeToMs = (value: ChartTimeLike): number | null => {
+  if (typeof value === "number") {
+    return Math.floor(value * 1000);
+  }
+
+  if (typeof value === "string") {
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  if (value && typeof value === "object") {
+    const { year, month, day } = value;
+    if (
+      Number.isFinite(year) &&
+      Number.isFinite(month) &&
+      Number.isFinite(day) &&
+      year >= 1970 &&
+      month >= 1 &&
+      month <= 12 &&
+      day >= 1 &&
+      day <= 31
+    ) {
+      return Date.UTC(year, month - 1, day);
+    }
+  }
+
+  return null;
+};
+
+const toChartCandle = (candle: EquityCandle): ChartCandle => {
+  return {
+    time: toChartTime(candle.ts),
+    open: candle.open,
+    high: candle.high,
+    low: candle.low,
+    close: candle.close
+  };
+};
+
+const clamp = (value: number, min: number, max: number): number => {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+  return Math.max(min, Math.min(max, value));
+};
+
+const sampleToLimit = <T,>(items: T[], limit: number): T[] => {
+  if (items.length <= limit) {
+    return items;
+  }
+
+  const safeLimit = Math.max(1, Math.floor(limit));
+  const step = Math.ceil(items.length / safeLimit);
+  const sampled: T[] = [];
+  for (let idx = 0; idx < items.length; idx += step) {
+    sampled.push(items[idx]);
+  }
+
+  return sampled;
+};
+
+const readErrorDetail = async (response: Response): Promise<string> => {
+  const text = await response.text();
+  if (!text) {
+    return "";
+  }
+  try {
+    const payload = JSON.parse(text) as {
+      detail?: string;
+      error?: string;
+      message?: string;
+    };
+    return payload.detail ?? payload.error ?? payload.message ?? text;
+  } catch {
+    return text;
+  }
+};
+
+type WsStatus = "connecting" | "connected" | "disconnected";
+
+type TapeMode = "live" | "replay";
+
+type MessageType =
+  | "option-print"
+  | "option-nbbo"
+  | "equity-print"
+  | "equity-candle"
+  | "equity-join"
+  | "flow-packet"
+  | "inferred-dark"
+  | "classifier-hit"
+  | "alert";
+
+type StreamMessage<T> = {
+  type: MessageType;
+  payload: T;
+};
+
+type ReplayCursor = {
+  ts: number;
+  seq: number;
+};
+
+type ReplayResponse<T> = {
+  data: T[];
+  next: ReplayCursor | null;
+};
+
+const inferTracePrefix = (traceId: string): string => {
+  const match = traceId.match(/^(.*)-\d+$/);
+  return match ? match[1] : traceId;
+};
+
+const extractTracePrefix = <T,>(item: T): string | null => {
+  const traceId = (item as { trace_id?: string }).trace_id;
+  if (!traceId) {
+    return null;
+  }
+  return inferTracePrefix(traceId);
+};
+
+const extractReplaySource = <T,>(item: T): string | null => {
+  const prefix = extractTracePrefix(item);
+  if (!prefix) {
+    return null;
+  }
+
+  const normalized = prefix.toLowerCase();
+  if (normalized.startsWith("synthetic")) {
+    return "synthetic";
+  }
+  if (normalized.startsWith("databento")) {
+    return "databento";
+  }
+  if (normalized.startsWith("alpaca")) {
+    return "alpaca";
+  }
+  if (normalized.startsWith("ibkr")) {
+    return "ibkr";
+  }
+
+  return prefix;
+};
+
+type SortableItem = {
+  ts?: number;
+  source_ts?: number;
+  ingest_ts?: number;
+  seq?: number;
+  trace_id?: string;
+  id?: string;
+};
+
+const extractSortTs = (item: SortableItem): number =>
+  item.ts ?? item.source_ts ?? item.ingest_ts ?? 0;
+
+const extractSortSeq = (item: SortableItem): number => item.seq ?? 0;
+
+const buildItemKey = (item: SortableItem): string | null => {
+  if (item.trace_id) {
+    return `${item.trace_id}:${item.seq ?? ""}`;
+  }
+
+  if (item.id) {
+    return `id:${item.id}`;
+  }
+
+  return null;
+};
+
+const mergeNewest = <T extends SortableItem>(incoming: T[], existing: T[]): T[] => {
+  const combined = [...incoming, ...existing];
+  if (combined.length === 0) {
+    return combined;
+  }
+
+  const seen = new Set<string>();
+  const deduped: T[] = [];
+
+  for (const item of combined) {
+    const key = buildItemKey(item);
+    if (key) {
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+    }
+    deduped.push(item);
+  }
+
+  deduped.sort((a, b) => {
+    const delta = extractSortTs(b) - extractSortTs(a);
+    if (delta !== 0) {
+      return delta;
+    }
+    return extractSortSeq(b) - extractSortSeq(a);
+  });
+
+  return deduped.slice(0, MAX_ITEMS);
+};
+
+type TapeState<T> = {
+  status: WsStatus;
+  items: T[];
+  lastUpdate: number | null;
+  replayTime: number | null;
+  replayComplete: boolean;
+  paused: boolean;
+  dropped: number;
+  togglePause: () => void;
+};
+
+const buildWsUrl = (path: string): string => {
+  const envBase = process.env.NEXT_PUBLIC_API_URL;
+
+  if (envBase) {
+    const url = new URL(envBase);
+    url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+    url.pathname = path;
+    url.search = "";
+    url.hash = "";
+    return url.toString();
+  }
+
+  const { protocol, hostname } = window.location;
+  const wsProtocol = protocol === "https:" ? "wss" : "ws";
+  const isLocal = LOCAL_HOSTS.has(hostname);
+  const host = isLocal ? `${hostname}:4000` : window.location.host;
+
+  return `${wsProtocol}://${host}${path}`;
+};
+
+const buildApiUrl = (path: string): string => {
+  const envBase = process.env.NEXT_PUBLIC_API_URL;
+
+  if (envBase) {
+    const url = new URL(envBase);
+    const secure = url.protocol === "https:" || url.protocol === "wss:";
+    url.protocol = secure ? "https:" : "http:";
+    url.pathname = path;
+    url.search = "";
+    url.hash = "";
+    return url.toString();
+  }
+
+  const { protocol, hostname } = window.location;
+  const httpProtocol = protocol === "https:" ? "https" : "http";
+  const isLocal = LOCAL_HOSTS.has(hostname);
+  const host = isLocal ? `${hostname}:4000` : window.location.host;
+
+  return `${httpProtocol}://${host}${path}`;
+};
+
+const formatPrice = (price: number): string => {
+  if (!Number.isFinite(price)) {
+    return "0.00";
+  }
+  return price.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+};
+
+const formatSize = (size: number): string => {
+  return size.toLocaleString();
+};
+
+const formatTime = (ts: number): string => {
+  return new Date(ts).toLocaleTimeString();
+};
+
+const formatConfidence = (value: number): string => `${Math.round(value * 100)}%`;
+
+const formatPct = (value: number): string => `${Math.round(value * 100)}%`;
+
+const formatUsd = (value: number): string => {
+  if (!Number.isFinite(value)) {
+    return "0.00";
+  }
+  return value.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+};
+
+const normalizeContractId = (value: string): string => value.trim();
+
+const formatContractLabel = (value: string): string => {
+  const normalized = normalizeContractId(value);
+  if (!normalized) {
+    return "Unknown contract";
+  }
+  if (/^\d+$/.test(normalized)) {
+    return `Instrument ${normalized}`;
+  }
+  return normalized;
+};
+
+const formatDateTime = (ts: number): string => {
+  const date = new Date(ts);
+  return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
+};
+
+const humanizeClassifierId = (value: string): string => {
+  if (!value) {
+    return "Classifier";
+  }
+
+  return value
+    .split("_")
+    .map((part) => (part ? part[0].toUpperCase() + part.slice(1) : part))
+    .join(" ");
+};
+
+const normalizeDirection = (value: string): "bullish" | "bearish" | "neutral" => {
+  const normalized = value.toLowerCase();
+  if (normalized === "bullish" || normalized === "bearish" || normalized === "neutral") {
+    return normalized;
+  }
+  return "neutral";
+};
+
+const extractUnderlying = (contractId: string): string => {
+  const match = contractId.match(/^(.+)-\d{4}-\d{2}-\d{2}-/);
+  if (match?.[1]) {
+    return match[1].toUpperCase();
+  }
+  return contractId.split("-")[0]?.toUpperCase() ?? contractId.toUpperCase();
+};
+
+const extractEquityTraceFromJoin = (joinId: string): string | null => {
+  const match = joinId.match(/^equityjoin:(.+)$/);
+  return match?.[1] ?? null;
+};
+
+const inferDarkUnderlying = (
+  event: InferredDarkEvent,
+  equityPrints: Map<string, EquityPrint>,
+  equityJoins: Map<string, EquityPrintJoin>
+): string | null => {
+  for (const ref of event.evidence_refs) {
+    const join = equityJoins.get(ref);
+    if (!join) {
+      continue;
+    }
+    const underlying = join.features.underlying_id;
+    if (typeof underlying === "string" && underlying.length > 0) {
+      return underlying.toUpperCase();
+    }
+  }
+
+  const match = event.trace_id.match(/^dark:(?:stealth_accumulation|distribution):([^:]+):/);
+  if (match?.[1]) {
+    return match[1].toUpperCase();
+  }
+
+  for (const ref of event.evidence_refs) {
+    const traceId = extractEquityTraceFromJoin(ref);
+    if (!traceId) {
+      continue;
+    }
+    const print = equityPrints.get(traceId);
+    if (print) {
+      return print.underlying_id.toUpperCase();
+    }
+  }
+
+  return null;
+};
+
+const parseNumber = (value: unknown, fallback: number): number => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return fallback;
+};
+
+const parseBoolean = (value: unknown, fallback = false): boolean => {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "number") {
+    return value !== 0;
+  }
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "1", "yes", "on"].includes(normalized)) {
+      return true;
+    }
+    if (["false", "0", "no", "off"].includes(normalized)) {
+      return false;
+    }
+  }
+  return fallback;
+};
+
+const getJoinString = (join: EquityPrintJoin, key: string): string | null => {
+  const value = join.features[key];
+  return typeof value === "string" ? value : null;
+};
+
+const getJoinNumber = (join: EquityPrintJoin, key: string, fallback = Number.NaN): number => {
+  return parseNumber(join.features[key], fallback);
+};
+
+const getJoinBoolean = (join: EquityPrintJoin, key: string): boolean => {
+  return parseBoolean(join.features[key], false);
+};
+
+type NbboSide = "AA" | "A" | "B" | "BB";
+
+const classifyNbboSide = (price: number, quote: OptionNBBO | null | undefined): NbboSide | null => {
+  if (!quote || !Number.isFinite(price)) {
+    return null;
+  }
+
+  const bid = quote.bid;
+  const ask = quote.ask;
+  if (!Number.isFinite(bid) || !Number.isFinite(ask) || ask <= 0) {
+    return null;
+  }
+
+  const spread = Math.max(0, ask - bid);
+  const epsilon = Math.max(0.01, spread * 0.05);
+
+  if (price > ask + epsilon) {
+    return "AA";
+  }
+  if (price >= ask - epsilon) {
+    return "A";
+  }
+  if (price < bid - epsilon) {
+    return "BB";
+  }
+  if (price <= bid + epsilon) {
+    return "B";
+  }
+
+  const mid = (bid + ask) / 2;
+  return price >= mid ? "A" : "B";
+};
+
+type ListScrollState = {
+  listRef: React.RefObject<HTMLDivElement>;
+  isAtTop: boolean;
+  isAtTopRef: React.MutableRefObject<boolean>;
+  missed: number;
+  resumeTick: number;
+  onNewItems: (count: number) => void;
+  jumpToTop: () => void;
+};
+
+const useListScroll = (): ListScrollState => {
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const [isAtTop, setIsAtTop] = useState(true);
+  const [missed, setMissed] = useState(0);
+  const [resumeTick, setResumeTick] = useState(0);
+  const isAtTopRef = useRef(true);
+  const prevAtTopRef = useRef(true);
+
+  useEffect(() => {
+    isAtTopRef.current = isAtTop;
+  }, [isAtTop]);
+
+  const updateScrollState = useCallback(() => {
+    const el = listRef.current;
+    if (!el) {
+      return;
+    }
+
+    const atTop = el.scrollTop <= 2;
+
+    if (atTop && !prevAtTopRef.current) {
+      setResumeTick((prev) => prev + 1);
+    }
+
+    prevAtTopRef.current = atTop;
+    isAtTopRef.current = atTop;
+    setIsAtTop(atTop);
+
+    if (atTop) {
+      setMissed(0);
+    }
+  }, [isAtTopRef]);
+
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) {
+      return;
+    }
+
+    const onScroll = () => {
+      updateScrollState();
+    };
+
+    updateScrollState();
+    el.addEventListener("scroll", onScroll);
+
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+    };
+  }, [updateScrollState]);
+
+  const onNewItems = useCallback((count: number) => {
+    if (count <= 0) {
+      return;
+    }
+
+    if (isAtTopRef.current) {
+      setMissed(0);
+      return;
+    }
+
+    setMissed((prev) => prev + count);
+  }, []);
+
+  const jumpToTop = useCallback(() => {
+    const el = listRef.current;
+    if (!el) {
+      return;
+    }
+
+    isAtTopRef.current = true;
+    el.scrollTop = 0;
+    updateScrollState();
+  }, [isAtTopRef, listRef, updateScrollState]);
+
+  return {
+    listRef,
+    isAtTop,
+    isAtTopRef,
+    missed,
+    resumeTick,
+    onNewItems,
+    jumpToTop
+  };
+};
+
+const useScrollAnchor = (
+  listRef: React.RefObject<HTMLDivElement>,
+  isAtTopRef: React.MutableRefObject<boolean>
+) => {
+  const pendingRef = useRef<{ height: number } | null>(null);
+
+  const capture = useCallback(() => {
+    if (isAtTopRef.current) {
+      pendingRef.current = null;
+      return;
+    }
+
+    const el = listRef.current;
+    if (!el) {
+      return;
+    }
+
+    pendingRef.current = {
+      height: el.scrollHeight
+    };
+  }, [isAtTopRef, listRef]);
+
+  const apply = useCallback(() => {
+    const pending = pendingRef.current;
+    if (!pending) {
+      return;
+    }
+
+    const el = listRef.current;
+    if (!el) {
+      return;
+    }
+
+    if (isAtTopRef.current) {
+      pendingRef.current = null;
+      return;
+    }
+
+    const delta = el.scrollHeight - pending.height;
+    if (delta !== 0) {
+      el.scrollTop = Math.max(0, el.scrollTop + delta);
+    }
+    pendingRef.current = null;
+  }, [isAtTopRef, listRef]);
+
+  return { capture, apply };
+};
+
+const statusLabel = (status: WsStatus, paused: boolean, mode: TapeMode): string => {
+  if (paused) {
+    return "Paused";
+  }
+
+  if (mode === "replay") {
+    return status === "disconnected" ? "Replay Down" : "Replay";
+  }
+
+  switch (status) {
+    case "connected":
+      return "Live";
+    case "connecting":
+      return "Connecting";
+    case "disconnected":
+    default:
+      return "Disconnected";
+  }
+};
+
+type TapeConfig<T> = {
+  mode: TapeMode;
+  wsPath: string;
+  replayPath: string;
+  latestPath?: string;
+  expectedType: MessageType;
+  batchSize?: number;
+  pollMs?: number;
+  captureScroll?: () => void;
+  onNewItems?: (count: number) => void;
+  getItemTs?: (item: T) => number;
+  getReplayKey?: (item: T) => string | null;
+  replaySourceKey?: string | null;
+  onReplaySourceKey?: (key: string | null) => void;
+};
+
+const useTape = <T extends SortableItem & { seq: number }>(
+  config: TapeConfig<T>
+): TapeState<T> => {
+  const { mode, wsPath, replayPath, expectedType, latestPath, onNewItems, captureScroll } = config;
+  const batchSize = config.batchSize ?? 40;
+  const pollMs = config.pollMs ?? 1000;
+  const getItemTs = config.getItemTs ?? extractSortTs;
+  const getReplayKey = config.getReplayKey ?? extractTracePrefix;
+  const replaySourceKey = config.replaySourceKey ?? null;
+  const onReplaySourceKey = config.onReplaySourceKey;
+  const [status, setStatus] = useState<WsStatus>("connecting");
+  const [items, setItems] = useState<T[]>([]);
+  const [lastUpdate, setLastUpdate] = useState<number | null>(null);
+  const [replayTime, setReplayTime] = useState<number | null>(null);
+  const [replayComplete, setReplayComplete] = useState<boolean>(false);
+  const [paused, setPaused] = useState<boolean>(false);
+  const [dropped, setDropped] = useState<number>(0);
+  const reconnectRef = useRef<number | null>(null);
+  const socketRef = useRef<WebSocket | null>(null);
+  const cursorRef = useRef<ReplayCursor>({ ts: 0, seq: 0 });
+  const replayEndRef = useRef<number | null>(null);
+  const replayCompleteRef = useRef<boolean>(false);
+  const replaySourceRef = useRef<string | null>(null);
+  const replaySourceNotifiedRef = useRef<string | null>(null);
+  const emptyPollsRef = useRef<number>(0);
+  const pausedRef = useRef(paused);
+  const pendingRef = useRef<T[]>([]);
+  const pendingCountRef = useRef(0);
+  const flushHandleRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    pausedRef.current = paused;
+  }, [paused]);
+
+  const cancelFlush = useCallback(() => {
+    if (flushHandleRef.current !== null) {
+      cancelAnimationFrame(flushHandleRef.current);
+      flushHandleRef.current = null;
+    }
+  }, []);
+
+  const scheduleFlush = useCallback(() => {
+    if (flushHandleRef.current !== null) {
+      return;
+    }
+
+    flushHandleRef.current = requestAnimationFrame(() => {
+      flushHandleRef.current = null;
+      const buffered = pendingRef.current;
+      if (buffered.length === 0) {
+        return;
+      }
+      pendingRef.current = [];
+
+      const pendingCount = pendingCountRef.current;
+      pendingCountRef.current = 0;
+
+      if (onNewItems && pendingCount > 0) {
+        onNewItems(pendingCount);
+      }
+
+      if (captureScroll) {
+        captureScroll();
+      }
+
+      setItems((prev) => mergeNewest(buffered, prev));
+      setLastUpdate(Date.now());
+    });
+  }, [captureScroll, onNewItems]);
+
+  const togglePause = useCallback(() => {
+    setPaused((prev) => {
+      const next = !prev;
+      if (!next) {
+        setDropped(0);
+      }
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    setItems([]);
+    setLastUpdate(null);
+    setReplayTime(null);
+    setReplayComplete(false);
+    replayCompleteRef.current = false;
+    replaySourceRef.current = null;
+    replaySourceNotifiedRef.current = null;
+    emptyPollsRef.current = 0;
+    setDropped(0);
+    setStatus("connecting");
+    cursorRef.current = { ts: 0, seq: 0 };
+    pendingRef.current = [];
+    pendingCountRef.current = 0;
+    cancelFlush();
+  }, [mode, replaySourceKey, cancelFlush]);
+
+  useEffect(() => {
+    if (mode !== "replay" || !latestPath) {
+      replayEndRef.current = null;
+      return;
+    }
+
+    let active = true;
+    replayEndRef.current = null;
+    setReplayComplete(false);
+    replayCompleteRef.current = false;
+
+    const fetchReplayEnd = async () => {
+      try {
+        const url = new URL(buildApiUrl(latestPath));
+        url.searchParams.set("limit", "1");
+        if (replaySourceKey) {
+          url.searchParams.set("source", replaySourceKey);
+        }
+        const response = await fetch(url.toString());
+        if (!response.ok) {
+          throw new Error(`Replay baseline failed with ${response.status}`);
+        }
+
+        const payload = (await response.json()) as { data?: T[] };
+        const latest = payload.data?.[0];
+        if (active && latest) {
+          replayEndRef.current = getItemTs(latest);
+        }
+      } catch (error) {
+        console.warn("Failed to load replay end cursor", error);
+      }
+    };
+
+    void fetchReplayEnd();
+
+    return () => {
+      active = false;
+    };
+  }, [mode, latestPath, getItemTs, replaySourceKey]);
+
+  useEffect(() => {
+    if (mode !== "live") {
+      return;
+    }
+
+    let active = true;
+
+    const connect = () => {
+      if (!active) {
+        return;
+      }
+
+      setStatus("connecting");
+
+      const socket = new WebSocket(buildWsUrl(wsPath));
+      socketRef.current = socket;
+
+      socket.onopen = () => {
+        if (!active) {
+          return;
+        }
+        setStatus("connected");
+      };
+
+      socket.onmessage = (event) => {
+        if (!active) {
+          return;
+        }
+
+        try {
+          const message = JSON.parse(event.data) as StreamMessage<T>;
+          if (!message || message.type !== expectedType) {
+            return;
+          }
+
+          if (pausedRef.current) {
+            setDropped((prev) => prev + 1);
+            setLastUpdate(Date.now());
+            return;
+          }
+
+          pendingRef.current.push(message.payload);
+          pendingCountRef.current += 1;
+          scheduleFlush();
+        } catch (error) {
+          console.warn("Failed to parse websocket payload", error);
+        }
+      };
+
+      socket.onclose = () => {
+        if (!active) {
+          return;
+        }
+
+        setStatus("disconnected");
+        reconnectRef.current = window.setTimeout(() => {
+          connect();
+        }, 1000);
+      };
+
+      socket.onerror = () => {
+        if (!active) {
+          return;
+        }
+
+        setStatus("disconnected");
+        socket.close();
+      };
+    };
+
+    connect();
+
+    return () => {
+      active = false;
+      cancelFlush();
+      if (reconnectRef.current !== null) {
+        window.clearTimeout(reconnectRef.current);
+      }
+      if (socketRef.current) {
+        socketRef.current.close();
+      }
+    };
+  }, [mode, wsPath, expectedType, scheduleFlush, cancelFlush]);
+
+  useEffect(() => {
+    if (mode !== "replay") {
+      return;
+    }
+
+    let active = true;
+
+    const poll = async () => {
+      if (!active || pausedRef.current) {
+        return;
+      }
+
+      if (replayCompleteRef.current) {
+        return;
+      }
+
+      try {
+        let keepPolling = true;
+
+        while (keepPolling && active && !pausedRef.current) {
+          const replayEnd = replayEndRef.current;
+          const cursor = cursorRef.current;
+
+          if (replayEnd !== null && cursor.ts >= replayEnd) {
+            replayCompleteRef.current = true;
+            setReplayComplete(true);
+            setStatus("disconnected");
+            return;
+          }
+
+          const url = new URL(buildApiUrl(replayPath));
+          url.searchParams.set("after_ts", cursor.ts.toString());
+          url.searchParams.set("after_seq", cursor.seq.toString());
+          url.searchParams.set("limit", batchSize.toString());
+          const desiredSource = replaySourceKey ?? replaySourceRef.current;
+          if (desiredSource) {
+            url.searchParams.set("source", desiredSource);
+          }
+
+          const response = await fetch(url.toString());
+          if (!response.ok) {
+            throw new Error(`Replay request failed with ${response.status}`);
+          }
+
+          const payload = (await response.json()) as ReplayResponse<T>;
+
+          let sourcePrefix = replaySourceRef.current;
+          if (replaySourceKey) {
+            if (sourcePrefix !== replaySourceKey) {
+              sourcePrefix = replaySourceKey;
+              replaySourceRef.current = replaySourceKey;
+            }
+          } else if (!sourcePrefix) {
+            const firstWithTrace = payload.data.find((item) => getReplayKey(item));
+            if (firstWithTrace) {
+              sourcePrefix = getReplayKey(firstWithTrace);
+              replaySourceRef.current = sourcePrefix ?? null;
+            }
+          }
+
+          if (onReplaySourceKey && sourcePrefix && replaySourceNotifiedRef.current !== sourcePrefix) {
+            replaySourceNotifiedRef.current = sourcePrefix;
+            onReplaySourceKey(sourcePrefix);
+          }
+
+          const filtered = sourcePrefix
+            ? payload.data.filter((item) => getReplayKey(item) === sourcePrefix)
+            : payload.data;
+
+          const hasForeign =
+            sourcePrefix &&
+            payload.data.some((item) => {
+              const prefix = getReplayKey(item);
+              return prefix !== null && prefix !== sourcePrefix;
+            });
+
+          if (filtered.length > 0) {
+            const nextItems = [...filtered].reverse();
+            pendingRef.current.push(...nextItems);
+            pendingCountRef.current += nextItems.length;
+            scheduleFlush();
+            const last = filtered.at(-1);
+            if (last) {
+              const lastTs = getItemTs(last);
+              setReplayTime(lastTs);
+              if (replayEnd !== null && lastTs >= replayEnd) {
+                cursorRef.current = { ts: lastTs, seq: last.seq };
+                replayCompleteRef.current = true;
+                setReplayComplete(true);
+                setStatus("disconnected");
+                return;
+              }
+            }
+            emptyPollsRef.current = 0;
+          } else if (sourcePrefix) {
+            emptyPollsRef.current += 1;
+          }
+
+          if (payload.next) {
+            cursorRef.current = payload.next;
+          }
+
+          setStatus("connected");
+          keepPolling = filtered.length === batchSize;
+
+          if (keepPolling) {
+            await new Promise((resolve) => setTimeout(resolve, 0));
+          }
+
+          if (!replaySourceKey && hasForeign) {
+            replayCompleteRef.current = true;
+            setReplayComplete(true);
+            setStatus("disconnected");
+            return;
+          }
+
+          if (sourcePrefix && emptyPollsRef.current >= 3) {
+            replayCompleteRef.current = true;
+            setReplayComplete(true);
+            setStatus("disconnected");
+            return;
+          }
+        }
+      } catch (error) {
+        console.warn("Replay poll failed", error);
+        setStatus("disconnected");
+      }
+    };
+
+    void poll();
+    const interval = window.setInterval(poll, pollMs);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      cancelFlush();
+    };
+  }, [
+    mode,
+    replayPath,
+    batchSize,
+    pollMs,
+    scheduleFlush,
+    cancelFlush,
+    getItemTs,
+    getReplayKey,
+    replaySourceKey,
+    onReplaySourceKey
+  ]);
+
+  return {
+    status,
+    items,
+    lastUpdate,
+    replayTime,
+    replayComplete,
+    paused,
+    dropped,
+    togglePause
+  };
+};
+
+const useLiveStream = <T extends SortableItem>(
+  config: {
+    enabled: boolean;
+    wsPath: string;
+    expectedType: MessageType;
+    onNewItems?: (count: number) => void;
+    captureScroll?: () => void;
+    shouldHold?: () => boolean;
+    resumeSignal?: number;
+  }
+): TapeState<T> => {
+  const [status, setStatus] = useState<WsStatus>(
+    config.enabled ? "connecting" : "disconnected"
+  );
+  const [items, setItems] = useState<T[]>([]);
+  const [lastUpdate, setLastUpdate] = useState<number | null>(null);
+  const [replayTime] = useState<number | null>(null);
+  const [replayComplete] = useState<boolean>(false);
+  const [paused, setPaused] = useState<boolean>(false);
+  const [dropped, setDropped] = useState<number>(0);
+  const reconnectRef = useRef<number | null>(null);
+  const socketRef = useRef<WebSocket | null>(null);
+  const pausedRef = useRef(paused);
+  const pendingRef = useRef<T[]>([]);
+  const pendingCountRef = useRef(0);
+  const flushHandleRef = useRef<number | null>(null);
+  const holdRef = useRef<T[]>([]);
+
+  useEffect(() => {
+    pausedRef.current = paused;
+  }, [paused]);
+
+  const cancelFlush = useCallback(() => {
+    if (flushHandleRef.current !== null) {
+      cancelAnimationFrame(flushHandleRef.current);
+      flushHandleRef.current = null;
+    }
+  }, []);
+
+  const scheduleFlush = useCallback(() => {
+    if (flushHandleRef.current !== null) {
+      return;
+    }
+
+    flushHandleRef.current = requestAnimationFrame(() => {
+      flushHandleRef.current = null;
+      const buffered = pendingRef.current;
+      if (buffered.length === 0) {
+        return;
+      }
+      pendingRef.current = [];
+
+      const pendingCount = pendingCountRef.current;
+      pendingCountRef.current = 0;
+
+      if (config.onNewItems && pendingCount > 0) {
+        config.onNewItems(pendingCount);
+      }
+
+      const shouldHold = config.shouldHold ? config.shouldHold() : false;
+      if (!shouldHold && config.captureScroll) {
+        config.captureScroll();
+      }
+
+      if (shouldHold) {
+        holdRef.current = mergeNewest(buffered, holdRef.current);
+        setLastUpdate(Date.now());
+        return;
+      }
+
+      const nextBatch =
+        holdRef.current.length > 0 ? [...holdRef.current, ...buffered] : buffered;
+      holdRef.current = [];
+
+      setItems((prev) => mergeNewest(nextBatch, prev));
+      setLastUpdate(Date.now());
+    });
+  }, [config.captureScroll, config.onNewItems, config.shouldHold]);
+
+  const togglePause = useCallback(() => {
+    setPaused((prev) => {
+      const next = !prev;
+      if (!next) {
+        setDropped(0);
+      }
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!config.enabled) {
+      setStatus("disconnected");
+      setItems([]);
+      setLastUpdate(null);
+      pendingRef.current = [];
+      pendingCountRef.current = 0;
+      holdRef.current = [];
+      cancelFlush();
+      return;
+    }
+
+    let active = true;
+
+    const connect = () => {
+      if (!active) {
+        return;
+      }
+
+      setStatus("connecting");
+
+      const socket = new WebSocket(buildWsUrl(config.wsPath));
+      socketRef.current = socket;
+
+      socket.onopen = () => {
+        if (!active) {
+          return;
+        }
+        setStatus("connected");
+      };
+
+      socket.onmessage = (event) => {
+        if (!active) {
+          return;
+        }
+
+        try {
+          const message = JSON.parse(event.data) as StreamMessage<T>;
+          if (!message || message.type !== config.expectedType) {
+            return;
+          }
+
+          if (pausedRef.current) {
+            setDropped((prev) => prev + 1);
+            setLastUpdate(Date.now());
+            return;
+          }
+
+          pendingRef.current.push(message.payload);
+          pendingCountRef.current += 1;
+          scheduleFlush();
+        } catch (error) {
+          console.warn("Failed to parse live stream payload", error);
+        }
+      };
+
+      socket.onclose = () => {
+        if (!active) {
+          return;
+        }
+
+        setStatus("disconnected");
+        reconnectRef.current = window.setTimeout(() => {
+          connect();
+        }, 1000);
+      };
+
+      socket.onerror = () => {
+        if (!active) {
+          return;
+        }
+
+        setStatus("disconnected");
+        socket.close();
+      };
+    };
+
+    connect();
+
+    return () => {
+      active = false;
+      cancelFlush();
+      if (reconnectRef.current !== null) {
+        window.clearTimeout(reconnectRef.current);
+      }
+      if (socketRef.current) {
+        socketRef.current.close();
+      }
+    };
+  }, [config.enabled, config.expectedType, config.wsPath, scheduleFlush, cancelFlush]);
+
+  useEffect(() => {
+    if (config.resumeSignal === undefined) {
+      return;
+    }
+    if (config.shouldHold && config.shouldHold()) {
+      return;
+    }
+    if (holdRef.current.length === 0) {
+      return;
+    }
+    setItems((prev) => mergeNewest(holdRef.current, prev));
+    holdRef.current = [];
+    setLastUpdate(Date.now());
+  }, [config.resumeSignal, config.shouldHold]);
+
+  return {
+    status,
+    items,
+    lastUpdate,
+    replayTime,
+    replayComplete,
+    paused,
+    dropped,
+    togglePause
+  };
+};
+
+const useFlowStream = (
+  enabled: boolean,
+  onNewItems?: (count: number) => void,
+  captureScroll?: () => void,
+  shouldHold?: () => boolean,
+  resumeSignal?: number
+): TapeState<FlowPacket> => {
+  return useLiveStream<FlowPacket>({
+    enabled,
+    wsPath: "/ws/flow",
+    expectedType: "flow-packet",
+    onNewItems,
+    captureScroll,
+    shouldHold,
+    resumeSignal
+  });
+};
+
+type TapeStatusProps = {
+  status: WsStatus;
+  lastUpdate: number | null;
+  replayTime: number | null;
+  replayComplete: boolean;
+  paused: boolean;
+  dropped: number;
+  mode: TapeMode;
+};
+
+const TapeStatus = ({
+  status,
+  lastUpdate: _lastUpdate,
+  replayTime,
+  replayComplete,
+  paused,
+  dropped,
+  mode
+}: TapeStatusProps) => {
+  const label = replayComplete ? "Replay Complete" : statusLabel(status, paused, mode);
+  const pausedLabel = paused && dropped > 0 ? `+${dropped} queued` : "";
+
+  return (
+    <div className={`status-inline status-${status} ${mode === "replay" ? "status-replay" : ""}`.trim()}>
+      <span className="status-dot" />
+      <span className="status-inline-label">{label}</span>
+      {mode === "replay" ? (
+        <span className="status-inline-meta">
+          Replay time {replayTime ? formatTime(replayTime) : "—"}
+        </span>
+      ) : null}
+      <span className={`status-inline-counter${pausedLabel ? " status-inline-counter-visible" : ""}`}>
+        {pausedLabel || "+000 queued"}
+      </span>
+    </div>
+  );
+};
+
+type TapeControlsProps = {
+  paused: boolean;
+  onTogglePause: () => void;
+  isAtTop: boolean;
+  missed: number;
+  onJump: () => void;
+};
+
+const TapeControls = ({ paused, onTogglePause, isAtTop, missed, onJump }: TapeControlsProps) => {
+  const active = !isAtTop && missed > 0;
+  return (
+    <div className={`tape-controls${active ? " tape-controls-active" : ""}`}>
+      <button className="pause-button" type="button" onClick={onTogglePause}>
+        {paused ? "Resume" : "Pause"}
+      </button>
+      <button className="jump-button" type="button" onClick={onJump} disabled={isAtTop}>
+        Jump to top
+      </button>
+      <span className="missed-count">{active ? `+${missed} new` : ""}</span>
+    </div>
+  );
+};
+
+type CandleChartProps = {
+  ticker: string;
+  intervalMs: number;
+  mode: TapeMode;
+  replayTime?: number | null;
+  classifierHits: ClassifierHitEvent[];
+  inferredDark: InferredDarkEvent[];
+  onClassifierHitClick: (hit: ClassifierHitEvent) => void;
+  onInferredDarkClick: (event: InferredDarkEvent) => void;
+};
+
+type MarkerAction =
+  | { kind: "hit"; hit: ClassifierHitEvent }
+  | { kind: "dark"; event: InferredDarkEvent };
+
+const CandleChart = ({
+  ticker,
+  intervalMs,
+  mode,
+  replayTime = null,
+  classifierHits,
+  inferredDark,
+  onClassifierHitClick,
+  onInferredDarkClick
+}: CandleChartProps) => {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const seriesRef = useRef<CandlestickSeries | null>(null);
+  const socketRef = useRef<WebSocket | null>(null);
+  const reconnectRef = useRef<number | null>(null);
+  const overlaySocketRef = useRef<WebSocket | null>(null);
+  const overlayReconnectRef = useRef<number | null>(null);
+  const lastCandleRef = useRef<{ time: UTCTimestamp; seq: number } | null>(null);
+
+  const markerLookupRef = useRef<Map<string, MarkerAction>>(new Map());
+  const [visibleRangeMs, setVisibleRangeMs] = useState<{ from: number; to: number } | null>(null);
+  const onHitClickRef = useRef(onClassifierHitClick);
+  const onDarkClickRef = useRef(onInferredDarkClick);
+
+  const overlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const overlayCtxRef = useRef<CanvasRenderingContext2D | null>(null);
+  const overlayDataRef = useRef<EquityOverlayPoint[]>([]);
+  const overlayLiveRef = useRef<EquityOverlayPoint[]>([]);
+  const overlayLastFetchRef = useRef<{ startTs: number; endTs: number; ticker: string } | null>(
+    null
+  );
+  const overlayFetchAbortRef = useRef<AbortController | null>(null);
+  const overlayTimerRef = useRef<number | null>(null);
+
+  const [overlayEnabled, setOverlayEnabled] = useState(true);
+
+  const drawOverlay = useCallback(
+    (points: EquityOverlayPoint[]) => {
+      const canvas = overlayCanvasRef.current;
+      const ctx = overlayCtxRef.current;
+      const chart = chartRef.current;
+      if (!canvas || !ctx || !chart) {
+        return;
+      }
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (!overlayEnabled || points.length === 0) {
+        canvas.style.opacity = "0";
+        return;
+      }
+
+      const timeScale = chart.timeScale();
+      if (!seriesRef.current) {
+        canvas.style.opacity = "0";
+        return;
+      }
+
+      const filtered = points.filter((point) => point.offExchangeFlag);
+      const sampled = sampleToLimit(filtered, 1400);
+
+      const maxRadius = 10;
+      const minRadius = 2;
+      const maxSize = Math.max(1, ...sampled.map((point) => point.size));
+
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = "rgba(31, 74, 123, 0.55)";
+      ctx.strokeStyle = "rgba(31, 74, 123, 0.95)";
+
+      for (const point of sampled) {
+        const x = timeScale.timeToCoordinate(toChartTime(point.ts));
+        const y = seriesRef.current.priceToCoordinate(point.price);
+        if (x === null || y === null) {
+          continue;
+        }
+
+        const radius = clamp(
+          minRadius + (Math.sqrt(point.size) / Math.sqrt(maxSize)) * (maxRadius - minRadius),
+          minRadius,
+          maxRadius
+        );
+
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      ctx.globalAlpha = 1;
+      canvas.style.opacity = "1";
+    },
+    [overlayEnabled]
+  );
+
+  useEffect(() => {
+    drawOverlay([...overlayDataRef.current, ...overlayLiveRef.current]);
+  }, [drawOverlay, ticker, intervalMs, mode]);
+
+  useEffect(() => {
+    onHitClickRef.current = onClassifierHitClick;
+  }, [onClassifierHitClick]);
+
+  useEffect(() => {
+    onDarkClickRef.current = onInferredDarkClick;
+  }, [onInferredDarkClick]);
+
+  const markerBundle = useMemo(() => {
+    const lookup = new Map<string, MarkerAction>();
+    const markers: SeriesMarker<UTCTimestamp>[] = [];
+
+    if (!visibleRangeMs) {
+      return { markers, lookup };
+    }
+
+    const { from, to } = visibleRangeMs;
+    const inRangeHits = classifierHits
+      .filter((hit) => hit.source_ts >= from && hit.source_ts <= to)
+      .sort((a, b) => {
+        const delta = a.source_ts - b.source_ts;
+        if (delta !== 0) {
+          return delta;
+        }
+        return a.seq - b.seq;
+      });
+    const inRangeDark = inferredDark
+      .filter((event) => event.source_ts >= from && event.source_ts <= to)
+      .sort((a, b) => {
+        const delta = a.source_ts - b.source_ts;
+        if (delta !== 0) {
+          return delta;
+        }
+        return a.seq - b.seq;
+      });
+
+    const MAX_HIT_MARKERS = 220;
+    const MAX_DARK_MARKERS = 120;
+    const MAX_TOTAL_MARKERS = 320;
+
+    const cappedHits =
+      inRangeHits.length > MAX_HIT_MARKERS
+        ? inRangeHits.slice(inRangeHits.length - MAX_HIT_MARKERS)
+        : inRangeHits;
+    const cappedDark =
+      inRangeDark.length > MAX_DARK_MARKERS
+        ? inRangeDark.slice(inRangeDark.length - MAX_DARK_MARKERS)
+        : inRangeDark;
+
+    for (const hit of cappedHits) {
+      const direction = normalizeDirection(hit.direction);
+      const markerId = `hit:${hit.trace_id}:${hit.seq}`;
+      lookup.set(markerId, { kind: "hit", hit });
+
+      markers.push({
+        id: markerId,
+        time: toChartTime(hit.source_ts),
+        position: direction === "bullish" ? "belowBar" : "aboveBar",
+        color:
+          direction === "bullish"
+            ? "#2f6d4f"
+            : direction === "bearish"
+              ? "#c46f2a"
+              : "rgba(111, 91, 57, 0.9)",
+        shape:
+          direction === "bullish"
+            ? "arrowUp"
+            : direction === "bearish"
+              ? "arrowDown"
+              : "circle",
+        text: hit.classifier_id ? hit.classifier_id.slice(0, 3).toUpperCase() : "H"
+      });
+    }
+
+    for (const event of cappedDark) {
+      const markerId = `dark:${event.trace_id}:${event.seq}`;
+      lookup.set(markerId, { kind: "dark", event });
+      markers.push({
+        id: markerId,
+        time: toChartTime(event.source_ts),
+        position: "aboveBar",
+        color: "rgba(31, 74, 123, 0.9)",
+        shape: "square",
+        text: "D"
+      });
+    }
+
+    markers.sort((a, b) => {
+      const delta = Number(a.time) - Number(b.time);
+      if (delta !== 0) {
+        return delta;
+      }
+      return String(a.id ?? "").localeCompare(String(b.id ?? ""));
+    });
+
+    const cappedMarkers =
+      markers.length > MAX_TOTAL_MARKERS
+        ? markers.slice(markers.length - MAX_TOTAL_MARKERS)
+        : markers;
+
+    if (cappedMarkers !== markers) {
+      const nextLookup = new Map<string, MarkerAction>();
+      for (const marker of cappedMarkers) {
+        const id = marker.id;
+        if (typeof id !== "string") {
+          continue;
+        }
+        const action = lookup.get(id);
+        if (action) {
+          nextLookup.set(id, action);
+        }
+      }
+      return { markers: cappedMarkers, lookup: nextLookup };
+    }
+
+    return { markers: cappedMarkers, lookup };
+  }, [classifierHits, inferredDark, visibleRangeMs]);
+
+  useEffect(() => {
+    if (!seriesRef.current) {
+      return;
+    }
+    markerLookupRef.current = markerBundle.lookup;
+    seriesRef.current.setMarkers(markerBundle.markers);
+  }, [markerBundle]);
+
+  const replayBucket = useMemo(() => {
+    if (mode !== "replay" || replayTime === null) {
+      return null;
+    }
+    return Math.floor(replayTime / intervalMs);
+  }, [mode, replayTime, intervalMs]);
+  const replayEndTs = useMemo(() => {
+    if (replayBucket === null) {
+      return null;
+    }
+    return (replayBucket + 1) * intervalMs - 1;
+  }, [replayBucket, intervalMs]);
+  const [ready, setReady] = useState(false);
+  const [status, setStatus] = useState<WsStatus>(mode === "live" ? "connecting" : "connected");
+  const [lastUpdate, setLastUpdate] = useState<number | null>(null);
+  const [hasData, setHasData] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) {
+      return;
+    }
+
+    const width = container.clientWidth || 600;
+    const height = container.clientHeight || 360;
+    const chart = createChart(container, {
+      width,
+      height,
+      layout: {
+        background: { color: "#fffdf7" },
+        textColor: "#4e3e25"
+      },
+      grid: {
+        vertLines: { color: "rgba(82, 64, 36, 0.12)" },
+        horzLines: { color: "rgba(82, 64, 36, 0.12)" }
+      },
+      crosshair: {
+        vertLine: { color: "rgba(47, 109, 79, 0.35)" },
+        horzLine: { color: "rgba(47, 109, 79, 0.35)" }
+      },
+      timeScale: {
+        borderColor: "rgba(111, 91, 57, 0.35)",
+        timeVisible: true,
+        secondsVisible: intervalMs < 60000
+      },
+      rightPriceScale: {
+        borderColor: "rgba(111, 91, 57, 0.35)"
+      }
+    });
+
+    const overlayCanvas = document.createElement("canvas");
+    overlayCanvas.width = Math.max(1, Math.floor(width));
+    overlayCanvas.height = Math.max(1, Math.floor(height));
+    overlayCanvas.style.position = "absolute";
+    overlayCanvas.style.inset = "0";
+    overlayCanvas.style.pointerEvents = "none";
+    overlayCanvas.style.zIndex = "2";
+    overlayCanvas.style.opacity = "0";
+    container.style.position = "relative";
+    container.appendChild(overlayCanvas);
+    overlayCanvasRef.current = overlayCanvas;
+    overlayCtxRef.current = overlayCanvas.getContext("2d");
+
+    const series = chart.addCandlestickSeries({
+      upColor: "#2f6d4f",
+      downColor: "#c46f2a",
+      borderVisible: false,
+      wickUpColor: "#2f6d4f",
+      wickDownColor: "#c46f2a"
+    });
+
+    chartRef.current = chart;
+    seriesRef.current = series;
+    setReady(true);
+
+    const timeScale = chart.timeScale();
+    const updateVisibleRange = () => {
+      const range = timeScale.getVisibleRange();
+      if (!range) {
+        setVisibleRangeMs(null);
+        return;
+      }
+      const from = chartTimeToMs(range.from);
+      const to = chartTimeToMs(range.to);
+      if (from === null || to === null) {
+        setVisibleRangeMs(null);
+        return;
+      }
+
+      setVisibleRangeMs({
+        from: Math.min(from, to),
+        to: Math.max(from, to)
+      });
+    };
+
+    const clickHandler = (param: { hoveredObjectId?: unknown }) => {
+      const hovered = param.hoveredObjectId;
+      if (hovered === null || hovered === undefined) {
+        return;
+      }
+      const key = typeof hovered === "string" ? hovered : String(hovered);
+      const action = markerLookupRef.current.get(key);
+      if (!action) {
+        return;
+      }
+      if (action.kind === "hit") {
+        onHitClickRef.current(action.hit);
+      } else {
+        onDarkClickRef.current(action.event);
+      }
+    };
+
+    updateVisibleRange();
+    timeScale.subscribeVisibleTimeRangeChange(updateVisibleRange);
+    chart.subscribeClick(clickHandler);
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) {
+        return;
+      }
+      const { width: nextWidth, height: nextHeight } = entry.contentRect;
+      if (Number.isFinite(nextWidth) && Number.isFinite(nextHeight)) {
+        const nextW = Math.max(1, Math.floor(nextWidth));
+        const nextH = Math.max(1, Math.floor(nextHeight));
+        chart.applyOptions({
+          width: nextW,
+          height: nextH
+        });
+
+        const canvas = overlayCanvasRef.current;
+        if (canvas) {
+          canvas.width = nextW;
+          canvas.height = nextH;
+        }
+      }
+    });
+
+    resizeObserver.observe(container);
+
+    return () => {
+      resizeObserver.disconnect();
+      timeScale.unsubscribeVisibleTimeRangeChange(updateVisibleRange);
+      chart.unsubscribeClick(clickHandler);
+      chart.remove();
+      chartRef.current = null;
+      seriesRef.current = null;
+      overlayCtxRef.current = null;
+      overlayCanvasRef.current?.remove();
+      overlayCanvasRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!ready || !seriesRef.current) {
+      return;
+    }
+
+    if (mode === "replay" && replayBucket === null) {
+      setError(null);
+      setHasData(false);
+      setLastUpdate(null);
+      lastCandleRef.current = null;
+      seriesRef.current.setData([]);
+      overlayDataRef.current = [];
+      overlayLiveRef.current = [];
+      overlayLastFetchRef.current = null;
+      setStatus("connected");
+      return;
+    }
+
+    let active = true;
+    setError(null);
+    setHasData(false);
+    setLastUpdate(null);
+    lastCandleRef.current = null;
+    seriesRef.current.setData([]);
+    overlayDataRef.current = [];
+    overlayLiveRef.current = [];
+    overlayLastFetchRef.current = null;
+    setStatus(mode === "live" ? "connecting" : "connected");
+
+    const fetchCandles = async () => {
+      try {
+        const url = new URL(buildApiUrl("/candles/equities"));
+        url.searchParams.set("underlying_id", ticker);
+        url.searchParams.set("interval_ms", intervalMs.toString());
+        url.searchParams.set("limit", "300");
+        url.searchParams.set("cache", "1");
+        if (mode === "replay" && replayEndTs !== null) {
+          url.searchParams.set("end_ts", replayEndTs.toString());
+        }
+        const response = await fetch(url.toString());
+        if (!response.ok) {
+          const detail = await readErrorDetail(response);
+          throw new Error(
+            `Candle fetch failed (${response.status})${detail ? `: ${detail}` : ""}`
+          );
+        }
+        const payload = (await response.json()) as { data?: EquityCandle[] };
+        if (!active || !seriesRef.current) {
+          return;
+        }
+        const sorted = [...(payload.data ?? [])].sort((a, b) => {
+          if (a.ts !== b.ts) {
+            return a.ts - b.ts;
+          }
+          return a.seq - b.seq;
+        });
+        const chartData = sorted.map(toChartCandle);
+        seriesRef.current.setData(chartData);
+        chartRef.current?.timeScale().fitContent();
+        drawOverlay([...overlayDataRef.current, ...overlayLiveRef.current]);
+
+        if (sorted.length > 0) {
+          const last = sorted[sorted.length - 1];
+          lastCandleRef.current = { time: toChartTime(last.ts), seq: last.seq };
+          setHasData(true);
+          setLastUpdate(last.ingest_ts ?? last.ts);
+        }
+      } catch (error) {
+        if (!active) {
+          return;
+        }
+        setError(error instanceof Error ? error.message : String(error));
+        setStatus("disconnected");
+        setHasData(false);
+      }
+    };
+
+
+    const ensureOverlayListener = () => {
+      if (!chartRef.current) {
+        return;
+      }
+
+      const handler = () => {
+        const combined = [...overlayDataRef.current, ...overlayLiveRef.current];
+        drawOverlay(combined);
+        scheduleOverlayFetch();
+      };
+
+      chartRef.current.timeScale().subscribeVisibleTimeRangeChange(handler);
+      return () => {
+        chartRef.current?.timeScale().unsubscribeVisibleTimeRangeChange(handler);
+      };
+    };
+
+    const cancelOverlayFetch = () => {
+      if (overlayFetchAbortRef.current) {
+        overlayFetchAbortRef.current.abort();
+        overlayFetchAbortRef.current = null;
+      }
+    };
+
+    const fetchOverlayRange = async (startTs: number, endTs: number) => {
+      cancelOverlayFetch();
+      const abort = new AbortController();
+      overlayFetchAbortRef.current = abort;
+
+      const url = new URL(buildApiUrl("/prints/equities/range"));
+      url.searchParams.set("underlying_id", ticker);
+      url.searchParams.set("start_ts", Math.floor(startTs).toString());
+      url.searchParams.set("end_ts", Math.floor(endTs).toString());
+      url.searchParams.set("limit", "2500");
+
+      const response = await fetch(url.toString(), { signal: abort.signal });
+      if (!response.ok) {
+        const detail = await readErrorDetail(response);
+        throw new Error(
+          `Equity range fetch failed (${response.status})${detail ? `: ${detail}` : ""}`
+        );
+      }
+
+      const payload = (await response.json()) as { data?: EquityPrint[] };
+      const prints = payload.data ?? [];
+      overlayDataRef.current = prints.map((print) => ({
+        ts: print.ts,
+        price: print.price,
+        size: print.size,
+        offExchangeFlag: print.offExchangeFlag
+      }));
+      overlayLiveRef.current = [];
+      overlayLastFetchRef.current = { startTs, endTs, ticker };
+    };
+
+    function scheduleOverlayFetch() {
+      if (overlayTimerRef.current !== null) {
+        window.clearTimeout(overlayTimerRef.current);
+      }
+
+      overlayTimerRef.current = window.setTimeout(() => {
+        if (!active || !chartRef.current || !seriesRef.current) {
+          return;
+        }
+
+        const timeScale = chartRef.current.timeScale();
+        const range = timeScale.getVisibleRange();
+        if (!range) {
+          return;
+        }
+
+        const startTs = chartTimeToMs(range.from);
+        const endTs = chartTimeToMs(range.to);
+        if (startTs === null || endTs === null) {
+          return;
+        }
+        const last = overlayLastFetchRef.current;
+
+        const needsFetch =
+          !last ||
+          last.ticker !== ticker ||
+          startTs < last.startTs ||
+          endTs > last.endTs ||
+          Math.abs(endTs - last.endTs) > intervalMs * 6;
+
+        if (!needsFetch) {
+          return;
+        }
+
+        void fetchOverlayRange(startTs, endTs)
+          .then(() => {
+            drawOverlay([...overlayDataRef.current, ...overlayLiveRef.current]);
+          })
+          .catch((error) => {
+            if (!active) {
+              return;
+            }
+            if (error instanceof DOMException && error.name === "AbortError") {
+              return;
+            }
+            console.warn("Overlay fetch failed", error);
+          });
+      }, 180);
+    }
+
+    const overlayUnsubscribe = ensureOverlayListener();
+    scheduleOverlayFetch();
+
+    void fetchCandles();
+
+    return () => {
+      active = false;
+      cancelOverlayFetch();
+      if (overlayTimerRef.current !== null) {
+        window.clearTimeout(overlayTimerRef.current);
+        overlayTimerRef.current = null;
+      }
+      overlayUnsubscribe?.();
+    };
+  }, [ready, ticker, intervalMs, mode, replayBucket, replayEndTs]);
+
+  useEffect(() => {
+    if (!ready || mode !== "live" || !seriesRef.current) {
+      if (socketRef.current) {
+        socketRef.current.close();
+      }
+      if (reconnectRef.current !== null) {
+        window.clearTimeout(reconnectRef.current);
+        reconnectRef.current = null;
+      }
+
+      if (overlaySocketRef.current) {
+        overlaySocketRef.current.close();
+      }
+      if (overlayReconnectRef.current !== null) {
+        window.clearTimeout(overlayReconnectRef.current);
+        overlayReconnectRef.current = null;
+      }
+
+      return;
+    }
+
+    let active = true;
+
+    const connect = () => {
+      if (!active) {
+        return;
+      }
+
+      setStatus("connecting");
+      const socket = new WebSocket(buildWsUrl("/ws/equity-candles"));
+      socketRef.current = socket;
+
+      socket.onopen = () => {
+        if (!active) {
+          return;
+        }
+        setStatus("connected");
+      };
+
+      socket.onmessage = (event) => {
+        if (!active || !seriesRef.current) {
+          return;
+        }
+
+        try {
+          const message = JSON.parse(event.data) as StreamMessage<EquityCandle>;
+          if (!message || message.type !== "equity-candle") {
+            return;
+          }
+
+          const candle = message.payload;
+          if (candle.underlying_id !== ticker || candle.interval_ms !== intervalMs) {
+            return;
+          }
+
+          const chartCandle = toChartCandle(candle);
+          const last = lastCandleRef.current;
+          if (last) {
+            if (chartCandle.time < last.time) {
+              return;
+            }
+            if (chartCandle.time === last.time && candle.seq <= last.seq) {
+              return;
+            }
+          }
+
+          seriesRef.current.update(chartCandle);
+          lastCandleRef.current = { time: chartCandle.time, seq: candle.seq };
+          setHasData(true);
+          setLastUpdate(candle.ingest_ts ?? candle.ts);
+          drawOverlay([...overlayDataRef.current, ...overlayLiveRef.current]);
+        } catch (error) {
+          console.warn("Failed to parse candle payload", error);
+        }
+      };
+
+      socket.onclose = () => {
+        if (!active) {
+          return;
+        }
+        setStatus("disconnected");
+        reconnectRef.current = window.setTimeout(connect, 1000);
+      };
+
+      socket.onerror = () => {
+        if (!active) {
+          return;
+        }
+        setStatus("disconnected");
+        socket.close();
+      };
+    };
+
+    const connectOverlay = () => {
+      if (!active) {
+        return;
+      }
+
+      const socket = new WebSocket(buildWsUrl("/ws/equities"));
+      overlaySocketRef.current = socket;
+
+      socket.onmessage = (event) => {
+        if (!active) {
+          return;
+        }
+
+        try {
+          const message = JSON.parse(event.data) as StreamMessage<EquityPrint>;
+          if (!message || message.type !== "equity-print") {
+            return;
+          }
+
+          const print = message.payload;
+          if (print.underlying_id !== ticker) {
+            return;
+          }
+
+          overlayLiveRef.current.push({
+            ts: print.ts,
+            price: print.price,
+            size: print.size,
+            offExchangeFlag: print.offExchangeFlag
+          });
+
+          if (overlayLiveRef.current.length > 1500) {
+            overlayLiveRef.current = overlayLiveRef.current.slice(-1500);
+          }
+
+          drawOverlay([...overlayDataRef.current, ...overlayLiveRef.current]);
+        } catch (error) {
+          console.warn("Failed to parse equity print payload", error);
+        }
+      };
+
+      socket.onclose = () => {
+        if (!active) {
+          return;
+        }
+        overlayReconnectRef.current = window.setTimeout(connectOverlay, 1500);
+      };
+
+      socket.onerror = () => {
+        if (!active) {
+          return;
+        }
+        socket.close();
+      };
+    };
+
+    connect();
+    connectOverlay();
+
+    return () => {
+      active = false;
+      if (reconnectRef.current !== null) {
+        window.clearTimeout(reconnectRef.current);
+        reconnectRef.current = null;
+      }
+      if (socketRef.current) {
+        socketRef.current.close();
+      }
+
+      if (overlayReconnectRef.current !== null) {
+        window.clearTimeout(overlayReconnectRef.current);
+        overlayReconnectRef.current = null;
+      }
+      if (overlaySocketRef.current) {
+        overlaySocketRef.current.close();
+      }
+    };
+  }, [ready, mode, ticker, intervalMs, drawOverlay]);
+
+  useEffect(() => {
+    if (!chartRef.current) {
+      return;
+    }
+    chartRef.current.timeScale().applyOptions({
+      timeVisible: true,
+      secondsVisible: intervalMs < 60000
+    });
+  }, [intervalMs]);
+
+  const statusText = statusLabel(status, false, mode);
+  const intervalLabel = formatIntervalLabel(intervalMs);
+  const emptyLabel =
+    mode === "live"
+      ? status === "connected"
+        ? `No candles yet. First ${intervalLabel} candle appears after the window closes.`
+        : "Chart offline. Start candles service."
+      : "No candles for this replay window.";
+
+  return (
+    <div className="chart-panel">
+      <div className="chart-meta">
+        <div className={`chart-status chart-status-${status}`}>
+          <span className="chart-dot" />
+          <span>{statusText}</span>
+        </div>
+        <span className="chart-meta-time">
+          {lastUpdate ? `Updated ${formatTime(lastUpdate)}` : "Waiting for data"}
+        </span>
+        <button
+          className={`overlay-toggle${overlayEnabled ? " overlay-toggle-on" : ""}`}
+          type="button"
+          onClick={() => setOverlayEnabled((prev) => !prev)}
+        >
+          Off-Ex {overlayEnabled ? "On" : "Off"}
+        </button>
+        <span className="overlay-legend">Blue circles = off-exchange trades</span>
+      </div>
+      <div className="chart-surface" ref={containerRef} />
+      {error ? (
+        <div className="empty chart-empty">Chart error: {error}</div>
+      ) : !hasData ? (
+        <div className="empty chart-empty">{emptyLabel}</div>
+      ) : null}
+    </div>
+  );
+};
+
+type AlertSeverityStripProps = {
+  alerts: AlertEvent[];
+};
+
+const AlertSeverityStrip = ({ alerts }: AlertSeverityStripProps) => {
+  const windowMs = 30 * 60 * 1000;
+  const now = Date.now();
+  const severityCounts = alerts.reduce(
+    (acc, alert) => {
+      if (now - alert.source_ts > windowMs) {
+        return acc;
+      }
+      if (alert.severity === "high") {
+        acc.high += 1;
+      } else if (alert.severity === "medium") {
+        acc.medium += 1;
+      } else {
+        acc.low += 1;
+      }
+      return acc;
+    },
+    { high: 0, medium: 0, low: 0 }
+  );
+
+  const directionCounts = alerts.reduce(
+    (acc, alert) => {
+      if (now - alert.source_ts > windowMs) {
+        return acc;
+      }
+      const direction = normalizeDirection(alert.hits[0]?.direction ?? "neutral");
+      acc[direction] += 1;
+      return acc;
+    },
+    { bullish: 0, bearish: 0, neutral: 0 }
+  );
+
+  const severityTotal = severityCounts.high + severityCounts.medium + severityCounts.low;
+  const highPct = severityTotal > 0 ? (severityCounts.high / severityTotal) * 100 : 0;
+  const mediumPct = severityTotal > 0 ? (severityCounts.medium / severityTotal) * 100 : 0;
+  const lowPct = severityTotal > 0 ? (severityCounts.low / severityTotal) * 100 : 0;
+
+  const directionTotal =
+    directionCounts.bullish + directionCounts.bearish + directionCounts.neutral;
+  const bullishPct = directionTotal > 0 ? (directionCounts.bullish / directionTotal) * 100 : 0;
+  const bearishPct = directionTotal > 0 ? (directionCounts.bearish / directionTotal) * 100 : 0;
+  const neutralPct = directionTotal > 0 ? (directionCounts.neutral / directionTotal) * 100 : 0;
+
+  return (
+    <div className="alert-strips">
+      <div className="alert-strip-section">
+        <div className="alert-strip-header">
+          <span>Severity (last 30m)</span>
+          <span>{severityTotal} alerts</span>
+        </div>
+        <div className="alert-strip-bar">
+          <div className="strip-segment severity-high" style={{ width: `${highPct}%` }}>
+            {severityCounts.high > 0 ? `High ${severityCounts.high}` : ""}
+          </div>
+          <div className="strip-segment severity-medium" style={{ width: `${mediumPct}%` }}>
+            {severityCounts.medium > 0 ? `Med ${severityCounts.medium}` : ""}
+          </div>
+          <div className="strip-segment severity-low" style={{ width: `${lowPct}%` }}>
+            {severityCounts.low > 0 ? `Low ${severityCounts.low}` : ""}
+          </div>
+        </div>
+      </div>
+      <div className="alert-strip-section">
+        <div className="alert-strip-header">
+          <span>Direction (last 30m)</span>
+          <span>{directionTotal} alerts</span>
+        </div>
+        <div className="alert-strip-bar">
+          <div className="strip-segment direction-bullish" style={{ width: `${bullishPct}%` }}>
+            {directionCounts.bullish > 0 ? `Bull ${directionCounts.bullish}` : ""}
+          </div>
+          <div className="strip-segment direction-bearish" style={{ width: `${bearishPct}%` }}>
+            {directionCounts.bearish > 0 ? `Bear ${directionCounts.bearish}` : ""}
+          </div>
+          <div className="strip-segment direction-neutral" style={{ width: `${neutralPct}%` }}>
+            {directionCounts.neutral > 0 ? `Neut ${directionCounts.neutral}` : ""}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+type EvidenceItem =
+  | { kind: "flow"; id: string; packet: FlowPacket }
+  | { kind: "print"; id: string; print: OptionPrint }
+  | { kind: "unknown"; id: string };
+
+type DarkEvidenceItem =
+  | { kind: "join"; id: string; join: EquityPrintJoin }
+  | { kind: "unknown"; id: string };
+
+type AlertDrawerProps = {
+  alert: AlertEvent;
+  flowPacket: FlowPacket | null;
+  evidence: EvidenceItem[];
+  onClose: () => void;
+};
+
+const AlertDrawer = ({ alert, flowPacket, evidence, onClose }: AlertDrawerProps) => {
+  const primary = alert.hits[0];
+  const direction = primary ? normalizeDirection(primary.direction) : "neutral";
+  const evidencePrints = evidence.filter((item) => item.kind === "print");
+  const unknownCount = evidence.filter((item) => item.kind === "unknown").length;
+
+  return (
+    <aside className="drawer">
+      <div className="drawer-header">
+        <div>
+          <p className="drawer-eyebrow">Alert details</p>
+          <h3>{primary ? humanizeClassifierId(primary.classifier_id) : "Alert"}</h3>
+          <p className="drawer-subtitle">{formatDateTime(alert.source_ts)}</p>
+        </div>
+        <button className="drawer-close" type="button" onClick={onClose}>
+          Close
+        </button>
+      </div>
+
+      <div className="drawer-meta">
+        <span className={`pill severity-${alert.severity}`}>{alert.severity}</span>
+        <span className="drawer-chip">Score {Math.round(alert.score)}</span>
+        {primary ? <span className={`pill direction-${direction}`}>{direction}</span> : null}
+      </div>
+
+      <div className="drawer-section">
+        <h4>Classifier hits</h4>
+        {alert.hits.length === 0 ? (
+          <p className="drawer-empty">No classifier hits captured.</p>
+        ) : (
+          <div className="drawer-list">
+            {alert.hits.map((hit, index) => (
+              <div className="drawer-row" key={`${alert.trace_id}-${hit.classifier_id}-${index}`}>
+                <div className="drawer-row-title">{humanizeClassifierId(hit.classifier_id)}</div>
+                <div className="drawer-row-meta">
+                  <span className={`pill direction-${normalizeDirection(hit.direction)}`}>
+                    {normalizeDirection(hit.direction)}
+                  </span>
+                  <span>Confidence {formatConfidence(hit.confidence)}</span>
+                </div>
+                {hit.explanations?.[0] ? (
+                  <p className="drawer-note">{hit.explanations[0]}</p>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="drawer-section">
+        <h4>Flow packet</h4>
+        {flowPacket ? (
+          <div className="drawer-row">
+            <div className="drawer-row-title">
+              {String(flowPacket.features.option_contract_id ?? flowPacket.id ?? "Flow packet")}
+            </div>
+            <div className="drawer-row-meta">
+              <span>{formatFlowMetric(parseNumber(flowPacket.features.count, flowPacket.members.length))} prints</span>
+              <span>{formatFlowMetric(parseNumber(flowPacket.features.total_size, 0))} size</span>
+              <span>
+                Notional $
+                {formatUsd(
+                  parseNumber(
+                    flowPacket.features.total_notional,
+                    parseNumber(flowPacket.features.total_premium, 0) * 100
+                  )
+                )}
+              </span>
+            </div>
+            <p className="drawer-note">
+              Window {formatFlowMetric(parseNumber(flowPacket.features.window_ms, 0), "ms")} ·{" "}
+              {formatTime(parseNumber(flowPacket.features.start_ts, flowPacket.source_ts))} →{" "}
+              {formatTime(parseNumber(flowPacket.features.end_ts, flowPacket.source_ts))}
+            </p>
+          </div>
+        ) : (
+          <p className="drawer-empty">Flow packet not in the current live cache.</p>
+        )}
+      </div>
+
+      <div className="drawer-section">
+        <h4>Evidence prints</h4>
+        {evidencePrints.length === 0 ? (
+          <p className="drawer-empty">No evidence prints in the live cache yet.</p>
+        ) : (
+          <div className="drawer-list">
+            {evidencePrints.slice(0, 6).map((item) => (
+              <div className="drawer-row" key={item.id}>
+                <div className="drawer-row-title">{item.print.option_contract_id}</div>
+                <div className="drawer-row-meta">
+                  <span>${formatPrice(item.print.price)}</span>
+                  <span>{formatSize(item.print.size)}x</span>
+                  <span>{item.print.exchange}</span>
+                </div>
+                <p className="drawer-note">{formatTime(item.print.ts)}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        {unknownCount > 0 ? (
+          <p className="drawer-empty">+{unknownCount} evidence prints not in cache.</p>
+        ) : null}
+      </div>
+    </aside>
+  );
+};
+
+type ClassifierHitDrawerProps = {
+  hit: ClassifierHitEvent;
+  flowPacket: FlowPacket | null;
+  evidence: EvidenceItem[];
+  onClose: () => void;
+};
+
+const ClassifierHitDrawer = ({ hit, flowPacket, evidence, onClose }: ClassifierHitDrawerProps) => {
+  const direction = normalizeDirection(hit.direction);
+  const evidencePrints = evidence.filter((item) => item.kind === "print");
+  const unknownCount = evidence.filter((item) => item.kind === "unknown").length;
+
+  return (
+    <aside className="drawer">
+      <div className="drawer-header">
+        <div>
+          <p className="drawer-eyebrow">Classifier hit</p>
+          <h3>{humanizeClassifierId(hit.classifier_id)}</h3>
+          <p className="drawer-subtitle">{formatDateTime(hit.source_ts)}</p>
+        </div>
+        <button className="drawer-close" type="button" onClick={onClose}>
+          Close
+        </button>
+      </div>
+
+      <div className="drawer-meta">
+        <span className={`pill direction-${direction}`}>{direction}</span>
+        <span className="drawer-chip">Confidence {formatConfidence(hit.confidence)}</span>
+      </div>
+
+      <div className="drawer-section">
+        <h4>Explanation</h4>
+        {hit.explanations.length === 0 ? (
+          <p className="drawer-empty">No explanation strings captured for this hit.</p>
+        ) : (
+          <div className="drawer-list">
+            {hit.explanations.slice(0, 6).map((text, idx) => (
+              <div className="drawer-row" key={`${hit.trace_id}-${hit.seq}-ex-${idx}`}>
+                <p className="drawer-note">{text}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        {hit.explanations.length > 6 ? (
+          <p className="drawer-empty">+{hit.explanations.length - 6} more explanations not shown.</p>
+        ) : null}
+      </div>
+
+      <div className="drawer-section">
+        <h4>Flow packet</h4>
+        {flowPacket ? (
+          <div className="drawer-row">
+            <div className="drawer-row-title">
+              {String(flowPacket.features.option_contract_id ?? flowPacket.id ?? "Flow packet")}
+            </div>
+            <div className="drawer-row-meta">
+              <span>
+                {formatFlowMetric(parseNumber(flowPacket.features.count, flowPacket.members.length))} prints
+              </span>
+              <span>{formatFlowMetric(parseNumber(flowPacket.features.total_size, 0))} size</span>
+              <span>
+                Notional $
+                {formatUsd(
+                  parseNumber(
+                    flowPacket.features.total_notional,
+                    parseNumber(flowPacket.features.total_premium, 0) * 100
+                  )
+                )}
+              </span>
+            </div>
+            <p className="drawer-note">
+              Window {formatFlowMetric(parseNumber(flowPacket.features.window_ms, 0), "ms")} ·{" "}
+              {formatTime(parseNumber(flowPacket.features.start_ts, flowPacket.source_ts))} →{" "}
+              {formatTime(parseNumber(flowPacket.features.end_ts, flowPacket.source_ts))}
+            </p>
+          </div>
+        ) : (
+          <p className="drawer-empty">Flow packet not in the current live cache.</p>
+        )}
+      </div>
+
+      <div className="drawer-section">
+        <h4>Evidence prints</h4>
+        {evidencePrints.length === 0 ? (
+          <p className="drawer-empty">No linked option prints in the live cache yet.</p>
+        ) : (
+          <div className="drawer-list">
+            {evidencePrints.slice(0, 6).map((item) => (
+              <div className="drawer-row" key={item.id}>
+                <div className="drawer-row-title">{item.print.option_contract_id}</div>
+                <div className="drawer-row-meta">
+                  <span>${formatPrice(item.print.price)}</span>
+                  <span>{formatSize(item.print.size)}x</span>
+                  <span>{item.print.exchange}</span>
+                </div>
+                <p className="drawer-note">{formatTime(item.print.ts)}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        {unknownCount > 0 ? (
+          <p className="drawer-empty">+{unknownCount} evidence prints not in cache.</p>
+        ) : null}
+      </div>
+    </aside>
+  );
+};
+
+type DarkDrawerProps = {
+  event: InferredDarkEvent;
+  evidence: DarkEvidenceItem[];
+  underlying: string | null;
+  onClose: () => void;
+};
+
+const DarkDrawer = ({ event, evidence, underlying, onClose }: DarkDrawerProps) => {
+  const joinEvidence = evidence.filter(
+    (item): item is { kind: "join"; id: string; join: EquityPrintJoin } => item.kind === "join"
+  );
+  const unknownCount = evidence.filter((item) => item.kind === "unknown").length;
+  const traceRefs = event.evidence_refs.slice(0, 6);
+  const extraRefs = Math.max(0, event.evidence_refs.length - traceRefs.length);
+
+  return (
+    <aside className="drawer">
+      <div className="drawer-header">
+        <div>
+          <p className="drawer-eyebrow">Inferred dark</p>
+          <h3>{humanizeClassifierId(event.type)}</h3>
+          <p className="drawer-subtitle">{formatDateTime(event.source_ts)}</p>
+        </div>
+        <button className="drawer-close" type="button" onClick={onClose}>
+          Close
+        </button>
+      </div>
+
+      <div className="drawer-meta">
+        <span className="drawer-chip">Confidence {formatConfidence(event.confidence)}</span>
+        {underlying ? <span className="drawer-chip">{underlying}</span> : null}
+        <span className="drawer-chip">Evidence {event.evidence_refs.length}</span>
+      </div>
+
+      <div className="drawer-section">
+        <h4>Trace path</h4>
+        <div className="drawer-row">
+          <div className="drawer-row-title">Event trace</div>
+          <p className="drawer-note">{event.trace_id}</p>
+        </div>
+        {traceRefs.length === 0 ? (
+          <p className="drawer-empty">No evidence references attached.</p>
+        ) : (
+          <div className="drawer-list">
+            {traceRefs.map((ref) => (
+              <div className="drawer-row" key={ref}>
+                <div className="drawer-row-title">Evidence ref</div>
+                <p className="drawer-note">{ref}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        {extraRefs > 0 ? <p className="drawer-empty">+{extraRefs} more evidence refs.</p> : null}
+      </div>
+
+      <div className="drawer-section">
+        <h4>Evidence joins</h4>
+        {joinEvidence.length === 0 ? (
+          <p className="drawer-empty">No evidence joins in the current cache.</p>
+        ) : (
+          <div className="drawer-list">
+            {joinEvidence.slice(0, 6).map((item) => {
+              const joinUnderlying = getJoinString(item.join, "underlying_id") ?? "Unknown";
+              const price = getJoinNumber(item.join, "price");
+              const size = getJoinNumber(item.join, "size");
+              const placement = getJoinString(item.join, "quote_placement") ?? "MISSING";
+              const offExchange = getJoinBoolean(item.join, "off_exchange_flag");
+              const bid = getJoinNumber(item.join, "quote_bid");
+              const ask = getJoinNumber(item.join, "quote_ask");
+              const mid = getJoinNumber(item.join, "quote_mid");
+              const spread = getJoinNumber(item.join, "quote_spread");
+              const quoteAge = parseNumber(item.join.join_quality.quote_age_ms, Number.NaN);
+              const quoteStale = parseNumber(item.join.join_quality.quote_stale, 0) > 0;
+              const quoteMissing = parseNumber(item.join.join_quality.quote_missing, 0) > 0;
+
+              return (
+                <div className="drawer-row" key={item.id}>
+                  <div className="drawer-row-title">{joinUnderlying}</div>
+                  <div className="drawer-row-meta">
+                    {Number.isFinite(price) ? <span>${formatPrice(price)}</span> : null}
+                    {Number.isFinite(size) ? <span>{formatSize(size)}x</span> : null}
+                    <span className="pill">{placement}</span>
+                    {offExchange ? (
+                      <span className="flag">Off-Ex</span>
+                    ) : (
+                      <span className="flag flag-muted">Lit</span>
+                    )}
+                    {Number.isFinite(quoteAge) ? <span>{Math.round(quoteAge)}ms</span> : null}
+                    {quoteStale ? <span className="pill nbbo-stale">Quote stale</span> : null}
+                    {quoteMissing ? <span className="pill nbbo-missing">Quote missing</span> : null}
+                  </div>
+                  <p className="drawer-note">{item.join.trace_id}</p>
+                  {Number.isFinite(bid) && Number.isFinite(ask) ? (
+                    <p className="drawer-note">
+                      Quote ${formatPrice(bid)} x ${formatPrice(ask)}
+                      {Number.isFinite(mid) ? ` · Mid ${formatPrice(mid)}` : ""}
+                      {Number.isFinite(spread) ? ` · Spr ${formatPrice(spread)}` : ""}
+                    </p>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {unknownCount > 0 ? (
+          <p className="drawer-empty">+{unknownCount} evidence refs not in cache.</p>
+        ) : null}
+      </div>
+    </aside>
+  );
+};
+
+const formatFlowMetric = (value: number, suffix?: string): string => {
+  if (suffix) {
+    return `${value}${suffix}`;
+  }
+
+  return value.toLocaleString();
+};
+
+const useTerminalState = () => {
+  const [mode, setMode] = useState<TapeMode>("live");
+  const [replaySource, setReplaySource] = useState<string | null>(null);
+  const [selectedAlert, setSelectedAlert] = useState<AlertEvent | null>(null);
+  const [selectedDarkEvent, setSelectedDarkEvent] = useState<InferredDarkEvent | null>(null);
+  const [selectedClassifierHit, setSelectedClassifierHit] = useState<ClassifierHitEvent | null>(null);
+  const [filterInput, setFilterInput] = useState<string>("");
+  const [chartIntervalMs, setChartIntervalMs] = useState<number>(CANDLE_INTERVALS[0].ms);
+
+  const handleReplaySource = useCallback((value: string | null) => {
+    setReplaySource(value);
+  }, []);
+
+  useEffect(() => {
+    setReplaySource(null);
+  }, [mode]);
+  const optionsScroll = useListScroll();
+  const equitiesScroll = useListScroll();
+  const flowScroll = useListScroll();
+  const darkScroll = useListScroll();
+  const alertsScroll = useListScroll();
+  const classifierScroll = useListScroll();
+
+  const optionsAnchor = useScrollAnchor(optionsScroll.listRef, optionsScroll.isAtTopRef);
+  const equitiesAnchor = useScrollAnchor(equitiesScroll.listRef, equitiesScroll.isAtTopRef);
+  const flowAnchor = useScrollAnchor(flowScroll.listRef, flowScroll.isAtTopRef);
+  const darkAnchor = useScrollAnchor(darkScroll.listRef, darkScroll.isAtTopRef);
+  const alertsAnchor = useScrollAnchor(alertsScroll.listRef, alertsScroll.isAtTopRef);
+  const classifierAnchor = useScrollAnchor(
+    classifierScroll.listRef,
+    classifierScroll.isAtTopRef
+  );
+  const disableReplayGrouping = useCallback(() => null, []);
+
+  const options = useTape<OptionPrint>({
+    mode,
+    wsPath: "/ws/options",
+    replayPath: "/replay/options",
+    latestPath: "/prints/options",
+    expectedType: "option-print",
+    batchSize: mode === "replay" ? 120 : undefined,
+    pollMs: mode === "replay" ? 200 : undefined,
+    captureScroll: optionsAnchor.capture,
+    onNewItems: optionsScroll.onNewItems,
+    getReplayKey: extractReplaySource,
+    onReplaySourceKey: handleReplaySource
+  });
+
+  const equities = useTape<EquityPrint>({
+    mode,
+    wsPath: "/ws/equities",
+    replayPath: "/replay/equities",
+    latestPath: "/prints/equities",
+    expectedType: "equity-print",
+    batchSize: mode === "replay" ? 120 : undefined,
+    pollMs: mode === "replay" ? 200 : undefined,
+    captureScroll: equitiesAnchor.capture,
+    onNewItems: equitiesScroll.onNewItems
+  });
+
+  const equityJoins = useTape<EquityPrintJoin>({
+    mode,
+    wsPath: "/ws/equity-joins",
+    replayPath: "/replay/equity-joins",
+    latestPath: "/joins/equities",
+    expectedType: "equity-join",
+    batchSize: mode === "replay" ? 120 : undefined,
+    pollMs: mode === "replay" ? 200 : undefined,
+    getReplayKey: disableReplayGrouping
+  });
+
+  const nbbo = useTape<OptionNBBO>({
+    mode,
+    wsPath: "/ws/options-nbbo",
+    replayPath: "/replay/nbbo",
+    latestPath: "/nbbo/options",
+    expectedType: "option-nbbo",
+    batchSize: mode === "replay" ? 120 : undefined,
+    pollMs: mode === "replay" ? 200 : undefined,
+    getReplayKey: extractReplaySource,
+    replaySourceKey: replaySource
+  });
+
+  const inferredDark = useTape<InferredDarkEvent>({
+    mode,
+    wsPath: "/ws/inferred-dark",
+    replayPath: "/replay/inferred-dark",
+    latestPath: "/dark/inferred",
+    expectedType: "inferred-dark",
+    batchSize: mode === "replay" ? 120 : undefined,
+    pollMs: mode === "replay" ? 200 : undefined,
+    captureScroll: darkAnchor.capture,
+    onNewItems: darkScroll.onNewItems,
+    getReplayKey: disableReplayGrouping
+  });
+
+  const flow = useTape<FlowPacket>({
+    mode,
+    wsPath: "/ws/flow",
+    replayPath: "/replay/flow",
+    latestPath: "/flow/packets",
+    expectedType: "flow-packet",
+    batchSize: mode === "replay" ? 120 : undefined,
+    pollMs: mode === "replay" ? 200 : undefined,
+    captureScroll: flowAnchor.capture,
+    onNewItems: flowScroll.onNewItems,
+    getReplayKey: disableReplayGrouping
+  });
+  const alerts = useTape<AlertEvent>({
+    mode,
+    wsPath: "/ws/alerts",
+    replayPath: "/replay/alerts",
+    latestPath: "/flow/alerts",
+    expectedType: "alert",
+    batchSize: mode === "replay" ? 120 : undefined,
+    pollMs: mode === "replay" ? 200 : undefined,
+    captureScroll: alertsAnchor.capture,
+    onNewItems: alertsScroll.onNewItems,
+    getReplayKey: disableReplayGrouping
+  });
+  const classifierHits = useTape<ClassifierHitEvent>({
+    mode,
+    wsPath: "/ws/classifier-hits",
+    replayPath: "/replay/classifier-hits",
+    latestPath: "/flow/classifier-hits",
+    expectedType: "classifier-hit",
+    batchSize: mode === "replay" ? 120 : undefined,
+    pollMs: mode === "replay" ? 200 : undefined,
+    captureScroll: classifierAnchor.capture,
+    onNewItems: classifierScroll.onNewItems,
+    getReplayKey: disableReplayGrouping
+  });
+
+  useLayoutEffect(() => {
+    optionsAnchor.apply();
+  }, [options.items, optionsAnchor.apply]);
+
+  useLayoutEffect(() => {
+    equitiesAnchor.apply();
+  }, [equities.items, equitiesAnchor.apply]);
+
+  useLayoutEffect(() => {
+    flowAnchor.apply();
+  }, [flow.items, flowAnchor.apply]);
+
+  useLayoutEffect(() => {
+    darkAnchor.apply();
+  }, [inferredDark.items, darkAnchor.apply]);
+
+  useLayoutEffect(() => {
+    alertsAnchor.apply();
+  }, [alerts.items, alertsAnchor.apply]);
+
+  useLayoutEffect(() => {
+    classifierAnchor.apply();
+  }, [classifierHits.items, classifierAnchor.apply]);
+
+  const activeTickers = useMemo(() => {
+    const parts = filterInput
+      .split(/[,\s]+/)
+      .map((value) => value.trim().toUpperCase())
+      .filter(Boolean);
+    return Array.from(new Set(parts));
+  }, [filterInput]);
+
+  const tickerSet = useMemo(() => new Set(activeTickers), [activeTickers]);
+  const chartTicker = useMemo(() => activeTickers[0] ?? "SPY", [activeTickers]);
+
+  const nbboMap = useMemo(() => {
+    const map = new Map<string, OptionNBBO>();
+    for (const quote of nbbo.items) {
+      const contractId = normalizeContractId(quote.option_contract_id);
+      const existing = map.get(contractId);
+      if (
+        !existing ||
+        quote.ts > existing.ts ||
+        (quote.ts === existing.ts && quote.seq >= existing.seq)
+      ) {
+        map.set(contractId, quote);
+      }
+    }
+    return map;
+  }, [nbbo.items]);
+
+  const optionPrintMap = useMemo(() => {
+    const map = new Map<string, OptionPrint>();
+    for (const print of options.items) {
+      if (print.trace_id) {
+        map.set(print.trace_id, print);
+      }
+    }
+    return map;
+  }, [options.items]);
+
+  const equityPrintMap = useMemo(() => {
+    const map = new Map<string, EquityPrint>();
+    for (const print of equities.items) {
+      if (print.trace_id) {
+        map.set(print.trace_id, print);
+      }
+    }
+    return map;
+  }, [equities.items]);
+
+  const equityJoinMap = useMemo(() => {
+    const map = new Map<string, EquityPrintJoin>();
+    for (const join of equityJoins.items) {
+      map.set(join.id, join);
+    }
+    return map;
+  }, [equityJoins.items]);
+
+  const flowPacketMap = useMemo(() => {
+    const map = new Map<string, FlowPacket>();
+    for (const packet of flow.items) {
+      map.set(packet.id, packet);
+    }
+    return map;
+  }, [flow.items]);
+
+  const selectedEvidence = useMemo((): EvidenceItem[] => {
+    if (!selectedAlert) {
+      return [];
+    }
+
+    return selectedAlert.evidence_refs.map((id) => {
+      const packet = flowPacketMap.get(id);
+      if (packet) {
+        return { kind: "flow", id, packet };
+      }
+      const print = optionPrintMap.get(id);
+      if (print) {
+        return { kind: "print", id, print };
+      }
+      return { kind: "unknown", id };
+    });
+  }, [selectedAlert, flowPacketMap, optionPrintMap]);
+
+  const selectedFlowPacket = useMemo(() => {
+    if (!selectedAlert) {
+      return null;
+    }
+    const packetId = selectedAlert.evidence_refs[0];
+    return packetId ? flowPacketMap.get(packetId) ?? null : null;
+  }, [selectedAlert, flowPacketMap]);
+
+  const selectedDarkEvidence = useMemo((): DarkEvidenceItem[] => {
+    if (!selectedDarkEvent) {
+      return [];
+    }
+
+    return selectedDarkEvent.evidence_refs.map((id) => {
+      const join = equityJoinMap.get(id);
+      if (join) {
+        return { kind: "join", id, join };
+      }
+      return { kind: "unknown", id };
+    });
+  }, [selectedDarkEvent, equityJoinMap]);
+
+  const selectedDarkUnderlying = useMemo(() => {
+    if (!selectedDarkEvent) {
+      return null;
+    }
+    return inferDarkUnderlying(selectedDarkEvent, equityPrintMap, equityJoinMap);
+  }, [selectedDarkEvent, equityJoinMap, equityPrintMap]);
+
+  useEffect(() => {
+    if (mode !== "live") {
+      setSelectedAlert(null);
+    }
+    setSelectedDarkEvent(null);
+    setSelectedClassifierHit(null);
+  }, [mode]);
+
+  const extractPacketContract = useCallback((packet: FlowPacket): string => {
+    const contract = packet.features.option_contract_id;
+    if (typeof contract === "string") {
+      return contract;
+    }
+    const match = packet.id.match(/^flowpacket:([^:]+):/);
+    return match?.[1] ?? packet.id;
+  }, []);
+
+  const extractUnderlyingFromTrace = useCallback((traceId: string): string | null => {
+    const match = traceId.match(/flowpacket:([^:]+):/);
+    if (!match?.[1]) {
+      return null;
+    }
+    return extractUnderlying(match[1]);
+  }, []);
+
+  const extractPacketIdFromClassifierHitTrace = useCallback((traceId: string): string | null => {
+    const idx = traceId.indexOf("flowpacket:");
+    if (idx < 0) {
+      return null;
+    }
+    return traceId.slice(idx);
+  }, []);
+
+  const selectedClassifierPacketId = useMemo(() => {
+    if (!selectedClassifierHit) {
+      return null;
+    }
+    return extractPacketIdFromClassifierHitTrace(selectedClassifierHit.trace_id);
+  }, [extractPacketIdFromClassifierHitTrace, selectedClassifierHit]);
+
+  const selectedClassifierFlowPacket = useMemo(() => {
+    if (!selectedClassifierPacketId) {
+      return null;
+    }
+    return flowPacketMap.get(selectedClassifierPacketId) ?? null;
+  }, [flowPacketMap, selectedClassifierPacketId]);
+
+  const selectedClassifierEvidence = useMemo((): EvidenceItem[] => {
+    if (!selectedClassifierHit) {
+      return [];
+    }
+
+    if (!selectedClassifierPacketId) {
+      return [];
+    }
+
+    const packet = flowPacketMap.get(selectedClassifierPacketId);
+    if (!packet) {
+      return [];
+    }
+
+    return packet.members.map((id) => {
+      const print = optionPrintMap.get(id);
+      if (print) {
+        return { kind: "print", id, print };
+      }
+      return { kind: "unknown", id };
+    });
+  }, [flowPacketMap, optionPrintMap, selectedClassifierHit, selectedClassifierPacketId]);
+
+  const inferAlertUnderlying = useCallback(
+    (alert: AlertEvent): string | null => {
+      const fromTrace = extractUnderlyingFromTrace(alert.trace_id);
+      if (fromTrace) {
+        return fromTrace;
+      }
+
+      const packetId = alert.evidence_refs[0];
+      if (packetId) {
+        const packet = flowPacketMap.get(packetId);
+        if (packet) {
+          return extractUnderlying(extractPacketContract(packet));
+        }
+      }
+
+      for (const ref of alert.evidence_refs) {
+        const print = optionPrintMap.get(ref);
+        if (print) {
+          return extractUnderlying(print.option_contract_id);
+        }
+      }
+
+      return null;
+    },
+    [extractPacketContract, extractUnderlyingFromTrace, flowPacketMap, optionPrintMap]
+  );
+
+  const matchesTicker = useCallback(
+    (value: string | null) => {
+      if (tickerSet.size === 0) {
+        return true;
+      }
+      if (!value) {
+        return false;
+      }
+      return tickerSet.has(value.toUpperCase());
+    },
+    [tickerSet]
+  );
+
+  const filteredOptions = useMemo(() => {
+    if (tickerSet.size === 0) {
+      return options.items;
+    }
+    return options.items.filter((print) =>
+      matchesTicker(extractUnderlying(normalizeContractId(print.option_contract_id)))
+    );
+  }, [options.items, matchesTicker, tickerSet]);
+
+  const filteredEquities = useMemo(() => {
+    if (tickerSet.size === 0) {
+      return equities.items;
+    }
+    return equities.items.filter((print) => matchesTicker(print.underlying_id));
+  }, [equities.items, matchesTicker, tickerSet]);
+
+  const filteredInferredDark = useMemo(() => {
+    if (tickerSet.size === 0) {
+      return inferredDark.items;
+    }
+    return inferredDark.items.filter((event) => {
+      const underlying = inferDarkUnderlying(event, equityPrintMap, equityJoinMap);
+      return matchesTicker(underlying);
+    });
+  }, [equityJoinMap, equityPrintMap, inferredDark.items, matchesTicker, tickerSet]);
+
+  const filteredFlow = useMemo(() => {
+    if (tickerSet.size === 0) {
+      return flow.items;
+    }
+    return flow.items.filter((packet) =>
+      matchesTicker(extractUnderlying(extractPacketContract(packet)))
+    );
+  }, [flow.items, extractPacketContract, matchesTicker, tickerSet]);
+
+  const filteredAlerts = useMemo(() => {
+    if (tickerSet.size === 0) {
+      return alerts.items;
+    }
+    return alerts.items.filter((alert) => matchesTicker(inferAlertUnderlying(alert)));
+  }, [alerts.items, inferAlertUnderlying, matchesTicker, tickerSet]);
+
+  const filteredClassifierHits = useMemo(() => {
+    if (tickerSet.size === 0) {
+      return classifierHits.items;
+    }
+    return classifierHits.items.filter((hit) => {
+      const underlying = extractUnderlyingFromTrace(hit.trace_id);
+      return matchesTicker(underlying);
+    });
+  }, [classifierHits.items, extractUnderlyingFromTrace, matchesTicker, tickerSet]);
+
+  const chartClassifierHits = useMemo(() => {
+    const desired = chartTicker.toUpperCase();
+    return classifierHits.items
+      .filter((hit) => extractUnderlyingFromTrace(hit.trace_id) === desired)
+      .sort((a, b) => {
+        const delta = a.source_ts - b.source_ts;
+        if (delta !== 0) {
+          return delta;
+        }
+        return a.seq - b.seq;
+      });
+  }, [chartTicker, classifierHits.items, extractUnderlyingFromTrace]);
+
+  const chartInferredDark = useMemo(() => {
+    const desired = chartTicker.toUpperCase();
+    return inferredDark.items
+      .filter((event) => inferDarkUnderlying(event, equityPrintMap, equityJoinMap) === desired)
+      .sort((a, b) => {
+        const delta = a.source_ts - b.source_ts;
+        if (delta !== 0) {
+          return delta;
+        }
+        return a.seq - b.seq;
+      });
+  }, [chartTicker, inferredDark.items, equityJoinMap, equityPrintMap]);
+
+  const findAlertForClassifierHit = useCallback(
+    (hit: ClassifierHitEvent): AlertEvent | null => {
+      const packetId = extractPacketIdFromClassifierHitTrace(hit.trace_id);
+      if (!packetId) {
+        return null;
+      }
+
+      const desiredTrace = `alert:${packetId}`;
+      return (
+        alerts.items.find(
+          (item) => item.trace_id === desiredTrace || item.evidence_refs[0] === packetId
+        ) ?? null
+      );
+    },
+    [alerts.items, extractPacketIdFromClassifierHitTrace]
+  );
+
+  const openFromClassifierHit = useCallback(
+    (hit: ClassifierHitEvent) => {
+      const alert = findAlertForClassifierHit(hit);
+      if (alert) {
+        setSelectedClassifierHit(null);
+        setSelectedDarkEvent(null);
+        setSelectedAlert(alert);
+        return;
+      }
+
+      setSelectedAlert(null);
+      setSelectedDarkEvent(null);
+      setSelectedClassifierHit(hit);
+    },
+    [findAlertForClassifierHit]
+  );
+
+  const handleClassifierMarkerClick = useCallback(
+    (hit: ClassifierHitEvent) => {
+      openFromClassifierHit(hit);
+    },
+    [openFromClassifierHit]
+  );
+
+  const handleDarkMarkerClick = useCallback((event: InferredDarkEvent) => {
+    setSelectedAlert(null);
+    setSelectedClassifierHit(null);
+    setSelectedDarkEvent(event);
+  }, []);
+
+  const lastSeen = useMemo(() => {
+    return [
+      options.lastUpdate,
+      equities.lastUpdate,
+      inferredDark.lastUpdate,
+      flow.lastUpdate,
+      alerts.lastUpdate,
+      classifierHits.lastUpdate
+    ]
+      .filter((value): value is number => value !== null)
+      .sort((a, b) => b - a)[0] ?? null;
+  }, [
+    options.lastUpdate,
+    equities.lastUpdate,
+    inferredDark.lastUpdate,
+    flow.lastUpdate,
+    alerts.lastUpdate,
+    classifierHits.lastUpdate
+  ]);
+
+  return {
+    mode,
+    setMode,
+    replaySource,
+    setReplaySource,
+    selectedAlert,
+    setSelectedAlert,
+    selectedDarkEvent,
+    setSelectedDarkEvent,
+    selectedClassifierHit,
+    setSelectedClassifierHit,
+    filterInput,
+    setFilterInput,
+    chartIntervalMs,
+    setChartIntervalMs,
+    optionsScroll,
+    equitiesScroll,
+    flowScroll,
+    darkScroll,
+    alertsScroll,
+    classifierScroll,
+    options,
+    equities,
+    equityJoins,
+    nbbo,
+    inferredDark,
+    flow,
+    alerts,
+    classifierHits,
+    activeTickers,
+    tickerSet,
+    chartTicker,
+    nbboMap,
+    optionPrintMap,
+    equityPrintMap,
+    equityJoinMap,
+    flowPacketMap,
+    selectedEvidence,
+    selectedFlowPacket,
+    selectedDarkEvidence,
+    selectedDarkUnderlying,
+    selectedClassifierPacketId,
+    selectedClassifierFlowPacket,
+    selectedClassifierEvidence,
+    filteredOptions,
+    filteredEquities,
+    filteredInferredDark,
+    filteredFlow,
+    filteredAlerts,
+    filteredClassifierHits,
+    chartClassifierHits,
+    chartInferredDark,
+    openFromClassifierHit,
+    handleClassifierMarkerClick,
+    handleDarkMarkerClick,
+    lastSeen,
+    toggleMode: () => {
+      setMode((prev) => (prev === "live" ? "replay" : "live"));
+    }
+  };
+};
+
+type TerminalState = ReturnType<typeof useTerminalState>;
+
+const TerminalContext = createContext<TerminalState | null>(null);
+
+const useTerminal = (): TerminalState => {
+  const value = useContext(TerminalContext);
+  if (!value) {
+    throw new Error("Terminal context missing");
+  }
+  return value;
+};
+
+const NAV_ITEMS = [
+  { href: "/", label: "Overview" },
+  { href: "/tape", label: "Tape" },
+  { href: "/signals", label: "Signals" },
+  { href: "/charts", label: "Charts" },
+  { href: "/replay", label: "Replay" }
+];
+
+type PageFrameProps = {
+  title: string;
+  actions?: ReactNode;
+  children: ReactNode;
+};
+
+const PageFrame = ({ title, actions, children }: PageFrameProps) => {
+  return (
+    <div className="page-shell">
+      <header className="page-header">
+        <h1 className="page-title">{title}</h1>
+        {actions ? <div className="page-actions">{actions}</div> : null}
+      </header>
+      {children}
+    </div>
+  );
+};
+
+type PaneProps = {
+  title: string;
+  status?: ReactNode;
+  actions?: ReactNode;
+  className?: string;
+  children: ReactNode;
+};
+
+const Pane = ({ title, status, actions, className = "", children }: PaneProps) => {
+  const classes = ["terminal-pane", className].filter(Boolean).join(" ");
+  return (
+    <section className={classes}>
+      <div className="terminal-pane-head">
+        <div className="terminal-pane-title-row">
+          <h2 className="terminal-pane-title">{title}</h2>
+          {status ? <div className="terminal-pane-status">{status}</div> : null}
+        </div>
+        {actions ? <div className="terminal-pane-actions">{actions}</div> : null}
+      </div>
+      <div className="terminal-pane-body">{children}</div>
+    </section>
+  );
+};
+
+const ShellMetricStrip = () => {
+  const state = useTerminal();
+  const focus = state.activeTickers.length > 0 ? state.activeTickers.join(", ") : "ALL";
+  const replay = state.replaySource ? state.replaySource.toUpperCase() : "AUTO";
+
+  return (
+    <div className="shell-metrics">
+      <div className="shell-metric">
+        <span className="shell-metric-label">Mode</span>
+        <span className="shell-metric-value">{state.mode === "live" ? "LIVE" : "REPLAY"}</span>
+      </div>
+      <div className="shell-metric">
+        <span className="shell-metric-label">Focus</span>
+        <span className="shell-metric-value">{focus}</span>
+      </div>
+      <div className="shell-metric">
+        <span className="shell-metric-label">Source</span>
+        <span className="shell-metric-value">{replay}</span>
+      </div>
+      <div className="shell-metric">
+        <span className="shell-metric-label">Last</span>
+        <span className="shell-metric-value">
+          {state.lastSeen ? formatTime(state.lastSeen) : "WAITING"}
+        </span>
+      </div>
+    </div>
+  );
+};
+
+const FeedStatusBar = () => {
+  const state = useTerminal();
+  const feeds = [
+    { label: "Opt", feed: state.options },
+    { label: "Eq", feed: state.equities },
+    { label: "Flow", feed: state.flow },
+    { label: "Alert", feed: state.alerts },
+    { label: "Rule", feed: state.classifierHits },
+    { label: "Dark", feed: state.inferredDark }
+  ];
+
+  return (
+    <div className="feed-status-bar">
+      {feeds.map(({ label, feed }) => (
+        <div className={`feed-status feed-status-${feed.status}`} key={label}>
+          <span className="feed-status-dot" />
+          <span>{label}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const OverviewBrief = () => {
+  const state = useTerminal();
+
+  return (
+    <div className="overview-strip">
+      <div className="overview-cell">
+        <span className="overview-label">Options</span>
+        <strong>{formatFlowMetric(state.filteredOptions.length)}</strong>
+      </div>
+      <div className="overview-cell">
+        <span className="overview-label">Equities</span>
+        <strong>{formatFlowMetric(state.filteredEquities.length)}</strong>
+      </div>
+      <div className="overview-cell">
+        <span className="overview-label">Flow</span>
+        <strong>{formatFlowMetric(state.filteredFlow.length)}</strong>
+      </div>
+      <div className="overview-cell">
+        <span className="overview-label">Alerts</span>
+        <strong>{formatFlowMetric(state.filteredAlerts.length)}</strong>
+      </div>
+      <div className="overview-cell">
+        <span className="overview-label">Rules</span>
+        <strong>{formatFlowMetric(state.filteredClassifierHits.length)}</strong>
+      </div>
+      <div className="overview-cell">
+        <span className="overview-label">Dark</span>
+        <strong>{formatFlowMetric(state.filteredInferredDark.length)}</strong>
+      </div>
+    </div>
+  );
+};
+
+type OptionsPaneProps = {
+  limit?: number;
+};
+
+const OptionsPane = ({ limit }: OptionsPaneProps) => {
+  const state = useTerminal();
+  const items = limit ? state.filteredOptions.slice(0, limit) : state.filteredOptions;
+
+  return (
+    <Pane
+      title="Options"
+      status={
+        <TapeStatus
+          status={state.options.status}
+          lastUpdate={state.options.lastUpdate}
+          replayTime={state.options.replayTime}
+          replayComplete={state.options.replayComplete}
+          paused={state.options.paused}
+          dropped={state.options.dropped}
+          mode={state.mode}
+        />
+      }
+      actions={
+        <TapeControls
+          paused={state.options.paused}
+          onTogglePause={state.options.togglePause}
+          isAtTop={state.optionsScroll.isAtTop}
+          missed={state.optionsScroll.missed}
+          onJump={state.optionsScroll.jumpToTop}
+        />
+      }
+    >
+      <div className="list terminal-list" ref={state.optionsScroll.listRef}>
+        {items.length === 0 ? (
+          <div className="empty">
+            {state.tickerSet.size > 0
+              ? "No option prints match the current filter."
+              : state.mode === "live"
+                ? "No option prints yet. Start ingest-options."
+                : "Replay queue empty. Ensure ClickHouse has data."}
+          </div>
+        ) : (
+          items.map((print) => {
+            const contractId = normalizeContractId(print.option_contract_id);
+            const quote = state.nbboMap.get(contractId);
+            const nbboAge = quote ? Math.abs(print.ts - quote.ts) : null;
+            const nbboStale = nbboAge !== null && nbboAge > NBBO_MAX_AGE_MS_SAFE;
+            const nbboMid = quote ? (quote.bid + quote.ask) / 2 : null;
+            const nbboSide = classifyNbboSide(print.price, quote);
+            const notional = print.price * print.size * 100;
+
+            return (
+              <div className="row" key={`${print.trace_id}-${print.seq}`}>
+                <div>
+                  <div className="contract">{formatContractLabel(contractId)}</div>
+                  <div className="meta">
+                    <span>${formatPrice(print.price)}</span>
+                    <span>{formatSize(print.size)}x</span>
+                    <span>{print.exchange}</span>
+                    <span>Notional ${formatUsd(notional)}</span>
+                    {print.conditions?.length ? <span>{print.conditions.join(", ")}</span> : null}
+                  </div>
+                  {quote ? (
+                    <div className="meta nbbo-meta">
+                      <span>Bid ${formatPrice(quote.bid)}</span>
+                      <span>Ask ${formatPrice(quote.ask)}</span>
+                      <span>Mid ${formatPrice(nbboMid ?? 0)}</span>
+                      <span>{Math.round(nbboAge ?? 0)}ms</span>
+                      {nbboSide ? (
+                        <span className="nbbo-side" tabIndex={0} aria-label="NBBO side legend">
+                          <span className={`nbbo-tag nbbo-tag-${nbboSide.toLowerCase()}`}>
+                            {nbboSide}
+                          </span>
+                          <span className="nbbo-tooltip" role="tooltip">
+                            <span className="nbbo-tooltip-row">
+                              <span className="nbbo-tag nbbo-tag-a">A</span>
+                              <span>Ask</span>
+                            </span>
+                            <span className="nbbo-tooltip-row">
+                              <span className="nbbo-tag nbbo-tag-aa">AA</span>
+                              <span>Above Ask</span>
+                            </span>
+                            <span className="nbbo-tooltip-row">
+                              <span className="nbbo-tag nbbo-tag-b">B</span>
+                              <span>Bid</span>
+                            </span>
+                            <span className="nbbo-tooltip-row">
+                              <span className="nbbo-tag nbbo-tag-bb">BB</span>
+                              <span>Below Bid</span>
+                            </span>
+                          </span>
+                        </span>
+                      ) : null}
+                      {nbboStale ? <span className="pill nbbo-stale">Stale</span> : null}
+                    </div>
+                  ) : (
+                    <div className="meta nbbo-meta">
+                      <span className="pill nbbo-missing">NBBO missing</span>
+                    </div>
+                  )}
+                </div>
+                <div className="time">{formatTime(print.ts)}</div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </Pane>
+  );
+};
+
+type EquitiesPaneProps = {
+  limit?: number;
+};
+
+const EquitiesPane = ({ limit }: EquitiesPaneProps) => {
+  const state = useTerminal();
+  const items = limit ? state.filteredEquities.slice(0, limit) : state.filteredEquities;
+
+  return (
+    <Pane
+      title="Equities"
+      status={
+        <TapeStatus
+          status={state.equities.status}
+          lastUpdate={state.equities.lastUpdate}
+          replayTime={state.equities.replayTime}
+          replayComplete={state.equities.replayComplete}
+          paused={state.equities.paused}
+          dropped={state.equities.dropped}
+          mode={state.mode}
+        />
+      }
+      actions={
+        <TapeControls
+          paused={state.equities.paused}
+          onTogglePause={state.equities.togglePause}
+          isAtTop={state.equitiesScroll.isAtTop}
+          missed={state.equitiesScroll.missed}
+          onJump={state.equitiesScroll.jumpToTop}
+        />
+      }
+    >
+      <div className="list terminal-list" ref={state.equitiesScroll.listRef}>
+        {items.length === 0 ? (
+          <div className="empty">
+            {state.tickerSet.size > 0
+              ? "No equity prints match the current filter."
+              : state.mode === "live"
+                ? "No equity prints yet. Start ingest-equities."
+                : "Replay queue empty. Ensure ClickHouse has data."}
+          </div>
+        ) : (
+          items.map((print) => (
+            <div className="row" key={`${print.trace_id}-${print.seq}`}>
+              <div>
+                <div className="contract">{print.underlying_id}</div>
+                <div className="meta">
+                  <span>${formatPrice(print.price)}</span>
+                  <span>{formatSize(print.size)}x</span>
+                  <span>{print.exchange}</span>
+                  {print.offExchangeFlag ? (
+                    <span className="flag">Off-Ex</span>
+                  ) : (
+                    <span className="flag flag-muted">Lit</span>
+                  )}
+                </div>
+              </div>
+              <div className="time">{formatTime(print.ts)}</div>
+            </div>
+          ))
+        )}
+      </div>
+    </Pane>
+  );
+};
+
+type FlowPaneProps = {
+  limit?: number;
+  title?: string;
+};
+
+const FlowPane = ({ limit, title = "Flow" }: FlowPaneProps) => {
+  const state = useTerminal();
+  const items = limit ? state.filteredFlow.slice(0, limit) : state.filteredFlow;
+
+  return (
+    <Pane
+      title={title}
+      status={
+        <TapeStatus
+          status={state.flow.status}
+          lastUpdate={state.flow.lastUpdate}
+          replayTime={state.flow.replayTime}
+          replayComplete={state.flow.replayComplete}
+          paused={state.flow.paused}
+          dropped={state.flow.dropped}
+          mode={state.mode}
+        />
+      }
+      actions={
+        <TapeControls
+          paused={state.flow.paused}
+          onTogglePause={state.flow.togglePause}
+          isAtTop={state.flowScroll.isAtTop}
+          missed={state.flowScroll.missed}
+          onJump={state.flowScroll.jumpToTop}
+        />
+      }
+    >
+      <div className="list terminal-list" ref={state.flowScroll.listRef}>
+        {items.length === 0 ? (
+          <div className="empty">
+            {state.tickerSet.size > 0
+              ? "No flow packets match the current filter."
+              : state.mode === "live"
+                ? "No flow packets yet. Start compute."
+                : "Replay queue empty. Ensure ClickHouse has data."}
+          </div>
+        ) : (
+          items.map((packet) => {
+            const features = packet.features ?? {};
+            const contract = String(features.option_contract_id ?? packet.id ?? "unknown");
+            const count = parseNumber(features.count, packet.members.length);
+            const totalSize = parseNumber(features.total_size, 0);
+            const totalNotional = parseNumber(features.total_notional, Number.NaN);
+            const notional = Number.isFinite(totalNotional)
+              ? totalNotional
+              : parseNumber(features.total_premium, 0) * 100;
+            const startTs = parseNumber(features.start_ts, packet.source_ts);
+            const endTs = parseNumber(features.end_ts, startTs);
+            const windowMs = parseNumber(features.window_ms, 0);
+            const structureType =
+              typeof features.structure_type === "string" ? features.structure_type : "";
+            const structureLegs = parseNumber(features.structure_legs, 0);
+            const structureRights =
+              typeof features.structure_rights === "string" ? features.structure_rights : "";
+            const structureStrikes = parseNumber(features.structure_strikes, 0);
+            const nbboBid = parseNumber(features.nbbo_bid, Number.NaN);
+            const nbboAsk = parseNumber(features.nbbo_ask, Number.NaN);
+            const nbboMid = parseNumber(features.nbbo_mid, Number.NaN);
+            const nbboSpread = parseNumber(features.nbbo_spread, Number.NaN);
+            const aggressiveBuyRatio = parseNumber(features.nbbo_aggressive_buy_ratio, Number.NaN);
+            const aggressiveSellRatio = parseNumber(
+              features.nbbo_aggressive_sell_ratio,
+              Number.NaN
+            );
+            const aggressiveCoverage = parseNumber(features.nbbo_coverage_ratio, Number.NaN);
+            const insideRatio = parseNumber(features.nbbo_inside_ratio, Number.NaN);
+            const nbboAge = parseNumber(packet.join_quality.nbbo_age_ms, Number.NaN);
+            const nbboStale = parseNumber(packet.join_quality.nbbo_stale, 0) > 0;
+            const nbboMissing = parseNumber(packet.join_quality.nbbo_missing, 0) > 0;
+
+            return (
+              <div className="row" key={packet.id}>
+                <div>
+                  <div className="contract">{contract}</div>
+                  <div className="meta flow-meta">
+                    <span>{formatFlowMetric(count)} prints</span>
+                    <span>{formatFlowMetric(totalSize)} size</span>
+                    <span>Notional ${formatUsd(notional)}</span>
+                    {windowMs > 0 ? <span>{formatFlowMetric(windowMs, "ms")}</span> : null}
+                    {structureType ? (
+                      <span className="pill structure-tag">
+                        {structureType.replace(/_/g, " ")}
+                        {structureRights ? ` ${structureRights}` : ""}
+                        {structureLegs > 0 ? ` ${structureLegs}L` : ""}
+                        {structureStrikes > 0 ? ` ${structureStrikes}K` : ""}
+                      </span>
+                    ) : null}
+                    {Number.isFinite(aggressiveCoverage) && aggressiveCoverage > 0 ? (
+                      <span className="pill aggressor-tag">
+                        Agg {formatPct(aggressiveBuyRatio)} / {formatPct(aggressiveSellRatio)}
+                        {Number.isFinite(insideRatio) && insideRatio > 0
+                          ? ` · In ${formatPct(insideRatio)}`
+                          : ""}
+                        {` · ${formatPct(aggressiveCoverage)} cov`}
+                      </span>
+                    ) : null}
+                    {Number.isFinite(nbboBid) && Number.isFinite(nbboAsk) ? (
+                      <span>
+                        NBBO ${formatPrice(nbboBid)} x ${formatPrice(nbboAsk)}
+                      </span>
+                    ) : null}
+                    {Number.isFinite(nbboMid) ? <span>Mid ${formatPrice(nbboMid)}</span> : null}
+                    {Number.isFinite(nbboSpread) ? (
+                      <span>Spread ${formatPrice(nbboSpread)}</span>
+                    ) : null}
+                    {Number.isFinite(nbboAge) ? <span>{Math.round(nbboAge)}ms</span> : null}
+                    {nbboStale ? <span className="pill nbbo-stale">NBBO stale</span> : null}
+                    {nbboMissing ? <span className="pill nbbo-missing">NBBO missing</span> : null}
+                  </div>
+                </div>
+                <div className="time">
+                  {formatTime(startTs)} → {formatTime(endTs)}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </Pane>
+  );
+};
+
+type AlertsPaneProps = {
+  limit?: number;
+  withStrip?: boolean;
+};
+
+const AlertsPane = ({ limit, withStrip = false }: AlertsPaneProps) => {
+  const state = useTerminal();
+  const items = limit ? state.filteredAlerts.slice(0, limit) : state.filteredAlerts;
+
+  return (
+    <Pane
+      title="Alerts"
+      status={
+        <TapeStatus
+          status={state.alerts.status}
+          lastUpdate={state.alerts.lastUpdate}
+          replayTime={state.alerts.replayTime}
+          replayComplete={state.alerts.replayComplete}
+          paused={state.alerts.paused}
+          dropped={state.alerts.dropped}
+          mode={state.mode}
+        />
+      }
+      actions={
+        <TapeControls
+          paused={state.alerts.paused}
+          onTogglePause={state.alerts.togglePause}
+          isAtTop={state.alertsScroll.isAtTop}
+          missed={state.alertsScroll.missed}
+          onJump={state.alertsScroll.jumpToTop}
+        />
+      }
+    >
+      {withStrip ? <AlertSeverityStrip alerts={state.filteredAlerts} /> : null}
+      <div className="list terminal-list" ref={state.alertsScroll.listRef}>
+        {items.length === 0 ? (
+          <div className="empty">
+            {state.tickerSet.size > 0
+              ? "No alerts match the current filter."
+              : state.mode === "live"
+                ? "No alerts yet. Start compute."
+                : "Replay queue empty. Ensure ClickHouse has data."}
+          </div>
+        ) : (
+          items.map((alert) => {
+            const primary = alert.hits[0];
+            const direction = primary ? normalizeDirection(primary.direction) : "neutral";
+
+            return (
+              <button
+                className="row row-button"
+                key={`${alert.trace_id}-${alert.seq}`}
+                type="button"
+                onClick={() => {
+                  state.setSelectedDarkEvent(null);
+                  state.setSelectedClassifierHit(null);
+                  state.setSelectedAlert(alert);
+                }}
+              >
+                <div>
+                  <div className="contract">
+                    {primary ? humanizeClassifierId(primary.classifier_id) : "Alert"}
+                  </div>
+                  <div className="meta">
+                    <span className={`pill severity-${alert.severity}`}>{alert.severity}</span>
+                    <span>Score {Math.round(alert.score)}</span>
+                    <span>{alert.hits.length} hits</span>
+                    {primary ? (
+                      <span className={`pill direction-${direction}`}>{direction}</span>
+                    ) : null}
+                  </div>
+                  {primary?.explanations?.[0] ? (
+                    <div className="note">{primary.explanations[0]}</div>
+                  ) : null}
+                </div>
+                <div className="time">{formatTime(alert.source_ts)}</div>
+              </button>
+            );
+          })
+        )}
+      </div>
+    </Pane>
+  );
+};
+
+type ClassifierPaneProps = {
+  limit?: number;
+};
+
+const ClassifierPane = ({ limit }: ClassifierPaneProps) => {
+  const state = useTerminal();
+  const items = limit ? state.filteredClassifierHits.slice(0, limit) : state.filteredClassifierHits;
+
+  return (
+    <Pane
+      title="Rules"
+      status={
+        <TapeStatus
+          status={state.classifierHits.status}
+          lastUpdate={state.classifierHits.lastUpdate}
+          replayTime={state.classifierHits.replayTime}
+          replayComplete={state.classifierHits.replayComplete}
+          paused={state.classifierHits.paused}
+          dropped={state.classifierHits.dropped}
+          mode={state.mode}
+        />
+      }
+      actions={
+        <TapeControls
+          paused={state.classifierHits.paused}
+          onTogglePause={state.classifierHits.togglePause}
+          isAtTop={state.classifierScroll.isAtTop}
+          missed={state.classifierScroll.missed}
+          onJump={state.classifierScroll.jumpToTop}
+        />
+      }
+    >
+      <div className="list terminal-list" ref={state.classifierScroll.listRef}>
+        {items.length === 0 ? (
+          <div className="empty">
+            {state.tickerSet.size > 0
+              ? "No classifier hits match the current filter."
+              : state.mode === "live"
+                ? "No classifier hits yet. Start compute."
+                : "Replay queue empty. Ensure ClickHouse has data."}
+          </div>
+        ) : (
+          items.map((hit) => {
+            const direction = normalizeDirection(hit.direction);
+            return (
+              <button
+                className="row row-button"
+                key={`${hit.trace_id}-${hit.seq}`}
+                type="button"
+                onClick={() => state.openFromClassifierHit(hit)}
+              >
+                <div>
+                  <div className="contract">{humanizeClassifierId(hit.classifier_id)}</div>
+                  <div className="meta">
+                    <span className={`pill direction-${direction}`}>{direction}</span>
+                    <span>Confidence {formatConfidence(hit.confidence)}</span>
+                  </div>
+                  {hit.explanations?.[0] ? <div className="note">{hit.explanations[0]}</div> : null}
+                </div>
+                <div className="time">{formatTime(hit.source_ts)}</div>
+              </button>
+            );
+          })
+        )}
+      </div>
+    </Pane>
+  );
+};
+
+type DarkPaneProps = {
+  limit?: number;
+};
+
+const DarkPane = ({ limit }: DarkPaneProps) => {
+  const state = useTerminal();
+  const items = limit ? state.filteredInferredDark.slice(0, limit) : state.filteredInferredDark;
+
+  return (
+    <Pane
+      title="Dark"
+      status={
+        <TapeStatus
+          status={state.inferredDark.status}
+          lastUpdate={state.inferredDark.lastUpdate}
+          replayTime={state.inferredDark.replayTime}
+          replayComplete={state.inferredDark.replayComplete}
+          paused={state.inferredDark.paused}
+          dropped={state.inferredDark.dropped}
+          mode={state.mode}
+        />
+      }
+      actions={
+        <TapeControls
+          paused={state.inferredDark.paused}
+          onTogglePause={state.inferredDark.togglePause}
+          isAtTop={state.darkScroll.isAtTop}
+          missed={state.darkScroll.missed}
+          onJump={state.darkScroll.jumpToTop}
+        />
+      }
+    >
+      <div className="list terminal-list" ref={state.darkScroll.listRef}>
+        {items.length === 0 ? (
+          <div className="empty">
+            {state.tickerSet.size > 0
+              ? "No inferred dark events match the current filter."
+              : state.mode === "live"
+                ? "No inferred dark events yet. Start compute."
+                : "Replay queue empty. Ensure ClickHouse has data."}
+          </div>
+        ) : (
+          items.map((event) => {
+            const underlying = inferDarkUnderlying(event, state.equityPrintMap, state.equityJoinMap);
+            const evidenceCount = event.evidence_refs.length;
+
+            return (
+              <button
+                className="row row-button"
+                key={`${event.trace_id}-${event.seq}`}
+                type="button"
+                onClick={() => {
+                  state.setSelectedAlert(null);
+                  state.setSelectedClassifierHit(null);
+                  state.setSelectedDarkEvent(event);
+                }}
+              >
+                <div>
+                  <div className="contract">{humanizeClassifierId(event.type)}</div>
+                  <div className="meta">
+                    {underlying ? <span>{underlying}</span> : <span className="pill">Unknown</span>}
+                    <span>Confidence {formatConfidence(event.confidence)}</span>
+                    <span>Evidence {evidenceCount}</span>
+                  </div>
+                  {underlying ? null : <div className="note">Underlying not in current equity cache.</div>}
+                </div>
+                <div className="time">{formatTime(event.source_ts)}</div>
+              </button>
+            );
+          })
+        )}
+      </div>
+    </Pane>
+  );
+};
+
+type ChartPaneProps = {
+  title?: string;
+};
+
+const ChartPane = ({ title = "Chart" }: ChartPaneProps) => {
+  const state = useTerminal();
+
+  return (
+    <Pane
+      title={title}
+      actions={
+        <div className="chart-controls">
+          <div className="chart-intervals">
+            {CANDLE_INTERVALS.map((interval) => (
+              <button
+                key={interval.ms}
+                className={`interval-button${interval.ms === state.chartIntervalMs ? " active" : ""}`}
+                type="button"
+                onClick={() => state.setChartIntervalMs(interval.ms)}
+              >
+                {interval.label}
+              </button>
+            ))}
+          </div>
+          <span className="chart-hint">{state.chartTicker}</span>
+        </div>
+      }
+    >
+      <CandleChart
+        ticker={state.chartTicker}
+        intervalMs={state.chartIntervalMs}
+        mode={state.mode}
+        replayTime={state.equities.replayTime}
+        classifierHits={state.chartClassifierHits}
+        inferredDark={state.chartInferredDark}
+        onClassifierHitClick={state.handleClassifierMarkerClick}
+        onInferredDarkClick={state.handleDarkMarkerClick}
+      />
+    </Pane>
+  );
+};
+
+const FocusPane = () => {
+  const state = useTerminal();
+  const hits = state.chartClassifierHits.slice(-10).reverse();
+  const dark = state.chartInferredDark.slice(-10).reverse();
+
+  return (
+    <Pane title="Focus">
+      <div className="focus-stack">
+        <div className="focus-block">
+          <div className="focus-label">Ticker</div>
+          <div className="focus-value">{state.chartTicker}</div>
+        </div>
+        <div className="focus-block">
+          <div className="focus-label">Rules</div>
+          {hits.length === 0 ? (
+            <div className="empty">No rule hits for {state.chartTicker}.</div>
+          ) : (
+            <div className="list terminal-list terminal-list-compact">
+              {hits.map((hit) => (
+                <button
+                  className="row row-button"
+                  key={`${hit.trace_id}-${hit.seq}`}
+                  type="button"
+                  onClick={() => state.openFromClassifierHit(hit)}
+                >
+                  <div>
+                    <div className="contract">{humanizeClassifierId(hit.classifier_id)}</div>
+                    <div className="meta">
+                      <span className={`pill direction-${normalizeDirection(hit.direction)}`}>
+                        {normalizeDirection(hit.direction)}
+                      </span>
+                      <span>{formatTime(hit.source_ts)}</span>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="focus-block">
+          <div className="focus-label">Dark</div>
+          {dark.length === 0 ? (
+            <div className="empty">No inferred dark events for {state.chartTicker}.</div>
+          ) : (
+            <div className="list terminal-list terminal-list-compact">
+              {dark.map((event) => (
+                <button
+                  className="row row-button"
+                  key={`${event.trace_id}-${event.seq}`}
+                  type="button"
+                  onClick={() => state.handleDarkMarkerClick(event)}
+                >
+                  <div>
+                    <div className="contract">{humanizeClassifierId(event.type)}</div>
+                    <div className="meta">
+                      <span>Confidence {formatConfidence(event.confidence)}</span>
+                      <span>{formatTime(event.source_ts)}</span>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </Pane>
+  );
+};
+
+const ReplayConsole = () => {
+  const state = useTerminal();
+  const replayActive = state.mode === "replay";
+
+  return (
+    <Pane
+      title="Console"
+      actions={
+        <button className="terminal-button terminal-button-primary" type="button" onClick={state.toggleMode}>
+          {replayActive ? "Switch Live" : "Switch Replay"}
+        </button>
+      }
+    >
+      <div className="replay-matrix">
+        <div className="overview-cell">
+          <span className="overview-label">Mode</span>
+          <strong>{replayActive ? "Replay" : "Live"}</strong>
+        </div>
+        <div className="overview-cell">
+          <span className="overview-label">Source</span>
+          <strong>{state.replaySource ? state.replaySource.toUpperCase() : "Auto"}</strong>
+        </div>
+        <div className="overview-cell">
+          <span className="overview-label">Replay Clock</span>
+          <strong>{state.options.replayTime ? formatTime(state.options.replayTime) : "—"}</strong>
+        </div>
+        <div className="overview-cell">
+          <span className="overview-label">Packets</span>
+          <strong>{formatFlowMetric(state.filteredFlow.length)}</strong>
+        </div>
+      </div>
+    </Pane>
+  );
+};
+
+export function TerminalAppShell({ children }: { children: ReactNode }) {
+  const state = useTerminalState();
+  const pathname = usePathname();
+
+  return (
+    <TerminalContext.Provider value={state}>
+      <div className="terminal-shell">
+        <aside className="terminal-rail">
+          <div className="terminal-brand">
+            <span className="terminal-brand-kicker">IF</span>
+            <span className="terminal-brand-name">Islandflow</span>
+          </div>
+          <nav className="terminal-nav">
+            {NAV_ITEMS.map((item) => {
+              const active = pathname === item.href;
+              return (
+                <Link
+                  className={`terminal-nav-link${active ? " terminal-nav-link-active" : ""}`}
+                  href={item.href}
+                  key={item.href}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+          <ShellMetricStrip />
+        </aside>
+
+        <div className="terminal-frame">
+          <header className="terminal-topbar">
+            <FeedStatusBar />
+            <div className="terminal-topbar-controls">
+              <label className="terminal-filter">
+                <span className="terminal-filter-label">Filter</span>
+                <span className="terminal-filter-field">
+                  <input
+                    className="terminal-input"
+                    value={state.filterInput}
+                    onChange={(event) => state.setFilterInput(event.target.value)}
+                    placeholder="SPY, NVDA, AAPL"
+                    spellCheck={false}
+                  />
+                </span>
+              </label>
+              <button
+                className="terminal-button"
+                type="button"
+                onClick={() => state.setFilterInput("")}
+                disabled={state.filterInput.trim().length === 0}
+              >
+                Clear
+              </button>
+              <button className="terminal-button terminal-button-primary" type="button" onClick={state.toggleMode}>
+                {state.mode === "live" ? "Replay" : "Live"}
+              </button>
+            </div>
+          </header>
+
+          <main className="terminal-content">{children}</main>
+        </div>
+
+        {state.selectedAlert ? (
+          <AlertDrawer
+            alert={state.selectedAlert}
+            flowPacket={state.selectedFlowPacket}
+            evidence={state.selectedEvidence}
+            onClose={() => state.setSelectedAlert(null)}
+          />
+        ) : null}
+
+        {state.selectedClassifierHit ? (
+          <ClassifierHitDrawer
+            hit={state.selectedClassifierHit}
+            flowPacket={state.selectedClassifierFlowPacket}
+            evidence={state.selectedClassifierEvidence}
+            onClose={() => state.setSelectedClassifierHit(null)}
+          />
+        ) : null}
+
+        {state.selectedDarkEvent ? (
+          <DarkDrawer
+            event={state.selectedDarkEvent}
+            evidence={state.selectedDarkEvidence}
+            underlying={state.selectedDarkUnderlying}
+            onClose={() => state.setSelectedDarkEvent(null)}
+          />
+        ) : null}
+      </div>
+    </TerminalContext.Provider>
+  );
+}
+
+export function OverviewRoute() {
+  return (
+    <PageFrame title="Overview">
+      <OverviewBrief />
+      <div className="page-grid page-grid-overview">
+        <ChartPane />
+        <AlertsPane limit={12} withStrip />
+        <FlowPane limit={12} />
+        <EquitiesPane limit={12} />
+      </div>
+    </PageFrame>
+  );
+}
+
+export function TapeRoute() {
+  return (
+    <PageFrame title="Tape">
+      <div className="page-grid page-grid-tape">
+        <OptionsPane />
+        <EquitiesPane />
+        <FlowPane title="Packets" />
+      </div>
+    </PageFrame>
+  );
+}
+
+export function SignalsRoute() {
+  return (
+    <PageFrame title="Signals">
+      <div className="page-grid page-grid-signals">
+        <AlertsPane withStrip />
+        <ClassifierPane />
+        <DarkPane />
+      </div>
+    </PageFrame>
+  );
+}
+
+export function ChartsRoute() {
+  return (
+    <PageFrame title="Charts">
+      <div className="page-grid page-grid-charts">
+        <ChartPane title="Price" />
+        <FocusPane />
+      </div>
+    </PageFrame>
+  );
+}
+
+export function ReplayRoute() {
+  return (
+    <PageFrame title="Replay">
+      <div className="page-grid page-grid-replay">
+        <ReplayConsole />
+        <AlertsPane limit={10} withStrip />
+        <FlowPane limit={12} />
+        <OptionsPane limit={12} />
+      </div>
+    </PageFrame>
+  );
+}

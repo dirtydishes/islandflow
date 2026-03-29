@@ -65,7 +65,28 @@ const envSchema = z.object({
 const env = readEnv(envSchema);
 
 const state = {
-  shuttingDown: false
+  shuttingDown: false,
+  shutdownPromise: null as Promise<void> | null
+};
+
+const getErrorMessage = (error: unknown): string => {
+  return error instanceof Error ? error.message : String(error);
+};
+
+const isExpectedShutdownError = (error: unknown): boolean => {
+  if (!state.shuttingDown) {
+    return false;
+  }
+
+  const message = getErrorMessage(error).toUpperCase();
+  return [
+    "SOCKET CONNECTION WAS CLOSED UNEXPECTEDLY",
+    "SOCKET CLOSED UNEXPECTEDLY",
+    "ECONNREFUSED",
+    "CONNECTION_CLOSED",
+    "CONNECTION_DRAINING",
+    "TIMEOUT"
+  ].some((token) => message.includes(token));
 };
 
 const buildThrottle = (enabled: boolean, throttleMs: number) => {
@@ -223,8 +244,12 @@ const run = async () => {
           underlying_id: print.underlying_id
         });
       } catch (error) {
+        if (isExpectedShutdownError(error)) {
+          return;
+        }
+
         logger.error("failed to publish equity print", {
-          error: error instanceof Error ? error.message : String(error),
+          error: getErrorMessage(error),
           trace_id: print.trace_id
         });
       }
@@ -245,8 +270,12 @@ const run = async () => {
         await insertEquityQuote(clickhouse, quote);
         await publishJson(js, SUBJECT_EQUITY_QUOTES, quote);
       } catch (error) {
+        if (isExpectedShutdownError(error)) {
+          return;
+        }
+
         logger.error("failed to publish equity quote", {
-          error: error instanceof Error ? error.message : String(error),
+          error: getErrorMessage(error),
           trace_id: quote.trace_id
         });
       }
@@ -254,18 +283,35 @@ const run = async () => {
   });
 
   const shutdown = async (signal: string) => {
-    if (state.shuttingDown) {
-      return;
+    if (state.shutdownPromise) {
+      return state.shutdownPromise;
     }
 
     state.shuttingDown = true;
-    await stopAdapter();
+    state.shutdownPromise = (async () => {
+      logger.info("service stopping", { signal });
+      await stopAdapter();
 
-    logger.info("service stopping", { signal });
+      try {
+        await nc.drain();
+      } catch (error) {
+        if (!isExpectedShutdownError(error)) {
+          throw error;
+        }
+      }
 
-    await nc.drain();
-    await clickhouse.close();
-    process.exit(0);
+      try {
+        await clickhouse.close();
+      } catch (error) {
+        if (!isExpectedShutdownError(error)) {
+          throw error;
+        }
+      }
+
+      process.exit(0);
+    })();
+
+    return state.shutdownPromise;
   };
 
   process.on("SIGINT", () => void shutdown("SIGINT"));

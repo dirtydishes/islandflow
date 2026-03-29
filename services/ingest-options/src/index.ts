@@ -88,7 +88,28 @@ const envSchema = z.object({
 const env = readEnv(envSchema);
 
 const state = {
-  shuttingDown: false
+  shuttingDown: false,
+  shutdownPromise: null as Promise<void> | null
+};
+
+const getErrorMessage = (error: unknown): string => {
+  return error instanceof Error ? error.message : String(error);
+};
+
+const isExpectedShutdownError = (error: unknown): boolean => {
+  if (!state.shuttingDown) {
+    return false;
+  }
+
+  const message = getErrorMessage(error).toUpperCase();
+  return [
+    "SOCKET CONNECTION WAS CLOSED UNEXPECTEDLY",
+    "SOCKET CLOSED UNEXPECTEDLY",
+    "ECONNREFUSED",
+    "CONNECTION_CLOSED",
+    "CONNECTION_DRAINING",
+    "TIMEOUT"
+  ].some((token) => message.includes(token));
 };
 
 const buildThrottle = (enabled: boolean, throttleMs: number) => {
@@ -293,8 +314,12 @@ const run = async () => {
           option_contract_id: print.option_contract_id
         });
       } catch (error) {
+        if (isExpectedShutdownError(error)) {
+          return;
+        }
+
         logger.error("failed to publish option print", {
-          error: error instanceof Error ? error.message : String(error),
+          error: getErrorMessage(error),
           trace_id: print.trace_id
         });
       }
@@ -315,8 +340,12 @@ const run = async () => {
         await insertOptionNBBO(clickhouse, nbbo);
         await publishJson(js, SUBJECT_OPTION_NBBO, nbbo);
       } catch (error) {
+        if (isExpectedShutdownError(error)) {
+          return;
+        }
+
         logger.error("failed to publish option nbbo", {
-          error: error instanceof Error ? error.message : String(error),
+          error: getErrorMessage(error),
           trace_id: nbbo.trace_id
         });
       }
@@ -324,18 +353,35 @@ const run = async () => {
   });
 
   const shutdown = async (signal: string) => {
-    if (state.shuttingDown) {
-      return;
+    if (state.shutdownPromise) {
+      return state.shutdownPromise;
     }
 
     state.shuttingDown = true;
-    await stopAdapter();
+    state.shutdownPromise = (async () => {
+      logger.info("service stopping", { signal });
+      await stopAdapter();
 
-    logger.info("service stopping", { signal });
+      try {
+        await nc.drain();
+      } catch (error) {
+        if (!isExpectedShutdownError(error)) {
+          throw error;
+        }
+      }
 
-    await nc.drain();
-    await clickhouse.close();
-    process.exit(0);
+      try {
+        await clickhouse.close();
+      } catch (error) {
+        if (!isExpectedShutdownError(error)) {
+          throw error;
+        }
+      }
+
+      process.exit(0);
+    })();
+
+    return state.shutdownPromise;
   };
 
   process.on("SIGINT", () => void shutdown("SIGINT"));

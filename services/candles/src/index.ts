@@ -54,6 +54,31 @@ const envSchema = z.object({
 
 const env = readEnv(envSchema);
 
+const state = {
+  shuttingDown: false,
+  shutdownPromise: null as Promise<void> | null
+};
+
+const getErrorMessage = (error: unknown): string => {
+  return error instanceof Error ? error.message : String(error);
+};
+
+const isExpectedShutdownError = (error: unknown): boolean => {
+  if (!state.shuttingDown) {
+    return false;
+  }
+
+  const message = getErrorMessage(error).toUpperCase();
+  return [
+    "SOCKET CONNECTION WAS CLOSED UNEXPECTEDLY",
+    "SOCKET CLOSED UNEXPECTEDLY",
+    "ECONNREFUSED",
+    "CONNECTION_CLOSED",
+    "CONNECTION_DRAINING",
+    "TIMEOUT"
+  ].some((token) => message.includes(token));
+};
+
 const retry = async <T>(
   label: string,
   attempts: number,
@@ -141,9 +166,13 @@ const emitCandle = async (
   try {
     await insertEquityCandle(clickhouse, candle);
   } catch (error) {
+    if (isExpectedShutdownError(error)) {
+      return;
+    }
+
     metrics.count("candles.persist_failed", 1);
     logger.error("failed to persist candle", {
-      error: error instanceof Error ? error.message : String(error),
+      error: getErrorMessage(error),
       trace_id: candle.trace_id,
       underlying_id: candle.underlying_id,
       interval_ms: candle.interval_ms
@@ -158,9 +187,13 @@ const emitCandle = async (
   try {
     await publishJson(js, SUBJECT_EQUITY_CANDLES, candle);
   } catch (error) {
+    if (isExpectedShutdownError(error)) {
+      return;
+    }
+
     metrics.count("candles.publish_failed", 1);
     logger.error("failed to publish candle", {
-      error: error instanceof Error ? error.message : String(error),
+      error: getErrorMessage(error),
       trace_id: candle.trace_id,
       underlying_id: candle.underlying_id,
       interval_ms: candle.interval_ms
@@ -171,9 +204,13 @@ const emitCandle = async (
     try {
       await cacheCandle(redis, candle, cacheLimit);
     } catch (error) {
+      if (isExpectedShutdownError(error)) {
+        return;
+      }
+
       metrics.count("candles.cache_failed", 1);
       logger.warn("failed to cache candle", {
-        error: error instanceof Error ? error.message : String(error),
+        error: getErrorMessage(error),
         trace_id: candle.trace_id,
         underlying_id: candle.underlying_id,
         interval_ms: candle.interval_ms
@@ -242,8 +279,12 @@ const run = async () => {
   try {
     redis = createRedisClient(env.REDIS_URL);
     redis.on("error", (error) => {
+      if (isExpectedShutdownError(error)) {
+        return;
+      }
+
       logger.warn("redis client error", {
-        error: error instanceof Error ? error.message : String(error)
+        error: getErrorMessage(error)
       });
     });
     await retry("redis connect", 20, 500, async () => {
@@ -376,20 +417,51 @@ const run = async () => {
   };
 
   const shutdown = async (signal: string) => {
-    logger.info("service stopping", { signal });
-    clearInterval(flushTimer);
-    await flushExpired();
-    const remaining = aggregator.drain();
-    for (const candle of remaining) {
-      const validated = EquityCandleSchema.parse(candle);
-      await emitCandle(clickhouse, js, redis, validated, env.CANDLE_CACHE_LIMIT);
+    if (state.shutdownPromise) {
+      return state.shutdownPromise;
     }
-    if (redis && redis.isOpen) {
-      await redis.quit();
-    }
-    await nc.drain();
-    await clickhouse.close();
-    process.exit(0);
+
+    state.shuttingDown = true;
+    state.shutdownPromise = (async () => {
+      logger.info("service stopping", { signal });
+      clearInterval(flushTimer);
+      await flushExpired();
+      const remaining = aggregator.drain();
+      for (const candle of remaining) {
+        const validated = EquityCandleSchema.parse(candle);
+        await emitCandle(clickhouse, js, redis, validated, env.CANDLE_CACHE_LIMIT);
+      }
+
+      if (redis && redis.isOpen) {
+        try {
+          await redis.quit();
+        } catch (error) {
+          if (!isExpectedShutdownError(error)) {
+            throw error;
+          }
+        }
+      }
+
+      try {
+        await nc.drain();
+      } catch (error) {
+        if (!isExpectedShutdownError(error)) {
+          throw error;
+        }
+      }
+
+      try {
+        await clickhouse.close();
+      } catch (error) {
+        if (!isExpectedShutdownError(error)) {
+          throw error;
+        }
+      }
+
+      process.exit(0);
+    })();
+
+    return state.shutdownPromise;
   };
 
   process.on("SIGINT", () => void shutdown("SIGINT"));
