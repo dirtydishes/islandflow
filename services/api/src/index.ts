@@ -89,6 +89,31 @@ const envSchema = z.object({
 
 const env = readEnv(envSchema);
 
+const state = {
+  shuttingDown: false,
+  shutdownPromise: null as Promise<void> | null
+};
+
+const getErrorMessage = (error: unknown): string => {
+  return error instanceof Error ? error.message : String(error);
+};
+
+const isExpectedShutdownError = (error: unknown): boolean => {
+  if (!state.shuttingDown) {
+    return false;
+  }
+
+  const message = getErrorMessage(error).toUpperCase();
+  return [
+    "SOCKET CONNECTION WAS CLOSED UNEXPECTEDLY",
+    "SOCKET CLOSED UNEXPECTEDLY",
+    "ECONNREFUSED",
+    "CONNECTION_CLOSED",
+    "CONNECTION_DRAINING",
+    "TIMEOUT"
+  ].some((token) => message.includes(token));
+};
+
 const retry = async <T>(
   label: string,
   attempts: number,
@@ -517,8 +542,12 @@ const run = async () => {
   try {
     redis = createClient({ url: env.REDIS_URL });
     redis.on("error", (error) => {
+      if (isExpectedShutdownError(error)) {
+        return;
+      }
+
       logger.warn("redis client error", {
-        error: error instanceof Error ? error.message : String(error)
+        error: getErrorMessage(error)
       });
     });
     await retry("redis connect", 5, 500, async () => {
@@ -1150,14 +1179,45 @@ const run = async () => {
   logger.info("api listening", { port: server.port });
 
   const shutdown = async (signal: string) => {
-    logger.info("service stopping", { signal });
-    server.stop();
-    if (redis && redis.isOpen) {
-      await redis.quit();
+    if (state.shutdownPromise) {
+      return state.shutdownPromise;
     }
-    await nc.drain();
-    await clickhouse.close();
-    process.exit(0);
+
+    state.shuttingDown = true;
+    state.shutdownPromise = (async () => {
+      logger.info("service stopping", { signal });
+      server.stop();
+
+      if (redis && redis.isOpen) {
+        try {
+          await redis.quit();
+        } catch (error) {
+          if (!isExpectedShutdownError(error)) {
+            throw error;
+          }
+        }
+      }
+
+      try {
+        await nc.drain();
+      } catch (error) {
+        if (!isExpectedShutdownError(error)) {
+          throw error;
+        }
+      }
+
+      try {
+        await clickhouse.close();
+      } catch (error) {
+        if (!isExpectedShutdownError(error)) {
+          throw error;
+        }
+      }
+
+      process.exit(0);
+    })();
+
+    return state.shutdownPromise;
   };
 
   process.on("SIGINT", () => void shutdown("SIGINT"));
