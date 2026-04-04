@@ -271,7 +271,7 @@ const run = async () => {
     database: env.CLICKHOUSE_DATABASE
   });
 
-  await retry("clickhouse table init", 20, 500, async () => {
+  await retry("clickhouse table init", 120, 500, async () => {
     await ensureEquityCandlesTable(clickhouse);
   });
 
@@ -287,7 +287,7 @@ const run = async () => {
         error: getErrorMessage(error)
       });
     });
-    await retry("redis connect", 20, 500, async () => {
+    await retry("redis connect", 120, 500, async () => {
       if (!redis) {
         return;
       }

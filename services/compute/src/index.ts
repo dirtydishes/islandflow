@@ -1138,7 +1138,7 @@ const run = async () => {
     logger.warn("redis client error", { error: error instanceof Error ? error.message : String(error) });
   });
 
-  await retry("redis connect", 20, 500, async () => {
+  await retry("redis connect", 120, 500, async () => {
     await redis.connect();
   });
 
@@ -1147,7 +1147,7 @@ const run = async () => {
     ttlSeconds: env.ROLLING_TTL_SEC
   };
 
-  await retry("clickhouse table init", 20, 500, async () => {
+  await retry("clickhouse table init", 120, 500, async () => {
     await ensureFlowPacketsTable(clickhouse);
     await ensureEquityPrintJoinsTable(clickhouse);
     await ensureInferredDarkTable(clickhouse);
