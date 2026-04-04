@@ -1,0 +1,16 @@
+.git
+.github
+.DS_Store
+.bun
+.tmp
+node_modules
+dist
+coverage
+logs
+apps/web/.next
+.env
+.env.*
+session-ses_*.md
+token-usage-output.txt
+!.env.example
+!**/.env.example
