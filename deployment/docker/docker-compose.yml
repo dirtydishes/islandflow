@@ -117,6 +117,7 @@ services:
         hard: 262144
     volumes:
       - clickhouse-data:/var/lib/clickhouse
+      - ./clickhouse/listen.xml:/etc/clickhouse-server/config.d/listen.xml:ro
     healthcheck:
       test:
         [
