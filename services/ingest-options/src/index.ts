@@ -282,7 +282,7 @@ const run = async () => {
     database: env.CLICKHOUSE_DATABASE
   });
 
-  await retry("clickhouse table init", 20, 500, async () => {
+  await retry("clickhouse table init", 120, 500, async () => {
     await ensureOptionPrintsTable(clickhouse);
     await ensureOptionNBBOTable(clickhouse);
   });
