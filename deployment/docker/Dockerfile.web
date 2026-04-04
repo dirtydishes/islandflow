@@ -1,0 +1,34 @@
+FROM oven/bun:1.3.11 AS build
+
+WORKDIR /app
+
+ARG NEXT_PUBLIC_API_URL=""
+ARG NEXT_PUBLIC_NBBO_MAX_AGE_MS=1000
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV NEXT_PUBLIC_NBBO_MAX_AGE_MS=${NEXT_PUBLIC_NBBO_MAX_AGE_MS}
+
+COPY . .
+
+RUN bun install --frozen-lockfile
+RUN bun run --cwd apps/web build
+
+FROM oven/bun:1.3.11 AS runtime
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/bun.lock ./bun.lock
+COPY --from=build /app/tsconfig.base.json ./tsconfig.base.json
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/apps/web ./apps/web
+COPY --from=build /app/packages ./packages
+
+EXPOSE 3000
+
+CMD ["bun", "run", "--cwd", "apps/web", "start"]
