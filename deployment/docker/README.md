@@ -6,9 +6,11 @@ It is separate from the repo-root `docker-compose.yml`, which is still the light
 
 ## What this stack does
 
-- Runs the core app behind a single public port on `80`.
-- Proxies the UI to the Next.js web app.
-- Proxies REST and websocket traffic to the API service.
+- Assumes Nginx Proxy Manager is the edge proxy and runs on the same Docker network.
+- Keeps `web` and `api` internal to the Docker network instead of publishing host ports.
+- Targets a two-subdomain routing model by default:
+  - `app.<domain>` -> `web:3000`
+  - `api.<domain>` -> `api:4000`
 - Runs ClickHouse, Redis, and NATS JetStream with persistent Docker volumes.
 - Runs the core runtime services: `ingest-options`, `ingest-equities`, `compute`, `candles`, `api`, and `web`.
 - Keeps `replay` opt-in through a Compose profile, because the current replay service starts immediately when the container is enabled.
@@ -19,14 +21,13 @@ It is separate from the repo-root `docker-compose.yml`, which is still the light
 - `deployment/docker/Dockerfile.service`: shared Bun runtime image for most services
 - `deployment/docker/Dockerfile.ingest-options`: Bun runtime plus Python dependencies for Databento and IBKR adapters
 - `deployment/docker/Dockerfile.web`: multi-stage build for the Next.js web app
-- `deployment/docker/nginx.conf`: reverse proxy that routes `/ws/*` and API paths to the API container and everything else to the web container
 - `deployment/docker/.env.example`: container-oriented environment template
 
 ## Prerequisites
 
 - A Linux VPS with Docker Engine and Docker Compose v2 installed
 - Enough RAM for ClickHouse plus the Bun services
-- Port `80/tcp` open on the VPS firewall
+- Nginx Proxy Manager running in Docker on the same host/network path you plan to use
 
 Optional:
 
@@ -48,7 +49,7 @@ Important defaults:
 
 - `NATS_URL`, `CLICKHOUSE_URL`, and `REDIS_URL` should stay on the internal container hostnames unless you intentionally split infra out.
 - `OPTIONS_INGEST_ADAPTER=synthetic` and `EQUITIES_INGEST_ADAPTER=synthetic` are the safest first boot settings.
-- Leave `NEXT_PUBLIC_API_URL` blank if you want the browser to use the same public host as the UI. That is the default layout this stack is configured for.
+- `NEXT_PUBLIC_API_URL=https://api.example.com` is the recommended production shape when using NPM with two subdomains.
 
 3. Build and start the stack:
 
@@ -63,10 +64,31 @@ docker compose ps
 docker compose logs -f api web compute candles ingest-options ingest-equities
 ```
 
-5. Open the app:
+5. Make sure NPM can reach the stack network.
 
-- `http://<your-vps-ip>/`
-- Health check: `http://<your-vps-ip>/health`
+The Compose project name is pinned to `islandflow-vps`, so the default network name will be:
+
+```bash
+islandflow-vps_default
+```
+
+If your NPM container is separate, connect it once:
+
+```bash
+docker network connect islandflow-vps_default <npm-container-name>
+```
+
+6. Create these NPM proxy hosts:
+
+- `app.example.com` -> forward to `web`, port `3000`
+- `api.example.com` -> forward to `api`, port `4000`
+
+For the API host, enable websocket support.
+
+7. Open the app:
+
+- `https://app.example.com/`
+- Health check: `https://api.example.com/health`
 
 ## Replay service
 
@@ -119,24 +141,16 @@ If IBKR is running somewhere else, change:
 - `IBKR_HOST`
 - `IBKR_PORT`
 
-## Public routing
+## NPM routing
 
-The reverse proxy sends these requests to the API container:
+Recommended proxy hosts:
 
-- `/health`
-- `/prints/*`
-- `/nbbo/*`
-- `/quotes/*`
-- `/candles/*`
-- `/joins/*`
-- `/dark/*`
-- `/flow/*`
-- `/replay/*`
-- `/ws/*`
+- `app.<domain>` -> `web:3000`
+- `api.<domain>` -> `api:4000`
 
-Everything else is sent to the Next.js web app.
+The web app should be built with `NEXT_PUBLIC_API_URL=https://api.<domain>` so browser REST and websocket traffic goes straight to the API host through NPM.
 
-That routing matters because the web client falls back to same-host API requests when `NEXT_PUBLIC_API_URL` is unset.
+The API host needs websocket support enabled because the app uses `/ws/*` endpoints for live streams.
 
 ## Updating the deployment
 
@@ -157,7 +171,7 @@ If you changed `NEXT_PUBLIC_API_URL` or `NEXT_PUBLIC_NBBO_MAX_AGE_MS`, rebuild t
 
 ```bash
 docker compose build web
-docker compose up -d web proxy
+docker compose up -d web
 ```
 
 ## Backups and persistence
@@ -189,5 +203,14 @@ Only use `-v` if you intentionally want to wipe ClickHouse, Redis, and JetStream
 ## Known caveats
 
 - The root `.env.example` still contains a `REPLAY_ENABLED` comment, but the current replay service does not read that variable. Use the Compose replay profile instead.
-- This stack exposes plain HTTP on port `80`. If you want TLS termination on the box, put Caddy, Nginx, Traefik, or a cloud load balancer in front of it, or replace the bundled Nginx config with your preferred HTTPS setup.
+- This stack does not publish `web` or `api` to host ports. NPM must be able to resolve `web` and `api` over the shared Docker network.
 - The stack assumes a single-node VPS deployment. If you later split infra or add external managed services, update the three core connection URLs in `.env`.
+
+## Smoke checks
+
+After NPM is wired up:
+
+- `https://app.<domain>/` should load the UI.
+- Browser network requests from the UI should target `https://api.<domain>/...`.
+- Live feeds should connect over `wss://api.<domain>/ws/...`.
+- `docker compose ps` should show no service publishing host port `80`.

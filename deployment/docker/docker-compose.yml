@@ -16,17 +16,6 @@ x-service-common: &service-common
     - redis
 
 services:
-  proxy:
-    image: nginx:1.27-alpine
-    restart: unless-stopped
-    depends_on:
-      - web
-      - api
-    ports:
-      - "80:80"
-    volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
-
   web:
     build:
       context: ../..
@@ -38,6 +27,8 @@ services:
       - ./.env
     restart: unless-stopped
     init: true
+    expose:
+      - "3000"
     depends_on:
       api:
         condition: service_healthy
@@ -57,6 +48,8 @@ services:
   api:
     <<: *service-common
     command: ["services/api/src/index.ts"]
+    expose:
+      - "4000"
     healthcheck:
       test:
         [
