@@ -21,6 +21,7 @@ It is separate from the repo-root `docker-compose.yml`, which is still the light
 - `deployment/docker/Dockerfile.service`: shared Bun runtime image for most services
 - `deployment/docker/Dockerfile.ingest-options`: Bun runtime plus Python dependencies for Databento and IBKR adapters
 - `deployment/docker/Dockerfile.web`: multi-stage build for the Next.js web app
+- `deployment/docker/clickhouse/listen.xml`: forces ClickHouse to listen on IPv4 for other containers on the Docker network
 - `deployment/docker/.env.example`: container-oriented environment template
 
 ## Prerequisites
@@ -67,6 +68,13 @@ Now build and start the stack:
 
 ```bash
 docker compose up -d --build
+```
+
+If you are updating an existing deployment that already has failing `api` restart loops, do a full recreate so the ClickHouse config mount and dependency changes are applied cleanly:
+
+```bash
+docker compose down
+docker compose up -d --build --force-recreate
 ```
 
 4. Confirm the containers are healthy:
@@ -219,6 +227,7 @@ Only use `-v` if you intentionally want to wipe ClickHouse, Redis, and JetStream
 
 - The root `.env.example` still contains a `REPLAY_ENABLED` comment, but the current replay service does not read that variable. Use the Compose replay profile instead.
 - This stack does not publish `web` or `api` to host ports. NPM must be able to resolve `web` and `api` over the shared user-defined network from `NPM_SHARED_NETWORK`.
+- Some hosts disable IPv6 inside containers; the bundled ClickHouse config pins `listen_host` to `0.0.0.0` so the API can reach ClickHouse reliably over Docker networking.
 - The stack assumes a single-node VPS deployment. If you later split infra or add external managed services, update the three core connection URLs in `.env`.
 
 ## Smoke checks
