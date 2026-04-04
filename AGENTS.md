@@ -1,186 +1,188 @@
-# AGENTS.md — Execution Guardrails for Codex
+# Agent Instructions
 
-This file defines **how Codex should think, act, and prioritize** when working in this repository.  
-Its purpose is to keep development **focused, correct, and non-drifting**.
+See [AGENT_INSTRUCTIONS.md](AGENT_INSTRUCTIONS.md) for full instructions.
 
-If there is any conflict between speed and correctness, **correctness wins**.
+This file exists for compatibility with tools that look for AGENTS.md.
 
----
+## Key Sections
 
-## Mission
+- **Issue Tracking** - How to use bd for work management
+- **Development Guidelines** - Code standards and testing
+- **Visual Design System** - Status icons, colors, and semantic styling for CLI output
 
-Build a **real-time, non-delayed options flow and off-exchange trade analysis platform** for personal use that is:
+## Visual Design Anti-Patterns
 
-- explainable
-- deterministic
-- replayable
-- microstructure-correct
-- low-latency
-- built on **Bun**
+**NEVER use emoji-style icons** (🔴🟠🟡🔵⚪) in CLI output. They cause cognitive overload.
 
-Codex is an **engineering executor**, not a product visionary.  
-Do not invent scope. Do not “improve” the plan. Implement it faithfully.
+**ALWAYS use small Unicode symbols** with semantic colors:
+- Status: `○ ◐ ● ✓ ❄`
+- Priority: `● P0` (filled circle with color)
 
----
+See [AGENT_INSTRUCTIONS.md](AGENT_INSTRUCTIONS.md) for full development guidelines.
 
-## Non-Negotiable Constraints
+## Agent Warning: Interactive Commands
 
-- **Bun is mandatory**
-  - Use Bun for runtime, package manager, scripts, and dev tooling.
-  - Do not introduce npm, yarn, pnpm, or Node-only assumptions.
-- **TypeScript only**
-  - No JS-only files unless unavoidable (and document why).
-- **No black-box logic**
-  - All classifiers must be rule-based and explainable.
-- **Personal-use architecture**
-  - No multi-user assumptions.
-  - No redistribution mechanisms.
-- **Deterministic pipelines**
-  - Live behavior must match replay behavior.
+**DO NOT use `bd edit`** - it opens an interactive editor ($EDITOR) which AI agents cannot use.
 
-If a change violates any of the above, **do not implement it**.
+Use `bd update` with flags instead:
+```bash
+bd update <id> --description "new description"
+bd update <id> --title "new title"
+bd update <id> --design "design notes"
+bd update <id> --notes "additional notes"
+bd update <id> --acceptance "acceptance criteria"
 
----
+# Use stdin for descriptions with special characters (backticks, !, nested quotes)
+echo 'Description with `backticks` and "quotes"' | bd create "Title" --description=-
+echo 'Updated text' | bd update <id> --description=-
+```
 
-## Source of Truth
+## Testing Commands (No Ambiguity)
 
-The authoritative documents are, in order:
+- Default local test command: `make test` (or `./scripts/test.sh`).
+- Full CGO-enabled suite: `make test-full-cgo` (or `./scripts/test-cgo.sh ./...`).
+- On macOS, do **not** run raw `CGO_ENABLED=1 go test ./...` unless ICU flags are set; use the script/Make target above.
+- If you need package- or test-scoped CGO runs:
+```bash
+./scripts/test-cgo.sh ./cmd/bd/...
+./scripts/test-cgo.sh -run '^TestName$' ./cmd/bd/...
+```
 
-1. `PLAN.md`
-2. `AGENTS.md`
-3. Code already merged into `main`
+## Non-Interactive Shell Commands
 
-If a request contradicts `PLAN.md`, Codex must **stop and ask for clarification**.
+**ALWAYS use non-interactive flags** with file operations to avoid hanging on confirmation prompts.
 
----
+Shell commands like `cp`, `mv`, and `rm` may be aliased to include `-i` (interactive) mode on some systems, causing the agent to hang indefinitely waiting for y/n input.
 
-## Development Rules
+**Use these forms instead:**
+```bash
+# Force overwrite without prompting
+cp -f source dest           # NOT: cp source dest
+mv -f source dest           # NOT: mv source dest
+rm -f file                  # NOT: rm file
 
-### 1. Never Skip the Event Layer
-- All incoming market data becomes **immutable events**.
-- Never compute directly off live feeds without persisting the event.
-- Never add UI-only logic that bypasses persisted data.
+# For recursive operations
+rm -rf directory            # NOT: rm -r directory
+cp -rf source dest          # NOT: cp -r source dest
+```
 
-### 2. Separate Fact from Inference
-- Raw data (`OptionPrint`, `EquityPrint`) is **fact**.
-- Classifiers and dark pool signals are **inference**.
-- Store and label them separately.
-- Never overwrite facts with inferred labels.
+**Other commands that may prompt:**
+- `scp` - use `-o BatchMode=yes` for non-interactive
+- `ssh` - use `-o BatchMode=yes` to fail instead of prompting
+- `apt-get` - use `-y` flag
+- `brew` - use `HOMEBREW_NO_AUTO_UPDATE=1` env var
 
-### 3. Explainability Is Required
-Every classifier must:
-- have a unique ID
-- expose its inputs
-- produce a human-readable explanation string
-- link back to evidence prints
+## Landing the Plane (Session Completion)
 
-If an alert cannot explain itself, it is invalid.
+**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
 
-### 4. Favor Simple, Explicit Logic
-- Prefer clear thresholds over clever heuristics.
-- Avoid premature ML or probabilistic tuning.
-- If logic becomes complex, break it into named steps.
+**MANDATORY WORKFLOW:**
 
-This is a research system, not a trading bot.
+1. **File issues for remaining work** - Create issues for anything that needs follow-up
+2. **Run quality gates** (if code changed) - Tests, linters, builds
+3. **Update issue status** - Close finished work, update in-progress items
+4. **PUSH TO REMOTE** - This is MANDATORY:
+   ```bash
+   git pull --rebase
+   git push
+   git status  # MUST show "up to date with origin"
+   ```
+5. **Clean up** - Clear stashes, prune remote branches
+6. **Verify** - All changes committed AND pushed
+7. **Hand off** - Provide context for next session
 
----
+**CRITICAL RULES:**
+- Work is NOT complete until `git push` succeeds
+- NEVER stop before pushing - that leaves work stranded locally
+- NEVER say "ready to push when you are" - YOU must push
+- If push fails, resolve and retry until it succeeds
 
-## Classifier Implementation Rules
+<!-- BEGIN BEADS INTEGRATION -->
+## Issue Tracking with bd (beads)
 
-- Classifiers operate on **FlowPackets**, not raw prints.
-- Each classifier:
-  - returns `{ confidence, direction, explanations[] }`
-  - contributes to alert scoring but does not decide alerts alone
-- Never infer intent with certainty.
-- Use language like:
-  - “likely”
-  - “suggests”
-  - “consistent with”
-- Never use language like:
-  - “smart money”
-  - “institutional intent”
-  - “guaranteed”
+**IMPORTANT**: This project uses **bd (beads)** for ALL issue tracking. Do NOT use markdown TODOs, task lists, or other tracking methods.
 
----
+### Why bd?
 
-## Time & Market Structure Rules
+- Dependency-aware: Track blockers and relationships between issues
+- Git-friendly: Dolt-powered version control with native sync
+- Agent-optimized: JSON output, ready work detection, discovered-from links
+- Prevents duplicate tracking systems and confusion
 
-- Always join prints to NBBO using bounded time windows.
-- Track and expose join quality (`nbbo_age_ms`, etc.).
-- Explicitly handle:
-  - 0DTE
-  - low-liquidity contracts
-  - wide spreads
-- If confidence is low, say so.
+### Quick Start
 
----
+**Check for ready work:**
 
-## Charting Rules
+```bash
+bd ready --json
+```
 
-- Candles are built **server-side only**.
-- Client never computes OHLC.
-- Overlays must be viewport-aware and decimated.
-- Performance beats decoration.
+**Create new issues:**
 
-If a chart stutters, reduce data density first—not visual quality.
+```bash
+bd create "Issue title" --description="Detailed context" -t bug|feature|task -p 0-4 --json
+bd create "Issue title" --description="What this issue is about" -p 1 --deps discovered-from:bd-123 --json
 
----
+# Use stdin for descriptions with special characters (backticks, !, nested quotes)
+echo 'Description with `backticks` and "quotes"' | bd create "Title" --description=- --json
+```
 
-## UI Rules
+**Claim and update:**
 
-- Prefer clarity over density.
-- Every alert must be clickable to evidence.
-- No “magic colors” without legend or explanation.
-- Motion must feel physical, not flashy.
+```bash
+bd update <id> --claim --json
+bd update bd-42 --priority 1 --json
+```
 
-UI exists to **inspect**, not to impress.
+**Complete work:**
 
----
+```bash
+bd close bd-42 --reason "Completed" --json
+```
 
-## Observability & Safety
+### Issue Types
 
-- Add metrics alongside new pipelines.
-- Log failures explicitly.
-- Never silently drop events.
-- During overload:
-  - persistence > compute > UI (in that priority order)
+- `bug` - Something broken
+- `feature` - New functionality
+- `task` - Work item (tests, docs, refactoring)
+- `epic` - Large feature with subtasks
+- `chore` - Maintenance (dependencies, tooling)
 
----
+### Priorities
 
-## What Codex Must NOT Do
+- `0` - Critical (security, data loss, broken builds)
+- `1` - High (major features, important bugs)
+- `2` - Medium (default, nice-to-have)
+- `3` - Low (polish, optimization)
+- `4` - Backlog (future ideas)
 
-- Do not invent new features or markets.
-- Do not introduce predictive claims.
-- Do not optimize prematurely.
-- Do not refactor without reason.
-- Do not replace explicit logic with ML.
-- Do not broaden scope beyond personal use.
+### Workflow for AI Agents
 
----
+1. **Check ready work**: `bd ready` shows unblocked issues
+2. **Claim your task atomically**: `bd update <id> --claim`
+3. **Work on it**: Implement, test, document
+4. **Discover new work?** Create linked issue:
+   - `bd create "Found bug" --description="Details about what was found" -p 1 --deps discovered-from:<parent-id>`
+5. **Complete**: `bd close <id> --reason "Done"`
 
-## When to Stop and Ask
+### Auto-Sync
 
-Codex must pause and ask for guidance if:
-- a data provider limitation blocks implementation
-- licensing or entitlement assumptions change
-- a requested change conflicts with `PLAN.md`
-- a design decision affects determinism or replayability
+bd automatically syncs via Dolt:
 
----
+- Each write auto-commits to Dolt history
+- Use `bd dolt push`/`bd dolt pull` for remote sync
+- No manual export/import needed!
 
-## Definition of “Done”
+### Important Rules
 
-A task is done only when:
-- it matches `PLAN.md`
-- it compiles and runs under Bun
-- it is deterministic
-- it is explainable
-- it is testable or replayable
+- ✅ Use bd for ALL task tracking
+- ✅ Always use `--json` flag for programmatic use
+- ✅ Link discovered work with `discovered-from` dependencies
+- ✅ Check `bd ready` before asking "what should I work on?"
+- ❌ Do NOT create markdown TODO lists
+- ❌ Do NOT use external issue trackers
+- ❌ Do NOT duplicate tracking systems
 
----
+For more details, see README.md and docs/QUICKSTART.md.
 
-## Final Reminder
-
-This system is built to **understand markets**, not to mythologize them.
-
-If something cannot be justified by observable data and clear logic, it does not belong here.
+<!-- END BEADS INTEGRATION -->
