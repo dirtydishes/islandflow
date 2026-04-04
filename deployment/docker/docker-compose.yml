@@ -31,7 +31,7 @@ services:
       - "3000"
     networks:
       - default
-      - bridge
+      - shared
     depends_on:
       api:
         condition: service_healthy
@@ -55,7 +55,7 @@ services:
       - "4000"
     networks:
       - default
-      - bridge
+      - shared
     healthcheck:
       test:
         [
@@ -127,9 +127,9 @@ services:
       - nats-data:/data
 
 networks:
-  bridge:
+  shared:
     external: true
-    name: bridge
+    name: ${NPM_SHARED_NETWORK:-npm-shared}
 
 volumes:
   clickhouse-data:

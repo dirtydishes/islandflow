@@ -6,7 +6,7 @@ It is separate from the repo-root `docker-compose.yml`, which is still the light
 
 ## What this stack does
 
-- Assumes Nginx Proxy Manager is the edge proxy and runs on the shared Docker network named `bridge`.
+- Assumes Nginx Proxy Manager is the edge proxy and runs on a shared user-defined Docker network.
 - Keeps `web` and `api` internal to the Docker network instead of publishing host ports.
 - Targets a two-subdomain routing model by default:
   - `app.<domain>` -> `web:3000`
@@ -28,7 +28,7 @@ It is separate from the repo-root `docker-compose.yml`, which is still the light
 - A Linux VPS with Docker Engine and Docker Compose v2 installed
 - Enough RAM for ClickHouse plus the Bun services
 - Nginx Proxy Manager running in Docker on the same host
-- A shared Docker network named `bridge`
+- A shared user-defined Docker network for NPM and this stack
 
 Optional:
 
@@ -50,9 +50,20 @@ Important defaults:
 
 - `NATS_URL`, `CLICKHOUSE_URL`, and `REDIS_URL` should stay on the internal container hostnames unless you intentionally split infra out.
 - `OPTIONS_INGEST_ADAPTER=synthetic` and `EQUITIES_INGEST_ADAPTER=synthetic` are the safest first boot settings.
+- `NPM_SHARED_NETWORK=npm-shared` is the recommended external Docker network name for NPM and this stack.
 - `NEXT_PUBLIC_API_URL=https://api.example.com` is the recommended production shape when using NPM with two subdomains.
 
 3. Build and start the stack:
+
+If you have not created the shared Docker network yet, do that once first:
+
+```bash
+docker network create npm-shared
+```
+
+Then make sure `.env` keeps `NPM_SHARED_NETWORK=npm-shared`, or set it to whatever user-defined network you want to share with NPM.
+
+Now build and start the stack:
 
 ```bash
 docker compose up -d --build
@@ -67,15 +78,15 @@ docker compose logs -f api web compute candles ingest-options ingest-equities
 
 5. Make sure NPM can reach the stack network.
 
-This deployment attaches `web` and `api` to the external Docker network named `bridge`, in addition to the stack-local network.
+This deployment attaches `web` and `api` to the external Docker network named by `NPM_SHARED_NETWORK`, in addition to the stack-local network.
 
-If your NPM container is not already attached to `bridge`, connect it once:
+If your NPM container is not already attached to that network, connect it once:
 
 ```bash
-docker network connect bridge <npm-container-name>
+docker network connect npm-shared <npm-container-name>
 ```
 
-If your NPM stack uses a different shared user-defined network, update the `bridge` network block in `deployment/docker/docker-compose.yml` to point at that external network name, then redeploy. The important part is that NPM, `web`, and `api` all share the same external Docker network.
+If you want to use a different network name, set `NPM_SHARED_NETWORK` in `.env` and make sure that external Docker network already exists. The important part is that NPM, `web`, and `api` all share the same user-defined Docker network.
 
 6. Create these NPM proxy hosts:
 
@@ -151,7 +162,7 @@ The web app should be built with `NEXT_PUBLIC_API_URL=https://api.<domain>` so b
 
 The API host needs websocket support enabled because the app uses `/ws/*` endpoints for live streams.
 
-Because `web` and `api` are both attached to `bridge`, NPM can target them directly by container DNS name:
+Because `web` and `api` are both attached to the shared user-defined network, NPM can target them directly by container DNS name:
 
 - `web`
 - `api`
@@ -207,7 +218,7 @@ Only use `-v` if you intentionally want to wipe ClickHouse, Redis, and JetStream
 ## Known caveats
 
 - The root `.env.example` still contains a `REPLAY_ENABLED` comment, but the current replay service does not read that variable. Use the Compose replay profile instead.
-- This stack does not publish `web` or `api` to host ports. NPM must be able to resolve `web` and `api` over the shared `bridge` network.
+- This stack does not publish `web` or `api` to host ports. NPM must be able to resolve `web` and `api` over the shared user-defined network from `NPM_SHARED_NETWORK`.
 - The stack assumes a single-node VPS deployment. If you later split infra or add external managed services, update the three core connection URLs in `.env`.
 
 ## Smoke checks
