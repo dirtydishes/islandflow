@@ -6,7 +6,7 @@ It is separate from the repo-root `docker-compose.yml`, which is still the light
 
 ## What this stack does
 
-- Assumes Nginx Proxy Manager is the edge proxy and runs on the same Docker network.
+- Assumes Nginx Proxy Manager is the edge proxy and runs on the shared Docker network named `bridge`.
 - Keeps `web` and `api` internal to the Docker network instead of publishing host ports.
 - Targets a two-subdomain routing model by default:
   - `app.<domain>` -> `web:3000`
@@ -27,7 +27,8 @@ It is separate from the repo-root `docker-compose.yml`, which is still the light
 
 - A Linux VPS with Docker Engine and Docker Compose v2 installed
 - Enough RAM for ClickHouse plus the Bun services
-- Nginx Proxy Manager running in Docker on the same host/network path you plan to use
+- Nginx Proxy Manager running in Docker on the same host
+- A shared Docker network named `bridge`
 
 Optional:
 
@@ -66,17 +67,15 @@ docker compose logs -f api web compute candles ingest-options ingest-equities
 
 5. Make sure NPM can reach the stack network.
 
-The Compose project name is pinned to `islandflow-vps`, so the default network name will be:
+This deployment attaches `web` and `api` to the external Docker network named `bridge`, in addition to the stack-local network.
+
+If your NPM container is not already attached to `bridge`, connect it once:
 
 ```bash
-islandflow-vps_default
+docker network connect bridge <npm-container-name>
 ```
 
-If your NPM container is separate, connect it once:
-
-```bash
-docker network connect islandflow-vps_default <npm-container-name>
-```
+If your NPM stack uses a different shared user-defined network, update the `bridge` network block in `deployment/docker/docker-compose.yml` to point at that external network name, then redeploy. The important part is that NPM, `web`, and `api` all share the same external Docker network.
 
 6. Create these NPM proxy hosts:
 
@@ -152,6 +151,11 @@ The web app should be built with `NEXT_PUBLIC_API_URL=https://api.<domain>` so b
 
 The API host needs websocket support enabled because the app uses `/ws/*` endpoints for live streams.
 
+Because `web` and `api` are both attached to `bridge`, NPM can target them directly by container DNS name:
+
+- `web`
+- `api`
+
 ## Updating the deployment
 
 When you pull new code:
@@ -203,7 +207,7 @@ Only use `-v` if you intentionally want to wipe ClickHouse, Redis, and JetStream
 ## Known caveats
 
 - The root `.env.example` still contains a `REPLAY_ENABLED` comment, but the current replay service does not read that variable. Use the Compose replay profile instead.
-- This stack does not publish `web` or `api` to host ports. NPM must be able to resolve `web` and `api` over the shared Docker network.
+- This stack does not publish `web` or `api` to host ports. NPM must be able to resolve `web` and `api` over the shared `bridge` network.
 - The stack assumes a single-node VPS deployment. If you later split infra or add external managed services, update the three core connection URLs in `.env`.
 
 ## Smoke checks
