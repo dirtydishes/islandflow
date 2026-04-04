@@ -29,6 +29,9 @@ services:
     init: true
     expose:
       - "3000"
+    networks:
+      - default
+      - bridge
     depends_on:
       api:
         condition: service_healthy
@@ -50,6 +53,9 @@ services:
     command: ["services/api/src/index.ts"]
     expose:
       - "4000"
+    networks:
+      - default
+      - bridge
     healthcheck:
       test:
         [
@@ -119,6 +125,11 @@ services:
     command: ["-js", "-sd", "/data"]
     volumes:
       - nats-data:/data
+
+networks:
+  bridge:
+    external: true
+    name: bridge
 
 volumes:
   clickhouse-data:
