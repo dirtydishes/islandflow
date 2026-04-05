@@ -92,7 +92,12 @@ export const createClickHouseClient = (options: ClickHouseOptions): ClickHouseCl
     url: options.url,
     database: options.database,
     username: options.username,
-    password: options.password
+    password: options.password,
+    // Bun can reach ClickHouse via fetch, but the Node agent keep-alive path
+    // used by this client has been unreliable in our container deployment.
+    keep_alive: {
+      enabled: false
+    }
   });
 };
 
