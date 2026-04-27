@@ -678,6 +678,10 @@ const run = async () => {
 
   const liveState = new LiveStateManager(clickhouse, redis);
   await liveState.hydrate();
+  const liveStateMetricsTimer = setInterval(() => {
+    const snapshot = liveState.getStatsSnapshot();
+    logger.info("live cache metrics", snapshot);
+  }, 60000);
 
   const subscribeWithReset = async <T>(
     subject: string,
@@ -1475,6 +1479,7 @@ const run = async () => {
     state.shutdownPromise = (async () => {
       logger.info("service stopping", { signal });
       server.stop();
+      clearInterval(liveStateMetricsTimer);
 
       if (redis && redis.isOpen) {
         try {

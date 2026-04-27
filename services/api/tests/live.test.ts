@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import type { ClickHouseClient } from "@islandflow/storage";
-import { LiveStateManager } from "../src/live";
+import { LiveStateManager, resolveGenericLiveLimits } from "../src/live";
 
 const makeClickHouse = (): ClickHouseClient =>
   ({
@@ -48,6 +48,19 @@ const makeRedis = () => {
 };
 
 describe("LiveStateManager", () => {
+  it("resolves live limits from env with clamping", () => {
+    const limits = resolveGenericLiveLimits({
+      LIVE_LIMIT_OPTIONS: "777",
+      LIVE_LIMIT_NBBO: "200000",
+      LIVE_LIMIT_FLOW: "bad"
+    } as NodeJS.ProcessEnv);
+
+    expect(limits.options).toBe(777);
+    expect(limits.nbbo).toBe(100000);
+    expect(limits.flow).toBe(10000);
+    expect(limits.alerts).toBe(10000);
+  });
+
   it("hydrates snapshots from redis generic windows", async () => {
     const redis = makeRedis();
     await redis.lPush(
@@ -119,5 +132,68 @@ describe("LiveStateManager", () => {
     expect(overlaySnapshot.items).toHaveLength(1);
     expect(candleSnapshot.watermark).toEqual({ ts: 100, seq: 1 });
     expect(overlaySnapshot.watermark).toEqual({ ts: 110, seq: 2 });
+  });
+
+  it("trims generic windows to configured per-channel limits", async () => {
+    const redis = makeRedis();
+    const manager = new LiveStateManager(
+      makeClickHouse(),
+      redis as never,
+      {
+        options: 10000,
+        nbbo: 10000,
+        equities: 10000,
+        "equity-joins": 10000,
+        flow: 2,
+        "classifier-hits": 10000,
+        alerts: 10000,
+        "inferred-dark": 10000
+      }
+    );
+
+    await manager.ingest("flow", {
+      source_ts: 100,
+      ingest_ts: 101,
+      seq: 1,
+      trace_id: "flow-1",
+      id: "flow-1",
+      members: ["a"],
+      features: {},
+      join_quality: {}
+    });
+    await manager.ingest("flow", {
+      source_ts: 110,
+      ingest_ts: 111,
+      seq: 2,
+      trace_id: "flow-2",
+      id: "flow-2",
+      members: ["b"],
+      features: {},
+      join_quality: {}
+    });
+    await manager.ingest("flow", {
+      source_ts: 120,
+      ingest_ts: 121,
+      seq: 3,
+      trace_id: "flow-3",
+      id: "flow-3",
+      members: ["c"],
+      features: {},
+      join_quality: {}
+    });
+
+    const snapshot = await manager.getSnapshot({ channel: "flow" });
+    expect(snapshot.items).toHaveLength(2);
+    expect((snapshot.items as Array<{ id: string }>).map((item) => item.id)).toEqual([
+      "flow-3",
+      "flow-2"
+    ]);
+
+    const persisted = await redis.lRange("live:flow", 0, 99);
+    expect(persisted).toHaveLength(2);
+
+    const stats = manager.getStatsSnapshot();
+    expect(stats.trimOperations).toBeGreaterThan(0);
+    expect(stats.cacheDepthByKey["live:flow"]).toBe(2);
   });
 });
