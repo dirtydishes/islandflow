@@ -4066,30 +4066,38 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
         <div className="terminal-frame">
           <header className="terminal-topbar">
             <FeedStatusBar />
-            <div className="terminal-topbar-controls">
-              <label className="terminal-filter">
-                <span className="terminal-filter-label">Filter</span>
-                <span className="terminal-filter-field">
-                  <input
-                    className="terminal-input"
-                    value={state.filterInput}
-                    onChange={(event) => state.setFilterInput(event.target.value)}
-                    placeholder="SPY, NVDA, AAPL"
-                    spellCheck={false}
-                  />
-                </span>
-              </label>
-              <button
-                className="terminal-button"
-                type="button"
-                onClick={() => state.setFilterInput("")}
-                disabled={state.filterInput.trim().length === 0}
-              >
-                Clear
-              </button>
-              <button className="terminal-button terminal-button-primary" type="button" onClick={state.toggleMode}>
-                {state.mode === "live" ? "Replay" : "Live"}
-              </button>
+            <div className="terminal-topbar-actions">
+              <div className="terminal-topbar-controls">
+                <label className="terminal-filter">
+                  <span className="terminal-filter-label">Filter</span>
+                  <span className="terminal-filter-field">
+                    <input
+                      className="terminal-input"
+                      value={state.filterInput}
+                      onChange={(event) => state.setFilterInput(event.target.value)}
+                      placeholder="SPY, NVDA, AAPL"
+                      spellCheck={false}
+                    />
+                  </span>
+                </label>
+                <button
+                  className="terminal-button"
+                  type="button"
+                  onClick={() => state.setFilterInput("")}
+                  disabled={state.filterInput.trim().length === 0}
+                >
+                  Clear
+                </button>
+              </div>
+              <div className="terminal-topbar-mode">
+                <button
+                  className="terminal-button terminal-button-primary"
+                  type="button"
+                  onClick={state.toggleMode}
+                >
+                  {state.mode === "live" ? "Replay" : "Live"}
+                </button>
+              </div>
             </div>
           </header>
 

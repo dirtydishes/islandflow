@@ -159,18 +159,18 @@ input {
 .terminal-frame {
   min-width: 0;
   display: grid;
-  grid-template-rows: var(--topbar-height) minmax(0, 1fr);
+  grid-template-rows: minmax(var(--topbar-height), auto) minmax(0, 1fr);
 }
 
 .terminal-topbar {
   position: sticky;
   top: 0;
   z-index: 20;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  padding: 14px 24px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 18px 24px;
+  padding: 16px 24px 14px;
   background: rgba(7, 10, 14, 0.92);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border);
@@ -181,6 +181,7 @@ input {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+  min-width: 0;
 }
 
 .feed-status {
@@ -226,18 +227,35 @@ input {
   box-shadow: 0 0 0 4px rgba(255, 107, 95, 0.12);
 }
 
+.terminal-topbar-actions {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 20px;
+  min-width: 0;
+}
+
 .terminal-topbar-controls {
   display: flex;
   align-items: flex-end;
-  gap: 14px;
-  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+  min-width: 0;
+}
+
+.terminal-topbar-mode {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  flex: 0 0 auto;
 }
 
 .terminal-filter {
-  display: grid;
-  gap: 2px;
-  min-width: clamp(220px, 22vw, 320px);
-  flex: 0 1 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: clamp(280px, 26vw, 420px);
+  flex: 0 1 clamp(280px, 26vw, 420px);
 }
 
 .terminal-filter-label {
@@ -249,7 +267,7 @@ input {
   position: relative;
   display: flex;
   align-items: center;
-  min-height: 34px;
+  min-height: 36px;
 }
 
 .terminal-filter-field::before,
@@ -283,7 +301,7 @@ input {
 .terminal-input {
   min-width: 0;
   width: 100%;
-  padding: 0 0 6px;
+  padding: 0 0 8px;
   border: none;
   border-radius: 0;
   background: transparent;
@@ -1021,9 +1039,16 @@ h3 {
 
   .terminal-topbar {
     position: static;
-    height: auto;
-    flex-direction: column;
+    grid-template-columns: minmax(0, 1fr);
     align-items: stretch;
+  }
+
+  .terminal-topbar-actions {
+    justify-content: space-between;
+  }
+
+  .terminal-topbar-controls {
+    flex: 1 1 auto;
   }
 }
 
@@ -1046,13 +1071,24 @@ h3 {
     align-items: flex-start;
   }
 
-  .terminal-topbar-controls {
+  .terminal-topbar-actions,
+  .terminal-topbar-controls,
+  .terminal-topbar-mode {
     width: 100%;
+    justify-content: flex-start;
+  }
+
+  .terminal-topbar-actions,
+  .terminal-topbar-controls {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .terminal-filter {
     width: 100%;
-    flex-basis: 100%;
+    min-width: 0;
+    flex-basis: auto;
+    flex: 1 1 auto;
   }
 
   .terminal-input {
