@@ -3223,8 +3223,7 @@ const NAV_ITEMS = [
   { href: "/tape", label: "Tape" },
   { href: "/signals", label: "Signals" },
   { href: "/charts", label: "Charts" },
-  { href: "/replay", label: "Replay" },
-  { href: "/concepts", label: "Concepts" }
+  { href: "/replay", label: "Replay" }
 ];
 
 type PageFrameProps = {
