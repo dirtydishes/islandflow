@@ -77,14 +77,13 @@ input {
 
 .terminal-brand {
   display: grid;
-  gap: 4px;
+  gap: 8px;
 }
 
-.terminal-brand-kicker {
-  font-family: var(--font-display), sans-serif;
-  font-size: 0.78rem;
-  letter-spacing: 0.24em;
-  color: var(--accent);
+.terminal-brand-mark {
+  width: 36px;
+  height: 36px;
+  color: #fff;
 }
 
 .terminal-brand-name {
