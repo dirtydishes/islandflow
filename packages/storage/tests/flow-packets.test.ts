@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { createClickHouseClient, fetchFlowPacketById, fetchFlowPacketsBefore } from "../src/clickhouse";
 import {
   flowPacketsTableDDL,
   FLOW_PACKETS_TABLE,
@@ -35,5 +36,25 @@ describe("flow-packets storage helpers", () => {
     const restored = fromFlowPacketRecord(record);
     expect(restored.features).toEqual(packet.features);
     expect(restored.join_quality).toEqual(packet.join_quality);
+  });
+
+  it("builds before-history and id lookup queries", async () => {
+    const queries: string[] = [];
+    const client = createClickHouseClient({ url: "http://127.0.0.1:8123" });
+    client.query = async ({ query }) => {
+      queries.push(query);
+      return {
+        async json<T>() {
+          return [] as T;
+        }
+      };
+    };
+
+    await fetchFlowPacketsBefore(client, 200, 3, 15);
+    await fetchFlowPacketById(client, "fp-1");
+
+    expect(queries[0]).toContain("(source_ts, seq) < (200, 3)");
+    expect(queries[0]).toContain("ORDER BY source_ts DESC, seq DESC LIMIT 15");
+    expect(queries[1]).toContain("WHERE id = 'fp-1'");
   });
 });

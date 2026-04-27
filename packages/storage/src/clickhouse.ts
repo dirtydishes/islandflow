@@ -418,6 +418,14 @@ const clampLimit = (limit: number): number => {
   return Math.max(1, Math.min(1000, Math.floor(limit)));
 };
 
+const clampLookupLimit = (limit: number): number => {
+  if (!Number.isFinite(limit)) {
+    return 100;
+  }
+
+  return Math.max(1, Math.min(5000, Math.floor(limit)));
+};
+
 const clampPositiveInt = (value: number, fallback = 1): number => {
   if (!Number.isFinite(value)) {
     return fallback;
@@ -450,6 +458,10 @@ const quoteString = (value: string): string => {
   return `'${escaped}'`;
 };
 
+const buildStringList = (values: string[]): string => {
+  return values.map((value) => quoteString(value)).join(", ");
+};
+
 const buildTracePrefixCondition = (tracePrefix: string | undefined): string | null => {
   if (!tracePrefix) {
     return null;
@@ -459,6 +471,15 @@ const buildTracePrefixCondition = (tracePrefix: string | undefined): string | nu
     return null;
   }
   return `startsWith(trace_id, ${quoteString(normalized)})`;
+};
+
+const buildBeforeTupleCondition = (
+  tsColumn: string,
+  seqColumn: string,
+  beforeTs: number,
+  beforeSeq: number
+): string => {
+  return `(${tsColumn}, ${seqColumn}) < (${clampCursor(beforeTs)}, ${clampCursor(beforeSeq)})`;
 };
 
 const normalizeNumericFields = (
@@ -1094,4 +1115,216 @@ export const fetchAlertsAfter = async (
     .filter((record): record is AlertRecord => record !== null);
   const alerts = records.map(fromAlertRecord);
   return AlertEventSchema.array().parse(alerts);
+};
+
+export const fetchOptionPrintsBefore = async (
+  client: ClickHouseClient,
+  beforeTs: number,
+  beforeSeq: number,
+  limit: number,
+  tracePrefix?: string
+): Promise<OptionPrint[]> => {
+  const safeLimit = clampLimit(limit);
+  const conditions = [buildBeforeTupleCondition("ts", "seq", beforeTs, beforeSeq)];
+  const traceCondition = buildTracePrefixCondition(tracePrefix);
+  if (traceCondition) {
+    conditions.push(traceCondition);
+  }
+
+  const result = await client.query({
+    query: `SELECT * FROM ${OPTION_PRINTS_TABLE} WHERE ${conditions.join(" AND ")} ORDER BY ts DESC, seq DESC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  return OptionPrintSchema.array().parse(rows.map(normalizeOptionRow));
+};
+
+export const fetchOptionNBBOBefore = async (
+  client: ClickHouseClient,
+  beforeTs: number,
+  beforeSeq: number,
+  limit: number,
+  tracePrefix?: string
+): Promise<OptionNBBO[]> => {
+  const safeLimit = clampLimit(limit);
+  const conditions = [buildBeforeTupleCondition("ts", "seq", beforeTs, beforeSeq)];
+  const traceCondition = buildTracePrefixCondition(tracePrefix);
+  if (traceCondition) {
+    conditions.push(traceCondition);
+  }
+
+  const result = await client.query({
+    query: `SELECT * FROM ${OPTION_NBBO_TABLE} WHERE ${conditions.join(" AND ")} ORDER BY ts DESC, seq DESC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  return OptionNBBOSchema.array().parse(rows.map(normalizeOptionNbboRow));
+};
+
+export const fetchEquityPrintsBefore = async (
+  client: ClickHouseClient,
+  beforeTs: number,
+  beforeSeq: number,
+  limit: number
+): Promise<EquityPrint[]> => {
+  const safeLimit = clampLimit(limit);
+  const result = await client.query({
+    query: `SELECT * FROM ${EQUITY_PRINTS_TABLE} WHERE ${buildBeforeTupleCondition("ts", "seq", beforeTs, beforeSeq)} ORDER BY ts DESC, seq DESC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  return EquityPrintSchema.array().parse(rows.map(normalizeEquityRow));
+};
+
+export const fetchEquityPrintJoinsBefore = async (
+  client: ClickHouseClient,
+  beforeTs: number,
+  beforeSeq: number,
+  limit: number
+): Promise<EquityPrintJoin[]> => {
+  const safeLimit = clampLimit(limit);
+  const result = await client.query({
+    query: `SELECT * FROM ${EQUITY_PRINT_JOINS_TABLE} WHERE ${buildBeforeTupleCondition("source_ts", "seq", beforeTs, beforeSeq)} ORDER BY source_ts DESC, seq DESC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  const records = rows
+    .map(normalizeEquityPrintJoinRow)
+    .filter((record): record is EquityPrintJoinRecord => record !== null);
+  return EquityPrintJoinSchema.array().parse(records.map(fromEquityPrintJoinRecord));
+};
+
+export const fetchFlowPacketsBefore = async (
+  client: ClickHouseClient,
+  beforeTs: number,
+  beforeSeq: number,
+  limit: number
+): Promise<FlowPacket[]> => {
+  const safeLimit = clampLimit(limit);
+  const result = await client.query({
+    query: `SELECT * FROM ${FLOW_PACKETS_TABLE} WHERE ${buildBeforeTupleCondition("source_ts", "seq", beforeTs, beforeSeq)} ORDER BY source_ts DESC, seq DESC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  const records = rows
+    .map(normalizeFlowPacketRow)
+    .filter((record): record is FlowPacketRecord => record !== null);
+  return FlowPacketSchema.array().parse(records.map(fromFlowPacketRecord));
+};
+
+export const fetchClassifierHitsBefore = async (
+  client: ClickHouseClient,
+  beforeTs: number,
+  beforeSeq: number,
+  limit: number
+): Promise<ClassifierHitEvent[]> => {
+  const safeLimit = clampLimit(limit);
+  const result = await client.query({
+    query: `SELECT * FROM ${CLASSIFIER_HITS_TABLE} WHERE ${buildBeforeTupleCondition("source_ts", "seq", beforeTs, beforeSeq)} ORDER BY source_ts DESC, seq DESC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  const records = rows
+    .map(normalizeClassifierHitRow)
+    .filter((record): record is ClassifierHitRecord => record !== null);
+  return ClassifierHitEventSchema.array().parse(records.map(fromClassifierHitRecord));
+};
+
+export const fetchAlertsBefore = async (
+  client: ClickHouseClient,
+  beforeTs: number,
+  beforeSeq: number,
+  limit: number
+): Promise<AlertEvent[]> => {
+  const safeLimit = clampLimit(limit);
+  const result = await client.query({
+    query: `SELECT * FROM ${ALERTS_TABLE} WHERE ${buildBeforeTupleCondition("source_ts", "seq", beforeTs, beforeSeq)} ORDER BY source_ts DESC, seq DESC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  const records = rows
+    .map(normalizeAlertRow)
+    .filter((record): record is AlertRecord => record !== null);
+  return AlertEventSchema.array().parse(records.map(fromAlertRecord));
+};
+
+export const fetchInferredDarkBefore = async (
+  client: ClickHouseClient,
+  beforeTs: number,
+  beforeSeq: number,
+  limit: number
+): Promise<InferredDarkEvent[]> => {
+  const safeLimit = clampLimit(limit);
+  const result = await client.query({
+    query: `SELECT * FROM ${INFERRED_DARK_TABLE} WHERE ${buildBeforeTupleCondition("source_ts", "seq", beforeTs, beforeSeq)} ORDER BY source_ts DESC, seq DESC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  const records = rows
+    .map(normalizeInferredDarkRow)
+    .filter((record): record is InferredDarkRecord => record !== null);
+  return InferredDarkEventSchema.array().parse(records.map(fromInferredDarkRecord));
+};
+
+export const fetchFlowPacketById = async (
+  client: ClickHouseClient,
+  id: string
+): Promise<FlowPacket | null> => {
+  const result = await client.query({
+    query: `SELECT * FROM ${FLOW_PACKETS_TABLE} WHERE id = ${quoteString(id)} ORDER BY source_ts DESC, seq DESC LIMIT 1`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  const record = rows
+    .map(normalizeFlowPacketRow)
+    .find((row): row is FlowPacketRecord => row !== null);
+  return record ? FlowPacketSchema.parse(fromFlowPacketRecord(record)) : null;
+};
+
+export const fetchOptionPrintsByTraceIds = async (
+  client: ClickHouseClient,
+  traceIds: string[]
+): Promise<OptionPrint[]> => {
+  const ids = Array.from(new Set(traceIds.map((id) => id.trim()).filter(Boolean)));
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const result = await client.query({
+    query: `SELECT * FROM ${OPTION_PRINTS_TABLE} WHERE trace_id IN (${buildStringList(ids)}) ORDER BY ts DESC, seq DESC LIMIT ${clampLookupLimit(ids.length)}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  return OptionPrintSchema.array().parse(rows.map(normalizeOptionRow));
+};
+
+export const fetchEquityPrintJoinsByIds = async (
+  client: ClickHouseClient,
+  ids: string[]
+): Promise<EquityPrintJoin[]> => {
+  const uniqueIds = Array.from(new Set(ids.map((id) => id.trim()).filter(Boolean)));
+  if (uniqueIds.length === 0) {
+    return [];
+  }
+
+  const result = await client.query({
+    query: `SELECT * FROM ${EQUITY_PRINT_JOINS_TABLE} WHERE id IN (${buildStringList(uniqueIds)}) ORDER BY source_ts DESC, seq DESC LIMIT ${clampLookupLimit(uniqueIds.length)}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  const records = rows
+    .map(normalizeEquityPrintJoinRow)
+    .filter((record): record is EquityPrintJoinRecord => record !== null);
+  return EquityPrintJoinSchema.array().parse(records.map(fromEquityPrintJoinRecord));
 };

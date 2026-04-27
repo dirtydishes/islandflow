@@ -39,8 +39,12 @@ import {
   ensureOptionNBBOTable,
   ensureOptionPrintsTable,
   fetchAlertsAfter,
+  fetchAlertsBefore,
   fetchClassifierHitsAfter,
+  fetchClassifierHitsBefore,
   fetchFlowPacketsAfter,
+  fetchFlowPacketById,
+  fetchFlowPacketsBefore,
   fetchRecentAlerts,
   fetchRecentClassifierHits,
   fetchRecentEquityPrintJoins,
@@ -49,31 +53,46 @@ import {
   fetchRecentEquityQuotes,
   fetchEquityCandlesAfter,
   fetchEquityCandlesRange,
+  fetchEquityPrintJoinsByIds,
+  fetchEquityPrintJoinsBefore,
   fetchRecentOptionNBBO,
   fetchEquityPrintsAfter,
+  fetchEquityPrintsBefore,
   fetchEquityPrintsRange,
   fetchEquityPrintJoinsAfter,
   fetchEquityQuotesAfter,
+  fetchInferredDarkBefore,
   fetchInferredDarkAfter,
   fetchRecentEquityPrints,
+  fetchOptionNBBOBefore,
   fetchOptionNBBOAfter,
+  fetchOptionPrintsBefore,
   fetchOptionPrintsAfter,
+  fetchOptionPrintsByTraceIds,
   fetchRecentOptionPrints
 } from "@islandflow/storage";
 import {
   AlertEventSchema,
   ClassifierHitEventSchema,
+  Cursor,
   EquityCandleSchema,
   EquityPrintSchema,
   EquityPrintJoinSchema,
   EquityQuoteSchema,
+  FeedSnapshot,
   InferredDarkEventSchema,
+  LiveClientMessageSchema,
+  LiveServerMessage,
+  LiveSubscription,
+  LiveSubscriptionSchema,
   FlowPacketSchema,
   OptionNBBOSchema,
-  OptionPrintSchema
+  OptionPrintSchema,
+  getSubscriptionKey
 } from "@islandflow/types";
 import { createClient } from "redis";
 import { z } from "zod";
+import { LiveStateManager } from "./live";
 
 const service = "api";
 const logger = createLogger({ service });
@@ -148,6 +167,11 @@ const replayParamsSchema = z.object({
   after_seq: z.coerce.number().int().nonnegative().default(0),
   limit: z.coerce.number().int().positive().max(1000).default(200)
 });
+const beforeParamsSchema = z.object({
+  before_ts: z.coerce.number().int().nonnegative(),
+  before_seq: z.coerce.number().int().nonnegative(),
+  limit: z.coerce.number().int().positive().max(1000).default(200)
+});
 
 const replaySourceSchema = z
   .string()
@@ -192,16 +216,26 @@ type WsData = {
   channel: Channel;
 };
 
-const optionSockets = new Set<WebSocket<WsData>>();
-const optionNbboSockets = new Set<WebSocket<WsData>>();
-const equitySockets = new Set<WebSocket<WsData>>();
-const equityCandleSockets = new Set<WebSocket<WsData>>();
-const equityQuoteSockets = new Set<WebSocket<WsData>>();
-const equityJoinSockets = new Set<WebSocket<WsData>>();
-const inferredDarkSockets = new Set<WebSocket<WsData>>();
-const flowSockets = new Set<WebSocket<WsData>>();
-const classifierHitSockets = new Set<WebSocket<WsData>>();
-const alertSockets = new Set<WebSocket<WsData>>();
+type LiveWsData = {
+  channel: "live";
+};
+
+type LegacySocket = any;
+type LiveSocket = any;
+
+const optionSockets = new Set<LegacySocket>();
+const optionNbboSockets = new Set<LegacySocket>();
+const equitySockets = new Set<LegacySocket>();
+const equityCandleSockets = new Set<LegacySocket>();
+const equityQuoteSockets = new Set<LegacySocket>();
+const equityJoinSockets = new Set<LegacySocket>();
+const inferredDarkSockets = new Set<LegacySocket>();
+const flowSockets = new Set<LegacySocket>();
+const classifierHitSockets = new Set<LegacySocket>();
+const alertSockets = new Set<LegacySocket>();
+const liveSocketSubscriptions = new Map<LiveSocket, Set<string>>();
+const subscriptionSockets = new Map<string, Set<LiveSocket>>();
+const liveHeartbeats = new Map<LiveSocket, ReturnType<typeof setInterval>>();
 
 const jsonResponse = (body: unknown, status = 200): Response => {
   return new Response(JSON.stringify(body), {
@@ -230,6 +264,20 @@ const parseReplayParams = (url: URL): { afterTs: number; afterSeq: number; limit
   return {
     afterTs: params.after_ts,
     afterSeq: params.after_seq,
+    limit: params.limit
+  };
+};
+
+const parseBeforeParams = (url: URL): { beforeTs: number; beforeSeq: number; limit: number } => {
+  const params = beforeParamsSchema.parse({
+    before_ts: url.searchParams.get("before_ts") ?? undefined,
+    before_seq: url.searchParams.get("before_seq") ?? undefined,
+    limit: url.searchParams.get("limit") ?? undefined
+  });
+
+  return {
+    beforeTs: params.before_ts,
+    beforeSeq: params.before_seq,
     limit: params.limit
   };
 };
@@ -330,7 +378,7 @@ const parseCandleReplayParams = (
   };
 };
 
-const broadcast = (sockets: Set<WebSocket<WsData>>, payload: unknown): void => {
+const broadcast = (sockets: Set<LegacySocket>, payload: unknown): void => {
   const message = JSON.stringify(payload);
 
   for (const socket of sockets) {
@@ -343,6 +391,71 @@ const broadcast = (sockets: Set<WebSocket<WsData>>, payload: unknown): void => {
       sockets.delete(socket);
     }
   }
+};
+
+const sendLiveMessage = (socket: LiveSocket, payload: LiveServerMessage): void => {
+  try {
+    socket.send(JSON.stringify(payload));
+  } catch (error) {
+    logger.warn("failed to send live websocket message", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+};
+
+const subscribeSocket = (socket: LiveSocket, subscription: LiveSubscription): void => {
+  const key = getSubscriptionKey(subscription);
+  const keys = liveSocketSubscriptions.get(socket) ?? new Set<string>();
+  keys.add(key);
+  liveSocketSubscriptions.set(socket, keys);
+
+  const sockets = subscriptionSockets.get(key) ?? new Set<LiveSocket>();
+  sockets.add(socket);
+  subscriptionSockets.set(key, sockets);
+};
+
+const unsubscribeSocket = (socket: LiveSocket, subscription: LiveSubscription): void => {
+  const key = getSubscriptionKey(subscription);
+  liveSocketSubscriptions.get(socket)?.delete(key);
+
+  const sockets = subscriptionSockets.get(key);
+  if (!sockets) {
+    return;
+  }
+  sockets.delete(socket);
+  if (sockets.size === 0) {
+    subscriptionSockets.delete(key);
+  }
+};
+
+const cleanupLiveSocket = (socket: LiveSocket): void => {
+  const keys = liveSocketSubscriptions.get(socket);
+  if (keys) {
+    for (const key of keys) {
+      const sockets = subscriptionSockets.get(key);
+      sockets?.delete(socket);
+      if (sockets && sockets.size === 0) {
+        subscriptionSockets.delete(key);
+      }
+    }
+  }
+  liveSocketSubscriptions.delete(socket);
+  const heartbeat = liveHeartbeats.get(socket);
+  if (heartbeat) {
+    clearInterval(heartbeat);
+    liveHeartbeats.delete(socket);
+  }
+};
+
+const buildHistoryResponse = <T extends { seq: number }>(
+  items: T[],
+  cursorOf: (item: T) => Cursor
+): { data: T[]; next_before: Cursor | null } => {
+  const last = items.at(-1);
+  return {
+    data: items,
+    next_before: last ? cursorOf(last) : null
+  };
 };
 
 const buildCandleCacheKey = (underlyingId: string, intervalMs: number): string => {
@@ -563,6 +676,9 @@ const run = async () => {
     redis = null;
   }
 
+  const liveState = new LiveStateManager(clickhouse, redis);
+  await liveState.hydrate();
+
   const subscribeWithReset = async <T>(
     subject: string,
     stream: string,
@@ -661,11 +777,34 @@ const run = async () => {
     "api-alerts"
   );
 
+  const fanoutLive = async (
+    subscription: LiveSubscription,
+    item: unknown,
+    ingestChannel: "options" | "nbbo" | "equities" | "equity-candles" | "equity-overlay" | "equity-joins" | "flow" | "classifier-hits" | "alerts" | "inferred-dark"
+  ) => {
+    const key = getSubscriptionKey(subscription);
+    const sockets = subscriptionSockets.get(key);
+    const watermark = await liveState.ingest(ingestChannel, item);
+    if (!sockets || sockets.size === 0) {
+      return;
+    }
+
+    for (const socket of sockets) {
+      sendLiveMessage(socket, {
+        op: "event",
+        subscription,
+        item,
+        watermark
+      });
+    }
+  };
+
   const pumpOptions = async () => {
     for await (const msg of optionSubscription.messages) {
       try {
         const payload = OptionPrintSchema.parse(optionSubscription.decode(msg));
         broadcast(optionSockets, { type: "option-print", payload });
+        await fanoutLive({ channel: "options" }, payload, "options");
         msg.ack();
       } catch (error) {
         logger.error("failed to process option print", {
@@ -681,6 +820,7 @@ const run = async () => {
       try {
         const payload = OptionNBBOSchema.parse(optionNbboSubscription.decode(msg));
         broadcast(optionNbboSockets, { type: "option-nbbo", payload });
+        await fanoutLive({ channel: "nbbo" }, payload, "nbbo");
         msg.ack();
       } catch (error) {
         logger.error("failed to process option nbbo", {
@@ -696,6 +836,12 @@ const run = async () => {
       try {
         const payload = EquityPrintSchema.parse(equitySubscription.decode(msg));
         broadcast(equitySockets, { type: "equity-print", payload });
+        await fanoutLive({ channel: "equities" }, payload, "equities");
+        await fanoutLive(
+          { channel: "equity-overlay", underlying_id: payload.underlying_id },
+          payload,
+          "equity-overlay"
+        );
         msg.ack();
       } catch (error) {
         logger.error("failed to process equity print", {
@@ -726,6 +872,15 @@ const run = async () => {
       try {
         const payload = EquityCandleSchema.parse(equityCandleSubscription.decode(msg));
         broadcast(equityCandleSockets, { type: "equity-candle", payload });
+        await fanoutLive(
+          {
+            channel: "equity-candles",
+            underlying_id: payload.underlying_id,
+            interval_ms: payload.interval_ms
+          },
+          payload,
+          "equity-candles"
+        );
         msg.ack();
       } catch (error) {
         logger.error("failed to process equity candle", {
@@ -741,6 +896,7 @@ const run = async () => {
       try {
         const payload = EquityPrintJoinSchema.parse(equityJoinSubscription.decode(msg));
         broadcast(equityJoinSockets, { type: "equity-join", payload });
+        await fanoutLive({ channel: "equity-joins" }, payload, "equity-joins");
         msg.ack();
       } catch (error) {
         logger.error("failed to process equity join", {
@@ -756,6 +912,7 @@ const run = async () => {
       try {
         const payload = InferredDarkEventSchema.parse(inferredDarkSubscription.decode(msg));
         broadcast(inferredDarkSockets, { type: "inferred-dark", payload });
+        await fanoutLive({ channel: "inferred-dark" }, payload, "inferred-dark");
         msg.ack();
       } catch (error) {
         logger.error("failed to process inferred dark event", {
@@ -771,6 +928,7 @@ const run = async () => {
       try {
         const payload = FlowPacketSchema.parse(flowSubscription.decode(msg));
         broadcast(flowSockets, { type: "flow-packet", payload });
+        await fanoutLive({ channel: "flow" }, payload, "flow");
         msg.ack();
       } catch (error) {
         logger.error("failed to process flow packet", {
@@ -786,6 +944,7 @@ const run = async () => {
       try {
         const payload = ClassifierHitEventSchema.parse(classifierHitSubscription.decode(msg));
         broadcast(classifierHitSockets, { type: "classifier-hit", payload });
+        await fanoutLive({ channel: "classifier-hits" }, payload, "classifier-hits");
         msg.ack();
       } catch (error) {
         logger.error("failed to process classifier hit", {
@@ -801,6 +960,7 @@ const run = async () => {
       try {
         const payload = AlertEventSchema.parse(alertSubscription.decode(msg));
         broadcast(alertSockets, { type: "alert", payload });
+        await fanoutLive({ channel: "alerts" }, payload, "alerts");
         msg.ack();
       } catch (error) {
         logger.error("failed to process alert", {
@@ -822,9 +982,9 @@ const run = async () => {
   void pumpClassifierHits();
   void pumpAlerts();
 
-  const server = Bun.serve<WsData>({
+  const server = Bun.serve<WsData | LiveWsData>({
     port: env.API_PORT,
-    fetch: async (req, serverRef) => {
+    fetch: async (req: Request, serverRef: any) => {
       const url = new URL(req.url);
 
       if (req.method === "GET" && url.pathname === "/health") {
@@ -937,6 +1097,84 @@ const run = async () => {
       if (req.method === "GET" && url.pathname === "/flow/alerts") {
         const limit = parseLimit(url.searchParams.get("limit"));
         const data = await fetchRecentAlerts(clickhouse, limit);
+        return jsonResponse({ data });
+      }
+
+      if (req.method === "GET" && url.pathname === "/history/options") {
+        const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
+        const source = parseReplaySource(url) ?? undefined;
+        const data = await fetchOptionPrintsBefore(clickhouse, beforeTs, beforeSeq, limit, source);
+        return jsonResponse(buildHistoryResponse(data, (item) => ({ ts: item.ts, seq: item.seq })));
+      }
+
+      if (req.method === "GET" && url.pathname === "/history/nbbo") {
+        const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
+        const source = parseReplaySource(url) ?? undefined;
+        const data = await fetchOptionNBBOBefore(clickhouse, beforeTs, beforeSeq, limit, source);
+        return jsonResponse(buildHistoryResponse(data, (item) => ({ ts: item.ts, seq: item.seq })));
+      }
+
+      if (req.method === "GET" && url.pathname === "/history/equities") {
+        const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
+        const data = await fetchEquityPrintsBefore(clickhouse, beforeTs, beforeSeq, limit);
+        return jsonResponse(buildHistoryResponse(data, (item) => ({ ts: item.ts, seq: item.seq })));
+      }
+
+      if (req.method === "GET" && url.pathname === "/history/equity-joins") {
+        const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
+        const data = await fetchEquityPrintJoinsBefore(clickhouse, beforeTs, beforeSeq, limit);
+        return jsonResponse(
+          buildHistoryResponse(data, (item) => ({ ts: item.source_ts, seq: item.seq }))
+        );
+      }
+
+      if (req.method === "GET" && url.pathname === "/history/flow") {
+        const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
+        const data = await fetchFlowPacketsBefore(clickhouse, beforeTs, beforeSeq, limit);
+        return jsonResponse(
+          buildHistoryResponse(data, (item) => ({ ts: item.source_ts, seq: item.seq }))
+        );
+      }
+
+      if (req.method === "GET" && url.pathname === "/history/classifier-hits") {
+        const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
+        const data = await fetchClassifierHitsBefore(clickhouse, beforeTs, beforeSeq, limit);
+        return jsonResponse(
+          buildHistoryResponse(data, (item) => ({ ts: item.source_ts, seq: item.seq }))
+        );
+      }
+
+      if (req.method === "GET" && url.pathname === "/history/alerts") {
+        const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
+        const data = await fetchAlertsBefore(clickhouse, beforeTs, beforeSeq, limit);
+        return jsonResponse(
+          buildHistoryResponse(data, (item) => ({ ts: item.source_ts, seq: item.seq }))
+        );
+      }
+
+      if (req.method === "GET" && url.pathname === "/history/inferred-dark") {
+        const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
+        const data = await fetchInferredDarkBefore(clickhouse, beforeTs, beforeSeq, limit);
+        return jsonResponse(
+          buildHistoryResponse(data, (item) => ({ ts: item.source_ts, seq: item.seq }))
+        );
+      }
+
+      if (req.method === "GET" && /^\/flow\/packets\/[^/]+$/.test(url.pathname)) {
+        const id = decodeURIComponent(url.pathname.slice("/flow/packets/".length));
+        const data = await fetchFlowPacketById(clickhouse, id);
+        return jsonResponse({ data });
+      }
+
+      if (req.method === "GET" && url.pathname === "/option-prints/by-trace") {
+        const traceIds = url.searchParams.getAll("trace_id");
+        const data = await fetchOptionPrintsByTraceIds(clickhouse, traceIds);
+        return jsonResponse({ data });
+      }
+
+      if (req.method === "GET" && url.pathname === "/equity-joins/by-id") {
+        const ids = url.searchParams.getAll("id");
+        const data = await fetchEquityPrintJoinsByIds(clickhouse, ids);
         return jsonResponse({ data });
       }
 
@@ -1120,11 +1358,25 @@ const run = async () => {
         return jsonResponse({ error: "websocket upgrade failed" }, 400);
       }
 
+      if (req.method === "GET" && url.pathname === "/ws/live") {
+        if (serverRef.upgrade(req, { data: { channel: "live" } })) {
+          return new Response(null, { status: 101 });
+        }
+
+        return jsonResponse({ error: "websocket upgrade failed" }, 400);
+      }
+
       return jsonResponse({ error: "not found" }, 404);
     },
     websocket: {
-      open: (socket) => {
-        if (socket.data.channel === "options") {
+      open: (socket: any) => {
+        if (socket.data.channel === "live") {
+          sendLiveMessage(socket, { op: "ready" });
+          const heartbeat = setInterval(() => {
+            sendLiveMessage(socket, { op: "heartbeat", ts: Date.now() });
+          }, 15000);
+          liveHeartbeats.set(socket, heartbeat);
+        } else if (socket.data.channel === "options") {
           optionSockets.add(socket);
         } else if (socket.data.channel === "options-nbbo") {
           optionNbboSockets.add(socket);
@@ -1148,8 +1400,44 @@ const run = async () => {
 
         logger.info("websocket connected", { channel: socket.data.channel });
       },
-      close: (socket) => {
-        if (socket.data.channel === "options") {
+      message: async (socket: any, message: string | ArrayBuffer | Uint8Array) => {
+        if (socket.data.channel !== "live") {
+          return;
+        }
+
+        try {
+          const payload =
+            typeof message === "string"
+              ? message
+              : new TextDecoder().decode(message instanceof Uint8Array ? message : new Uint8Array(message));
+          const parsed = LiveClientMessageSchema.parse(JSON.parse(payload));
+          if (parsed.op === "ping") {
+            sendLiveMessage(socket, { op: "heartbeat", ts: Date.now() });
+            return;
+          }
+
+          for (const subscription of parsed.subscriptions) {
+            LiveSubscriptionSchema.parse(subscription);
+            if (parsed.op === "unsubscribe") {
+              unsubscribeSocket(socket, subscription);
+              continue;
+            }
+
+            subscribeSocket(socket, subscription);
+            const snapshot = await liveState.getSnapshot(subscription);
+            sendLiveMessage(socket, { op: "snapshot", snapshot });
+          }
+        } catch (error) {
+          sendLiveMessage(socket, {
+            op: "error",
+            message: error instanceof Error ? error.message : String(error)
+          });
+        }
+      },
+      close: (socket: any) => {
+        if (socket.data.channel === "live") {
+          cleanupLiveSocket(socket);
+        } else if (socket.data.channel === "options") {
           optionSockets.delete(socket);
         } else if (socket.data.channel === "options-nbbo") {
           optionNbboSockets.delete(socket);

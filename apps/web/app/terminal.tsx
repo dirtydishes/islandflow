@@ -16,11 +16,14 @@ import {
 import type {
   AlertEvent,
   ClassifierHitEvent,
+  Cursor,
   EquityCandle,
   EquityPrint,
   EquityPrintJoin,
   FlowPacket,
   InferredDarkEvent,
+  LiveServerMessage,
+  LiveSubscription,
   OptionNBBO,
   OptionPrint
 } from "@islandflow/types";
@@ -692,6 +695,7 @@ type TapeConfig<T> = {
   wsPath: string;
   replayPath: string;
   latestPath?: string;
+  liveEnabled?: boolean;
   expectedType: MessageType;
   batchSize?: number;
   pollMs?: number;
@@ -841,7 +845,7 @@ const useTape = <T extends SortableItem & { seq: number }>(
   }, [mode, latestPath, getItemTs, replaySourceKey]);
 
   useEffect(() => {
-    if (mode !== "live") {
+    if (mode !== "live" || config.liveEnabled === false) {
       return;
     }
 
@@ -1086,6 +1090,21 @@ const useTape = <T extends SortableItem & { seq: number }>(
   };
 };
 
+const toStaticTapeState = <T,>(
+  status: WsStatus,
+  items: T[],
+  lastUpdate: number | null
+): TapeState<T> => ({
+  status,
+  items,
+  lastUpdate,
+  replayTime: null,
+  replayComplete: false,
+  paused: false,
+  dropped: 0,
+  togglePause: () => {}
+});
+
 const useLiveStream = <T extends SortableItem>(
   config: {
     enabled: boolean;
@@ -1311,6 +1330,310 @@ const useFlowStream = (
   });
 };
 
+type LiveSessionState = {
+  status: WsStatus;
+  lastUpdate: number | null;
+  options: OptionPrint[];
+  nbbo: OptionNBBO[];
+  equities: EquityPrint[];
+  equityJoins: EquityPrintJoin[];
+  flow: FlowPacket[];
+  classifierHits: ClassifierHitEvent[];
+  alerts: AlertEvent[];
+  inferredDark: InferredDarkEvent[];
+  chartCandles: EquityCandle[];
+  chartOverlay: EquityPrint[];
+};
+
+const getLiveSubscriptionKey = (subscription: LiveSubscription): string => {
+  switch (subscription.channel) {
+    case "equity-candles":
+      return `${subscription.channel}|${subscription.underlying_id}|${subscription.interval_ms}`;
+    case "equity-overlay":
+      return `${subscription.channel}|${subscription.underlying_id}`;
+    default:
+      return subscription.channel;
+  }
+};
+
+const getLiveManifest = (
+  pathname: string,
+  chartTicker: string,
+  chartIntervalMs: number
+): LiveSubscription[] => {
+  const chartSubs: LiveSubscription[] = [
+    { channel: "equity-candles", underlying_id: chartTicker, interval_ms: chartIntervalMs },
+    { channel: "equity-overlay", underlying_id: chartTicker }
+  ];
+
+  if (pathname === "/tape") {
+    return [
+      { channel: "options" },
+      { channel: "nbbo" },
+      { channel: "equities" },
+      { channel: "flow" }
+    ];
+  }
+
+  if (pathname === "/signals") {
+    return [{ channel: "alerts" }, { channel: "classifier-hits" }, { channel: "inferred-dark" }];
+  }
+
+  if (pathname === "/charts") {
+    return [...chartSubs, { channel: "classifier-hits" }, { channel: "inferred-dark" }];
+  }
+
+  if (pathname === "/replay") {
+    return [];
+  }
+
+  return [
+    { channel: "equities" },
+    { channel: "flow" },
+    { channel: "alerts" },
+    { channel: "classifier-hits" },
+    { channel: "inferred-dark" },
+    ...chartSubs
+  ];
+};
+
+const useLiveSession = (
+  enabled: boolean,
+  pathname: string,
+  chartTicker: string,
+  chartIntervalMs: number
+): LiveSessionState => {
+  const [status, setStatus] = useState<WsStatus>(enabled ? "connecting" : "disconnected");
+  const [lastUpdate, setLastUpdate] = useState<number | null>(null);
+  const [options, setOptions] = useState<OptionPrint[]>([]);
+  const [nbbo, setNbbo] = useState<OptionNBBO[]>([]);
+  const [equities, setEquities] = useState<EquityPrint[]>([]);
+  const [equityJoins, setEquityJoins] = useState<EquityPrintJoin[]>([]);
+  const [flow, setFlow] = useState<FlowPacket[]>([]);
+  const [classifierHits, setClassifierHits] = useState<ClassifierHitEvent[]>([]);
+  const [alerts, setAlerts] = useState<AlertEvent[]>([]);
+  const [inferredDark, setInferredDark] = useState<InferredDarkEvent[]>([]);
+  const [chartCandles, setChartCandles] = useState<EquityCandle[]>([]);
+  const [chartOverlay, setChartOverlay] = useState<EquityPrint[]>([]);
+  const socketRef = useRef<WebSocket | null>(null);
+  const reconnectRef = useRef<number | null>(null);
+  const subscribedKeysRef = useRef<Set<string>>(new Set());
+  const subscribedMapRef = useRef<Map<string, LiveSubscription>>(new Map());
+  const manifest = useMemo(
+    () => getLiveManifest(pathname, chartTicker.toUpperCase(), chartIntervalMs),
+    [pathname, chartTicker, chartIntervalMs]
+  );
+
+  useEffect(() => {
+    if (!enabled) {
+      setStatus("disconnected");
+      setLastUpdate(null);
+      setOptions([]);
+      setNbbo([]);
+      setEquities([]);
+      setEquityJoins([]);
+      setFlow([]);
+      setClassifierHits([]);
+      setAlerts([]);
+      setInferredDark([]);
+      setChartCandles([]);
+      setChartOverlay([]);
+      subscribedKeysRef.current = new Set();
+      subscribedMapRef.current = new Map();
+      if (socketRef.current) {
+        socketRef.current.close();
+        socketRef.current = null;
+      }
+      if (reconnectRef.current !== null) {
+        window.clearTimeout(reconnectRef.current);
+        reconnectRef.current = null;
+      }
+      return;
+    }
+
+    let active = true;
+
+    const syncSubscriptions = (socket: WebSocket) => {
+      const nextKeys = new Set(manifest.map(getLiveSubscriptionKey));
+      const nextMap = new Map(manifest.map((sub) => [getLiveSubscriptionKey(sub), sub]));
+      const currentKeys = subscribedKeysRef.current;
+      const toSubscribe = manifest.filter((sub) => !currentKeys.has(getLiveSubscriptionKey(sub)));
+      const toUnsubscribe = Array.from(currentKeys)
+        .filter((key) => !nextKeys.has(key))
+        .map((key) => subscribedMapRef.current.get(key) ?? null)
+        .filter((sub): sub is LiveSubscription => sub !== null);
+
+      if (toUnsubscribe.length > 0) {
+        socket.send(JSON.stringify({ op: "unsubscribe", subscriptions: toUnsubscribe }));
+      }
+      if (toSubscribe.length > 0) {
+        socket.send(JSON.stringify({ op: "subscribe", subscriptions: toSubscribe }));
+      }
+      subscribedKeysRef.current = nextKeys;
+      subscribedMapRef.current = nextMap;
+    };
+
+    const handleMessage = (message: LiveServerMessage) => {
+      if (message.op === "ready" || message.op === "heartbeat") {
+        return;
+      }
+      if (message.op === "error") {
+        console.warn("Live socket error", message.message);
+        return;
+      }
+
+      const subscription = message.op === "snapshot" ? message.snapshot.subscription : message.subscription;
+      const items = message.op === "snapshot" ? message.snapshot.items : [message.item];
+      const updateAt = Date.now();
+
+      const mergeItems = <T extends SortableItem>(
+        setter: React.Dispatch<React.SetStateAction<T[]>>,
+        nextItems: T[]
+      ) => {
+        setter((prev) =>
+          message.op === "snapshot" ? (nextItems as T[]) : mergeNewest(nextItems as T[], prev)
+        );
+      };
+
+      switch (subscription.channel) {
+        case "options":
+          mergeItems(setOptions, items as OptionPrint[]);
+          break;
+        case "nbbo":
+          mergeItems(setNbbo, items as OptionNBBO[]);
+          break;
+        case "equities":
+          mergeItems(setEquities, items as EquityPrint[]);
+          break;
+        case "equity-joins":
+          mergeItems(setEquityJoins, items as EquityPrintJoin[]);
+          break;
+        case "flow":
+          mergeItems(setFlow, items as FlowPacket[]);
+          break;
+        case "classifier-hits":
+          mergeItems(setClassifierHits, items as ClassifierHitEvent[]);
+          break;
+        case "alerts":
+          mergeItems(setAlerts, items as AlertEvent[]);
+          break;
+        case "inferred-dark":
+          mergeItems(setInferredDark, items as InferredDarkEvent[]);
+          break;
+        case "equity-candles":
+          mergeItems(setChartCandles, items as EquityCandle[]);
+          break;
+        case "equity-overlay":
+          mergeItems(setChartOverlay, items as EquityPrint[]);
+          break;
+      }
+
+      setLastUpdate(updateAt);
+    };
+
+    const connect = () => {
+      if (!active) {
+        return;
+      }
+      setStatus("connecting");
+      const socket = new WebSocket(buildWsUrl("/ws/live"));
+      socketRef.current = socket;
+
+      socket.onopen = () => {
+        if (!active) {
+          return;
+        }
+        setStatus("connected");
+        syncSubscriptions(socket);
+      };
+
+      socket.onmessage = (event) => {
+        if (!active) {
+          return;
+        }
+        try {
+          const parsed = JSON.parse(event.data) as LiveServerMessage;
+          handleMessage(parsed);
+        } catch (error) {
+          console.warn("Failed to parse live session payload", error);
+        }
+      };
+
+      socket.onclose = () => {
+        if (!active) {
+          return;
+        }
+        setStatus("disconnected");
+        subscribedKeysRef.current = new Set();
+        subscribedMapRef.current = new Map();
+        reconnectRef.current = window.setTimeout(connect, 1000);
+      };
+
+      socket.onerror = () => {
+        if (!active) {
+          return;
+        }
+        setStatus("disconnected");
+        socket.close();
+      };
+    };
+
+    connect();
+
+    return () => {
+      active = false;
+      if (reconnectRef.current !== null) {
+        window.clearTimeout(reconnectRef.current);
+      }
+      if (socketRef.current) {
+        socketRef.current.close();
+      }
+    };
+  }, [enabled]);
+
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!enabled || !socket || socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    const nextKeys = new Set(manifest.map(getLiveSubscriptionKey));
+    const nextMap = new Map(manifest.map((sub) => [getLiveSubscriptionKey(sub), sub]));
+    const currentKeys = subscribedKeysRef.current;
+    const toSubscribe = manifest.filter((sub) => !currentKeys.has(getLiveSubscriptionKey(sub)));
+    const removedKeys = Array.from(currentKeys).filter((key) => !nextKeys.has(key));
+
+    if (removedKeys.length > 0) {
+      const removedSubs = removedKeys
+        .map((key) => subscribedMapRef.current.get(key) ?? null)
+        .filter((sub): sub is LiveSubscription => sub !== null);
+      if (removedSubs.length > 0) {
+        socket.send(JSON.stringify({ op: "unsubscribe", subscriptions: removedSubs }));
+      }
+    }
+    if (toSubscribe.length > 0) {
+      socket.send(JSON.stringify({ op: "subscribe", subscriptions: toSubscribe }));
+    }
+    subscribedKeysRef.current = nextKeys;
+    subscribedMapRef.current = nextMap;
+  }, [enabled, manifest]);
+
+  return {
+    status,
+    lastUpdate,
+    options,
+    nbbo,
+    equities,
+    equityJoins,
+    flow,
+    classifierHits,
+    alerts,
+    inferredDark,
+    chartCandles,
+    chartOverlay
+  };
+};
+
 type TapeStatusProps = {
   status: WsStatus;
   lastUpdate: number | null;
@@ -1377,6 +1700,8 @@ type CandleChartProps = {
   intervalMs: number;
   mode: TapeMode;
   replayTime?: number | null;
+  liveCandles?: EquityCandle[];
+  liveOverlayPrints?: EquityPrint[];
   classifierHits: ClassifierHitEvent[];
   inferredDark: InferredDarkEvent[];
   onClassifierHitClick: (hit: ClassifierHitEvent) => void;
@@ -1392,6 +1717,8 @@ const CandleChart = ({
   intervalMs,
   mode,
   replayTime = null,
+  liveCandles = [],
+  liveOverlayPrints = [],
   classifierHits,
   inferredDark,
   onClassifierHitClick,
@@ -1985,156 +2312,30 @@ const CandleChart = ({
       return;
     }
 
-    let active = true;
+    if (mode !== "live" || !seriesRef.current) {
+      return;
+    }
 
-    const connect = () => {
-      if (!active) {
-        return;
-      }
-
-      setStatus("connecting");
-      const socket = new WebSocket(buildWsUrl("/ws/equity-candles"));
-      socketRef.current = socket;
-
-      socket.onopen = () => {
-        if (!active) {
-          return;
-        }
+    const sortedCandles = [...liveCandles].sort((a, b) => (a.ts - b.ts) || (a.seq - b.seq));
+    if (sortedCandles.length > 0) {
+      seriesRef.current.setData(sortedCandles.map(toChartCandle));
+      const last = sortedCandles.at(-1);
+      if (last) {
+        lastCandleRef.current = { time: toChartTime(last.ts), seq: last.seq };
+        setHasData(true);
+        setLastUpdate(last.ingest_ts ?? last.ts);
         setStatus("connected");
-      };
-
-      socket.onmessage = (event) => {
-        if (!active || !seriesRef.current) {
-          return;
-        }
-
-        try {
-          const message = JSON.parse(event.data) as StreamMessage<EquityCandle>;
-          if (!message || message.type !== "equity-candle") {
-            return;
-          }
-
-          const candle = message.payload;
-          if (candle.underlying_id !== ticker || candle.interval_ms !== intervalMs) {
-            return;
-          }
-
-          const chartCandle = toChartCandle(candle);
-          const last = lastCandleRef.current;
-          if (last) {
-            if (chartCandle.time < last.time) {
-              return;
-            }
-            if (chartCandle.time === last.time && candle.seq <= last.seq) {
-              return;
-            }
-          }
-
-          seriesRef.current.update(chartCandle);
-          lastCandleRef.current = { time: chartCandle.time, seq: candle.seq };
-          setHasData(true);
-          setLastUpdate(candle.ingest_ts ?? candle.ts);
-          drawOverlay([...overlayDataRef.current, ...overlayLiveRef.current]);
-        } catch (error) {
-          console.warn("Failed to parse candle payload", error);
-        }
-      };
-
-      socket.onclose = () => {
-        if (!active) {
-          return;
-        }
-        setStatus("disconnected");
-        reconnectRef.current = window.setTimeout(connect, 1000);
-      };
-
-      socket.onerror = () => {
-        if (!active) {
-          return;
-        }
-        setStatus("disconnected");
-        socket.close();
-      };
-    };
-
-    const connectOverlay = () => {
-      if (!active) {
-        return;
       }
+    }
 
-      const socket = new WebSocket(buildWsUrl("/ws/equities"));
-      overlaySocketRef.current = socket;
-
-      socket.onmessage = (event) => {
-        if (!active) {
-          return;
-        }
-
-        try {
-          const message = JSON.parse(event.data) as StreamMessage<EquityPrint>;
-          if (!message || message.type !== "equity-print") {
-            return;
-          }
-
-          const print = message.payload;
-          if (print.underlying_id !== ticker) {
-            return;
-          }
-
-          overlayLiveRef.current.push({
-            ts: print.ts,
-            price: print.price,
-            size: print.size,
-            offExchangeFlag: print.offExchangeFlag
-          });
-
-          if (overlayLiveRef.current.length > 1500) {
-            overlayLiveRef.current = overlayLiveRef.current.slice(-1500);
-          }
-
-          drawOverlay([...overlayDataRef.current, ...overlayLiveRef.current]);
-        } catch (error) {
-          console.warn("Failed to parse equity print payload", error);
-        }
-      };
-
-      socket.onclose = () => {
-        if (!active) {
-          return;
-        }
-        overlayReconnectRef.current = window.setTimeout(connectOverlay, 1500);
-      };
-
-      socket.onerror = () => {
-        if (!active) {
-          return;
-        }
-        socket.close();
-      };
-    };
-
-    connect();
-    connectOverlay();
-
-    return () => {
-      active = false;
-      if (reconnectRef.current !== null) {
-        window.clearTimeout(reconnectRef.current);
-        reconnectRef.current = null;
-      }
-      if (socketRef.current) {
-        socketRef.current.close();
-      }
-
-      if (overlayReconnectRef.current !== null) {
-        window.clearTimeout(overlayReconnectRef.current);
-        overlayReconnectRef.current = null;
-      }
-      if (overlaySocketRef.current) {
-        overlaySocketRef.current.close();
-      }
-    };
-  }, [ready, mode, ticker, intervalMs, drawOverlay]);
+    overlayLiveRef.current = liveOverlayPrints.map((print) => ({
+      ts: print.ts,
+      price: print.price,
+      size: print.size,
+      offExchangeFlag: print.offExchangeFlag
+    }));
+    drawOverlay([...overlayDataRef.current, ...overlayLiveRef.current]);
+  }, [ready, mode, liveCandles, liveOverlayPrints, drawOverlay]);
 
   useEffect(() => {
     if (!chartRef.current) {
@@ -2623,6 +2824,7 @@ const formatFlowMetric = (value: number, suffix?: string): string => {
 };
 
 const useTerminalState = () => {
+  const pathname = usePathname();
   const [mode, setMode] = useState<TapeMode>("live");
   const [replaySource, setReplaySource] = useState<string | null>(null);
   const [selectedAlert, setSelectedAlert] = useState<AlertEvent | null>(null);
@@ -2630,6 +2832,16 @@ const useTerminalState = () => {
   const [selectedClassifierHit, setSelectedClassifierHit] = useState<ClassifierHitEvent | null>(null);
   const [filterInput, setFilterInput] = useState<string>("");
   const [chartIntervalMs, setChartIntervalMs] = useState<number>(CANDLE_INTERVALS[0].ms);
+  const activeTickers = useMemo(() => {
+    const parts = filterInput
+      .split(/[,\s]+/)
+      .map((value) => value.trim().toUpperCase())
+      .filter(Boolean);
+    return Array.from(new Set(parts));
+  }, [filterInput]);
+  const tickerSet = useMemo(() => new Set(activeTickers), [activeTickers]);
+  const chartTicker = useMemo(() => activeTickers[0] ?? "SPY", [activeTickers]);
+  const liveSession = useLiveSession(mode === "live", pathname, chartTicker, chartIntervalMs);
 
   const handleReplaySource = useCallback((value: string | null) => {
     setReplaySource(value);
@@ -2658,6 +2870,7 @@ const useTerminalState = () => {
 
   const options = useTape<OptionPrint>({
     mode,
+    liveEnabled: false,
     wsPath: "/ws/options",
     replayPath: "/replay/options",
     latestPath: "/prints/options",
@@ -2672,6 +2885,7 @@ const useTerminalState = () => {
 
   const equities = useTape<EquityPrint>({
     mode,
+    liveEnabled: false,
     wsPath: "/ws/equities",
     replayPath: "/replay/equities",
     latestPath: "/prints/equities",
@@ -2684,6 +2898,7 @@ const useTerminalState = () => {
 
   const equityJoins = useTape<EquityPrintJoin>({
     mode,
+    liveEnabled: false,
     wsPath: "/ws/equity-joins",
     replayPath: "/replay/equity-joins",
     latestPath: "/joins/equities",
@@ -2695,6 +2910,7 @@ const useTerminalState = () => {
 
   const nbbo = useTape<OptionNBBO>({
     mode,
+    liveEnabled: false,
     wsPath: "/ws/options-nbbo",
     replayPath: "/replay/nbbo",
     latestPath: "/nbbo/options",
@@ -2707,6 +2923,7 @@ const useTerminalState = () => {
 
   const inferredDark = useTape<InferredDarkEvent>({
     mode,
+    liveEnabled: false,
     wsPath: "/ws/inferred-dark",
     replayPath: "/replay/inferred-dark",
     latestPath: "/dark/inferred",
@@ -2720,6 +2937,7 @@ const useTerminalState = () => {
 
   const flow = useTape<FlowPacket>({
     mode,
+    liveEnabled: false,
     wsPath: "/ws/flow",
     replayPath: "/replay/flow",
     latestPath: "/flow/packets",
@@ -2732,6 +2950,7 @@ const useTerminalState = () => {
   });
   const alerts = useTape<AlertEvent>({
     mode,
+    liveEnabled: false,
     wsPath: "/ws/alerts",
     replayPath: "/replay/alerts",
     latestPath: "/flow/alerts",
@@ -2744,6 +2963,7 @@ const useTerminalState = () => {
   });
   const classifierHits = useTape<ClassifierHitEvent>({
     mode,
+    liveEnabled: false,
     wsPath: "/ws/classifier-hits",
     replayPath: "/replay/classifier-hits",
     latestPath: "/flow/classifier-hits",
@@ -2755,44 +2975,60 @@ const useTerminalState = () => {
     getReplayKey: disableReplayGrouping
   });
 
+  const optionsFeed =
+    mode === "live"
+      ? toStaticTapeState(liveSession.status, liveSession.options, liveSession.lastUpdate)
+      : options;
+  const nbboFeed =
+    mode === "live" ? toStaticTapeState(liveSession.status, liveSession.nbbo, liveSession.lastUpdate) : nbbo;
+  const equitiesFeed =
+    mode === "live"
+      ? toStaticTapeState(liveSession.status, liveSession.equities, liveSession.lastUpdate)
+      : equities;
+  const equityJoinsFeed =
+    mode === "live"
+      ? toStaticTapeState(liveSession.status, liveSession.equityJoins, liveSession.lastUpdate)
+      : equityJoins;
+  const flowFeed =
+    mode === "live" ? toStaticTapeState(liveSession.status, liveSession.flow, liveSession.lastUpdate) : flow;
+  const alertsFeed =
+    mode === "live" ? toStaticTapeState(liveSession.status, liveSession.alerts, liveSession.lastUpdate) : alerts;
+  const classifierHitsFeed =
+    mode === "live"
+      ? toStaticTapeState(liveSession.status, liveSession.classifierHits, liveSession.lastUpdate)
+      : classifierHits;
+  const inferredDarkFeed =
+    mode === "live"
+      ? toStaticTapeState(liveSession.status, liveSession.inferredDark, liveSession.lastUpdate)
+      : inferredDark;
+
   useLayoutEffect(() => {
     optionsAnchor.apply();
-  }, [options.items, optionsAnchor.apply]);
+  }, [optionsFeed.items, optionsAnchor.apply]);
 
   useLayoutEffect(() => {
     equitiesAnchor.apply();
-  }, [equities.items, equitiesAnchor.apply]);
+  }, [equitiesFeed.items, equitiesAnchor.apply]);
 
   useLayoutEffect(() => {
     flowAnchor.apply();
-  }, [flow.items, flowAnchor.apply]);
+  }, [flowFeed.items, flowAnchor.apply]);
 
   useLayoutEffect(() => {
     darkAnchor.apply();
-  }, [inferredDark.items, darkAnchor.apply]);
+  }, [inferredDarkFeed.items, darkAnchor.apply]);
 
   useLayoutEffect(() => {
     alertsAnchor.apply();
-  }, [alerts.items, alertsAnchor.apply]);
+  }, [alertsFeed.items, alertsAnchor.apply]);
 
   useLayoutEffect(() => {
     classifierAnchor.apply();
-  }, [classifierHits.items, classifierAnchor.apply]);
-
-  const activeTickers = useMemo(() => {
-    const parts = filterInput
-      .split(/[,\s]+/)
-      .map((value) => value.trim().toUpperCase())
-      .filter(Boolean);
-    return Array.from(new Set(parts));
-  }, [filterInput]);
-
-  const tickerSet = useMemo(() => new Set(activeTickers), [activeTickers]);
-  const chartTicker = useMemo(() => activeTickers[0] ?? "SPY", [activeTickers]);
+  }, [classifierHitsFeed.items, classifierAnchor.apply]);
 
   const nbboMap = useMemo(() => {
     const map = new Map<string, OptionNBBO>();
-    for (const quote of nbbo.items) {
+    for (const quote of nbboFeed.items) {
       const contractId = normalizeContractId(quote.option_contract_id);
       const existing = map.get(contractId);
       if (
@@ -2804,43 +3040,142 @@ const useTerminalState = () => {
       }
     }
     return map;
-  }, [nbbo.items]);
+  }, [nbboFeed.items]);
 
   const optionPrintMap = useMemo(() => {
     const map = new Map<string, OptionPrint>();
-    for (const print of options.items) {
+    for (const print of optionsFeed.items) {
       if (print.trace_id) {
         map.set(print.trace_id, print);
       }
     }
     return map;
-  }, [options.items]);
+  }, [optionsFeed.items]);
 
   const equityPrintMap = useMemo(() => {
     const map = new Map<string, EquityPrint>();
-    for (const print of equities.items) {
+    for (const print of equitiesFeed.items) {
       if (print.trace_id) {
         map.set(print.trace_id, print);
       }
     }
     return map;
-  }, [equities.items]);
+  }, [equitiesFeed.items]);
 
   const equityJoinMap = useMemo(() => {
     const map = new Map<string, EquityPrintJoin>();
-    for (const join of equityJoins.items) {
+    for (const join of equityJoinsFeed.items) {
       map.set(join.id, join);
     }
     return map;
-  }, [equityJoins.items]);
+  }, [equityJoinsFeed.items]);
 
   const flowPacketMap = useMemo(() => {
     const map = new Map<string, FlowPacket>();
-    for (const packet of flow.items) {
+    for (const packet of flowFeed.items) {
       map.set(packet.id, packet);
     }
     return map;
-  }, [flow.items]);
+  }, [flowFeed.items]);
+  const [fetchedOptionPrintMap, setFetchedOptionPrintMap] = useState<Map<string, OptionPrint>>(
+    () => new Map()
+  );
+  const [fetchedFlowPacketMap, setFetchedFlowPacketMap] = useState<Map<string, FlowPacket>>(
+    () => new Map()
+  );
+  const [fetchedEquityJoinMap, setFetchedEquityJoinMap] = useState<Map<string, EquityPrintJoin>>(
+    () => new Map()
+  );
+  const mergedOptionPrintMap = useMemo(() => {
+    const merged = new Map(optionPrintMap);
+    for (const [key, value] of fetchedOptionPrintMap) {
+      merged.set(key, value);
+    }
+    return merged;
+  }, [optionPrintMap, fetchedOptionPrintMap]);
+  const mergedFlowPacketMap = useMemo(() => {
+    const merged = new Map(flowPacketMap);
+    for (const [key, value] of fetchedFlowPacketMap) {
+      merged.set(key, value);
+    }
+    return merged;
+  }, [flowPacketMap, fetchedFlowPacketMap]);
+  const mergedEquityJoinMap = useMemo(() => {
+    const merged = new Map(equityJoinMap);
+    for (const [key, value] of fetchedEquityJoinMap) {
+      merged.set(key, value);
+    }
+    return merged;
+  }, [equityJoinMap, fetchedEquityJoinMap]);
+
+  useEffect(() => {
+    if (!selectedAlert || mode !== "live") {
+      return;
+    }
+
+    const packetId = selectedAlert.evidence_refs[0];
+    if (packetId && !mergedFlowPacketMap.has(packetId)) {
+      void fetch(buildApiUrl(`/flow/packets/${encodeURIComponent(packetId)}`))
+        .then((response) => response.json())
+        .then((payload: { data?: FlowPacket | null }) => {
+          if (!payload.data) {
+            return;
+          }
+          setFetchedFlowPacketMap((prev) => new Map(prev).set(payload.data!.id, payload.data!));
+        })
+        .catch((error) => console.warn("Failed to fetch flow packet evidence", error));
+    }
+
+    const missingPrintIds = selectedAlert.evidence_refs.filter(
+      (id) => !mergedFlowPacketMap.has(id) && !mergedOptionPrintMap.has(id)
+    );
+    if (missingPrintIds.length > 0) {
+      const url = new URL(buildApiUrl("/option-prints/by-trace"));
+      for (const traceId of missingPrintIds) {
+        url.searchParams.append("trace_id", traceId);
+      }
+      void fetch(url.toString())
+        .then((response) => response.json())
+        .then((payload: { data?: OptionPrint[] }) => {
+          const next = new Map<string, OptionPrint>();
+          for (const item of payload.data ?? []) {
+            next.set(item.trace_id, item);
+          }
+          if (next.size > 0) {
+            setFetchedOptionPrintMap((prev) => new Map([...prev, ...next]));
+          }
+        })
+        .catch((error) => console.warn("Failed to fetch option print evidence", error));
+    }
+  }, [selectedAlert, mode, mergedFlowPacketMap, mergedOptionPrintMap]);
+
+  useEffect(() => {
+    if (!selectedDarkEvent || mode !== "live") {
+      return;
+    }
+
+    const missingIds = selectedDarkEvent.evidence_refs.filter((id) => !mergedEquityJoinMap.has(id));
+    if (missingIds.length === 0) {
+      return;
+    }
+
+    const url = new URL(buildApiUrl("/equity-joins/by-id"));
+    for (const id of missingIds) {
+      url.searchParams.append("id", id);
+    }
+    void fetch(url.toString())
+      .then((response) => response.json())
+      .then((payload: { data?: EquityPrintJoin[] }) => {
+        const next = new Map<string, EquityPrintJoin>();
+        for (const item of payload.data ?? []) {
+          next.set(item.id, item);
+        }
+        if (next.size > 0) {
+          setFetchedEquityJoinMap((prev) => new Map([...prev, ...next]));
+        }
+      })
+      .catch((error) => console.warn("Failed to fetch dark evidence joins", error));
+  }, [selectedDarkEvent, mode, mergedEquityJoinMap]);
 
   const selectedEvidence = useMemo((): EvidenceItem[] => {
     if (!selectedAlert) {
@@ -2848,25 +3183,25 @@ const useTerminalState = () => {
     }
 
     return selectedAlert.evidence_refs.map((id) => {
-      const packet = flowPacketMap.get(id);
+      const packet = mergedFlowPacketMap.get(id);
       if (packet) {
         return { kind: "flow", id, packet };
       }
-      const print = optionPrintMap.get(id);
+      const print = mergedOptionPrintMap.get(id);
       if (print) {
         return { kind: "print", id, print };
       }
       return { kind: "unknown", id };
     });
-  }, [selectedAlert, flowPacketMap, optionPrintMap]);
+  }, [selectedAlert, mergedFlowPacketMap, mergedOptionPrintMap]);
 
   const selectedFlowPacket = useMemo(() => {
     if (!selectedAlert) {
       return null;
     }
     const packetId = selectedAlert.evidence_refs[0];
-    return packetId ? flowPacketMap.get(packetId) ?? null : null;
-  }, [selectedAlert, flowPacketMap]);
+    return packetId ? mergedFlowPacketMap.get(packetId) ?? null : null;
+  }, [selectedAlert, mergedFlowPacketMap]);
 
   const selectedDarkEvidence = useMemo((): DarkEvidenceItem[] => {
     if (!selectedDarkEvent) {
@@ -2874,20 +3209,20 @@ const useTerminalState = () => {
     }
 
     return selectedDarkEvent.evidence_refs.map((id) => {
-      const join = equityJoinMap.get(id);
+      const join = mergedEquityJoinMap.get(id);
       if (join) {
         return { kind: "join", id, join };
       }
       return { kind: "unknown", id };
     });
-  }, [selectedDarkEvent, equityJoinMap]);
+  }, [selectedDarkEvent, mergedEquityJoinMap]);
 
   const selectedDarkUnderlying = useMemo(() => {
     if (!selectedDarkEvent) {
       return null;
     }
-    return inferDarkUnderlying(selectedDarkEvent, equityPrintMap, equityJoinMap);
-  }, [selectedDarkEvent, equityJoinMap, equityPrintMap]);
+    return inferDarkUnderlying(selectedDarkEvent, equityPrintMap, mergedEquityJoinMap);
+  }, [selectedDarkEvent, mergedEquityJoinMap, equityPrintMap]);
 
   useEffect(() => {
     if (mode !== "live") {
@@ -2929,12 +3264,30 @@ const useTerminalState = () => {
     return extractPacketIdFromClassifierHitTrace(selectedClassifierHit.trace_id);
   }, [extractPacketIdFromClassifierHitTrace, selectedClassifierHit]);
 
+  useEffect(() => {
+    if (!selectedClassifierPacketId || mode !== "live") {
+      return;
+    }
+
+    if (!mergedFlowPacketMap.has(selectedClassifierPacketId)) {
+      void fetch(buildApiUrl(`/flow/packets/${encodeURIComponent(selectedClassifierPacketId)}`))
+        .then((response) => response.json())
+        .then((payload: { data?: FlowPacket | null }) => {
+          if (!payload.data) {
+            return;
+          }
+          setFetchedFlowPacketMap((prev) => new Map(prev).set(payload.data!.id, payload.data!));
+        })
+        .catch((error) => console.warn("Failed to fetch classifier flow packet", error));
+    }
+  }, [selectedClassifierPacketId, mode, mergedFlowPacketMap]);
+
   const selectedClassifierFlowPacket = useMemo(() => {
     if (!selectedClassifierPacketId) {
       return null;
     }
-    return flowPacketMap.get(selectedClassifierPacketId) ?? null;
-  }, [flowPacketMap, selectedClassifierPacketId]);
+    return mergedFlowPacketMap.get(selectedClassifierPacketId) ?? null;
+  }, [mergedFlowPacketMap, selectedClassifierPacketId]);
 
   const selectedClassifierEvidence = useMemo((): EvidenceItem[] => {
     if (!selectedClassifierHit) {
@@ -2945,19 +3298,19 @@ const useTerminalState = () => {
       return [];
     }
 
-    const packet = flowPacketMap.get(selectedClassifierPacketId);
+    const packet = mergedFlowPacketMap.get(selectedClassifierPacketId);
     if (!packet) {
       return [];
     }
 
     return packet.members.map((id) => {
-      const print = optionPrintMap.get(id);
+      const print = mergedOptionPrintMap.get(id);
       if (print) {
         return { kind: "print", id, print };
       }
       return { kind: "unknown", id };
     });
-  }, [flowPacketMap, optionPrintMap, selectedClassifierHit, selectedClassifierPacketId]);
+  }, [mergedFlowPacketMap, mergedOptionPrintMap, selectedClassifierHit, selectedClassifierPacketId]);
 
   const inferAlertUnderlying = useCallback(
     (alert: AlertEvent): string | null => {
@@ -2968,14 +3321,14 @@ const useTerminalState = () => {
 
       const packetId = alert.evidence_refs[0];
       if (packetId) {
-        const packet = flowPacketMap.get(packetId);
+        const packet = mergedFlowPacketMap.get(packetId);
         if (packet) {
           return extractUnderlying(extractPacketContract(packet));
         }
       }
 
       for (const ref of alert.evidence_refs) {
-        const print = optionPrintMap.get(ref);
+        const print = mergedOptionPrintMap.get(ref);
         if (print) {
           return extractUnderlying(print.option_contract_id);
         }
@@ -2983,7 +3336,7 @@ const useTerminalState = () => {
 
       return null;
     },
-    [extractPacketContract, extractUnderlyingFromTrace, flowPacketMap, optionPrintMap]
+    [extractPacketContract, extractUnderlyingFromTrace, mergedFlowPacketMap, mergedOptionPrintMap]
   );
 
   const matchesTicker = useCallback(
@@ -3001,59 +3354,59 @@ const useTerminalState = () => {
 
   const filteredOptions = useMemo(() => {
     if (tickerSet.size === 0) {
-      return options.items;
+      return optionsFeed.items;
     }
-    return options.items.filter((print) =>
+    return optionsFeed.items.filter((print) =>
       matchesTicker(extractUnderlying(normalizeContractId(print.option_contract_id)))
     );
-  }, [options.items, matchesTicker, tickerSet]);
+  }, [optionsFeed.items, matchesTicker, tickerSet]);
 
   const filteredEquities = useMemo(() => {
     if (tickerSet.size === 0) {
-      return equities.items;
+      return equitiesFeed.items;
     }
-    return equities.items.filter((print) => matchesTicker(print.underlying_id));
-  }, [equities.items, matchesTicker, tickerSet]);
+    return equitiesFeed.items.filter((print) => matchesTicker(print.underlying_id));
+  }, [equitiesFeed.items, matchesTicker, tickerSet]);
 
   const filteredInferredDark = useMemo(() => {
     if (tickerSet.size === 0) {
-      return inferredDark.items;
+      return inferredDarkFeed.items;
     }
-    return inferredDark.items.filter((event) => {
-      const underlying = inferDarkUnderlying(event, equityPrintMap, equityJoinMap);
+    return inferredDarkFeed.items.filter((event) => {
+      const underlying = inferDarkUnderlying(event, equityPrintMap, mergedEquityJoinMap);
       return matchesTicker(underlying);
     });
-  }, [equityJoinMap, equityPrintMap, inferredDark.items, matchesTicker, tickerSet]);
+  }, [mergedEquityJoinMap, equityPrintMap, inferredDarkFeed.items, matchesTicker, tickerSet]);
 
   const filteredFlow = useMemo(() => {
     if (tickerSet.size === 0) {
-      return flow.items;
+      return flowFeed.items;
     }
-    return flow.items.filter((packet) =>
+    return flowFeed.items.filter((packet) =>
       matchesTicker(extractUnderlying(extractPacketContract(packet)))
     );
-  }, [flow.items, extractPacketContract, matchesTicker, tickerSet]);
+  }, [flowFeed.items, extractPacketContract, matchesTicker, tickerSet]);
 
   const filteredAlerts = useMemo(() => {
     if (tickerSet.size === 0) {
-      return alerts.items;
+      return alertsFeed.items;
     }
-    return alerts.items.filter((alert) => matchesTicker(inferAlertUnderlying(alert)));
-  }, [alerts.items, inferAlertUnderlying, matchesTicker, tickerSet]);
+    return alertsFeed.items.filter((alert) => matchesTicker(inferAlertUnderlying(alert)));
+  }, [alertsFeed.items, inferAlertUnderlying, matchesTicker, tickerSet]);
 
   const filteredClassifierHits = useMemo(() => {
     if (tickerSet.size === 0) {
-      return classifierHits.items;
+      return classifierHitsFeed.items;
     }
-    return classifierHits.items.filter((hit) => {
+    return classifierHitsFeed.items.filter((hit) => {
       const underlying = extractUnderlyingFromTrace(hit.trace_id);
       return matchesTicker(underlying);
     });
-  }, [classifierHits.items, extractUnderlyingFromTrace, matchesTicker, tickerSet]);
+  }, [classifierHitsFeed.items, extractUnderlyingFromTrace, matchesTicker, tickerSet]);
 
   const chartClassifierHits = useMemo(() => {
     const desired = chartTicker.toUpperCase();
-    return classifierHits.items
+    return classifierHitsFeed.items
       .filter((hit) => extractUnderlyingFromTrace(hit.trace_id) === desired)
       .sort((a, b) => {
         const delta = a.source_ts - b.source_ts;
@@ -3062,12 +3415,12 @@ const useTerminalState = () => {
         }
         return a.seq - b.seq;
       });
-  }, [chartTicker, classifierHits.items, extractUnderlyingFromTrace]);
+  }, [chartTicker, classifierHitsFeed.items, extractUnderlyingFromTrace]);
 
   const chartInferredDark = useMemo(() => {
     const desired = chartTicker.toUpperCase();
-    return inferredDark.items
-      .filter((event) => inferDarkUnderlying(event, equityPrintMap, equityJoinMap) === desired)
+    return inferredDarkFeed.items
+      .filter((event) => inferDarkUnderlying(event, equityPrintMap, mergedEquityJoinMap) === desired)
       .sort((a, b) => {
         const delta = a.source_ts - b.source_ts;
         if (delta !== 0) {
@@ -3075,7 +3428,7 @@ const useTerminalState = () => {
         }
         return a.seq - b.seq;
       });
-  }, [chartTicker, inferredDark.items, equityJoinMap, equityPrintMap]);
+  }, [chartTicker, inferredDarkFeed.items, mergedEquityJoinMap, equityPrintMap]);
 
   const findAlertForClassifierHit = useCallback(
     (hit: ClassifierHitEvent): AlertEvent | null => {
@@ -3086,12 +3439,12 @@ const useTerminalState = () => {
 
       const desiredTrace = `alert:${packetId}`;
       return (
-        alerts.items.find(
+        alertsFeed.items.find(
           (item) => item.trace_id === desiredTrace || item.evidence_refs[0] === packetId
         ) ?? null
       );
     },
-    [alerts.items, extractPacketIdFromClassifierHitTrace]
+    [alertsFeed.items, extractPacketIdFromClassifierHitTrace]
   );
 
   const openFromClassifierHit = useCallback(
@@ -3126,22 +3479,22 @@ const useTerminalState = () => {
 
   const lastSeen = useMemo(() => {
     return [
-      options.lastUpdate,
-      equities.lastUpdate,
-      inferredDark.lastUpdate,
-      flow.lastUpdate,
-      alerts.lastUpdate,
-      classifierHits.lastUpdate
+      optionsFeed.lastUpdate,
+      equitiesFeed.lastUpdate,
+      inferredDarkFeed.lastUpdate,
+      flowFeed.lastUpdate,
+      alertsFeed.lastUpdate,
+      classifierHitsFeed.lastUpdate
     ]
       .filter((value): value is number => value !== null)
       .sort((a, b) => b - a)[0] ?? null;
   }, [
-    options.lastUpdate,
-    equities.lastUpdate,
-    inferredDark.lastUpdate,
-    flow.lastUpdate,
-    alerts.lastUpdate,
-    classifierHits.lastUpdate
+    optionsFeed.lastUpdate,
+    equitiesFeed.lastUpdate,
+    inferredDarkFeed.lastUpdate,
+    flowFeed.lastUpdate,
+    alertsFeed.lastUpdate,
+    classifierHitsFeed.lastUpdate
   ]);
 
   return {
@@ -3165,22 +3518,23 @@ const useTerminalState = () => {
     darkScroll,
     alertsScroll,
     classifierScroll,
-    options,
-    equities,
-    equityJoins,
-    nbbo,
-    inferredDark,
-    flow,
-    alerts,
-    classifierHits,
+    options: optionsFeed,
+    equities: equitiesFeed,
+    equityJoins: equityJoinsFeed,
+    nbbo: nbboFeed,
+    inferredDark: inferredDarkFeed,
+    flow: flowFeed,
+    alerts: alertsFeed,
+    classifierHits: classifierHitsFeed,
+    liveSession,
     activeTickers,
     tickerSet,
     chartTicker,
     nbboMap,
-    optionPrintMap,
+    optionPrintMap: mergedOptionPrintMap,
     equityPrintMap,
-    equityJoinMap,
-    flowPacketMap,
+    equityJoinMap: mergedEquityJoinMap,
+    flowPacketMap: mergedFlowPacketMap,
     selectedEvidence,
     selectedFlowPacket,
     selectedDarkEvidence,
@@ -3921,6 +4275,8 @@ const ChartPane = ({ title = "Chart" }: ChartPaneProps) => {
         intervalMs={state.chartIntervalMs}
         mode={state.mode}
         replayTime={state.equities.replayTime}
+        liveCandles={state.liveSession.chartCandles}
+        liveOverlayPrints={state.liveSession.chartOverlay}
         classifierHits={state.chartClassifierHits}
         inferredDark={state.chartInferredDark}
         onClassifierHitClick={state.handleClassifierMarkerClick}
