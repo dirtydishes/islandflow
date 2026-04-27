@@ -6,7 +6,12 @@ ENV NODE_ENV=production
 ENV VIRTUAL_ENV=/opt/ingest-options-venv
 ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
 
-COPY . .
+COPY --from=workspace package.json ./package.json
+COPY --from=workspace bun.lock ./bun.lock
+COPY --from=workspace tsconfig.base.json ./tsconfig.base.json
+COPY --from=services . ./services
+COPY --from=packages . ./packages
+COPY --from=apps . ./apps
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends python3 python3-pip python3-venv \

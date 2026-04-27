@@ -52,7 +52,8 @@ Important defaults:
 - `NATS_URL`, `CLICKHOUSE_URL`, and `REDIS_URL` should stay on the internal container hostnames unless you intentionally split infra out.
 - `OPTIONS_INGEST_ADAPTER=synthetic` and `EQUITIES_INGEST_ADAPTER=synthetic` are the safest first boot settings.
 - `NPM_SHARED_NETWORK=npm-shared` is the recommended external Docker network name for NPM and this stack.
-- `NEXT_PUBLIC_API_URL=https://api.example.com` is the recommended production shape when using NPM with two subdomains.
+- `NEXT_PUBLIC_API_URL=https://api.example.com` uses a two-subdomain setup (`app` + `api`).
+- `NEXT_PUBLIC_API_URL=` (empty) uses same-origin mode where the app host also proxies API paths to `api:4000`.
 
 3. Build and start the stack:
 
@@ -98,10 +99,12 @@ If you want to use a different network name, set `NPM_SHARED_NETWORK` in `.env` 
 
 6. Create these NPM proxy hosts:
 
-- `app.example.com` -> forward to `web`, port `3000`
-- `api.example.com` -> forward to `api`, port `4000`
+- `app.example.com` -> forward to `web` (or `islandflow-vps-web-1`), port `3000`
+- `api.example.com` -> forward to `api` (or `islandflow-vps-api-1`), port `4000`
 
 For the API host, enable websocket support.
+
+If NPM is attached to multiple Docker networks and another stack also has an `api` container alias, prefer the explicit container name (`islandflow-vps-api-1`) to avoid DNS collisions.
 
 7. Open the app:
 
@@ -161,19 +164,24 @@ If IBKR is running somewhere else, change:
 
 ## NPM routing
 
-Recommended proxy hosts:
+The Islandflow stack expects an external NPM instance on the shared Docker network. The dedicated NPM stack now lives in `../npm`.
 
-- `app.<domain>` -> `web:3000`
-- `api.<domain>` -> `api:4000`
+Supported routing modes:
 
-The web app should be built with `NEXT_PUBLIC_API_URL=https://api.<domain>` so browser REST and websocket traffic goes straight to the API host through NPM.
+1. Two-subdomain mode
+   - `app.<domain>` -> `web:3000`
+   - `api.<domain>` -> `api:4000`
+   - Build web with `NEXT_PUBLIC_API_URL=https://api.<domain>`.
 
-The API host needs websocket support enabled because the app uses `/ws/*` endpoints for live streams.
+2. Same-origin fallback mode
+   - Build web with `NEXT_PUBLIC_API_URL=` (empty).
+   - Keep `app.<domain>` -> web.
+   - Add path-based proxy rules on `app.<domain>` for API routes to `api:4000`:
+     - `/ws/*`, `/replay/*`, `/prints/*`, `/joins/*`, `/nbbo/*`, `/dark/*`, `/flow/*`, `/candles/*`
 
-Because `web` and `api` are both attached to the shared user-defined network, NPM can target them directly by container DNS name:
+Use websocket support on whichever host serves `/ws/*`.
 
-- `web`
-- `api`
+If NPM is on multiple networks and names collide (for example another stack also exposes `api`), target explicit container names (`islandflow-vps-api-1`, `islandflow-vps-web-1`) instead of generic aliases.
 
 ## Updating the deployment
 
@@ -227,6 +235,7 @@ Only use `-v` if you intentionally want to wipe ClickHouse, Redis, and JetStream
 
 - The root `.env.example` still contains a `REPLAY_ENABLED` comment, but the current replay service does not read that variable. Use the Compose replay profile instead.
 - This stack does not publish `web` or `api` to host ports. NPM must be able to resolve `web` and `api` over the shared user-defined network from `NPM_SHARED_NETWORK`.
+- If NPM is attached to more than one application network, generic upstream aliases like `api` can resolve to the wrong stack. Prefer explicit container names in NPM upstream settings.
 - Some hosts disable IPv6 inside containers; the bundled ClickHouse config pins `listen_host` to `0.0.0.0` so the API can reach ClickHouse reliably over Docker networking.
 - The stack assumes a single-node VPS deployment. If you later split infra or add external managed services, update the three core connection URLs in `.env`.
 
@@ -235,6 +244,6 @@ Only use `-v` if you intentionally want to wipe ClickHouse, Redis, and JetStream
 After NPM is wired up:
 
 - `https://app.<domain>/` should load the UI.
-- Browser network requests from the UI should target `https://api.<domain>/...`.
-- Live feeds should connect over `wss://api.<domain>/ws/...`.
+- In two-subdomain mode, browser requests should target `https://api.<domain>/...` and live feeds should use `wss://api.<domain>/ws/...`.
+- In same-origin mode, browser requests should target `https://app.<domain>/...` for API paths and live feeds should use `wss://app.<domain>/ws/...`.
 - `docker compose ps` should show no service publishing host port `80`.

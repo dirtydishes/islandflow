@@ -1,9 +1,17 @@
 name: islandflow-vps
 
+x-build-contexts: &build-contexts
+  context: .
+  additional_contexts:
+    workspace: ./workspace-root
+    apps: ../../apps
+    services: ../../services
+    packages: ../../packages
+
 x-service-common: &service-common
   build:
-    context: ../..
-    dockerfile: deployment/docker/Dockerfile.service
+    <<: *build-contexts
+    dockerfile: Dockerfile.service
   env_file:
     - ./.env
   restart: unless-stopped
@@ -21,8 +29,8 @@ x-service-common: &service-common
 services:
   web:
     build:
-      context: ../..
-      dockerfile: deployment/docker/Dockerfile.web
+      <<: *build-contexts
+      dockerfile: Dockerfile.web
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
         NEXT_PUBLIC_NBBO_MAX_AGE_MS: ${NEXT_PUBLIC_NBBO_MAX_AGE_MS:-1000}
@@ -82,8 +90,8 @@ services:
 
   ingest-options:
     build:
-      context: ../..
-      dockerfile: deployment/docker/Dockerfile.ingest-options
+      <<: *build-contexts
+      dockerfile: Dockerfile.ingest-options
     env_file:
       - ./.env
     restart: unless-stopped
