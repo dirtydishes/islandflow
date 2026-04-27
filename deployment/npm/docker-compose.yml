@@ -1,0 +1,29 @@
+name: nginx-proxy-manager
+
+services:
+  npm:
+    image: jc21/nginx-proxy-manager:2
+    container_name: nginx-proxy-manager
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "${NPM_ADMIN_BIND_IP:-100.87.130.79}:81:81"
+      - "443:443"
+    env_file:
+      - ./.env
+    environment:
+      TZ: ${TZ}
+    volumes:
+      - ./data:/data
+      - ./letsencrypt:/etc/letsencrypt
+    networks:
+      - edge
+      - shared
+
+networks:
+  edge:
+    external: true
+    name: ${NPM_EDGE_NETWORK:-nextcloud_edge}
+  shared:
+    external: true
+    name: ${NPM_SHARED_NETWORK:-npm-shared}
