@@ -473,7 +473,61 @@ const extractUnderlying = (contractId: string): string => {
 
 const extractEquityTraceFromJoin = (joinId: string): string | null => {
   const match = joinId.match(/^equityjoin:(.+)$/);
-  return match?.[1] ?? null;
+  if (match?.[1]) {
+    return match[1];
+  }
+  return joinId.trim().length > 0 ? joinId.trim() : null;
+};
+
+const normalizeJoinRefCandidates = (value: string): string[] => {
+  const ref = value.trim();
+  if (!ref) {
+    return [];
+  }
+
+  if (ref.startsWith("equityjoin:")) {
+    const rawTrace = ref.slice("equityjoin:".length);
+    return rawTrace ? [ref, rawTrace] : [ref];
+  }
+
+  return [ref, `equityjoin:${ref}`];
+};
+
+const resolveJoinFromRef = (
+  ref: string,
+  joins: Map<string, EquityPrintJoin>
+): EquityPrintJoin | null => {
+  const candidates = normalizeJoinRefCandidates(ref);
+  for (const key of candidates) {
+    const match = joins.get(key);
+    if (match) {
+      return match;
+    }
+  }
+  return null;
+};
+
+const formatDarkTrace = (traceId: string): string => {
+  const normalized = traceId.trim();
+  if (!normalized) {
+    return "unknown";
+  }
+
+  if (normalized.startsWith("equityjoin:")) {
+    return normalized.slice("equityjoin:".length);
+  }
+
+  const parts = normalized.split(":").filter(Boolean);
+  if (parts.length < 2) {
+    return normalized;
+  }
+
+  const kind = parts[1]?.replace(/_/g, " ") ?? "event";
+  const remainder = parts.slice(2).join(" -> ");
+  if (!remainder) {
+    return kind;
+  }
+  return `${kind}: ${remainder}`;
 };
 
 const inferDarkUnderlying = (
@@ -482,7 +536,7 @@ const inferDarkUnderlying = (
   equityJoins: Map<string, EquityPrintJoin>
 ): string | null => {
   for (const ref of event.evidence_refs) {
-    const join = equityJoins.get(ref);
+    const join = resolveJoinFromRef(ref, equityJoins);
     if (!join) {
       continue;
     }
@@ -2935,7 +2989,7 @@ const DarkDrawer = ({ event, evidence, underlying, onClose }: DarkDrawerProps) =
         <h4>Trace path</h4>
         <div className="drawer-row">
           <div className="drawer-row-title">Event trace</div>
-          <p className="drawer-note">{event.trace_id}</p>
+          <p className="drawer-note">{formatDarkTrace(event.trace_id)}</p>
         </div>
         {traceRefs.length === 0 ? (
           <p className="drawer-empty">No evidence references attached.</p>
@@ -2944,7 +2998,7 @@ const DarkDrawer = ({ event, evidence, underlying, onClose }: DarkDrawerProps) =
             {traceRefs.map((ref) => (
               <div className="drawer-row" key={ref}>
                 <div className="drawer-row-title">Evidence ref</div>
-                <p className="drawer-note">{ref}</p>
+                <p className="drawer-note">{formatDarkTrace(ref)}</p>
               </div>
             ))}
           </div>
@@ -3386,15 +3440,23 @@ const useTerminalState = () => {
       return;
     }
 
-    const missingIds = selectedDarkEvent.evidence_refs.filter((id) => !resolvedEquityJoinMap.has(id));
+    const missingIds = selectedDarkEvent.evidence_refs.filter(
+      (id) => resolveJoinFromRef(id, resolvedEquityJoinMap) === null
+    );
     if (missingIds.length === 0) {
       return;
     }
 
     incrementRetentionMetric("pinnedFetchMisses", missingIds.length);
     const url = new URL(buildApiUrl("/equity-joins/by-id"));
+    const requested = new Set<string>();
     for (const id of missingIds) {
-      url.searchParams.append("id", id);
+      for (const candidate of normalizeJoinRefCandidates(id)) {
+        if (!requested.has(candidate)) {
+          requested.add(candidate);
+          url.searchParams.append("id", candidate);
+        }
+      }
     }
     void fetch(url.toString())
       .then(async (response) => {
@@ -3407,6 +3469,10 @@ const useTerminalState = () => {
         const next = new Map<string, EquityPrintJoin>();
         for (const item of payload.data ?? []) {
           next.set(item.id, item);
+          next.set(item.trace_id, item);
+          if (item.print_trace_id) {
+            next.set(item.print_trace_id, item);
+          }
         }
         if (next.size > 0) {
           const now = Date.now();
@@ -3451,7 +3517,7 @@ const useTerminalState = () => {
     }
 
     return selectedDarkEvent.evidence_refs.map((id) => {
-      const join = resolvedEquityJoinMap.get(id);
+      const join = resolveJoinFromRef(id, resolvedEquityJoinMap);
       if (join) {
         return { kind: "join", id, join };
       }
@@ -3782,7 +3848,9 @@ const useTerminalState = () => {
     const keys = new Set<string>();
     if (selectedDarkEvent) {
       for (const id of selectedDarkEvent.evidence_refs) {
-        keys.add(id);
+        for (const candidate of normalizeJoinRefCandidates(id)) {
+          keys.add(candidate);
+        }
       }
     }
     return keys;

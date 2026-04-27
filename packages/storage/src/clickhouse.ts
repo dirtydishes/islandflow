@@ -1317,8 +1317,34 @@ export const fetchEquityPrintJoinsByIds = async (
     return [];
   }
 
+  const joinIds = new Set<string>();
+  const printTraceIds = new Set<string>();
+  for (const id of uniqueIds) {
+    joinIds.add(id);
+    if (id.startsWith("equityjoin:")) {
+      const trace = id.slice("equityjoin:".length);
+      if (trace) {
+        printTraceIds.add(trace);
+      }
+    } else {
+      joinIds.add(`equityjoin:${id}`);
+      printTraceIds.add(id);
+    }
+  }
+
+  const joinIdList = Array.from(joinIds);
+  const printTraceList = Array.from(printTraceIds);
+  const whereParts = [
+    `id IN (${buildStringList(joinIdList)})`,
+    `trace_id IN (${buildStringList(joinIdList)})`
+  ];
+  if (printTraceList.length > 0) {
+    whereParts.push(`print_trace_id IN (${buildStringList(printTraceList)})`);
+  }
+  const lookupLimit = clampLookupLimit(joinIdList.length + printTraceList.length);
+
   const result = await client.query({
-    query: `SELECT * FROM ${EQUITY_PRINT_JOINS_TABLE} WHERE id IN (${buildStringList(uniqueIds)}) ORDER BY source_ts DESC, seq DESC LIMIT ${clampLookupLimit(uniqueIds.length)}`,
+    query: `SELECT * FROM ${EQUITY_PRINT_JOINS_TABLE} WHERE ${whereParts.join(" OR ")} ORDER BY source_ts DESC, seq DESC LIMIT ${lookupLimit}`,
     format: "JSONEachRow"
   });
 
