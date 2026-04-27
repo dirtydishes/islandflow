@@ -29,7 +29,35 @@ import type {
 } from "@islandflow/types";
 import { createChart, type IChartApi, type SeriesMarker, type UTCTimestamp } from "lightweight-charts";
 
-const MAX_ITEMS = 500;
+const parseBoundedInt = (
+  value: string | undefined,
+  fallback: number,
+  min: number,
+  max: number
+): number => {
+  if (!value || value.trim().length === 0) {
+    return fallback;
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return Math.max(min, Math.min(max, Math.floor(parsed)));
+};
+
+const LIVE_HOT_WINDOW = parseBoundedInt(process.env.NEXT_PUBLIC_LIVE_HOT_WINDOW, 2000, 100, 100000);
+const PINNED_EVIDENCE_TTL_MS = parseBoundedInt(
+  process.env.NEXT_PUBLIC_PINNED_EVIDENCE_TTL_MS,
+  20 * 60 * 1000,
+  60 * 1000,
+  2 * 60 * 60 * 1000
+);
+const PINNED_EVIDENCE_MAX_ITEMS = parseBoundedInt(
+  process.env.NEXT_PUBLIC_PINNED_EVIDENCE_MAX_ITEMS,
+  4000,
+  100,
+  50000
+);
 const NBBO_MAX_AGE_MS = Number(process.env.NEXT_PUBLIC_NBBO_MAX_AGE_MS);
 const NBBO_MAX_AGE_MS_SAFE =
   Number.isFinite(NBBO_MAX_AGE_MS) && NBBO_MAX_AGE_MS > 0 ? NBBO_MAX_AGE_MS : 1000;
@@ -229,6 +257,32 @@ type SortableItem = {
   id?: string;
 };
 
+type PinnedEntry<T> = {
+  value: T;
+  updatedAt: number;
+};
+
+type RetentionMetricKey =
+  | "hotWindowEvictions"
+  | "pinnedFetchMisses"
+  | "pinnedFetchFailures"
+  | "pinnedStoreSize";
+
+const frontendRetentionMetrics: Record<RetentionMetricKey, number> = {
+  hotWindowEvictions: 0,
+  pinnedFetchMisses: 0,
+  pinnedFetchFailures: 0,
+  pinnedStoreSize: 0
+};
+
+const incrementRetentionMetric = (key: RetentionMetricKey, count = 1): void => {
+  frontendRetentionMetrics[key] += count;
+};
+
+const setRetentionMetric = (key: RetentionMetricKey, value: number): void => {
+  frontendRetentionMetrics[key] = value;
+};
+
 const extractSortTs = (item: SortableItem): number =>
   item.ts ?? item.source_ts ?? item.ingest_ts ?? 0;
 
@@ -246,7 +300,12 @@ const buildItemKey = (item: SortableItem): string | null => {
   return null;
 };
 
-const mergeNewest = <T extends SortableItem>(incoming: T[], existing: T[]): T[] => {
+const mergeNewest = <T extends SortableItem>(
+  incoming: T[],
+  existing: T[],
+  limit = LIVE_HOT_WINDOW,
+  onTrim?: (evicted: number) => void
+): T[] => {
   const combined = [...incoming, ...existing];
   if (combined.length === 0) {
     return combined;
@@ -274,7 +333,13 @@ const mergeNewest = <T extends SortableItem>(incoming: T[], existing: T[]): T[] 
     return extractSortSeq(b) - extractSortSeq(a);
   });
 
-  return deduped.slice(0, MAX_ITEMS);
+  const safeLimit = Math.max(1, Math.floor(limit));
+  const evicted = Math.max(0, deduped.length - safeLimit);
+  if (evicted > 0) {
+    onTrim?.(evicted);
+  }
+
+  return deduped.slice(0, safeLimit);
 };
 
 type TapeState<T> = {
@@ -670,6 +735,117 @@ const useScrollAnchor = (
   return { capture, apply };
 };
 
+type VirtualListResult<T> = {
+  visibleItems: T[];
+  topSpacerHeight: number;
+  bottomSpacerHeight: number;
+};
+
+const useVirtualList = <T,>(
+  items: T[],
+  listRef: React.RefObject<HTMLDivElement>,
+  enabled: boolean,
+  rowHeight: number,
+  overscan = 8
+): VirtualListResult<T> => {
+  const [range, setRange] = useState<{ start: number; end: number }>({
+    start: 0,
+    end: items.length
+  });
+
+  const recompute = useCallback(() => {
+    if (!enabled) {
+      setRange({ start: 0, end: items.length });
+      return;
+    }
+
+    const element = listRef.current;
+    if (!element) {
+      setRange({ start: 0, end: Math.min(items.length, 80) });
+      return;
+    }
+
+    const viewportHeight = Math.max(rowHeight, element.clientHeight);
+    const visibleCount = Math.ceil(viewportHeight / rowHeight);
+    const start = Math.max(0, Math.floor(element.scrollTop / rowHeight) - overscan);
+    const end = Math.min(items.length, start + visibleCount + overscan * 2);
+    setRange({ start, end });
+  }, [enabled, items.length, listRef, overscan, rowHeight]);
+
+  useEffect(() => {
+    recompute();
+  }, [items.length, recompute]);
+
+  useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
+    const element = listRef.current;
+    if (!element) {
+      return;
+    }
+
+    const onScroll = () => recompute();
+    const onResize = () => recompute();
+
+    element.addEventListener("scroll", onScroll);
+    window.addEventListener("resize", onResize);
+
+    return () => {
+      element.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [enabled, listRef, recompute]);
+
+  if (!enabled) {
+    return {
+      visibleItems: items,
+      topSpacerHeight: 0,
+      bottomSpacerHeight: 0
+    };
+  }
+
+  const start = Math.min(range.start, items.length);
+  const end = Math.min(Math.max(range.end, start), items.length);
+
+  return {
+    visibleItems: items.slice(start, end),
+    topSpacerHeight: start * rowHeight,
+    bottomSpacerHeight: Math.max(0, (items.length - end) * rowHeight)
+  };
+};
+
+const upsertPinnedEntries = <T,>(
+  current: Map<string, PinnedEntry<T>>,
+  incoming: Map<string, T>,
+  now: number
+): Map<string, PinnedEntry<T>> => {
+  const next = new Map(current);
+  for (const [key, value] of incoming) {
+    next.set(key, { value, updatedAt: now });
+  }
+  return next;
+};
+
+const prunePinnedEntries = <T,>(
+  current: Map<string, PinnedEntry<T>>,
+  activeKeys: Set<string>,
+  now: number
+): Map<string, PinnedEntry<T>> => {
+  const surviving: Array<[string, PinnedEntry<T>]> = [];
+
+  for (const [key, entry] of current) {
+    if (activeKeys.has(key) || now - entry.updatedAt <= PINNED_EVIDENCE_TTL_MS) {
+      surviving.push([key, entry]);
+    }
+  }
+
+  surviving.sort((a, b) => b[1].updatedAt - a[1].updatedAt);
+  const trimmed = surviving.slice(0, PINNED_EVIDENCE_MAX_ITEMS);
+  return new Map(trimmed);
+};
+
 const statusLabel = (status: WsStatus, paused: boolean, mode: TapeMode): string => {
   if (paused) {
     return "Paused";
@@ -772,7 +948,11 @@ const useTape = <T extends SortableItem & { seq: number }>(
         captureScroll();
       }
 
-      setItems((prev) => mergeNewest(buffered, prev));
+      setItems((prev) =>
+        mergeNewest(buffered, prev, LIVE_HOT_WINDOW, (evicted) =>
+          incrementRetentionMetric("hotWindowEvictions", evicted)
+        )
+      );
       setLastUpdate(Date.now());
     });
   }, [captureScroll, onNewItems]);
@@ -1170,7 +1350,9 @@ const useLiveStream = <T extends SortableItem>(
       }
 
       if (shouldHold) {
-        holdRef.current = mergeNewest(buffered, holdRef.current);
+        holdRef.current = mergeNewest(buffered, holdRef.current, LIVE_HOT_WINDOW, (evicted) =>
+          incrementRetentionMetric("hotWindowEvictions", evicted)
+        );
         setLastUpdate(Date.now());
         return;
       }
@@ -1179,7 +1361,11 @@ const useLiveStream = <T extends SortableItem>(
         holdRef.current.length > 0 ? [...holdRef.current, ...buffered] : buffered;
       holdRef.current = [];
 
-      setItems((prev) => mergeNewest(nextBatch, prev));
+      setItems((prev) =>
+        mergeNewest(nextBatch, prev, LIVE_HOT_WINDOW, (evicted) =>
+          incrementRetentionMetric("hotWindowEvictions", evicted)
+        )
+      );
       setLastUpdate(Date.now());
     });
   }, [config.captureScroll, config.onNewItems, config.shouldHold]);
@@ -1295,7 +1481,11 @@ const useLiveStream = <T extends SortableItem>(
     if (holdRef.current.length === 0) {
       return;
     }
-    setItems((prev) => mergeNewest(holdRef.current, prev));
+    setItems((prev) =>
+      mergeNewest(holdRef.current, prev, LIVE_HOT_WINDOW, (evicted) =>
+        incrementRetentionMetric("hotWindowEvictions", evicted)
+      )
+    );
     holdRef.current = [];
     setLastUpdate(Date.now());
   }, [config.resumeSignal, config.shouldHold]);
@@ -1491,7 +1681,11 @@ const useLiveSession = (
         nextItems: T[]
       ) => {
         setter((prev) =>
-          message.op === "snapshot" ? (nextItems as T[]) : mergeNewest(nextItems as T[], prev)
+          message.op === "snapshot"
+            ? (nextItems as T[])
+            : mergeNewest(nextItems as T[], prev, LIVE_HOT_WINDOW, (evicted) =>
+                incrementRetentionMetric("hotWindowEvictions", evicted)
+              )
         );
       };
 
@@ -3077,36 +3271,53 @@ const useTerminalState = () => {
     }
     return map;
   }, [flowFeed.items]);
-  const [fetchedOptionPrintMap, setFetchedOptionPrintMap] = useState<Map<string, OptionPrint>>(
-    () => new Map()
-  );
-  const [fetchedFlowPacketMap, setFetchedFlowPacketMap] = useState<Map<string, FlowPacket>>(
-    () => new Map()
-  );
-  const [fetchedEquityJoinMap, setFetchedEquityJoinMap] = useState<Map<string, EquityPrintJoin>>(
-    () => new Map()
-  );
-  const mergedOptionPrintMap = useMemo(() => {
-    const merged = new Map(optionPrintMap);
-    for (const [key, value] of fetchedOptionPrintMap) {
+  const [pinnedOptionPrintMap, setPinnedOptionPrintMap] = useState<
+    Map<string, PinnedEntry<OptionPrint>>
+  >(() => new Map());
+  const [pinnedFlowPacketMap, setPinnedFlowPacketMap] = useState<
+    Map<string, PinnedEntry<FlowPacket>>
+  >(() => new Map());
+  const [pinnedEquityJoinMap, setPinnedEquityJoinMap] = useState<
+    Map<string, PinnedEntry<EquityPrintJoin>>
+  >(() => new Map());
+
+  const resolvedOptionPrintMap = useMemo(() => {
+    const merged = new Map<string, OptionPrint>();
+    for (const [key, entry] of pinnedOptionPrintMap) {
+      merged.set(key, entry.value);
+    }
+    for (const [key, value] of optionPrintMap) {
       merged.set(key, value);
     }
     return merged;
-  }, [optionPrintMap, fetchedOptionPrintMap]);
-  const mergedFlowPacketMap = useMemo(() => {
-    const merged = new Map(flowPacketMap);
-    for (const [key, value] of fetchedFlowPacketMap) {
+  }, [optionPrintMap, pinnedOptionPrintMap]);
+  const resolvedFlowPacketMap = useMemo(() => {
+    const merged = new Map<string, FlowPacket>();
+    for (const [key, entry] of pinnedFlowPacketMap) {
+      merged.set(key, entry.value);
+    }
+    for (const [key, value] of flowPacketMap) {
       merged.set(key, value);
     }
     return merged;
-  }, [flowPacketMap, fetchedFlowPacketMap]);
-  const mergedEquityJoinMap = useMemo(() => {
-    const merged = new Map(equityJoinMap);
-    for (const [key, value] of fetchedEquityJoinMap) {
+  }, [flowPacketMap, pinnedFlowPacketMap]);
+  const resolvedEquityJoinMap = useMemo(() => {
+    const merged = new Map<string, EquityPrintJoin>();
+    for (const [key, entry] of pinnedEquityJoinMap) {
+      merged.set(key, entry.value);
+    }
+    for (const [key, value] of equityJoinMap) {
       merged.set(key, value);
     }
     return merged;
-  }, [equityJoinMap, fetchedEquityJoinMap]);
+  }, [equityJoinMap, pinnedEquityJoinMap]);
+
+  useEffect(() => {
+    setRetentionMetric(
+      "pinnedStoreSize",
+      pinnedOptionPrintMap.size + pinnedFlowPacketMap.size + pinnedEquityJoinMap.size
+    );
+  }, [pinnedOptionPrintMap.size, pinnedFlowPacketMap.size, pinnedEquityJoinMap.size]);
 
   useEffect(() => {
     if (!selectedAlert || mode !== "live") {
@@ -3114,68 +3325,99 @@ const useTerminalState = () => {
     }
 
     const packetId = selectedAlert.evidence_refs[0];
-    if (packetId && !mergedFlowPacketMap.has(packetId)) {
+    if (packetId && !resolvedFlowPacketMap.has(packetId)) {
+      incrementRetentionMetric("pinnedFetchMisses", 1);
       void fetch(buildApiUrl(`/flow/packets/${encodeURIComponent(packetId)}`))
-        .then((response) => response.json())
+        .then(async (response) => {
+          if (!response.ok) {
+            throw new Error(await readErrorDetail(response));
+          }
+          return response.json();
+        })
         .then((payload: { data?: FlowPacket | null }) => {
           if (!payload.data) {
             return;
           }
-          setFetchedFlowPacketMap((prev) => new Map(prev).set(payload.data!.id, payload.data!));
+          const now = Date.now();
+          const next = new Map<string, FlowPacket>([[payload.data.id, payload.data]]);
+          setPinnedFlowPacketMap((prev) => upsertPinnedEntries(prev, next, now));
         })
-        .catch((error) => console.warn("Failed to fetch flow packet evidence", error));
+        .catch((error) => {
+          incrementRetentionMetric("pinnedFetchFailures", 1);
+          console.warn("Failed to fetch flow packet evidence", error);
+        });
     }
 
     const missingPrintIds = selectedAlert.evidence_refs.filter(
-      (id) => !mergedFlowPacketMap.has(id) && !mergedOptionPrintMap.has(id)
+      (id) => !resolvedFlowPacketMap.has(id) && !resolvedOptionPrintMap.has(id)
     );
     if (missingPrintIds.length > 0) {
+      incrementRetentionMetric("pinnedFetchMisses", missingPrintIds.length);
       const url = new URL(buildApiUrl("/option-prints/by-trace"));
       for (const traceId of missingPrintIds) {
         url.searchParams.append("trace_id", traceId);
       }
       void fetch(url.toString())
-        .then((response) => response.json())
+        .then(async (response) => {
+          if (!response.ok) {
+            throw new Error(await readErrorDetail(response));
+          }
+          return response.json();
+        })
         .then((payload: { data?: OptionPrint[] }) => {
           const next = new Map<string, OptionPrint>();
           for (const item of payload.data ?? []) {
             next.set(item.trace_id, item);
           }
           if (next.size > 0) {
-            setFetchedOptionPrintMap((prev) => new Map([...prev, ...next]));
+            const now = Date.now();
+            setPinnedOptionPrintMap((prev) => upsertPinnedEntries(prev, next, now));
           }
         })
-        .catch((error) => console.warn("Failed to fetch option print evidence", error));
+        .catch((error) => {
+          incrementRetentionMetric("pinnedFetchFailures", 1);
+          console.warn("Failed to fetch option print evidence", error);
+        });
     }
-  }, [selectedAlert, mode, mergedFlowPacketMap, mergedOptionPrintMap]);
+  }, [selectedAlert, mode, resolvedFlowPacketMap, resolvedOptionPrintMap]);
 
   useEffect(() => {
     if (!selectedDarkEvent || mode !== "live") {
       return;
     }
 
-    const missingIds = selectedDarkEvent.evidence_refs.filter((id) => !mergedEquityJoinMap.has(id));
+    const missingIds = selectedDarkEvent.evidence_refs.filter((id) => !resolvedEquityJoinMap.has(id));
     if (missingIds.length === 0) {
       return;
     }
 
+    incrementRetentionMetric("pinnedFetchMisses", missingIds.length);
     const url = new URL(buildApiUrl("/equity-joins/by-id"));
     for (const id of missingIds) {
       url.searchParams.append("id", id);
     }
     void fetch(url.toString())
-      .then((response) => response.json())
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(await readErrorDetail(response));
+        }
+        return response.json();
+      })
       .then((payload: { data?: EquityPrintJoin[] }) => {
         const next = new Map<string, EquityPrintJoin>();
         for (const item of payload.data ?? []) {
           next.set(item.id, item);
         }
         if (next.size > 0) {
-          setFetchedEquityJoinMap((prev) => new Map([...prev, ...next]));
+          const now = Date.now();
+          setPinnedEquityJoinMap((prev) => upsertPinnedEntries(prev, next, now));
         }
       })
-      .catch((error) => console.warn("Failed to fetch dark evidence joins", error));
-  }, [selectedDarkEvent, mode, mergedEquityJoinMap]);
+      .catch((error) => {
+        incrementRetentionMetric("pinnedFetchFailures", 1);
+        console.warn("Failed to fetch dark evidence joins", error);
+      });
+  }, [selectedDarkEvent, mode, resolvedEquityJoinMap]);
 
   const selectedEvidence = useMemo((): EvidenceItem[] => {
     if (!selectedAlert) {
@@ -3183,25 +3425,25 @@ const useTerminalState = () => {
     }
 
     return selectedAlert.evidence_refs.map((id) => {
-      const packet = mergedFlowPacketMap.get(id);
+      const packet = resolvedFlowPacketMap.get(id);
       if (packet) {
         return { kind: "flow", id, packet };
       }
-      const print = mergedOptionPrintMap.get(id);
+      const print = resolvedOptionPrintMap.get(id);
       if (print) {
         return { kind: "print", id, print };
       }
       return { kind: "unknown", id };
     });
-  }, [selectedAlert, mergedFlowPacketMap, mergedOptionPrintMap]);
+  }, [selectedAlert, resolvedFlowPacketMap, resolvedOptionPrintMap]);
 
   const selectedFlowPacket = useMemo(() => {
     if (!selectedAlert) {
       return null;
     }
     const packetId = selectedAlert.evidence_refs[0];
-    return packetId ? mergedFlowPacketMap.get(packetId) ?? null : null;
-  }, [selectedAlert, mergedFlowPacketMap]);
+    return packetId ? resolvedFlowPacketMap.get(packetId) ?? null : null;
+  }, [selectedAlert, resolvedFlowPacketMap]);
 
   const selectedDarkEvidence = useMemo((): DarkEvidenceItem[] => {
     if (!selectedDarkEvent) {
@@ -3209,20 +3451,20 @@ const useTerminalState = () => {
     }
 
     return selectedDarkEvent.evidence_refs.map((id) => {
-      const join = mergedEquityJoinMap.get(id);
+      const join = resolvedEquityJoinMap.get(id);
       if (join) {
         return { kind: "join", id, join };
       }
       return { kind: "unknown", id };
     });
-  }, [selectedDarkEvent, mergedEquityJoinMap]);
+  }, [selectedDarkEvent, resolvedEquityJoinMap]);
 
   const selectedDarkUnderlying = useMemo(() => {
     if (!selectedDarkEvent) {
       return null;
     }
-    return inferDarkUnderlying(selectedDarkEvent, equityPrintMap, mergedEquityJoinMap);
-  }, [selectedDarkEvent, mergedEquityJoinMap, equityPrintMap]);
+    return inferDarkUnderlying(selectedDarkEvent, equityPrintMap, resolvedEquityJoinMap);
+  }, [selectedDarkEvent, resolvedEquityJoinMap, equityPrintMap]);
 
   useEffect(() => {
     if (mode !== "live") {
@@ -3269,25 +3511,36 @@ const useTerminalState = () => {
       return;
     }
 
-    if (!mergedFlowPacketMap.has(selectedClassifierPacketId)) {
+    if (!resolvedFlowPacketMap.has(selectedClassifierPacketId)) {
+      incrementRetentionMetric("pinnedFetchMisses", 1);
       void fetch(buildApiUrl(`/flow/packets/${encodeURIComponent(selectedClassifierPacketId)}`))
-        .then((response) => response.json())
+        .then(async (response) => {
+          if (!response.ok) {
+            throw new Error(await readErrorDetail(response));
+          }
+          return response.json();
+        })
         .then((payload: { data?: FlowPacket | null }) => {
           if (!payload.data) {
             return;
           }
-          setFetchedFlowPacketMap((prev) => new Map(prev).set(payload.data!.id, payload.data!));
+          const now = Date.now();
+          const next = new Map<string, FlowPacket>([[payload.data.id, payload.data]]);
+          setPinnedFlowPacketMap((prev) => upsertPinnedEntries(prev, next, now));
         })
-        .catch((error) => console.warn("Failed to fetch classifier flow packet", error));
+        .catch((error) => {
+          incrementRetentionMetric("pinnedFetchFailures", 1);
+          console.warn("Failed to fetch classifier flow packet", error);
+        });
     }
-  }, [selectedClassifierPacketId, mode, mergedFlowPacketMap]);
+  }, [selectedClassifierPacketId, mode, resolvedFlowPacketMap]);
 
   const selectedClassifierFlowPacket = useMemo(() => {
     if (!selectedClassifierPacketId) {
       return null;
     }
-    return mergedFlowPacketMap.get(selectedClassifierPacketId) ?? null;
-  }, [mergedFlowPacketMap, selectedClassifierPacketId]);
+    return resolvedFlowPacketMap.get(selectedClassifierPacketId) ?? null;
+  }, [resolvedFlowPacketMap, selectedClassifierPacketId]);
 
   const selectedClassifierEvidence = useMemo((): EvidenceItem[] => {
     if (!selectedClassifierHit) {
@@ -3298,19 +3551,19 @@ const useTerminalState = () => {
       return [];
     }
 
-    const packet = mergedFlowPacketMap.get(selectedClassifierPacketId);
+    const packet = resolvedFlowPacketMap.get(selectedClassifierPacketId);
     if (!packet) {
       return [];
     }
 
     return packet.members.map((id) => {
-      const print = mergedOptionPrintMap.get(id);
+      const print = resolvedOptionPrintMap.get(id);
       if (print) {
         return { kind: "print", id, print };
       }
       return { kind: "unknown", id };
     });
-  }, [mergedFlowPacketMap, mergedOptionPrintMap, selectedClassifierHit, selectedClassifierPacketId]);
+  }, [resolvedFlowPacketMap, resolvedOptionPrintMap, selectedClassifierHit, selectedClassifierPacketId]);
 
   const inferAlertUnderlying = useCallback(
     (alert: AlertEvent): string | null => {
@@ -3321,14 +3574,14 @@ const useTerminalState = () => {
 
       const packetId = alert.evidence_refs[0];
       if (packetId) {
-        const packet = mergedFlowPacketMap.get(packetId);
+        const packet = resolvedFlowPacketMap.get(packetId);
         if (packet) {
           return extractUnderlying(extractPacketContract(packet));
         }
       }
 
       for (const ref of alert.evidence_refs) {
-        const print = mergedOptionPrintMap.get(ref);
+        const print = resolvedOptionPrintMap.get(ref);
         if (print) {
           return extractUnderlying(print.option_contract_id);
         }
@@ -3336,7 +3589,7 @@ const useTerminalState = () => {
 
       return null;
     },
-    [extractPacketContract, extractUnderlyingFromTrace, mergedFlowPacketMap, mergedOptionPrintMap]
+    [extractPacketContract, extractUnderlyingFromTrace, resolvedFlowPacketMap, resolvedOptionPrintMap]
   );
 
   const matchesTicker = useCallback(
@@ -3373,10 +3626,10 @@ const useTerminalState = () => {
       return inferredDarkFeed.items;
     }
     return inferredDarkFeed.items.filter((event) => {
-      const underlying = inferDarkUnderlying(event, equityPrintMap, mergedEquityJoinMap);
+      const underlying = inferDarkUnderlying(event, equityPrintMap, resolvedEquityJoinMap);
       return matchesTicker(underlying);
     });
-  }, [mergedEquityJoinMap, equityPrintMap, inferredDarkFeed.items, matchesTicker, tickerSet]);
+  }, [resolvedEquityJoinMap, equityPrintMap, inferredDarkFeed.items, matchesTicker, tickerSet]);
 
   const filteredFlow = useMemo(() => {
     if (tickerSet.size === 0) {
@@ -3393,6 +3646,175 @@ const useTerminalState = () => {
     }
     return alertsFeed.items.filter((alert) => matchesTicker(inferAlertUnderlying(alert)));
   }, [alertsFeed.items, inferAlertUnderlying, matchesTicker, tickerSet]);
+
+  const visibleAlerts = useMemo(() => filteredAlerts.slice(0, 12), [filteredAlerts]);
+
+  const visibleAlertEvidenceRefs = useMemo(() => {
+    const refs = new Set<string>();
+    for (const alert of visibleAlerts) {
+      for (const id of alert.evidence_refs.slice(0, 8)) {
+        refs.add(id);
+      }
+    }
+    return refs;
+  }, [visibleAlerts]);
+
+  useEffect(() => {
+    if (mode !== "live" || visibleAlerts.length === 0) {
+      return;
+    }
+
+    const visiblePacketIds = visibleAlerts
+      .map((alert) => alert.evidence_refs[0] ?? null)
+      .filter((id): id is string => Boolean(id) && id.startsWith("flowpacket:"));
+    const missingPacketIds = Array.from(new Set(visiblePacketIds)).filter(
+      (id) => !resolvedFlowPacketMap.has(id)
+    );
+
+    if (missingPacketIds.length > 0) {
+      incrementRetentionMetric("pinnedFetchMisses", missingPacketIds.length);
+      void Promise.all(
+        missingPacketIds.map(async (packetId) => {
+          const response = await fetch(buildApiUrl(`/flow/packets/${encodeURIComponent(packetId)}`));
+          if (!response.ok) {
+            throw new Error(await readErrorDetail(response));
+          }
+          const payload = (await response.json()) as { data?: FlowPacket | null };
+          return payload.data ?? null;
+        })
+      )
+        .then((packets) => {
+          const next = new Map<string, FlowPacket>();
+          for (const packet of packets) {
+            if (packet) {
+              next.set(packet.id, packet);
+            }
+          }
+          if (next.size > 0) {
+            const now = Date.now();
+            setPinnedFlowPacketMap((prev) => upsertPinnedEntries(prev, next, now));
+          }
+        })
+        .catch((error) => {
+          incrementRetentionMetric("pinnedFetchFailures", 1);
+          console.warn("Failed to prefetch visible alert packets", error);
+        });
+    }
+
+    const missingPrintIds = Array.from(visibleAlertEvidenceRefs).filter(
+      (id) => !resolvedFlowPacketMap.has(id) && !resolvedOptionPrintMap.has(id)
+    );
+    if (missingPrintIds.length === 0) {
+      return;
+    }
+
+    incrementRetentionMetric("pinnedFetchMisses", missingPrintIds.length);
+    const url = new URL(buildApiUrl("/option-prints/by-trace"));
+    for (const traceId of missingPrintIds) {
+      url.searchParams.append("trace_id", traceId);
+    }
+    void fetch(url.toString())
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(await readErrorDetail(response));
+        }
+        return response.json();
+      })
+      .then((payload: { data?: OptionPrint[] }) => {
+        const next = new Map<string, OptionPrint>();
+        for (const item of payload.data ?? []) {
+          next.set(item.trace_id, item);
+        }
+        if (next.size > 0) {
+          const now = Date.now();
+          setPinnedOptionPrintMap((prev) => upsertPinnedEntries(prev, next, now));
+        }
+      })
+      .catch((error) => {
+        incrementRetentionMetric("pinnedFetchFailures", 1);
+        console.warn("Failed to prefetch visible alert evidence", error);
+      });
+  }, [
+    mode,
+    visibleAlerts,
+    visibleAlertEvidenceRefs,
+    resolvedFlowPacketMap,
+    resolvedOptionPrintMap
+  ]);
+
+  const activePinnedFlowKeys = useMemo(() => {
+    const keys = new Set<string>();
+    const selectedAlertPacketId = selectedAlert?.evidence_refs[0];
+    if (selectedAlertPacketId) {
+      keys.add(selectedAlertPacketId);
+    }
+    if (selectedClassifierPacketId) {
+      keys.add(selectedClassifierPacketId);
+    }
+    for (const alert of visibleAlerts) {
+      const packetId = alert.evidence_refs[0];
+      if (packetId) {
+        keys.add(packetId);
+      }
+    }
+    return keys;
+  }, [selectedAlert, selectedClassifierPacketId, visibleAlerts]);
+
+  const activePinnedOptionKeys = useMemo(() => {
+    const keys = new Set<string>();
+    if (selectedAlert) {
+      for (const id of selectedAlert.evidence_refs) {
+        keys.add(id);
+      }
+    }
+    if (selectedClassifierFlowPacket) {
+      for (const id of selectedClassifierFlowPacket.members) {
+        keys.add(id);
+      }
+    }
+    for (const id of visibleAlertEvidenceRefs) {
+      keys.add(id);
+    }
+    return keys;
+  }, [selectedAlert, selectedClassifierFlowPacket, visibleAlertEvidenceRefs]);
+
+  const activePinnedJoinKeys = useMemo(() => {
+    const keys = new Set<string>();
+    if (selectedDarkEvent) {
+      for (const id of selectedDarkEvent.evidence_refs) {
+        keys.add(id);
+      }
+    }
+    return keys;
+  }, [selectedDarkEvent]);
+
+  useEffect(() => {
+    if (mode !== "live") {
+      return;
+    }
+
+    const prune = () => {
+      const now = Date.now();
+      setPinnedOptionPrintMap((prev) => prunePinnedEntries(prev, activePinnedOptionKeys, now));
+      setPinnedFlowPacketMap((prev) => prunePinnedEntries(prev, activePinnedFlowKeys, now));
+      setPinnedEquityJoinMap((prev) => prunePinnedEntries(prev, activePinnedJoinKeys, now));
+    };
+
+    prune();
+    const interval = window.setInterval(prune, 60000);
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [mode, activePinnedOptionKeys, activePinnedFlowKeys, activePinnedJoinKeys]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      console.info("frontend live retention metrics", frontendRetentionMetrics);
+    }, 60000);
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, []);
 
   const filteredClassifierHits = useMemo(() => {
     if (tickerSet.size === 0) {
@@ -3420,7 +3842,7 @@ const useTerminalState = () => {
   const chartInferredDark = useMemo(() => {
     const desired = chartTicker.toUpperCase();
     return inferredDarkFeed.items
-      .filter((event) => inferDarkUnderlying(event, equityPrintMap, mergedEquityJoinMap) === desired)
+      .filter((event) => inferDarkUnderlying(event, equityPrintMap, resolvedEquityJoinMap) === desired)
       .sort((a, b) => {
         const delta = a.source_ts - b.source_ts;
         if (delta !== 0) {
@@ -3428,7 +3850,7 @@ const useTerminalState = () => {
         }
         return a.seq - b.seq;
       });
-  }, [chartTicker, inferredDarkFeed.items, mergedEquityJoinMap, equityPrintMap]);
+  }, [chartTicker, inferredDarkFeed.items, resolvedEquityJoinMap, equityPrintMap]);
 
   const findAlertForClassifierHit = useCallback(
     (hit: ClassifierHitEvent): AlertEvent | null => {
@@ -3531,10 +3953,10 @@ const useTerminalState = () => {
     tickerSet,
     chartTicker,
     nbboMap,
-    optionPrintMap: mergedOptionPrintMap,
+    optionPrintMap: resolvedOptionPrintMap,
     equityPrintMap,
-    equityJoinMap: mergedEquityJoinMap,
-    flowPacketMap: mergedFlowPacketMap,
+    equityJoinMap: resolvedEquityJoinMap,
+    flowPacketMap: resolvedFlowPacketMap,
     selectedEvidence,
     selectedFlowPacket,
     selectedDarkEvidence,
@@ -3714,6 +4136,7 @@ type OptionsPaneProps = {
 const OptionsPane = ({ limit }: OptionsPaneProps) => {
   const state = useTerminal();
   const items = limit ? state.filteredOptions.slice(0, limit) : state.filteredOptions;
+  const virtual = useVirtualList(items, state.optionsScroll.listRef, !limit, 96);
 
   return (
     <Pane
@@ -3749,7 +4172,11 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          items.map((print) => {
+          <>
+            {virtual.topSpacerHeight > 0 ? (
+              <div style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
+            ) : null}
+            {virtual.visibleItems.map((print) => {
             const contractId = normalizeContractId(print.option_contract_id);
             const quote = state.nbboMap.get(contractId);
             const nbboAge = quote ? Math.abs(print.ts - quote.ts) : null;
@@ -3811,7 +4238,11 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
                 <div className="time">{formatTime(print.ts)}</div>
               </div>
             );
-          })
+            })}
+            {virtual.bottomSpacerHeight > 0 ? (
+              <div style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
+            ) : null}
+          </>
         )}
       </div>
     </Pane>
@@ -3825,6 +4256,7 @@ type EquitiesPaneProps = {
 const EquitiesPane = ({ limit }: EquitiesPaneProps) => {
   const state = useTerminal();
   const items = limit ? state.filteredEquities.slice(0, limit) : state.filteredEquities;
+  const virtual = useVirtualList(items, state.equitiesScroll.listRef, !limit, 78);
 
   return (
     <Pane
@@ -3860,8 +4292,12 @@ const EquitiesPane = ({ limit }: EquitiesPaneProps) => {
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          items.map((print) => (
-            <div className="row" key={`${print.trace_id}-${print.seq}`}>
+          <>
+            {virtual.topSpacerHeight > 0 ? (
+              <div style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
+            ) : null}
+            {virtual.visibleItems.map((print) => (
+              <div className="row" key={`${print.trace_id}-${print.seq}`}>
               <div>
                 <div className="contract">{print.underlying_id}</div>
                 <div className="meta">
@@ -3876,8 +4312,12 @@ const EquitiesPane = ({ limit }: EquitiesPaneProps) => {
                 </div>
               </div>
               <div className="time">{formatTime(print.ts)}</div>
-            </div>
-          ))
+              </div>
+            ))}
+            {virtual.bottomSpacerHeight > 0 ? (
+              <div style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
+            ) : null}
+          </>
         )}
       </div>
     </Pane>
@@ -3892,6 +4332,7 @@ type FlowPaneProps = {
 const FlowPane = ({ limit, title = "Flow" }: FlowPaneProps) => {
   const state = useTerminal();
   const items = limit ? state.filteredFlow.slice(0, limit) : state.filteredFlow;
+  const virtual = useVirtualList(items, state.flowScroll.listRef, !limit, 104);
 
   return (
     <Pane
@@ -3927,7 +4368,11 @@ const FlowPane = ({ limit, title = "Flow" }: FlowPaneProps) => {
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          items.map((packet) => {
+          <>
+            {virtual.topSpacerHeight > 0 ? (
+              <div style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
+            ) : null}
+            {virtual.visibleItems.map((packet) => {
             const features = packet.features ?? {};
             const contract = String(features.option_contract_id ?? packet.id ?? "unknown");
             const count = parseNumber(features.count, packet.members.length);
@@ -4005,7 +4450,11 @@ const FlowPane = ({ limit, title = "Flow" }: FlowPaneProps) => {
                 </div>
               </div>
             );
-          })
+            })}
+            {virtual.bottomSpacerHeight > 0 ? (
+              <div style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
+            ) : null}
+          </>
         )}
       </div>
     </Pane>
@@ -4020,6 +4469,7 @@ type AlertsPaneProps = {
 const AlertsPane = ({ limit, withStrip = false }: AlertsPaneProps) => {
   const state = useTerminal();
   const items = limit ? state.filteredAlerts.slice(0, limit) : state.filteredAlerts;
+  const virtual = useVirtualList(items, state.alertsScroll.listRef, !limit, 92);
 
   return (
     <Pane
@@ -4056,7 +4506,11 @@ const AlertsPane = ({ limit, withStrip = false }: AlertsPaneProps) => {
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          items.map((alert) => {
+          <>
+            {virtual.topSpacerHeight > 0 ? (
+              <div style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
+            ) : null}
+            {virtual.visibleItems.map((alert) => {
             const primary = alert.hits[0];
             const direction = primary ? normalizeDirection(primary.direction) : "neutral";
 
@@ -4090,7 +4544,11 @@ const AlertsPane = ({ limit, withStrip = false }: AlertsPaneProps) => {
                 <div className="time">{formatTime(alert.source_ts)}</div>
               </button>
             );
-          })
+            })}
+            {virtual.bottomSpacerHeight > 0 ? (
+              <div style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
+            ) : null}
+          </>
         )}
       </div>
     </Pane>
@@ -4104,6 +4562,7 @@ type ClassifierPaneProps = {
 const ClassifierPane = ({ limit }: ClassifierPaneProps) => {
   const state = useTerminal();
   const items = limit ? state.filteredClassifierHits.slice(0, limit) : state.filteredClassifierHits;
+  const virtual = useVirtualList(items, state.classifierScroll.listRef, !limit, 88);
 
   return (
     <Pane
@@ -4139,7 +4598,11 @@ const ClassifierPane = ({ limit }: ClassifierPaneProps) => {
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          items.map((hit) => {
+          <>
+            {virtual.topSpacerHeight > 0 ? (
+              <div style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
+            ) : null}
+            {virtual.visibleItems.map((hit) => {
             const direction = normalizeDirection(hit.direction);
             return (
               <button
@@ -4159,7 +4622,11 @@ const ClassifierPane = ({ limit }: ClassifierPaneProps) => {
                 <div className="time">{formatTime(hit.source_ts)}</div>
               </button>
             );
-          })
+            })}
+            {virtual.bottomSpacerHeight > 0 ? (
+              <div style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
+            ) : null}
+          </>
         )}
       </div>
     </Pane>
@@ -4173,6 +4640,7 @@ type DarkPaneProps = {
 const DarkPane = ({ limit }: DarkPaneProps) => {
   const state = useTerminal();
   const items = limit ? state.filteredInferredDark.slice(0, limit) : state.filteredInferredDark;
+  const virtual = useVirtualList(items, state.darkScroll.listRef, !limit, 88);
 
   return (
     <Pane
@@ -4208,7 +4676,11 @@ const DarkPane = ({ limit }: DarkPaneProps) => {
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          items.map((event) => {
+          <>
+            {virtual.topSpacerHeight > 0 ? (
+              <div style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
+            ) : null}
+            {virtual.visibleItems.map((event) => {
             const underlying = inferDarkUnderlying(event, state.equityPrintMap, state.equityJoinMap);
             const evidenceCount = event.evidence_refs.length;
 
@@ -4235,7 +4707,11 @@ const DarkPane = ({ limit }: DarkPaneProps) => {
                 <div className="time">{formatTime(event.source_ts)}</div>
               </button>
             );
-          })
+            })}
+            {virtual.bottomSpacerHeight > 0 ? (
+              <div style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
+            ) : null}
+          </>
         )}
       </div>
     </Pane>

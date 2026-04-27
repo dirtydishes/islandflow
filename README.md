@@ -149,6 +149,13 @@ All runtime configuration comes from `.env`.
 ### API
 
 - `API_PORT`, `REST_DEFAULT_LIMIT`
+- `LIVE_LIMIT_OPTIONS`, `LIVE_LIMIT_NBBO`, `LIVE_LIMIT_EQUITIES`, `LIVE_LIMIT_EQUITY_JOINS`, `LIVE_LIMIT_FLOW`, `LIVE_LIMIT_CLASSIFIER_HITS`, `LIVE_LIMIT_ALERTS`, `LIVE_LIMIT_INFERRED_DARK` (bounded live generic cache depths; defaults `10000`, max `100000`)
+
+### Web live retention
+
+- `NEXT_PUBLIC_LIVE_HOT_WINDOW` (frontend hot live window cap; default `2000`)
+- `NEXT_PUBLIC_PINNED_EVIDENCE_TTL_MS` (pinned evidence TTL; default `1200000`)
+- `NEXT_PUBLIC_PINNED_EVIDENCE_MAX_ITEMS` (pinned evidence cache guardrail; default `4000`)
 
 ### Replay service
 
@@ -163,4 +170,8 @@ All runtime configuration comes from `.env`.
 
 - Python dependencies are required only for IBKR/Databento sidecars (`services/ingest-options/py/requirements.txt`).
 - Candle construction is server-side; the client consumes prebuilt OHLC events.
+- Live retention uses a two-tier model:
+  - API/Redis maintain a bounded hot cache per live generic channel.
+  - UI keeps a bounded hot window for rendering performance.
+  - Alert/drawer evidence is pinned and hydrated by id/trace so details remain inspectable after hot-window eviction.
 - This repository is for personal, non-redistributed usage.
