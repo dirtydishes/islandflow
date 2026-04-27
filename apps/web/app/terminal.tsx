@@ -39,6 +39,51 @@ const CANDLE_INTERVALS = [
   { label: "5m", ms: 300000 }
 ];
 
+const IslandflowLogo = ({ className }: { className?: string }) => {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      viewBox="0 0 64 64"
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+    >
+      <path
+        d="M20.5 22C22.7 17.7 26.9 14.7 32.1 14.1C28.8 17.5 27.7 21.6 28.2 25.9C25.2 24.9 22.7 23.6 20.5 22Z"
+        fill="currentColor"
+      />
+      <path
+        d="M30.6 13.4C36.2 11.7 42.2 13 46.6 16.8C41.5 17.2 37.8 19.1 34.7 22.2C33.6 18.9 32.2 16 30.6 13.4Z"
+        fill="currentColor"
+      />
+      <path
+        d="M32.9 13.9C38.5 12.5 44.5 14 48.7 18C43.6 18.2 39.7 20 36.4 23.1C35.4 19.8 34.2 16.7 32.9 13.9Z"
+        fill="currentColor"
+      />
+      <path
+        d="M31.4 23.8C35.3 26.9 36.9 31.4 36.3 36.3C32.9 33.1 29.1 31.4 24.4 30.9C26.1 27.7 28.4 25.3 31.4 23.8Z"
+        fill="currentColor"
+      />
+      <path
+        d="M32.5 23.2C36.9 25.5 39.8 29.6 40.6 34.7C36.3 32.2 31.9 31.3 27 31.7C28 28 29.8 25.2 32.5 23.2Z"
+        fill="currentColor"
+      />
+      <path
+        d="M31.9 23.2C30.8 28.5 29.3 33.6 27.5 38.5C27.3 39 26.8 39.2 26.2 39C25.7 38.8 25.4 38.2 25.6 37.7C27.4 32.9 28.8 27.9 29.9 22.8L31.9 23.2Z"
+        fill="currentColor"
+      />
+      <path
+        d="M14 47.2C17.9 43.7 23.1 41.9 28.7 42.4C36.2 43.1 43.6 42.2 50.1 39.8C47.9 45.7 42.3 50 35.7 50H20.2C17.9 50 15.7 49 14 47.2Z"
+        fill="currentColor"
+      />
+      <path
+        d="M8 53.3C14.4 50.4 21.5 49.7 28.3 51.3C35.7 52.9 43.5 52.2 50.4 49.2L56 46.7V51.8L51.7 53.7C44.2 57 35.6 57.8 27.5 56C20.3 54.4 12.7 55.1 6 58V53.9L8 53.3Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+};
+
 type CandlestickSeries = ReturnType<IChartApi["addCandlestickSeries"]>;
 
 type EquityOverlayPoint = {
@@ -4399,7 +4444,7 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
       <div className="terminal-shell">
         <aside className="terminal-rail">
           <div className="terminal-brand">
-            <span className="terminal-brand-kicker">IF</span>
+            <IslandflowLogo className="terminal-brand-mark" />
             <span className="terminal-brand-name">Islandflow</span>
           </div>
           <nav className="terminal-nav">
