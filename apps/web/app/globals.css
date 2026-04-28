@@ -220,6 +220,13 @@ input {
   animation: pulse 1.3s ease-in-out infinite;
 }
 
+.feed-status-stale .feed-status-dot,
+.status-stale .status-dot,
+.chart-status-stale .chart-dot {
+  background: var(--accent);
+  box-shadow: 0 0 0 4px rgba(245, 166, 35, 0.18);
+}
+
 .feed-status-disconnected .feed-status-dot,
 .status-disconnected .status-dot,
 .chart-status-disconnected .chart-dot {
@@ -417,55 +424,144 @@ h3 {
   display: flex;
   align-items: center;
   gap: 10px;
+  position: relative;
 }
 
-.flow-filter-panel {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 10px 16px;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+.flow-filter-popover {
+  position: relative;
 }
 
-.flow-filter-group {
-  display: flex;
-  flex-wrap: wrap;
+.flow-filter-trigger {
+  display: inline-flex;
   align-items: center;
   gap: 8px;
 }
 
-.flow-filter-label {
-  color: var(--muted);
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
+.flow-filter-trigger.is-active {
+  border-color: rgba(245, 166, 35, 0.55);
+  background: linear-gradient(180deg, rgba(245, 166, 35, 0.18), rgba(245, 166, 35, 0.07));
+}
+
+.flow-filter-badge {
+  min-width: 22px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(245, 166, 35, 0.22);
+  color: #ffe4b3;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.7rem;
+  text-align: center;
+}
+
+.flow-filter-popover-panel {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  z-index: 30;
+  width: min(420px, calc(100vw - 72px));
+  max-height: min(70vh, 560px);
+  overflow: auto;
+  border: 1px solid rgba(245, 166, 35, 0.24);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
+    rgba(11, 16, 22, 0.92);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(18px);
+}
+
+.flow-filter-popover-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 16px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.flow-filter-popover-title {
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.9rem;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+.flow-filter-popover-copy {
+  margin-top: 6px;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+}
+
+.flow-filter-popover-body {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.flow-filter-section {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(0, 0, 0, 0.1));
+}
+
+.flow-filter-section-title {
+  color: #ffd89a;
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.flow-filter-checkbox-grid,
+.flow-filter-chip-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.flow-filter-checkbox-grid-wide {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .flow-filter-check {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 0.84rem;
+  gap: 8px;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  font-size: 0.82rem;
   text-transform: uppercase;
+  cursor: pointer;
+}
+
+.flow-filter-check input {
+  margin: 0;
+  accent-color: var(--accent);
 }
 
 .filter-chip {
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.03);
   color: var(--text);
-  padding: 6px 10px;
+  min-height: 42px;
+  padding: 8px 12px;
   font: inherit;
   cursor: pointer;
+  text-transform: uppercase;
 }
 
 .filter-chip.is-active {
-  border-color: rgba(127, 234, 170, 0.6);
-  background: rgba(127, 234, 170, 0.14);
-  color: var(--accent-strong);
+  border-color: rgba(245, 166, 35, 0.45);
+  background: linear-gradient(180deg, rgba(245, 166, 35, 0.18), rgba(245, 166, 35, 0.07));
+  color: #ffe4b3;
 }
 
 .overview-strip,
@@ -1099,6 +1195,10 @@ h3 {
   .terminal-topbar-controls {
     flex: 1 1 auto;
   }
+
+  .flow-filter-popover-panel {
+    width: min(420px, calc(100vw - 56px));
+  }
 }
 
 @media (max-width: 720px) {
@@ -1142,6 +1242,34 @@ h3 {
 
   .terminal-input {
     width: 100%;
+  }
+
+  .page-actions {
+    width: 100%;
+  }
+
+  .flow-filter-popover {
+    width: 100%;
+  }
+
+  .flow-filter-trigger {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .flow-filter-popover-panel {
+    position: fixed;
+    top: calc(var(--topbar-height) + 26px);
+    left: 14px;
+    right: 14px;
+    width: auto;
+    max-height: min(68vh, 560px);
+  }
+
+  .flow-filter-checkbox-grid,
+  .flow-filter-checkbox-grid-wide,
+  .flow-filter-chip-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .row {

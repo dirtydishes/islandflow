@@ -63,11 +63,12 @@ describe("LiveStateManager", () => {
 
   it("hydrates snapshots from redis generic windows", async () => {
     const redis = makeRedis();
+    const now = Date.now();
     await redis.lPush(
       "live:flow",
       JSON.stringify({
-        source_ts: 100,
-        ingest_ts: 101,
+        source_ts: now,
+        ingest_ts: now + 1,
         seq: 1,
         trace_id: "flow-1",
         id: "flow-1",
@@ -76,15 +77,15 @@ describe("LiveStateManager", () => {
         join_quality: {}
       })
     );
-    await redis.hSet("live:cursors", "flow", JSON.stringify({ ts: 100, seq: 1 }));
+    await redis.hSet("live:cursors", "flow", JSON.stringify({ ts: now, seq: 1 }));
 
     const manager = new LiveStateManager(makeClickHouse(), redis as never);
     await manager.hydrate();
     const snapshot = await manager.getSnapshot({ channel: "flow" });
 
     expect(snapshot.items).toHaveLength(1);
-    expect(snapshot.watermark).toEqual({ ts: 100, seq: 1 });
-    expect(snapshot.next_before).toEqual({ ts: 100, seq: 1 });
+    expect(snapshot.watermark).toEqual({ ts: now, seq: 1 });
+    expect(snapshot.next_before).toEqual({ ts: now, seq: 1 });
   });
 
   it("persists parameterized candle and overlay caches on ingest", async () => {
@@ -136,6 +137,7 @@ describe("LiveStateManager", () => {
 
   it("trims generic windows to configured per-channel limits", async () => {
     const redis = makeRedis();
+    const now = Date.now();
     const manager = new LiveStateManager(
       makeClickHouse(),
       redis as never,
@@ -152,8 +154,8 @@ describe("LiveStateManager", () => {
     );
 
     await manager.ingest("flow", {
-      source_ts: 100,
-      ingest_ts: 101,
+      source_ts: now,
+      ingest_ts: now + 1,
       seq: 1,
       trace_id: "flow-1",
       id: "flow-1",
@@ -162,8 +164,8 @@ describe("LiveStateManager", () => {
       join_quality: {}
     });
     await manager.ingest("flow", {
-      source_ts: 110,
-      ingest_ts: 111,
+      source_ts: now + 10,
+      ingest_ts: now + 11,
       seq: 2,
       trace_id: "flow-2",
       id: "flow-2",
@@ -172,8 +174,8 @@ describe("LiveStateManager", () => {
       join_quality: {}
     });
     await manager.ingest("flow", {
-      source_ts: 120,
-      ingest_ts: 121,
+      source_ts: now + 20,
+      ingest_ts: now + 21,
       seq: 3,
       trace_id: "flow-3",
       id: "flow-3",
@@ -199,13 +201,14 @@ describe("LiveStateManager", () => {
 
   it("filters option and flow snapshots using subscription filters", async () => {
     const manager = new LiveStateManager(makeClickHouse(), null);
+    const now = Date.now();
 
     await manager.ingest("options", {
-      source_ts: 100,
-      ingest_ts: 101,
+      source_ts: now,
+      ingest_ts: now + 1,
       seq: 1,
       trace_id: "opt-1",
-      ts: 100,
+      ts: now,
       option_contract_id: "AAPL-2025-01-17-200-C",
       price: 1,
       size: 100,
@@ -220,11 +223,11 @@ describe("LiveStateManager", () => {
       signal_profile: "smart-money"
     });
     await manager.ingest("options", {
-      source_ts: 110,
-      ingest_ts: 111,
+      source_ts: now + 10,
+      ingest_ts: now + 11,
       seq: 2,
       trace_id: "opt-2",
-      ts: 110,
+      ts: now + 10,
       option_contract_id: "SPY-2025-01-17-500-P",
       price: 1,
       size: 100,
@@ -239,8 +242,8 @@ describe("LiveStateManager", () => {
       signal_profile: "smart-money"
     });
     await manager.ingest("flow", {
-      source_ts: 120,
-      ingest_ts: 121,
+      source_ts: now + 20,
+      ingest_ts: now + 21,
       seq: 3,
       trace_id: "flow-1",
       id: "flow-1",
@@ -272,5 +275,204 @@ describe("LiveStateManager", () => {
 
     expect(optionSnapshot.items).toHaveLength(1);
     expect(flowSnapshot.items).toHaveLength(1);
+  });
+
+  it("suppresses stale items from live snapshots while preserving fresh ones", async () => {
+    const manager = new LiveStateManager(makeClickHouse(), null);
+    const now = Date.now();
+
+    await manager.ingest("options", {
+      source_ts: now - 20_000,
+      ingest_ts: now - 19_999,
+      seq: 1,
+      trace_id: "opt-stale",
+      ts: now - 20_000,
+      option_contract_id: "AAPL-2025-01-17-200-C",
+      price: 1,
+      size: 10,
+      exchange: "X"
+    });
+    await manager.ingest("options", {
+      source_ts: now - 5_000,
+      ingest_ts: now - 4_999,
+      seq: 2,
+      trace_id: "opt-fresh",
+      ts: now - 5_000,
+      option_contract_id: "AAPL-2025-01-17-205-C",
+      price: 1,
+      size: 10,
+      exchange: "X"
+    });
+
+    await manager.ingest("nbbo", {
+      source_ts: now - 20_000,
+      ingest_ts: now - 19_999,
+      seq: 1,
+      trace_id: "nbbo-stale",
+      ts: now - 20_000,
+      option_contract_id: "AAPL-2025-01-17-200-C",
+      bid: 1,
+      ask: 1.1,
+      bidSize: 10,
+      askSize: 10
+    });
+    await manager.ingest("nbbo", {
+      source_ts: now - 5_000,
+      ingest_ts: now - 4_999,
+      seq: 2,
+      trace_id: "nbbo-fresh",
+      ts: now - 5_000,
+      option_contract_id: "AAPL-2025-01-17-205-C",
+      bid: 1,
+      ask: 1.1,
+      bidSize: 10,
+      askSize: 10
+    });
+
+    await manager.ingest("equities", {
+      source_ts: now - 20_000,
+      ingest_ts: now - 19_999,
+      seq: 1,
+      trace_id: "eq-stale",
+      ts: now - 20_000,
+      underlying_id: "AAPL",
+      price: 100,
+      size: 10,
+      exchange: "X",
+      offExchangeFlag: false
+    });
+    await manager.ingest("equities", {
+      source_ts: now - 5_000,
+      ingest_ts: now - 4_999,
+      seq: 2,
+      trace_id: "eq-fresh",
+      ts: now - 5_000,
+      underlying_id: "AAPL",
+      price: 101,
+      size: 10,
+      exchange: "X",
+      offExchangeFlag: false
+    });
+
+    await manager.ingest("flow", {
+      source_ts: now - 40_000,
+      ingest_ts: now - 39_999,
+      seq: 1,
+      trace_id: "flow-stale",
+      id: "flow-stale",
+      members: ["opt-stale"],
+      features: {},
+      join_quality: {}
+    });
+    await manager.ingest("flow", {
+      source_ts: now - 5_000,
+      ingest_ts: now - 4_999,
+      seq: 2,
+      trace_id: "flow-fresh",
+      id: "flow-fresh",
+      members: ["opt-fresh"],
+      features: {},
+      join_quality: {}
+    });
+
+    const [optionsSnapshot, nbboSnapshot, equitiesSnapshot, flowSnapshot] = await Promise.all([
+      manager.getSnapshot({ channel: "options" }),
+      manager.getSnapshot({ channel: "nbbo" }),
+      manager.getSnapshot({ channel: "equities" }),
+      manager.getSnapshot({ channel: "flow" })
+    ]);
+
+    expect((optionsSnapshot.items as Array<{ trace_id: string }>).map((item) => item.trace_id)).toEqual([
+      "opt-fresh"
+    ]);
+    expect((nbboSnapshot.items as Array<{ trace_id: string }>).map((item) => item.trace_id)).toEqual([
+      "nbbo-fresh"
+    ]);
+    expect((equitiesSnapshot.items as Array<{ trace_id: string }>).map((item) => item.trace_id)).toEqual([
+      "eq-fresh"
+    ]);
+    expect((flowSnapshot.items as Array<{ id: string }>).map((item) => item.id)).toEqual([
+      "flow-fresh"
+    ]);
+  });
+
+  it("keeps only the newest NBBO quote per contract across hydrate and ingest", async () => {
+    const redis = makeRedis();
+    const now = Date.now();
+
+    await redis.lPush(
+      "live:nbbo",
+      JSON.stringify({
+        source_ts: now - 2_000,
+        ingest_ts: now - 1_999,
+        seq: 1,
+        trace_id: "nbbo-old",
+        ts: now - 2_000,
+        option_contract_id: "AAPL-2025-01-17-200-C",
+        bid: 1,
+        ask: 1.1,
+        bidSize: 10,
+        askSize: 10
+      })
+    );
+    await redis.lPush(
+      "live:nbbo",
+      JSON.stringify({
+        source_ts: now - 1_000,
+        ingest_ts: now - 999,
+        seq: 2,
+        trace_id: "nbbo-new",
+        ts: now - 1_000,
+        option_contract_id: "AAPL-2025-01-17-200-C",
+        bid: 1.2,
+        ask: 1.3,
+        bidSize: 12,
+        askSize: 12
+      })
+    );
+    await redis.lPush(
+      "live:nbbo",
+      JSON.stringify({
+        source_ts: now - 500,
+        ingest_ts: now - 499,
+        seq: 3,
+        trace_id: "nbbo-other",
+        ts: now - 500,
+        option_contract_id: "MSFT-2025-01-17-300-C",
+        bid: 2,
+        ask: 2.1,
+        bidSize: 15,
+        askSize: 15
+      })
+    );
+    await redis.hSet("live:cursors", "nbbo", JSON.stringify({ ts: now - 500, seq: 3 }));
+
+    const manager = new LiveStateManager(makeClickHouse(), redis as never);
+    await manager.hydrate();
+
+    await manager.ingest("nbbo", {
+      source_ts: now - 250,
+      ingest_ts: now - 249,
+      seq: 4,
+      trace_id: "nbbo-latest",
+      ts: now - 250,
+      option_contract_id: "AAPL-2025-01-17-200-C",
+      bid: 1.4,
+      ask: 1.5,
+      bidSize: 14,
+      askSize: 14
+    });
+
+    const snapshot = await manager.getSnapshot({ channel: "nbbo" });
+    expect(snapshot.items).toHaveLength(2);
+    expect(
+      (snapshot.items as Array<{ option_contract_id: string; trace_id: string }>).map((item) => [
+        item.option_contract_id,
+        item.trace_id
+      ])
+    ).toEqual([
+      ["AAPL-2025-01-17-200-C", "nbbo-latest"],
+      ["MSFT-2025-01-17-300-C", "nbbo-other"]
+    ]);
   });
 });

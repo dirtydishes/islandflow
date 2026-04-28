@@ -23,6 +23,8 @@ type Burst = {
   seed: number;
 };
 
+const OPTION_CONTRACT_MULTIPLIER = 100;
+
 const SYNTHETIC_SYMBOLS = ["SPY", ...(SP500_SYMBOLS as readonly string[])];
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const EXPIRY_OFFSETS = [0, 1, 7, 14, 28, 45, 60, 90];
@@ -47,7 +49,7 @@ type Scenario = {
   right: "C" | "P" | "either";
   countRange: [number, number];
   sizeRange: [number, number];
-  premiumRange: [number, number];
+  targetNotionalRange: [number, number];
   priceTrend: "up" | "down" | "flat";
   conditions?: string[];
 };
@@ -59,7 +61,7 @@ const REALISTIC_SCENARIOS: Scenario[] = [
     right: "either",
     countRange: [1, 2],
     sizeRange: [30, 180],
-    premiumRange: [9_000, 35_000],
+    targetNotionalRange: [9_000, 35_000],
     priceTrend: "flat",
     conditions: ["FILL"]
   },
@@ -69,7 +71,7 @@ const REALISTIC_SCENARIOS: Scenario[] = [
     right: "either",
     countRange: [1, 2],
     sizeRange: [120, 480],
-    premiumRange: [12_000, 45_000],
+    targetNotionalRange: [12_000, 45_000],
     priceTrend: "flat",
     conditions: ["FILL"]
   },
@@ -79,7 +81,7 @@ const REALISTIC_SCENARIOS: Scenario[] = [
     right: "C",
     countRange: [2, 3],
     sizeRange: [180, 520],
-    premiumRange: [25_000, 90_000],
+    targetNotionalRange: [25_000, 90_000],
     priceTrend: "up",
     conditions: ["SWEEP"]
   },
@@ -89,7 +91,7 @@ const REALISTIC_SCENARIOS: Scenario[] = [
     right: "P",
     countRange: [2, 3],
     sizeRange: [180, 520],
-    premiumRange: [25_000, 90_000],
+    targetNotionalRange: [25_000, 90_000],
     priceTrend: "up",
     conditions: ["SWEEP"]
   },
@@ -99,7 +101,7 @@ const REALISTIC_SCENARIOS: Scenario[] = [
     right: "either",
     countRange: [2, 3],
     sizeRange: [500, 900],
-    premiumRange: [18_000, 70_000],
+    targetNotionalRange: [18_000, 70_000],
     priceTrend: "flat",
     conditions: ["ISO"]
   },
@@ -109,7 +111,7 @@ const REALISTIC_SCENARIOS: Scenario[] = [
     right: "either",
     countRange: [1, 2],
     sizeRange: [5, 60],
-    premiumRange: [500, 6_000],
+    targetNotionalRange: [500, 6_000],
     priceTrend: "flat",
     conditions: ["FILL"]
   }
@@ -122,7 +124,7 @@ const ACTIVE_SCENARIOS: Scenario[] = [
     right: "C",
     countRange: [7, 10],
     sizeRange: [600, 1800],
-    premiumRange: [120_000, 240_000],
+    targetNotionalRange: [120_000, 240_000],
     priceTrend: "up",
     conditions: ["SWEEP"]
   },
@@ -132,7 +134,7 @@ const ACTIVE_SCENARIOS: Scenario[] = [
     right: "P",
     countRange: [7, 10],
     sizeRange: [600, 1800],
-    premiumRange: [120_000, 240_000],
+    targetNotionalRange: [120_000, 240_000],
     priceTrend: "up",
     conditions: ["SWEEP"]
   },
@@ -142,7 +144,7 @@ const ACTIVE_SCENARIOS: Scenario[] = [
     right: "either",
     countRange: [5, 8],
     sizeRange: [1200, 3200],
-    premiumRange: [60_000, 140_000],
+    targetNotionalRange: [60_000, 140_000],
     priceTrend: "flat",
     conditions: ["ISO"]
   },
@@ -152,7 +154,7 @@ const ACTIVE_SCENARIOS: Scenario[] = [
     right: "either",
     countRange: [2, 4],
     sizeRange: [10, 200],
-    premiumRange: [500, 5000],
+    targetNotionalRange: [500, 5000],
     priceTrend: "flat",
     conditions: ["FILL"]
   }
@@ -261,14 +263,17 @@ const SYNTHETIC_PROFILES: Record<SyntheticMarketMode, SyntheticOptionsProfile> =
             weight: 20,
             countRange: [5, 8],
             sizeRange: [20, 300],
-            premiumRange: [800, 12_000]
+            targetNotionalRange: [800, 12_000]
           }
         : {
             ...scenario,
             weight: scenario.weight + 10,
             countRange: [scenario.countRange[0] + 2, scenario.countRange[1] + 3],
             sizeRange: [scenario.sizeRange[0], scenario.sizeRange[1] * 2],
-            premiumRange: [scenario.premiumRange[0], scenario.premiumRange[1] * 1.5]
+            targetNotionalRange: [
+              scenario.targetNotionalRange[0],
+              scenario.targetNotionalRange[1] * 1.5
+            ]
           }
     ),
     pricePlacements: FIREHOSE_PRICE_PLACEMENTS
@@ -367,12 +372,20 @@ const buildBurst = (burstIndex: number, now: number, profile: SyntheticOptionsPr
   const exchange = pick(EXCHANGES, burstIndex + symbolHash);
   const printCount = pickInt(scenario.countRange[0], scenario.countRange[1], symbolHash + burstIndex * 13);
   const baseSize = pickInt(scenario.sizeRange[0], scenario.sizeRange[1], symbolHash + burstIndex * 17);
-  const premiumTarget = pickFloat(
-    scenario.premiumRange[0],
-    scenario.premiumRange[1],
+  const targetNotional = pickFloat(
+    scenario.targetNotionalRange[0],
+    scenario.targetNotionalRange[1],
     symbolHash + burstIndex * 19
   );
-  const basePricePer = Math.max(0.05, Number((premiumTarget / (baseSize * printCount)).toFixed(2)));
+  const basePricePer = Math.max(
+    0.05,
+    Number(
+      (
+        targetNotional /
+        (baseSize * printCount * OPTION_CONTRACT_MULTIPLIER)
+      ).toFixed(2)
+    )
+  );
   const conditions = scenario.conditions?.length ? scenario.conditions : [pick(CONDITIONS, burstIndex)];
   const priceStep =
     scenario.priceTrend === "up" ? 0.01 : scenario.priceTrend === "down" ? -0.01 : 0;
@@ -389,6 +402,12 @@ const buildBurst = (burstIndex: number, now: number, profile: SyntheticOptionsPr
     seed
   };
 };
+
+export const buildSyntheticBurstForTest = (
+  burstIndex: number,
+  now: number,
+  mode: SyntheticMarketMode
+): Burst => buildBurst(burstIndex, now, SYNTHETIC_PROFILES[mode]);
 
 export const createSyntheticOptionsAdapter = (
   config: SyntheticOptionsAdapterConfig

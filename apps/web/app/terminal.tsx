@@ -11,7 +11,9 @@ import {
   useMemo,
   useRef,
   useState,
-  type ReactNode
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction
 } from "react";
 import type {
   AlertEvent,
@@ -55,6 +57,10 @@ const parseBoundedInt = (
 };
 
 const LIVE_HOT_WINDOW = parseBoundedInt(process.env.NEXT_PUBLIC_LIVE_HOT_WINDOW, 2000, 100, 100000);
+const LIVE_OPTIONS_STALE_MS = 15_000;
+const LIVE_NBBO_STALE_MS = 15_000;
+const LIVE_EQUITIES_STALE_MS = 15_000;
+const LIVE_FLOW_STALE_MS = 30_000;
 const PINNED_EVIDENCE_TTL_MS = parseBoundedInt(
   process.env.NEXT_PUBLIC_PINNED_EVIDENCE_TTL_MS,
   20 * 60 * 1000,
@@ -192,7 +198,7 @@ const readErrorDetail = async (response: Response): Promise<string> => {
   }
 };
 
-type WsStatus = "connecting" | "connected" | "disconnected";
+type WsStatus = "connecting" | "connected" | "disconnected" | "stale";
 
 type TapeMode = "live" | "replay";
 
@@ -350,6 +356,103 @@ const mergeNewest = <T extends SortableItem>(
   }
 
   return deduped.slice(0, safeLimit);
+};
+
+const getTapeItemKey = (item: SortableItem): string => {
+  return buildItemKey(item) ?? `${extractSortTs(item)}:${extractSortSeq(item)}`;
+};
+
+type PausableTapeData<T> = {
+  visible: T[];
+  queued: T[];
+  seenKeys: Set<string>;
+  dropped: number;
+};
+
+export const reducePausableTapeData = <T extends SortableItem>(
+  current: PausableTapeData<T>,
+  incoming: T[],
+  paused: boolean
+): PausableTapeData<T> => {
+  if (incoming.length === 0) {
+    return current;
+  }
+
+  const nextSeenKeys = new Set(current.seenKeys);
+  const unseen: T[] = [];
+
+  for (const item of incoming) {
+    const key = getTapeItemKey(item);
+    if (nextSeenKeys.has(key)) {
+      continue;
+    }
+    nextSeenKeys.add(key);
+    unseen.push(item);
+  }
+
+  if (unseen.length === 0) {
+    return current;
+  }
+
+  if (paused) {
+    return {
+      visible: current.visible,
+      queued: mergeNewest(unseen, current.queued, LIVE_HOT_WINDOW, (evicted) =>
+        incrementRetentionMetric("hotWindowEvictions", evicted)
+      ),
+      seenKeys: nextSeenKeys,
+      dropped: current.dropped + unseen.length
+    };
+  }
+
+  const nextBatch = current.queued.length > 0 ? [...current.queued, ...unseen] : unseen;
+  return {
+    visible: mergeNewest(nextBatch, current.visible, LIVE_HOT_WINDOW, (evicted) =>
+      incrementRetentionMetric("hotWindowEvictions", evicted)
+    ),
+    queued: [],
+    seenKeys: nextSeenKeys,
+    dropped: 0
+  };
+};
+
+export const flushPausableTapeData = <T extends SortableItem>(
+  current: PausableTapeData<T>
+): PausableTapeData<T> => {
+  if (current.queued.length === 0) {
+    return current.dropped === 0 ? current : { ...current, dropped: 0 };
+  }
+
+  return {
+    visible: mergeNewest(current.queued, current.visible, LIVE_HOT_WINDOW, (evicted) =>
+      incrementRetentionMetric("hotWindowEvictions", evicted)
+    ),
+    queued: [],
+    seenKeys: current.seenKeys,
+    dropped: 0
+  };
+};
+
+const EMPTY_PAUSABLE_TAPE = {
+  visible: [],
+  queued: [],
+  seenKeys: new Set<string>(),
+  dropped: 0
+};
+
+export const getLiveFeedStatus = (
+  sourceStatus: WsStatus,
+  freshestTs: number | null,
+  thresholdMs: number,
+  now = Date.now()
+): WsStatus => {
+  if (sourceStatus !== "connected") {
+    return sourceStatus;
+  }
+  if (freshestTs === null) {
+    return "connected";
+  }
+  return isFreshLiveItem(freshestTs, thresholdMs, now) ? "connected" : "stale";
 };
 
 type TapeState<T> = {
@@ -628,7 +731,7 @@ const DEFAULT_FLOW_SIDES: OptionNbboSide[] = ["AA", "A", "MID"];
 const DEFAULT_FLOW_OPTION_TYPES: OptionType[] = ["call", "put"];
 const DEFAULT_FLOW_SECURITY_TYPES: OptionSecurityType[] = ["stock"];
 
-const buildDefaultFlowFilters = (): OptionFlowFilters => ({
+export const buildDefaultFlowFilters = (): OptionFlowFilters => ({
   view: "signal",
   securityTypes: DEFAULT_FLOW_SECURITY_TYPES,
   nbboSides: DEFAULT_FLOW_SIDES,
@@ -637,11 +740,53 @@ const buildDefaultFlowFilters = (): OptionFlowFilters => ({
     FLOW_FILTER_PRESET === "all"
       ? undefined
       : FLOW_FILTER_PRESET === "balanced"
-        ? 5_000
-        : undefined
+      ? 5_000
+      : undefined
 });
 
-const toggleFilterValue = <T extends string>(values: T[] | undefined, value: T, enabled: boolean): T[] => {
+const sameFilterValues = <T extends string>(left: T[] | undefined, right: T[] | undefined): boolean => {
+  const leftValues = [...(left ?? [])].sort();
+  const rightValues = [...(right ?? [])].sort();
+  if (leftValues.length !== rightValues.length) {
+    return false;
+  }
+  return leftValues.every((value, index) => value === rightValues[index]);
+};
+
+export const countActiveFlowFilterGroups = (filters: OptionFlowFilters): number => {
+  const defaults = buildDefaultFlowFilters();
+  let count = 0;
+
+  if (!sameFilterValues(filters.securityTypes, defaults.securityTypes)) {
+    count += 1;
+  }
+  if (!sameFilterValues(filters.nbboSides, defaults.nbboSides)) {
+    count += 1;
+  }
+  if (!sameFilterValues(filters.optionTypes, defaults.optionTypes)) {
+    count += 1;
+  }
+  if ((filters.minNotional ?? undefined) !== (defaults.minNotional ?? undefined)) {
+    count += 1;
+  }
+
+  return count;
+};
+
+const isFreshLiveItem = (ts: number, thresholdMs: number, now = Date.now()): boolean => now - ts <= thresholdMs;
+
+const filterFreshLiveItems = <T extends SortableItem>(
+  items: T[],
+  thresholdMs: number,
+  getItemTs: (item: T) => number = extractSortTs,
+  now = Date.now()
+): T[] => items.filter((item) => isFreshLiveItem(getItemTs(item), thresholdMs, now));
+
+export const toggleFilterValue = <T extends string>(
+  values: T[] | undefined,
+  value: T,
+  enabled: boolean
+): T[] => {
   const current = new Set(values ?? []);
   if (enabled) {
     current.add(value);
@@ -649,6 +794,13 @@ const toggleFilterValue = <T extends string>(values: T[] | undefined, value: T, 
     current.delete(value);
   }
   return [...current].sort();
+};
+
+export const nextFlowFilterPopoverState = (
+  current: boolean,
+  action: "toggle" | "dismiss"
+): boolean => {
+  return action === "toggle" ? !current : false;
 };
 
 const classifyNbboSide = (price: number, quote: OptionNBBO | null | undefined): NbboSide | null => {
@@ -949,6 +1101,8 @@ const statusLabel = (status: WsStatus, paused: boolean, mode: TapeMode): string 
   switch (status) {
     case "connected":
       return "Live";
+    case "stale":
+      return "Live feed behind";
     case "connecting":
       return "Connecting";
     case "disconnected":
@@ -1388,6 +1542,115 @@ const toStaticTapeState = <T,>(
   dropped: 0,
   togglePause: () => {}
 });
+
+type PausableTapeViewConfig<T extends SortableItem & { seq: number }> = {
+  enabled: boolean;
+  sourceStatus: WsStatus;
+  sourceItems: T[];
+  lastUpdate: number | null;
+  freshnessMs: number;
+  onNewItems?: (count: number) => void;
+  captureScroll?: () => void;
+  getItemTs?: (item: T) => number;
+};
+
+const usePausableTapeView = <T extends SortableItem & { seq: number }>(
+  config: PausableTapeViewConfig<T>
+): TapeState<T> => {
+  const [paused, setPaused] = useState(false);
+  const [data, setData] = useState<PausableTapeData<T>>(EMPTY_PAUSABLE_TAPE);
+  const [clock, setClock] = useState(() => Date.now());
+
+  useEffect(() => {
+    const handle = window.setInterval(() => {
+      setClock(Date.now());
+    }, 1000);
+
+    return () => {
+      window.clearInterval(handle);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!config.enabled) {
+      setPaused(false);
+      setData(EMPTY_PAUSABLE_TAPE);
+      return;
+    }
+
+    setData((current) => {
+      const next = reducePausableTapeData(current, config.sourceItems, paused);
+      if (next === current) {
+        return current;
+      }
+
+      const unseenCount = next.seenKeys.size - current.seenKeys.size;
+      if (!paused && unseenCount > 0) {
+        config.onNewItems?.(unseenCount);
+        config.captureScroll?.();
+      }
+
+      return next;
+    });
+  }, [config.enabled, config.sourceItems, config.onNewItems, config.captureScroll, paused]);
+
+  useEffect(() => {
+    if (!config.enabled || paused) {
+      return;
+    }
+
+    setData((current) => {
+      const next = flushPausableTapeData(current);
+      if (next === current) {
+        return current;
+      }
+
+      if (current.queued.length > 0) {
+        config.onNewItems?.(current.queued.length);
+        config.captureScroll?.();
+      }
+
+      return next;
+    });
+  }, [config.enabled, config.onNewItems, config.captureScroll, paused]);
+
+  const togglePause = useCallback(() => {
+    setPaused((current) => !current);
+  }, []);
+
+  const getItemTs = config.getItemTs ?? extractSortTs;
+  const freshestTs = useMemo(() => {
+    if (config.sourceItems.length === 0) {
+      return null;
+    }
+
+    let newest = Number.NEGATIVE_INFINITY;
+    for (const item of config.sourceItems) {
+      newest = Math.max(newest, getItemTs(item));
+    }
+
+    return Number.isFinite(newest) ? newest : null;
+  }, [config.sourceItems, getItemTs]);
+
+  const status = config.enabled
+    ? getLiveFeedStatus(config.sourceStatus, freshestTs, config.freshnessMs, clock)
+    : "disconnected";
+  const items =
+    status === "stale"
+      ? []
+      : filterFreshLiveItems(data.visible, config.freshnessMs, getItemTs, clock);
+
+  return {
+    status,
+    items,
+    lastUpdate: status === "stale" ? null : config.lastUpdate,
+    replayTime: null,
+    replayComplete: false,
+    paused,
+    dropped: data.dropped,
+    togglePause
+  };
+};
 
 const useLiveStream = <T extends SortableItem>(
   config: {
@@ -3286,22 +3549,44 @@ const useTerminalState = () => {
     getReplayKey: disableReplayGrouping
   });
 
-  const optionsFeed =
-    mode === "live"
-      ? toStaticTapeState(liveSession.status, liveSession.options, liveSession.lastUpdate)
-      : options;
+  const liveOptions = usePausableTapeView<OptionPrint>({
+    enabled: mode === "live",
+    sourceStatus: liveSession.status,
+    sourceItems: liveSession.options,
+    lastUpdate: liveSession.lastUpdate,
+    freshnessMs: LIVE_OPTIONS_STALE_MS,
+    captureScroll: optionsAnchor.capture,
+    onNewItems: optionsScroll.onNewItems
+  });
+  const liveEquities = usePausableTapeView<EquityPrint>({
+    enabled: mode === "live",
+    sourceStatus: liveSession.status,
+    sourceItems: liveSession.equities,
+    lastUpdate: liveSession.lastUpdate,
+    freshnessMs: LIVE_EQUITIES_STALE_MS,
+    captureScroll: equitiesAnchor.capture,
+    onNewItems: equitiesScroll.onNewItems
+  });
+  const liveFlow = usePausableTapeView<FlowPacket>({
+    enabled: mode === "live",
+    sourceStatus: liveSession.status,
+    sourceItems: liveSession.flow,
+    lastUpdate: liveSession.lastUpdate,
+    freshnessMs: LIVE_FLOW_STALE_MS,
+    captureScroll: flowAnchor.capture,
+    onNewItems: flowScroll.onNewItems,
+    getItemTs: (item) => item.source_ts
+  });
+
+  const optionsFeed = mode === "live" ? liveOptions : options;
   const nbboFeed =
     mode === "live" ? toStaticTapeState(liveSession.status, liveSession.nbbo, liveSession.lastUpdate) : nbbo;
-  const equitiesFeed =
-    mode === "live"
-      ? toStaticTapeState(liveSession.status, liveSession.equities, liveSession.lastUpdate)
-      : equities;
+  const equitiesFeed = mode === "live" ? liveEquities : equities;
   const equityJoinsFeed =
     mode === "live"
       ? toStaticTapeState(liveSession.status, liveSession.equityJoins, liveSession.lastUpdate)
       : equityJoins;
-  const flowFeed =
-    mode === "live" ? toStaticTapeState(liveSession.status, liveSession.flow, liveSession.lastUpdate) : flow;
+  const flowFeed = mode === "live" ? liveFlow : flow;
   const alertsFeed =
     mode === "live" ? toStaticTapeState(liveSession.status, liveSession.alerts, liveSession.lastUpdate) : alerts;
   const classifierHitsFeed =
@@ -4159,99 +4444,194 @@ const PageFrame = ({ title, actions, children }: PageFrameProps) => {
   );
 };
 
-const FlowFilterControls = () => {
-  const state = useTerminal();
-  const filters = state.flowFilters;
+type FlowFilterPopoverProps = {
+  filters: OptionFlowFilters;
+  onChange: Dispatch<SetStateAction<OptionFlowFilters>>;
+};
+
+const FlowFilterSection = ({
+  title,
+  children
+}: {
+  title: string;
+  children: ReactNode;
+}) => {
+  return (
+    <section className="flow-filter-section">
+      <div className="flow-filter-section-title">{title}</div>
+      {children}
+    </section>
+  );
+};
+
+export const FlowFilterPopover = ({ filters, onChange }: FlowFilterPopoverProps) => {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const activeCount = countActiveFlowFilterGroups(filters);
 
   const toggleSecurity = (value: OptionSecurityType, enabled: boolean) => {
-    state.setFlowFilters((prev) => ({
+    onChange((prev) => ({
       ...prev,
       securityTypes: toggleFilterValue(prev.securityTypes, value, enabled)
     }));
   };
 
   const toggleSide = (value: OptionNbboSide, enabled: boolean) => {
-    state.setFlowFilters((prev) => ({
+    onChange((prev) => ({
       ...prev,
       nbboSides: toggleFilterValue(prev.nbboSides, value, enabled)
     }));
   };
 
   const toggleOptionType = (value: OptionType, enabled: boolean) => {
-    state.setFlowFilters((prev) => ({
+    onChange((prev) => ({
       ...prev,
       optionTypes: toggleFilterValue(prev.optionTypes, value, enabled)
     }));
   };
 
   const applyMinNotional = (value: number | undefined) => {
-    state.setFlowFilters((prev) => ({
+    onChange((prev) => ({
       ...prev,
       minNotional: value
     }));
   };
 
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen((current) => nextFlowFilterPopoverState(current, "dismiss"));
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen((current) => nextFlowFilterPopoverState(current, "dismiss"));
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
   return (
-    <div className="flow-filter-panel">
-      <div className="flow-filter-group">
-        <span className="flow-filter-label">Security</span>
-        {(["stock", "etf"] as OptionSecurityType[]).map((value) => (
-          <label className="flow-filter-check" key={value}>
-            <input
-              type="checkbox"
-              checked={(filters.securityTypes ?? []).includes(value)}
-              onChange={(event) => toggleSecurity(value, event.target.checked)}
-            />
-            <span>{value.toUpperCase()}</span>
-          </label>
-        ))}
-      </div>
-      <div className="flow-filter-group">
-        <span className="flow-filter-label">Side</span>
-        {(["AA", "A", "MID", "B", "BB"] as OptionNbboSide[]).map((value) => (
-          <label className="flow-filter-check" key={value}>
-            <input
-              type="checkbox"
-              checked={(filters.nbboSides ?? []).includes(value)}
-              onChange={(event) => toggleSide(value, event.target.checked)}
-            />
-            <span>{value}</span>
-          </label>
-        ))}
-      </div>
-      <div className="flow-filter-group">
-        <span className="flow-filter-label">Type</span>
-        {(["call", "put"] as OptionType[]).map((value) => (
-          <label className="flow-filter-check" key={value}>
-            <input
-              type="checkbox"
-              checked={(filters.optionTypes ?? []).includes(value)}
-              onChange={(event) => toggleOptionType(value, event.target.checked)}
-            />
-            <span>{value}</span>
-          </label>
-        ))}
-      </div>
-      <div className="flow-filter-group">
-        <span className="flow-filter-label">Min Notional</span>
-        {[
-          { label: "All signal", value: undefined },
-          { label: ">= 25k", value: 25_000 },
-          { label: ">= 50k", value: 50_000 },
-          { label: ">= 100k", value: 100_000 }
-        ].map((preset) => (
-          <button
-            className={`filter-chip ${filters.minNotional === preset.value ? "is-active" : ""}`}
-            key={preset.label}
-            type="button"
-            onClick={() => applyMinNotional(preset.value)}
-          >
-            {preset.label}
-          </button>
-        ))}
-      </div>
+    <div className={`flow-filter-popover${open ? " is-open" : ""}`} ref={rootRef}>
+      <button
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        className={`terminal-button flow-filter-trigger${activeCount > 0 ? " is-active" : ""}`}
+        type="button"
+        onClick={() => setOpen((current) => nextFlowFilterPopoverState(current, "toggle"))}
+      >
+        <span>Filter</span>
+        {activeCount > 0 ? <span className="flow-filter-badge">{activeCount}</span> : null}
+      </button>
+
+      {open ? (
+        <div
+          aria-label="Flow filters"
+          className="flow-filter-popover-panel"
+          role="dialog"
+        >
+          <div className="flow-filter-popover-head">
+            <div>
+              <div className="flow-filter-popover-title">Flow Filters</div>
+              <div className="flow-filter-popover-copy">Changes apply immediately.</div>
+            </div>
+            <button
+              className="terminal-button"
+              type="button"
+              onClick={() => onChange(buildDefaultFlowFilters())}
+            >
+              Reset
+            </button>
+          </div>
+
+          <div className="flow-filter-popover-body">
+            <FlowFilterSection title="Security">
+              <div className="flow-filter-checkbox-grid">
+                {(["stock", "etf"] as OptionSecurityType[]).map((value) => (
+                  <label className="flow-filter-check" key={value}>
+                    <input
+                      type="checkbox"
+                      checked={(filters.securityTypes ?? []).includes(value)}
+                      onChange={(event) => toggleSecurity(value, event.target.checked)}
+                    />
+                    <span>{value.toUpperCase()}</span>
+                  </label>
+                ))}
+              </div>
+            </FlowFilterSection>
+
+            <FlowFilterSection title="Side">
+              <div className="flow-filter-checkbox-grid flow-filter-checkbox-grid-wide">
+                {(["AA", "A", "MID", "B", "BB"] as OptionNbboSide[]).map((value) => (
+                  <label className="flow-filter-check" key={value}>
+                    <input
+                      type="checkbox"
+                      checked={(filters.nbboSides ?? []).includes(value)}
+                      onChange={(event) => toggleSide(value, event.target.checked)}
+                    />
+                    <span>{value}</span>
+                  </label>
+                ))}
+              </div>
+            </FlowFilterSection>
+
+            <FlowFilterSection title="Type">
+              <div className="flow-filter-checkbox-grid">
+                {(["call", "put"] as OptionType[]).map((value) => (
+                  <label className="flow-filter-check" key={value}>
+                    <input
+                      type="checkbox"
+                      checked={(filters.optionTypes ?? []).includes(value)}
+                      onChange={(event) => toggleOptionType(value, event.target.checked)}
+                    />
+                    <span>{value}</span>
+                  </label>
+                ))}
+              </div>
+            </FlowFilterSection>
+
+            <FlowFilterSection title="Min Notional">
+              <div className="flow-filter-chip-grid">
+                {[
+                  { label: "All signal", value: undefined },
+                  { label: ">= 25k", value: 25_000 },
+                  { label: ">= 50k", value: 50_000 },
+                  { label: ">= 100k", value: 100_000 }
+                ].map((preset) => (
+                  <button
+                    className={`filter-chip ${filters.minNotional === preset.value ? "is-active" : ""}`}
+                    key={preset.label}
+                    type="button"
+                    onClick={() => applyMinNotional(preset.value)}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </FlowFilterSection>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
+};
+
+const FlowFilterControls = () => {
+  const state = useTerminal();
+
+  return <FlowFilterPopover filters={state.flowFilters} onChange={state.setFlowFilters} />;
 };
 
 type PaneProps = {
@@ -4402,7 +4782,9 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
             {state.tickerSet.size > 0
               ? "No option prints match the current filter."
               : state.mode === "live"
-                ? "No option prints yet. Start ingest-options."
+                ? state.options.status === "stale"
+                  ? "Live feed behind. Waiting for fresh option prints."
+                  : "No option prints yet. Start ingest-options."
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
@@ -4524,7 +4906,9 @@ const EquitiesPane = ({ limit }: EquitiesPaneProps) => {
             {state.tickerSet.size > 0
               ? "No equity prints match the current filter."
               : state.mode === "live"
-                ? "No equity prints yet. Start ingest-equities."
+                ? state.equities.status === "stale"
+                  ? "Live feed behind. Waiting for fresh equity prints."
+                  : "No equity prints yet. Start ingest-equities."
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
@@ -4600,7 +4984,9 @@ const FlowPane = ({ limit, title = "Flow" }: FlowPaneProps) => {
             {state.tickerSet.size > 0
               ? "No flow packets match the current filter."
               : state.mode === "live"
-                ? "No flow packets yet. Start compute."
+                ? state.flow.status === "stale"
+                  ? "Live feed behind. Waiting for fresh flow packets."
+                  : "No flow packets yet. Start compute."
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
