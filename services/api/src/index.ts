@@ -10,7 +10,7 @@ import {
   SUBJECT_INFERRED_DARK,
   SUBJECT_FLOW_PACKETS,
   SUBJECT_OPTION_NBBO,
-  SUBJECT_OPTION_PRINTS,
+  SUBJECT_OPTION_SIGNAL_PRINTS,
   STREAM_ALERTS,
   STREAM_CLASSIFIER_HITS,
   STREAM_EQUITY_CANDLES,
@@ -20,7 +20,7 @@ import {
   STREAM_INFERRED_DARK,
   STREAM_FLOW_PACKETS,
   STREAM_OPTION_NBBO,
-  STREAM_OPTION_PRINTS,
+  STREAM_OPTION_SIGNAL_PRINTS,
   buildDurableConsumer,
   connectJetStreamWithRetry,
   ensureStream,
@@ -85,6 +85,13 @@ import {
   LiveServerMessage,
   LiveSubscription,
   LiveSubscriptionSchema,
+  matchesFlowPacketFilters,
+  matchesOptionPrintFilters,
+  OptionFlowFilters,
+  OptionFlowViewSchema,
+  OptionNbboSideSchema,
+  OptionSecurityTypeSchema,
+  OptionTypeSchema,
   FlowPacketSchema,
   OptionNBBOSchema,
   OptionPrintSchema,
@@ -199,6 +206,32 @@ const equityPrintRangeSchema = z.object({
   end_ts: z.coerce.number().int().nonnegative(),
   limit: limitSchema.optional()
 });
+const optionSideListSchema = z
+  .string()
+  .transform((value) =>
+    value
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+  )
+  .pipe(z.array(OptionNbboSideSchema));
+const optionTypeListSchema = z
+  .string()
+  .transform((value) =>
+    value
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+  )
+  .pipe(z.array(OptionTypeSchema));
+const optionSecuritySchema = z.enum(["stock", "etf", "all"]);
+const optionFilterQuerySchema = z.object({
+  view: OptionFlowViewSchema.optional(),
+  security: optionSecuritySchema.optional(),
+  side: optionSideListSchema.optional(),
+  type: optionTypeListSchema.optional(),
+  min_notional: z.coerce.number().nonnegative().optional()
+});
 
 type Channel =
   | "options"
@@ -235,6 +268,7 @@ const classifierHitSockets = new Set<LegacySocket>();
 const alertSockets = new Set<LegacySocket>();
 const liveSocketSubscriptions = new Map<LiveSocket, Set<string>>();
 const subscriptionSockets = new Map<string, Set<LiveSocket>>();
+const subscriptionDefinitions = new Map<string, LiveSubscription>();
 const liveHeartbeats = new Map<LiveSocket, ReturnType<typeof setInterval>>();
 
 const jsonResponse = (body: unknown, status = 200): Response => {
@@ -252,6 +286,43 @@ const parseLimit = (value: string | null): number => {
   }
 
   return limitSchema.parse(value);
+};
+
+const parseOptionPrintFilters = (
+  url: URL
+): {
+  view: z.infer<typeof OptionFlowViewSchema>;
+  storageFilters: Parameters<typeof fetchRecentOptionPrints>[3];
+  liveFilters: OptionFlowFilters;
+} => {
+  const parsed = optionFilterQuerySchema.parse({
+    view: url.searchParams.get("view") ?? undefined,
+    security: url.searchParams.get("security") ?? undefined,
+    side: url.searchParams.get("side") ?? undefined,
+    type: url.searchParams.get("type") ?? undefined,
+    min_notional: url.searchParams.get("min_notional") ?? undefined
+  });
+  const view = parsed.view ?? "signal";
+  const security = parsed.security ?? (view === "raw" ? "all" : "stock");
+  const storageFilters = {
+    view,
+    security,
+    minNotional: parsed.min_notional,
+    nbboSides: parsed.side,
+    optionTypes: parsed.type
+  } as const;
+  const liveFilters: OptionFlowFilters = {
+    view,
+    securityTypes:
+      security === "all"
+        ? undefined
+        : ([security] as Array<z.infer<typeof OptionSecurityTypeSchema>>),
+    nbboSides: parsed.side,
+    optionTypes: parsed.type,
+    minNotional: parsed.min_notional
+  };
+
+  return { view, storageFilters, liveFilters };
 };
 
 const parseReplayParams = (url: URL): { afterTs: number; afterSeq: number; limit: number } => {
@@ -412,6 +483,7 @@ const subscribeSocket = (socket: LiveSocket, subscription: LiveSubscription): vo
   const sockets = subscriptionSockets.get(key) ?? new Set<LiveSocket>();
   sockets.add(socket);
   subscriptionSockets.set(key, sockets);
+  subscriptionDefinitions.set(key, subscription);
 };
 
 const unsubscribeSocket = (socket: LiveSocket, subscription: LiveSubscription): void => {
@@ -425,6 +497,7 @@ const unsubscribeSocket = (socket: LiveSocket, subscription: LiveSubscription): 
   sockets.delete(socket);
   if (sockets.size === 0) {
     subscriptionSockets.delete(key);
+    subscriptionDefinitions.delete(key);
   }
 };
 
@@ -436,6 +509,7 @@ const cleanupLiveSocket = (socket: LiveSocket): void => {
       sockets?.delete(socket);
       if (sockets && sockets.size === 0) {
         subscriptionSockets.delete(key);
+        subscriptionDefinitions.delete(key);
       }
     }
   }
@@ -504,8 +578,8 @@ const run = async () => {
   );
 
   await ensureStream(jsm, {
-    name: STREAM_OPTION_PRINTS,
-    subjects: [SUBJECT_OPTION_PRINTS],
+    name: STREAM_OPTION_SIGNAL_PRINTS,
+    subjects: [SUBJECT_OPTION_SIGNAL_PRINTS],
     retention: "limits",
     storage: "file",
     discard: "old",
@@ -722,8 +796,8 @@ const run = async () => {
   };
 
   const optionSubscription = await subscribeWithReset(
-    SUBJECT_OPTION_PRINTS,
-    STREAM_OPTION_PRINTS,
+    SUBJECT_OPTION_SIGNAL_PRINTS,
+    STREAM_OPTION_SIGNAL_PRINTS,
     "api-option-prints"
   );
 
@@ -786,20 +860,44 @@ const run = async () => {
     item: unknown,
     ingestChannel: "options" | "nbbo" | "equities" | "equity-candles" | "equity-overlay" | "equity-joins" | "flow" | "classifier-hits" | "alerts" | "inferred-dark"
   ) => {
-    const key = getSubscriptionKey(subscription);
-    const sockets = subscriptionSockets.get(key);
     const watermark = await liveState.ingest(ingestChannel, item);
-    if (!sockets || sockets.size === 0) {
+    const matchingSubscriptions =
+      subscription.channel === "options" || subscription.channel === "flow"
+        ? [...subscriptionDefinitions.entries()].filter(([, candidate]) => candidate.channel === subscription.channel)
+        : [[getSubscriptionKey(subscription), subscription] as const];
+
+    if (matchingSubscriptions.length === 0) {
       return;
     }
 
-    for (const socket of sockets) {
-      sendLiveMessage(socket, {
-        op: "event",
-        subscription,
-        item,
-        watermark
-      });
+    for (const [key, candidate] of matchingSubscriptions) {
+      const sockets = subscriptionSockets.get(key);
+      if (!sockets || sockets.size === 0) {
+        continue;
+      }
+
+      if (
+        candidate.channel === "options" &&
+        !matchesOptionPrintFilters(OptionPrintSchema.parse(item), candidate.filters)
+      ) {
+        continue;
+      }
+
+      if (
+        candidate.channel === "flow" &&
+        !matchesFlowPacketFilters(FlowPacketSchema.parse(item), candidate.filters)
+      ) {
+        continue;
+      }
+
+      for (const socket of sockets) {
+        sendLiveMessage(socket, {
+          op: "event",
+          subscription: candidate,
+          item,
+          watermark
+        });
+      }
     }
   };
 
@@ -996,10 +1094,21 @@ const run = async () => {
       }
 
       if (req.method === "GET" && url.pathname === "/prints/options") {
-        const limit = parseLimit(url.searchParams.get("limit"));
-        const source = parseReplaySource(url) ?? undefined;
-        const data = await fetchRecentOptionPrints(clickhouse, limit, source);
-        return jsonResponse({ data });
+        try {
+          const limit = parseLimit(url.searchParams.get("limit"));
+          const source = parseReplaySource(url) ?? undefined;
+          const { storageFilters } = parseOptionPrintFilters(url);
+          const data = await fetchRecentOptionPrints(clickhouse, limit, source, storageFilters);
+          return jsonResponse({ data });
+        } catch (error) {
+          return jsonResponse(
+            {
+              error: "invalid options query",
+              detail: error instanceof Error ? error.message : String(error)
+            },
+            400
+          );
+        }
       }
 
       if (req.method === "GET" && url.pathname === "/nbbo/options") {
@@ -1105,10 +1214,28 @@ const run = async () => {
       }
 
       if (req.method === "GET" && url.pathname === "/history/options") {
-        const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
-        const source = parseReplaySource(url) ?? undefined;
-        const data = await fetchOptionPrintsBefore(clickhouse, beforeTs, beforeSeq, limit, source);
-        return jsonResponse(buildHistoryResponse(data, (item) => ({ ts: item.ts, seq: item.seq })));
+        try {
+          const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
+          const source = parseReplaySource(url) ?? undefined;
+          const { storageFilters } = parseOptionPrintFilters(url);
+          const data = await fetchOptionPrintsBefore(
+            clickhouse,
+            beforeTs,
+            beforeSeq,
+            limit,
+            source,
+            storageFilters
+          );
+          return jsonResponse(buildHistoryResponse(data, (item) => ({ ts: item.ts, seq: item.seq })));
+        } catch (error) {
+          return jsonResponse(
+            {
+              error: "invalid options history query",
+              detail: error instanceof Error ? error.message : String(error)
+            },
+            400
+          );
+        }
       }
 
       if (req.method === "GET" && url.pathname === "/history/nbbo") {
@@ -1183,12 +1310,30 @@ const run = async () => {
       }
 
       if (req.method === "GET" && url.pathname === "/replay/options") {
-        const { afterTs, afterSeq, limit } = parseReplayParams(url);
-        const source = parseReplaySource(url) ?? undefined;
-        const data = await fetchOptionPrintsAfter(clickhouse, afterTs, afterSeq, limit, source);
-        const last = data.at(-1);
-        const next = last ? { ts: last.ts, seq: last.seq } : null;
-        return jsonResponse({ data, next });
+        try {
+          const { afterTs, afterSeq, limit } = parseReplayParams(url);
+          const source = parseReplaySource(url) ?? undefined;
+          const { storageFilters } = parseOptionPrintFilters(url);
+          const data = await fetchOptionPrintsAfter(
+            clickhouse,
+            afterTs,
+            afterSeq,
+            limit,
+            source,
+            storageFilters
+          );
+          const last = data.at(-1);
+          const next = last ? { ts: last.ts, seq: last.seq } : null;
+          return jsonResponse({ data, next });
+        } catch (error) {
+          return jsonResponse(
+            {
+              error: "invalid options replay query",
+              detail: error instanceof Error ? error.message : String(error)
+            },
+            400
+          );
+        }
       }
 
       if (req.method === "GET" && url.pathname === "/replay/nbbo") {

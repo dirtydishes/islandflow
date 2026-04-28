@@ -125,6 +125,15 @@ All runtime configuration comes from `.env`.
 - `OPTIONS_INGEST_ADAPTER` (`synthetic` | `alpaca` | `ibkr` | `databento`)
 - `EQUITIES_INGEST_ADAPTER` (`synthetic` | `alpaca`)
 - `EMIT_INTERVAL_MS` (synthetic emit cadence)
+- `SYNTHETIC_MARKET_MODE` (`realistic` | `active` | `firehose`, default `realistic`)
+- `SYNTHETIC_OPTIONS_MODE` (optional per-service override; falls back to `SYNTHETIC_MARKET_MODE`)
+- `SYNTHETIC_EQUITIES_MODE` (optional per-service override; falls back to `SYNTHETIC_MARKET_MODE`)
+
+### Synthetic mode profiles
+
+- `realistic` is the default local mode. Options produce materially more ordinary prints, fewer repeated bursts, and fewer alert-driving sweeps/spikes. Equities produce smaller batches and less relentless off-exchange activity.
+- `active` is a busier demo mode that still leaves meaningful visible history in the UI.
+- `firehose` is the stress profile for backpressure, hot-window eviction, and Databento-readiness validation.
 
 ### Options adapter settings
 
@@ -142,6 +151,30 @@ All runtime configuration comes from `.env`.
 - Classifiers: `CLASSIFIER_SWEEP_MIN_PREMIUM`, `CLASSIFIER_SWEEP_MIN_COUNT`, `CLASSIFIER_SWEEP_MIN_PREMIUM_Z`, `CLASSIFIER_SPIKE_MIN_PREMIUM`, `CLASSIFIER_SPIKE_MIN_SIZE`, `CLASSIFIER_SPIKE_MIN_PREMIUM_Z`, `CLASSIFIER_SPIKE_MIN_SIZE_Z`, `CLASSIFIER_Z_MIN_SAMPLES`, `CLASSIFIER_MIN_NBBO_COVERAGE`, `CLASSIFIER_MIN_AGGRESSOR_RATIO`, `CLASSIFIER_0DTE_MAX_ATM_PCT`, `CLASSIFIER_0DTE_MIN_PREMIUM`, `CLASSIFIER_0DTE_MIN_SIZE`
 - Dark inference: `EQUITY_QUOTE_MAX_AGE_MS`, `DARK_INFER_WINDOW_MS`, `DARK_INFER_COOLDOWN_MS`, `DARK_INFER_MIN_BLOCK_SIZE`, `DARK_INFER_MIN_ACCUM_SIZE`, `DARK_INFER_MIN_ACCUM_COUNT`, `DARK_INFER_MIN_PRINT_SIZE`, `DARK_INFER_MAX_EVIDENCE`, `DARK_INFER_MAX_SPREAD_PCT`
 
+### Options signal filtering
+
+- `OPTIONS_SIGNAL_MODE` (`smart-money` | `balanced` | `all`, default `smart-money`)
+- `OPTIONS_SIGNAL_MIN_NOTIONAL` (default `10000`)
+- `OPTIONS_SIGNAL_ETF_MIN_NOTIONAL` (default `50000`)
+- `OPTIONS_SIGNAL_BID_SIDE_MIN_NOTIONAL` (default `25000`)
+- `OPTIONS_SIGNAL_MID_MIN_NOTIONAL` (default `20000`)
+- `OPTIONS_SIGNAL_NBBO_MAX_AGE_MS` (default `1500`)
+- `OPTIONS_SIGNAL_ETF_UNDERLYINGS` (default `SPY,QQQ,IWM,DIA,TLT,GLD,SLV,XLF,XLE,XLV,XLI,XLP,XLU,XLY,SMH,ARKK`)
+
+Default `smart-money` behavior:
+
+- reject sub-`10k` options prints,
+- reject ETF prints below `50k`,
+- reject `B` / `BB` prints below `25k`,
+- reject non-`SWEEP` / non-`ISO` `MID` prints below `20k`,
+- require `50k` when NBBO is missing or stale,
+- auto-keep `100k+`,
+- keep ask-side `A` / `AA` prints at `10k+`,
+- keep `SWEEP` / `ISO` prints at `25k+`,
+- keep `500+` contract prints at `10k+`.
+
+`balanced` uses the same shape with lower thresholds. `all` marks every option print as signal-passing.
+
 ### Candles
 
 - `CANDLE_INTERVALS_MS`, `CANDLE_MAX_LATE_MS`, `CANDLE_CACHE_LIMIT`, `CANDLE_DELIVER_POLICY`, `CANDLE_CONSUMER_RESET`
@@ -156,6 +189,7 @@ All runtime configuration comes from `.env`.
 - `NEXT_PUBLIC_LIVE_HOT_WINDOW` (frontend hot live window cap; default `2000`)
 - `NEXT_PUBLIC_PINNED_EVIDENCE_TTL_MS` (pinned evidence TTL; default `1200000`)
 - `NEXT_PUBLIC_PINNED_EVIDENCE_MAX_ITEMS` (pinned evidence cache guardrail; default `4000`)
+- `NEXT_PUBLIC_FLOW_FILTER_PRESET` (`smart-money` | `balanced` | `all`, default `smart-money`)
 
 ### Replay service
 
@@ -170,8 +204,48 @@ All runtime configuration comes from `.env`.
 
 - Python dependencies are required only for IBKR/Databento sidecars (`services/ingest-options/py/requirements.txt`).
 - Candle construction is server-side; the client consumes prebuilt OHLC events.
+- Option prints now persist as enriched raw rows and can be queried as either:
+  - `view=signal` — default live/UI path and compute input.
+  - `view=raw` — audit/debug path that preserves every stored print.
+- The default Tape page options/packets posture is now stock-only, hides `B` / `BB`, keeps calls and puts visible, and applies in-memory min-notional controls immediately.
 - Live retention uses a two-tier model:
   - API/Redis maintain a bounded hot cache per live generic channel.
-  - UI keeps a bounded hot window for rendering performance.
+  - UI keeps a bounded hot window for rendering performance around the signal view rather than raw noise.
   - Alert/drawer evidence is pinned and hydrated by id/trace so details remain inspectable after hot-window eviction.
+- Firehose-readiness strategy:
+  - preserve raw ingest for storage/replay,
+  - feed compute and default live UI from the filtered signal path,
+  - add filterable live subscription contracts now so selective delivery can move server-side without reshaping the protocol later.
 - This repository is for personal, non-redistributed usage.
+
+## Useful Examples
+
+Realistic local demo:
+
+```bash
+SYNTHETIC_MARKET_MODE=realistic \
+OPTIONS_SIGNAL_MODE=smart-money \
+bun run dev
+```
+
+Active demo:
+
+```bash
+SYNTHETIC_MARKET_MODE=active bun run dev
+```
+
+Firehose stress test:
+
+```bash
+SYNTHETIC_MARKET_MODE=firehose \
+NEXT_PUBLIC_LIVE_HOT_WINDOW=2000 \
+bun run dev
+```
+
+Show raw options flow for debugging:
+
+```text
+/prints/options?view=raw&security=all
+/history/options?view=raw&security=all&before_ts=<ts>&before_seq=<seq>
+/replay/options?view=raw&security=all&after_ts=<ts>&after_seq=<seq>
+```

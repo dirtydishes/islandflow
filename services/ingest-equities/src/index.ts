@@ -19,6 +19,7 @@ import {
 import {
   EquityPrintSchema,
   EquityQuoteSchema,
+  resolveSyntheticMarketModes,
   type EquityPrint,
   type EquityQuote
 } from "@islandflow/types";
@@ -36,6 +37,8 @@ const envSchema = z.object({
   CLICKHOUSE_DATABASE: z.string().default("default"),
   EQUITIES_INGEST_ADAPTER: z.string().min(1).default("synthetic"),
   EMIT_INTERVAL_MS: z.coerce.number().int().positive().default(1000),
+  SYNTHETIC_MARKET_MODE: z.string().default("realistic"),
+  SYNTHETIC_EQUITIES_MODE: z.string().default(""),
 
   // Alpaca (equities)
   ALPACA_KEY_ID: z.string().default(""),
@@ -63,6 +66,10 @@ const envSchema = z.object({
 });
 
 const env = readEnv(envSchema);
+const syntheticModes = resolveSyntheticMarketModes({
+  syntheticMarketMode: env.SYNTHETIC_MARKET_MODE,
+  syntheticEquitiesMode: env.SYNTHETIC_EQUITIES_MODE
+});
 
 const state = {
   shuttingDown: false,
@@ -153,7 +160,10 @@ const parseSymbolList = (value: string): string[] => {
 
 const selectAdapter = (name: string): EquityIngestAdapter => {
   if (name === "synthetic") {
-    return createSyntheticEquitiesAdapter({ emitIntervalMs: env.EMIT_INTERVAL_MS });
+    return createSyntheticEquitiesAdapter({
+      emitIntervalMs: env.EMIT_INTERVAL_MS,
+      mode: syntheticModes.equities
+    });
   }
 
   if (name === "alpaca") {

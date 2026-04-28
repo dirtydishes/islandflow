@@ -196,4 +196,81 @@ describe("LiveStateManager", () => {
     expect(stats.trimOperations).toBeGreaterThan(0);
     expect(stats.cacheDepthByKey["live:flow"]).toBe(2);
   });
+
+  it("filters option and flow snapshots using subscription filters", async () => {
+    const manager = new LiveStateManager(makeClickHouse(), null);
+
+    await manager.ingest("options", {
+      source_ts: 100,
+      ingest_ts: 101,
+      seq: 1,
+      trace_id: "opt-1",
+      ts: 100,
+      option_contract_id: "AAPL-2025-01-17-200-C",
+      price: 1,
+      size: 100,
+      exchange: "X",
+      underlying_id: "AAPL",
+      option_type: "call",
+      notional: 10000,
+      nbbo_side: "A",
+      is_etf: false,
+      signal_pass: true,
+      signal_reasons: ["keep:ask-side"],
+      signal_profile: "smart-money"
+    });
+    await manager.ingest("options", {
+      source_ts: 110,
+      ingest_ts: 111,
+      seq: 2,
+      trace_id: "opt-2",
+      ts: 110,
+      option_contract_id: "SPY-2025-01-17-500-P",
+      price: 1,
+      size: 100,
+      exchange: "X",
+      underlying_id: "SPY",
+      option_type: "put",
+      notional: 10000,
+      nbbo_side: "B",
+      is_etf: true,
+      signal_pass: true,
+      signal_reasons: ["keep:ask-side"],
+      signal_profile: "smart-money"
+    });
+    await manager.ingest("flow", {
+      source_ts: 120,
+      ingest_ts: 121,
+      seq: 3,
+      trace_id: "flow-1",
+      id: "flow-1",
+      members: ["opt-1"],
+      features: {
+        option_contract_id: "AAPL-2025-01-17-200-C",
+        total_notional: 10000,
+        is_etf: false,
+        option_type: "call",
+        nbbo_a_count: 1,
+        nbbo_aa_count: 0,
+        nbbo_mid_count: 0,
+        nbbo_b_count: 0,
+        nbbo_bb_count: 0,
+        nbbo_missing_count: 0,
+        nbbo_stale_count: 0
+      },
+      join_quality: {}
+    });
+
+    const optionSnapshot = await manager.getSnapshot({
+      channel: "options",
+      filters: { securityTypes: ["stock"], nbboSides: ["A"], optionTypes: ["call"] }
+    });
+    const flowSnapshot = await manager.getSnapshot({
+      channel: "flow",
+      filters: { securityTypes: ["stock"], nbboSides: ["A"], optionTypes: ["call"] }
+    });
+
+    expect(optionSnapshot.items).toHaveLength(1);
+    expect(flowSnapshot.items).toHaveLength(1);
+  });
 });

@@ -9,7 +9,7 @@ import {
   SUBJECT_INFERRED_DARK,
   SUBJECT_FLOW_PACKETS,
   SUBJECT_OPTION_NBBO,
-  SUBJECT_OPTION_PRINTS,
+  SUBJECT_OPTION_SIGNAL_PRINTS,
   STREAM_ALERTS,
   STREAM_CLASSIFIER_HITS,
   STREAM_EQUITY_JOINS,
@@ -18,7 +18,7 @@ import {
   STREAM_INFERRED_DARK,
   STREAM_FLOW_PACKETS,
   STREAM_OPTION_NBBO,
-  STREAM_OPTION_PRINTS,
+  STREAM_OPTION_SIGNAL_PRINTS,
   buildDurableConsumer,
   connectJetStreamWithRetry,
   ensureStream,
@@ -231,6 +231,9 @@ type NbboPlacementCounts = {
 
 type ClusterState = {
   contractId: string;
+  underlyingId: string | null;
+  optionType: string | null;
+  isEtf: boolean | null;
   startTs: number;
   endTs: number;
   startSourceTs: number;
@@ -530,6 +533,9 @@ const buildCluster = (print: OptionPrint): ClusterState => {
   recordPlacement(placements, classifyPlacement(print.price, selectNbbo(print.option_contract_id, print.ts)));
   return {
     contractId: print.option_contract_id,
+    underlyingId: print.underlying_id ?? null,
+    optionType: print.option_type ?? null,
+    isEtf: typeof print.is_etf === "boolean" ? print.is_etf : null,
     startTs: print.ts,
     endTs: print.ts,
     startSourceTs: print.source_ts,
@@ -546,6 +552,15 @@ const buildCluster = (print: OptionPrint): ClusterState => {
 };
 
 const updateCluster = (cluster: ClusterState, print: OptionPrint): ClusterState => {
+  if (!cluster.underlyingId && print.underlying_id) {
+    cluster.underlyingId = print.underlying_id;
+  }
+  if (!cluster.optionType && print.option_type) {
+    cluster.optionType = print.option_type;
+  }
+  if (cluster.isEtf === null && typeof print.is_etf === "boolean") {
+    cluster.isEtf = print.is_etf;
+  }
   cluster.endTs = Math.max(cluster.endTs, print.ts);
   cluster.endIngestTs = Math.max(cluster.endIngestTs, print.ingest_ts);
   cluster.endSeq = Math.max(cluster.endSeq, print.seq);
@@ -704,6 +719,15 @@ const flushCluster = async (
         }
       }
     }
+  }
+  if (cluster.underlyingId) {
+    features.underlying_id = cluster.underlyingId;
+  }
+  if (cluster.optionType) {
+    features.option_type = cluster.optionType;
+  }
+  if (cluster.isEtf !== null) {
+    features.is_etf = cluster.isEtf;
   }
 
   const placementTotal =
@@ -1012,8 +1036,8 @@ const run = async () => {
   );
 
   await ensureStream(jsm, {
-    name: STREAM_OPTION_PRINTS,
-    subjects: [SUBJECT_OPTION_PRINTS],
+    name: STREAM_OPTION_SIGNAL_PRINTS,
+    subjects: [SUBJECT_OPTION_SIGNAL_PRINTS],
     retention: "limits",
     storage: "file",
     discard: "old",
@@ -1162,7 +1186,7 @@ const run = async () => {
 
   if (env.COMPUTE_CONSUMER_RESET) {
     try {
-      await jsm.consumers.delete(STREAM_OPTION_PRINTS, durableName);
+      await jsm.consumers.delete(STREAM_OPTION_SIGNAL_PRINTS, durableName);
       logger.warn("reset jetstream consumer", { durable: durableName });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -1172,14 +1196,14 @@ const run = async () => {
     }
   } else {
     try {
-      const info = await jsm.consumers.info(STREAM_OPTION_PRINTS, durableName);
+      const info = await jsm.consumers.info(STREAM_OPTION_SIGNAL_PRINTS, durableName);
       if (info?.config?.deliver_policy && info.config.deliver_policy !== env.COMPUTE_DELIVER_POLICY) {
         logger.warn("resetting consumer due to deliver policy change", {
           durable: durableName,
           current: info.config.deliver_policy,
           desired: env.COMPUTE_DELIVER_POLICY
         });
-        await jsm.consumers.delete(STREAM_OPTION_PRINTS, durableName);
+        await jsm.consumers.delete(STREAM_OPTION_SIGNAL_PRINTS, durableName);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -1292,7 +1316,7 @@ const run = async () => {
     const opts = buildDurableConsumer(durableName);
     applyDeliverPolicy(opts, env.COMPUTE_DELIVER_POLICY);
     try {
-      return await subscribeJson(js, SUBJECT_OPTION_PRINTS, opts);
+      return await subscribeJson(js, SUBJECT_OPTION_SIGNAL_PRINTS, opts);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const shouldReset =
@@ -1307,7 +1331,7 @@ const run = async () => {
       logger.warn("resetting jetstream consumer", { durable: durableName, error: message });
 
       try {
-        await jsm.consumers.delete(STREAM_OPTION_PRINTS, durableName);
+        await jsm.consumers.delete(STREAM_OPTION_SIGNAL_PRINTS, durableName);
       } catch (deleteError) {
         const deleteMessage = deleteError instanceof Error ? deleteError.message : String(deleteError);
         if (!deleteMessage.includes("not found")) {
@@ -1320,7 +1344,7 @@ const run = async () => {
 
       const resetOpts = buildDurableConsumer(durableName);
       applyDeliverPolicy(resetOpts, env.COMPUTE_DELIVER_POLICY);
-      return await subscribeJson(js, SUBJECT_OPTION_PRINTS, resetOpts);
+      return await subscribeJson(js, SUBJECT_OPTION_SIGNAL_PRINTS, resetOpts);
     }
   })();
 

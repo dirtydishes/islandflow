@@ -1,5 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { createClickHouseClient, fetchOptionPrintsBefore, fetchOptionPrintsByTraceIds } from "../src/clickhouse";
+import {
+  createClickHouseClient,
+  fetchOptionPrintsBefore,
+  fetchOptionPrintsByTraceIds,
+  fetchRecentOptionPrints
+} from "../src/clickhouse";
 import { normalizeOptionPrint, optionPrintsTableDDL, OPTION_PRINTS_TABLE } from "../src/option-prints";
 
 const basePrint = {
@@ -38,12 +43,24 @@ describe("option-prints storage helpers", () => {
       };
     };
 
+    await fetchRecentOptionPrints(client, 25, undefined, {
+      view: "signal",
+      security: "stock",
+      nbboSides: ["AA", "A"],
+      optionTypes: ["call"],
+      minNotional: 25_000
+    });
     await fetchOptionPrintsBefore(client, 100, 5, 20, "alpaca");
     await fetchOptionPrintsByTraceIds(client, ["trace-1", "trace-2"]);
 
-    expect(queries[0]).toContain("(ts, seq) < (100, 5)");
-    expect(queries[0]).toContain("startsWith(trace_id, 'alpaca')");
-    expect(queries[0]).toContain("ORDER BY ts DESC, seq DESC LIMIT 20");
-    expect(queries[1]).toContain("trace_id IN ('trace-1', 'trace-2')");
+    expect(queries[0]).toContain("signal_pass = 1");
+    expect(queries[0]).toContain("(is_etf = 0 OR is_etf IS NULL)");
+    expect(queries[0]).toContain("nbbo_side IN ('AA', 'A')");
+    expect(queries[0]).toContain("option_type IN ('call')");
+    expect(queries[0]).toContain("notional >= 25000");
+    expect(queries[1]).toContain("(ts, seq) < (100, 5)");
+    expect(queries[1]).toContain("startsWith(trace_id, 'alpaca')");
+    expect(queries[1]).toContain("ORDER BY ts DESC, seq DESC LIMIT 20");
+    expect(queries[2]).toContain("trace_id IN ('trace-1', 'trace-2')");
   });
 });

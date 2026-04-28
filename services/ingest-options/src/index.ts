@@ -3,8 +3,10 @@ import { createLogger } from "@islandflow/observability";
 import {
   SUBJECT_OPTION_NBBO,
   SUBJECT_OPTION_PRINTS,
+  SUBJECT_OPTION_SIGNAL_PRINTS,
   STREAM_OPTION_NBBO,
   STREAM_OPTION_PRINTS,
+  STREAM_OPTION_SIGNAL_PRINTS,
   connectJetStreamWithRetry,
   ensureStream,
   publishJson
@@ -16,7 +18,16 @@ import {
   insertOptionNBBO,
   insertOptionPrint
 } from "@islandflow/storage";
-import { OptionNBBOSchema, OptionPrintSchema, type OptionNBBO, type OptionPrint } from "@islandflow/types";
+import {
+  OptionNBBOSchema,
+  OptionPrintSchema,
+  evaluateOptionSignal,
+  deriveOptionPrintMetadata,
+  resolveSyntheticMarketModes,
+  type OptionNBBO,
+  type OptionPrint,
+  type OptionsSignalConfig
+} from "@islandflow/types";
 import { createAlpacaOptionsAdapter } from "./adapters/alpaca";
 import { createDatabentoOptionsAdapter } from "./adapters/databento";
 import { createIbkrOptionsAdapter } from "./adapters/ibkr";
@@ -68,6 +79,17 @@ const envSchema = z.object({
   IBKR_CURRENCY: z.string().min(1).default("USD"),
   IBKR_PYTHON_BIN: z.string().min(1).default("python3"),
   EMIT_INTERVAL_MS: z.coerce.number().int().positive().default(1000),
+  SYNTHETIC_MARKET_MODE: z.string().default("realistic"),
+  SYNTHETIC_OPTIONS_MODE: z.string().default(""),
+  OPTIONS_SIGNAL_MODE: z.enum(["smart-money", "balanced", "all"]).default("smart-money"),
+  OPTIONS_SIGNAL_MIN_NOTIONAL: z.coerce.number().nonnegative().default(10_000),
+  OPTIONS_SIGNAL_ETF_MIN_NOTIONAL: z.coerce.number().nonnegative().default(50_000),
+  OPTIONS_SIGNAL_BID_SIDE_MIN_NOTIONAL: z.coerce.number().nonnegative().default(25_000),
+  OPTIONS_SIGNAL_MID_MIN_NOTIONAL: z.coerce.number().nonnegative().default(20_000),
+  OPTIONS_SIGNAL_NBBO_MAX_AGE_MS: z.coerce.number().int().positive().default(1500),
+  OPTIONS_SIGNAL_ETF_UNDERLYINGS: z
+    .string()
+    .default("SPY,QQQ,IWM,DIA,TLT,GLD,SLV,XLF,XLE,XLV,XLI,XLP,XLU,XLY,SMH,ARKK"),
   TESTING_MODE: z
     .preprocess((value) => {
       if (typeof value === "string") {
@@ -86,11 +108,34 @@ const envSchema = z.object({
 });
 
 const env = readEnv(envSchema);
+const syntheticModes = resolveSyntheticMarketModes({
+  syntheticMarketMode: env.SYNTHETIC_MARKET_MODE,
+  syntheticOptionsMode: env.SYNTHETIC_OPTIONS_MODE
+});
+const optionsSignalConfig: OptionsSignalConfig = {
+  mode: env.OPTIONS_SIGNAL_MODE,
+  minNotional: env.OPTIONS_SIGNAL_MIN_NOTIONAL,
+  etfMinNotional: env.OPTIONS_SIGNAL_ETF_MIN_NOTIONAL,
+  bidSideMinNotional: env.OPTIONS_SIGNAL_BID_SIDE_MIN_NOTIONAL,
+  midMinNotional: env.OPTIONS_SIGNAL_MID_MIN_NOTIONAL,
+  missingNbboMinNotional: 50_000,
+  largePrintMinSize: 500,
+  largePrintMinNotional: env.OPTIONS_SIGNAL_MIN_NOTIONAL,
+  sweepMinNotional: env.OPTIONS_SIGNAL_BID_SIDE_MIN_NOTIONAL,
+  autoKeepMinNotional: 100_000,
+  nbboMaxAgeMs: env.OPTIONS_SIGNAL_NBBO_MAX_AGE_MS,
+  etfUnderlyings: new Set(
+    env.OPTIONS_SIGNAL_ETF_UNDERLYINGS.split(",")
+      .map((value) => value.trim().toUpperCase())
+      .filter(Boolean)
+  )
+};
 
 const state = {
   shuttingDown: false,
   shutdownPromise: null as Promise<void> | null
 };
+const latestNbboByContract = new Map<string, OptionNBBO>();
 
 const getErrorMessage = (error: unknown): string => {
   return error instanceof Error ? error.message : String(error);
@@ -169,7 +214,10 @@ const retry = async <T>(
 
 const selectAdapter = (name: string): OptionIngestAdapter => {
   if (name === "synthetic") {
-    return createSyntheticOptionsAdapter({ emitIntervalMs: env.EMIT_INTERVAL_MS });
+    return createSyntheticOptionsAdapter({
+      emitIntervalMs: env.EMIT_INTERVAL_MS,
+      mode: syntheticModes.options
+    });
   }
 
   if (name === "alpaca") {
@@ -277,6 +325,19 @@ const run = async () => {
     num_replicas: 1
   });
 
+  await ensureStream(jsm, {
+    name: STREAM_OPTION_SIGNAL_PRINTS,
+    subjects: [SUBJECT_OPTION_SIGNAL_PRINTS],
+    retention: "limits",
+    storage: "file",
+    discard: "old",
+    max_msgs_per_subject: -1,
+    max_msgs: -1,
+    max_bytes: -1,
+    max_age: 0,
+    num_replicas: 1
+  });
+
   const clickhouse = createClickHouseClient({
     url: env.CLICKHOUSE_URL,
     database: env.CLICKHOUSE_DATABASE
@@ -303,15 +364,41 @@ const run = async () => {
         return;
       }
 
-      const print = OptionPrintSchema.parse(candidate);
+      const rawPrint = OptionPrintSchema.parse(candidate);
+      const derived = deriveOptionPrintMetadata(
+        rawPrint,
+        latestNbboByContract.get(rawPrint.option_contract_id),
+        optionsSignalConfig
+      );
+      const signalDecision = evaluateOptionSignal(
+        {
+          ...rawPrint,
+          ...derived,
+          signal_profile: optionsSignalConfig.mode
+        },
+        optionsSignalConfig
+      );
+      const print = OptionPrintSchema.parse({
+        ...rawPrint,
+        ...derived,
+        signal_pass: signalDecision.signalPass,
+        signal_reasons: signalDecision.signalReasons,
+        signal_profile: signalDecision.signalProfile
+      });
 
       try {
         await insertOptionPrint(clickhouse, print);
         await publishJson(js, SUBJECT_OPTION_PRINTS, print);
+        if (print.signal_pass) {
+          await publishJson(js, SUBJECT_OPTION_SIGNAL_PRINTS, print);
+        }
         logger.info("published option print", {
           trace_id: print.trace_id,
           seq: print.seq,
-          option_contract_id: print.option_contract_id
+          option_contract_id: print.option_contract_id,
+          signal_pass: print.signal_pass,
+          nbbo_side: print.nbbo_side,
+          notional: print.notional
         });
       } catch (error) {
         if (isExpectedShutdownError(error)) {
@@ -335,6 +422,14 @@ const run = async () => {
       }
 
       const nbbo = OptionNBBOSchema.parse(candidate);
+      const existing = latestNbboByContract.get(nbbo.option_contract_id);
+      if (
+        !existing ||
+        nbbo.ts > existing.ts ||
+        (nbbo.ts === existing.ts && nbbo.seq >= existing.seq)
+      ) {
+        latestNbboByContract.set(nbbo.option_contract_id, nbbo);
+      }
 
       try {
         await insertOptionNBBO(clickhouse, nbbo);

@@ -1,4 +1,5 @@
 import {
+  fetchRecentOptionPrints,
   fetchRecentAlerts,
   fetchRecentClassifierHits,
   fetchRecentEquityCandles,
@@ -7,9 +8,9 @@ import {
   fetchRecentFlowPackets,
   fetchRecentInferredDark,
   fetchRecentOptionNBBO,
-  fetchRecentOptionPrints,
   type ClickHouseClient
 } from "@islandflow/storage";
+import type { OptionPrintQueryFilters } from "@islandflow/storage";
 import {
   AlertEventSchema,
   ClassifierHitEventSchema,
@@ -22,8 +23,11 @@ import {
   InferredDarkEventSchema,
   LiveGenericChannel,
   LiveSubscription,
+  matchesFlowPacketFilters,
+  matchesOptionPrintFilters,
   OptionNBBOSchema,
   OptionPrintSchema,
+  type OptionFlowFilters,
   type Cursor,
   type EquityCandle,
   type EquityPrint,
@@ -124,7 +128,8 @@ const getGenericConfig = (limits: GenericLiveLimits): {
     limit: limits.options,
     parse: (value) => OptionPrintSchema.parse(value),
     cursor: (item) => ({ ts: item.ts, seq: item.seq }),
-    fetchRecent: fetchRecentOptionPrints
+    fetchRecent: (clickhouse, limit) =>
+      fetchRecentOptionPrints(clickhouse, limit, undefined, { view: "signal" })
   },
   nbbo: {
     redisKey: "live:nbbo",
@@ -279,6 +284,55 @@ export class LiveStateManager {
 
   async getSnapshot(subscription: LiveSubscription): Promise<FeedSnapshot<unknown>> {
     switch (subscription.channel) {
+      case "options": {
+        if (subscription.filters?.view === "raw") {
+          const storageFilters: OptionPrintQueryFilters = {
+            view: "raw",
+            security:
+              subscription.filters.securityTypes?.length === 1
+                ? subscription.filters.securityTypes[0]
+                : "all",
+            nbboSides: subscription.filters.nbboSides,
+            optionTypes: subscription.filters.optionTypes,
+            minNotional: subscription.filters.minNotional
+          };
+          const items = await fetchRecentOptionPrints(
+            this.clickhouse,
+            this.generic.options.limit,
+            undefined,
+            storageFilters
+          );
+          return {
+            subscription,
+            items,
+            watermark: items[0] ? { ts: items[0].ts, seq: items[0].seq } : null,
+            next_before: nextBeforeForItems(items, (item) => ({ ts: item.ts, seq: item.seq }))
+          };
+        }
+
+        const config = this.generic.options;
+        const items = (this.genericItems.get("options") ?? []).filter((item) =>
+          matchesOptionPrintFilters(item, subscription.filters)
+        );
+        return {
+          subscription,
+          items,
+          watermark: this.genericCursors.get(config.cursorField) ?? null,
+          next_before: nextBeforeForItems(items, config.cursor)
+        };
+      }
+      case "flow": {
+        const config = this.generic.flow;
+        const items = (this.genericItems.get("flow") ?? []).filter((item) =>
+          matchesFlowPacketFilters(item, subscription.filters)
+        );
+        return {
+          subscription,
+          items,
+          watermark: this.genericCursors.get(config.cursorField) ?? null,
+          next_before: nextBeforeForItems(items, config.cursor)
+        };
+      }
       case "equity-candles": {
         const key = candleRedisKey(subscription.underlying_id, subscription.interval_ms);
         const cursorField = candleCursorField(subscription.underlying_id, subscription.interval_ms);

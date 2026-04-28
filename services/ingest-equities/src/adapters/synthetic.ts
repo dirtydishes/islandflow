@@ -1,8 +1,14 @@
-import { SP500_SYMBOLS, type EquityPrint, type EquityQuote } from "@islandflow/types";
+import {
+  SP500_SYMBOLS,
+  type EquityPrint,
+  type EquityQuote,
+  type SyntheticMarketMode
+} from "@islandflow/types";
 import type { EquityIngestAdapter, EquityIngestHandlers } from "./types";
 
 type SyntheticEquitiesAdapterConfig = {
   emitIntervalMs: number;
+  mode: SyntheticMarketMode;
 };
 
 const EXCHANGES = ["NYSE", "NASDAQ", "ARCA", "BATS", "IEX", "TEST"];
@@ -22,10 +28,7 @@ const DARK_SEQUENCE: DarkScenario[] = [
   "sell",
   "sell"
 ];
-const SYNTHETIC_SYMBOLS = [
-  "SPY",
-  ...SP500_SYMBOLS.filter((symbol) => symbol !== "SPY")
-];
+const SYNTHETIC_SYMBOLS = ["SPY", ...(SP500_SYMBOLS as readonly string[])];
 
 const hashSymbol = (value: string): number => {
   let hash = 0;
@@ -124,6 +127,30 @@ const priceForPlacement = (
 export const createSyntheticEquitiesAdapter = (
   config: SyntheticEquitiesAdapterConfig
 ): EquityIngestAdapter => {
+  const profile =
+    config.mode === "firehose"
+      ? {
+          batchSize: 10,
+          darkEvery: true,
+          offExchangeMod: 2,
+          litSizeBase: 40,
+          litSizeRange: 1400
+        }
+      : config.mode === "active"
+        ? {
+            batchSize: 5,
+            darkEvery: true,
+            offExchangeMod: 4,
+            litSizeBase: 20,
+            litSizeRange: 900
+          }
+        : {
+            batchSize: 2,
+            darkEvery: false,
+            offExchangeMod: 8,
+            litSizeBase: 10,
+            litSizeRange: 300
+          };
   return {
     name: "synthetic",
     start: (handlers: EquityIngestHandlers) => {
@@ -140,7 +167,7 @@ export const createSyntheticEquitiesAdapter = (
         }
 
         const now = Date.now();
-        const batchSize = 3;
+        const batchSize = profile.batchSize;
 
         const darkSymbol = SYNTHETIC_SYMBOLS[darkSymbolIndex % SYNTHETIC_SYMBOLS.length];
         const darkHash = hashSymbol(darkSymbol);
@@ -151,44 +178,46 @@ export const createSyntheticEquitiesAdapter = (
         const scenario = DARK_SEQUENCE[darkStep % DARK_SEQUENCE.length];
         const darkTs = now;
 
-        if (handlers.onQuote) {
-          quoteSeq += 1;
-          const quoteEvent = buildSyntheticQuote(
-            quoteSeq,
-            darkTs - 2,
+        if (profile.darkEvery) {
+          if (handlers.onQuote) {
+            quoteSeq += 1;
+            const quoteEvent = buildSyntheticQuote(
+              quoteSeq,
+              darkTs - 2,
+              darkSymbol,
+              darkQuote.bid,
+              darkQuote.ask
+            );
+            void handlers.onQuote(quoteEvent);
+          }
+
+          seq += 1;
+          let darkPlacement: PricePlacement = "MID";
+          let darkSize = config.mode === "firehose" ? 4000 : 2600;
+          if (scenario === "buy") {
+            darkPlacement = darkStep % 2 === 0 ? "A" : "AA";
+            darkSize = config.mode === "firehose" ? 1500 : 800;
+          } else if (scenario === "sell") {
+            darkPlacement = darkStep % 2 === 0 ? "B" : "BB";
+            darkSize = config.mode === "firehose" ? 1500 : 800;
+          }
+          const darkPrice = priceForPlacement(darkMid, darkQuote, darkPlacement);
+          const darkPrint = buildSyntheticPrint(
+            seq,
+            darkTs,
             darkSymbol,
-            darkQuote.bid,
-            darkQuote.ask
+            darkPrice,
+            darkSize,
+            DARK_EXCHANGE,
+            true
           );
-          void handlers.onQuote(quoteEvent);
-        }
+          void handlers.onTrade(darkPrint);
 
-        seq += 1;
-        let darkPlacement: PricePlacement = "MID";
-        let darkSize = 2600;
-        if (scenario === "buy") {
-          darkPlacement = darkStep % 2 === 0 ? "A" : "AA";
-          darkSize = 800;
-        } else if (scenario === "sell") {
-          darkPlacement = darkStep % 2 === 0 ? "B" : "BB";
-          darkSize = 800;
-        }
-        const darkPrice = priceForPlacement(darkMid, darkQuote, darkPlacement);
-        const darkPrint = buildSyntheticPrint(
-          seq,
-          darkTs,
-          darkSymbol,
-          darkPrice,
-          darkSize,
-          DARK_EXCHANGE,
-          true
-        );
-        void handlers.onTrade(darkPrint);
-
-        darkStep += 1;
-        if (darkStep >= DARK_SEQUENCE.length) {
-          darkStep = 0;
-          darkSymbolIndex += 1;
+          darkStep += 1;
+          if (darkStep >= DARK_SEQUENCE.length) {
+            darkStep = 0;
+            darkSymbolIndex += 1;
+          }
         }
 
         for (let i = 0; i < batchSize; i += 1) {
@@ -201,9 +230,9 @@ export const createSyntheticEquitiesAdapter = (
           const placement: PricePlacement =
             seq % 11 === 0 ? "A" : seq % 13 === 0 ? "B" : "MID";
           const price = priceForPlacement(mid, quote, placement);
-          const size = 10 + (seq % 600);
+          const size = profile.litSizeBase + (seq % profile.litSizeRange);
           const exchange = EXCHANGES[(seq + symbolHash) % EXCHANGES.length];
-          const offExchangeFlag = (seq + i) % 6 === 0;
+          const offExchangeFlag = (seq + i) % profile.offExchangeMod === 0;
           const eventTs = now + i * 4;
 
           if (handlers.onQuote) {

@@ -5,10 +5,12 @@ import {
   SUBJECT_EQUITY_QUOTES,
   SUBJECT_OPTION_NBBO,
   SUBJECT_OPTION_PRINTS,
+  SUBJECT_OPTION_SIGNAL_PRINTS,
   STREAM_EQUITY_PRINTS,
   STREAM_EQUITY_QUOTES,
   STREAM_OPTION_NBBO,
   STREAM_OPTION_PRINTS,
+  STREAM_OPTION_SIGNAL_PRINTS,
   connectJetStreamWithRetry,
   ensureStream,
   publishJson
@@ -304,6 +306,9 @@ const run = async () => {
     const def = STREAM_DEFS[kind];
     await ensureStream(jsm, buildStreamConfig(def.streamName, def.subject));
   }
+  if (streamKinds.includes("options")) {
+    await ensureStream(jsm, buildStreamConfig(STREAM_OPTION_SIGNAL_PRINTS, SUBJECT_OPTION_SIGNAL_PRINTS));
+  }
 
   const clickhouse = createClickHouseClient({
     url: env.CLICKHOUSE_URL,
@@ -411,6 +416,9 @@ const run = async () => {
 
     try {
       await publishJson(js, stream.subject, event);
+      if (stream.kind === "options" && (event as OptionPrint).signal_pass) {
+        await publishJson(js, SUBJECT_OPTION_SIGNAL_PRINTS, event as OptionPrint);
+      }
     } catch (error) {
       logger.error("failed to publish replay event", {
         error: error instanceof Error ? error.message : String(error),

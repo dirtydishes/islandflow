@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { OptionNbboSideSchema, OptionTypeSchema, OptionsSignalModeSchema } from "./options-flow";
 
 export const EventMetaSchema = z.object({
   source_ts: z.number().int().nonnegative(),
@@ -16,7 +17,18 @@ export const OptionPrintSchema = EventMetaSchema.merge(
     price: z.number().nonnegative(),
     size: z.number().int().positive(),
     exchange: z.string().min(1),
-    conditions: z.array(z.string().min(1)).optional()
+    conditions: z.array(z.string().min(1)).optional(),
+    underlying_id: z.preprocess((value) => (value === null ? undefined : value), z.string().min(1).optional()),
+    option_type: z.preprocess((value) => (value === null ? undefined : value), OptionTypeSchema.optional()),
+    notional: z.preprocess((value) => (value === null ? undefined : value), z.number().nonnegative().optional()),
+    nbbo_side: z.preprocess((value) => (value === null ? undefined : value), OptionNbboSideSchema.optional()),
+    is_etf: z.preprocess((value) => (value === null ? undefined : value), z.boolean().optional()),
+    signal_pass: z.preprocess((value) => (value === null ? undefined : value), z.boolean().optional()),
+    signal_reasons: z.array(z.string().min(1)).optional(),
+    signal_profile: z.preprocess(
+      (value) => (value === null ? undefined : value),
+      OptionsSignalModeSchema.optional()
+    )
   })
 );
 

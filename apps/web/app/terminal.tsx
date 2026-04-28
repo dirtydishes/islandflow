@@ -24,8 +24,17 @@ import type {
   InferredDarkEvent,
   LiveServerMessage,
   LiveSubscription,
+  OptionFlowFilters,
+  OptionNbboSide,
+  OptionSecurityType,
+  OptionType,
   OptionNBBO,
   OptionPrint
+} from "@islandflow/types";
+import {
+  getSubscriptionKey as getLiveSubscriptionKey,
+  matchesFlowPacketFilters,
+  matchesOptionPrintFilters
 } from "@islandflow/types";
 import { createChart, type IChartApi, type SeriesMarker, type UTCTimestamp } from "lightweight-charts";
 
@@ -61,6 +70,7 @@ const PINNED_EVIDENCE_MAX_ITEMS = parseBoundedInt(
 const NBBO_MAX_AGE_MS = Number(process.env.NEXT_PUBLIC_NBBO_MAX_AGE_MS);
 const NBBO_MAX_AGE_MS_SAFE =
   Number.isFinite(NBBO_MAX_AGE_MS) && NBBO_MAX_AGE_MS > 0 ? NBBO_MAX_AGE_MS : 1000;
+const FLOW_FILTER_PRESET = process.env.NEXT_PUBLIC_FLOW_FILTER_PRESET ?? "smart-money";
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"]);
 const CANDLE_INTERVALS = [
   { label: "1m", ms: 60000 },
@@ -614,6 +624,33 @@ const getJoinBoolean = (join: EquityPrintJoin, key: string): boolean => {
 
 type NbboSide = "AA" | "A" | "B" | "BB";
 
+const DEFAULT_FLOW_SIDES: OptionNbboSide[] = ["AA", "A", "MID"];
+const DEFAULT_FLOW_OPTION_TYPES: OptionType[] = ["call", "put"];
+const DEFAULT_FLOW_SECURITY_TYPES: OptionSecurityType[] = ["stock"];
+
+const buildDefaultFlowFilters = (): OptionFlowFilters => ({
+  view: "signal",
+  securityTypes: DEFAULT_FLOW_SECURITY_TYPES,
+  nbboSides: DEFAULT_FLOW_SIDES,
+  optionTypes: DEFAULT_FLOW_OPTION_TYPES,
+  minNotional:
+    FLOW_FILTER_PRESET === "all"
+      ? undefined
+      : FLOW_FILTER_PRESET === "balanced"
+        ? 5_000
+        : undefined
+});
+
+const toggleFilterValue = <T extends string>(values: T[] | undefined, value: T, enabled: boolean): T[] => {
+  const current = new Set(values ?? []);
+  if (enabled) {
+    current.add(value);
+  } else {
+    current.delete(value);
+  }
+  return [...current].sort();
+};
+
 const classifyNbboSide = (price: number, quote: OptionNBBO | null | undefined): NbboSide | null => {
   if (!quote || !Number.isFinite(price)) {
     return null;
@@ -935,6 +972,7 @@ type TapeConfig<T> = {
   getReplayKey?: (item: T) => string | null;
   replaySourceKey?: string | null;
   onReplaySourceKey?: (key: string | null) => void;
+  queryParams?: Record<string, string | null | undefined>;
 };
 
 const useTape = <T extends SortableItem & { seq: number }>(
@@ -947,6 +985,7 @@ const useTape = <T extends SortableItem & { seq: number }>(
   const getReplayKey = config.getReplayKey ?? extractTracePrefix;
   const replaySourceKey = config.replaySourceKey ?? null;
   const onReplaySourceKey = config.onReplaySourceKey;
+  const queryParams = config.queryParams;
   const [status, setStatus] = useState<WsStatus>("connecting");
   const [items, setItems] = useState<T[]>([]);
   const [lastUpdate, setLastUpdate] = useState<number | null>(null);
@@ -1053,6 +1092,11 @@ const useTape = <T extends SortableItem & { seq: number }>(
       try {
         const url = new URL(buildApiUrl(latestPath));
         url.searchParams.set("limit", "1");
+        for (const [key, value] of Object.entries(queryParams ?? {})) {
+          if (value) {
+            url.searchParams.set(key, value);
+          }
+        }
         if (replaySourceKey) {
           url.searchParams.set("source", replaySourceKey);
         }
@@ -1076,7 +1120,7 @@ const useTape = <T extends SortableItem & { seq: number }>(
     return () => {
       active = false;
     };
-  }, [mode, latestPath, getItemTs, replaySourceKey]);
+  }, [mode, latestPath, getItemTs, replaySourceKey, queryParams]);
 
   useEffect(() => {
     if (mode !== "live" || config.liveEnabled === false) {
@@ -1196,6 +1240,11 @@ const useTape = <T extends SortableItem & { seq: number }>(
           url.searchParams.set("after_ts", cursor.ts.toString());
           url.searchParams.set("after_seq", cursor.seq.toString());
           url.searchParams.set("limit", batchSize.toString());
+          for (const [key, value] of Object.entries(queryParams ?? {})) {
+            if (value) {
+              url.searchParams.set(key, value);
+            }
+          }
           const desiredSource = replaySourceKey ?? replaySourceRef.current;
           if (desiredSource) {
             url.searchParams.set("source", desiredSource);
@@ -1309,7 +1358,8 @@ const useTape = <T extends SortableItem & { seq: number }>(
     getItemTs,
     getReplayKey,
     replaySourceKey,
-    onReplaySourceKey
+    onReplaySourceKey,
+    queryParams
   ]);
 
   return {
@@ -1589,21 +1639,11 @@ type LiveSessionState = {
   chartOverlay: EquityPrint[];
 };
 
-const getLiveSubscriptionKey = (subscription: LiveSubscription): string => {
-  switch (subscription.channel) {
-    case "equity-candles":
-      return `${subscription.channel}|${subscription.underlying_id}|${subscription.interval_ms}`;
-    case "equity-overlay":
-      return `${subscription.channel}|${subscription.underlying_id}`;
-    default:
-      return subscription.channel;
-  }
-};
-
 const getLiveManifest = (
   pathname: string,
   chartTicker: string,
-  chartIntervalMs: number
+  chartIntervalMs: number,
+  flowFilters: OptionFlowFilters
 ): LiveSubscription[] => {
   const chartSubs: LiveSubscription[] = [
     { channel: "equity-candles", underlying_id: chartTicker, interval_ms: chartIntervalMs },
@@ -1612,10 +1652,10 @@ const getLiveManifest = (
 
   if (pathname === "/tape") {
     return [
-      { channel: "options" },
+      { channel: "options", filters: flowFilters },
       { channel: "nbbo" },
       { channel: "equities" },
-      { channel: "flow" }
+      { channel: "flow", filters: flowFilters }
     ];
   }
 
@@ -1645,7 +1685,8 @@ const useLiveSession = (
   enabled: boolean,
   pathname: string,
   chartTicker: string,
-  chartIntervalMs: number
+  chartIntervalMs: number,
+  flowFilters: OptionFlowFilters
 ): LiveSessionState => {
   const [status, setStatus] = useState<WsStatus>(enabled ? "connecting" : "disconnected");
   const [lastUpdate, setLastUpdate] = useState<number | null>(null);
@@ -1664,8 +1705,8 @@ const useLiveSession = (
   const subscribedKeysRef = useRef<Set<string>>(new Set());
   const subscribedMapRef = useRef<Map<string, LiveSubscription>>(new Map());
   const manifest = useMemo(
-    () => getLiveManifest(pathname, chartTicker.toUpperCase(), chartIntervalMs),
-    [pathname, chartTicker, chartIntervalMs]
+    () => getLiveManifest(pathname, chartTicker.toUpperCase(), chartIntervalMs, flowFilters),
+    [pathname, chartTicker, chartIntervalMs, flowFilters]
   );
 
   useEffect(() => {
@@ -3079,6 +3120,7 @@ const useTerminalState = () => {
   const [selectedDarkEvent, setSelectedDarkEvent] = useState<InferredDarkEvent | null>(null);
   const [selectedClassifierHit, setSelectedClassifierHit] = useState<ClassifierHitEvent | null>(null);
   const [filterInput, setFilterInput] = useState<string>("");
+  const [flowFilters, setFlowFilters] = useState<OptionFlowFilters>(() => buildDefaultFlowFilters());
   const [chartIntervalMs, setChartIntervalMs] = useState<number>(CANDLE_INTERVALS[0].ms);
   const activeTickers = useMemo(() => {
     const parts = filterInput
@@ -3089,7 +3131,13 @@ const useTerminalState = () => {
   }, [filterInput]);
   const tickerSet = useMemo(() => new Set(activeTickers), [activeTickers]);
   const chartTicker = useMemo(() => activeTickers[0] ?? "SPY", [activeTickers]);
-  const liveSession = useLiveSession(mode === "live", pathname, chartTicker, chartIntervalMs);
+  const liveSession = useLiveSession(
+    mode === "live",
+    pathname,
+    chartTicker,
+    chartIntervalMs,
+    flowFilters
+  );
 
   const handleReplaySource = useCallback((value: string | null) => {
     setReplaySource(value);
@@ -3115,6 +3163,20 @@ const useTerminalState = () => {
     classifierScroll.isAtTopRef
   );
   const disableReplayGrouping = useCallback(() => null, []);
+  const optionQueryParams = useMemo<Record<string, string | undefined>>(
+    () => ({
+      view: flowFilters.view ?? "signal",
+      security:
+        flowFilters.securityTypes?.length === 1 ? flowFilters.securityTypes[0] : undefined,
+      side: flowFilters.nbboSides?.length ? flowFilters.nbboSides.join(",") : undefined,
+      type: flowFilters.optionTypes?.length ? flowFilters.optionTypes.join(",") : undefined,
+      min_notional:
+        typeof flowFilters.minNotional === "number"
+          ? String(flowFilters.minNotional)
+          : undefined
+    }),
+    [flowFilters]
+  );
 
   const options = useTape<OptionPrint>({
     mode,
@@ -3128,7 +3190,8 @@ const useTerminalState = () => {
     captureScroll: optionsAnchor.capture,
     onNewItems: optionsScroll.onNewItems,
     getReplayKey: extractReplaySource,
-    onReplaySourceKey: handleReplaySource
+    onReplaySourceKey: handleReplaySource,
+    queryParams: optionQueryParams
   });
 
   const equities = useTape<EquityPrint>({
@@ -3672,13 +3735,16 @@ const useTerminalState = () => {
   );
 
   const filteredOptions = useMemo(() => {
-    if (tickerSet.size === 0) {
-      return optionsFeed.items;
-    }
-    return optionsFeed.items.filter((print) =>
-      matchesTicker(extractUnderlying(normalizeContractId(print.option_contract_id)))
-    );
-  }, [optionsFeed.items, matchesTicker, tickerSet]);
+    return optionsFeed.items.filter((print) => {
+      if (!matchesOptionPrintFilters(print, flowFilters)) {
+        return false;
+      }
+      if (tickerSet.size === 0) {
+        return true;
+      }
+      return matchesTicker(extractUnderlying(normalizeContractId(print.option_contract_id)));
+    });
+  }, [flowFilters, optionsFeed.items, matchesTicker, tickerSet]);
 
   const filteredEquities = useMemo(() => {
     if (tickerSet.size === 0) {
@@ -3698,13 +3764,16 @@ const useTerminalState = () => {
   }, [resolvedEquityJoinMap, equityPrintMap, inferredDarkFeed.items, matchesTicker, tickerSet]);
 
   const filteredFlow = useMemo(() => {
-    if (tickerSet.size === 0) {
-      return flowFeed.items;
-    }
-    return flowFeed.items.filter((packet) =>
-      matchesTicker(extractUnderlying(extractPacketContract(packet)))
-    );
-  }, [flowFeed.items, extractPacketContract, matchesTicker, tickerSet]);
+    return flowFeed.items.filter((packet) => {
+      if (!matchesFlowPacketFilters(packet, flowFilters)) {
+        return false;
+      }
+      if (tickerSet.size === 0) {
+        return true;
+      }
+      return matchesTicker(extractUnderlying(extractPacketContract(packet)));
+    });
+  }, [flowFeed.items, flowFilters, extractPacketContract, matchesTicker, tickerSet]);
 
   const filteredAlerts = useMemo(() => {
     if (tickerSet.size === 0) {
@@ -4000,6 +4069,8 @@ const useTerminalState = () => {
     setSelectedClassifierHit,
     filterInput,
     setFilterInput,
+    flowFilters,
+    setFlowFilters,
     chartIntervalMs,
     setChartIntervalMs,
     optionsScroll,
@@ -4084,6 +4155,101 @@ const PageFrame = ({ title, actions, children }: PageFrameProps) => {
         {actions ? <div className="page-actions">{actions}</div> : null}
       </header>
       {children}
+    </div>
+  );
+};
+
+const FlowFilterControls = () => {
+  const state = useTerminal();
+  const filters = state.flowFilters;
+
+  const toggleSecurity = (value: OptionSecurityType, enabled: boolean) => {
+    state.setFlowFilters((prev) => ({
+      ...prev,
+      securityTypes: toggleFilterValue(prev.securityTypes, value, enabled)
+    }));
+  };
+
+  const toggleSide = (value: OptionNbboSide, enabled: boolean) => {
+    state.setFlowFilters((prev) => ({
+      ...prev,
+      nbboSides: toggleFilterValue(prev.nbboSides, value, enabled)
+    }));
+  };
+
+  const toggleOptionType = (value: OptionType, enabled: boolean) => {
+    state.setFlowFilters((prev) => ({
+      ...prev,
+      optionTypes: toggleFilterValue(prev.optionTypes, value, enabled)
+    }));
+  };
+
+  const applyMinNotional = (value: number | undefined) => {
+    state.setFlowFilters((prev) => ({
+      ...prev,
+      minNotional: value
+    }));
+  };
+
+  return (
+    <div className="flow-filter-panel">
+      <div className="flow-filter-group">
+        <span className="flow-filter-label">Security</span>
+        {(["stock", "etf"] as OptionSecurityType[]).map((value) => (
+          <label className="flow-filter-check" key={value}>
+            <input
+              type="checkbox"
+              checked={(filters.securityTypes ?? []).includes(value)}
+              onChange={(event) => toggleSecurity(value, event.target.checked)}
+            />
+            <span>{value.toUpperCase()}</span>
+          </label>
+        ))}
+      </div>
+      <div className="flow-filter-group">
+        <span className="flow-filter-label">Side</span>
+        {(["AA", "A", "MID", "B", "BB"] as OptionNbboSide[]).map((value) => (
+          <label className="flow-filter-check" key={value}>
+            <input
+              type="checkbox"
+              checked={(filters.nbboSides ?? []).includes(value)}
+              onChange={(event) => toggleSide(value, event.target.checked)}
+            />
+            <span>{value}</span>
+          </label>
+        ))}
+      </div>
+      <div className="flow-filter-group">
+        <span className="flow-filter-label">Type</span>
+        {(["call", "put"] as OptionType[]).map((value) => (
+          <label className="flow-filter-check" key={value}>
+            <input
+              type="checkbox"
+              checked={(filters.optionTypes ?? []).includes(value)}
+              onChange={(event) => toggleOptionType(value, event.target.checked)}
+            />
+            <span>{value}</span>
+          </label>
+        ))}
+      </div>
+      <div className="flow-filter-group">
+        <span className="flow-filter-label">Min Notional</span>
+        {[
+          { label: "All signal", value: undefined },
+          { label: ">= 25k", value: 25_000 },
+          { label: ">= 50k", value: 50_000 },
+          { label: ">= 100k", value: 100_000 }
+        ].map((preset) => (
+          <button
+            className={`filter-chip ${filters.minNotional === preset.value ? "is-active" : ""}`}
+            key={preset.label}
+            type="button"
+            onClick={() => applyMinNotional(preset.value)}
+          >
+            {preset.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 };
@@ -4250,8 +4416,8 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
             const nbboAge = quote ? Math.abs(print.ts - quote.ts) : null;
             const nbboStale = nbboAge !== null && nbboAge > NBBO_MAX_AGE_MS_SAFE;
             const nbboMid = quote ? (quote.bid + quote.ask) / 2 : null;
-            const nbboSide = classifyNbboSide(print.price, quote);
-            const notional = print.price * print.size * 100;
+            const nbboSide = print.nbbo_side ?? classifyNbboSide(print.price, quote);
+            const notional = print.notional ?? print.price * print.size * 100;
 
             return (
               <div className="row" key={`${print.trace_id}-${print.seq}`}>
@@ -4295,11 +4461,13 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
                           </span>
                         </span>
                       ) : null}
-                      {nbboStale ? <span className="pill nbbo-stale">Stale</span> : null}
+                      {print.nbbo_side === "STALE" || nbboStale ? <span className="pill nbbo-stale">Stale</span> : null}
                     </div>
                   ) : (
                     <div className="meta nbbo-meta">
-                      <span className="pill nbbo-missing">NBBO missing</span>
+                      <span className="pill nbbo-missing">
+                        {print.nbbo_side === "STALE" ? "NBBO stale" : "NBBO missing"}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -5051,7 +5219,7 @@ export function OverviewRoute() {
 
 export function TapeRoute() {
   return (
-    <PageFrame title="Tape">
+    <PageFrame title="Tape" actions={<FlowFilterControls />}>
       <div className="page-grid page-grid-tape">
         <OptionsPane />
         <EquitiesPane />

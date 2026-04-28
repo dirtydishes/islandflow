@@ -20,11 +20,14 @@ import type {
   InferredDarkEvent,
   FlowPacket,
   OptionNBBO,
-  OptionPrint
+  OptionPrint,
+  OptionFlowFilters,
+  OptionFlowView
 } from "@islandflow/types";
 import {
   normalizeOptionPrint,
   optionPrintsTableDDL,
+  optionPrintsTableMigrations,
   OPTION_PRINTS_TABLE
 } from "./option-prints";
 import { normalizeOptionNBBO, optionNBBOTableDDL, OPTION_NBBO_TABLE } from "./option-nbbo";
@@ -221,6 +224,9 @@ export const ensureOptionPrintsTable = async (
   await client.exec({
     query: optionPrintsTableDDL()
   });
+  for (const query of optionPrintsTableMigrations()) {
+    await client.exec({ query });
+  }
 };
 
 export const ensureOptionNBBOTable = async (
@@ -499,17 +505,76 @@ const normalizeNumericFields = (
 
 const normalizeOptionRow = (row: unknown): unknown => {
   if (row && typeof row === "object") {
-    return normalizeNumericFields(row as Record<string, unknown>, [
+    const record = normalizeNumericFields(row as Record<string, unknown>, [
       "source_ts",
       "ingest_ts",
       "seq",
       "ts",
       "price",
-      "size"
+      "size",
+      "notional"
     ]);
+
+    if ("is_etf" in record) {
+      record.is_etf = Boolean(record.is_etf);
+    }
+    if ("signal_pass" in record) {
+      record.signal_pass = Boolean(record.signal_pass);
+    }
+    if (record.signal_reasons == null) {
+      record.signal_reasons = [];
+    }
+    return record;
   }
 
   return row;
+};
+
+export type OptionPrintQueryFilters = {
+  view?: OptionFlowView;
+  minNotional?: number;
+  security?: "stock" | "etf" | "all";
+  optionTypes?: string[];
+  nbboSides?: string[];
+};
+
+const buildOptionPrintFilterConditions = (
+  filters: OptionPrintQueryFilters | undefined,
+  tracePrefix: string | undefined
+): string[] => {
+  const conditions: string[] = [];
+  const traceCondition = buildTracePrefixCondition(tracePrefix);
+  if (traceCondition) {
+    conditions.push(traceCondition);
+  }
+
+  if (!filters) {
+    return conditions;
+  }
+
+  if ((filters.view ?? "signal") === "signal") {
+    conditions.push("signal_pass = 1");
+  }
+
+  if (typeof filters.minNotional === "number" && Number.isFinite(filters.minNotional)) {
+    conditions.push(`notional >= ${filters.minNotional}`);
+  }
+
+  if (filters.security === "stock") {
+    conditions.push("(is_etf = 0 OR is_etf IS NULL)");
+  } else if (filters.security === "etf") {
+    conditions.push("is_etf = 1");
+  }
+
+  if (filters.optionTypes && filters.optionTypes.length > 0) {
+    conditions.push(`option_type IN (${buildStringList(filters.optionTypes)})`);
+  }
+
+  if (filters.nbboSides && filters.nbboSides.length > 0) {
+    conditions.push(`nbbo_side IN (${buildStringList(filters.nbboSides)})`);
+  }
+
+  return conditions;
 };
 
 const normalizeOptionNbboRow = (row: unknown): unknown => {
@@ -683,11 +748,12 @@ const normalizeAlertRow = (row: unknown): AlertRecord | null => {
 export const fetchRecentOptionPrints = async (
   client: ClickHouseClient,
   limit: number,
-  tracePrefix?: string
+  tracePrefix?: string,
+  filters?: OptionPrintQueryFilters
 ): Promise<OptionPrint[]> => {
   const safeLimit = clampLimit(limit);
-  const condition = buildTracePrefixCondition(tracePrefix);
-  const whereClause = condition ? ` WHERE ${condition}` : "";
+  const conditions = buildOptionPrintFilterConditions(filters, tracePrefix);
+  const whereClause = conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")}` : "";
   const result = await client.query({
     query: `SELECT * FROM ${OPTION_PRINTS_TABLE}${whereClause} ORDER BY ts DESC, seq DESC LIMIT ${safeLimit}`,
     format: "JSONEachRow"
@@ -855,16 +921,19 @@ export const fetchOptionPrintsAfter = async (
   afterTs: number,
   afterSeq: number,
   limit: number,
-  tracePrefix?: string
+  tracePrefix?: string,
+  filters?: OptionPrintQueryFilters
 ): Promise<OptionPrint[]> => {
   const safeLimit = clampLimit(limit);
   const safeAfterTs = clampCursor(afterTs);
   const safeAfterSeq = clampCursor(afterSeq);
-  const traceCondition = buildTracePrefixCondition(tracePrefix);
-  const traceClause = traceCondition ? ` AND ${traceCondition}` : "";
+  const conditions = [
+    `((ts, seq) > (${safeAfterTs}, ${safeAfterSeq}))`,
+    ...buildOptionPrintFilterConditions(filters, tracePrefix)
+  ];
 
   const result = await client.query({
-    query: `SELECT * FROM ${OPTION_PRINTS_TABLE} WHERE (ts, seq) > (${safeAfterTs}, ${safeAfterSeq})${traceClause} ORDER BY ts ASC, seq ASC LIMIT ${safeLimit}`,
+    query: `SELECT * FROM ${OPTION_PRINTS_TABLE} WHERE ${conditions.join(" AND ")} ORDER BY ts ASC, seq ASC LIMIT ${safeLimit}`,
     format: "JSONEachRow"
   });
 
@@ -1122,14 +1191,14 @@ export const fetchOptionPrintsBefore = async (
   beforeTs: number,
   beforeSeq: number,
   limit: number,
-  tracePrefix?: string
+  tracePrefix?: string,
+  filters?: OptionPrintQueryFilters
 ): Promise<OptionPrint[]> => {
   const safeLimit = clampLimit(limit);
-  const conditions = [buildBeforeTupleCondition("ts", "seq", beforeTs, beforeSeq)];
-  const traceCondition = buildTracePrefixCondition(tracePrefix);
-  if (traceCondition) {
-    conditions.push(traceCondition);
-  }
+  const conditions = [
+    buildBeforeTupleCondition("ts", "seq", beforeTs, beforeSeq),
+    ...buildOptionPrintFilterConditions(filters, tracePrefix)
+  ];
 
   const result = await client.query({
     query: `SELECT * FROM ${OPTION_PRINTS_TABLE} WHERE ${conditions.join(" AND ")} ORDER BY ts DESC, seq DESC LIMIT ${safeLimit}`,

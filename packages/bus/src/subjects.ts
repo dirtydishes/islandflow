@@ -1,5 +1,7 @@
 export const STREAM_OPTION_PRINTS = "OPTIONS_PRINTS";
 export const SUBJECT_OPTION_PRINTS = "options.prints";
+export const STREAM_OPTION_SIGNAL_PRINTS = "OPTIONS_SIGNAL_PRINTS";
+export const SUBJECT_OPTION_SIGNAL_PRINTS = "options.prints.signal";
 export const STREAM_OPTION_NBBO = "OPTIONS_NBBO";
 export const SUBJECT_OPTION_NBBO = "options.nbbo";
 export const STREAM_EQUITY_PRINTS = "EQUITY_PRINTS";

@@ -10,6 +10,10 @@ import {
   OptionNBBOSchema,
   OptionPrintSchema
 } from "./events";
+import {
+  OptionFlowFiltersSchema,
+  optionFlowFilterKey
+} from "./options-flow";
 
 export const CursorSchema = z.object({
   ts: z.number().int().nonnegative(),
@@ -47,7 +51,15 @@ export type LiveGenericChannel = z.infer<typeof LiveGenericChannelSchema>;
 
 export const LiveSubscriptionSchema = z.discriminatedUnion("channel", [
   z.object({
-    channel: LiveGenericChannelSchema
+    channel: z.literal("options"),
+    filters: OptionFlowFiltersSchema.optional()
+  }),
+  z.object({
+    channel: z.literal("flow"),
+    filters: OptionFlowFiltersSchema.optional()
+  }),
+  z.object({
+    channel: z.enum(["nbbo", "equities", "equity-joins", "classifier-hits", "alerts", "inferred-dark"])
   }),
   z.object({
     channel: z.literal("equity-candles"),
@@ -165,6 +177,9 @@ export type LiveServerMessage = z.infer<typeof LiveServerMessageSchema>;
 
 export const getSubscriptionKey = (subscription: LiveSubscription): string => {
   switch (subscription.channel) {
+    case "options":
+    case "flow":
+      return `${subscription.channel}|${optionFlowFilterKey(subscription.filters)}`;
     case "equity-candles":
       return `${subscription.channel}|${subscription.underlying_id}|${subscription.interval_ms}`;
     case "equity-overlay":

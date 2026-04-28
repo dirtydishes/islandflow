@@ -8,7 +8,21 @@ import {
 
 describe("live protocol types", () => {
   it("builds stable keys for generic and parameterized subscriptions", () => {
-    expect(getSubscriptionKey({ channel: "flow" })).toBe("flow");
+    expect(getSubscriptionKey({ channel: "flow" })).toBe("flow|{}");
+    expect(
+      getSubscriptionKey({
+        channel: "options",
+        filters: {
+          view: "signal",
+          securityTypes: ["stock"],
+          nbboSides: ["A", "AA"],
+          optionTypes: ["call", "put"],
+          minNotional: 25000
+        }
+      })
+    ).toBe(
+      'options|{"view":"signal","securityTypes":["stock"],"nbboSides":["A","AA"],"optionTypes":["call","put"],"minNotional":25000}'
+    );
     expect(
       getSubscriptionKey({
         channel: "equity-candles",
@@ -25,7 +39,7 @@ describe("live protocol types", () => {
     const parsed = LiveClientMessageSchema.parse({
       op: "subscribe",
       subscriptions: [
-        { channel: "flow" },
+        { channel: "flow", filters: { nbboSides: ["AA", "A"], minNotional: 50000 } },
         { channel: "equity-candles", underlying_id: "SPY", interval_ms: 60000 }
       ]
     });

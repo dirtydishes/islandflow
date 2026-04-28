@@ -1,8 +1,14 @@
-import { SP500_SYMBOLS, type OptionNBBO, type OptionPrint } from "@islandflow/types";
+import {
+  SP500_SYMBOLS,
+  type OptionNBBO,
+  type OptionPrint,
+  type SyntheticMarketMode
+} from "@islandflow/types";
 import type { OptionIngestAdapter, OptionIngestHandlers } from "./types";
 
 type SyntheticOptionsAdapterConfig = {
   emitIntervalMs: number;
+  mode: SyntheticMarketMode;
 };
 
 type Burst = {
@@ -17,17 +23,18 @@ type Burst = {
   seed: number;
 };
 
-const SYNTHETIC_SYMBOLS = [
-  "SPY",
-  ...SP500_SYMBOLS.filter((symbol) => symbol !== "SPY")
-];
+const SYNTHETIC_SYMBOLS = ["SPY", ...(SP500_SYMBOLS as readonly string[])];
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const EXPIRY_OFFSETS = [0, 1, 7, 14, 28, 45, 60, 90];
 const EXCHANGES = ["CBOE", "PHLX", "ISE", "ARCA", "BOX", "MIAX"];
 const CONDITIONS = ["SWEEP", "ISO", "FILL", "TEST"];
-const BURST_RUN_RANGE: [number, number] = [2, 4];
+type SyntheticOptionsProfile = {
+  burstRunRange: [number, number];
+  scenarios: Scenario[];
+  pricePlacements: Record<string, WeightedValue<PricePlacement>[]>;
+};
 
-type PricePlacement = "AA" | "A" | "B" | "BB";
+type PricePlacement = "AA" | "A" | "MID" | "B" | "BB";
 
 type WeightedValue<T> = {
   value: T;
@@ -45,7 +52,70 @@ type Scenario = {
   conditions?: string[];
 };
 
-const SCENARIOS: Scenario[] = [
+const REALISTIC_SCENARIOS: Scenario[] = [
+  {
+    id: "ask_lift",
+    weight: 18,
+    right: "either",
+    countRange: [1, 2],
+    sizeRange: [30, 180],
+    premiumRange: [9_000, 35_000],
+    priceTrend: "flat",
+    conditions: ["FILL"]
+  },
+  {
+    id: "mid_block",
+    weight: 14,
+    right: "either",
+    countRange: [1, 2],
+    sizeRange: [120, 480],
+    premiumRange: [12_000, 45_000],
+    priceTrend: "flat",
+    conditions: ["FILL"]
+  },
+  {
+    id: "bullish_sweep",
+    weight: 8,
+    right: "C",
+    countRange: [2, 3],
+    sizeRange: [180, 520],
+    premiumRange: [25_000, 90_000],
+    priceTrend: "up",
+    conditions: ["SWEEP"]
+  },
+  {
+    id: "bearish_sweep",
+    weight: 8,
+    right: "P",
+    countRange: [2, 3],
+    sizeRange: [180, 520],
+    premiumRange: [25_000, 90_000],
+    priceTrend: "up",
+    conditions: ["SWEEP"]
+  },
+  {
+    id: "contract_spike",
+    weight: 6,
+    right: "either",
+    countRange: [2, 3],
+    sizeRange: [500, 900],
+    premiumRange: [18_000, 70_000],
+    priceTrend: "flat",
+    conditions: ["ISO"]
+  },
+  {
+    id: "noise",
+    weight: 46,
+    right: "either",
+    countRange: [1, 2],
+    sizeRange: [5, 60],
+    premiumRange: [500, 6_000],
+    priceTrend: "flat",
+    conditions: ["FILL"]
+  }
+];
+
+const ACTIVE_SCENARIOS: Scenario[] = [
   {
     id: "bullish_sweep",
     weight: 35,
@@ -88,7 +158,50 @@ const SCENARIOS: Scenario[] = [
   }
 ];
 
-const PRICE_PLACEMENTS: Record<string, WeightedValue<PricePlacement>[]> = {
+const REALISTIC_PRICE_PLACEMENTS: Record<string, WeightedValue<PricePlacement>[]> = {
+  ask_lift: [
+    { value: "A", weight: 45 },
+    { value: "AA", weight: 20 },
+    { value: "MID", weight: 25 },
+    { value: "B", weight: 8 },
+    { value: "BB", weight: 2 }
+  ],
+  mid_block: [
+    { value: "MID", weight: 60 },
+    { value: "A", weight: 20 },
+    { value: "B", weight: 20 }
+  ],
+  bullish_sweep: [
+    { value: "AA", weight: 20 },
+    { value: "A", weight: 50 },
+    { value: "MID", weight: 15 },
+    { value: "B", weight: 10 },
+    { value: "BB", weight: 5 }
+  ],
+  bearish_sweep: [
+    { value: "AA", weight: 10 },
+    { value: "A", weight: 20 },
+    { value: "MID", weight: 15 },
+    { value: "B", weight: 35 },
+    { value: "BB", weight: 20 }
+  ],
+  contract_spike: [
+    { value: "A", weight: 25 },
+    { value: "MID", weight: 40 },
+    { value: "B", weight: 25 },
+    { value: "AA", weight: 5 },
+    { value: "BB", weight: 5 }
+  ],
+  noise: [
+    { value: "MID", weight: 40 },
+    { value: "A", weight: 20 },
+    { value: "B", weight: 20 },
+    { value: "AA", weight: 10 },
+    { value: "BB", weight: 10 }
+  ]
+};
+
+const ACTIVE_PRICE_PLACEMENTS: Record<string, WeightedValue<PricePlacement>[]> = {
   bullish_sweep: [
     { value: "AA", weight: 25 },
     { value: "A", weight: 40 },
@@ -115,7 +228,52 @@ const PRICE_PLACEMENTS: Record<string, WeightedValue<PricePlacement>[]> = {
   ]
 };
 
-const PLACEMENT_PATTERN: PricePlacement[] = ["A", "AA", "B", "BB"];
+const FIREHOSE_PRICE_PLACEMENTS: Record<string, WeightedValue<PricePlacement>[]> = {
+  ...ACTIVE_PRICE_PLACEMENTS,
+  noise: [
+    { value: "A", weight: 20 },
+    { value: "AA", weight: 20 },
+    { value: "MID", weight: 20 },
+    { value: "B", weight: 20 },
+    { value: "BB", weight: 20 }
+  ]
+};
+
+const PLACEMENT_PATTERN: PricePlacement[] = ["A", "AA", "MID", "B", "BB"];
+
+const SYNTHETIC_PROFILES: Record<SyntheticMarketMode, SyntheticOptionsProfile> = {
+  realistic: {
+    burstRunRange: [1, 2],
+    scenarios: REALISTIC_SCENARIOS,
+    pricePlacements: REALISTIC_PRICE_PLACEMENTS
+  },
+  active: {
+    burstRunRange: [2, 4],
+    scenarios: ACTIVE_SCENARIOS,
+    pricePlacements: ACTIVE_PRICE_PLACEMENTS
+  },
+  firehose: {
+    burstRunRange: [4, 7],
+    scenarios: ACTIVE_SCENARIOS.map((scenario): Scenario =>
+      scenario.id === "noise"
+        ? {
+            ...scenario,
+            weight: 20,
+            countRange: [5, 8],
+            sizeRange: [20, 300],
+            premiumRange: [800, 12_000]
+          }
+        : {
+            ...scenario,
+            weight: scenario.weight + 10,
+            countRange: [scenario.countRange[0] + 2, scenario.countRange[1] + 3],
+            sizeRange: [scenario.sizeRange[0], scenario.sizeRange[1] * 2],
+            premiumRange: [scenario.premiumRange[0], scenario.premiumRange[1] * 1.5]
+          }
+    ),
+    pricePlacements: FIREHOSE_PRICE_PLACEMENTS
+  }
+};
 
 const pick = <T,>(items: T[], seed: number): T => {
   return items[Math.abs(seed) % items.length];
@@ -153,8 +311,12 @@ const pickWeightedValue = <T>(items: WeightedValue<T>[], seed: number): T => {
   return pickWeighted(items, seed).value;
 };
 
-const pickPlacement = (burst: Burst, index: number): PricePlacement => {
-  const placementOptions = PRICE_PLACEMENTS[burst.scenarioId] ?? PRICE_PLACEMENTS.noise;
+const pickPlacement = (
+  burst: Burst,
+  index: number,
+  profile: SyntheticOptionsProfile
+): PricePlacement => {
+  const placementOptions = profile.pricePlacements[burst.scenarioId] ?? profile.pricePlacements.noise;
   const offset = Math.abs(burst.seed) % PLACEMENT_PATTERN.length;
   if (index < PLACEMENT_PATTERN.length) {
     return PLACEMENT_PATTERN[(offset + index) % PLACEMENT_PATTERN.length];
@@ -180,11 +342,11 @@ const formatExpiry = (now: number, offsetDays: number): string => {
   return expiryDate.toISOString().slice(0, 10);
 };
 
-const buildBurst = (burstIndex: number, now: number): Burst => {
+const buildBurst = (burstIndex: number, now: number, profile: SyntheticOptionsProfile): Burst => {
   const symbol = SYNTHETIC_SYMBOLS[burstIndex % SYNTHETIC_SYMBOLS.length];
   const symbolHash = hashSymbol(symbol);
   const seed = symbolHash + burstIndex * 7;
-  const scenario = pickWeighted(SCENARIOS, seed);
+  const scenario = pickWeighted(profile.scenarios, seed);
   const baseUnderlying = 30 + (symbolHash % 470);
   const expiryOffset = pick(EXPIRY_OFFSETS, symbolHash + burstIndex);
   const expiry = formatExpiry(now, expiryOffset);
@@ -231,6 +393,7 @@ const buildBurst = (burstIndex: number, now: number): Burst => {
 export const createSyntheticOptionsAdapter = (
   config: SyntheticOptionsAdapterConfig
 ): OptionIngestAdapter => {
+  const profile = SYNTHETIC_PROFILES[config.mode];
   return {
     name: "synthetic",
     start: (handlers: OptionIngestHandlers) => {
@@ -250,8 +413,12 @@ export const createSyntheticOptionsAdapter = (
         const now = Date.now();
         if (!currentBurst || remainingRuns <= 0) {
           burstIndex += 1;
-          currentBurst = buildBurst(burstIndex, now);
-          remainingRuns = pickInt(BURST_RUN_RANGE[0], BURST_RUN_RANGE[1], burstIndex * 23);
+          currentBurst = buildBurst(burstIndex, now, profile);
+          remainingRuns = pickInt(
+            profile.burstRunRange[0],
+            profile.burstRunRange[1],
+            burstIndex * 23
+          );
         }
 
         const burst = currentBurst;
@@ -267,13 +434,15 @@ export const createSyntheticOptionsAdapter = (
           const bid = Math.max(0.01, Number((mid - spread / 2).toFixed(2)));
           const ask = Math.max(bid + 0.01, Number((mid + spread / 2).toFixed(2)));
           const tick = Math.max(0.01, Number((spread * 0.25).toFixed(2)));
-          const placement = pickPlacement(burst, i);
+          const placement = pickPlacement(burst, i, profile);
           let tradePrice = mid;
 
           if (placement === "AA") {
             tradePrice = ask + tick;
           } else if (placement === "A") {
             tradePrice = ask;
+          } else if (placement === "MID") {
+            tradePrice = mid;
           } else if (placement === "BB") {
             tradePrice = Math.max(0.01, bid - tick);
           } else {
