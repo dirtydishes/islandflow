@@ -99,7 +99,7 @@ import {
 } from "@islandflow/types";
 import { createClient } from "redis";
 import { z } from "zod";
-import { LiveStateManager } from "./live";
+import { LiveStateManager, isLiveItemFresh } from "./live";
 
 const service = "api";
 const logger = createLogger({ service });
@@ -860,6 +860,16 @@ const run = async () => {
     item: unknown,
     ingestChannel: "options" | "nbbo" | "equities" | "equity-candles" | "equity-overlay" | "equity-joins" | "flow" | "classifier-hits" | "alerts" | "inferred-dark"
   ) => {
+    if (
+      (ingestChannel === "options" ||
+        ingestChannel === "nbbo" ||
+        ingestChannel === "equities" ||
+        ingestChannel === "flow") &&
+      !isLiveItemFresh(ingestChannel, item)
+    ) {
+      return;
+    }
+
     const watermark = await liveState.ingest(ingestChannel, item);
     const matchingSubscriptions =
       subscription.channel === "options" || subscription.channel === "flow"

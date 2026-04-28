@@ -65,7 +65,7 @@ type GenericFeedConfig = {
   fetchRecent: (clickhouse: ClickHouseClient, limit: number) => Promise<any[]>;
 };
 
-const LIVE_FRESHNESS_THRESHOLDS: Partial<Record<LiveGenericChannel, number>> = {
+export const LIVE_FRESHNESS_THRESHOLDS: Partial<Record<LiveGenericChannel, number>> = {
   options: 15_000,
   nbbo: 15_000,
   equities: 15_000,
@@ -259,6 +259,22 @@ const extractFreshnessTs = (channel: LiveGenericChannel, item: any): number | nu
   }
 };
 
+export const isLiveItemFresh = (
+  channel: LiveGenericChannel,
+  item: unknown,
+  now = Date.now()
+): boolean => {
+  const thresholdMs = LIVE_FRESHNESS_THRESHOLDS[channel];
+  if (!thresholdMs) {
+    return true;
+  }
+  const ts = extractFreshnessTs(channel, item);
+  if (ts === null) {
+    return false;
+  }
+  return now - ts <= thresholdMs;
+};
+
 const filterFreshGenericItems = <T>(
   channel: LiveGenericChannel,
   items: T[],
@@ -269,13 +285,7 @@ const filterFreshGenericItems = <T>(
     return items;
   }
 
-  return items.filter((item) => {
-    const ts = extractFreshnessTs(channel, item);
-    if (ts === null) {
-      return false;
-    }
-    return now - ts <= thresholdMs;
-  });
+  return items.filter((item) => isLiveItemFresh(channel, item, now));
 };
 
 const nextBeforeForItems = <T>(items: T[], cursorOf: (item: T) => Cursor): Cursor | null => {
@@ -503,6 +513,9 @@ export class LiveStateManager {
       default: {
         const config = this.generic[channel];
         const parsed = config.parse(item);
+        if (!isLiveItemFresh(channel, parsed)) {
+          return this.genericCursors.get(config.cursorField) ?? null;
+        }
         const items = this.genericItems.get(channel) ?? [];
         const next = normalizeGenericItems(channel, [parsed, ...items], config);
         this.genericItems.set(channel, next);

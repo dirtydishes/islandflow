@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import type { ClickHouseClient } from "@islandflow/storage";
-import { LiveStateManager, resolveGenericLiveLimits } from "../src/live";
+import { LiveStateManager, isLiveItemFresh, resolveGenericLiveLimits } from "../src/live";
 
 const makeClickHouse = (): ClickHouseClient =>
   ({
@@ -474,5 +474,32 @@ describe("LiveStateManager", () => {
       ["AAPL-2025-01-17-200-C", "nbbo-latest"],
       ["MSFT-2025-01-17-300-C", "nbbo-other"]
     ]);
+  });
+
+  it("rejects stale ingest for freshness-gated channels", async () => {
+    const manager = new LiveStateManager(makeClickHouse(), null);
+    const now = Date.now();
+
+    await manager.ingest("equities", {
+      source_ts: now - 60_000,
+      ingest_ts: now - 59_999,
+      seq: 1,
+      trace_id: "eq-stale",
+      ts: now - 60_000,
+      underlying_id: "AAPL",
+      price: 100,
+      size: 10,
+      exchange: "X",
+      offExchangeFlag: false
+    });
+
+    const snapshot = await manager.getSnapshot({ channel: "equities" });
+    expect(snapshot.items).toHaveLength(0);
+  });
+
+  it("exposes freshness helper for event fanout gating", () => {
+    expect(isLiveItemFresh("options", { ts: 1000 }, 1010)).toBe(true);
+    expect(isLiveItemFresh("options", { ts: 1000 }, 20_001)).toBe(false);
+    expect(isLiveItemFresh("equity-joins", { source_ts: 1 }, 1_000_000)).toBe(true);
   });
 });
