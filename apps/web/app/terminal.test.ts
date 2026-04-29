@@ -2,6 +2,8 @@ import { describe, expect, it } from "bun:test";
 import {
   buildDefaultFlowFilters,
   countActiveFlowFilterGroups,
+  formatCompactUsd,
+  formatOptionContractLabel,
   flushPausableTapeData,
   getLiveFeedStatus,
   nextFlowFilterPopoverState,
@@ -49,6 +51,18 @@ describe("live tape pausable helpers", () => {
 
     state = reducePausableTapeData(state, [makeItem("a", 1, 100)], false);
     expect(state.visible.map((item) => item.trace_id)).toEqual(["a"]);
+  });
+
+  it("applies custom retention limits when requested", () => {
+    const state = reducePausableTapeData(
+      { visible: [], queued: [], seenKeys: new Set<string>(), dropped: 0 },
+      [makeItem("a", 1, 100), makeItem("b", 2, 200), makeItem("c", 3, 300)],
+      false,
+      2
+    );
+
+    expect(state.visible.map((item) => item.trace_id)).toEqual(["c", "b"]);
+    expect(state.visible).toHaveLength(2);
   });
 
   it("marks connected feeds stale once their freshest event ages past the threshold", () => {
@@ -104,6 +118,43 @@ describe("live tape pausable helpers", () => {
     expect(shouldRetainLiveSnapshotHistory("alerts", true, 0, 3)).toBe(false);
     expect(shouldRetainLiveSnapshotHistory("options", true, 1, 3)).toBe(false);
     expect(shouldRetainLiveSnapshotHistory("options", false, 0, 3)).toBe(false);
+  });
+});
+
+describe("options display formatters", () => {
+  it("formats dashed option contracts as ticker strike expiry", () => {
+    expect(formatOptionContractLabel("SPY-2025-01-17-450-C")).toEqual({
+      ticker: "SPY",
+      strike: "450C",
+      expiration: "01-17-25"
+    });
+  });
+
+  it("formats OCC contracts as ticker strike expiry", () => {
+    expect(formatOptionContractLabel("AAPL250117P00150000")).toEqual({
+      ticker: "AAPL",
+      strike: "150P",
+      expiration: "01-17-25"
+    });
+  });
+
+  it("preserves decimal strikes and side suffix", () => {
+    expect(formatOptionContractLabel("QQQ-2025-01-17-509.5-C")).toEqual({
+      ticker: "QQQ",
+      strike: "509.5C",
+      expiration: "01-17-25"
+    });
+  });
+
+  it("returns null when contract parsing fails", () => {
+    expect(formatOptionContractLabel("not-a-contract")).toBeNull();
+  });
+
+  it("formats compact notional values", () => {
+    expect(formatCompactUsd(999)).toBe("999.00");
+    expect(formatCompactUsd(11_430)).toBe("11.4K");
+    expect(formatCompactUsd(1_250_000)).toBe("1.3M");
+    expect(formatCompactUsd(Number.NaN)).toBe("0.00");
   });
 });
 

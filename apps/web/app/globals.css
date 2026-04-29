@@ -859,6 +859,12 @@ h3 {
   font-weight: 600;
 }
 
+.option-contract {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .meta,
 .drawer-row-meta,
 .flow-meta {
@@ -866,6 +872,41 @@ h3 {
   flex-wrap: wrap;
   gap: 10px;
   font-size: 0.76rem;
+}
+
+.notional-emphasis {
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #ffe08c;
+}
+
+.condition-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.condition-sweep {
+  border-color: rgba(37, 193, 122, 0.34);
+  color: #98f0c0;
+  background: var(--green-soft);
+}
+
+.condition-iso {
+  border-color: rgba(77, 163, 255, 0.34);
+  color: #bddcff;
+  background: var(--blue-soft);
+}
+
+.condition-neutral {
+  border-color: rgba(192, 200, 210, 0.28);
+  color: #d4dbe3;
+  background: rgba(192, 200, 210, 0.08);
 }
 
 .pill,
