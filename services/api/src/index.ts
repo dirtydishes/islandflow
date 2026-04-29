@@ -104,13 +104,17 @@ import { LiveStateManager, isLiveItemFresh } from "./live";
 const service = "api";
 const logger = createLogger({ service });
 
+const DeliverPolicySchema = z.enum(["new", "all", "last", "last_per_subject"]);
+
 const envSchema = z.object({
   API_PORT: z.coerce.number().int().positive().default(4000),
   NATS_URL: z.string().default("nats://127.0.0.1:4222"),
   CLICKHOUSE_URL: z.string().default("http://127.0.0.1:8123"),
   CLICKHOUSE_DATABASE: z.string().default("default"),
   REDIS_URL: z.string().default("redis://127.0.0.1:6379"),
-  REST_DEFAULT_LIMIT: z.coerce.number().int().positive().default(200)
+  REST_DEFAULT_LIMIT: z.coerce.number().int().positive().default(200),
+  API_DELIVER_POLICY: DeliverPolicySchema.default("new"),
+  API_CONSUMER_RESET: z.coerce.boolean().default(false)
 });
 
 const env = readEnv(envSchema);
@@ -286,6 +290,27 @@ const parseLimit = (value: string | null): number => {
   }
 
   return limitSchema.parse(value);
+};
+
+const applyDeliverPolicy = (
+  opts: ReturnType<typeof buildDurableConsumer>,
+  policy: z.infer<typeof DeliverPolicySchema>
+): void => {
+  switch (policy) {
+    case "all":
+      opts.deliverAll();
+      break;
+    case "last":
+      opts.deliverLast();
+      break;
+    case "last_per_subject":
+      opts.deliverLastPerSubject();
+      break;
+    case "new":
+    default:
+      opts.deliverNew();
+      break;
+  }
 };
 
 const parseOptionPrintFilters = (
@@ -757,12 +782,105 @@ const run = async () => {
     logger.info("live cache metrics", snapshot);
   }, 60000);
 
+  const consumerBindings = [
+    {
+      subject: SUBJECT_OPTION_SIGNAL_PRINTS,
+      stream: STREAM_OPTION_SIGNAL_PRINTS,
+      durableName: "api-option-prints"
+    },
+    {
+      subject: SUBJECT_OPTION_NBBO,
+      stream: STREAM_OPTION_NBBO,
+      durableName: "api-option-nbbo"
+    },
+    {
+      subject: SUBJECT_EQUITY_PRINTS,
+      stream: STREAM_EQUITY_PRINTS,
+      durableName: "api-equity-prints"
+    },
+    {
+      subject: SUBJECT_EQUITY_QUOTES,
+      stream: STREAM_EQUITY_QUOTES,
+      durableName: "api-equity-quotes"
+    },
+    {
+      subject: SUBJECT_EQUITY_CANDLES,
+      stream: STREAM_EQUITY_CANDLES,
+      durableName: "api-equity-candles"
+    },
+    {
+      subject: SUBJECT_EQUITY_JOINS,
+      stream: STREAM_EQUITY_JOINS,
+      durableName: "api-equity-joins"
+    },
+    {
+      subject: SUBJECT_INFERRED_DARK,
+      stream: STREAM_INFERRED_DARK,
+      durableName: "api-inferred-dark"
+    },
+    {
+      subject: SUBJECT_FLOW_PACKETS,
+      stream: STREAM_FLOW_PACKETS,
+      durableName: "api-flow-packets"
+    },
+    {
+      subject: SUBJECT_CLASSIFIER_HITS,
+      stream: STREAM_CLASSIFIER_HITS,
+      durableName: "api-classifier-hits"
+    },
+    {
+      subject: SUBJECT_ALERTS,
+      stream: STREAM_ALERTS,
+      durableName: "api-alerts"
+    }
+  ] as const;
+
+  if (env.API_CONSUMER_RESET) {
+    for (const binding of consumerBindings) {
+      try {
+        await jsm.consumers.delete(binding.stream, binding.durableName);
+        logger.warn("reset jetstream consumer", { durable: binding.durableName });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!message.includes("not found")) {
+          logger.warn("failed to reset jetstream consumer", {
+            durable: binding.durableName,
+            error: message
+          });
+        }
+      }
+    }
+  } else {
+    for (const binding of consumerBindings) {
+      try {
+        const info = await jsm.consumers.info(binding.stream, binding.durableName);
+        if (info?.config?.deliver_policy && info.config.deliver_policy !== env.API_DELIVER_POLICY) {
+          logger.warn("resetting consumer due to deliver policy change", {
+            durable: binding.durableName,
+            current: info.config.deliver_policy,
+            desired: env.API_DELIVER_POLICY
+          });
+          await jsm.consumers.delete(binding.stream, binding.durableName);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!message.includes("not found")) {
+          logger.warn("failed to inspect jetstream consumer", {
+            durable: binding.durableName,
+            error: message
+          });
+        }
+      }
+    }
+  }
+
   const subscribeWithReset = async <T>(
     subject: string,
     stream: string,
     durableName: string
   ) => {
     const opts = buildDurableConsumer(durableName);
+    applyDeliverPolicy(opts, env.API_DELIVER_POLICY);
     try {
       return await subscribeJson<T>(js, subject, opts);
     } catch (error) {
@@ -791,68 +909,69 @@ const run = async () => {
       }
 
       const resetOpts = buildDurableConsumer(durableName);
+      applyDeliverPolicy(resetOpts, env.API_DELIVER_POLICY);
       return await subscribeJson<T>(js, subject, resetOpts);
     }
   };
 
   const optionSubscription = await subscribeWithReset(
-    SUBJECT_OPTION_SIGNAL_PRINTS,
-    STREAM_OPTION_SIGNAL_PRINTS,
-    "api-option-prints"
+    consumerBindings[0].subject,
+    consumerBindings[0].stream,
+    consumerBindings[0].durableName
   );
 
   const optionNbboSubscription = await subscribeWithReset(
-    SUBJECT_OPTION_NBBO,
-    STREAM_OPTION_NBBO,
-    "api-option-nbbo"
+    consumerBindings[1].subject,
+    consumerBindings[1].stream,
+    consumerBindings[1].durableName
   );
 
   const equitySubscription = await subscribeWithReset(
-    SUBJECT_EQUITY_PRINTS,
-    STREAM_EQUITY_PRINTS,
-    "api-equity-prints"
+    consumerBindings[2].subject,
+    consumerBindings[2].stream,
+    consumerBindings[2].durableName
   );
 
   const equityQuoteSubscription = await subscribeWithReset(
-    SUBJECT_EQUITY_QUOTES,
-    STREAM_EQUITY_QUOTES,
-    "api-equity-quotes"
+    consumerBindings[3].subject,
+    consumerBindings[3].stream,
+    consumerBindings[3].durableName
   );
 
   const equityCandleSubscription = await subscribeWithReset(
-    SUBJECT_EQUITY_CANDLES,
-    STREAM_EQUITY_CANDLES,
-    "api-equity-candles"
+    consumerBindings[4].subject,
+    consumerBindings[4].stream,
+    consumerBindings[4].durableName
   );
 
   const equityJoinSubscription = await subscribeWithReset(
-    SUBJECT_EQUITY_JOINS,
-    STREAM_EQUITY_JOINS,
-    "api-equity-joins"
+    consumerBindings[5].subject,
+    consumerBindings[5].stream,
+    consumerBindings[5].durableName
   );
 
   const inferredDarkSubscription = await subscribeWithReset(
-    SUBJECT_INFERRED_DARK,
-    STREAM_INFERRED_DARK,
-    "api-inferred-dark"
+    consumerBindings[6].subject,
+    consumerBindings[6].stream,
+    consumerBindings[6].durableName
   );
 
   const flowSubscription = await subscribeWithReset(
-    SUBJECT_FLOW_PACKETS,
-    STREAM_FLOW_PACKETS,
-    "api-flow-packets"
+    consumerBindings[7].subject,
+    consumerBindings[7].stream,
+    consumerBindings[7].durableName
   );
 
   const classifierHitSubscription = await subscribeWithReset(
-    SUBJECT_CLASSIFIER_HITS,
-    STREAM_CLASSIFIER_HITS,
-    "api-classifier-hits"
+    consumerBindings[8].subject,
+    consumerBindings[8].stream,
+    consumerBindings[8].durableName
   );
 
   const alertSubscription = await subscribeWithReset(
-    SUBJECT_ALERTS,
-    STREAM_ALERTS,
-    "api-alerts"
+    consumerBindings[9].subject,
+    consumerBindings[9].stream,
+    consumerBindings[9].durableName
   );
 
   const fanoutLive = async (

@@ -481,8 +481,6 @@ export const createSyntheticOptionsAdapter = (
             conditions: burst.conditions
           };
 
-          void handlers.onTrade(print);
-
           if (handlers.onNBBO) {
             nbboSeq += 1;
             const sizeBase = Math.max(1, Math.round(burst.baseSize * 0.4));
@@ -503,6 +501,8 @@ export const createSyntheticOptionsAdapter = (
 
             void handlers.onNBBO(nbbo);
           }
+
+          void handlers.onTrade(print);
         }
 
         remainingRuns -= 1;
