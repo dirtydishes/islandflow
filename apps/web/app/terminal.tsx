@@ -582,6 +582,66 @@ const normalizeDirection = (value: string): "bullish" | "bearish" | "neutral" =>
   return "neutral";
 };
 
+const normalizeAlertSeverityValue = (value: string): "high" | "medium" | "low" | null => {
+  const normalized = value.trim().toLowerCase();
+  if (["high", "critical", "severe", "sev1", "p0", "p1"].includes(normalized)) {
+    return "high";
+  }
+  if (["medium", "med", "moderate", "sev2", "p2"].includes(normalized)) {
+    return "medium";
+  }
+  if (["low", "minor", "info", "informational", "sev3", "p3", "p4"].includes(normalized)) {
+    return "low";
+  }
+  return null;
+};
+
+export const normalizeAlertSeverity = (alert: AlertEvent): "high" | "medium" | "low" => {
+  const normalized = normalizeAlertSeverityValue(alert.severity);
+  if (normalized) {
+    return normalized;
+  }
+  if (alert.score >= 80) {
+    return "high";
+  }
+  if (alert.score >= 45) {
+    return "medium";
+  }
+  return "low";
+};
+
+export const deriveAlertDirection = (alert: AlertEvent): "bullish" | "bearish" | "neutral" => {
+  const totals = {
+    bullish: { count: 0, confidence: 0 },
+    bearish: { count: 0, confidence: 0 },
+    neutral: { count: 0, confidence: 0 }
+  };
+
+  for (const hit of alert.hits) {
+    const direction = normalizeDirection(hit.direction);
+    totals[direction].count += 1;
+    totals[direction].confidence += Number.isFinite(hit.confidence) ? hit.confidence : 0;
+  }
+
+  const ranked = (Object.entries(totals) as Array<
+    ["bullish" | "bearish" | "neutral", { count: number; confidence: number }]
+  >).sort((a, b) => {
+    if (b[1].count !== a[1].count) {
+      return b[1].count - a[1].count;
+    }
+    return b[1].confidence - a[1].confidence;
+  });
+
+  return ranked[0] && ranked[0][1].count > 0 ? ranked[0][0] : "neutral";
+};
+
+export const getAlertWindowAnchorTs = (alerts: AlertEvent[], fallbackNow = Date.now()): number => {
+  if (alerts.length === 0) {
+    return fallbackNow;
+  }
+  return alerts.reduce((max, alert) => Math.max(max, alert.source_ts), alerts[0]?.source_ts ?? fallbackNow);
+};
+
 const extractUnderlying = (contractId: string): string => {
   const match = contractId.match(/^(.+)-\d{4}-\d{2}-\d{2}-/);
   if (match?.[1]) {
@@ -1142,7 +1202,7 @@ const prunePinnedEntries = <T,>(
   return new Map(trimmed);
 };
 
-const statusLabel = (status: WsStatus, paused: boolean, mode: TapeMode): string => {
+export const statusLabel = (status: WsStatus, paused: boolean, mode: TapeMode): string => {
   if (paused) {
     return "Paused";
   }
@@ -1153,9 +1213,9 @@ const statusLabel = (status: WsStatus, paused: boolean, mode: TapeMode): string 
 
   switch (status) {
     case "connected":
-      return "Live";
+      return "Connected";
     case "stale":
-      return "Live feed behind";
+      return "Feed behind";
     case "connecting":
       return "Connecting";
     case "disconnected":
@@ -3020,15 +3080,16 @@ type AlertSeverityStripProps = {
 
 const AlertSeverityStrip = ({ alerts }: AlertSeverityStripProps) => {
   const windowMs = 30 * 60 * 1000;
-  const now = Date.now();
+  const windowAnchor = getAlertWindowAnchorTs(alerts);
   const severityCounts = alerts.reduce(
     (acc, alert) => {
-      if (now - alert.source_ts > windowMs) {
+      if (windowAnchor - alert.source_ts > windowMs) {
         return acc;
       }
-      if (alert.severity === "high") {
+      const severity = normalizeAlertSeverity(alert);
+      if (severity === "high") {
         acc.high += 1;
-      } else if (alert.severity === "medium") {
+      } else if (severity === "medium") {
         acc.medium += 1;
       } else {
         acc.low += 1;
@@ -3040,10 +3101,10 @@ const AlertSeverityStrip = ({ alerts }: AlertSeverityStripProps) => {
 
   const directionCounts = alerts.reduce(
     (acc, alert) => {
-      if (now - alert.source_ts > windowMs) {
+      if (windowAnchor - alert.source_ts > windowMs) {
         return acc;
       }
-      const direction = normalizeDirection(alert.hits[0]?.direction ?? "neutral");
+      const direction = deriveAlertDirection(alert);
       acc[direction] += 1;
       return acc;
     },
@@ -3119,7 +3180,8 @@ type AlertDrawerProps = {
 
 const AlertDrawer = ({ alert, flowPacket, evidence, onClose }: AlertDrawerProps) => {
   const primary = alert.hits[0];
-  const direction = primary ? normalizeDirection(primary.direction) : "neutral";
+  const direction = deriveAlertDirection(alert);
+  const severity = normalizeAlertSeverity(alert);
   const evidencePrints = evidence.filter((item) => item.kind === "print");
   const unknownCount = evidence.filter((item) => item.kind === "unknown").length;
 
@@ -3137,9 +3199,9 @@ const AlertDrawer = ({ alert, flowPacket, evidence, onClose }: AlertDrawerProps)
       </div>
 
       <div className="drawer-meta">
-        <span className={`pill severity-${alert.severity}`}>{alert.severity}</span>
+        <span className={`pill severity-${severity}`}>{severity}</span>
         <span className="drawer-chip">Score {Math.round(alert.score)}</span>
-        {primary ? <span className={`pill direction-${direction}`}>{direction}</span> : null}
+        <span className={`pill direction-${direction}`}>{direction}</span>
       </div>
 
       <div className="drawer-section">
@@ -4875,7 +4937,7 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
               ? "No option prints match the current filter."
               : state.mode === "live"
                 ? state.options.status === "stale"
-                  ? "Live feed behind. Waiting for fresh option prints."
+                  ? "Feed behind. Waiting for fresh option prints."
                   : "No option prints yet. Start ingest-options."
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
@@ -5000,8 +5062,8 @@ const EquitiesPane = ({ limit }: EquitiesPaneProps) => {
               : state.mode === "live"
                 ? state.equitiesSilentWarning
                   ? "Connected but no equity prints received. Check ingest-equities."
-                  : state.equities.status === "stale"
-                  ? "Live feed behind. Waiting for fresh equity prints."
+                : state.equities.status === "stale"
+                  ? "Feed behind. Waiting for fresh equity prints."
                   : "No equity prints yet. Start ingest-equities."
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
@@ -5079,7 +5141,7 @@ const FlowPane = ({ limit, title = "Flow" }: FlowPaneProps) => {
               ? "No flow packets match the current filter."
               : state.mode === "live"
                 ? state.flow.status === "stale"
-                  ? "Live feed behind. Waiting for fresh flow packets."
+                  ? "Feed behind. Waiting for fresh flow packets."
                   : "No flow packets yet. Start compute."
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
@@ -5180,15 +5242,17 @@ const FlowPane = ({ limit, title = "Flow" }: FlowPaneProps) => {
 type AlertsPaneProps = {
   limit?: number;
   withStrip?: boolean;
+  className?: string;
 };
 
-const AlertsPane = ({ limit, withStrip = false }: AlertsPaneProps) => {
+const AlertsPane = ({ limit, withStrip = false, className }: AlertsPaneProps) => {
   const state = useTerminal();
   const items = limit ? state.filteredAlerts.slice(0, limit) : state.filteredAlerts;
   const virtual = useVirtualList(items, state.alertsScroll.listRef, !limit, 92);
 
   return (
     <Pane
+      className={className}
       title="Alerts"
       status={
         <TapeStatus
@@ -5228,7 +5292,8 @@ const AlertsPane = ({ limit, withStrip = false }: AlertsPaneProps) => {
             ) : null}
             {virtual.visibleItems.map((alert) => {
             const primary = alert.hits[0];
-            const direction = primary ? normalizeDirection(primary.direction) : "neutral";
+            const direction = deriveAlertDirection(alert);
+            const severity = normalizeAlertSeverity(alert);
 
             return (
               <button
@@ -5246,12 +5311,10 @@ const AlertsPane = ({ limit, withStrip = false }: AlertsPaneProps) => {
                     {primary ? humanizeClassifierId(primary.classifier_id) : "Alert"}
                   </div>
                   <div className="meta">
-                    <span className={`pill severity-${alert.severity}`}>{alert.severity}</span>
+                    <span className={`pill severity-${severity}`}>{severity}</span>
                     <span>Score {Math.round(alert.score)}</span>
                     <span>{alert.hits.length} hits</span>
-                    {primary ? (
-                      <span className={`pill direction-${direction}`}>{direction}</span>
-                    ) : null}
+                    <span className={`pill direction-${direction}`}>{direction}</span>
                   </div>
                   {primary?.explanations?.[0] ? (
                     <div className="note">{primary.explanations[0]}</div>
@@ -5273,15 +5336,17 @@ const AlertsPane = ({ limit, withStrip = false }: AlertsPaneProps) => {
 
 type ClassifierPaneProps = {
   limit?: number;
+  className?: string;
 };
 
-const ClassifierPane = ({ limit }: ClassifierPaneProps) => {
+const ClassifierPane = ({ limit, className }: ClassifierPaneProps) => {
   const state = useTerminal();
   const items = limit ? state.filteredClassifierHits.slice(0, limit) : state.filteredClassifierHits;
   const virtual = useVirtualList(items, state.classifierScroll.listRef, !limit, 88);
 
   return (
     <Pane
+      className={className}
       title="Rules"
       status={
         <TapeStatus
@@ -5351,15 +5416,17 @@ const ClassifierPane = ({ limit }: ClassifierPaneProps) => {
 
 type DarkPaneProps = {
   limit?: number;
+  className?: string;
 };
 
-const DarkPane = ({ limit }: DarkPaneProps) => {
+const DarkPane = ({ limit, className }: DarkPaneProps) => {
   const state = useTerminal();
   const items = limit ? state.filteredInferredDark.slice(0, limit) : state.filteredInferredDark;
   const virtual = useVirtualList(items, state.darkScroll.listRef, !limit, 88);
 
   return (
     <Pane
+      className={className}
       title="Dark"
       status={
         <TapeStatus
@@ -5713,9 +5780,9 @@ export function SignalsRoute() {
   return (
     <PageFrame title="Signals">
       <div className="page-grid page-grid-signals">
-        <AlertsPane withStrip />
-        <ClassifierPane />
-        <DarkPane />
+        <AlertsPane withStrip className="signals-pane-alerts" />
+        <ClassifierPane className="signals-pane-rules" />
+        <DarkPane className="signals-pane-dark" />
       </div>
     </PageFrame>
   );

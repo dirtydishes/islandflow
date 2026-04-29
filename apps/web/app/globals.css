@@ -594,8 +594,8 @@ h3 {
 }
 
 .page-grid-signals {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-template-rows: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 2fr) minmax(0, 1fr);
   height: calc(100vh - var(--topbar-height) - 172px);
   min-height: 620px;
 }
@@ -659,7 +659,7 @@ h3 {
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .terminal-pane-body,
@@ -774,15 +774,21 @@ h3 {
 .tape-controls {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 6px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+}
+
+.tape-controls button {
+  white-space: nowrap;
 }
 
 .missed-count {
-  min-width: 62px;
+  width: 86px;
   font-size: 0.72rem;
   color: var(--accent);
   text-align: right;
+  white-space: nowrap;
 }
 
 .list {
@@ -813,6 +819,21 @@ h3 {
 .page-grid-signals > .terminal-pane {
   height: 100%;
   min-height: 0;
+}
+
+.page-grid-signals > .signals-pane-alerts {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.page-grid-signals > .signals-pane-rules {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.page-grid-signals > .signals-pane-dark {
+  grid-column: 1 / -1;
+  grid-row: 2;
 }
 
 .page-grid-tape > :first-child {

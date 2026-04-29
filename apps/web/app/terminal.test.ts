@@ -1,14 +1,18 @@
 import { describe, expect, it } from "bun:test";
 import {
   buildDefaultFlowFilters,
+  deriveAlertDirection,
   countActiveFlowFilterGroups,
   flushPausableTapeData,
+  getAlertWindowAnchorTs,
   getLiveFeedStatus,
+  normalizeAlertSeverity,
   nextFlowFilterPopoverState,
   projectPausableTapeState,
   reducePausableTapeData,
   shouldRetainLiveSnapshotHistory,
   shouldShowEquitiesSilentFeedWarning,
+  statusLabel,
   toggleFilterValue
 } from "./terminal";
 
@@ -17,6 +21,17 @@ const makeItem = (traceId: string, seq: number, ts: number) => ({
   seq,
   ts
 });
+
+const makeAlert = (overrides: Record<string, unknown> = {}) =>
+  ({
+    trace_id: "alert-1",
+    seq: 1,
+    source_ts: 1_000,
+    severity: "low",
+    score: 20,
+    hits: [],
+    ...overrides
+  }) as any;
 
 describe("live tape pausable helpers", () => {
   it("queues new items while paused and flushes them on resume", () => {
@@ -126,5 +141,60 @@ describe("flow filter popup helpers", () => {
     expect(countActiveFlowFilterGroups(defaults)).toBe(0);
     expect(countActiveFlowFilterGroups(next)).toBe(3);
     expect(buildDefaultFlowFilters()).toEqual(defaults);
+  });
+});
+
+describe("signals helpers", () => {
+  it("normalizes severity aliases/casing and falls back to score", () => {
+    expect(normalizeAlertSeverity(makeAlert({ severity: "HIGH", score: 1 }))).toBe("high");
+    expect(normalizeAlertSeverity(makeAlert({ severity: "med", score: 1 }))).toBe("medium");
+    expect(normalizeAlertSeverity(makeAlert({ severity: "informational", score: 99 }))).toBe("low");
+    expect(normalizeAlertSeverity(makeAlert({ severity: "unknown", score: 80 }))).toBe("high");
+    expect(normalizeAlertSeverity(makeAlert({ severity: "unknown", score: 45 }))).toBe("medium");
+    expect(normalizeAlertSeverity(makeAlert({ severity: "unknown", score: 44 }))).toBe("low");
+  });
+
+  it("derives dominant direction with confidence tie-break and neutral fallback", () => {
+    expect(
+      deriveAlertDirection(
+        makeAlert({
+          hits: [
+            { direction: "bullish", confidence: 0.4 },
+            { direction: "bullish", confidence: 0.2 },
+            { direction: "bearish", confidence: 0.9 }
+          ]
+        })
+      )
+    ).toBe("bullish");
+
+    expect(
+      deriveAlertDirection(
+        makeAlert({
+          hits: [
+            { direction: "bullish", confidence: 0.4 },
+            { direction: "bearish", confidence: 0.9 }
+          ]
+        })
+      )
+    ).toBe("bearish");
+
+    expect(deriveAlertDirection(makeAlert({ hits: [{ direction: "weird", confidence: 0.4 }] }))).toBe(
+      "neutral"
+    );
+    expect(deriveAlertDirection(makeAlert({ hits: [] }))).toBe("neutral");
+  });
+
+  it("anchors strip window to latest visible alert timestamp", () => {
+    const alerts = [
+      makeAlert({ source_ts: 1_700_000_000_000, severity: "high" }),
+      makeAlert({ source_ts: 1_700_000_000_000 - 10 * 60 * 1000, severity: "low" })
+    ];
+    expect(getAlertWindowAnchorTs(alerts, 42)).toBe(1_700_000_000_000);
+    expect(getAlertWindowAnchorTs([], 42)).toBe(42);
+  });
+
+  it("returns connected/stale live status labels without live wording", () => {
+    expect(statusLabel("connected", false, "live")).toBe("Connected");
+    expect(statusLabel("stale", false, "live")).toBe("Feed behind");
   });
 });
