@@ -186,7 +186,8 @@ Default `smart-money` behavior:
 
 ### Web live retention
 
-- `NEXT_PUBLIC_LIVE_HOT_WINDOW` (frontend hot live window cap; default `2000`)
+- `NEXT_PUBLIC_LIVE_HOT_WINDOW` (frontend hot live window cap for non-options feeds; default `2000`)
+- `NEXT_PUBLIC_LIVE_HOT_WINDOW_OPTIONS` (frontend hot live window cap for options prints; default `25000`)
 - `NEXT_PUBLIC_PINNED_EVIDENCE_TTL_MS` (pinned evidence TTL; default `1200000`)
 - `NEXT_PUBLIC_PINNED_EVIDENCE_MAX_ITEMS` (pinned evidence cache guardrail; default `4000`)
 - `NEXT_PUBLIC_FLOW_FILTER_PRESET` (`smart-money` | `balanced` | `all`, default `smart-money`)
@@ -211,6 +212,7 @@ Default `smart-money` behavior:
 - Live retention uses a two-tier model:
   - API/Redis maintain a bounded hot cache per live generic channel.
   - UI keeps a bounded hot window for rendering performance around the signal view rather than raw noise.
+  - Options prints can use a deeper dedicated cap via `NEXT_PUBLIC_LIVE_HOT_WINDOW_OPTIONS` without raising every other feed.
   - Alert/drawer evidence is pinned and hydrated by id/trace so details remain inspectable after hot-window eviction.
 - Firehose-readiness strategy:
   - preserve raw ingest for storage/replay,

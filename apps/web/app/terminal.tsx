@@ -35,6 +35,7 @@ import type {
 } from "@islandflow/types";
 import {
   getSubscriptionKey as getLiveSubscriptionKey,
+  parseOptionContractId,
   matchesFlowPacketFilters,
   matchesOptionPrintFilters
 } from "@islandflow/types";
@@ -57,6 +58,12 @@ const parseBoundedInt = (
 };
 
 const LIVE_HOT_WINDOW = parseBoundedInt(process.env.NEXT_PUBLIC_LIVE_HOT_WINDOW, 2000, 100, 100000);
+const LIVE_HOT_WINDOW_OPTIONS = parseBoundedInt(
+  process.env.NEXT_PUBLIC_LIVE_HOT_WINDOW_OPTIONS,
+  25000,
+  100,
+  100000
+);
 const LIVE_OPTIONS_STALE_MS = 15_000;
 const LIVE_NBBO_STALE_MS = 15_000;
 const LIVE_EQUITIES_STALE_MS = 15_000;
@@ -284,6 +291,12 @@ type PinnedEntry<T> = {
   updatedAt: number;
 };
 
+type OptionContractDisplay = {
+  ticker: string;
+  strike: string;
+  expiration: string;
+};
+
 type RetentionMetricKey =
   | "hotWindowEvictions"
   | "pinnedFetchMisses"
@@ -378,7 +391,8 @@ type PausableTapeData<T> = {
 export const reducePausableTapeData = <T extends SortableItem>(
   current: PausableTapeData<T>,
   incoming: T[],
-  paused: boolean
+  paused: boolean,
+  retentionLimit = LIVE_HOT_WINDOW
 ): PausableTapeData<T> => {
   if (incoming.length === 0) {
     return current;
@@ -403,7 +417,7 @@ export const reducePausableTapeData = <T extends SortableItem>(
   if (paused) {
     return {
       visible: current.visible,
-      queued: mergeNewest(unseen, current.queued, LIVE_HOT_WINDOW, (evicted) =>
+      queued: mergeNewest(unseen, current.queued, retentionLimit, (evicted) =>
         incrementRetentionMetric("hotWindowEvictions", evicted)
       ),
       seenKeys: nextSeenKeys,
@@ -413,7 +427,7 @@ export const reducePausableTapeData = <T extends SortableItem>(
 
   const nextBatch = current.queued.length > 0 ? [...current.queued, ...unseen] : unseen;
   return {
-    visible: mergeNewest(nextBatch, current.visible, LIVE_HOT_WINDOW, (evicted) =>
+    visible: mergeNewest(nextBatch, current.visible, retentionLimit, (evicted) =>
       incrementRetentionMetric("hotWindowEvictions", evicted)
     ),
     queued: [],
@@ -423,14 +437,15 @@ export const reducePausableTapeData = <T extends SortableItem>(
 };
 
 export const flushPausableTapeData = <T extends SortableItem>(
-  current: PausableTapeData<T>
+  current: PausableTapeData<T>,
+  retentionLimit = LIVE_HOT_WINDOW
 ): PausableTapeData<T> => {
   if (current.queued.length === 0) {
     return current.dropped === 0 ? current : { ...current, dropped: 0 };
   }
 
   return {
-    visible: mergeNewest(current.queued, current.visible, LIVE_HOT_WINDOW, (evicted) =>
+    visible: mergeNewest(current.queued, current.visible, retentionLimit, (evicted) =>
       incrementRetentionMetric("hotWindowEvictions", evicted)
     ),
     queued: [],
@@ -545,9 +560,74 @@ const formatUsd = (value: number): string => {
   });
 };
 
+export const formatCompactUsd = (value: number): string => {
+  if (!Number.isFinite(value)) {
+    return "0.00";
+  }
+
+  const abs = Math.abs(value);
+  const sign = value < 0 ? "-" : "";
+  if (abs < 1_000) {
+    return formatUsd(value);
+  }
+  if (abs < 1_000_000) {
+    return `${sign}${(abs / 1_000).toFixed(1)}K`;
+  }
+  if (abs < 1_000_000_000) {
+    return `${sign}${(abs / 1_000_000).toFixed(1)}M`;
+  }
+  return `${sign}${(abs / 1_000_000_000).toFixed(1)}B`;
+};
+
 const normalizeContractId = (value: string): string => value.trim();
 
+const formatStrike = (value: number): string => {
+  if (!Number.isFinite(value)) {
+    return "0";
+  }
+  if (Number.isInteger(value)) {
+    return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  }
+  return value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 3 });
+};
+
+const formatExpiryShort = (value: string): string | null => {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    return null;
+  }
+  const [, year, month, day] = match;
+  return `${month}-${day}-${year.slice(2)}`;
+};
+
+export const formatOptionContractLabel = (value: string): OptionContractDisplay | null => {
+  const normalized = normalizeContractId(value);
+  if (!normalized) {
+    return null;
+  }
+
+  const parsed = parseOptionContractId(normalized);
+  if (!parsed) {
+    return null;
+  }
+
+  const expiration = formatExpiryShort(parsed.expiry);
+  if (!expiration) {
+    return null;
+  }
+
+  return {
+    ticker: parsed.root.toUpperCase(),
+    strike: `${formatStrike(parsed.strike)}${parsed.right}`,
+    expiration
+  };
+};
+
 const formatContractLabel = (value: string): string => {
+  const parsed = formatOptionContractLabel(value);
+  if (parsed) {
+    return `${parsed.ticker} ${parsed.strike} ${parsed.expiration}`;
+  }
   const normalized = normalizeContractId(value);
   if (!normalized) {
     return "Unknown contract";
@@ -1180,6 +1260,7 @@ type TapeConfig<T> = {
   replaySourceKey?: string | null;
   onReplaySourceKey?: (key: string | null) => void;
   queryParams?: Record<string, string | null | undefined>;
+  hotWindowLimit?: number;
 };
 
 const useTape = <T extends SortableItem & { seq: number }>(
@@ -1193,6 +1274,7 @@ const useTape = <T extends SortableItem & { seq: number }>(
   const replaySourceKey = config.replaySourceKey ?? null;
   const onReplaySourceKey = config.onReplaySourceKey;
   const queryParams = config.queryParams;
+  const hotWindowLimit = config.hotWindowLimit ?? LIVE_HOT_WINDOW;
   const [status, setStatus] = useState<WsStatus>("connecting");
   const [items, setItems] = useState<T[]>([]);
   const [lastUpdate, setLastUpdate] = useState<number | null>(null);
@@ -1249,13 +1331,13 @@ const useTape = <T extends SortableItem & { seq: number }>(
       }
 
       setItems((prev) =>
-        mergeNewest(buffered, prev, LIVE_HOT_WINDOW, (evicted) =>
+        mergeNewest(buffered, prev, hotWindowLimit, (evicted) =>
           incrementRetentionMetric("hotWindowEvictions", evicted)
         )
       );
       setLastUpdate(Date.now());
     });
-  }, [captureScroll, onNewItems]);
+  }, [captureScroll, hotWindowLimit, onNewItems]);
 
   const togglePause = useCallback(() => {
     setPaused((prev) => {
@@ -1605,6 +1687,7 @@ type PausableTapeViewConfig<T extends SortableItem & { seq: number }> = {
   onNewItems?: (count: number) => void;
   captureScroll?: () => void;
   getItemTs?: (item: T) => number;
+  retentionLimit?: number;
 };
 
 const usePausableTapeView = <T extends SortableItem & { seq: number }>(
@@ -1632,7 +1715,12 @@ const usePausableTapeView = <T extends SortableItem & { seq: number }>(
     }
 
     setData((current) => {
-      const next = reducePausableTapeData(current, config.sourceItems, paused);
+      const next = reducePausableTapeData(
+        current,
+        config.sourceItems,
+        paused,
+        config.retentionLimit ?? LIVE_HOT_WINDOW
+      );
       if (next === current) {
         return current;
       }
@@ -1645,7 +1733,14 @@ const usePausableTapeView = <T extends SortableItem & { seq: number }>(
 
       return next;
     });
-  }, [config.enabled, config.sourceItems, config.onNewItems, config.captureScroll, paused]);
+  }, [
+    config.enabled,
+    config.sourceItems,
+    config.onNewItems,
+    config.captureScroll,
+    config.retentionLimit,
+    paused
+  ]);
 
   useEffect(() => {
     if (!config.enabled || paused) {
@@ -1653,7 +1748,7 @@ const usePausableTapeView = <T extends SortableItem & { seq: number }>(
     }
 
     setData((current) => {
-      const next = flushPausableTapeData(current);
+      const next = flushPausableTapeData(current, config.retentionLimit ?? LIVE_HOT_WINDOW);
       if (next === current) {
         return current;
       }
@@ -1665,7 +1760,7 @@ const usePausableTapeView = <T extends SortableItem & { seq: number }>(
 
       return next;
     });
-  }, [config.enabled, config.onNewItems, config.captureScroll, paused]);
+  }, [config.captureScroll, config.enabled, config.onNewItems, config.retentionLimit, paused]);
 
   const togglePause = useCallback(() => {
     setPaused((current) => !current);
@@ -2094,7 +2189,8 @@ const useLiveSession = (
 
       const mergeItems = <T extends SortableItem>(
         setter: React.Dispatch<React.SetStateAction<T[]>>,
-        nextItems: T[]
+        nextItems: T[],
+        retentionLimit = LIVE_HOT_WINDOW
       ) => {
         setter((prev) =>
           message.op === "snapshot"
@@ -2106,7 +2202,7 @@ const useLiveSession = (
               )
               ? prev
               : (nextItems as T[])
-            : mergeNewest(nextItems as T[], prev, LIVE_HOT_WINDOW, (evicted) =>
+            : mergeNewest(nextItems as T[], prev, retentionLimit, (evicted) =>
                 incrementRetentionMetric("hotWindowEvictions", evicted)
               )
         );
@@ -2114,7 +2210,7 @@ const useLiveSession = (
 
       switch (subscription.channel) {
         case "options":
-          mergeItems(setOptions, items as OptionPrint[]);
+          mergeItems(setOptions, items as OptionPrint[], LIVE_HOT_WINDOW_OPTIONS);
           break;
         case "nbbo":
           mergeItems(setNbbo, items as OptionNBBO[]);
@@ -3532,6 +3628,7 @@ const useTerminalState = () => {
     replayPath: "/replay/options",
     latestPath: "/prints/options",
     expectedType: "option-print",
+    hotWindowLimit: LIVE_HOT_WINDOW_OPTIONS,
     batchSize: mode === "replay" ? 120 : undefined,
     pollMs: mode === "replay" ? 200 : undefined,
     captureScroll: optionsAnchor.capture,
@@ -3639,6 +3736,7 @@ const useTerminalState = () => {
     sourceItems: liveSession.options,
     lastUpdate: liveSession.lastUpdate,
     freshnessMs: LIVE_OPTIONS_STALE_MS,
+    retentionLimit: LIVE_HOT_WINDOW_OPTIONS,
     captureScroll: optionsAnchor.capture,
     onNewItems: optionsScroll.onNewItems
   });
@@ -4886,6 +4984,7 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
             ) : null}
             {virtual.visibleItems.map((print) => {
             const contractId = normalizeContractId(print.option_contract_id);
+            const contractDisplay = formatOptionContractLabel(contractId);
             const quote = state.nbboMap.get(contractId);
             const nbboAge = quote ? Math.abs(print.ts - quote.ts) : null;
             const nbboStale = nbboAge !== null && nbboAge > NBBO_MAX_AGE_MS_SAFE;
@@ -4896,13 +4995,36 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
             return (
               <div className="row" key={`${print.trace_id}-${print.seq}`}>
                 <div>
-                  <div className="contract">{formatContractLabel(contractId)}</div>
+                  <div className={`contract${contractDisplay ? " option-contract" : ""}`}>
+                    {contractDisplay ? (
+                      <>
+                        <span>{contractDisplay.ticker}</span>
+                        <span>{contractDisplay.strike}</span>
+                        <span>{contractDisplay.expiration}</span>
+                      </>
+                    ) : (
+                      formatContractLabel(contractId)
+                    )}
+                  </div>
                   <div className="meta">
                     <span>${formatPrice(print.price)}</span>
                     <span>{formatSize(print.size)}x</span>
                     <span>{print.exchange}</span>
-                    <span>Notional ${formatUsd(notional)}</span>
-                    {print.conditions?.length ? <span>{print.conditions.join(", ")}</span> : null}
+                    <span className="notional-emphasis">Notional ${formatCompactUsd(notional)}</span>
+                    {print.conditions?.map((condition) => {
+                      const normalized = condition.toUpperCase();
+                      const tone =
+                        normalized === "SWEEP"
+                          ? "condition-sweep"
+                          : normalized === "ISO"
+                            ? "condition-iso"
+                            : "condition-neutral";
+                      return (
+                        <span className={`condition-chip ${tone}`} key={`${print.trace_id}-${condition}`}>
+                          {normalized}
+                        </span>
+                      );
+                    })}
                   </div>
                   {quote ? (
                     <div className="meta nbbo-meta">
