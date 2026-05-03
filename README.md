@@ -1,12 +1,15 @@
 <p align="center">
-  <img src="assets/islandflow-logo.png" alt="Islandflow logo" width="520" />
+  <img src="assets/islandflow-logo.svg" alt="Islandflow logo" width="720" />
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/status-pre--alpha-b91c1c?style=for-the-badge" alt="Status: pre-alpha" />
 </p>
 
 # Real-Time Options Flow & Off-Exchange Analysis
 
-<div align="center" style="padding: 12px; border-radius: 8px; border: 2px solid #b91c1c; background: #fee2e2; color: #7f1d1d; font-weight: 700; margin: 12px 0;">
-  PRE-ALPHA: This project is in an early pre-alpha state. It will not perform consistently or as expected, and APIs, behavior, and data contracts may change without notice.
-</div>
+> **Pre-alpha warning**
+> This project is in an early pre-alpha state. It will not perform consistently or as expected, and APIs, behavior, and data contracts may change without notice.
 
 This repository contains a Bun + TypeScript monorepo for a personal-use, event-sourced market microstructure research platform focused on:
 
