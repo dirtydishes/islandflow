@@ -1,12 +1,8 @@
-<p align="center">
-  <img src="assets/islandflow-logo.svg" alt="Islandflow logo" width="720" />
-</p>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/status-pre--alpha-b91c1c?style=for-the-badge" alt="Status: pre-alpha" />
-</p>
-
 # Real-Time Options Flow & Off-Exchange Analysis
+
+<p align="center">
+  <img src="assets/islandflow-logo.svg" alt="Islandflow logo" width="640" />
+</p>
 
 > **Pre-alpha warning**
 > This project is in an early pre-alpha state. It will not perform consistently or as expected, and APIs, behavior, and data contracts may change without notice.
