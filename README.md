@@ -1,4 +1,12 @@
+<p align="center">
+  <img src="assets/islandflow-logo.png" alt="Islandflow logo" width="520" />
+</p>
+
 # Real-Time Options Flow & Off-Exchange Analysis
+
+<div align="center" style="padding: 12px; border-radius: 8px; border: 2px solid #b91c1c; background: #fee2e2; color: #7f1d1d; font-weight: 700; margin: 12px 0;">
+  PRE-ALPHA: This project is in an early pre-alpha state. It will not perform consistently or as expected, and APIs, behavior, and data contracts may change without notice.
+</div>
 
 This repository contains a Bun + TypeScript monorepo for a personal-use, event-sourced market microstructure research platform focused on:
 
@@ -115,91 +123,178 @@ All runtime configuration comes from `.env`.
 
 ### Core infrastructure
 
-- `NATS_URL` (default `nats://127.0.0.1:4222`)
-- `CLICKHOUSE_URL` (default `http://127.0.0.1:8123`)
-- `CLICKHOUSE_DATABASE` (default `default`)
-- `REDIS_URL` (default `redis://127.0.0.1:6379`)
+| Variable | Default | What it controls |
+| --- | --- | --- |
+| `NATS_URL` | `nats://127.0.0.1:4222` | JetStream broker address used by all services. |
+| `CLICKHOUSE_URL` | `http://127.0.0.1:8123` | ClickHouse HTTP endpoint for reads/writes. |
+| `CLICKHOUSE_DATABASE` | `default` | ClickHouse database/schema name. |
+| `REDIS_URL` | `redis://127.0.0.1:6379` | Redis endpoint for rolling stats, live caches, and candle cache. |
 
-### Ingest adapter selection
+### Ingest selection and synthetic behavior
 
-- `OPTIONS_INGEST_ADAPTER` (`synthetic` | `alpaca` | `ibkr` | `databento`)
-- `EQUITIES_INGEST_ADAPTER` (`synthetic` | `alpaca`)
-- `EMIT_INTERVAL_MS` (synthetic emit cadence)
-- `SYNTHETIC_MARKET_MODE` (`realistic` | `active` | `firehose`, default `realistic`)
-- `SYNTHETIC_OPTIONS_MODE` (optional per-service override; falls back to `SYNTHETIC_MARKET_MODE`)
-- `SYNTHETIC_EQUITIES_MODE` (optional per-service override; falls back to `SYNTHETIC_MARKET_MODE`)
+| Variable | Default | What it controls |
+| --- | --- | --- |
+| `OPTIONS_INGEST_ADAPTER` | `synthetic` | Options ingest source: `synthetic`, `alpaca`, `ibkr`, or `databento`. |
+| `EQUITIES_INGEST_ADAPTER` | `synthetic` | Equities ingest source: `synthetic` or `alpaca`. |
+| `EMIT_INTERVAL_MS` | `1000` | Emit cadence for synthetic ingest adapters. |
+| `SYNTHETIC_MARKET_MODE` | `realistic` | Shared synthetic profile (`realistic`, `active`, `firehose`) used when per-service override is unset. |
+| `SYNTHETIC_OPTIONS_MODE` | empty | Options-only synthetic profile override; falls back to `SYNTHETIC_MARKET_MODE`. |
+| `SYNTHETIC_EQUITIES_MODE` | empty | Equities-only synthetic profile override; falls back to `SYNTHETIC_MARKET_MODE`. |
 
-### Synthetic mode profiles
+Synthetic profile intent:
+- `realistic`: default local mode with lower synthetic burstiness/noise.
+- `active`: busier demo flow while still readable.
+- `firehose`: stress mode for throughput/backpressure/hot-window behavior.
 
-- `realistic` is the default local mode. Options produce materially more ordinary prints, fewer repeated bursts, and fewer alert-driving sweeps/spikes. Equities produce smaller batches and less relentless off-exchange activity.
-- `active` is a busier demo mode that still leaves meaningful visible history in the UI.
-- `firehose` is the stress profile for backpressure, hot-window eviction, and Databento-readiness validation.
+### Options ingest adapter configuration
 
-### Options adapter settings
+| Variable | Default | What it controls |
+| --- | --- | --- |
+| `ALPACA_KEY_ID` | empty | Alpaca API key for options/equities adapters. Required when `*_INGEST_ADAPTER=alpaca`. |
+| `ALPACA_SECRET_KEY` | empty | Alpaca API secret for options/equities adapters. Required when `*_INGEST_ADAPTER=alpaca`. |
+| `ALPACA_REST_URL` | `https://data.alpaca.markets` | Alpaca REST base URL for contract discovery/reference calls. |
+| `ALPACA_WS_BASE_URL` | `wss://stream.data.alpaca.markets/v1beta1` (options), `wss://stream.data.alpaca.markets` (equities) | Alpaca websocket base URL. |
+| `ALPACA_FEED` | `indicative` | Options feed tier for Alpaca options (`indicative` or `opra`). |
+| `ALPACA_UNDERLYINGS` | `SPY,NVDA,AAPL` | Comma-separated symbols targeted by Alpaca ingest. |
+| `ALPACA_STRIKES_PER_SIDE` | `8` | Contracts selected per side of spot for Alpaca options chain sampling. |
+| `ALPACA_MAX_DTE_DAYS` | `30` | Max days-to-expiry included for Alpaca options contract selection. |
+| `ALPACA_MONEYNESS_PCT` | `0.06` | Primary moneyness filter for Alpaca options contract selection. |
+| `ALPACA_MONEYNESS_FALLBACK_PCT` | `0.1` | Wider fallback moneyness filter if candidate set is too sparse. |
+| `ALPACA_MAX_QUOTES` | `200` | Upper bound on selected Alpaca options contracts/quotes per cycle. |
+| `ALPACA_EQUITIES_FEED` | `iex` | Alpaca equities feed (`iex` free tier, `sip` paid consolidated feed). |
 
-- Alpaca: `ALPACA_KEY_ID`, `ALPACA_SECRET_KEY`, `ALPACA_REST_URL`, `ALPACA_WS_BASE_URL`, `ALPACA_FEED`, `ALPACA_UNDERLYINGS`, `ALPACA_STRIKES_PER_SIDE`, `ALPACA_MAX_DTE_DAYS`, `ALPACA_MONEYNESS_PCT`, `ALPACA_MONEYNESS_FALLBACK_PCT`, `ALPACA_MAX_QUOTES`
-- Databento: `DATABENTO_API_KEY`, `DATABENTO_DATASET`, `DATABENTO_SCHEMA`, `DATABENTO_NBBO_SCHEMA`, `DATABENTO_START`, `DATABENTO_END`, `DATABENTO_SYMBOLS`, `DATABENTO_STYPE_IN`, `DATABENTO_STYPE_OUT`, `DATABENTO_LIMIT`, `DATABENTO_PRICE_SCALE`, `DATABENTO_PYTHON_BIN`
-- IBKR: `IBKR_HOST`, `IBKR_PORT`, `IBKR_CLIENT_ID`, `IBKR_SYMBOL`, `IBKR_EXPIRY`, `IBKR_STRIKE`, `IBKR_RIGHT`, `IBKR_EXCHANGE`, `IBKR_CURRENCY`, `IBKR_PYTHON_BIN`
+### Databento replay adapter configuration
 
-### Equities adapter settings
+| Variable | Default | What it controls |
+| --- | --- | --- |
+| `DATABENTO_API_KEY` | empty | Databento API key. Required when `OPTIONS_INGEST_ADAPTER=databento`. |
+| `DATABENTO_DATASET` | `OPRA.PILLAR` | Databento dataset name. |
+| `DATABENTO_SCHEMA` | `trades` | Databento schema for options trade records. |
+| `DATABENTO_NBBO_SCHEMA` | `tbbo` | Databento schema for options NBBO records. |
+| `DATABENTO_START` | empty | Required replay start timestamp/string passed to sidecar. |
+| `DATABENTO_END` | empty | Optional replay end timestamp/string. |
+| `DATABENTO_SYMBOLS` | `ALL` | Symbol selection forwarded to Databento sidecar query. |
+| `DATABENTO_STYPE_IN` | `raw_symbol` | Databento input symbology type. |
+| `DATABENTO_STYPE_OUT` | `raw_symbol` | Databento output symbology type. |
+| `DATABENTO_LIMIT` | `0` | Max Databento records (`0` means no explicit limit). |
+| `DATABENTO_PRICE_SCALE` | `1` | Multiplier applied to decoded prices from sidecar output. |
+| `DATABENTO_PYTHON_BIN` | `python3` | Python executable used to run Databento sidecar script. |
 
-- `ALPACA_EQUITIES_FEED` (`iex` or `sip`)
+### IBKR options adapter configuration
 
-### Compute / classifiers / inference
-
-- Delivery and windowing: `COMPUTE_DELIVER_POLICY`, `COMPUTE_CONSUMER_RESET`, `NBBO_MAX_AGE_MS`, `ROLLING_WINDOW_SIZE`, `ROLLING_TTL_SEC`
-- Classifiers: `CLASSIFIER_SWEEP_MIN_PREMIUM`, `CLASSIFIER_SWEEP_MIN_COUNT`, `CLASSIFIER_SWEEP_MIN_PREMIUM_Z`, `CLASSIFIER_SPIKE_MIN_PREMIUM`, `CLASSIFIER_SPIKE_MIN_SIZE`, `CLASSIFIER_SPIKE_MIN_PREMIUM_Z`, `CLASSIFIER_SPIKE_MIN_SIZE_Z`, `CLASSIFIER_Z_MIN_SAMPLES`, `CLASSIFIER_MIN_NBBO_COVERAGE`, `CLASSIFIER_MIN_AGGRESSOR_RATIO`, `CLASSIFIER_0DTE_MAX_ATM_PCT`, `CLASSIFIER_0DTE_MIN_PREMIUM`, `CLASSIFIER_0DTE_MIN_SIZE`
-- Dark inference: `EQUITY_QUOTE_MAX_AGE_MS`, `DARK_INFER_WINDOW_MS`, `DARK_INFER_COOLDOWN_MS`, `DARK_INFER_MIN_BLOCK_SIZE`, `DARK_INFER_MIN_ACCUM_SIZE`, `DARK_INFER_MIN_ACCUM_COUNT`, `DARK_INFER_MIN_PRINT_SIZE`, `DARK_INFER_MAX_EVIDENCE`, `DARK_INFER_MAX_SPREAD_PCT`
+| Variable | Default | What it controls |
+| --- | --- | --- |
+| `IBKR_HOST` | `127.0.0.1` | TWS/Gateway host for IBKR bridge. |
+| `IBKR_PORT` | `7497` | TWS/Gateway port for IBKR bridge. |
+| `IBKR_CLIENT_ID` | `0` | IBKR client id used by the bridge connection. |
+| `IBKR_SYMBOL` | `SPY` | Underlying symbol requested from IBKR. |
+| `IBKR_EXPIRY` | `20250117` | Option expiry (YYYYMMDD) requested from IBKR. |
+| `IBKR_STRIKE` | `450` | Strike requested from IBKR. |
+| `IBKR_RIGHT` | `C` | Option side (`C` or `P`). |
+| `IBKR_EXCHANGE` | `SMART` | IBKR exchange routing code. |
+| `IBKR_CURRENCY` | `USD` | Contract currency. |
+| `IBKR_PYTHON_BIN` | `python3` | Python executable used for IBKR sidecar. |
 
 ### Options signal filtering
 
-- `OPTIONS_SIGNAL_MODE` (`smart-money` | `balanced` | `all`, default `smart-money`)
-- `OPTIONS_SIGNAL_MIN_NOTIONAL` (default `10000`)
-- `OPTIONS_SIGNAL_ETF_MIN_NOTIONAL` (default `50000`)
-- `OPTIONS_SIGNAL_BID_SIDE_MIN_NOTIONAL` (default `25000`)
-- `OPTIONS_SIGNAL_MID_MIN_NOTIONAL` (default `20000`)
-- `OPTIONS_SIGNAL_NBBO_MAX_AGE_MS` (default `1500`)
-- `OPTIONS_SIGNAL_ETF_UNDERLYINGS` (default `SPY,QQQ,IWM,DIA,TLT,GLD,SLV,XLF,XLE,XLV,XLI,XLP,XLU,XLY,SMH,ARKK`)
+| Variable | Default | What it controls |
+| --- | --- | --- |
+| `OPTIONS_SIGNAL_MODE` | `smart-money` | Signal pass policy (`smart-money`, `balanced`, `all`) for options prints. |
+| `OPTIONS_SIGNAL_MIN_NOTIONAL` | `10000` | Base minimum notional for most signal candidates. |
+| `OPTIONS_SIGNAL_ETF_MIN_NOTIONAL` | `50000` | ETF-specific minimum notional for signal inclusion. |
+| `OPTIONS_SIGNAL_BID_SIDE_MIN_NOTIONAL` | `25000` | Minimum notional for bid-side (`B`/`BB`) or sweep/ISO thresholds. |
+| `OPTIONS_SIGNAL_MID_MIN_NOTIONAL` | `20000` | Minimum notional for non-sweep/non-ISO `MID` prints. |
+| `OPTIONS_SIGNAL_NBBO_MAX_AGE_MS` | `1500` | NBBO freshness threshold used during signal classification. |
+| `OPTIONS_SIGNAL_ETF_UNDERLYINGS` | `SPY,QQQ,IWM,DIA,TLT,GLD,SLV,XLF,XLE,XLV,XLI,XLP,XLU,XLY,SMH,ARKK` | Comma-separated underlyings treated as ETFs by signal filters. |
 
-Default `smart-money` behavior:
+Default `smart-money` policy rejects lower-information prints and keeps high-confidence/high-notional/sweep-style flow; `balanced` lowers thresholds; `all` bypasses filtering.
 
-- reject sub-`10k` options prints,
-- reject ETF prints below `50k`,
-- reject `B` / `BB` prints below `25k`,
-- reject non-`SWEEP` / non-`ISO` `MID` prints below `20k`,
-- require `50k` when NBBO is missing or stale,
-- auto-keep `100k+`,
-- keep ask-side `A` / `AA` prints at `10k+`,
-- keep `SWEEP` / `ISO` prints at `25k+`,
-- keep `500+` contract prints at `10k+`.
+### Compute/classifier/dark-inference configuration
 
-`balanced` uses the same shape with lower thresholds. `all` marks every option print as signal-passing.
+| Variable | Default | What it controls |
+| --- | --- | --- |
+| `CLUSTER_WINDOW_MS` | `500` | Time window used to cluster nearby option prints into a packet candidate. |
+| `COMPUTE_DELIVER_POLICY` | `new` | Consumer start policy for compute stream subscriptions (`new`, `all`, `last`, `last_per_subject`). |
+| `COMPUTE_CONSUMER_RESET` | `false` | If true, resets durable consumer position for compute on startup. |
+| `NBBO_MAX_AGE_MS` | `1000` | Max NBBO age accepted when enriching option prints in compute. |
+| `ROLLING_WINDOW_SIZE` | `50` | Number of observations retained per rolling metric key. |
+| `ROLLING_TTL_SEC` | `86400` | Redis TTL for rolling metric keys. |
+| `EQUITY_QUOTE_MAX_AGE_MS` | `1000` | Max quote staleness when joining equity prints for inference. |
+| `DARK_INFER_WINDOW_MS` | `60000` | Sliding window length for dark-style inference accumulation. |
+| `DARK_INFER_COOLDOWN_MS` | `30000` | Cooldown before emitting repeated dark inferences for same symbol/pattern. |
+| `DARK_INFER_MIN_BLOCK_SIZE` | `2000` | Minimum single-print size for block-style dark inference evidence. |
+| `DARK_INFER_MIN_ACCUM_SIZE` | `3000` | Minimum aggregate size for accumulation-style dark inference evidence. |
+| `DARK_INFER_MIN_ACCUM_COUNT` | `4` | Minimum print count for accumulation-style dark inference. |
+| `DARK_INFER_MIN_PRINT_SIZE` | `200` | Minimum print size considered as dark inference evidence. |
+| `DARK_INFER_MAX_EVIDENCE` | `20` | Max evidence items attached to one inferred dark event. |
+| `DARK_INFER_MAX_SPREAD_PCT` | `0.005` | Maximum spread percentage allowed for dark inference confidence. |
+| `CLASSIFIER_SWEEP_MIN_PREMIUM` | `40000` | Minimum premium to trigger sweep classifier logic. |
+| `CLASSIFIER_SWEEP_MIN_COUNT` | `3` | Minimum child prints in cluster for sweep classifier hit. |
+| `CLASSIFIER_SWEEP_MIN_PREMIUM_Z` | `2` | Min premium z-score for sweep classifier confirmation. |
+| `CLASSIFIER_SPIKE_MIN_PREMIUM` | `20000` | Minimum premium for spike classifier logic. |
+| `CLASSIFIER_SPIKE_MIN_SIZE` | `400` | Minimum total size for spike classifier logic. |
+| `CLASSIFIER_SPIKE_MIN_PREMIUM_Z` | `2.5` | Min premium z-score for spike classifier confirmation. |
+| `CLASSIFIER_SPIKE_MIN_SIZE_Z` | `2` | Min size z-score for spike classifier confirmation. |
+| `CLASSIFIER_Z_MIN_SAMPLES` | `12` | Minimum rolling sample count before z-score gating applies. |
+| `CLASSIFIER_MIN_NBBO_COVERAGE` | `0.5` | Required fraction of prints in cluster with valid NBBO context. |
+| `CLASSIFIER_MIN_AGGRESSOR_RATIO` | `0.55` | Minimum aggressor-side ratio for classifier confidence. |
+| `CLASSIFIER_0DTE_MAX_ATM_PCT` | `0.01` | Max distance-from-ATM to qualify as near-ATM 0DTE event. |
+| `CLASSIFIER_0DTE_MIN_PREMIUM` | `20000` | Minimum premium for 0DTE classifier events. |
+| `CLASSIFIER_0DTE_MIN_SIZE` | `400` | Minimum size for 0DTE classifier events. |
 
-### Candles
+### Candle service configuration
 
-- `CANDLE_INTERVALS_MS`, `CANDLE_MAX_LATE_MS`, `CANDLE_CACHE_LIMIT`, `CANDLE_DELIVER_POLICY`, `CANDLE_CONSUMER_RESET`
+| Variable | Default | What it controls |
+| --- | --- | --- |
+| `CANDLE_INTERVALS_MS` | `60000,300000` | Comma-separated candle intervals generated from equity prints. |
+| `CANDLE_MAX_LATE_MS` | `0` | Allowed lateness for out-of-order prints before candle rejection/roll policy applies. |
+| `CANDLE_CACHE_LIMIT` | `2000` | Max cached candles per `(underlying, interval)` in Redis (`0` disables cache). |
+| `CANDLE_DELIVER_POLICY` | `new` | Consumer start policy for candle service (`new`, `all`, `last`, `last_per_subject`). |
+| `CANDLE_CONSUMER_RESET` | `false` | If true, resets candle durable consumer position on startup. |
 
-### API
+### API + live cache configuration
 
-- `API_PORT`, `REST_DEFAULT_LIMIT`, `API_DELIVER_POLICY`, `API_CONSUMER_RESET`
-- `LIVE_LIMIT_OPTIONS`, `LIVE_LIMIT_NBBO`, `LIVE_LIMIT_EQUITIES`, `LIVE_LIMIT_EQUITY_JOINS`, `LIVE_LIMIT_FLOW`, `LIVE_LIMIT_CLASSIFIER_HITS`, `LIVE_LIMIT_ALERTS`, `LIVE_LIMIT_INFERRED_DARK` (bounded live generic cache depths; defaults `10000`, max `100000`)
+| Variable | Default | What it controls |
+| --- | --- | --- |
+| `API_PORT` | `4000` | API service listen port. |
+| `REST_DEFAULT_LIMIT` | `200` | Default record count when a REST endpoint omits `limit`. |
+| `API_DELIVER_POLICY` | `new` | JetStream consumer start policy used by API live subscribers (`new`, `all`, `last`, `last_per_subject`). |
+| `API_CONSUMER_RESET` | `false` | If true, API resets/recreates its live durable consumers on startup. |
+| `LIVE_LIMIT_OPTIONS` | `10000` | In-memory/Redis live cache depth for options channel (clamped `1..100000`). |
+| `LIVE_LIMIT_NBBO` | `10000` | Live cache depth for options NBBO channel (clamped `1..100000`). |
+| `LIVE_LIMIT_EQUITIES` | `10000` | Live cache depth for equities channel (clamped `1..100000`). |
+| `LIVE_LIMIT_EQUITY_JOINS` | `10000` | Live cache depth for equity join channel (clamped `1..100000`). |
+| `LIVE_LIMIT_FLOW` | `10000` | Live cache depth for flow packet channel (clamped `1..100000`). |
+| `LIVE_LIMIT_CLASSIFIER_HITS` | `10000` | Live cache depth for classifier hits channel (clamped `1..100000`). |
+| `LIVE_LIMIT_ALERTS` | `10000` | Live cache depth for alerts channel (clamped `1..100000`). |
+| `LIVE_LIMIT_INFERRED_DARK` | `10000` | Live cache depth for inferred dark channel (clamped `1..100000`). |
 
-### Web live retention
+### Web client configuration (`NEXT_PUBLIC_*`)
 
-- `NEXT_PUBLIC_LIVE_HOT_WINDOW` (frontend hot live window cap for non-options feeds; default `2000`)
-- `NEXT_PUBLIC_LIVE_HOT_WINDOW_OPTIONS` (frontend hot live window cap for options prints; default `25000`)
-- `NEXT_PUBLIC_PINNED_EVIDENCE_TTL_MS` (pinned evidence TTL; default `1200000`)
-- `NEXT_PUBLIC_PINNED_EVIDENCE_MAX_ITEMS` (pinned evidence cache guardrail; default `4000`)
-- `NEXT_PUBLIC_FLOW_FILTER_PRESET` (`smart-money` | `balanced` | `all`, default `smart-money`)
+| Variable | Default | What it controls |
+| --- | --- | --- |
+| `NEXT_PUBLIC_API_URL` | auto-detected (`window.location.origin` in browser; `http://127.0.0.1:4000` fallback) | Explicit base URL for API/WS calls from the web app. |
+| `NEXT_PUBLIC_LIVE_HOT_WINDOW` | `2000` | Max hot-window items retained for non-options live streams in UI state (`100..100000`). |
+| `NEXT_PUBLIC_LIVE_HOT_WINDOW_OPTIONS` | `25000` | Dedicated max hot-window items retained for options prints (`100..100000`). |
+| `NEXT_PUBLIC_NBBO_MAX_AGE_MS` | `1000` | Frontend NBBO staleness threshold used for UI status/placement logic. |
+| `NEXT_PUBLIC_LIVE_EQUITIES_SILENT_WARNING_MS` | `25000` | Delay before warning when equities stream is quiet (`5000..300000`). |
+| `NEXT_PUBLIC_PINNED_EVIDENCE_TTL_MS` | `1200000` | TTL for pinned evidence objects in UI (`60000..7200000`). |
+| `NEXT_PUBLIC_PINNED_EVIDENCE_MAX_ITEMS` | `4000` | Maximum pinned evidence cache size in UI (`100..50000`). |
+| `NEXT_PUBLIC_FLOW_FILTER_PRESET` | `smart-money` | Default flow filter preset applied on page load (`smart-money`, `balanced`, `all`). |
 
-### Replay service
+### Replay and testing controls
 
-- `REPLAY_ENABLED`, `REPLAY_STREAMS`, `REPLAY_START_TS`, `REPLAY_END_TS`, `REPLAY_SPEED`, `REPLAY_BATCH_SIZE`, `REPLAY_LOG_EVERY`
-
-### Testing-mode throttling
-
-- `TESTING_MODE`
-- `TESTING_THROTTLE_MS`
+| Variable | Default | What it controls |
+| --- | --- | --- |
+| `REPLAY_ENABLED` | `false` | Dev-script toggle: starts replay service in `bun run dev` when truthy. |
+| `REPLAY_STREAMS` | `options,nbbo,equities,equity-quotes` | Replay stream selection (`all` or comma list of supported aliases). |
+| `REPLAY_START_TS` | `0` | Replay lower-bound timestamp; `0` means from earliest stored data. |
+| `REPLAY_END_TS` | `0` | Replay upper-bound timestamp; `0` means no explicit end bound. |
+| `REPLAY_SPEED` | `1` | Replay speed multiplier relative to original event timing. |
+| `REPLAY_BATCH_SIZE` | `200` | Batch fetch size per replay stream pull. |
+| `REPLAY_LOG_EVERY` | `1000` | Progress log interval (emitted event count). |
+| `TESTING_MODE` | `false` | Enables ingest publish throttling for deterministic/lower-volume test runs. |
+| `TESTING_THROTTLE_MS` | `200` | Minimum delay between emitted events while `TESTING_MODE=true`. |
 
 ## Quick Notes
 
