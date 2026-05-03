@@ -1,7 +1,7 @@
 # Real-Time Options Flow & Off-Exchange Analysis
 
 <p align="center">
-  <img src="assets/islandflow-logo.svg" alt="Islandflow logo" width="640" />
+  <img src="assets/logo.png" alt="Islandflow logo" width="640" />
 </p>
 
 > **Pre-alpha warning**
