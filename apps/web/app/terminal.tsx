@@ -2693,7 +2693,9 @@ const useLiveSession = (
           appendOptionFlowFilters(params, subscription.filters);
         }
         appendLiveScopeParams(params, subscription);
-        const response = await fetch(buildApiUrl(`${endpoint}?${params.toString()}`));
+        const url = new URL(buildApiUrl(endpoint));
+        url.search = params.toString();
+        const response = await fetch(url.toString());
         if (!response.ok) {
           const detail = await readErrorDetail(response);
           throw new Error(detail || `HTTP ${response.status}`);
@@ -2840,39 +2842,6 @@ const TapeControls = ({ paused, onTogglePause, isAtTop, missed, onJump }: TapeCo
         Jump to top
       </button>
       <span className="missed-count">{active ? `+${missed} new` : ""}</span>
-    </div>
-  );
-};
-
-type LoadOlderControlProps = {
-  channel: LiveSubscription["channel"];
-};
-
-const LoadOlderControl = ({ channel }: LoadOlderControlProps) => {
-  const state = useTerminal();
-  const subscription = state.liveSession.manifest.find((candidate) => candidate.channel === channel);
-  if (state.mode !== "live" || !subscription || !(subscription.channel in LIVE_HISTORY_ENDPOINTS)) {
-    return null;
-  }
-
-  const key = getLiveSubscriptionKey(subscription);
-  const cursor = state.liveSession.historyCursors[key];
-  const loading = Boolean(state.liveSession.historyLoading[key]);
-  const error = state.liveSession.historyErrors[key];
-  if (!cursor && !loading && !error) {
-    return null;
-  }
-
-  return (
-    <div className="load-older">
-      <button
-        type="button"
-        onClick={() => void state.liveSession.loadOlder(channel)}
-        disabled={!cursor || loading}
-      >
-        {loading ? "Loading older" : cursor ? "Load older" : "No more history"}
-      </button>
-      {error ? <span>{error}</span> : null}
     </div>
   );
 };
@@ -5615,7 +5584,6 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
             </div>
           </div>
         )}
-        {!limit ? <LoadOlderControl channel="options" /> : null}
       </div>
     </Pane>
   );
@@ -5710,7 +5678,6 @@ const EquitiesPane = ({ limit }: EquitiesPaneProps) => {
             </div>
           </div>
         )}
-        {!limit ? <LoadOlderControl channel="equities" /> : null}
       </div>
     </Pane>
   );
@@ -5849,7 +5816,6 @@ const FlowPane = ({ limit, title = "Flow" }: FlowPaneProps) => {
             </div>
           </div>
         )}
-        {!limit ? <LoadOlderControl channel="flow" /> : null}
       </div>
     </Pane>
   );
@@ -5948,7 +5914,6 @@ const AlertsPane = ({ limit, withStrip = false, className }: AlertsPaneProps) =>
             </div>
           </div>
         )}
-        {!limit ? <LoadOlderControl channel="alerts" /> : null}
       </div>
     </Pane>
   );
@@ -6034,7 +5999,6 @@ const ClassifierPane = ({ limit, className }: ClassifierPaneProps) => {
             </div>
           </div>
         )}
-        {!limit ? <LoadOlderControl channel="classifier-hits" /> : null}
       </div>
     </Pane>
   );
@@ -6128,7 +6092,6 @@ const DarkPane = ({ limit, className }: DarkPaneProps) => {
             </div>
           </div>
         )}
-        {!limit ? <LoadOlderControl channel="inferred-dark" /> : null}
       </div>
     </Pane>
   );
@@ -6323,7 +6286,6 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
                     </button>
                   </span>
                 ) : null}
-                <FlowFilterControls />
                 <label className="terminal-filter">
                   <span className="terminal-filter-label">Ticker</span>
                   <span className="terminal-filter-field">
@@ -6405,7 +6367,7 @@ export function OverviewRoute() {
 
 export function TapeRoute() {
   return (
-    <PageFrame title="Tape">
+    <PageFrame title="Tape" actions={<FlowFilterControls />}>
       <div className="page-grid page-grid-tape">
         <OptionsPane />
         <EquitiesPane />

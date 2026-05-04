@@ -168,6 +168,7 @@ input {
   z-index: 20;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 12px;
   padding: 10px 20px;
   background: rgba(7, 10, 14, 0.92);
@@ -210,18 +211,20 @@ input {
 .terminal-topbar-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 12px;
   min-width: 0;
-  width: 100%;
+  width: auto;
+  margin-left: auto;
 }
 
 .terminal-topbar-controls {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 10px;
   min-width: 0;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
 }
 
 .terminal-topbar-mode {
@@ -237,7 +240,7 @@ input {
   flex-direction: column;
   gap: 4px;
   min-width: clamp(220px, 24vw, 360px);
-  flex: 1 1 clamp(220px, 24vw, 360px);
+  flex: 0 1 clamp(220px, 24vw, 360px);
 }
 
 .terminal-filter-label {
@@ -808,30 +811,6 @@ h3 {
 
 .tape-controls button {
   white-space: nowrap;
-}
-
-.load-older {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 4px 0 0;
-  font-size: 0.76rem;
-  color: var(--muted);
-}
-
-.load-older button {
-  min-width: 112px;
-  white-space: nowrap;
-}
-
-.load-older span {
-  max-width: 260px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--danger);
 }
 
 .missed-count {
@@ -1585,15 +1564,18 @@ h3 {
   .terminal-topbar {
     position: static;
     align-items: center;
+    justify-content: flex-end;
     padding: 10px 16px;
   }
 
   .terminal-topbar-actions {
-    justify-content: space-between;
+    justify-content: flex-end;
+    margin-left: auto;
+    width: auto;
   }
 
   .terminal-topbar-controls {
-    flex: 1 1 auto;
+    flex: 0 1 auto;
   }
 
   .flow-filter-popover-panel {
