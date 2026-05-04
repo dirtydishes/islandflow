@@ -1127,6 +1127,7 @@ export const getOptionTableSnapshot = (
 
 type ListScrollState = {
   listRef: React.RefObject<HTMLDivElement>;
+  setListRef: (node: HTMLDivElement | null) => void;
   isAtTop: boolean;
   isAtTopRef: React.MutableRefObject<boolean>;
   missed: number;
@@ -1137,11 +1138,17 @@ type ListScrollState = {
 
 const useListScroll = (): ListScrollState => {
   const listRef = useRef<HTMLDivElement | null>(null);
+  const [listNode, setListNode] = useState<HTMLDivElement | null>(null);
   const [isAtTop, setIsAtTop] = useState(true);
   const [missed, setMissed] = useState(0);
   const [resumeTick, setResumeTick] = useState(0);
   const isAtTopRef = useRef(true);
   const prevAtTopRef = useRef(true);
+
+  const setListRef = useCallback((node: HTMLDivElement | null) => {
+    listRef.current = node;
+    setListNode(node);
+  }, []);
 
   useEffect(() => {
     isAtTopRef.current = isAtTop;
@@ -1169,8 +1176,7 @@ const useListScroll = (): ListScrollState => {
   }, [isAtTopRef]);
 
   useEffect(() => {
-    const el = listRef.current;
-    if (!el) {
+    if (!listNode) {
       return;
     }
 
@@ -1179,12 +1185,12 @@ const useListScroll = (): ListScrollState => {
     };
 
     updateScrollState();
-    el.addEventListener("scroll", onScroll);
+    listNode.addEventListener("scroll", onScroll);
 
     return () => {
-      el.removeEventListener("scroll", onScroll);
+      listNode.removeEventListener("scroll", onScroll);
     };
-  }, [updateScrollState]);
+  }, [listNode, updateScrollState]);
 
   const onNewItems = useCallback((count: number) => {
     if (count <= 0) {
@@ -1212,6 +1218,7 @@ const useListScroll = (): ListScrollState => {
 
   return {
     listRef,
+    setListRef,
     isAtTop,
     isAtTopRef,
     missed,
@@ -1846,6 +1853,8 @@ type PausableTapeViewConfig<T extends SortableItem & { seq: number }> = {
   captureScroll?: () => void;
   getItemTs?: (item: T) => number;
   retentionLimit?: number;
+  shouldHold?: () => boolean;
+  resumeSignal?: number;
 };
 
 const usePausableTapeView = <T extends SortableItem & { seq: number }>(
@@ -1872,11 +1881,12 @@ const usePausableTapeView = <T extends SortableItem & { seq: number }>(
       return;
     }
 
+    const holdForScroll = config.shouldHold ? config.shouldHold() : false;
     setData((current) => {
       const next = reducePausableTapeData(
         current,
         config.sourceItems,
-        paused,
+        paused || holdForScroll,
         config.retentionLimit ?? LIVE_HOT_WINDOW
       );
       if (next === current) {
@@ -1897,11 +1907,17 @@ const usePausableTapeView = <T extends SortableItem & { seq: number }>(
     config.onNewItems,
     config.captureScroll,
     config.retentionLimit,
+    config.shouldHold,
     paused
   ]);
 
   useEffect(() => {
     if (!config.enabled || paused) {
+      return;
+    }
+
+    const holdForScroll = config.shouldHold ? config.shouldHold() : false;
+    if (holdForScroll) {
       return;
     }
 
@@ -1918,7 +1934,15 @@ const usePausableTapeView = <T extends SortableItem & { seq: number }>(
 
       return next;
     });
-  }, [config.captureScroll, config.enabled, config.onNewItems, config.retentionLimit, paused]);
+  }, [
+    config.captureScroll,
+    config.enabled,
+    config.onNewItems,
+    config.retentionLimit,
+    config.resumeSignal,
+    config.shouldHold,
+    paused
+  ]);
 
   const togglePause = useCallback(() => {
     setPaused((current) => !current);
@@ -2841,7 +2865,9 @@ const TapeControls = ({ paused, onTogglePause, isAtTop, missed, onJump }: TapeCo
       <button className="jump-button" type="button" onClick={onJump} disabled={isAtTop}>
         Jump to top
       </button>
-      <span className="missed-count">{active ? `+${missed} new` : ""}</span>
+      <span className={`missed-count${active ? " missed-count-visible" : ""}`} aria-hidden={!active}>
+        +{missed} new
+      </span>
     </div>
   );
 };
@@ -4233,7 +4259,9 @@ const useTerminalState = () => {
     freshnessMs: LIVE_OPTIONS_STALE_MS,
     retentionLimit: LIVE_HOT_WINDOW_OPTIONS,
     captureScroll: optionsAnchor.capture,
-    onNewItems: optionsScroll.onNewItems
+    onNewItems: optionsScroll.onNewItems,
+    shouldHold: () => !optionsScroll.isAtTopRef.current,
+    resumeSignal: optionsScroll.resumeTick
   });
   const liveEquities = usePausableTapeView<EquityPrint>({
     enabled: mode === "live",
@@ -4242,7 +4270,9 @@ const useTerminalState = () => {
     lastUpdate: liveSession.lastUpdate,
     freshnessMs: LIVE_EQUITIES_STALE_MS,
     captureScroll: equitiesAnchor.capture,
-    onNewItems: equitiesScroll.onNewItems
+    onNewItems: equitiesScroll.onNewItems,
+    shouldHold: () => !equitiesScroll.isAtTopRef.current,
+    resumeSignal: equitiesScroll.resumeTick
   });
   const liveFlow = usePausableTapeView<FlowPacket>({
     enabled: mode === "live",
@@ -4252,6 +4282,8 @@ const useTerminalState = () => {
     freshnessMs: LIVE_FLOW_STALE_MS,
     captureScroll: flowAnchor.capture,
     onNewItems: flowScroll.onNewItems,
+    shouldHold: () => !flowScroll.isAtTopRef.current,
+    resumeSignal: flowScroll.resumeTick,
     getItemTs: (item) => item.source_ts
   });
 
@@ -5494,7 +5526,7 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          <div className="data-table-wrap" ref={state.optionsScroll.listRef}>
+          <div className="data-table-wrap" ref={state.optionsScroll.setListRef}>
             <div className="data-table data-table-options" role="table" aria-label="Options tape">
               <div className="data-table-head" role="row">
                 <span className="data-table-cell">TIME</span>
@@ -5660,7 +5692,7 @@ const EquitiesPane = ({ limit }: EquitiesPaneProps) => {
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          <div className="data-table-wrap" ref={state.equitiesScroll.listRef}>
+          <div className="data-table-wrap" ref={state.equitiesScroll.setListRef}>
             <div className="data-table data-table-equities" role="table" aria-label="Equity prints">
               <div className="data-table-head" role="row">
                 <span className="data-table-cell">TIME</span>
@@ -5753,7 +5785,7 @@ const FlowPane = ({ limit, title = "Flow" }: FlowPaneProps) => {
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          <div className="data-table-wrap" ref={state.flowScroll.listRef}>
+          <div className="data-table-wrap" ref={state.flowScroll.setListRef}>
             <div className="data-table data-table-flow" role="table" aria-label="Flow packets">
               <div className="data-table-head" role="row">
                 <span className="data-table-cell">TIME</span>
@@ -5892,7 +5924,7 @@ const AlertsPane = ({ limit, withStrip = false, className }: AlertsPaneProps) =>
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          <div className="data-table-wrap" ref={state.alertsScroll.listRef}>
+          <div className="data-table-wrap" ref={state.alertsScroll.setListRef}>
             <div className="data-table data-table-alerts" role="table" aria-label="Alerts">
               <div className="data-table-head" role="row">
                 <span className="data-table-cell">TIME</span>
@@ -5988,7 +6020,7 @@ const ClassifierPane = ({ limit, className }: ClassifierPaneProps) => {
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          <div className="data-table-wrap" ref={state.classifierScroll.listRef}>
+          <div className="data-table-wrap" ref={state.classifierScroll.setListRef}>
             <div className="data-table data-table-classifier" role="table" aria-label="Classifier hits">
               <div className="data-table-head" role="row">
                 <span className="data-table-cell">TIME</span>
@@ -6073,7 +6105,7 @@ const DarkPane = ({ limit, className }: DarkPaneProps) => {
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          <div className="data-table-wrap" ref={state.darkScroll.listRef}>
+          <div className="data-table-wrap" ref={state.darkScroll.setListRef}>
             <div className="data-table data-table-dark" role="table" aria-label="Dark events">
               <div className="data-table-head" role="row">
                 <span className="data-table-cell">TIME</span>

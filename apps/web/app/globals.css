@@ -835,11 +835,26 @@ h3 {
 }
 
 .missed-count {
-  width: 86px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  max-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
   font-size: 0.72rem;
   color: var(--accent);
-  text-align: right;
-  white-space: nowrap;
+  opacity: 0;
+  transform: translateX(6px);
+  transition:
+    max-width 180ms ease,
+    opacity 140ms ease,
+    transform 180ms ease;
+}
+
+.missed-count-visible {
+  max-width: 92px;
+  opacity: 1;
+  transform: translateX(0);
 }
 
 .list {
