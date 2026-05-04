@@ -2291,7 +2291,6 @@ export const getLiveManifest = (
   if (pathname === "/tape") {
     return dedupeLiveSubscriptions([
       ...baselineSubs,
-      { channel: "options", filters: flowFilters, ...optionScope },
       { channel: "nbbo" },
       { channel: "equities", ...equityScope },
       { channel: "flow", filters: flowFilters },
@@ -2299,32 +2298,10 @@ export const getLiveManifest = (
     ]);
   }
 
-  if (pathname === "/signals") {
-    return dedupeLiveSubscriptions([
-      ...baselineSubs,
-      { channel: "alerts" },
-      { channel: "classifier-hits" },
-      { channel: "inferred-dark" }
-    ]);
-  }
-
-  if (pathname === "/charts") {
-    return dedupeLiveSubscriptions([
-      ...baselineSubs,
-      ...chartSubs,
-      { channel: "classifier-hits" },
-      { channel: "inferred-dark" }
-    ]);
-  }
-
-  if (pathname === "/replay") {
-    return baselineSubs;
-  }
-
   return dedupeLiveSubscriptions([
     ...baselineSubs,
     { channel: "equities", ...equityScope },
-    { channel: "flow" },
+    { channel: "flow", filters: flowFilters },
     { channel: "alerts" },
     { channel: "classifier-hits" },
     { channel: "inferred-dark" },
@@ -4104,6 +4081,40 @@ const useTerminalState = () => {
   useEffect(() => {
     setReplaySource(null);
   }, [mode]);
+
+  useEffect(() => {
+    if (!selectedAlert && !selectedClassifierHit && !selectedDarkEvent) {
+      return;
+    }
+
+    const dismissDrawers = () => {
+      setSelectedAlert(null);
+      setSelectedClassifierHit(null);
+      setSelectedDarkEvent(null);
+    };
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if ((event.target as Element | null)?.closest(".drawer")) {
+        return;
+      }
+      dismissDrawers();
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        dismissDrawers();
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [selectedAlert, selectedClassifierHit, selectedDarkEvent]);
+
   const optionsScroll = useListScroll();
   const equitiesScroll = useListScroll();
   const flowScroll = useListScroll();
@@ -5174,13 +5185,10 @@ const useTerminal = (): TerminalState => {
   return value;
 };
 
-const NAV_ITEMS = [
-  { href: "/", label: "Overview" },
-  { href: "/tape", label: "Tape" },
-  { href: "/signals", label: "Signals" },
-  { href: "/charts", label: "Charts" },
-  { href: "/replay", label: "Replay" }
-];
+export const NAV_ITEMS = [
+  { href: "/", label: "Home" },
+  { href: "/tape", label: "Tape" }
+] as const;
 
 type PageFrameProps = {
   title: string;
@@ -5221,6 +5229,7 @@ const FlowFilterSection = ({
 };
 
 export const FlowFilterPopover = ({ filters, onChange }: FlowFilterPopoverProps) => {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const activeCount = countActiveFlowFilterGroups(filters);
@@ -5278,6 +5287,10 @@ export const FlowFilterPopover = ({ filters, onChange }: FlowFilterPopoverProps)
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [open]);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
 
   return (
     <div className={`flow-filter-popover${open ? " is-open" : ""}`} ref={rootRef}>
@@ -5438,62 +5451,6 @@ const ShellMetricStrip = () => {
         <span className="shell-metric-value">
           {state.lastSeen ? formatTime(state.lastSeen) : "WAITING"}
         </span>
-      </div>
-    </div>
-  );
-};
-
-const FeedStatusBar = () => {
-  const state = useTerminal();
-  const feeds = [
-    { label: "Opt", feed: state.options },
-    { label: "Eq", feed: state.equities },
-    { label: "Flow", feed: state.flow },
-    { label: "Alert", feed: state.alerts },
-    { label: "Rule", feed: state.classifierHits },
-    { label: "Dark", feed: state.inferredDark }
-  ];
-
-  return (
-    <div className="feed-status-bar">
-      {feeds.map(({ label, feed }) => (
-        <div className={`feed-status feed-status-${feed.status}`} key={label}>
-          <span className="feed-status-dot" />
-          <span>{label}</span>
-        </div>
-      ))}
-    </div>
-  );
-};
-
-const OverviewBrief = () => {
-  const state = useTerminal();
-
-  return (
-    <div className="overview-strip">
-      <div className="overview-cell">
-        <span className="overview-label">Options</span>
-        <strong>{formatFlowMetric(state.filteredOptions.length)}</strong>
-      </div>
-      <div className="overview-cell">
-        <span className="overview-label">Equities</span>
-        <strong>{formatFlowMetric(state.filteredEquities.length)}</strong>
-      </div>
-      <div className="overview-cell">
-        <span className="overview-label">Flow</span>
-        <strong>{formatFlowMetric(state.filteredFlow.length)}</strong>
-      </div>
-      <div className="overview-cell">
-        <span className="overview-label">Alerts</span>
-        <strong>{formatFlowMetric(state.filteredAlerts.length)}</strong>
-      </div>
-      <div className="overview-cell">
-        <span className="overview-label">Rules</span>
-        <strong>{formatFlowMetric(state.filteredClassifierHits.length)}</strong>
-      </div>
-      <div className="overview-cell">
-        <span className="overview-label">Dark</span>
-        <strong>{formatFlowMetric(state.filteredInferredDark.length)}</strong>
       </div>
     </div>
   );
@@ -6356,11 +6313,19 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
 
         <div className="terminal-frame">
           <header className="terminal-topbar">
-            <FeedStatusBar />
             <div className="terminal-topbar-actions">
               <div className="terminal-topbar-controls">
+                {state.selectedInstrumentLabel ? (
+                  <span className="instrument-focus-chip">
+                    <span>{state.selectedInstrumentLabel}</span>
+                    <button type="button" onClick={() => state.setSelectedInstrument(null)}>
+                      Clear
+                    </button>
+                  </span>
+                ) : null}
+                <FlowFilterControls />
                 <label className="terminal-filter">
-                  <span className="terminal-filter-label">Filter</span>
+                  <span className="terminal-filter-label">Ticker</span>
                   <span className="terminal-filter-field">
                     <input
                       className="terminal-input"
@@ -6379,14 +6344,6 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
                 >
                   Clear
                 </button>
-                {state.selectedInstrumentLabel ? (
-                  <span className="instrument-focus-chip">
-                    <span>{state.selectedInstrumentLabel}</span>
-                    <button type="button" onClick={() => state.setSelectedInstrument(null)}>
-                      Clear
-                    </button>
-                  </span>
-                ) : null}
               </div>
               <div className="terminal-topbar-mode">
                 <button
@@ -6436,13 +6393,11 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
 
 export function OverviewRoute() {
   return (
-    <PageFrame title="Overview">
-      <OverviewBrief />
-      <div className="page-grid page-grid-overview">
+    <PageFrame title="Home">
+      <div className="page-grid page-grid-home">
         <ChartPane />
-        <AlertsPane limit={12} withStrip />
-        <FlowPane limit={12} />
-        <EquitiesPane limit={12} />
+        <EquitiesPane />
+        <AlertsPane withStrip />
       </div>
     </PageFrame>
   );
@@ -6450,7 +6405,7 @@ export function OverviewRoute() {
 
 export function TapeRoute() {
   return (
-    <PageFrame title="Tape" actions={<FlowFilterControls />}>
+    <PageFrame title="Tape">
       <div className="page-grid page-grid-tape">
         <OptionsPane />
         <EquitiesPane />

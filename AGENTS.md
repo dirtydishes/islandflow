@@ -44,3 +44,27 @@ bd close <id>         # Complete work
 - NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds
 <!-- END BEADS INTEGRATION -->
+
+## Minimal Repo Operating Instructions
+
+This is a Bun + TypeScript monorepo for an event-sourced market-data pipeline:
+- Flow: ingest services publish to NATS/JetStream, compute/candles derive events, API serves REST/WS, web consumes live/replay streams.
+- Main folders: `services/*` (runtime services), `packages/*` (shared libs/types/storage), `apps/web` (Next.js UI).
+- Infra dependency: local dev assumes Docker services (NATS, ClickHouse, Redis) are available.
+
+Use these repo-specific commands:
+- Install deps: `bun install`
+- Start full stack: `bun run dev`
+- Start infra only: `bun run dev:infra`
+- Start backend services only: `bun run dev:services`
+- Start web only: `bun run dev:web`
+
+Testing and validation in this repo are Bun-first:
+- Run tests: `bun test`
+- Run scoped tests: `bun test services/compute/tests` (or another package/service path)
+- Validate web production build when UI code changes: `bun --cwd=apps/web run build`
+
+Working style that avoids common problems here:
+- Prefer editing in the touched workspace (`services/<name>`, `packages/<name>`, `apps/web`) and keep shared contract changes in `packages/types`.
+- Keep `.env` aligned with `.env.example`; adapters default to synthetic modes for local development.
+- Dev runners persist child PID state in `.tmp/`; if a previous run crashed, restart via the standard `bun run dev*` commands so stale processes are cleaned up.

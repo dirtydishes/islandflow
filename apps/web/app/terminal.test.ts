@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+  NAV_ITEMS,
   buildDefaultFlowFilters,
   classifierToneForFamily,
   deriveAlertDirection,
@@ -40,9 +41,9 @@ const makeAlert = (overrides: Record<string, unknown> = {}) =>
   }) as any;
 
 describe("live manifest", () => {
-  it("includes options on every live route", () => {
+  it("includes options on home and tape", () => {
     const filters = buildDefaultFlowFilters();
-    for (const pathname of ["/", "/tape", "/signals", "/charts", "/replay"]) {
+    for (const pathname of ["/", "/tape"]) {
       expect(
         getLiveManifest(pathname, "SPY", 60000, filters).some(
           (subscription) => subscription.channel === "options"
@@ -61,17 +62,38 @@ describe("live manifest", () => {
     expect(tapeOptionsSubscriptions).toHaveLength(1);
   });
 
-  it("keeps option filters on baseline subscription", () => {
+  it("keeps option filters on baseline subscription across page changes", () => {
     const filters = {
       ...buildDefaultFlowFilters(),
       minNotional: 125_000
     };
 
-    const optionsSubscription = getLiveManifest("/signals", "SPY", 60000, filters).find(
+    const homeOptionsSubscription = getLiveManifest("/", "SPY", 60000, filters).find(
+      (subscription) => subscription.channel === "options"
+    );
+    const tapeOptionsSubscription = getLiveManifest("/tape", "SPY", 60000, filters).find(
       (subscription) => subscription.channel === "options"
     );
 
-    expect(optionsSubscription?.filters).toBe(filters);
+    expect(homeOptionsSubscription?.filters).toBe(filters);
+    expect(tapeOptionsSubscription?.filters).toBe(filters);
+  });
+
+  it("applies global flow filters to flow subscriptions on home and tape", () => {
+    const filters = {
+      ...buildDefaultFlowFilters(),
+      minNotional: 50_000
+    };
+
+    const homeFlowSubscription = getLiveManifest("/", "SPY", 60000, filters).find(
+      (subscription) => subscription.channel === "flow"
+    );
+    const tapeFlowSubscription = getLiveManifest("/tape", "SPY", 60000, filters).find(
+      (subscription) => subscription.channel === "flow"
+    );
+
+    expect(homeFlowSubscription?.filters).toBe(filters);
+    expect(tapeFlowSubscription?.filters).toBe(filters);
   });
 
   it("includes scoped option and equity subscriptions", () => {
@@ -98,6 +120,15 @@ describe("live manifest", () => {
     expect(optionsSubscription?.underlying_ids).toEqual(["AAPL"]);
     expect(optionsSubscription?.option_contract_id).toBe("AAPL-2025-01-17-200-C");
     expect(equitiesSubscription?.underlying_ids).toEqual(["AAPL"]);
+  });
+});
+
+describe("terminal navigation", () => {
+  it("exposes only Home and Tape as top-level destinations", () => {
+    expect(NAV_ITEMS).toEqual([
+      { href: "/", label: "Home" },
+      { href: "/tape", label: "Tape" }
+    ]);
   });
 });
 
