@@ -5,6 +5,7 @@ import {
   EquityCandleSchema,
   EquityPrintJoinSchema,
   EquityPrintSchema,
+  EquityQuoteSchema,
   FlowPacketSchema,
   InferredDarkEventSchema,
   OptionNBBOSchema,
@@ -26,6 +27,7 @@ export const LiveGenericChannelSchema = z.enum([
   "options",
   "nbbo",
   "equities",
+  "equity-quotes",
   "equity-joins",
   "flow",
   "classifier-hits",
@@ -37,6 +39,7 @@ export const LiveChannelSchema = z.enum([
   "options",
   "nbbo",
   "equities",
+  "equity-quotes",
   "equity-joins",
   "flow",
   "classifier-hits",
@@ -52,14 +55,20 @@ export type LiveGenericChannel = z.infer<typeof LiveGenericChannelSchema>;
 export const LiveSubscriptionSchema = z.discriminatedUnion("channel", [
   z.object({
     channel: z.literal("options"),
-    filters: OptionFlowFiltersSchema.optional()
+    filters: OptionFlowFiltersSchema.optional(),
+    underlying_ids: z.array(z.string().min(1)).optional(),
+    option_contract_id: z.string().min(1).optional()
   }),
   z.object({
     channel: z.literal("flow"),
     filters: OptionFlowFiltersSchema.optional()
   }),
   z.object({
-    channel: z.enum(["nbbo", "equities", "equity-joins", "classifier-hits", "alerts", "inferred-dark"])
+    channel: z.enum(["nbbo", "equity-quotes", "equity-joins", "classifier-hits", "alerts", "inferred-dark"])
+  }),
+  z.object({
+    channel: z.literal("equities"),
+    underlying_ids: z.array(z.string().min(1)).optional()
   }),
   z.object({
     channel: z.literal("equity-candles"),
@@ -78,6 +87,7 @@ const livePayloadSchemas = {
   options: OptionPrintSchema,
   nbbo: OptionNBBOSchema,
   equities: EquityPrintSchema,
+  "equity-quotes": EquityQuoteSchema,
   "equity-joins": EquityPrintJoinSchema,
   flow: FlowPacketSchema,
   "classifier-hits": ClassifierHitEventSchema,
@@ -177,9 +187,23 @@ export type LiveServerMessage = z.infer<typeof LiveServerMessageSchema>;
 
 export const getSubscriptionKey = (subscription: LiveSubscription): string => {
   switch (subscription.channel) {
-    case "options":
+    case "options": {
+      const underlyings = subscription.underlying_ids?.length
+        ? `|underlyings:${[...subscription.underlying_ids].sort().join(",")}`
+        : "";
+      const contract = subscription.option_contract_id
+        ? `|contract:${subscription.option_contract_id}`
+        : "";
+      return `${subscription.channel}|${optionFlowFilterKey(subscription.filters)}${underlyings}${contract}`;
+    }
     case "flow":
       return `${subscription.channel}|${optionFlowFilterKey(subscription.filters)}`;
+    case "equities": {
+      const underlyings = subscription.underlying_ids?.length
+        ? `|underlyings:${[...subscription.underlying_ids].sort().join(",")}`
+        : "";
+      return `${subscription.channel}${underlyings}`;
+    }
     case "equity-candles":
       return `${subscription.channel}|${subscription.underlying_id}|${subscription.interval_ms}`;
     case "equity-overlay":

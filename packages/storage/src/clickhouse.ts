@@ -512,7 +512,23 @@ const normalizeOptionRow = (row: unknown): unknown => {
       "ts",
       "price",
       "size",
-      "notional"
+      "notional",
+      "execution_nbbo_bid",
+      "execution_nbbo_ask",
+      "execution_nbbo_mid",
+      "execution_nbbo_spread",
+      "execution_nbbo_bid_size",
+      "execution_nbbo_ask_size",
+      "execution_nbbo_ts",
+      "execution_nbbo_age_ms",
+      "execution_underlying_spot",
+      "execution_underlying_bid",
+      "execution_underlying_ask",
+      "execution_underlying_mid",
+      "execution_underlying_spread",
+      "execution_underlying_ts",
+      "execution_underlying_age_ms",
+      "execution_iv"
     ]);
 
     if ("is_etf" in record) {
@@ -536,6 +552,14 @@ export type OptionPrintQueryFilters = {
   security?: "stock" | "etf" | "all";
   optionTypes?: string[];
   nbboSides?: string[];
+  underlyingIds?: string[];
+  optionContractId?: string;
+  sinceTs?: number;
+};
+
+export type EquityPrintQueryFilters = {
+  underlyingIds?: string[];
+  sinceTs?: number;
 };
 
 const buildOptionPrintFilterConditions = (
@@ -574,6 +598,32 @@ const buildOptionPrintFilterConditions = (
     conditions.push(`nbbo_side IN (${buildStringList(filters.nbboSides)})`);
   }
 
+  if (filters.underlyingIds && filters.underlyingIds.length > 0) {
+    conditions.push(`underlying_id IN (${buildStringList(filters.underlyingIds)})`);
+  }
+
+  if (filters.optionContractId) {
+    conditions.push(`option_contract_id = ${quoteString(filters.optionContractId)}`);
+  }
+
+  if (typeof filters.sinceTs === "number" && Number.isFinite(filters.sinceTs)) {
+    conditions.push(`ts >= ${clampCursor(filters.sinceTs)}`);
+  }
+
+  return conditions;
+};
+
+const buildEquityPrintFilterConditions = (filters?: EquityPrintQueryFilters): string[] => {
+  const conditions: string[] = [];
+  if (!filters) {
+    return conditions;
+  }
+  if (filters.underlyingIds && filters.underlyingIds.length > 0) {
+    conditions.push(`underlying_id IN (${buildStringList(filters.underlyingIds)})`);
+  }
+  if (typeof filters.sinceTs === "number" && Number.isFinite(filters.sinceTs)) {
+    conditions.push(`ts >= ${clampCursor(filters.sinceTs)}`);
+  }
   return conditions;
 };
 
@@ -782,11 +832,14 @@ export const fetchRecentOptionNBBO = async (
 
 export const fetchRecentEquityPrints = async (
   client: ClickHouseClient,
-  limit: number
+  limit: number,
+  filters?: EquityPrintQueryFilters
 ): Promise<EquityPrint[]> => {
   const safeLimit = clampLimit(limit);
+  const conditions = buildEquityPrintFilterConditions(filters);
+  const whereClause = conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")}` : "";
   const result = await client.query({
-    query: `SELECT * FROM ${EQUITY_PRINTS_TABLE} ORDER BY ts DESC, seq DESC LIMIT ${safeLimit}`,
+    query: `SELECT * FROM ${EQUITY_PRINTS_TABLE}${whereClause} ORDER BY ts DESC, seq DESC LIMIT ${safeLimit}`,
     format: "JSONEachRow"
   });
 
@@ -967,14 +1020,20 @@ export const fetchEquityPrintsAfter = async (
   client: ClickHouseClient,
   afterTs: number,
   afterSeq: number,
-  limit: number
+  limit: number,
+  filters?: EquityPrintQueryFilters
 ): Promise<EquityPrint[]> => {
   const safeLimit = clampLimit(limit);
   const safeAfterTs = clampCursor(afterTs);
   const safeAfterSeq = clampCursor(afterSeq);
 
+  const conditions = [
+    `((ts, seq) > (${safeAfterTs}, ${safeAfterSeq}))`,
+    ...buildEquityPrintFilterConditions(filters)
+  ];
+
   const result = await client.query({
-    query: `SELECT * FROM ${EQUITY_PRINTS_TABLE} WHERE (ts, seq) > (${safeAfterTs}, ${safeAfterSeq}) ORDER BY ts ASC, seq ASC LIMIT ${safeLimit}`,
+    query: `SELECT * FROM ${EQUITY_PRINTS_TABLE} WHERE ${conditions.join(" AND ")} ORDER BY ts ASC, seq ASC LIMIT ${safeLimit}`,
     format: "JSONEachRow"
   });
 
@@ -1236,16 +1295,37 @@ export const fetchEquityPrintsBefore = async (
   client: ClickHouseClient,
   beforeTs: number,
   beforeSeq: number,
-  limit: number
+  limit: number,
+  filters?: EquityPrintQueryFilters
 ): Promise<EquityPrint[]> => {
   const safeLimit = clampLimit(limit);
+  const conditions = [
+    buildBeforeTupleCondition("ts", "seq", beforeTs, beforeSeq),
+    ...buildEquityPrintFilterConditions(filters)
+  ];
   const result = await client.query({
-    query: `SELECT * FROM ${EQUITY_PRINTS_TABLE} WHERE ${buildBeforeTupleCondition("ts", "seq", beforeTs, beforeSeq)} ORDER BY ts DESC, seq DESC LIMIT ${safeLimit}`,
+    query: `SELECT * FROM ${EQUITY_PRINTS_TABLE} WHERE ${conditions.join(" AND ")} ORDER BY ts DESC, seq DESC LIMIT ${safeLimit}`,
     format: "JSONEachRow"
   });
 
   const rows = await result.json<unknown[]>();
   return EquityPrintSchema.array().parse(rows.map(normalizeEquityRow));
+};
+
+export const fetchEquityQuotesBefore = async (
+  client: ClickHouseClient,
+  beforeTs: number,
+  beforeSeq: number,
+  limit: number
+): Promise<EquityQuote[]> => {
+  const safeLimit = clampLimit(limit);
+  const result = await client.query({
+    query: `SELECT * FROM ${EQUITY_QUOTES_TABLE} WHERE ${buildBeforeTupleCondition("ts", "seq", beforeTs, beforeSeq)} ORDER BY ts DESC, seq DESC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  return EquityQuoteSchema.array().parse(rows.map(normalizeEquityQuoteRow));
 };
 
 export const fetchEquityPrintJoinsBefore = async (

@@ -1,5 +1,7 @@
-import { ChartsRoute } from "../terminal";
+import { redirect } from "next/navigation";
+
+export const dynamic = "force-dynamic";
 
 export default function Page() {
-  return <ChartsRoute />;
+  redirect("/");
 }

@@ -261,6 +261,7 @@ Default `smart-money` policy rejects lower-information prints and keeps high-con
 | `LIVE_LIMIT_OPTIONS` | `10000` | In-memory/Redis live cache depth for options channel (clamped `1..100000`). |
 | `LIVE_LIMIT_NBBO` | `10000` | Live cache depth for options NBBO channel (clamped `1..100000`). |
 | `LIVE_LIMIT_EQUITIES` | `10000` | Live cache depth for equities channel (clamped `1..100000`). |
+| `LIVE_LIMIT_EQUITY_QUOTES` | `10000` | Live cache depth for equity quotes channel (clamped `1..100000`). |
 | `LIVE_LIMIT_EQUITY_JOINS` | `10000` | Live cache depth for equity join channel (clamped `1..100000`). |
 | `LIVE_LIMIT_FLOW` | `10000` | Live cache depth for flow packet channel (clamped `1..100000`). |
 | `LIVE_LIMIT_CLASSIFIER_HITS` | `10000` | Live cache depth for classifier hits channel (clamped `1..100000`). |
@@ -303,7 +304,10 @@ Default `smart-money` policy rejects lower-information prints and keeps high-con
   - `view=raw` — audit/debug path that preserves every stored print.
 - The default Tape page options/packets posture is now stock-only, hides `B` / `BB`, keeps calls and puts visible, and applies in-memory min-notional controls immediately.
 - Live retention uses a two-tier model:
-  - API/Redis maintain a bounded hot cache per live generic channel.
+  - ClickHouse is durable server history; Redis is a bounded hot cache per live generic channel.
+  - `LIVE_LIMIT_*` controls initial snapshot/hot-cache depth, not total persisted history.
+  - Browser state is only a rendering window and UI preferences, not a market-data database.
+  - Devices connected to the same API hydrate from the same server-seen history.
   - UI keeps a bounded hot window for rendering performance around the signal view rather than raw noise.
   - Options prints can use a deeper dedicated cap via `NEXT_PUBLIC_LIVE_HOT_WINDOW_OPTIONS` without raising every other feed.
   - Alert/drawer evidence is pinned and hydrated by id/trace so details remain inspectable after hot-window eviction.

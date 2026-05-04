@@ -25,10 +25,20 @@ describe("option-prints storage helpers", () => {
     expect(normalized.conditions).toEqual([]);
   });
 
+  it("normalizes legacy rows with missing execution context", () => {
+    const normalized = normalizeOptionPrint(basePrint);
+    expect(normalized.execution_nbbo_bid).toBeUndefined();
+    expect(normalized.execution_underlying_spot).toBeUndefined();
+    expect(normalized.execution_iv).toBeUndefined();
+  });
+
   it("includes the correct table name in the DDL", () => {
     const ddl = optionPrintsTableDDL();
     expect(ddl).toContain(OPTION_PRINTS_TABLE);
     expect(ddl).toContain("CREATE TABLE IF NOT EXISTS");
+    expect(ddl).toContain("execution_nbbo_bid Nullable(Float64)");
+    expect(ddl).toContain("execution_underlying_spot Nullable(Float64)");
+    expect(ddl).toContain("execution_iv Nullable(Float64)");
   });
 
   it("builds before/history and trace lookup queries", async () => {
@@ -48,7 +58,10 @@ describe("option-prints storage helpers", () => {
       security: "stock",
       nbboSides: ["AA", "A"],
       optionTypes: ["call"],
-      minNotional: 25_000
+      minNotional: 25_000,
+      underlyingIds: ["AAPL", "NVDA"],
+      optionContractId: "AAPL-2025-01-17-200-C",
+      sinceTs: 123
     });
     await fetchOptionPrintsBefore(client, 100, 5, 20, "alpaca");
     await fetchOptionPrintsByTraceIds(client, ["trace-1", "trace-2"]);
@@ -58,6 +71,9 @@ describe("option-prints storage helpers", () => {
     expect(queries[0]).toContain("nbbo_side IN ('AA', 'A')");
     expect(queries[0]).toContain("option_type IN ('call')");
     expect(queries[0]).toContain("notional >= 25000");
+    expect(queries[0]).toContain("underlying_id IN ('AAPL', 'NVDA')");
+    expect(queries[0]).toContain("option_contract_id = 'AAPL-2025-01-17-200-C'");
+    expect(queries[0]).toContain("ts >= 123");
     expect(queries[1]).toContain("(ts, seq) < (100, 5)");
     expect(queries[1]).toContain("startsWith(trace_id, 'alpaca')");
     expect(queries[1]).toContain("ORDER BY ts DESC, seq DESC LIMIT 20");

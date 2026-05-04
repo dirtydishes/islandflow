@@ -1,19 +1,24 @@
 import { describe, expect, it } from "bun:test";
 import {
+  NAV_ITEMS,
   buildDefaultFlowFilters,
+  classifierToneForFamily,
   deriveAlertDirection,
   countActiveFlowFilterGroups,
   formatCompactUsd,
   formatOptionContractLabel,
   flushPausableTapeData,
   getAlertWindowAnchorTs,
+  getOptionTableSnapshot,
   getLiveFeedStatus,
+  getLiveManifest,
   normalizeAlertSeverity,
   nextFlowFilterPopoverState,
   projectPausableTapeState,
   reducePausableTapeData,
   shouldRetainLiveSnapshotHistory,
   shouldShowEquitiesSilentFeedWarning,
+  selectPrimaryClassifierHit,
   statusLabel,
   toggleFilterValue
 } from "./terminal";
@@ -34,6 +39,98 @@ const makeAlert = (overrides: Record<string, unknown> = {}) =>
     hits: [],
     ...overrides
   }) as any;
+
+describe("live manifest", () => {
+  it("includes options on home and tape", () => {
+    const filters = buildDefaultFlowFilters();
+    for (const pathname of ["/", "/tape"]) {
+      expect(
+        getLiveManifest(pathname, "SPY", 60000, filters).some(
+          (subscription) => subscription.channel === "options"
+        )
+      ).toBe(true);
+    }
+  });
+
+  it("dedupes tape options subscription", () => {
+    const tapeOptionsSubscriptions = getLiveManifest(
+      "/tape",
+      "SPY",
+      60000,
+      buildDefaultFlowFilters()
+    ).filter((subscription) => subscription.channel === "options");
+    expect(tapeOptionsSubscriptions).toHaveLength(1);
+  });
+
+  it("keeps option filters on baseline subscription across page changes", () => {
+    const filters = {
+      ...buildDefaultFlowFilters(),
+      minNotional: 125_000
+    };
+
+    const homeOptionsSubscription = getLiveManifest("/", "SPY", 60000, filters).find(
+      (subscription) => subscription.channel === "options"
+    );
+    const tapeOptionsSubscription = getLiveManifest("/tape", "SPY", 60000, filters).find(
+      (subscription) => subscription.channel === "options"
+    );
+
+    expect(homeOptionsSubscription?.filters).toBe(filters);
+    expect(tapeOptionsSubscription?.filters).toBe(filters);
+  });
+
+  it("applies global flow filters to flow subscriptions on home and tape", () => {
+    const filters = {
+      ...buildDefaultFlowFilters(),
+      minNotional: 50_000
+    };
+
+    const homeFlowSubscription = getLiveManifest("/", "SPY", 60000, filters).find(
+      (subscription) => subscription.channel === "flow"
+    );
+    const tapeFlowSubscription = getLiveManifest("/tape", "SPY", 60000, filters).find(
+      (subscription) => subscription.channel === "flow"
+    );
+
+    expect(homeFlowSubscription?.filters).toBe(filters);
+    expect(tapeFlowSubscription?.filters).toBe(filters);
+  });
+
+  it("includes scoped option and equity subscriptions", () => {
+    const manifest = getLiveManifest(
+      "/tape",
+      "AAPL",
+      60000,
+      buildDefaultFlowFilters(),
+      {
+        underlying_ids: ["AAPL"],
+        option_contract_id: "AAPL-2025-01-17-200-C"
+      },
+      { underlying_ids: ["AAPL"] }
+    );
+    const optionsSubscription = manifest.find(
+      (subscription): subscription is Extract<(typeof manifest)[number], { channel: "options" }> =>
+        subscription.channel === "options"
+    );
+    const equitiesSubscription = manifest.find(
+      (subscription): subscription is Extract<(typeof manifest)[number], { channel: "equities" }> =>
+        subscription.channel === "equities"
+    );
+
+    expect(optionsSubscription?.underlying_ids).toEqual(["AAPL"]);
+    expect(optionsSubscription?.option_contract_id).toBe("AAPL-2025-01-17-200-C");
+    expect(equitiesSubscription?.underlying_ids).toEqual(["AAPL"]);
+  });
+});
+
+describe("terminal navigation", () => {
+  it("exposes only Home and Tape as top-level destinations", () => {
+    expect(NAV_ITEMS).toEqual([
+      { href: "/", label: "Home" },
+      { href: "/tape", label: "Tape" }
+    ]);
+  });
+});
 
 describe("live tape pausable helpers", () => {
   it("queues new items while paused and flushes them on resume", () => {
@@ -170,6 +267,54 @@ describe("options display formatters", () => {
     expect(formatCompactUsd(11_430)).toBe("11.4K");
     expect(formatCompactUsd(1_250_000)).toBe("1.3M");
     expect(formatCompactUsd(Number.NaN)).toBe("0.00");
+  });
+
+  it("renders options table snapshot values from preserved spot and IV", () => {
+    expect(
+      getOptionTableSnapshot({
+        price: 1.25,
+        size: 10,
+        notional: 12_500,
+        execution_nbbo_side: "A",
+        execution_underlying_spot: 450.05,
+        execution_iv: 0.42
+      })
+    ).toEqual({
+      spot: "450.05",
+      iv: "42%",
+      side: "A",
+      details: "10@1.25_A",
+      value: "12.5K"
+    });
+  });
+
+  it("renders legacy options table snapshot spot and IV as dashes", () => {
+    const snapshot = getOptionTableSnapshot({
+      price: 1,
+      size: 2
+    });
+
+    expect(snapshot.spot).toBe("--");
+    expect(snapshot.iv).toBe("--");
+  });
+});
+
+describe("classifier row decoration helpers", () => {
+  it("maps classifier families to row tones", () => {
+    expect(classifierToneForFamily("large_bullish_call_sweep")).toBe("green");
+    expect(classifierToneForFamily("large_bearish_put_sweep")).toBe("red");
+    expect(classifierToneForFamily("straddle")).toBe("blue");
+    expect(classifierToneForFamily("unknown_family")).toBe("neutral");
+  });
+
+  it("selects primary hits by confidence, source timestamp, then seq", () => {
+    const hit = selectPrimaryClassifierHit([
+      { ...makeAlert({ classifier_id: "old", confidence: 0.9, source_ts: 1_000, seq: 1 }), direction: "bullish", explanations: [] },
+      { ...makeAlert({ classifier_id: "new", confidence: 0.9, source_ts: 2_000, seq: 1 }), direction: "bullish", explanations: [] },
+      { ...makeAlert({ classifier_id: "low", confidence: 0.5, source_ts: 3_000, seq: 9 }), direction: "bullish", explanations: [] }
+    ]);
+
+    expect(hit?.classifier_id).toBe("new");
   });
 });
 

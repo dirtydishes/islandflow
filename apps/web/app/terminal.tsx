@@ -11,7 +11,9 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type Dispatch,
+  type MouseEvent as ReactMouseEvent,
   type ReactNode,
   type SetStateAction
 } from "react";
@@ -22,6 +24,7 @@ import type {
   EquityCandle,
   EquityPrint,
   EquityPrintJoin,
+  EquityQuote,
   FlowPacket,
   InferredDarkEvent,
   LiveServerMessage,
@@ -95,6 +98,15 @@ const CANDLE_INTERVALS = [
   { label: "1m", ms: 60000 },
   { label: "5m", ms: 300000 }
 ];
+const LIVE_SESSION_IDLE_RECONNECT_MS = 12_000;
+const LIVE_SESSION_IDLE_CHECK_MS = 3_000;
+const LIVE_SESSION_HOT_CHANNELS = new Set<LiveSubscription["channel"]>([
+  "options",
+  "nbbo",
+  "equities",
+  "flow",
+  "equity-overlay"
+]);
 
 type CandlestickSeries = ReturnType<IChartApi["addCandlestickSeries"]>;
 
@@ -112,6 +124,11 @@ type ChartCandle = {
   low: number;
   close: number;
 };
+
+type SelectedInstrument =
+  | null
+  | { kind: "equity"; underlyingId: string }
+  | { kind: "option-contract"; contractId: string; underlyingId: string };
 
 const formatIntervalLabel = (intervalMs: number): string => {
   const match = CANDLE_INTERVALS.find((interval) => interval.ms === intervalMs);
@@ -398,13 +415,19 @@ export const reducePausableTapeData = <T extends SortableItem>(
     return current;
   }
 
-  const nextSeenKeys = new Set(current.seenKeys);
+  const seenKeys = current.seenKeys;
+  let nextSeenKeys: Set<string> | null = null;
   const unseen: T[] = [];
 
+  // Incoming items are maintained newest-first by mergeNewest.
+  // Once we hit a previously seen key, the remainder is older history.
   for (const item of incoming) {
     const key = getTapeItemKey(item);
-    if (nextSeenKeys.has(key)) {
-      continue;
+    if (seenKeys.has(key)) {
+      break;
+    }
+    if (!nextSeenKeys) {
+      nextSeenKeys = new Set(seenKeys);
     }
     nextSeenKeys.add(key);
     unseen.push(item);
@@ -420,7 +443,7 @@ export const reducePausableTapeData = <T extends SortableItem>(
       queued: mergeNewest(unseen, current.queued, retentionLimit, (evicted) =>
         incrementRetentionMetric("hotWindowEvictions", evicted)
       ),
-      seenKeys: nextSeenKeys,
+      seenKeys: nextSeenKeys ?? seenKeys,
       dropped: current.dropped + unseen.length
     };
   }
@@ -431,7 +454,7 @@ export const reducePausableTapeData = <T extends SortableItem>(
       incrementRetentionMetric("hotWindowEvictions", evicted)
     ),
     queued: [],
-    seenKeys: nextSeenKeys,
+    seenKeys: nextSeenKeys ?? seenKeys,
     dropped: 0
   };
 };
@@ -982,7 +1005,8 @@ const LIVE_SNAPSHOT_HISTORY_CHANNELS = new Set<LiveSubscription["channel"]>([
   "options",
   "nbbo",
   "equities",
-  "flow"
+  "flow",
+  "classifier-hits"
 ]);
 
 export const shouldRetainLiveSnapshotHistory = (
@@ -1027,8 +1051,83 @@ const classifyNbboSide = (price: number, quote: OptionNBBO | null | undefined): 
   return price >= mid ? "A" : "B";
 };
 
+type ClassifierDecor = {
+  hit: ClassifierHitEvent;
+  family: string;
+  tone: string;
+  intensity: number;
+};
+
+const CLASSIFIER_FAMILY_TONES: Record<string, string> = {
+  large_bullish_call_sweep: "green",
+  large_bearish_put_sweep: "red",
+  unusual_contract_spike: "amber",
+  large_call_sell_overwrite: "copper",
+  large_put_sell_write: "copper",
+  straddle: "blue",
+  strangle: "blue",
+  vertical_spread: "teal",
+  ladder_accumulation: "yellowgreen",
+  roll_up_down_out: "violet",
+  far_dated_conviction: "cyan",
+  zero_dte_gamma_punch: "magenta"
+};
+
+export const selectPrimaryClassifierHit = (
+  hits: readonly ClassifierHitEvent[]
+): ClassifierHitEvent | null => {
+  if (hits.length === 0) {
+    return null;
+  }
+  return [...hits].sort((a, b) => {
+    const confidenceDelta = b.confidence - a.confidence;
+    if (confidenceDelta !== 0) {
+      return confidenceDelta;
+    }
+    const tsDelta = b.source_ts - a.source_ts;
+    if (tsDelta !== 0) {
+      return tsDelta;
+    }
+    return b.seq - a.seq;
+  })[0];
+};
+
+export const classifierToneForFamily = (classifierId: string): string =>
+  CLASSIFIER_FAMILY_TONES[classifierId] ?? "neutral";
+
+const buildClassifierDecor = (hit: ClassifierHitEvent): ClassifierDecor => ({
+  hit,
+  family: hit.classifier_id,
+  tone: classifierToneForFamily(hit.classifier_id),
+  intensity: clamp(hit.confidence, 0.25, 1)
+});
+
+export const getOptionTableSnapshot = (
+  print: Pick<
+    OptionPrint,
+    | "price"
+    | "size"
+    | "notional"
+    | "nbbo_side"
+    | "execution_nbbo_side"
+    | "execution_underlying_spot"
+    | "execution_iv"
+  >,
+  fallbackSide: OptionNbboSide | null = null
+): { spot: string; iv: string; side: string; details: string; value: string } => {
+  const side = print.execution_nbbo_side ?? print.nbbo_side ?? fallbackSide ?? "--";
+  return {
+    spot: typeof print.execution_underlying_spot === "number" ? formatPrice(print.execution_underlying_spot) : "--",
+    iv: typeof print.execution_iv === "number" ? formatPct(print.execution_iv) : "--",
+    side,
+    details: `${formatSize(print.size)}@${formatPrice(print.price)}_${side}`,
+    value: formatCompactUsd(print.notional ?? print.price * print.size * 100)
+  };
+};
+
 type ListScrollState = {
   listRef: React.RefObject<HTMLDivElement>;
+  setListRef: (node: HTMLDivElement | null) => void;
   isAtTop: boolean;
   isAtTopRef: React.MutableRefObject<boolean>;
   missed: number;
@@ -1039,11 +1138,17 @@ type ListScrollState = {
 
 const useListScroll = (): ListScrollState => {
   const listRef = useRef<HTMLDivElement | null>(null);
+  const [listNode, setListNode] = useState<HTMLDivElement | null>(null);
   const [isAtTop, setIsAtTop] = useState(true);
   const [missed, setMissed] = useState(0);
   const [resumeTick, setResumeTick] = useState(0);
   const isAtTopRef = useRef(true);
   const prevAtTopRef = useRef(true);
+
+  const setListRef = useCallback((node: HTMLDivElement | null) => {
+    listRef.current = node;
+    setListNode(node);
+  }, []);
 
   useEffect(() => {
     isAtTopRef.current = isAtTop;
@@ -1071,8 +1176,7 @@ const useListScroll = (): ListScrollState => {
   }, [isAtTopRef]);
 
   useEffect(() => {
-    const el = listRef.current;
-    if (!el) {
+    if (!listNode) {
       return;
     }
 
@@ -1081,12 +1185,12 @@ const useListScroll = (): ListScrollState => {
     };
 
     updateScrollState();
-    el.addEventListener("scroll", onScroll);
+    listNode.addEventListener("scroll", onScroll);
 
     return () => {
-      el.removeEventListener("scroll", onScroll);
+      listNode.removeEventListener("scroll", onScroll);
     };
-  }, [updateScrollState]);
+  }, [listNode, updateScrollState]);
 
   const onNewItems = useCallback((count: number) => {
     if (count <= 0) {
@@ -1114,6 +1218,7 @@ const useListScroll = (): ListScrollState => {
 
   return {
     listRef,
+    setListRef,
     isAtTop,
     isAtTopRef,
     missed,
@@ -1748,6 +1853,8 @@ type PausableTapeViewConfig<T extends SortableItem & { seq: number }> = {
   captureScroll?: () => void;
   getItemTs?: (item: T) => number;
   retentionLimit?: number;
+  shouldHold?: () => boolean;
+  resumeSignal?: number;
 };
 
 const usePausableTapeView = <T extends SortableItem & { seq: number }>(
@@ -1774,11 +1881,12 @@ const usePausableTapeView = <T extends SortableItem & { seq: number }>(
       return;
     }
 
+    const holdForScroll = config.shouldHold ? config.shouldHold() : false;
     setData((current) => {
       const next = reducePausableTapeData(
         current,
         config.sourceItems,
-        paused,
+        paused || holdForScroll,
         config.retentionLimit ?? LIVE_HOT_WINDOW
       );
       if (next === current) {
@@ -1799,11 +1907,17 @@ const usePausableTapeView = <T extends SortableItem & { seq: number }>(
     config.onNewItems,
     config.captureScroll,
     config.retentionLimit,
+    config.shouldHold,
     paused
   ]);
 
   useEffect(() => {
     if (!config.enabled || paused) {
+      return;
+    }
+
+    const holdForScroll = config.shouldHold ? config.shouldHold() : false;
+    if (holdForScroll) {
       return;
     }
 
@@ -1820,7 +1934,15 @@ const usePausableTapeView = <T extends SortableItem & { seq: number }>(
 
       return next;
     });
-  }, [config.captureScroll, config.enabled, config.onNewItems, config.retentionLimit, paused]);
+  }, [
+    config.captureScroll,
+    config.enabled,
+    config.onNewItems,
+    config.retentionLimit,
+    config.resumeSignal,
+    config.shouldHold,
+    paused
+  ]);
 
   const togglePause = useCallback(() => {
     setPaused((current) => !current);
@@ -2097,9 +2219,15 @@ type LiveSessionState = {
   connectedAt: number | null;
   lastUpdate: number | null;
   lastEventByChannel: Partial<Record<LiveSubscription["channel"], number>>;
+  manifest: LiveSubscription[];
+  historyCursors: Partial<Record<string, Cursor | null>>;
+  historyLoading: Partial<Record<string, boolean>>;
+  historyErrors: Partial<Record<string, string | null>>;
+  loadOlder: (channel: LiveSubscription["channel"]) => Promise<void>;
   options: OptionPrint[];
   nbbo: OptionNBBO[];
   equities: EquityPrint[];
+  equityQuotes: EquityQuote[];
   equityJoins: EquityPrintJoin[];
   flow: FlowPacket[];
   classifierHits: ClassifierHitEvent[];
@@ -2109,46 +2237,100 @@ type LiveSessionState = {
   chartOverlay: EquityPrint[];
 };
 
-const getLiveManifest = (
+type LiveHistoryResponse<T> = {
+  data: T[];
+  next_before: Cursor | null;
+};
+
+const LIVE_HISTORY_ENDPOINTS: Partial<Record<LiveSubscription["channel"], string>> = {
+  options: "/history/options",
+  nbbo: "/history/nbbo",
+  equities: "/history/equities",
+  "equity-quotes": "/history/equity-quotes",
+  "equity-joins": "/history/equity-joins",
+  flow: "/history/flow",
+  "classifier-hits": "/history/classifier-hits",
+  alerts: "/history/alerts",
+  "inferred-dark": "/history/inferred-dark"
+};
+
+const appendOptionFlowFilters = (params: URLSearchParams, filters: OptionFlowFilters | undefined): void => {
+  if (!filters) {
+    return;
+  }
+  if (filters.view) {
+    params.set("view", filters.view);
+  }
+  if (filters.securityTypes?.length === 1) {
+    params.set("security", filters.securityTypes[0]);
+  } else if (filters.securityTypes && filters.securityTypes.length > 1) {
+    params.set("security", "all");
+  }
+  if (filters.nbboSides?.length) {
+    params.set("side", filters.nbboSides.join(","));
+  }
+  if (filters.optionTypes?.length) {
+    params.set("type", filters.optionTypes.join(","));
+  }
+  if (typeof filters.minNotional === "number") {
+    params.set("min_notional", String(filters.minNotional));
+  }
+};
+
+const appendLiveScopeParams = (params: URLSearchParams, subscription: LiveSubscription): void => {
+  if ((subscription.channel === "options" || subscription.channel === "equities") && subscription.underlying_ids?.length) {
+    params.set("underlying_ids", subscription.underlying_ids.join(","));
+  }
+  if (subscription.channel === "options" && subscription.option_contract_id) {
+    params.set("option_contract_id", subscription.option_contract_id);
+  }
+};
+
+const dedupeLiveSubscriptions = (subscriptions: LiveSubscription[]): LiveSubscription[] => {
+  const seen = new Set<string>();
+  return subscriptions.filter((subscription) => {
+    const key = getLiveSubscriptionKey(subscription);
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+};
+
+export const getLiveManifest = (
   pathname: string,
   chartTicker: string,
   chartIntervalMs: number,
-  flowFilters: OptionFlowFilters
+  flowFilters: OptionFlowFilters,
+  optionScope?: Pick<Extract<LiveSubscription, { channel: "options" }>, "underlying_ids" | "option_contract_id">,
+  equityScope?: Pick<Extract<LiveSubscription, { channel: "equities" }>, "underlying_ids">
 ): LiveSubscription[] => {
+  const baselineSubs: LiveSubscription[] = [{ channel: "options", filters: flowFilters, ...optionScope }];
   const chartSubs: LiveSubscription[] = [
     { channel: "equity-candles", underlying_id: chartTicker, interval_ms: chartIntervalMs },
     { channel: "equity-overlay", underlying_id: chartTicker }
   ];
 
   if (pathname === "/tape") {
-    return [
-      { channel: "options", filters: flowFilters },
+    return dedupeLiveSubscriptions([
+      ...baselineSubs,
       { channel: "nbbo" },
-      { channel: "equities" },
-      { channel: "flow", filters: flowFilters }
-    ];
+      { channel: "equities", ...equityScope },
+      { channel: "flow", filters: flowFilters },
+      { channel: "classifier-hits" }
+    ]);
   }
 
-  if (pathname === "/signals") {
-    return [{ channel: "alerts" }, { channel: "classifier-hits" }, { channel: "inferred-dark" }];
-  }
-
-  if (pathname === "/charts") {
-    return [...chartSubs, { channel: "classifier-hits" }, { channel: "inferred-dark" }];
-  }
-
-  if (pathname === "/replay") {
-    return [];
-  }
-
-  return [
-    { channel: "equities" },
-    { channel: "flow" },
+  return dedupeLiveSubscriptions([
+    ...baselineSubs,
+    { channel: "equities", ...equityScope },
+    { channel: "flow", filters: flowFilters },
     { channel: "alerts" },
     { channel: "classifier-hits" },
     { channel: "inferred-dark" },
     ...chartSubs
-  ];
+  ]);
 };
 
 const useLiveSession = (
@@ -2156,7 +2338,9 @@ const useLiveSession = (
   pathname: string,
   chartTicker: string,
   chartIntervalMs: number,
-  flowFilters: OptionFlowFilters
+  flowFilters: OptionFlowFilters,
+  optionScope?: Pick<Extract<LiveSubscription, { channel: "options" }>, "underlying_ids" | "option_contract_id">,
+  equityScope?: Pick<Extract<LiveSubscription, { channel: "equities" }>, "underlying_ids">
 ): LiveSessionState => {
   const [status, setStatus] = useState<WsStatus>(enabled ? "connecting" : "disconnected");
   const [connectedAt, setConnectedAt] = useState<number | null>(null);
@@ -2164,9 +2348,13 @@ const useLiveSession = (
   const [lastEventByChannel, setLastEventByChannel] = useState<
     Partial<Record<LiveSubscription["channel"], number>>
   >({});
+  const [historyCursors, setHistoryCursors] = useState<Partial<Record<string, Cursor | null>>>({});
+  const [historyLoading, setHistoryLoading] = useState<Partial<Record<string, boolean>>>({});
+  const [historyErrors, setHistoryErrors] = useState<Partial<Record<string, string | null>>>({});
   const [options, setOptions] = useState<OptionPrint[]>([]);
   const [nbbo, setNbbo] = useState<OptionNBBO[]>([]);
   const [equities, setEquities] = useState<EquityPrint[]>([]);
+  const [equityQuotes, setEquityQuotes] = useState<EquityQuote[]>([]);
   const [equityJoins, setEquityJoins] = useState<EquityPrintJoin[]>([]);
   const [flow, setFlow] = useState<FlowPacket[]>([]);
   const [classifierHits, setClassifierHits] = useState<ClassifierHitEvent[]>([]);
@@ -2176,11 +2364,14 @@ const useLiveSession = (
   const [chartOverlay, setChartOverlay] = useState<EquityPrint[]>([]);
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<number | null>(null);
+  const idleWatchdogRef = useRef<number | null>(null);
+  const connectedAtRef = useRef<number | null>(null);
+  const lastEventAtRef = useRef<number | null>(null);
   const subscribedKeysRef = useRef<Set<string>>(new Set());
   const subscribedMapRef = useRef<Map<string, LiveSubscription>>(new Map());
   const manifest = useMemo(
-    () => getLiveManifest(pathname, chartTicker.toUpperCase(), chartIntervalMs, flowFilters),
-    [pathname, chartTicker, chartIntervalMs, flowFilters]
+    () => getLiveManifest(pathname, chartTicker.toUpperCase(), chartIntervalMs, flowFilters, optionScope, equityScope),
+    [pathname, chartTicker, chartIntervalMs, flowFilters, optionScope, equityScope]
   );
 
   useEffect(() => {
@@ -2189,9 +2380,13 @@ const useLiveSession = (
       setConnectedAt(null);
       setLastUpdate(null);
       setLastEventByChannel({});
+      setHistoryCursors({});
+      setHistoryLoading({});
+      setHistoryErrors({});
       setOptions([]);
       setNbbo([]);
       setEquities([]);
+      setEquityQuotes([]);
       setEquityJoins([]);
       setFlow([]);
       setClassifierHits([]);
@@ -2209,6 +2404,12 @@ const useLiveSession = (
         window.clearTimeout(reconnectRef.current);
         reconnectRef.current = null;
       }
+      if (idleWatchdogRef.current !== null) {
+        window.clearInterval(idleWatchdogRef.current);
+        idleWatchdogRef.current = null;
+      }
+      connectedAtRef.current = null;
+      lastEventAtRef.current = null;
       return;
     }
 
@@ -2245,6 +2446,7 @@ const useLiveSession = (
 
       const subscription = message.op === "snapshot" ? message.snapshot.subscription : message.subscription;
       const items = message.op === "snapshot" ? message.snapshot.items : [message.item];
+      const subscriptionKey = getLiveSubscriptionKey(subscription);
       const updateAt = Date.now();
 
       const mergeItems = <T extends SortableItem>(
@@ -2278,6 +2480,9 @@ const useLiveSession = (
         case "equities":
           mergeItems(setEquities, items as EquityPrint[]);
           break;
+        case "equity-quotes":
+          mergeItems(setEquityQuotes, items as EquityQuote[]);
+          break;
         case "equity-joins":
           mergeItems(setEquityJoins, items as EquityPrintJoin[]);
           break;
@@ -2301,7 +2506,19 @@ const useLiveSession = (
           break;
       }
 
+      if (message.op === "snapshot") {
+        setHistoryCursors((current) => ({
+          ...current,
+          [subscriptionKey]: message.snapshot.next_before
+        }));
+        setHistoryErrors((current) => ({
+          ...current,
+          [subscriptionKey]: null
+        }));
+      }
+
       if (items.length > 0) {
+        lastEventAtRef.current = updateAt;
         setLastEventByChannel((current) => ({
           ...current,
           [subscription.channel]: updateAt
@@ -2324,7 +2541,10 @@ const useLiveSession = (
           return;
         }
         setStatus("connected");
-        setConnectedAt(Date.now());
+        const now = Date.now();
+        setConnectedAt(now);
+        connectedAtRef.current = now;
+        lastEventAtRef.current = null;
         syncSubscriptions(socket);
       };
 
@@ -2346,6 +2566,8 @@ const useLiveSession = (
         }
         setStatus("disconnected");
         setConnectedAt(null);
+        connectedAtRef.current = null;
+        lastEventAtRef.current = null;
         subscribedKeysRef.current = new Set();
         subscribedMapRef.current = new Map();
         reconnectRef.current = window.setTimeout(connect, 1000);
@@ -2357,14 +2579,43 @@ const useLiveSession = (
         }
         setStatus("disconnected");
         setConnectedAt(null);
+        connectedAtRef.current = null;
+        lastEventAtRef.current = null;
         socket.close();
       };
     };
 
     connect();
+    idleWatchdogRef.current = window.setInterval(() => {
+      if (!active) {
+        return;
+      }
+      const socket = socketRef.current;
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        return;
+      }
+      const hasHotSubscription = Array.from(subscribedMapRef.current.values()).some((sub) =>
+        LIVE_SESSION_HOT_CHANNELS.has(sub.channel)
+      );
+      if (!hasHotSubscription) {
+        return;
+      }
+      const baseline = lastEventAtRef.current ?? connectedAtRef.current;
+      if (baseline === null) {
+        return;
+      }
+      if (Date.now() - baseline >= LIVE_SESSION_IDLE_RECONNECT_MS) {
+        console.warn("Live socket idle; reconnecting");
+        socket.close();
+      }
+    }, LIVE_SESSION_IDLE_CHECK_MS);
 
     return () => {
       active = false;
+      if (idleWatchdogRef.current !== null) {
+        window.clearInterval(idleWatchdogRef.current);
+        idleWatchdogRef.current = null;
+      }
       if (reconnectRef.current !== null) {
         window.clearTimeout(reconnectRef.current);
       }
@@ -2385,6 +2636,42 @@ const useLiveSession = (
     const currentKeys = subscribedKeysRef.current;
     const toSubscribe = manifest.filter((sub) => !currentKeys.has(getLiveSubscriptionKey(sub)));
     const removedKeys = Array.from(currentKeys).filter((key) => !nextKeys.has(key));
+    const resetScopedChannels = new Set(
+      [...removedKeys, ...toSubscribe.map(getLiveSubscriptionKey)]
+        .map((key) => subscribedMapRef.current.get(key) ?? nextMap.get(key) ?? null)
+        .filter((sub): sub is LiveSubscription => sub !== null)
+        .map((sub) => sub.channel)
+        .filter((channel) => channel === "options" || channel === "equities")
+    );
+    if (resetScopedChannels.has("options")) {
+      setOptions([]);
+    }
+    if (resetScopedChannels.has("equities")) {
+      setEquities([]);
+    }
+    if (resetScopedChannels.size > 0) {
+      setHistoryCursors((current) => {
+        const next = { ...current };
+        for (const key of [...removedKeys, ...toSubscribe.map(getLiveSubscriptionKey)]) {
+          delete next[key];
+        }
+        return next;
+      });
+      setHistoryLoading((current) => {
+        const next = { ...current };
+        for (const key of [...removedKeys, ...toSubscribe.map(getLiveSubscriptionKey)]) {
+          delete next[key];
+        }
+        return next;
+      });
+      setHistoryErrors((current) => {
+        const next = { ...current };
+        for (const key of [...removedKeys, ...toSubscribe.map(getLiveSubscriptionKey)]) {
+          delete next[key];
+        }
+        return next;
+      });
+    }
 
     if (removedKeys.length > 0) {
       const removedSubs = removedKeys
@@ -2401,14 +2688,117 @@ const useLiveSession = (
     subscribedMapRef.current = nextMap;
   }, [enabled, manifest]);
 
+  const loadOlder = useCallback(
+    async (channel: LiveSubscription["channel"]) => {
+      const subscription = manifest.find((candidate) => candidate.channel === channel);
+      if (!enabled || !subscription) {
+        return;
+      }
+      const endpoint = LIVE_HISTORY_ENDPOINTS[subscription.channel];
+      if (!endpoint) {
+        return;
+      }
+      const key = getLiveSubscriptionKey(subscription);
+      const cursor = historyCursors[key];
+      if (!cursor || historyLoading[key]) {
+        return;
+      }
+
+      setHistoryLoading((current) => ({ ...current, [key]: true }));
+      setHistoryErrors((current) => ({ ...current, [key]: null }));
+
+      try {
+        const params = new URLSearchParams({
+          before_ts: String(cursor.ts),
+          before_seq: String(cursor.seq),
+          limit: String(subscription.channel === "options" ? 500 : 200)
+        });
+        if (subscription.channel === "options" || subscription.channel === "flow") {
+          appendOptionFlowFilters(params, subscription.filters);
+        }
+        appendLiveScopeParams(params, subscription);
+        const url = new URL(buildApiUrl(endpoint));
+        url.search = params.toString();
+        const response = await fetch(url.toString());
+        if (!response.ok) {
+          const detail = await readErrorDetail(response);
+          throw new Error(detail || `HTTP ${response.status}`);
+        }
+        const payload = (await response.json()) as LiveHistoryResponse<SortableItem>;
+        const older = payload.data ?? [];
+
+        const mergeOlder = <T extends SortableItem>(
+          setter: Dispatch<SetStateAction<T[]>>,
+          limit: number
+        ) => {
+          setter((prev) =>
+            mergeNewest(older as T[], prev, limit, (evicted) =>
+              incrementRetentionMetric("hotWindowEvictions", evicted)
+            )
+          );
+        };
+
+        switch (subscription.channel) {
+          case "options":
+            mergeOlder(setOptions, LIVE_HOT_WINDOW_OPTIONS);
+            break;
+          case "nbbo":
+            mergeOlder(setNbbo, LIVE_HOT_WINDOW);
+            break;
+          case "equities":
+            mergeOlder(setEquities, LIVE_HOT_WINDOW);
+            break;
+          case "equity-quotes":
+            mergeOlder(setEquityQuotes, LIVE_HOT_WINDOW);
+            break;
+          case "equity-joins":
+            mergeOlder(setEquityJoins, LIVE_HOT_WINDOW);
+            break;
+          case "flow":
+            mergeOlder(setFlow, LIVE_HOT_WINDOW);
+            break;
+          case "classifier-hits":
+            mergeOlder(setClassifierHits, LIVE_HOT_WINDOW);
+            break;
+          case "alerts":
+            mergeOlder(setAlerts, LIVE_HOT_WINDOW);
+            break;
+          case "inferred-dark":
+            mergeOlder(setInferredDark, LIVE_HOT_WINDOW);
+            break;
+        }
+
+        setHistoryCursors((current) => ({
+          ...current,
+          [key]: older.length > 0 ? payload.next_before : null
+        }));
+        setLastUpdate(Date.now());
+      } catch (error) {
+        setHistoryErrors((current) => ({
+          ...current,
+          [key]: error instanceof Error ? error.message : String(error)
+        }));
+      } finally {
+        setHistoryLoading((current) => ({ ...current, [key]: false }));
+      }
+    },
+    [enabled, manifest, historyCursors, historyLoading]
+  );
+
   return {
     status,
     connectedAt,
     lastUpdate,
     lastEventByChannel,
+    manifest,
+    historyCursors,
+    historyLoading,
+    historyErrors,
+    loadOlder,
     options,
     nbbo,
     equities,
+    equityQuotes,
     equityJoins,
     flow,
     classifierHits,
@@ -2475,7 +2865,9 @@ const TapeControls = ({ paused, onTogglePause, isAtTop, missed, onJump }: TapeCo
       <button className="jump-button" type="button" onClick={onJump} disabled={isAtTop}>
         Jump to top
       </button>
-      <span className="missed-count">{active ? `+${missed} new` : ""}</span>
+      <span className={`missed-count${active ? " missed-count-visible" : ""}`} aria-hidden={!active}>
+        +{missed} new
+      </span>
     </div>
   );
 };
@@ -3617,6 +4009,7 @@ const useTerminalState = () => {
   const [selectedAlert, setSelectedAlert] = useState<AlertEvent | null>(null);
   const [selectedDarkEvent, setSelectedDarkEvent] = useState<InferredDarkEvent | null>(null);
   const [selectedClassifierHit, setSelectedClassifierHit] = useState<ClassifierHitEvent | null>(null);
+  const [selectedInstrument, setSelectedInstrument] = useState<SelectedInstrument>(null);
   const [filterInput, setFilterInput] = useState<string>("");
   const [flowFilters, setFlowFilters] = useState<OptionFlowFilters>(() => buildDefaultFlowFilters());
   const [chartIntervalMs, setChartIntervalMs] = useState<number>(CANDLE_INTERVALS[0].ms);
@@ -3628,20 +4021,52 @@ const useTerminalState = () => {
     return Array.from(new Set(parts));
   }, [filterInput]);
   const tickerSet = useMemo(() => new Set(activeTickers), [activeTickers]);
-  const chartTicker = useMemo(() => activeTickers[0] ?? "SPY", [activeTickers]);
+  const instrumentUnderlying = selectedInstrument?.underlyingId.toUpperCase() ?? null;
+  const optionScope = useMemo(
+    () => ({
+      underlying_ids: activeTickers.length > 0 ? activeTickers : instrumentUnderlying ? [instrumentUnderlying] : undefined,
+      option_contract_id:
+        selectedInstrument?.kind === "option-contract" ? selectedInstrument.contractId : undefined
+    }),
+    [activeTickers, instrumentUnderlying, selectedInstrument]
+  );
+  const equityScope = useMemo(
+    () => ({
+      underlying_ids: activeTickers.length > 0 ? activeTickers : instrumentUnderlying ? [instrumentUnderlying] : undefined
+    }),
+    [activeTickers, instrumentUnderlying]
+  );
+  const chartTicker = useMemo(
+    () => instrumentUnderlying ?? activeTickers[0] ?? "SPY",
+    [activeTickers, instrumentUnderlying]
+  );
+  const selectedInstrumentLabel = useMemo(() => {
+    if (!selectedInstrument) {
+      return null;
+    }
+    if (selectedInstrument.kind === "equity") {
+      return `Equity: ${selectedInstrument.underlyingId}`;
+    }
+    const display = formatOptionContractLabel(selectedInstrument.contractId);
+    return display
+      ? `Contract: ${display.ticker} ${display.expiration} ${display.strike}`
+      : `Contract: ${selectedInstrument.contractId}`;
+  }, [selectedInstrument]);
   const liveSession = useLiveSession(
     mode === "live",
     pathname,
     chartTicker,
     chartIntervalMs,
-    flowFilters
+    flowFilters,
+    optionScope,
+    equityScope
   );
   const equitiesLiveSubscriptionActive = useMemo(
     () =>
-      getLiveManifest(pathname, chartTicker.toUpperCase(), chartIntervalMs, flowFilters).some(
+      getLiveManifest(pathname, chartTicker.toUpperCase(), chartIntervalMs, flowFilters, optionScope, equityScope).some(
         (sub) => sub.channel === "equities"
       ),
-    [pathname, chartTicker, chartIntervalMs, flowFilters]
+    [pathname, chartTicker, chartIntervalMs, flowFilters, optionScope, equityScope]
   );
 
   const handleReplaySource = useCallback((value: string | null) => {
@@ -3651,6 +4076,40 @@ const useTerminalState = () => {
   useEffect(() => {
     setReplaySource(null);
   }, [mode]);
+
+  useEffect(() => {
+    if (!selectedAlert && !selectedClassifierHit && !selectedDarkEvent) {
+      return;
+    }
+
+    const dismissDrawers = () => {
+      setSelectedAlert(null);
+      setSelectedClassifierHit(null);
+      setSelectedDarkEvent(null);
+    };
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if ((event.target as Element | null)?.closest(".drawer")) {
+        return;
+      }
+      dismissDrawers();
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        dismissDrawers();
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [selectedAlert, selectedClassifierHit, selectedDarkEvent]);
+
   const optionsScroll = useListScroll();
   const equitiesScroll = useListScroll();
   const flowScroll = useListScroll();
@@ -3800,7 +4259,9 @@ const useTerminalState = () => {
     freshnessMs: LIVE_OPTIONS_STALE_MS,
     retentionLimit: LIVE_HOT_WINDOW_OPTIONS,
     captureScroll: optionsAnchor.capture,
-    onNewItems: optionsScroll.onNewItems
+    onNewItems: optionsScroll.onNewItems,
+    shouldHold: () => !optionsScroll.isAtTopRef.current,
+    resumeSignal: optionsScroll.resumeTick
   });
   const liveEquities = usePausableTapeView<EquityPrint>({
     enabled: mode === "live",
@@ -3809,7 +4270,9 @@ const useTerminalState = () => {
     lastUpdate: liveSession.lastUpdate,
     freshnessMs: LIVE_EQUITIES_STALE_MS,
     captureScroll: equitiesAnchor.capture,
-    onNewItems: equitiesScroll.onNewItems
+    onNewItems: equitiesScroll.onNewItems,
+    shouldHold: () => !equitiesScroll.isAtTopRef.current,
+    resumeSignal: equitiesScroll.resumeTick
   });
   const liveFlow = usePausableTapeView<FlowPacket>({
     enabled: mode === "live",
@@ -3819,6 +4282,8 @@ const useTerminalState = () => {
     freshnessMs: LIVE_FLOW_STALE_MS,
     captureScroll: flowAnchor.capture,
     onNewItems: flowScroll.onNewItems,
+    shouldHold: () => !flowScroll.isAtTopRef.current,
+    resumeSignal: flowScroll.resumeTick,
     getItemTs: (item) => item.source_ts
   });
 
@@ -4157,6 +4622,39 @@ const useTerminalState = () => {
     return traceId.slice(idx);
   }, []);
 
+  const classifierHitsByPacketId = useMemo(() => {
+    const map = new Map<string, ClassifierHitEvent[]>();
+    for (const hit of classifierHitsFeed.items) {
+      const packetId = extractPacketIdFromClassifierHitTrace(hit.trace_id);
+      if (!packetId) {
+        continue;
+      }
+      map.set(packetId, [...(map.get(packetId) ?? []), hit]);
+    }
+    return map;
+  }, [classifierHitsFeed.items, extractPacketIdFromClassifierHitTrace]);
+
+  const packetIdByOptionTraceId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const packet of flowFeed.items) {
+      for (const member of packet.members) {
+        map.set(member, packet.id);
+      }
+    }
+    return map;
+  }, [flowFeed.items]);
+
+  const classifierDecorByOptionTraceId = useMemo(() => {
+    const map = new Map<string, ClassifierDecor>();
+    for (const [traceId, packetId] of packetIdByOptionTraceId) {
+      const primary = selectPrimaryClassifierHit(classifierHitsByPacketId.get(packetId) ?? []);
+      if (primary) {
+        map.set(traceId, buildClassifierDecor(primary));
+      }
+    }
+    return map;
+  }, [classifierHitsByPacketId, packetIdByOptionTraceId]);
+
   const selectedClassifierPacketId = useMemo(() => {
     if (!selectedClassifierHit) {
       return null;
@@ -4268,19 +4766,31 @@ const useTerminalState = () => {
       if (!matchesOptionPrintFilters(print, flowFilters)) {
         return false;
       }
+      if (
+        selectedInstrument?.kind === "option-contract" &&
+        normalizeContractId(print.option_contract_id) !== selectedInstrument.contractId
+      ) {
+        return false;
+      }
       if (tickerSet.size === 0) {
-        return true;
+        return (
+          !instrumentUnderlying ||
+          extractUnderlying(normalizeContractId(print.option_contract_id)) === instrumentUnderlying
+        );
       }
       return matchesTicker(extractUnderlying(normalizeContractId(print.option_contract_id)));
     });
-  }, [flowFilters, optionsFeed.items, matchesTicker, tickerSet]);
+  }, [flowFilters, optionsFeed.items, matchesTicker, tickerSet, selectedInstrument, instrumentUnderlying]);
 
   const filteredEquities = useMemo(() => {
     if (tickerSet.size === 0) {
+      if (instrumentUnderlying) {
+        return equitiesFeed.items.filter((print) => print.underlying_id.toUpperCase() === instrumentUnderlying);
+      }
       return equitiesFeed.items;
     }
     return equitiesFeed.items.filter((print) => matchesTicker(print.underlying_id));
-  }, [equitiesFeed.items, matchesTicker, tickerSet]);
+  }, [equitiesFeed.items, matchesTicker, tickerSet, instrumentUnderlying]);
 
   const equitiesSilentWarning = shouldShowEquitiesSilentFeedWarning({
     wsStatus: liveSession.status,
@@ -4603,6 +5113,9 @@ const useTerminalState = () => {
     setSelectedDarkEvent,
     selectedClassifierHit,
     setSelectedClassifierHit,
+    selectedInstrument,
+    setSelectedInstrument,
+    selectedInstrumentLabel,
     filterInput,
     setFilterInput,
     flowFilters,
@@ -4632,6 +5145,9 @@ const useTerminalState = () => {
     equityPrintMap,
     equityJoinMap: resolvedEquityJoinMap,
     flowPacketMap: resolvedFlowPacketMap,
+    classifierHitsByPacketId,
+    packetIdByOptionTraceId,
+    classifierDecorByOptionTraceId,
     selectedEvidence,
     selectedFlowPacket,
     selectedDarkEvidence,
@@ -4670,13 +5186,10 @@ const useTerminal = (): TerminalState => {
   return value;
 };
 
-const NAV_ITEMS = [
-  { href: "/", label: "Overview" },
-  { href: "/tape", label: "Tape" },
-  { href: "/signals", label: "Signals" },
-  { href: "/charts", label: "Charts" },
-  { href: "/replay", label: "Replay" }
-];
+export const NAV_ITEMS = [
+  { href: "/", label: "Home" },
+  { href: "/tape", label: "Tape" }
+] as const;
 
 type PageFrameProps = {
   title: string;
@@ -4717,6 +5230,7 @@ const FlowFilterSection = ({
 };
 
 export const FlowFilterPopover = ({ filters, onChange }: FlowFilterPopoverProps) => {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const activeCount = countActiveFlowFilterGroups(filters);
@@ -4774,6 +5288,10 @@ export const FlowFilterPopover = ({ filters, onChange }: FlowFilterPopoverProps)
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [open]);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
 
   return (
     <div className={`flow-filter-popover${open ? " is-open" : ""}`} ref={rootRef}>
@@ -4886,6 +5404,30 @@ const FlowFilterControls = () => {
   return <FlowFilterPopover filters={state.flowFilters} onChange={state.setFlowFilters} />;
 };
 
+const ContractFilterControl = () => {
+  const state = useTerminal();
+  const selected = state.selectedInstrument;
+  const isContractFilterActive = selected?.kind === "option-contract";
+
+  return (
+    <button
+      className={`terminal-button contract-filter-button${isContractFilterActive ? " is-active" : ""}`}
+      type="button"
+      disabled={!isContractFilterActive}
+      onClick={() => state.setSelectedInstrument(null)}
+      title={
+        isContractFilterActive
+          ? "Clear active contract filter"
+          : "Contract filter activates when you focus a contract in the Options tape"
+      }
+    >
+      <span className="contract-filter-button-label">
+        {isContractFilterActive ? state.selectedInstrumentLabel : "Contract Filter"}
+      </span>
+    </button>
+  );
+};
+
 type PaneProps = {
   title: string;
   status?: ReactNode;
@@ -4939,62 +5481,6 @@ const ShellMetricStrip = () => {
   );
 };
 
-const FeedStatusBar = () => {
-  const state = useTerminal();
-  const feeds = [
-    { label: "Opt", feed: state.options },
-    { label: "Eq", feed: state.equities },
-    { label: "Flow", feed: state.flow },
-    { label: "Alert", feed: state.alerts },
-    { label: "Rule", feed: state.classifierHits },
-    { label: "Dark", feed: state.inferredDark }
-  ];
-
-  return (
-    <div className="feed-status-bar">
-      {feeds.map(({ label, feed }) => (
-        <div className={`feed-status feed-status-${feed.status}`} key={label}>
-          <span className="feed-status-dot" />
-          <span>{label}</span>
-        </div>
-      ))}
-    </div>
-  );
-};
-
-const OverviewBrief = () => {
-  const state = useTerminal();
-
-  return (
-    <div className="overview-strip">
-      <div className="overview-cell">
-        <span className="overview-label">Options</span>
-        <strong>{formatFlowMetric(state.filteredOptions.length)}</strong>
-      </div>
-      <div className="overview-cell">
-        <span className="overview-label">Equities</span>
-        <strong>{formatFlowMetric(state.filteredEquities.length)}</strong>
-      </div>
-      <div className="overview-cell">
-        <span className="overview-label">Flow</span>
-        <strong>{formatFlowMetric(state.filteredFlow.length)}</strong>
-      </div>
-      <div className="overview-cell">
-        <span className="overview-label">Alerts</span>
-        <strong>{formatFlowMetric(state.filteredAlerts.length)}</strong>
-      </div>
-      <div className="overview-cell">
-        <span className="overview-label">Rules</span>
-        <strong>{formatFlowMetric(state.filteredClassifierHits.length)}</strong>
-      </div>
-      <div className="overview-cell">
-        <span className="overview-label">Dark</span>
-        <strong>{formatFlowMetric(state.filteredInferredDark.length)}</strong>
-      </div>
-    </div>
-  );
-};
-
 type OptionsPaneProps = {
   limit?: number;
 };
@@ -5002,7 +5488,7 @@ type OptionsPaneProps = {
 const OptionsPane = ({ limit }: OptionsPaneProps) => {
   const state = useTerminal();
   const items = limit ? state.filteredOptions.slice(0, limit) : state.filteredOptions;
-  const virtual = useVirtualList(items, state.optionsScroll.listRef, !limit, 96);
+  const virtual = useVirtualList(items, state.optionsScroll.listRef, !limit, 36);
 
   return (
     <Pane
@@ -5028,7 +5514,7 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
         />
       }
     >
-      <div className="list terminal-list" ref={state.optionsScroll.listRef}>
+      <div className="data-table-shell">
         {items.length === 0 ? (
           <div className="empty">
             {state.tickerSet.size > 0
@@ -5040,103 +5526,119 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          <>
-            {virtual.topSpacerHeight > 0 ? (
-              <div style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
-            ) : null}
-            {virtual.visibleItems.map((print) => {
-            const contractId = normalizeContractId(print.option_contract_id);
-            const contractDisplay = formatOptionContractLabel(contractId);
-            const quote = state.nbboMap.get(contractId);
-            const nbboAge = quote ? Math.abs(print.ts - quote.ts) : null;
-            const nbboStale = nbboAge !== null && nbboAge > NBBO_MAX_AGE_MS_SAFE;
-            const nbboMid = quote ? (quote.bid + quote.ask) / 2 : null;
-            const nbboSide = print.nbbo_side ?? classifyNbboSide(print.price, quote);
-            const notional = print.notional ?? print.price * print.size * 100;
-
-            return (
-              <div className="row" key={`${print.trace_id}-${print.seq}`}>
-                <div>
-                  <div className={`contract${contractDisplay ? " option-contract" : ""}`}>
-                    {contractDisplay ? (
-                      <>
-                        <span>{contractDisplay.ticker}</span>
-                        <span>{contractDisplay.strike}</span>
-                        <span>{contractDisplay.expiration}</span>
-                      </>
-                    ) : (
-                      formatContractLabel(contractId)
-                    )}
-                  </div>
-                  <div className="meta">
-                    <span>${formatPrice(print.price)}</span>
-                    <span>{formatSize(print.size)}x</span>
-                    <span>{print.exchange}</span>
-                    <span className="notional-emphasis">Notional ${formatCompactUsd(notional)}</span>
-                    {print.conditions?.map((condition) => {
-                      const normalized = condition.toUpperCase();
-                      const tone =
-                        normalized === "SWEEP"
-                          ? "condition-sweep"
-                          : normalized === "ISO"
-                            ? "condition-iso"
-                            : "condition-neutral";
-                      return (
-                        <span className={`condition-chip ${tone}`} key={`${print.trace_id}-${condition}`}>
-                          {normalized}
-                        </span>
-                      );
-                    })}
-                  </div>
-                  {quote ? (
-                    <div className="meta nbbo-meta">
-                      <span>Bid ${formatPrice(quote.bid)}</span>
-                      <span>Ask ${formatPrice(quote.ask)}</span>
-                      <span>Mid ${formatPrice(nbboMid ?? 0)}</span>
-                      <span>{Math.round(nbboAge ?? 0)}ms</span>
-                      {nbboSide ? (
-                        <span className="nbbo-side" tabIndex={0} aria-label="NBBO side legend">
-                          <span className={`nbbo-tag nbbo-tag-${nbboSide.toLowerCase()}`}>
-                            {nbboSide}
-                          </span>
-                          <span className="nbbo-tooltip" role="tooltip">
-                            <span className="nbbo-tooltip-row">
-                              <span className="nbbo-tag nbbo-tag-a">A</span>
-                              <span>Ask</span>
-                            </span>
-                            <span className="nbbo-tooltip-row">
-                              <span className="nbbo-tag nbbo-tag-aa">AA</span>
-                              <span>Above Ask</span>
-                            </span>
-                            <span className="nbbo-tooltip-row">
-                              <span className="nbbo-tag nbbo-tag-b">B</span>
-                              <span>Bid</span>
-                            </span>
-                            <span className="nbbo-tooltip-row">
-                              <span className="nbbo-tag nbbo-tag-bb">BB</span>
-                              <span>Below Bid</span>
-                            </span>
-                          </span>
-                        </span>
-                      ) : null}
-                      {print.nbbo_side === "STALE" || nbboStale ? <span className="pill nbbo-stale">Stale</span> : null}
-                    </div>
-                  ) : (
-                    <div className="meta nbbo-meta">
-                      <span className="pill nbbo-missing">
-                        {print.nbbo_side === "STALE" ? "NBBO stale" : "NBBO missing"}
-                      </span>
-                    </div>
-                  )}
-                </div>
-                <div className="time">{formatTime(print.ts)}</div>
+          <div className="data-table-wrap" ref={state.optionsScroll.setListRef}>
+            <div className="data-table data-table-options" role="table" aria-label="Options tape">
+              <div className="data-table-head" role="row">
+                <span className="data-table-cell">TIME</span>
+                <span className="data-table-cell">SYM</span>
+                <span className="data-table-cell">EXP</span>
+                <span className="data-table-cell">STRIKE</span>
+                <span className="data-table-cell">C/P</span>
+                <span className="data-table-cell">SPOT</span>
+                <span className="data-table-cell">DETAILS</span>
+                <span className="data-table-cell">TYPE</span>
+                <span className="data-table-cell">VALUE</span>
+                <span className="data-table-cell">SIDE</span>
+                <span className="data-table-cell">IV</span>
+                <span className="data-table-cell">CLASSIFIER</span>
               </div>
-            );
-            })}
-            {virtual.bottomSpacerHeight > 0 ? (
-              <div style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
-            ) : null}
-          </>
+              {virtual.topSpacerHeight > 0 ? (
+                <div className="data-table-spacer" style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
+              ) : null}
+              {virtual.visibleItems.map((print) => {
+              const contractId = normalizeContractId(print.option_contract_id);
+              const parsed = parseOptionContractId(contractId);
+              const contractDisplay = formatOptionContractLabel(contractId);
+              const quote = state.nbboMap.get(contractId);
+              const hasPreservedNbbo = typeof print.execution_nbbo_side === "string";
+              const nbboSide =
+                print.execution_nbbo_side ??
+                print.nbbo_side ??
+                (!hasPreservedNbbo ? classifyNbboSide(print.price, quote) : null);
+              const notional = print.notional ?? print.price * print.size * 100;
+              const spot = print.execution_underlying_spot;
+              const iv = print.execution_iv;
+              const decor = state.classifierDecorByOptionTraceId.get(print.trace_id);
+              const underlyingId = (print.underlying_id ?? parsed?.root ?? extractUnderlying(contractId)).toUpperCase();
+              const focusContract = (event: ReactMouseEvent<HTMLButtonElement>) => {
+                event.stopPropagation();
+                state.setSelectedInstrument({
+                  kind: "option-contract",
+                  contractId,
+                  underlyingId
+                });
+              };
+              const commonProps = {
+                className: `data-table-row data-table-row-button data-table-row-classified data-table-row-options${decor ? ` is-classified classifier-${decor.tone}` : ""}`,
+                style: decor ? ({ "--classifier-intensity": decor.intensity } as CSSProperties) : undefined
+              };
+              const cells = (
+                <>
+                  <span className="data-table-cell data-table-cell-number">{formatTime(print.ts)}</span>
+                  <span className="data-table-cell">
+                    <button className="instrument-cell-button" type="button" onClick={focusContract}>
+                      {contractDisplay?.ticker ?? parsed?.root ?? formatContractLabel(contractId)}
+                    </button>
+                  </span>
+                  <span className="data-table-cell">
+                    <button className="instrument-cell-button" type="button" onClick={focusContract}>
+                      {contractDisplay?.expiration ?? parsed?.expiry ?? "--"}
+                    </button>
+                  </span>
+                  <span className="data-table-cell data-table-cell-number">
+                    <button className="instrument-cell-button" type="button" onClick={focusContract}>
+                      {contractDisplay?.strike.replace(/[CP]$/, "") ?? "--"}
+                    </button>
+                  </span>
+                  <span className="data-table-cell">
+                    <button className="instrument-cell-button" type="button" onClick={focusContract}>
+                      {parsed?.right ?? contractDisplay?.strike.slice(-1) ?? "--"}
+                    </button>
+                  </span>
+                  <span className="data-table-cell data-table-cell-number">{typeof spot === "number" ? formatPrice(spot) : "--"}</span>
+                  <span className="data-table-cell data-table-cell-number">
+                    {formatSize(print.size)}@{formatPrice(print.price)}_{nbboSide ?? "--"}
+                  </span>
+                  <span className="data-table-cell">{print.option_type ?? "--"}</span>
+                  <span className="data-table-cell data-table-cell-number notional-emphasis">${formatCompactUsd(notional)}</span>
+                  <span className="data-table-cell">
+                    {nbboSide ? (
+                      <span className={`nbbo-tag nbbo-tag-${nbboSide.toLowerCase()}`}>{nbboSide}</span>
+                    ) : (
+                      "--"
+                    )}
+                  </span>
+                  <span className="data-table-cell data-table-cell-number">{typeof iv === "number" ? formatPct(iv) : "--"}</span>
+                  <span className="data-table-cell">{decor ? humanizeClassifierId(decor.family) : "--"}</span>
+                </>
+              );
+
+              return decor ? (
+                <button
+                  type="button"
+                  {...commonProps}
+                  key={`${print.trace_id}-${print.seq}`}
+                  onClick={() => state.openFromClassifierHit(decor.hit)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      state.openFromClassifierHit(decor.hit);
+                    }
+                  }}
+                >
+                  {cells}
+                </button>
+              ) : (
+                <div {...commonProps} key={`${print.trace_id}-${print.seq}`}>
+                  {cells}
+                </div>
+              );
+              })}
+              {virtual.bottomSpacerHeight > 0 ? (
+                <div className="data-table-spacer" style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
+              ) : null}
+            </div>
+          </div>
         )}
       </div>
     </Pane>
@@ -5150,7 +5652,7 @@ type EquitiesPaneProps = {
 const EquitiesPane = ({ limit }: EquitiesPaneProps) => {
   const state = useTerminal();
   const items = limit ? state.filteredEquities.slice(0, limit) : state.filteredEquities;
-  const virtual = useVirtualList(items, state.equitiesScroll.listRef, !limit, 78);
+  const virtual = useVirtualList(items, state.equitiesScroll.listRef, !limit, 36);
 
   return (
     <Pane
@@ -5176,7 +5678,7 @@ const EquitiesPane = ({ limit }: EquitiesPaneProps) => {
         />
       }
     >
-      <div className="list terminal-list" ref={state.equitiesScroll.listRef}>
+      <div className="data-table-shell">
         {items.length === 0 ? (
           <div className="empty">
             {state.tickerSet.size > 0
@@ -5190,32 +5692,47 @@ const EquitiesPane = ({ limit }: EquitiesPaneProps) => {
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          <>
+          <div className="data-table-wrap" ref={state.equitiesScroll.setListRef}>
+            <div className="data-table data-table-equities" role="table" aria-label="Equity prints">
+              <div className="data-table-head" role="row">
+                <span className="data-table-cell">TIME</span>
+                <span className="data-table-cell">SYM</span>
+                <span className="data-table-cell">PRICE</span>
+                <span className="data-table-cell">SIZE</span>
+                <span className="data-table-cell">VENUE</span>
+                <span className="data-table-cell">TAPE</span>
+              </div>
             {virtual.topSpacerHeight > 0 ? (
-              <div style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
+              <div className="data-table-spacer" style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
             ) : null}
             {virtual.visibleItems.map((print) => (
-              <div className="row" key={`${print.trace_id}-${print.seq}`}>
-              <div>
-                <div className="contract">{print.underlying_id}</div>
-                <div className="meta">
-                  <span>${formatPrice(print.price)}</span>
-                  <span>{formatSize(print.size)}x</span>
-                  <span>{print.exchange}</span>
-                  {print.offExchangeFlag ? (
-                    <span className="flag">Off-Ex</span>
-                  ) : (
-                    <span className="flag flag-muted">Lit</span>
-                  )}
-                </div>
-              </div>
-              <div className="time">{formatTime(print.ts)}</div>
+              <div className="data-table-row data-table-row-equities" key={`${print.trace_id}-${print.seq}`}>
+                <span className="data-table-cell data-table-cell-number">{formatTime(print.ts)}</span>
+                <span className="data-table-cell">
+                  <button
+                    className="instrument-cell-button"
+                    type="button"
+                    onClick={() =>
+                      state.setSelectedInstrument({
+                        kind: "equity",
+                        underlyingId: print.underlying_id.toUpperCase()
+                      })
+                    }
+                  >
+                    {print.underlying_id}
+                  </button>
+                </span>
+                <span className="data-table-cell data-table-cell-number">${formatPrice(print.price)}</span>
+                <span className="data-table-cell data-table-cell-number">{formatSize(print.size)}x</span>
+                <span className="data-table-cell">{print.exchange}</span>
+                <span className="data-table-cell">{print.offExchangeFlag ? "Off-Ex" : "Lit"}</span>
               </div>
             ))}
             {virtual.bottomSpacerHeight > 0 ? (
-              <div style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
+              <div className="data-table-spacer" style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
             ) : null}
-          </>
+            </div>
+          </div>
         )}
       </div>
     </Pane>
@@ -5230,7 +5747,7 @@ type FlowPaneProps = {
 const FlowPane = ({ limit, title = "Flow" }: FlowPaneProps) => {
   const state = useTerminal();
   const items = limit ? state.filteredFlow.slice(0, limit) : state.filteredFlow;
-  const virtual = useVirtualList(items, state.flowScroll.listRef, !limit, 104);
+  const virtual = useVirtualList(items, state.flowScroll.listRef, !limit, 44);
 
   return (
     <Pane
@@ -5256,7 +5773,7 @@ const FlowPane = ({ limit, title = "Flow" }: FlowPaneProps) => {
         />
       }
     >
-      <div className="list terminal-list" ref={state.flowScroll.listRef}>
+      <div className="data-table-shell">
         {items.length === 0 ? (
           <div className="empty">
             {state.tickerSet.size > 0
@@ -5268,9 +5785,21 @@ const FlowPane = ({ limit, title = "Flow" }: FlowPaneProps) => {
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          <>
+          <div className="data-table-wrap" ref={state.flowScroll.setListRef}>
+            <div className="data-table data-table-flow" role="table" aria-label="Flow packets">
+              <div className="data-table-head" role="row">
+                <span className="data-table-cell">TIME</span>
+                <span className="data-table-cell">CONTRACT</span>
+                <span className="data-table-cell">PRINTS</span>
+                <span className="data-table-cell">SIZE</span>
+                <span className="data-table-cell">NOTIONAL</span>
+                <span className="data-table-cell">WINDOW</span>
+                <span className="data-table-cell">STRUCTURE</span>
+                <span className="data-table-cell">NBBO</span>
+                <span className="data-table-cell">QUALITY</span>
+              </div>
             {virtual.topSpacerHeight > 0 ? (
-              <div style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
+              <div className="data-table-spacer" style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
             ) : null}
             {virtual.visibleItems.map((packet) => {
             const features = packet.features ?? {};
@@ -5304,57 +5833,44 @@ const FlowPane = ({ limit, title = "Flow" }: FlowPaneProps) => {
             const nbboAge = parseNumber(packet.join_quality.nbbo_age_ms, Number.NaN);
             const nbboStale = parseNumber(packet.join_quality.nbbo_stale, 0) > 0;
             const nbboMissing = parseNumber(packet.join_quality.nbbo_missing, 0) > 0;
+            const structureLabel = structureType
+              ? `${structureType.replace(/_/g, " ")}${structureRights ? ` ${structureRights}` : ""}${structureLegs > 0 ? ` ${structureLegs}L` : ""}${structureStrikes > 0 ? ` ${structureStrikes}K` : ""}`
+              : "--";
+            const nbboLabel = Number.isFinite(nbboBid) && Number.isFinite(nbboAsk)
+              ? `${formatPrice(nbboBid)} x ${formatPrice(nbboAsk)}`
+              : Number.isFinite(nbboMid)
+                ? `Mid ${formatPrice(nbboMid)}`
+                : "--";
+            const qualityLabel = [
+              Number.isFinite(aggressiveCoverage) && aggressiveCoverage > 0
+                ? `Agg ${formatPct(aggressiveBuyRatio)}/${formatPct(aggressiveSellRatio)} ${formatPct(aggressiveCoverage)} cov`
+                : null,
+              Number.isFinite(insideRatio) && insideRatio > 0 ? `In ${formatPct(insideRatio)}` : null,
+              Number.isFinite(nbboSpread) ? `Spr ${formatPrice(nbboSpread)}` : null,
+              Number.isFinite(nbboAge) ? `${Math.round(nbboAge)}ms` : null,
+              nbboStale ? "Stale" : null,
+              nbboMissing ? "Missing" : null
+            ].filter(Boolean).join(" | ");
 
             return (
-              <div className="row" key={packet.id}>
-                <div>
-                  <div className="contract">{contract}</div>
-                  <div className="meta flow-meta">
-                    <span>{formatFlowMetric(count)} prints</span>
-                    <span>{formatFlowMetric(totalSize)} size</span>
-                    <span>Notional ${formatUsd(notional)}</span>
-                    {windowMs > 0 ? <span>{formatFlowMetric(windowMs, "ms")}</span> : null}
-                    {structureType ? (
-                      <span className="pill structure-tag">
-                        {structureType.replace(/_/g, " ")}
-                        {structureRights ? ` ${structureRights}` : ""}
-                        {structureLegs > 0 ? ` ${structureLegs}L` : ""}
-                        {structureStrikes > 0 ? ` ${structureStrikes}K` : ""}
-                      </span>
-                    ) : null}
-                    {Number.isFinite(aggressiveCoverage) && aggressiveCoverage > 0 ? (
-                      <span className="pill aggressor-tag">
-                        Agg {formatPct(aggressiveBuyRatio)} / {formatPct(aggressiveSellRatio)}
-                        {Number.isFinite(insideRatio) && insideRatio > 0
-                          ? ` · In ${formatPct(insideRatio)}`
-                          : ""}
-                        {` · ${formatPct(aggressiveCoverage)} cov`}
-                      </span>
-                    ) : null}
-                    {Number.isFinite(nbboBid) && Number.isFinite(nbboAsk) ? (
-                      <span>
-                        NBBO ${formatPrice(nbboBid)} x ${formatPrice(nbboAsk)}
-                      </span>
-                    ) : null}
-                    {Number.isFinite(nbboMid) ? <span>Mid ${formatPrice(nbboMid)}</span> : null}
-                    {Number.isFinite(nbboSpread) ? (
-                      <span>Spread ${formatPrice(nbboSpread)}</span>
-                    ) : null}
-                    {Number.isFinite(nbboAge) ? <span>{Math.round(nbboAge)}ms</span> : null}
-                    {nbboStale ? <span className="pill nbbo-stale">NBBO stale</span> : null}
-                    {nbboMissing ? <span className="pill nbbo-missing">NBBO missing</span> : null}
-                  </div>
-                </div>
-                <div className="time">
-                  {formatTime(startTs)} → {formatTime(endTs)}
-                </div>
+              <div className={`data-table-row data-table-row-flow${nbboStale || nbboMissing ? " data-table-row-warn" : ""}`} key={packet.id}>
+                <span className="data-table-cell data-table-cell-number">{formatTime(startTs)} → {formatTime(endTs)}</span>
+                <span className="data-table-cell">{contract}</span>
+                <span className="data-table-cell data-table-cell-number">{formatFlowMetric(count)}</span>
+                <span className="data-table-cell data-table-cell-number">{formatFlowMetric(totalSize)}</span>
+                <span className="data-table-cell data-table-cell-number">${formatUsd(notional)}</span>
+                <span className="data-table-cell data-table-cell-number">{windowMs > 0 ? formatFlowMetric(windowMs, "ms") : "--"}</span>
+                <span className="data-table-cell">{structureLabel}</span>
+                <span className="data-table-cell data-table-cell-number">{nbboLabel}</span>
+                <span className="data-table-cell">{qualityLabel || "--"}</span>
               </div>
             );
             })}
             {virtual.bottomSpacerHeight > 0 ? (
-              <div style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
+              <div className="data-table-spacer" style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
             ) : null}
-          </>
+            </div>
+          </div>
         )}
       </div>
     </Pane>
@@ -5370,7 +5886,7 @@ type AlertsPaneProps = {
 const AlertsPane = ({ limit, withStrip = false, className }: AlertsPaneProps) => {
   const state = useTerminal();
   const items = limit ? state.filteredAlerts.slice(0, limit) : state.filteredAlerts;
-  const virtual = useVirtualList(items, state.alertsScroll.listRef, !limit, 92);
+  const virtual = useVirtualList(items, state.alertsScroll.listRef, !limit, 46);
 
   return (
     <Pane
@@ -5398,7 +5914,7 @@ const AlertsPane = ({ limit, withStrip = false, className }: AlertsPaneProps) =>
       }
     >
       {withStrip ? <AlertSeverityStrip alerts={state.filteredAlerts} /> : null}
-      <div className="list terminal-list" ref={state.alertsScroll.listRef}>
+      <div className="data-table-shell">
         {items.length === 0 ? (
           <div className="empty">
             {state.tickerSet.size > 0
@@ -5408,9 +5924,19 @@ const AlertsPane = ({ limit, withStrip = false, className }: AlertsPaneProps) =>
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          <>
+          <div className="data-table-wrap" ref={state.alertsScroll.setListRef}>
+            <div className="data-table data-table-alerts" role="table" aria-label="Alerts">
+              <div className="data-table-head" role="row">
+                <span className="data-table-cell">TIME</span>
+                <span className="data-table-cell">ALERT</span>
+                <span className="data-table-cell">SEV</span>
+                <span className="data-table-cell">SCORE</span>
+                <span className="data-table-cell">HITS</span>
+                <span className="data-table-cell">DIR</span>
+                <span className="data-table-cell">NOTE</span>
+              </div>
             {virtual.topSpacerHeight > 0 ? (
-              <div style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
+              <div className="data-table-spacer" style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
             ) : null}
             {virtual.visibleItems.map((alert) => {
             const primary = alert.hits[0];
@@ -5419,7 +5945,7 @@ const AlertsPane = ({ limit, withStrip = false, className }: AlertsPaneProps) =>
 
             return (
               <button
-                className="row row-button"
+                className={`data-table-row data-table-row-button data-table-row-alerts data-table-row-severity-${severity}`}
                 key={`${alert.trace_id}-${alert.seq}`}
                 type="button"
                 onClick={() => {
@@ -5428,28 +5954,21 @@ const AlertsPane = ({ limit, withStrip = false, className }: AlertsPaneProps) =>
                   state.setSelectedAlert(alert);
                 }}
               >
-                <div>
-                  <div className="contract">
-                    {primary ? humanizeClassifierId(primary.classifier_id) : "Alert"}
-                  </div>
-                  <div className="meta">
-                    <span className={`pill severity-${severity}`}>{severity}</span>
-                    <span>Score {Math.round(alert.score)}</span>
-                    <span>{alert.hits.length} hits</span>
-                    <span className={`pill direction-${direction}`}>{direction}</span>
-                  </div>
-                  {primary?.explanations?.[0] ? (
-                    <div className="note">{primary.explanations[0]}</div>
-                  ) : null}
-                </div>
-                <div className="time">{formatTime(alert.source_ts)}</div>
+                <span className="data-table-cell data-table-cell-number">{formatTime(alert.source_ts)}</span>
+                <span className="data-table-cell">{primary ? humanizeClassifierId(primary.classifier_id) : "Alert"}</span>
+                <span className="data-table-cell">{severity}</span>
+                <span className="data-table-cell data-table-cell-number">{Math.round(alert.score)}</span>
+                <span className="data-table-cell data-table-cell-number">{alert.hits.length}</span>
+                <span className="data-table-cell">{direction}</span>
+                <span className="data-table-cell">{primary?.explanations?.[0] ?? "--"}</span>
               </button>
             );
             })}
             {virtual.bottomSpacerHeight > 0 ? (
-              <div style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
+              <div className="data-table-spacer" style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
             ) : null}
-          </>
+            </div>
+          </div>
         )}
       </div>
     </Pane>
@@ -5464,7 +5983,7 @@ type ClassifierPaneProps = {
 const ClassifierPane = ({ limit, className }: ClassifierPaneProps) => {
   const state = useTerminal();
   const items = limit ? state.filteredClassifierHits.slice(0, limit) : state.filteredClassifierHits;
-  const virtual = useVirtualList(items, state.classifierScroll.listRef, !limit, 88);
+  const virtual = useVirtualList(items, state.classifierScroll.listRef, !limit, 44);
 
   return (
     <Pane
@@ -5491,7 +6010,7 @@ const ClassifierPane = ({ limit, className }: ClassifierPaneProps) => {
         />
       }
     >
-      <div className="list terminal-list" ref={state.classifierScroll.listRef}>
+      <div className="data-table-shell">
         {items.length === 0 ? (
           <div className="empty">
             {state.tickerSet.size > 0
@@ -5501,35 +6020,40 @@ const ClassifierPane = ({ limit, className }: ClassifierPaneProps) => {
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          <>
+          <div className="data-table-wrap" ref={state.classifierScroll.setListRef}>
+            <div className="data-table data-table-classifier" role="table" aria-label="Classifier hits">
+              <div className="data-table-head" role="row">
+                <span className="data-table-cell">TIME</span>
+                <span className="data-table-cell">RULE</span>
+                <span className="data-table-cell">DIR</span>
+                <span className="data-table-cell">CONF</span>
+                <span className="data-table-cell">NOTE</span>
+              </div>
             {virtual.topSpacerHeight > 0 ? (
-              <div style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
+              <div className="data-table-spacer" style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
             ) : null}
             {virtual.visibleItems.map((hit) => {
             const direction = normalizeDirection(hit.direction);
             return (
               <button
-                className="row row-button"
+                className={`data-table-row data-table-row-button data-table-row-classifier data-table-row-direction-${direction}`}
                 key={`${hit.trace_id}-${hit.seq}`}
                 type="button"
                 onClick={() => state.openFromClassifierHit(hit)}
               >
-                <div>
-                  <div className="contract">{humanizeClassifierId(hit.classifier_id)}</div>
-                  <div className="meta">
-                    <span className={`pill direction-${direction}`}>{direction}</span>
-                    <span>Confidence {formatConfidence(hit.confidence)}</span>
-                  </div>
-                  {hit.explanations?.[0] ? <div className="note">{hit.explanations[0]}</div> : null}
-                </div>
-                <div className="time">{formatTime(hit.source_ts)}</div>
+                <span className="data-table-cell data-table-cell-number">{formatTime(hit.source_ts)}</span>
+                <span className="data-table-cell">{humanizeClassifierId(hit.classifier_id)}</span>
+                <span className="data-table-cell">{direction}</span>
+                <span className="data-table-cell data-table-cell-number">{formatConfidence(hit.confidence)}</span>
+                <span className="data-table-cell">{hit.explanations?.[0] ?? "--"}</span>
               </button>
             );
             })}
             {virtual.bottomSpacerHeight > 0 ? (
-              <div style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
+              <div className="data-table-spacer" style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
             ) : null}
-          </>
+            </div>
+          </div>
         )}
       </div>
     </Pane>
@@ -5544,7 +6068,7 @@ type DarkPaneProps = {
 const DarkPane = ({ limit, className }: DarkPaneProps) => {
   const state = useTerminal();
   const items = limit ? state.filteredInferredDark.slice(0, limit) : state.filteredInferredDark;
-  const virtual = useVirtualList(items, state.darkScroll.listRef, !limit, 88);
+  const virtual = useVirtualList(items, state.darkScroll.listRef, !limit, 44);
 
   return (
     <Pane
@@ -5571,7 +6095,7 @@ const DarkPane = ({ limit, className }: DarkPaneProps) => {
         />
       }
     >
-      <div className="list terminal-list" ref={state.darkScroll.listRef}>
+      <div className="data-table-shell">
         {items.length === 0 ? (
           <div className="empty">
             {state.tickerSet.size > 0
@@ -5581,9 +6105,18 @@ const DarkPane = ({ limit, className }: DarkPaneProps) => {
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          <>
+          <div className="data-table-wrap" ref={state.darkScroll.setListRef}>
+            <div className="data-table data-table-dark" role="table" aria-label="Dark events">
+              <div className="data-table-head" role="row">
+                <span className="data-table-cell">TIME</span>
+                <span className="data-table-cell">TYPE</span>
+                <span className="data-table-cell">SYM</span>
+                <span className="data-table-cell">CONF</span>
+                <span className="data-table-cell">EVIDENCE</span>
+                <span className="data-table-cell">NOTE</span>
+              </div>
             {virtual.topSpacerHeight > 0 ? (
-              <div style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
+              <div className="data-table-spacer" style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
             ) : null}
             {virtual.visibleItems.map((event) => {
             const underlying = inferDarkUnderlying(event, state.equityPrintMap, state.equityJoinMap);
@@ -5591,7 +6124,7 @@ const DarkPane = ({ limit, className }: DarkPaneProps) => {
 
             return (
               <button
-                className="row row-button"
+                className="data-table-row data-table-row-button data-table-row-dark"
                 key={`${event.trace_id}-${event.seq}`}
                 type="button"
                 onClick={() => {
@@ -5600,23 +6133,20 @@ const DarkPane = ({ limit, className }: DarkPaneProps) => {
                   state.setSelectedDarkEvent(event);
                 }}
               >
-                <div>
-                  <div className="contract">{humanizeClassifierId(event.type)}</div>
-                  <div className="meta">
-                    {underlying ? <span>{underlying}</span> : <span className="pill">Unknown</span>}
-                    <span>Confidence {formatConfidence(event.confidence)}</span>
-                    <span>Evidence {evidenceCount}</span>
-                  </div>
-                  {underlying ? null : <div className="note">Underlying not in current equity cache.</div>}
-                </div>
-                <div className="time">{formatTime(event.source_ts)}</div>
+                <span className="data-table-cell data-table-cell-number">{formatTime(event.source_ts)}</span>
+                <span className="data-table-cell">{humanizeClassifierId(event.type)}</span>
+                <span className="data-table-cell">{underlying ?? "Unknown"}</span>
+                <span className="data-table-cell data-table-cell-number">{formatConfidence(event.confidence)}</span>
+                <span className="data-table-cell data-table-cell-number">{evidenceCount}</span>
+                <span className="data-table-cell">{underlying ? "--" : "Underlying not in current equity cache."}</span>
               </button>
             );
             })}
             {virtual.bottomSpacerHeight > 0 ? (
-              <div style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
+              <div className="data-table-spacer" style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
             ) : null}
-          </>
+            </div>
+          </div>
         )}
       </div>
     </Pane>
@@ -5802,11 +6332,18 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
 
         <div className="terminal-frame">
           <header className="terminal-topbar">
-            <FeedStatusBar />
             <div className="terminal-topbar-actions">
               <div className="terminal-topbar-controls">
+                {state.selectedInstrumentLabel && state.selectedInstrument?.kind !== "option-contract" ? (
+                  <span className="instrument-focus-chip">
+                    <span>{state.selectedInstrumentLabel}</span>
+                    <button type="button" onClick={() => state.setSelectedInstrument(null)}>
+                      Clear
+                    </button>
+                  </span>
+                ) : null}
                 <label className="terminal-filter">
-                  <span className="terminal-filter-label">Filter</span>
+                  <span className="terminal-filter-label">Ticker</span>
                   <span className="terminal-filter-field">
                     <input
                       className="terminal-input"
@@ -5874,13 +6411,11 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
 
 export function OverviewRoute() {
   return (
-    <PageFrame title="Overview">
-      <OverviewBrief />
-      <div className="page-grid page-grid-overview">
+    <PageFrame title="Home">
+      <div className="page-grid page-grid-home">
         <ChartPane />
-        <AlertsPane limit={12} withStrip />
-        <FlowPane limit={12} />
-        <EquitiesPane limit={12} />
+        <EquitiesPane />
+        <AlertsPane withStrip />
       </div>
     </PageFrame>
   );
@@ -5888,7 +6423,15 @@ export function OverviewRoute() {
 
 export function TapeRoute() {
   return (
-    <PageFrame title="Tape" actions={<FlowFilterControls />}>
+    <PageFrame
+      title="Tape"
+      actions={
+        <>
+          <ContractFilterControl />
+          <FlowFilterControls />
+        </>
+      }
+    >
       <div className="page-grid page-grid-tape">
         <OptionsPane />
         <EquitiesPane />

@@ -1,5 +1,7 @@
-import { SignalsRoute } from "../terminal";
+import { redirect } from "next/navigation";
+
+export const dynamic = "force-dynamic";
 
 export default function Page() {
-  return <SignalsRoute />;
+  redirect("/");
 }

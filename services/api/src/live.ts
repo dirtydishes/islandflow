@@ -5,12 +5,14 @@ import {
   fetchRecentEquityCandles,
   fetchRecentEquityPrintJoins,
   fetchRecentEquityPrints,
+  fetchRecentEquityQuotes,
   fetchRecentFlowPackets,
   fetchRecentInferredDark,
   fetchRecentOptionNBBO,
   type ClickHouseClient
 } from "@islandflow/storage";
 import type { OptionPrintQueryFilters } from "@islandflow/storage";
+import type { EquityPrintQueryFilters } from "@islandflow/storage";
 import {
   AlertEventSchema,
   ClassifierHitEventSchema,
@@ -18,6 +20,7 @@ import {
   EquityCandleSchema,
   EquityPrintJoinSchema,
   EquityPrintSchema,
+  EquityQuoteSchema,
   FeedSnapshot,
   FlowPacketSchema,
   InferredDarkEventSchema,
@@ -36,6 +39,7 @@ import {
 import type { RedisClientType } from "redis";
 
 const CURSOR_HASH_KEY = "live:cursors";
+export const LIVE_FEED_LOOKBACK_MS = 24 * 60 * 60 * 1000;
 
 const DEFAULT_GENERIC_LIMIT = 10000;
 const MAX_GENERIC_LIMIT = 100000;
@@ -44,6 +48,7 @@ const GENERIC_LIMIT_ENV_KEYS: Record<LiveGenericChannel, string> = {
   options: "LIVE_LIMIT_OPTIONS",
   nbbo: "LIVE_LIMIT_NBBO",
   equities: "LIVE_LIMIT_EQUITIES",
+  "equity-quotes": "LIVE_LIMIT_EQUITY_QUOTES",
   "equity-joins": "LIVE_LIMIT_EQUITY_JOINS",
   flow: "LIVE_LIMIT_FLOW",
   "classifier-hits": "LIVE_LIMIT_CLASSIFIER_HITS",
@@ -69,6 +74,7 @@ export const LIVE_FRESHNESS_THRESHOLDS: Partial<Record<LiveGenericChannel, numbe
   options: 15_000,
   nbbo: 15_000,
   equities: 15_000,
+  "equity-quotes": 15_000,
   flow: 30_000
 };
 
@@ -102,6 +108,7 @@ export const resolveGenericLiveLimits = (env: NodeJS.ProcessEnv = process.env): 
   options: parseGenericLimit(env, "options", DEFAULT_GENERIC_LIMIT),
   nbbo: parseGenericLimit(env, "nbbo", DEFAULT_GENERIC_LIMIT),
   equities: parseGenericLimit(env, "equities", DEFAULT_GENERIC_LIMIT),
+  "equity-quotes": parseGenericLimit(env, "equity-quotes", DEFAULT_GENERIC_LIMIT),
   "equity-joins": parseGenericLimit(env, "equity-joins", DEFAULT_GENERIC_LIMIT),
   flow: parseGenericLimit(env, "flow", DEFAULT_GENERIC_LIMIT),
   "classifier-hits": parseGenericLimit(env, "classifier-hits", DEFAULT_GENERIC_LIMIT),
@@ -153,6 +160,14 @@ const getGenericConfig = (limits: GenericLiveLimits): {
     parse: (value) => EquityPrintSchema.parse(value),
     cursor: (item) => ({ ts: item.ts, seq: item.seq }),
     fetchRecent: fetchRecentEquityPrints
+  },
+  "equity-quotes": {
+    redisKey: "live:equity-quotes",
+    cursorField: "equity-quotes",
+    limit: limits["equity-quotes"],
+    parse: (value) => EquityQuoteSchema.parse(value),
+    cursor: (item) => ({ ts: item.ts, seq: item.seq }),
+    fetchRecent: fetchRecentEquityQuotes
   },
   "equity-joins": {
     redisKey: "live:equity-joins",
@@ -251,12 +266,25 @@ const extractFreshnessTs = (channel: LiveGenericChannel, item: any): number | nu
     case "options":
     case "nbbo":
     case "equities":
+    case "equity-quotes":
       return typeof item.ts === "number" ? item.ts : null;
     case "flow":
+    case "classifier-hits":
+    case "alerts":
+    case "inferred-dark":
       return typeof item.source_ts === "number" ? item.source_ts : null;
     default:
       return null;
   }
+};
+
+const isWithinLiveFeedLookback = (
+  channel: LiveGenericChannel,
+  item: unknown,
+  now = Date.now()
+): boolean => {
+  const ts = extractFreshnessTs(channel, item);
+  return ts !== null && now - ts <= LIVE_FEED_LOOKBACK_MS;
 };
 
 export const isLiveItemFresh = (
@@ -275,17 +303,11 @@ export const isLiveItemFresh = (
   return now - ts <= thresholdMs;
 };
 
-const filterFreshGenericItems = <T>(
-  channel: LiveGenericChannel,
-  items: T[],
-  now = Date.now()
-): T[] => {
-  const thresholdMs = LIVE_FRESHNESS_THRESHOLDS[channel];
-  if (!thresholdMs) {
-    return items;
+export const shouldFanoutLiveEvent = (channel: LiveChannel, item: unknown): boolean => {
+  if (channel === "equity-candles" || channel === "equity-overlay") {
+    return true;
   }
-
-  return items.filter((item) => isLiveItemFresh(channel, item, now));
+  return isWithinLiveFeedLookback(channel, item);
 };
 
 const nextBeforeForItems = <T>(items: T[], cursorOf: (item: T) => Cursor): Cursor | null => {
@@ -316,7 +338,8 @@ export class LiveStateManager {
     genericHydrateFromRedis: 0,
     genericHydrateFromClickHouse: 0,
     trimOperations: 0,
-    cacheDepthByKey: new Map<string, number>()
+    cacheDepthByKey: new Map<string, number>(),
+    freshnessAgeMsByKey: new Map<string, number>()
   };
 
   constructor(
@@ -332,13 +355,28 @@ export class LiveStateManager {
     genericHydrateFromClickHouse: number;
     trimOperations: number;
     cacheDepthByKey: Record<string, number>;
+    freshnessAgeMsByKey: Record<string, number>;
   } {
     return {
       genericHydrateFromRedis: this.stats.genericHydrateFromRedis,
       genericHydrateFromClickHouse: this.stats.genericHydrateFromClickHouse,
       trimOperations: this.stats.trimOperations,
-      cacheDepthByKey: Object.fromEntries(this.stats.cacheDepthByKey)
+      cacheDepthByKey: Object.fromEntries(this.stats.cacheDepthByKey),
+      freshnessAgeMsByKey: Object.fromEntries(this.stats.freshnessAgeMsByKey)
     };
+  }
+
+  private updateFreshnessMetric(listKey: string, channel: LiveChannel, item: unknown, now = Date.now()): void {
+    const ts =
+      channel === "equity-candles" || channel === "equity-overlay"
+        ? typeof (item as { ts?: unknown })?.ts === "number"
+          ? ((item as { ts: number }).ts as number)
+          : null
+        : extractFreshnessTs(channel, item);
+
+    if (typeof ts === "number" && Number.isFinite(ts)) {
+      this.stats.freshnessAgeMsByKey.set(listKey, Math.max(0, now - ts));
+    }
   }
 
   async hydrate(): Promise<void> {
@@ -350,11 +388,18 @@ export class LiveStateManager {
     const config = this.generic[channel];
     if (this.redis?.isOpen) {
       const payloads = await this.redis.lRange(config.redisKey, 0, config.limit - 1);
-      const cached = normalizeGenericItems(channel, parseJsonList(payloads, config.parse), config);
+      const cached = normalizeGenericItems(
+        channel,
+        parseJsonList(payloads, config.parse).filter((item) =>
+          isWithinLiveFeedLookback(channel, item)
+        ),
+        config
+      );
       if (cached.length > 0) {
         this.genericItems.set(channel, cached);
         this.stats.genericHydrateFromRedis += 1;
         this.stats.cacheDepthByKey.set(config.redisKey, cached.length);
+        this.updateFreshnessMetric(config.redisKey, channel, cached[0]);
         this.genericCursors.set(config.cursorField, parseCursor(await this.redis.hGet(CURSOR_HASH_KEY, config.cursorField)));
         await this.persistList(
           config.redisKey,
@@ -367,10 +412,19 @@ export class LiveStateManager {
       }
     }
 
-    const fresh = normalizeGenericItems(channel, await config.fetchRecent(this.clickhouse, config.limit), config);
+    const fresh = normalizeGenericItems(
+      channel,
+      (await config.fetchRecent(this.clickhouse, config.limit)).filter((item) =>
+        isWithinLiveFeedLookback(channel, item)
+      ),
+      config
+    );
     this.stats.genericHydrateFromClickHouse += 1;
     this.stats.cacheDepthByKey.set(config.redisKey, fresh.length);
     this.genericItems.set(channel, fresh);
+    if (fresh.length > 0) {
+      this.updateFreshnessMetric(config.redisKey, channel, fresh[0]);
+    }
     const watermark = fresh[0] ? config.cursor(fresh[0]) : null;
     this.genericCursors.set(config.cursorField, watermark);
     await this.persistList(config.redisKey, config.cursorField, fresh, config.limit, watermark);
@@ -379,16 +433,21 @@ export class LiveStateManager {
   async getSnapshot(subscription: LiveSubscription): Promise<FeedSnapshot<unknown>> {
     switch (subscription.channel) {
       case "options": {
-        if (subscription.filters?.view === "raw") {
+        const scoped =
+          Boolean(subscription.underlying_ids?.length) || Boolean(subscription.option_contract_id);
+        if (subscription.filters?.view === "raw" || scoped) {
           const storageFilters: OptionPrintQueryFilters = {
-            view: "raw",
+            view: subscription.filters?.view ?? "signal",
             security:
-              subscription.filters.securityTypes?.length === 1
+              subscription.filters?.securityTypes?.length === 1
                 ? subscription.filters.securityTypes[0]
                 : "all",
-            nbboSides: subscription.filters.nbboSides,
-            optionTypes: subscription.filters.optionTypes,
-            minNotional: subscription.filters.minNotional
+            nbboSides: subscription.filters?.nbboSides,
+            optionTypes: subscription.filters?.optionTypes,
+            minNotional: subscription.filters?.minNotional,
+            underlyingIds: subscription.underlying_ids,
+            optionContractId: subscription.option_contract_id,
+            sinceTs: Date.now() - LIVE_FEED_LOOKBACK_MS
           };
           const items = await fetchRecentOptionPrints(
             this.clickhouse,
@@ -396,21 +455,18 @@ export class LiveStateManager {
             undefined,
             storageFilters
           );
-          const freshItems = filterFreshGenericItems("options", items);
           return {
             subscription,
-            items: freshItems,
+            items,
             watermark: items[0] ? { ts: items[0].ts, seq: items[0].seq } : null,
-            next_before: nextBeforeForItems(freshItems, (item) => ({ ts: item.ts, seq: item.seq }))
+            next_before: nextBeforeForItems(items, (item) => ({ ts: item.ts, seq: item.seq }))
           };
         }
 
         const config = this.generic.options;
-        const items = filterFreshGenericItems(
-          "options",
-          (this.genericItems.get("options") ?? []).filter((item) =>
-            matchesOptionPrintFilters(item, subscription.filters)
-          )
+        const items = (this.genericItems.get("options") ?? []).filter((item) =>
+          isWithinLiveFeedLookback("options", item) &&
+          matchesOptionPrintFilters(item, subscription.filters)
         );
         return {
           subscription,
@@ -421,11 +477,34 @@ export class LiveStateManager {
       }
       case "flow": {
         const config = this.generic.flow;
-        const items = filterFreshGenericItems(
-          "flow",
-          (this.genericItems.get("flow") ?? []).filter((item) =>
-            matchesFlowPacketFilters(item, subscription.filters)
-          )
+        const items = (this.genericItems.get("flow") ?? []).filter((item) =>
+          isWithinLiveFeedLookback("flow", item) &&
+          matchesFlowPacketFilters(item, subscription.filters)
+        );
+        return {
+          subscription,
+          items,
+          watermark: this.genericCursors.get(config.cursorField) ?? null,
+          next_before: nextBeforeForItems(items, config.cursor)
+        };
+      }
+      case "equities": {
+        const config = this.generic.equities;
+        if (subscription.underlying_ids?.length) {
+          const filters: EquityPrintQueryFilters = {
+            underlyingIds: subscription.underlying_ids,
+            sinceTs: Date.now() - LIVE_FEED_LOOKBACK_MS
+          };
+          const items = await fetchRecentEquityPrints(this.clickhouse, config.limit, filters);
+          return {
+            subscription,
+            items,
+            watermark: items[0] ? { ts: items[0].ts, seq: items[0].seq } : null,
+            next_before: nextBeforeForItems(items, config.cursor)
+          };
+        }
+        const items = (this.genericItems.get("equities") ?? []).filter((item) =>
+          isWithinLiveFeedLookback("equities", item)
         );
         return {
           subscription,
@@ -464,9 +543,8 @@ export class LiveStateManager {
       }
       default: {
         const config = this.generic[subscription.channel];
-        const items = filterFreshGenericItems(
-          subscription.channel,
-          this.genericItems.get(subscription.channel) ?? []
+        const items = (this.genericItems.get(subscription.channel) ?? []).filter((item) =>
+          isWithinLiveFeedLookback(subscription.channel, item)
         );
         return {
           subscription,
@@ -484,6 +562,7 @@ export class LiveStateManager {
         const candle = EquityCandleSchema.parse(item);
         const key = candleRedisKey(candle.underlying_id, candle.interval_ms);
         const cursorField = candleCursorField(candle.underlying_id, candle.interval_ms);
+        const previousCursor = this.candleCursors.get(cursorField) ?? null;
         const items = this.candleItems.get(key) ?? [];
         const next = [candle, ...items]
           .sort((a, b) => (b.ts - a.ts) || (b.seq - a.seq))
@@ -492,13 +571,22 @@ export class LiveStateManager {
         this.stats.cacheDepthByKey.set(key, next.length);
         const cursor = { ts: candle.ts, seq: candle.seq };
         this.candleCursors.set(cursorField, cursor);
-        await this.persistList(key, cursorField, next, CHART_LIMITS.candles, cursor);
+        if (next.length > 0) {
+          this.updateFreshnessMetric(key, "equity-candles", next[0]);
+        }
+        const outOfOrder = previousCursor ? compareCursors(cursor, previousCursor) > 0 : false;
+        if (outOfOrder) {
+          await this.persistList(key, cursorField, next, CHART_LIMITS.candles, cursor);
+        } else {
+          await this.persistItem(key, cursorField, candle, CHART_LIMITS.candles, cursor, next.length);
+        }
         return cursor;
       }
       case "equity-overlay": {
         const print = EquityPrintSchema.parse(item);
         const key = overlayRedisKey(print.underlying_id);
         const cursorField = overlayCursorField(print.underlying_id);
+        const previousCursor = this.overlayCursors.get(cursorField) ?? null;
         const items = this.overlayItems.get(key) ?? [];
         const next = [print, ...items]
           .sort((a, b) => (b.ts - a.ts) || (b.seq - a.seq))
@@ -507,22 +595,39 @@ export class LiveStateManager {
         this.stats.cacheDepthByKey.set(key, next.length);
         const cursor = { ts: print.ts, seq: print.seq };
         this.overlayCursors.set(cursorField, cursor);
-        await this.persistList(key, cursorField, next, CHART_LIMITS.overlay, cursor);
+        if (next.length > 0) {
+          this.updateFreshnessMetric(key, "equity-overlay", next[0]);
+        }
+        const outOfOrder = previousCursor ? compareCursors(cursor, previousCursor) > 0 : false;
+        if (outOfOrder) {
+          await this.persistList(key, cursorField, next, CHART_LIMITS.overlay, cursor);
+        } else {
+          await this.persistItem(key, cursorField, print, CHART_LIMITS.overlay, cursor, next.length);
+        }
         return cursor;
       }
       default: {
         const config = this.generic[channel];
         const parsed = config.parse(item);
-        if (!isLiveItemFresh(channel, parsed)) {
-          return this.genericCursors.get(config.cursorField) ?? null;
+        if (!isWithinLiveFeedLookback(channel, parsed)) {
+          return null;
         }
+        const previousCursor = this.genericCursors.get(config.cursorField) ?? null;
         const items = this.genericItems.get(channel) ?? [];
         const next = normalizeGenericItems(channel, [parsed, ...items], config);
         this.genericItems.set(channel, next);
         this.stats.cacheDepthByKey.set(config.redisKey, next.length);
         const cursor = config.cursor(parsed);
         this.genericCursors.set(config.cursorField, cursor);
-        await this.persistList(config.redisKey, config.cursorField, next, config.limit, cursor);
+        if (next.length > 0) {
+          this.updateFreshnessMetric(config.redisKey, channel, next[0]);
+        }
+        const outOfOrder = previousCursor ? compareCursors(cursor, previousCursor) > 0 : false;
+        if (channel === "nbbo" || outOfOrder) {
+          await this.persistList(config.redisKey, config.cursorField, next, config.limit, cursor);
+        } else {
+          await this.persistItem(config.redisKey, config.cursorField, parsed, config.limit, cursor, next.length);
+        }
         return cursor;
       }
     }
@@ -537,6 +642,7 @@ export class LiveStateManager {
       if (cached.length > 0) {
         this.candleItems.set(key, cached);
         this.stats.cacheDepthByKey.set(key, cached.length);
+        this.updateFreshnessMetric(key, "equity-candles", cached[0]);
         this.candleCursors.set(cursorField, parseCursor(await this.redis.hGet(CURSOR_HASH_KEY, cursorField)));
         return;
       }
@@ -545,6 +651,9 @@ export class LiveStateManager {
     const fresh = await fetchRecentEquityCandles(this.clickhouse, underlyingId, intervalMs, CHART_LIMITS.candles);
     this.candleItems.set(key, fresh);
     this.stats.cacheDepthByKey.set(key, fresh.length);
+    if (fresh.length > 0) {
+      this.updateFreshnessMetric(key, "equity-candles", fresh[0]);
+    }
     const watermark = fresh[0] ? { ts: fresh[0].ts, seq: fresh[0].seq } : null;
     this.candleCursors.set(cursorField, watermark);
     await this.persistList(key, cursorField, fresh, CHART_LIMITS.candles, watermark);
@@ -559,6 +668,7 @@ export class LiveStateManager {
       if (cached.length > 0) {
         this.overlayItems.set(key, cached);
         this.stats.cacheDepthByKey.set(key, cached.length);
+        this.updateFreshnessMetric(key, "equity-overlay", cached[0]);
         this.overlayCursors.set(cursorField, parseCursor(await this.redis.hGet(CURSOR_HASH_KEY, cursorField)));
         return;
       }
@@ -569,9 +679,31 @@ export class LiveStateManager {
     );
     this.overlayItems.set(key, fresh);
     this.stats.cacheDepthByKey.set(key, fresh.length);
+    if (fresh.length > 0) {
+      this.updateFreshnessMetric(key, "equity-overlay", fresh[0]);
+    }
     const watermark = fresh[0] ? { ts: fresh[0].ts, seq: fresh[0].seq } : null;
     this.overlayCursors.set(cursorField, watermark);
     await this.persistList(key, cursorField, fresh, CHART_LIMITS.overlay, watermark);
+  }
+
+  private async persistItem<T>(
+    listKey: string,
+    cursorField: string,
+    item: T,
+    limit: number,
+    cursor: Cursor | null,
+    depth: number
+  ): Promise<void> {
+    if (!this.redis?.isOpen) {
+      return;
+    }
+
+    await this.redis.lPush(listKey, JSON.stringify(item));
+    await this.redis.lTrim(listKey, 0, limit - 1);
+    this.stats.trimOperations += 1;
+    this.stats.cacheDepthByKey.set(listKey, Math.min(depth, limit));
+    await this.redis.hSet(CURSOR_HASH_KEY, cursorField, JSON.stringify(cursor));
   }
 
   private async persistList<T>(
