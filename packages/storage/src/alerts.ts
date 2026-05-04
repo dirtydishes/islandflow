@@ -1,4 +1,4 @@
-import type { AlertEvent, ClassifierHit } from "@islandflow/types";
+import type { AlertEvent, ClassifierHit, SmartMoneyProfileScore } from "@islandflow/types";
 
 export const ALERTS_TABLE = "alerts";
 
@@ -11,6 +11,8 @@ export type AlertRecord = {
   severity: string;
   hits_json: string;
   evidence_refs_json: string;
+  primary_profile_id: string;
+  profile_scores_json: string;
 };
 
 export const alertsTableDDL = (): string => {
@@ -23,12 +25,19 @@ CREATE TABLE IF NOT EXISTS ${ALERTS_TABLE} (
   score Float64,
   severity String,
   hits_json String,
-  evidence_refs_json String
+  evidence_refs_json String,
+  primary_profile_id String DEFAULT '',
+  profile_scores_json String DEFAULT '[]'
 )
 ENGINE = MergeTree
 ORDER BY (source_ts, seq)
 `;
 };
+
+export const alertsTableMigrations = (): string[] => [
+  `ALTER TABLE ${ALERTS_TABLE} ADD COLUMN IF NOT EXISTS primary_profile_id String DEFAULT ''`,
+  `ALTER TABLE ${ALERTS_TABLE} ADD COLUMN IF NOT EXISTS profile_scores_json String DEFAULT '[]'`
+];
 
 export const toAlertRecord = (alert: AlertEvent): AlertRecord => {
   return {
@@ -39,7 +48,9 @@ export const toAlertRecord = (alert: AlertEvent): AlertRecord => {
     score: alert.score,
     severity: alert.severity,
     hits_json: JSON.stringify(alert.hits),
-    evidence_refs_json: JSON.stringify(alert.evidence_refs)
+    evidence_refs_json: JSON.stringify(alert.evidence_refs),
+    primary_profile_id: alert.primary_profile_id ?? "",
+    profile_scores_json: JSON.stringify(alert.profile_scores ?? [])
   };
 };
 
@@ -79,6 +90,28 @@ const safeStringArray = (value: string): string[] => {
   return [];
 };
 
+const safeProfileScoreArray = (value: string): SmartMoneyProfileScore[] => {
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) {
+      return parsed.map((entry) => {
+        const record = entry as Partial<SmartMoneyProfileScore>;
+        return {
+          profile_id: String(record.profile_id ?? "") as SmartMoneyProfileScore["profile_id"],
+          probability: Number(record.probability ?? 0),
+          confidence_band: String(record.confidence_band ?? "low") as SmartMoneyProfileScore["confidence_band"],
+          direction: String(record.direction ?? "unknown") as SmartMoneyProfileScore["direction"],
+          reasons: Array.isArray(record.reasons) ? record.reasons.map((item) => String(item)) : []
+        };
+      });
+    }
+  } catch {
+    // ignore
+  }
+
+  return [];
+};
+
 export const fromAlertRecord = (record: AlertRecord): AlertEvent => {
   return {
     source_ts: record.source_ts,
@@ -88,6 +121,8 @@ export const fromAlertRecord = (record: AlertRecord): AlertEvent => {
     score: record.score,
     severity: record.severity,
     hits: safeHitArray(record.hits_json),
-    evidence_refs: safeStringArray(record.evidence_refs_json)
+    evidence_refs: safeStringArray(record.evidence_refs_json),
+    ...(record.primary_profile_id ? { primary_profile_id: record.primary_profile_id as AlertEvent["primary_profile_id"] } : {}),
+    profile_scores: safeProfileScoreArray(record.profile_scores_json)
   };
 };

@@ -8,6 +8,7 @@ import {
   SUBJECT_EQUITY_QUOTES,
   SUBJECT_INFERRED_DARK,
   SUBJECT_FLOW_PACKETS,
+  SUBJECT_SMART_MONEY_EVENTS,
   SUBJECT_OPTION_NBBO,
   SUBJECT_OPTION_SIGNAL_PRINTS,
   STREAM_ALERTS,
@@ -17,6 +18,7 @@ import {
   STREAM_EQUITY_QUOTES,
   STREAM_INFERRED_DARK,
   STREAM_FLOW_PACKETS,
+  STREAM_SMART_MONEY_EVENTS,
   STREAM_OPTION_NBBO,
   STREAM_OPTION_SIGNAL_PRINTS,
   buildDurableConsumer,
@@ -32,11 +34,13 @@ import {
   ensureEquityPrintJoinsTable,
   ensureInferredDarkTable,
   ensureFlowPacketsTable,
+  ensureSmartMoneyEventsTable,
   insertAlert,
   insertClassifierHit,
   insertEquityPrintJoin,
   insertInferredDark,
-  insertFlowPacket
+  insertFlowPacket,
+  insertSmartMoneyEvent
 } from "@islandflow/storage";
 import {
   AlertEventSchema,
@@ -46,6 +50,7 @@ import {
   EquityQuoteSchema,
   InferredDarkEventSchema,
   FlowPacketSchema,
+  SmartMoneyEventSchema,
   OptionNBBOSchema,
   OptionPrintSchema,
   type AlertEvent,
@@ -55,11 +60,16 @@ import {
   type EquityPrintJoin,
   type InferredDarkEvent,
   type FlowPacket,
+  type SmartMoneyEvent,
   type OptionNBBO,
   type OptionPrint
 } from "@islandflow/types";
 import { z } from "zod";
-import { evaluateClassifiers, type ClassifierConfig } from "./classifiers";
+import type { ClassifierConfig } from "./classifiers";
+import {
+  buildSmartMoneyEventFromPacket,
+  deriveClassifierHitsFromSmartMoneyEvent
+} from "./parent-events";
 import { parseContractId } from "./contracts";
 import {
   createDarkInferenceState,
@@ -886,7 +896,23 @@ const emitClassifiers = async (
   js: Awaited<ReturnType<typeof connectJetStreamWithRetry>>["js"],
   packet: FlowPacket
 ): Promise<void> => {
-  const hits = evaluateClassifiers(packet, classifierConfig);
+  let smartMoneyEvent: SmartMoneyEvent;
+  try {
+    smartMoneyEvent = SmartMoneyEventSchema.parse(buildSmartMoneyEventFromPacket(packet));
+    await insertSmartMoneyEvent(clickhouse, smartMoneyEvent);
+    await publishJson(js, SUBJECT_SMART_MONEY_EVENTS, smartMoneyEvent);
+  } catch (error) {
+    if (isExpectedShutdownNatsError(error)) {
+      return;
+    }
+    logger.error("failed to emit smart money event", {
+      error: error instanceof Error ? error.message : String(error),
+      packet_id: packet.id
+    });
+    return;
+  }
+
+  const hits = deriveClassifierHitsFromSmartMoneyEvent(smartMoneyEvent);
   if (hits.length === 0) {
     return;
   }
@@ -922,7 +948,7 @@ const emitClassifiers = async (
     source_ts: packet.source_ts,
     ingest_ts: packet.ingest_ts,
     seq: packet.seq,
-    trace_id: `alert:${packet.id}`,
+    trace_id: `alert:${smartMoneyEvent.event_id}`,
     score,
     severity,
     hits: hitEvents.map((hit) => ({
@@ -931,7 +957,11 @@ const emitClassifiers = async (
       direction: hit.direction,
       explanations: hit.explanations
     })),
-    evidence_refs: [packet.id, ...packet.members]
+    evidence_refs: [smartMoneyEvent.event_id, packet.id, ...packet.members],
+    ...(smartMoneyEvent.primary_profile_id
+      ? { primary_profile_id: smartMoneyEvent.primary_profile_id }
+      : {}),
+    profile_scores: smartMoneyEvent.profile_scores
   });
 
   try {
@@ -1101,6 +1131,19 @@ const run = async () => {
   });
 
   await ensureStream(jsm, {
+    name: STREAM_SMART_MONEY_EVENTS,
+    subjects: [SUBJECT_SMART_MONEY_EVENTS],
+    retention: "limits",
+    storage: "file",
+    discard: "old",
+    max_msgs_per_subject: -1,
+    max_msgs: -1,
+    max_bytes: -1,
+    max_age: 0,
+    num_replicas: 1
+  });
+
+  await ensureStream(jsm, {
     name: STREAM_EQUITY_JOINS,
     subjects: [SUBJECT_EQUITY_JOINS],
     retention: "limits",
@@ -1173,6 +1216,7 @@ const run = async () => {
 
   await retry("clickhouse table init", 120, 500, async () => {
     await ensureFlowPacketsTable(clickhouse);
+    await ensureSmartMoneyEventsTable(clickhouse);
     await ensureEquityPrintJoinsTable(clickhouse);
     await ensureInferredDarkTable(clickhouse);
     await ensureClassifierHitsTable(clickhouse);
