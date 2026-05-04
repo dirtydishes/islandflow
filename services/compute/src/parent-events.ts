@@ -8,6 +8,7 @@ import {
   type SmartMoneyProfileId,
   type SmartMoneyProfileScore
 } from "@islandflow/types";
+import type { EventCalendarMatch } from "@islandflow/refdata/event-calendar";
 import { parseContractId } from "./contracts";
 
 const MS_PER_DAY = 86_400_000;
@@ -97,7 +98,11 @@ const inferDirection = (packet: FlowPacket): SmartMoneyDirection => {
   return "neutral";
 };
 
-const buildFeatures = (packet: FlowPacket): SmartMoneyFeatures => {
+export type SmartMoneyParentEventOptions = {
+  eventCalendarMatch?: EventCalendarMatch | null;
+};
+
+const buildFeatures = (packet: FlowPacket, options: SmartMoneyParentEventOptions = {}): SmartMoneyFeatures => {
   const contractId = stringFeature(packet, "option_contract_id");
   const contract = parseContractId(contractId);
   const underlyingMid = numberFeature(packet, "underlying_mid");
@@ -108,7 +113,8 @@ const buildFeatures = (packet: FlowPacket): SmartMoneyFeatures => {
   const structureLegs = Math.max(0, Math.round(numberFeature(packet, "structure_legs")));
   const strikeCount = Math.max(1, Math.round(numberFeature(packet, "structure_strikes") || (contract ? 1 : 0)));
   const specialCount = numberFeature(packet, "special_print_count");
-  const eventTs = numberFeature(packet, "corporate_event_ts");
+  const calendarEventTs = options.eventCalendarMatch?.event_ts ?? null;
+  const eventTs = calendarEventTs ?? numberFeature(packet, "corporate_event_ts");
   const referenceTs = getReferenceTs(packet);
   const expiryTs = contract ? Date.parse(`${contract.expiry}T00:00:00Z`) : Number.NaN;
 
@@ -259,8 +265,11 @@ const evaluateProfiles = (
   return scores.sort((a, b) => b.probability - a.probability);
 };
 
-export const buildSmartMoneyEventFromPacket = (packet: FlowPacket): SmartMoneyEvent => {
-  const features = buildFeatures(packet);
+export const buildSmartMoneyEventFromPacket = (
+  packet: FlowPacket,
+  options: SmartMoneyParentEventOptions = {}
+): SmartMoneyEvent => {
+  const features = buildFeatures(packet, options);
   const suppressed = detectSuppression(packet, features);
   const profileScores = evaluateProfiles(packet, features, suppressed);
   const primary = profileScores[0] ?? null;

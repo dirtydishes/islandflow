@@ -24,7 +24,7 @@ Acceptance: live and replay produce the same event ID for the same packet.
 ### Phase 3: Feature Engineering
 - [x] Build typed features for aggressor mix, spread/quote quality, timing, strike concentration, DTE, moneyness, structure markers, and event alignment fields.
 - [x] Keep batch-only validation fields out of live scoring.
-- [ ] Connect an external event-calendar feed through `services/refdata`.
+- [x] Connect an external event-calendar feed through `services/refdata`.
 
 Acceptance: missing event-calendar fields produce neutral `null` feature values and do not block scoring.
 

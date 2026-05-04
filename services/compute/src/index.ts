@@ -1,6 +1,11 @@
 import { readEnv } from "@islandflow/config";
 import { createLogger } from "@islandflow/observability";
 import {
+  createEmptyEventCalendarProvider,
+  loadEventCalendarProviderFromFile,
+  type EventCalendarProvider
+} from "@islandflow/refdata/event-calendar";
+import {
   SUBJECT_ALERTS,
   SUBJECT_CLASSIFIER_HITS,
   SUBJECT_EQUITY_JOINS,
@@ -135,10 +140,12 @@ const envSchema = z.object({
   CLASSIFIER_MIN_AGGRESSOR_RATIO: z.coerce.number().min(0).max(1).default(0.55),
   CLASSIFIER_0DTE_MAX_ATM_PCT: z.coerce.number().min(0).max(1).default(0.01),
   CLASSIFIER_0DTE_MIN_PREMIUM: z.coerce.number().positive().default(20_000),
-  CLASSIFIER_0DTE_MIN_SIZE: z.coerce.number().int().positive().default(400)
+  CLASSIFIER_0DTE_MIN_SIZE: z.coerce.number().int().positive().default(400),
+  SMART_MONEY_EVENT_CALENDAR_PATH: z.string().optional()
 });
 
 const env = readEnv(envSchema);
+let eventCalendarProvider: EventCalendarProvider = createEmptyEventCalendarProvider();
 
 const classifierConfig: ClassifierConfig = {
   sweepMinPremium: env.CLASSIFIER_SWEEP_MIN_PREMIUM,
@@ -898,7 +905,16 @@ const emitClassifiers = async (
 ): Promise<void> => {
   let smartMoneyEvent: SmartMoneyEvent;
   try {
-    smartMoneyEvent = SmartMoneyEventSchema.parse(buildSmartMoneyEventFromPacket(packet));
+    const underlyingId =
+      typeof packet.features.underlying_id === "string"
+        ? packet.features.underlying_id
+        : parseContractId(typeof packet.features.option_contract_id === "string" ? packet.features.option_contract_id : "")?.root;
+    const referenceTs =
+      typeof packet.features.end_ts === "number" && Number.isFinite(packet.features.end_ts)
+        ? packet.features.end_ts
+        : packet.source_ts;
+    const eventCalendarMatch = underlyingId ? eventCalendarProvider.findNextEvent(underlyingId, referenceTs) : null;
+    smartMoneyEvent = SmartMoneyEventSchema.parse(buildSmartMoneyEventFromPacket(packet, { eventCalendarMatch }));
     await insertSmartMoneyEvent(clickhouse, smartMoneyEvent);
     await publishJson(js, SUBJECT_SMART_MONEY_EVENTS, smartMoneyEvent);
   } catch (error) {
@@ -1199,6 +1215,19 @@ const run = async () => {
     url: env.CLICKHOUSE_URL,
     database: env.CLICKHOUSE_DATABASE
   });
+
+  if (env.SMART_MONEY_EVENT_CALENDAR_PATH) {
+    try {
+      eventCalendarProvider = await loadEventCalendarProviderFromFile(env.SMART_MONEY_EVENT_CALENDAR_PATH);
+      logger.info("smart money event calendar loaded", { path: env.SMART_MONEY_EVENT_CALENDAR_PATH });
+    } catch (error) {
+      eventCalendarProvider = createEmptyEventCalendarProvider();
+      logger.warn("smart money event calendar unavailable; scoring will use neutral event features", {
+        path: env.SMART_MONEY_EVENT_CALENDAR_PATH,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
 
   const redis = createRedisClient(env.REDIS_URL);
   redis.on("error", (error) => {
