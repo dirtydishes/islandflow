@@ -13,6 +13,7 @@ import {
   useState,
   type CSSProperties,
   type Dispatch,
+  type MouseEvent as ReactMouseEvent,
   type ReactNode,
   type SetStateAction
 } from "react";
@@ -123,6 +124,11 @@ type ChartCandle = {
   low: number;
   close: number;
 };
+
+type SelectedInstrument =
+  | null
+  | { kind: "equity"; underlyingId: string }
+  | { kind: "option-contract"; contractId: string; underlyingId: string };
 
 const formatIntervalLabel = (intervalMs: number): string => {
   const match = CANDLE_INTERVALS.find((interval) => interval.ms === intervalMs);
@@ -2247,6 +2253,15 @@ const appendOptionFlowFilters = (params: URLSearchParams, filters: OptionFlowFil
   }
 };
 
+const appendLiveScopeParams = (params: URLSearchParams, subscription: LiveSubscription): void => {
+  if ((subscription.channel === "options" || subscription.channel === "equities") && subscription.underlying_ids?.length) {
+    params.set("underlying_ids", subscription.underlying_ids.join(","));
+  }
+  if (subscription.channel === "options" && subscription.option_contract_id) {
+    params.set("option_contract_id", subscription.option_contract_id);
+  }
+};
+
 const dedupeLiveSubscriptions = (subscriptions: LiveSubscription[]): LiveSubscription[] => {
   const seen = new Set<string>();
   return subscriptions.filter((subscription) => {
@@ -2263,9 +2278,11 @@ export const getLiveManifest = (
   pathname: string,
   chartTicker: string,
   chartIntervalMs: number,
-  flowFilters: OptionFlowFilters
+  flowFilters: OptionFlowFilters,
+  optionScope?: Pick<Extract<LiveSubscription, { channel: "options" }>, "underlying_ids" | "option_contract_id">,
+  equityScope?: Pick<Extract<LiveSubscription, { channel: "equities" }>, "underlying_ids">
 ): LiveSubscription[] => {
-  const baselineSubs: LiveSubscription[] = [{ channel: "options", filters: flowFilters }];
+  const baselineSubs: LiveSubscription[] = [{ channel: "options", filters: flowFilters, ...optionScope }];
   const chartSubs: LiveSubscription[] = [
     { channel: "equity-candles", underlying_id: chartTicker, interval_ms: chartIntervalMs },
     { channel: "equity-overlay", underlying_id: chartTicker }
@@ -2274,9 +2291,9 @@ export const getLiveManifest = (
   if (pathname === "/tape") {
     return dedupeLiveSubscriptions([
       ...baselineSubs,
-      { channel: "options", filters: flowFilters },
+      { channel: "options", filters: flowFilters, ...optionScope },
       { channel: "nbbo" },
-      { channel: "equities" },
+      { channel: "equities", ...equityScope },
       { channel: "flow", filters: flowFilters },
       { channel: "classifier-hits" }
     ]);
@@ -2306,7 +2323,7 @@ export const getLiveManifest = (
 
   return dedupeLiveSubscriptions([
     ...baselineSubs,
-    { channel: "equities" },
+    { channel: "equities", ...equityScope },
     { channel: "flow" },
     { channel: "alerts" },
     { channel: "classifier-hits" },
@@ -2320,7 +2337,9 @@ const useLiveSession = (
   pathname: string,
   chartTicker: string,
   chartIntervalMs: number,
-  flowFilters: OptionFlowFilters
+  flowFilters: OptionFlowFilters,
+  optionScope?: Pick<Extract<LiveSubscription, { channel: "options" }>, "underlying_ids" | "option_contract_id">,
+  equityScope?: Pick<Extract<LiveSubscription, { channel: "equities" }>, "underlying_ids">
 ): LiveSessionState => {
   const [status, setStatus] = useState<WsStatus>(enabled ? "connecting" : "disconnected");
   const [connectedAt, setConnectedAt] = useState<number | null>(null);
@@ -2350,8 +2369,8 @@ const useLiveSession = (
   const subscribedKeysRef = useRef<Set<string>>(new Set());
   const subscribedMapRef = useRef<Map<string, LiveSubscription>>(new Map());
   const manifest = useMemo(
-    () => getLiveManifest(pathname, chartTicker.toUpperCase(), chartIntervalMs, flowFilters),
-    [pathname, chartTicker, chartIntervalMs, flowFilters]
+    () => getLiveManifest(pathname, chartTicker.toUpperCase(), chartIntervalMs, flowFilters, optionScope, equityScope),
+    [pathname, chartTicker, chartIntervalMs, flowFilters, optionScope, equityScope]
   );
 
   useEffect(() => {
@@ -2616,6 +2635,42 @@ const useLiveSession = (
     const currentKeys = subscribedKeysRef.current;
     const toSubscribe = manifest.filter((sub) => !currentKeys.has(getLiveSubscriptionKey(sub)));
     const removedKeys = Array.from(currentKeys).filter((key) => !nextKeys.has(key));
+    const resetScopedChannels = new Set(
+      [...removedKeys, ...toSubscribe.map(getLiveSubscriptionKey)]
+        .map((key) => subscribedMapRef.current.get(key) ?? nextMap.get(key) ?? null)
+        .filter((sub): sub is LiveSubscription => sub !== null)
+        .map((sub) => sub.channel)
+        .filter((channel) => channel === "options" || channel === "equities")
+    );
+    if (resetScopedChannels.has("options")) {
+      setOptions([]);
+    }
+    if (resetScopedChannels.has("equities")) {
+      setEquities([]);
+    }
+    if (resetScopedChannels.size > 0) {
+      setHistoryCursors((current) => {
+        const next = { ...current };
+        for (const key of [...removedKeys, ...toSubscribe.map(getLiveSubscriptionKey)]) {
+          delete next[key];
+        }
+        return next;
+      });
+      setHistoryLoading((current) => {
+        const next = { ...current };
+        for (const key of [...removedKeys, ...toSubscribe.map(getLiveSubscriptionKey)]) {
+          delete next[key];
+        }
+        return next;
+      });
+      setHistoryErrors((current) => {
+        const next = { ...current };
+        for (const key of [...removedKeys, ...toSubscribe.map(getLiveSubscriptionKey)]) {
+          delete next[key];
+        }
+        return next;
+      });
+    }
 
     if (removedKeys.length > 0) {
       const removedSubs = removedKeys
@@ -2660,6 +2715,7 @@ const useLiveSession = (
         if (subscription.channel === "options" || subscription.channel === "flow") {
           appendOptionFlowFilters(params, subscription.filters);
         }
+        appendLiveScopeParams(params, subscription);
         const response = await fetch(buildApiUrl(`${endpoint}?${params.toString()}`));
         if (!response.ok) {
           const detail = await readErrorDetail(response);
@@ -3981,6 +4037,7 @@ const useTerminalState = () => {
   const [selectedAlert, setSelectedAlert] = useState<AlertEvent | null>(null);
   const [selectedDarkEvent, setSelectedDarkEvent] = useState<InferredDarkEvent | null>(null);
   const [selectedClassifierHit, setSelectedClassifierHit] = useState<ClassifierHitEvent | null>(null);
+  const [selectedInstrument, setSelectedInstrument] = useState<SelectedInstrument>(null);
   const [filterInput, setFilterInput] = useState<string>("");
   const [flowFilters, setFlowFilters] = useState<OptionFlowFilters>(() => buildDefaultFlowFilters());
   const [chartIntervalMs, setChartIntervalMs] = useState<number>(CANDLE_INTERVALS[0].ms);
@@ -3992,20 +4049,52 @@ const useTerminalState = () => {
     return Array.from(new Set(parts));
   }, [filterInput]);
   const tickerSet = useMemo(() => new Set(activeTickers), [activeTickers]);
-  const chartTicker = useMemo(() => activeTickers[0] ?? "SPY", [activeTickers]);
+  const instrumentUnderlying = selectedInstrument?.underlyingId.toUpperCase() ?? null;
+  const optionScope = useMemo(
+    () => ({
+      underlying_ids: activeTickers.length > 0 ? activeTickers : instrumentUnderlying ? [instrumentUnderlying] : undefined,
+      option_contract_id:
+        selectedInstrument?.kind === "option-contract" ? selectedInstrument.contractId : undefined
+    }),
+    [activeTickers, instrumentUnderlying, selectedInstrument]
+  );
+  const equityScope = useMemo(
+    () => ({
+      underlying_ids: activeTickers.length > 0 ? activeTickers : instrumentUnderlying ? [instrumentUnderlying] : undefined
+    }),
+    [activeTickers, instrumentUnderlying]
+  );
+  const chartTicker = useMemo(
+    () => instrumentUnderlying ?? activeTickers[0] ?? "SPY",
+    [activeTickers, instrumentUnderlying]
+  );
+  const selectedInstrumentLabel = useMemo(() => {
+    if (!selectedInstrument) {
+      return null;
+    }
+    if (selectedInstrument.kind === "equity") {
+      return `Equity: ${selectedInstrument.underlyingId}`;
+    }
+    const display = formatOptionContractLabel(selectedInstrument.contractId);
+    return display
+      ? `Contract: ${display.ticker} ${display.expiration} ${display.strike}`
+      : `Contract: ${selectedInstrument.contractId}`;
+  }, [selectedInstrument]);
   const liveSession = useLiveSession(
     mode === "live",
     pathname,
     chartTicker,
     chartIntervalMs,
-    flowFilters
+    flowFilters,
+    optionScope,
+    equityScope
   );
   const equitiesLiveSubscriptionActive = useMemo(
     () =>
-      getLiveManifest(pathname, chartTicker.toUpperCase(), chartIntervalMs, flowFilters).some(
+      getLiveManifest(pathname, chartTicker.toUpperCase(), chartIntervalMs, flowFilters, optionScope, equityScope).some(
         (sub) => sub.channel === "equities"
       ),
-    [pathname, chartTicker, chartIntervalMs, flowFilters]
+    [pathname, chartTicker, chartIntervalMs, flowFilters, optionScope, equityScope]
   );
 
   const handleReplaySource = useCallback((value: string | null) => {
@@ -4665,19 +4754,31 @@ const useTerminalState = () => {
       if (!matchesOptionPrintFilters(print, flowFilters)) {
         return false;
       }
+      if (
+        selectedInstrument?.kind === "option-contract" &&
+        normalizeContractId(print.option_contract_id) !== selectedInstrument.contractId
+      ) {
+        return false;
+      }
       if (tickerSet.size === 0) {
-        return true;
+        return (
+          !instrumentUnderlying ||
+          extractUnderlying(normalizeContractId(print.option_contract_id)) === instrumentUnderlying
+        );
       }
       return matchesTicker(extractUnderlying(normalizeContractId(print.option_contract_id)));
     });
-  }, [flowFilters, optionsFeed.items, matchesTicker, tickerSet]);
+  }, [flowFilters, optionsFeed.items, matchesTicker, tickerSet, selectedInstrument, instrumentUnderlying]);
 
   const filteredEquities = useMemo(() => {
     if (tickerSet.size === 0) {
+      if (instrumentUnderlying) {
+        return equitiesFeed.items.filter((print) => print.underlying_id.toUpperCase() === instrumentUnderlying);
+      }
       return equitiesFeed.items;
     }
     return equitiesFeed.items.filter((print) => matchesTicker(print.underlying_id));
-  }, [equitiesFeed.items, matchesTicker, tickerSet]);
+  }, [equitiesFeed.items, matchesTicker, tickerSet, instrumentUnderlying]);
 
   const equitiesSilentWarning = shouldShowEquitiesSilentFeedWarning({
     wsStatus: liveSession.status,
@@ -5000,6 +5101,9 @@ const useTerminalState = () => {
     setSelectedDarkEvent,
     selectedClassifierHit,
     setSelectedClassifierHit,
+    selectedInstrument,
+    setSelectedInstrument,
+    selectedInstrumentLabel,
     filterInput,
     setFilterInput,
     flowFilters,
@@ -5473,6 +5577,15 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
               const spot = print.execution_underlying_spot;
               const iv = print.execution_iv;
               const decor = state.classifierDecorByOptionTraceId.get(print.trace_id);
+              const underlyingId = (print.underlying_id ?? parsed?.root ?? extractUnderlying(contractId)).toUpperCase();
+              const focusContract = (event: ReactMouseEvent<HTMLButtonElement>) => {
+                event.stopPropagation();
+                state.setSelectedInstrument({
+                  kind: "option-contract",
+                  contractId,
+                  underlyingId
+                });
+              };
               const commonProps = {
                 className: `data-table-row data-table-row-button data-table-row-classified data-table-row-options${decor ? ` is-classified classifier-${decor.tone}` : ""}`,
                 style: decor ? ({ "--classifier-intensity": decor.intensity } as CSSProperties) : undefined
@@ -5480,10 +5593,26 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
               const cells = (
                 <>
                   <span className="data-table-cell data-table-cell-number">{formatTime(print.ts)}</span>
-                  <span className="data-table-cell">{contractDisplay?.ticker ?? parsed?.root ?? formatContractLabel(contractId)}</span>
-                  <span className="data-table-cell">{contractDisplay?.expiration ?? parsed?.expiry ?? "--"}</span>
-                  <span className="data-table-cell data-table-cell-number">{contractDisplay?.strike.replace(/[CP]$/, "") ?? "--"}</span>
-                  <span className="data-table-cell">{parsed?.right ?? contractDisplay?.strike.slice(-1) ?? "--"}</span>
+                  <span className="data-table-cell">
+                    <button className="instrument-cell-button" type="button" onClick={focusContract}>
+                      {contractDisplay?.ticker ?? parsed?.root ?? formatContractLabel(contractId)}
+                    </button>
+                  </span>
+                  <span className="data-table-cell">
+                    <button className="instrument-cell-button" type="button" onClick={focusContract}>
+                      {contractDisplay?.expiration ?? parsed?.expiry ?? "--"}
+                    </button>
+                  </span>
+                  <span className="data-table-cell data-table-cell-number">
+                    <button className="instrument-cell-button" type="button" onClick={focusContract}>
+                      {contractDisplay?.strike.replace(/[CP]$/, "") ?? "--"}
+                    </button>
+                  </span>
+                  <span className="data-table-cell">
+                    <button className="instrument-cell-button" type="button" onClick={focusContract}>
+                      {parsed?.right ?? contractDisplay?.strike.slice(-1) ?? "--"}
+                    </button>
+                  </span>
                   <span className="data-table-cell data-table-cell-number">{typeof spot === "number" ? formatPrice(spot) : "--"}</span>
                   <span className="data-table-cell data-table-cell-number">
                     {formatSize(print.size)}@{formatPrice(print.price)}_{nbboSide ?? "--"}
@@ -5598,7 +5727,20 @@ const EquitiesPane = ({ limit }: EquitiesPaneProps) => {
             {virtual.visibleItems.map((print) => (
               <div className="data-table-row data-table-row-equities" key={`${print.trace_id}-${print.seq}`}>
                 <span className="data-table-cell data-table-cell-number">{formatTime(print.ts)}</span>
-                <span className="data-table-cell">{print.underlying_id}</span>
+                <span className="data-table-cell">
+                  <button
+                    className="instrument-cell-button"
+                    type="button"
+                    onClick={() =>
+                      state.setSelectedInstrument({
+                        kind: "equity",
+                        underlyingId: print.underlying_id.toUpperCase()
+                      })
+                    }
+                  >
+                    {print.underlying_id}
+                  </button>
+                </span>
                 <span className="data-table-cell data-table-cell-number">${formatPrice(print.price)}</span>
                 <span className="data-table-cell data-table-cell-number">{formatSize(print.size)}x</span>
                 <span className="data-table-cell">{print.exchange}</span>
@@ -6237,6 +6379,14 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
                 >
                   Clear
                 </button>
+                {state.selectedInstrumentLabel ? (
+                  <span className="instrument-focus-chip">
+                    <span>{state.selectedInstrumentLabel}</span>
+                    <button type="button" onClick={() => state.setSelectedInstrument(null)}>
+                      Clear
+                    </button>
+                  </span>
+                ) : null}
               </div>
               <div className="terminal-topbar-mode">
                 <button

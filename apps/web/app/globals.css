@@ -384,6 +384,59 @@ input {
   color: #ffd89a;
 }
 
+.instrument-focus-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  max-width: min(360px, 32vw);
+  padding: 6px 8px 6px 10px;
+  border: 1px solid rgba(255, 216, 154, 0.34);
+  border-radius: 8px;
+  background: rgba(245, 166, 35, 0.08);
+  color: #ffe2aa;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.instrument-focus-chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.instrument-focus-chip button,
+.instrument-cell-button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.instrument-focus-chip button {
+  padding: 4px 6px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.62rem;
+}
+
+.instrument-cell-button {
+  padding: 0;
+  text-align: inherit;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 216, 154, 0.36);
+  text-underline-offset: 3px;
+}
+
+.instrument-cell-button:hover,
+.instrument-cell-button:focus-visible {
+  color: #ffd89a;
+  outline: none;
+}
+
 .pause-button {
   padding: 7px 10px;
   font-size: 0.66rem;

@@ -72,6 +72,7 @@ import {
   fetchOptionPrintsByTraceIds,
   fetchRecentOptionPrints
 } from "@islandflow/storage";
+import type { EquityPrintQueryFilters, OptionPrintQueryFilters } from "@islandflow/storage";
 import {
   AlertEventSchema,
   ClassifierHitEventSchema,
@@ -100,7 +101,7 @@ import {
 } from "@islandflow/types";
 import { createClient } from "redis";
 import { z } from "zod";
-import { LiveStateManager, shouldFanoutLiveEvent } from "./live";
+import { LIVE_FEED_LOOKBACK_MS, LiveStateManager, shouldFanoutLiveEvent } from "./live";
 
 const service = "api";
 const logger = createLogger({ service });
@@ -558,6 +559,62 @@ const buildHistoryResponse = <T extends { seq: number }>(
   };
 };
 
+const parseScopeList = (url: URL, ...keys: string[]): string[] | undefined => {
+  const values = keys
+    .flatMap((key) => url.searchParams.getAll(key))
+    .flatMap((value) => value.split(","))
+    .map((value) => value.trim().toUpperCase())
+    .filter(Boolean);
+  const unique = Array.from(new Set(values));
+  return unique.length > 0 ? unique : undefined;
+};
+
+const parseLiveOptionPrintFilters = (url: URL): OptionPrintQueryFilters => {
+  const { storageFilters } = parseOptionPrintFilters(url);
+  return {
+    ...storageFilters,
+    underlyingIds: parseScopeList(url, "underlying_id", "underlying_ids"),
+    optionContractId: url.searchParams.get("option_contract_id") ?? undefined,
+    sinceTs: Date.now() - LIVE_FEED_LOOKBACK_MS
+  };
+};
+
+const parseLiveEquityPrintFilters = (url: URL): EquityPrintQueryFilters => ({
+  underlyingIds: parseScopeList(url, "underlying_id", "underlying_ids"),
+  sinceTs: Date.now() - LIVE_FEED_LOOKBACK_MS
+});
+
+const matchesScopedOptionSubscription = (
+  print: { underlying_id?: string; option_contract_id: string },
+  subscription: LiveSubscription
+): boolean => {
+  if (subscription.channel !== "options") {
+    return false;
+  }
+  if (subscription.option_contract_id && subscription.option_contract_id !== print.option_contract_id) {
+    return false;
+  }
+  if (subscription.underlying_ids?.length) {
+    const underlying = (print.underlying_id ?? "").toUpperCase();
+    return subscription.underlying_ids.map((value) => value.toUpperCase()).includes(underlying);
+  }
+  return true;
+};
+
+const matchesScopedEquitySubscription = (
+  print: { underlying_id: string },
+  subscription: LiveSubscription
+): boolean => {
+  if (subscription.channel !== "equities") {
+    return false;
+  }
+  if (!subscription.underlying_ids?.length) {
+    return true;
+  }
+  const underlying = print.underlying_id.toUpperCase();
+  return subscription.underlying_ids.map((value) => value.toUpperCase()).includes(underlying);
+};
+
 const buildCandleCacheKey = (underlyingId: string, intervalMs: number): string => {
   return `candles:equity:${intervalMs}:${underlyingId}`;
 };
@@ -987,7 +1044,7 @@ const run = async () => {
     }
 
     const matchingSubscriptions =
-      subscription.channel === "options" || subscription.channel === "flow"
+      subscription.channel === "options" || subscription.channel === "flow" || subscription.channel === "equities"
         ? [...subscriptionDefinitions.entries()].filter(([, candidate]) => candidate.channel === subscription.channel)
         : [[getSubscriptionKey(subscription), subscription] as const];
 
@@ -1003,7 +1060,15 @@ const run = async () => {
 
       if (
         candidate.channel === "options" &&
-        !matchesOptionPrintFilters(OptionPrintSchema.parse(item), candidate.filters)
+        (!matchesOptionPrintFilters(OptionPrintSchema.parse(item), candidate.filters) ||
+          !matchesScopedOptionSubscription(OptionPrintSchema.parse(item), candidate))
+      ) {
+        continue;
+      }
+
+      if (
+        candidate.channel === "equities" &&
+        !matchesScopedEquitySubscription(EquityPrintSchema.parse(item), candidate)
       ) {
         continue;
       }
@@ -1343,7 +1408,7 @@ const run = async () => {
         try {
           const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
           const source = parseReplaySource(url) ?? undefined;
-          const { storageFilters } = parseOptionPrintFilters(url);
+          const storageFilters = parseLiveOptionPrintFilters(url);
           const data = await fetchOptionPrintsBefore(
             clickhouse,
             beforeTs,
@@ -1373,7 +1438,13 @@ const run = async () => {
 
       if (req.method === "GET" && url.pathname === "/history/equities") {
         const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
-        const data = await fetchEquityPrintsBefore(clickhouse, beforeTs, beforeSeq, limit);
+        const data = await fetchEquityPrintsBefore(
+          clickhouse,
+          beforeTs,
+          beforeSeq,
+          limit,
+          parseLiveEquityPrintFilters(url)
+        );
         return jsonResponse(buildHistoryResponse(data, (item) => ({ ts: item.ts, seq: item.seq })));
       }
 

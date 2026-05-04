@@ -73,6 +73,32 @@ describe("live manifest", () => {
 
     expect(optionsSubscription?.filters).toBe(filters);
   });
+
+  it("includes scoped option and equity subscriptions", () => {
+    const manifest = getLiveManifest(
+      "/tape",
+      "AAPL",
+      60000,
+      buildDefaultFlowFilters(),
+      {
+        underlying_ids: ["AAPL"],
+        option_contract_id: "AAPL-2025-01-17-200-C"
+      },
+      { underlying_ids: ["AAPL"] }
+    );
+    const optionsSubscription = manifest.find(
+      (subscription): subscription is Extract<(typeof manifest)[number], { channel: "options" }> =>
+        subscription.channel === "options"
+    );
+    const equitiesSubscription = manifest.find(
+      (subscription): subscription is Extract<(typeof manifest)[number], { channel: "equities" }> =>
+        subscription.channel === "equities"
+    );
+
+    expect(optionsSubscription?.underlying_ids).toEqual(["AAPL"]);
+    expect(optionsSubscription?.option_contract_id).toBe("AAPL-2025-01-17-200-C");
+    expect(equitiesSubscription?.underlying_ids).toEqual(["AAPL"]);
+  });
 });
 
 describe("live tape pausable helpers", () => {

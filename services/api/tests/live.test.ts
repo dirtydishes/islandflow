@@ -578,9 +578,11 @@ describe("LiveStateManager", () => {
     expect(isLiveItemFresh("equity-joins", { source_ts: 1 }, 1_000_000)).toBe(true);
   });
 
-  it("fans out stale live events so delayed data remains visible without refresh", () => {
-    expect(shouldFanoutLiveEvent("options", { ts: 1000 })).toBe(true);
-    expect(shouldFanoutLiveEvent("equities", { ts: 1000 })).toBe(true);
-    expect(shouldFanoutLiveEvent("flow", { source_ts: 1000 })).toBe(true);
+  it("gates live feed fanout to the rolling visibility window", () => {
+    const now = Date.now();
+    expect(shouldFanoutLiveEvent("options", { ts: now })).toBe(true);
+    expect(shouldFanoutLiveEvent("equities", { ts: now - 25 * 60 * 60 * 1000 })).toBe(false);
+    expect(shouldFanoutLiveEvent("flow", { source_ts: now - 25 * 60 * 60 * 1000 })).toBe(false);
+    expect(shouldFanoutLiveEvent("equity-candles", { ts: 1000 })).toBe(true);
   });
 });

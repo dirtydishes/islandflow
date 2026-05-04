@@ -58,7 +58,10 @@ describe("option-prints storage helpers", () => {
       security: "stock",
       nbboSides: ["AA", "A"],
       optionTypes: ["call"],
-      minNotional: 25_000
+      minNotional: 25_000,
+      underlyingIds: ["AAPL", "NVDA"],
+      optionContractId: "AAPL-2025-01-17-200-C",
+      sinceTs: 123
     });
     await fetchOptionPrintsBefore(client, 100, 5, 20, "alpaca");
     await fetchOptionPrintsByTraceIds(client, ["trace-1", "trace-2"]);
@@ -68,6 +71,9 @@ describe("option-prints storage helpers", () => {
     expect(queries[0]).toContain("nbbo_side IN ('AA', 'A')");
     expect(queries[0]).toContain("option_type IN ('call')");
     expect(queries[0]).toContain("notional >= 25000");
+    expect(queries[0]).toContain("underlying_id IN ('AAPL', 'NVDA')");
+    expect(queries[0]).toContain("option_contract_id = 'AAPL-2025-01-17-200-C'");
+    expect(queries[0]).toContain("ts >= 123");
     expect(queries[1]).toContain("(ts, seq) < (100, 5)");
     expect(queries[1]).toContain("startsWith(trace_id, 'alpaca')");
     expect(queries[1]).toContain("ORDER BY ts DESC, seq DESC LIMIT 20");

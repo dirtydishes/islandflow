@@ -25,6 +25,19 @@ describe("live protocol types", () => {
     );
     expect(
       getSubscriptionKey({
+        channel: "options",
+        filters: { view: "signal" },
+        underlying_ids: ["NVDA", "AAPL"],
+        option_contract_id: "AAPL-2025-01-17-200-C"
+      })
+    ).toBe(
+      'options|{"view":"signal"}|underlyings:AAPL,NVDA|contract:AAPL-2025-01-17-200-C'
+    );
+    expect(getSubscriptionKey({ channel: "equities", underlying_ids: ["NVDA", "AAPL"] })).toBe(
+      "equities|underlyings:AAPL,NVDA"
+    );
+    expect(
+      getSubscriptionKey({
         channel: "equity-candles",
         underlying_id: "SPY",
         interval_ms: 60000

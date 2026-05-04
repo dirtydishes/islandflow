@@ -12,6 +12,7 @@ import {
   type ClickHouseClient
 } from "@islandflow/storage";
 import type { OptionPrintQueryFilters } from "@islandflow/storage";
+import type { EquityPrintQueryFilters } from "@islandflow/storage";
 import {
   AlertEventSchema,
   ClassifierHitEventSchema,
@@ -38,6 +39,7 @@ import {
 import type { RedisClientType } from "redis";
 
 const CURSOR_HASH_KEY = "live:cursors";
+export const LIVE_FEED_LOOKBACK_MS = 24 * 60 * 60 * 1000;
 
 const DEFAULT_GENERIC_LIMIT = 10000;
 const MAX_GENERIC_LIMIT = 100000;
@@ -267,10 +269,22 @@ const extractFreshnessTs = (channel: LiveGenericChannel, item: any): number | nu
     case "equity-quotes":
       return typeof item.ts === "number" ? item.ts : null;
     case "flow":
+    case "classifier-hits":
+    case "alerts":
+    case "inferred-dark":
       return typeof item.source_ts === "number" ? item.source_ts : null;
     default:
       return null;
   }
+};
+
+const isWithinLiveFeedLookback = (
+  channel: LiveGenericChannel,
+  item: unknown,
+  now = Date.now()
+): boolean => {
+  const ts = extractFreshnessTs(channel, item);
+  return ts !== null && now - ts <= LIVE_FEED_LOOKBACK_MS;
 };
 
 export const isLiveItemFresh = (
@@ -289,7 +303,12 @@ export const isLiveItemFresh = (
   return now - ts <= thresholdMs;
 };
 
-export const shouldFanoutLiveEvent = (_channel: LiveChannel, _item: unknown): boolean => true;
+export const shouldFanoutLiveEvent = (channel: LiveChannel, item: unknown): boolean => {
+  if (channel === "equity-candles" || channel === "equity-overlay") {
+    return true;
+  }
+  return isWithinLiveFeedLookback(channel, item);
+};
 
 const nextBeforeForItems = <T>(items: T[], cursorOf: (item: T) => Cursor): Cursor | null => {
   const last = items.at(-1);
@@ -353,7 +372,13 @@ export class LiveStateManager {
     const config = this.generic[channel];
     if (this.redis?.isOpen) {
       const payloads = await this.redis.lRange(config.redisKey, 0, config.limit - 1);
-      const cached = normalizeGenericItems(channel, parseJsonList(payloads, config.parse), config);
+      const cached = normalizeGenericItems(
+        channel,
+        parseJsonList(payloads, config.parse).filter((item) =>
+          isWithinLiveFeedLookback(channel, item)
+        ),
+        config
+      );
       if (cached.length > 0) {
         this.genericItems.set(channel, cached);
         this.stats.genericHydrateFromRedis += 1;
@@ -370,7 +395,13 @@ export class LiveStateManager {
       }
     }
 
-    const fresh = normalizeGenericItems(channel, await config.fetchRecent(this.clickhouse, config.limit), config);
+    const fresh = normalizeGenericItems(
+      channel,
+      (await config.fetchRecent(this.clickhouse, config.limit)).filter((item) =>
+        isWithinLiveFeedLookback(channel, item)
+      ),
+      config
+    );
     this.stats.genericHydrateFromClickHouse += 1;
     this.stats.cacheDepthByKey.set(config.redisKey, fresh.length);
     this.genericItems.set(channel, fresh);
@@ -382,16 +413,21 @@ export class LiveStateManager {
   async getSnapshot(subscription: LiveSubscription): Promise<FeedSnapshot<unknown>> {
     switch (subscription.channel) {
       case "options": {
-        if (subscription.filters?.view === "raw") {
+        const scoped =
+          Boolean(subscription.underlying_ids?.length) || Boolean(subscription.option_contract_id);
+        if (subscription.filters?.view === "raw" || scoped) {
           const storageFilters: OptionPrintQueryFilters = {
-            view: "raw",
+            view: subscription.filters?.view ?? "signal",
             security:
-              subscription.filters.securityTypes?.length === 1
+              subscription.filters?.securityTypes?.length === 1
                 ? subscription.filters.securityTypes[0]
                 : "all",
-            nbboSides: subscription.filters.nbboSides,
-            optionTypes: subscription.filters.optionTypes,
-            minNotional: subscription.filters.minNotional
+            nbboSides: subscription.filters?.nbboSides,
+            optionTypes: subscription.filters?.optionTypes,
+            minNotional: subscription.filters?.minNotional,
+            underlyingIds: subscription.underlying_ids,
+            optionContractId: subscription.option_contract_id,
+            sinceTs: Date.now() - LIVE_FEED_LOOKBACK_MS
           };
           const items = await fetchRecentOptionPrints(
             this.clickhouse,
@@ -409,6 +445,7 @@ export class LiveStateManager {
 
         const config = this.generic.options;
         const items = (this.genericItems.get("options") ?? []).filter((item) =>
+          isWithinLiveFeedLookback("options", item) &&
           matchesOptionPrintFilters(item, subscription.filters)
         );
         return {
@@ -421,7 +458,33 @@ export class LiveStateManager {
       case "flow": {
         const config = this.generic.flow;
         const items = (this.genericItems.get("flow") ?? []).filter((item) =>
+          isWithinLiveFeedLookback("flow", item) &&
           matchesFlowPacketFilters(item, subscription.filters)
+        );
+        return {
+          subscription,
+          items,
+          watermark: this.genericCursors.get(config.cursorField) ?? null,
+          next_before: nextBeforeForItems(items, config.cursor)
+        };
+      }
+      case "equities": {
+        const config = this.generic.equities;
+        if (subscription.underlying_ids?.length) {
+          const filters: EquityPrintQueryFilters = {
+            underlyingIds: subscription.underlying_ids,
+            sinceTs: Date.now() - LIVE_FEED_LOOKBACK_MS
+          };
+          const items = await fetchRecentEquityPrints(this.clickhouse, config.limit, filters);
+          return {
+            subscription,
+            items,
+            watermark: items[0] ? { ts: items[0].ts, seq: items[0].seq } : null,
+            next_before: nextBeforeForItems(items, config.cursor)
+          };
+        }
+        const items = (this.genericItems.get("equities") ?? []).filter((item) =>
+          isWithinLiveFeedLookback("equities", item)
         );
         return {
           subscription,
@@ -460,7 +523,9 @@ export class LiveStateManager {
       }
       default: {
         const config = this.generic[subscription.channel];
-        const items = this.genericItems.get(subscription.channel) ?? [];
+        const items = (this.genericItems.get(subscription.channel) ?? []).filter((item) =>
+          isWithinLiveFeedLookback(subscription.channel, item)
+        );
         return {
           subscription,
           items,
@@ -506,6 +571,9 @@ export class LiveStateManager {
       default: {
         const config = this.generic[channel];
         const parsed = config.parse(item);
+        if (!isWithinLiveFeedLookback(channel, parsed)) {
+          return null;
+        }
         const items = this.genericItems.get(channel) ?? [];
         const next = normalizeGenericItems(channel, [parsed, ...items], config);
         this.genericItems.set(channel, next);
