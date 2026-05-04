@@ -5372,6 +5372,30 @@ const FlowFilterControls = () => {
   return <FlowFilterPopover filters={state.flowFilters} onChange={state.setFlowFilters} />;
 };
 
+const ContractFilterControl = () => {
+  const state = useTerminal();
+  const selected = state.selectedInstrument;
+  const isContractFilterActive = selected?.kind === "option-contract";
+
+  return (
+    <button
+      className={`terminal-button contract-filter-button${isContractFilterActive ? " is-active" : ""}`}
+      type="button"
+      disabled={!isContractFilterActive}
+      onClick={() => state.setSelectedInstrument(null)}
+      title={
+        isContractFilterActive
+          ? "Clear active contract filter"
+          : "Contract filter activates when you focus a contract in the Options tape"
+      }
+    >
+      <span className="contract-filter-button-label">
+        {isContractFilterActive ? state.selectedInstrumentLabel : "Contract Filter"}
+      </span>
+    </button>
+  );
+};
+
 type PaneProps = {
   title: string;
   status?: ReactNode;
@@ -6278,7 +6302,7 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
           <header className="terminal-topbar">
             <div className="terminal-topbar-actions">
               <div className="terminal-topbar-controls">
-                {state.selectedInstrumentLabel ? (
+                {state.selectedInstrumentLabel && state.selectedInstrument?.kind !== "option-contract" ? (
                   <span className="instrument-focus-chip">
                     <span>{state.selectedInstrumentLabel}</span>
                     <button type="button" onClick={() => state.setSelectedInstrument(null)}>
@@ -6367,7 +6391,15 @@ export function OverviewRoute() {
 
 export function TapeRoute() {
   return (
-    <PageFrame title="Tape" actions={<FlowFilterControls />}>
+    <PageFrame
+      title="Tape"
+      actions={
+        <>
+          <ContractFilterControl />
+          <FlowFilterControls />
+        </>
+      }
+    >
       <div className="page-grid page-grid-tape">
         <OptionsPane />
         <EquitiesPane />

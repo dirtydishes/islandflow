@@ -458,6 +458,27 @@ h3 {
   position: relative;
 }
 
+.contract-filter-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  min-width: 0;
+  max-width: min(440px, 42vw);
+}
+
+.contract-filter-button-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contract-filter-button.is-active {
+  border-color: rgba(245, 166, 35, 0.55);
+  background: linear-gradient(180deg, rgba(245, 166, 35, 0.18), rgba(245, 166, 35, 0.07));
+  color: #ffe2aa;
+}
+
 .flow-filter-popover {
   position: relative;
 }
