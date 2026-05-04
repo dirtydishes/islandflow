@@ -409,13 +409,19 @@ export const reducePausableTapeData = <T extends SortableItem>(
     return current;
   }
 
-  const nextSeenKeys = new Set(current.seenKeys);
+  const seenKeys = current.seenKeys;
+  let nextSeenKeys: Set<string> | null = null;
   const unseen: T[] = [];
 
+  // Incoming items are maintained newest-first by mergeNewest.
+  // Once we hit a previously seen key, the remainder is older history.
   for (const item of incoming) {
     const key = getTapeItemKey(item);
-    if (nextSeenKeys.has(key)) {
-      continue;
+    if (seenKeys.has(key)) {
+      break;
+    }
+    if (!nextSeenKeys) {
+      nextSeenKeys = new Set(seenKeys);
     }
     nextSeenKeys.add(key);
     unseen.push(item);
@@ -431,7 +437,7 @@ export const reducePausableTapeData = <T extends SortableItem>(
       queued: mergeNewest(unseen, current.queued, retentionLimit, (evicted) =>
         incrementRetentionMetric("hotWindowEvictions", evicted)
       ),
-      seenKeys: nextSeenKeys,
+      seenKeys: nextSeenKeys ?? seenKeys,
       dropped: current.dropped + unseen.length
     };
   }
@@ -442,7 +448,7 @@ export const reducePausableTapeData = <T extends SortableItem>(
       incrementRetentionMetric("hotWindowEvictions", evicted)
     ),
     queued: [],
-    seenKeys: nextSeenKeys,
+    seenKeys: nextSeenKeys ?? seenKeys,
     dropped: 0
   };
 };
