@@ -5343,7 +5343,7 @@ type OptionsPaneProps = {
 const OptionsPane = ({ limit }: OptionsPaneProps) => {
   const state = useTerminal();
   const items = limit ? state.filteredOptions.slice(0, limit) : state.filteredOptions;
-  const virtual = useVirtualList(items, state.optionsScroll.listRef, !limit, 34);
+  const virtual = useVirtualList(items, state.optionsScroll.listRef, !limit, 36);
 
   return (
     <Pane
@@ -5369,7 +5369,7 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
         />
       }
     >
-      <div className="options-table-wrap">
+      <div className="data-table-shell">
         {items.length === 0 ? (
           <div className="empty">
             {state.tickerSet.size > 0
@@ -5381,24 +5381,24 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          <div className="options-table" role="table" aria-label="Options tape">
-            <div className="options-table-head" role="row">
-              <span>TIME</span>
-              <span>SYM</span>
-              <span>EXP</span>
-              <span>STRIKE</span>
-              <span>C/P</span>
-              <span>SPOT</span>
-              <span>DETAILS</span>
-              <span>TYPE</span>
-              <span>VALUE</span>
-              <span>SIDE</span>
-              <span>IV</span>
-              <span>CLASSIFIER</span>
-            </div>
-            <div className="options-table-body" ref={state.optionsScroll.listRef}>
+          <div className="data-table-wrap" ref={state.optionsScroll.listRef}>
+            <div className="data-table data-table-options" role="table" aria-label="Options tape">
+              <div className="data-table-head" role="row">
+                <span className="data-table-cell">TIME</span>
+                <span className="data-table-cell">SYM</span>
+                <span className="data-table-cell">EXP</span>
+                <span className="data-table-cell">STRIKE</span>
+                <span className="data-table-cell">C/P</span>
+                <span className="data-table-cell">SPOT</span>
+                <span className="data-table-cell">DETAILS</span>
+                <span className="data-table-cell">TYPE</span>
+                <span className="data-table-cell">VALUE</span>
+                <span className="data-table-cell">SIDE</span>
+                <span className="data-table-cell">IV</span>
+                <span className="data-table-cell">CLASSIFIER</span>
+              </div>
               {virtual.topSpacerHeight > 0 ? (
-                <div style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
+                <div className="data-table-spacer" style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
               ) : null}
               {virtual.visibleItems.map((print) => {
               const contractId = normalizeContractId(print.option_contract_id);
@@ -5415,31 +5415,31 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
               const iv = print.execution_iv;
               const decor = state.classifierDecorByOptionTraceId.get(print.trace_id);
               const commonProps = {
-                className: `options-table-row${decor ? ` is-classified classifier-${decor.tone}` : ""}`,
+                className: `data-table-row data-table-row-button data-table-row-classified data-table-row-options${decor ? ` is-classified classifier-${decor.tone}` : ""}`,
                 style: decor ? ({ "--classifier-intensity": decor.intensity } as CSSProperties) : undefined
               };
               const cells = (
                 <>
-                  <span className="mono">{formatTime(print.ts)}</span>
-                  <span>{contractDisplay?.ticker ?? parsed?.root ?? formatContractLabel(contractId)}</span>
-                  <span>{contractDisplay?.expiration ?? parsed?.expiry ?? "--"}</span>
-                  <span>{contractDisplay?.strike.replace(/[CP]$/, "") ?? "--"}</span>
-                  <span>{parsed?.right ?? contractDisplay?.strike.slice(-1) ?? "--"}</span>
-                  <span>{typeof spot === "number" ? formatPrice(spot) : "--"}</span>
-                  <span className="mono">
+                  <span className="data-table-cell data-table-cell-number">{formatTime(print.ts)}</span>
+                  <span className="data-table-cell">{contractDisplay?.ticker ?? parsed?.root ?? formatContractLabel(contractId)}</span>
+                  <span className="data-table-cell">{contractDisplay?.expiration ?? parsed?.expiry ?? "--"}</span>
+                  <span className="data-table-cell data-table-cell-number">{contractDisplay?.strike.replace(/[CP]$/, "") ?? "--"}</span>
+                  <span className="data-table-cell">{parsed?.right ?? contractDisplay?.strike.slice(-1) ?? "--"}</span>
+                  <span className="data-table-cell data-table-cell-number">{typeof spot === "number" ? formatPrice(spot) : "--"}</span>
+                  <span className="data-table-cell data-table-cell-number">
                     {formatSize(print.size)}@{formatPrice(print.price)}_{nbboSide ?? "--"}
                   </span>
-                  <span>{print.option_type ?? "--"}</span>
-                  <span className="notional-emphasis">${formatCompactUsd(notional)}</span>
-                  <span>
+                  <span className="data-table-cell">{print.option_type ?? "--"}</span>
+                  <span className="data-table-cell data-table-cell-number notional-emphasis">${formatCompactUsd(notional)}</span>
+                  <span className="data-table-cell">
                     {nbboSide ? (
                       <span className={`nbbo-tag nbbo-tag-${nbboSide.toLowerCase()}`}>{nbboSide}</span>
                     ) : (
                       "--"
                     )}
                   </span>
-                  <span>{typeof iv === "number" ? formatPct(iv) : "--"}</span>
-                  <span>{decor ? humanizeClassifierId(decor.family) : "--"}</span>
+                  <span className="data-table-cell data-table-cell-number">{typeof iv === "number" ? formatPct(iv) : "--"}</span>
+                  <span className="data-table-cell">{decor ? humanizeClassifierId(decor.family) : "--"}</span>
                 </>
               );
 
@@ -5465,7 +5465,7 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
               );
               })}
               {virtual.bottomSpacerHeight > 0 ? (
-                <div style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
+                <div className="data-table-spacer" style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
               ) : null}
             </div>
           </div>
@@ -5483,7 +5483,7 @@ type EquitiesPaneProps = {
 const EquitiesPane = ({ limit }: EquitiesPaneProps) => {
   const state = useTerminal();
   const items = limit ? state.filteredEquities.slice(0, limit) : state.filteredEquities;
-  const virtual = useVirtualList(items, state.equitiesScroll.listRef, !limit, 78);
+  const virtual = useVirtualList(items, state.equitiesScroll.listRef, !limit, 36);
 
   return (
     <Pane
@@ -5509,7 +5509,7 @@ const EquitiesPane = ({ limit }: EquitiesPaneProps) => {
         />
       }
     >
-      <div className="list terminal-list" ref={state.equitiesScroll.listRef}>
+      <div className="data-table-shell">
         {items.length === 0 ? (
           <div className="empty">
             {state.tickerSet.size > 0
@@ -5523,34 +5523,36 @@ const EquitiesPane = ({ limit }: EquitiesPaneProps) => {
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          <>
+          <div className="data-table-wrap" ref={state.equitiesScroll.listRef}>
+            <div className="data-table data-table-equities" role="table" aria-label="Equity prints">
+              <div className="data-table-head" role="row">
+                <span className="data-table-cell">TIME</span>
+                <span className="data-table-cell">SYM</span>
+                <span className="data-table-cell">PRICE</span>
+                <span className="data-table-cell">SIZE</span>
+                <span className="data-table-cell">VENUE</span>
+                <span className="data-table-cell">TAPE</span>
+              </div>
             {virtual.topSpacerHeight > 0 ? (
-              <div style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
+              <div className="data-table-spacer" style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
             ) : null}
             {virtual.visibleItems.map((print) => (
-              <div className="row" key={`${print.trace_id}-${print.seq}`}>
-              <div>
-                <div className="contract">{print.underlying_id}</div>
-                <div className="meta">
-                  <span>${formatPrice(print.price)}</span>
-                  <span>{formatSize(print.size)}x</span>
-                  <span>{print.exchange}</span>
-                  {print.offExchangeFlag ? (
-                    <span className="flag">Off-Ex</span>
-                  ) : (
-                    <span className="flag flag-muted">Lit</span>
-                  )}
-                </div>
-              </div>
-              <div className="time">{formatTime(print.ts)}</div>
+              <div className="data-table-row data-table-row-equities" key={`${print.trace_id}-${print.seq}`}>
+                <span className="data-table-cell data-table-cell-number">{formatTime(print.ts)}</span>
+                <span className="data-table-cell">{print.underlying_id}</span>
+                <span className="data-table-cell data-table-cell-number">${formatPrice(print.price)}</span>
+                <span className="data-table-cell data-table-cell-number">{formatSize(print.size)}x</span>
+                <span className="data-table-cell">{print.exchange}</span>
+                <span className="data-table-cell">{print.offExchangeFlag ? "Off-Ex" : "Lit"}</span>
               </div>
             ))}
             {virtual.bottomSpacerHeight > 0 ? (
-              <div style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
+              <div className="data-table-spacer" style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
             ) : null}
-            {!limit ? <LoadOlderControl channel="equities" /> : null}
-          </>
+            </div>
+          </div>
         )}
+        {!limit ? <LoadOlderControl channel="equities" /> : null}
       </div>
     </Pane>
   );
@@ -5564,7 +5566,7 @@ type FlowPaneProps = {
 const FlowPane = ({ limit, title = "Flow" }: FlowPaneProps) => {
   const state = useTerminal();
   const items = limit ? state.filteredFlow.slice(0, limit) : state.filteredFlow;
-  const virtual = useVirtualList(items, state.flowScroll.listRef, !limit, 104);
+  const virtual = useVirtualList(items, state.flowScroll.listRef, !limit, 44);
 
   return (
     <Pane
@@ -5590,7 +5592,7 @@ const FlowPane = ({ limit, title = "Flow" }: FlowPaneProps) => {
         />
       }
     >
-      <div className="list terminal-list" ref={state.flowScroll.listRef}>
+      <div className="data-table-shell">
         {items.length === 0 ? (
           <div className="empty">
             {state.tickerSet.size > 0
@@ -5602,9 +5604,21 @@ const FlowPane = ({ limit, title = "Flow" }: FlowPaneProps) => {
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          <>
+          <div className="data-table-wrap" ref={state.flowScroll.listRef}>
+            <div className="data-table data-table-flow" role="table" aria-label="Flow packets">
+              <div className="data-table-head" role="row">
+                <span className="data-table-cell">TIME</span>
+                <span className="data-table-cell">CONTRACT</span>
+                <span className="data-table-cell">PRINTS</span>
+                <span className="data-table-cell">SIZE</span>
+                <span className="data-table-cell">NOTIONAL</span>
+                <span className="data-table-cell">WINDOW</span>
+                <span className="data-table-cell">STRUCTURE</span>
+                <span className="data-table-cell">NBBO</span>
+                <span className="data-table-cell">QUALITY</span>
+              </div>
             {virtual.topSpacerHeight > 0 ? (
-              <div style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
+              <div className="data-table-spacer" style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
             ) : null}
             {virtual.visibleItems.map((packet) => {
             const features = packet.features ?? {};
@@ -5638,59 +5652,46 @@ const FlowPane = ({ limit, title = "Flow" }: FlowPaneProps) => {
             const nbboAge = parseNumber(packet.join_quality.nbbo_age_ms, Number.NaN);
             const nbboStale = parseNumber(packet.join_quality.nbbo_stale, 0) > 0;
             const nbboMissing = parseNumber(packet.join_quality.nbbo_missing, 0) > 0;
+            const structureLabel = structureType
+              ? `${structureType.replace(/_/g, " ")}${structureRights ? ` ${structureRights}` : ""}${structureLegs > 0 ? ` ${structureLegs}L` : ""}${structureStrikes > 0 ? ` ${structureStrikes}K` : ""}`
+              : "--";
+            const nbboLabel = Number.isFinite(nbboBid) && Number.isFinite(nbboAsk)
+              ? `${formatPrice(nbboBid)} x ${formatPrice(nbboAsk)}`
+              : Number.isFinite(nbboMid)
+                ? `Mid ${formatPrice(nbboMid)}`
+                : "--";
+            const qualityLabel = [
+              Number.isFinite(aggressiveCoverage) && aggressiveCoverage > 0
+                ? `Agg ${formatPct(aggressiveBuyRatio)}/${formatPct(aggressiveSellRatio)} ${formatPct(aggressiveCoverage)} cov`
+                : null,
+              Number.isFinite(insideRatio) && insideRatio > 0 ? `In ${formatPct(insideRatio)}` : null,
+              Number.isFinite(nbboSpread) ? `Spr ${formatPrice(nbboSpread)}` : null,
+              Number.isFinite(nbboAge) ? `${Math.round(nbboAge)}ms` : null,
+              nbboStale ? "Stale" : null,
+              nbboMissing ? "Missing" : null
+            ].filter(Boolean).join(" | ");
 
             return (
-              <div className="row" key={packet.id}>
-                <div>
-                  <div className="contract">{contract}</div>
-                  <div className="meta flow-meta">
-                    <span>{formatFlowMetric(count)} prints</span>
-                    <span>{formatFlowMetric(totalSize)} size</span>
-                    <span>Notional ${formatUsd(notional)}</span>
-                    {windowMs > 0 ? <span>{formatFlowMetric(windowMs, "ms")}</span> : null}
-                    {structureType ? (
-                      <span className="pill structure-tag">
-                        {structureType.replace(/_/g, " ")}
-                        {structureRights ? ` ${structureRights}` : ""}
-                        {structureLegs > 0 ? ` ${structureLegs}L` : ""}
-                        {structureStrikes > 0 ? ` ${structureStrikes}K` : ""}
-                      </span>
-                    ) : null}
-                    {Number.isFinite(aggressiveCoverage) && aggressiveCoverage > 0 ? (
-                      <span className="pill aggressor-tag">
-                        Agg {formatPct(aggressiveBuyRatio)} / {formatPct(aggressiveSellRatio)}
-                        {Number.isFinite(insideRatio) && insideRatio > 0
-                          ? ` · In ${formatPct(insideRatio)}`
-                          : ""}
-                        {` · ${formatPct(aggressiveCoverage)} cov`}
-                      </span>
-                    ) : null}
-                    {Number.isFinite(nbboBid) && Number.isFinite(nbboAsk) ? (
-                      <span>
-                        NBBO ${formatPrice(nbboBid)} x ${formatPrice(nbboAsk)}
-                      </span>
-                    ) : null}
-                    {Number.isFinite(nbboMid) ? <span>Mid ${formatPrice(nbboMid)}</span> : null}
-                    {Number.isFinite(nbboSpread) ? (
-                      <span>Spread ${formatPrice(nbboSpread)}</span>
-                    ) : null}
-                    {Number.isFinite(nbboAge) ? <span>{Math.round(nbboAge)}ms</span> : null}
-                    {nbboStale ? <span className="pill nbbo-stale">NBBO stale</span> : null}
-                    {nbboMissing ? <span className="pill nbbo-missing">NBBO missing</span> : null}
-                  </div>
-                </div>
-                <div className="time">
-                  {formatTime(startTs)} → {formatTime(endTs)}
-                </div>
+              <div className={`data-table-row data-table-row-flow${nbboStale || nbboMissing ? " data-table-row-warn" : ""}`} key={packet.id}>
+                <span className="data-table-cell data-table-cell-number">{formatTime(startTs)} → {formatTime(endTs)}</span>
+                <span className="data-table-cell">{contract}</span>
+                <span className="data-table-cell data-table-cell-number">{formatFlowMetric(count)}</span>
+                <span className="data-table-cell data-table-cell-number">{formatFlowMetric(totalSize)}</span>
+                <span className="data-table-cell data-table-cell-number">${formatUsd(notional)}</span>
+                <span className="data-table-cell data-table-cell-number">{windowMs > 0 ? formatFlowMetric(windowMs, "ms") : "--"}</span>
+                <span className="data-table-cell">{structureLabel}</span>
+                <span className="data-table-cell data-table-cell-number">{nbboLabel}</span>
+                <span className="data-table-cell">{qualityLabel || "--"}</span>
               </div>
             );
             })}
             {virtual.bottomSpacerHeight > 0 ? (
-              <div style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
+              <div className="data-table-spacer" style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
             ) : null}
-            {!limit ? <LoadOlderControl channel="flow" /> : null}
-          </>
+            </div>
+          </div>
         )}
+        {!limit ? <LoadOlderControl channel="flow" /> : null}
       </div>
     </Pane>
   );
@@ -5705,7 +5706,7 @@ type AlertsPaneProps = {
 const AlertsPane = ({ limit, withStrip = false, className }: AlertsPaneProps) => {
   const state = useTerminal();
   const items = limit ? state.filteredAlerts.slice(0, limit) : state.filteredAlerts;
-  const virtual = useVirtualList(items, state.alertsScroll.listRef, !limit, 92);
+  const virtual = useVirtualList(items, state.alertsScroll.listRef, !limit, 46);
 
   return (
     <Pane
@@ -5733,7 +5734,7 @@ const AlertsPane = ({ limit, withStrip = false, className }: AlertsPaneProps) =>
       }
     >
       {withStrip ? <AlertSeverityStrip alerts={state.filteredAlerts} /> : null}
-      <div className="list terminal-list" ref={state.alertsScroll.listRef}>
+      <div className="data-table-shell">
         {items.length === 0 ? (
           <div className="empty">
             {state.tickerSet.size > 0
@@ -5743,9 +5744,19 @@ const AlertsPane = ({ limit, withStrip = false, className }: AlertsPaneProps) =>
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          <>
+          <div className="data-table-wrap" ref={state.alertsScroll.listRef}>
+            <div className="data-table data-table-alerts" role="table" aria-label="Alerts">
+              <div className="data-table-head" role="row">
+                <span className="data-table-cell">TIME</span>
+                <span className="data-table-cell">ALERT</span>
+                <span className="data-table-cell">SEV</span>
+                <span className="data-table-cell">SCORE</span>
+                <span className="data-table-cell">HITS</span>
+                <span className="data-table-cell">DIR</span>
+                <span className="data-table-cell">NOTE</span>
+              </div>
             {virtual.topSpacerHeight > 0 ? (
-              <div style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
+              <div className="data-table-spacer" style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
             ) : null}
             {virtual.visibleItems.map((alert) => {
             const primary = alert.hits[0];
@@ -5754,7 +5765,7 @@ const AlertsPane = ({ limit, withStrip = false, className }: AlertsPaneProps) =>
 
             return (
               <button
-                className="row row-button"
+                className={`data-table-row data-table-row-button data-table-row-alerts data-table-row-severity-${severity}`}
                 key={`${alert.trace_id}-${alert.seq}`}
                 type="button"
                 onClick={() => {
@@ -5763,30 +5774,23 @@ const AlertsPane = ({ limit, withStrip = false, className }: AlertsPaneProps) =>
                   state.setSelectedAlert(alert);
                 }}
               >
-                <div>
-                  <div className="contract">
-                    {primary ? humanizeClassifierId(primary.classifier_id) : "Alert"}
-                  </div>
-                  <div className="meta">
-                    <span className={`pill severity-${severity}`}>{severity}</span>
-                    <span>Score {Math.round(alert.score)}</span>
-                    <span>{alert.hits.length} hits</span>
-                    <span className={`pill direction-${direction}`}>{direction}</span>
-                  </div>
-                  {primary?.explanations?.[0] ? (
-                    <div className="note">{primary.explanations[0]}</div>
-                  ) : null}
-                </div>
-                <div className="time">{formatTime(alert.source_ts)}</div>
+                <span className="data-table-cell data-table-cell-number">{formatTime(alert.source_ts)}</span>
+                <span className="data-table-cell">{primary ? humanizeClassifierId(primary.classifier_id) : "Alert"}</span>
+                <span className="data-table-cell">{severity}</span>
+                <span className="data-table-cell data-table-cell-number">{Math.round(alert.score)}</span>
+                <span className="data-table-cell data-table-cell-number">{alert.hits.length}</span>
+                <span className="data-table-cell">{direction}</span>
+                <span className="data-table-cell">{primary?.explanations?.[0] ?? "--"}</span>
               </button>
             );
             })}
             {virtual.bottomSpacerHeight > 0 ? (
-              <div style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
+              <div className="data-table-spacer" style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
             ) : null}
-            {!limit ? <LoadOlderControl channel="alerts" /> : null}
-          </>
+            </div>
+          </div>
         )}
+        {!limit ? <LoadOlderControl channel="alerts" /> : null}
       </div>
     </Pane>
   );
@@ -5800,7 +5804,7 @@ type ClassifierPaneProps = {
 const ClassifierPane = ({ limit, className }: ClassifierPaneProps) => {
   const state = useTerminal();
   const items = limit ? state.filteredClassifierHits.slice(0, limit) : state.filteredClassifierHits;
-  const virtual = useVirtualList(items, state.classifierScroll.listRef, !limit, 88);
+  const virtual = useVirtualList(items, state.classifierScroll.listRef, !limit, 44);
 
   return (
     <Pane
@@ -5827,7 +5831,7 @@ const ClassifierPane = ({ limit, className }: ClassifierPaneProps) => {
         />
       }
     >
-      <div className="list terminal-list" ref={state.classifierScroll.listRef}>
+      <div className="data-table-shell">
         {items.length === 0 ? (
           <div className="empty">
             {state.tickerSet.size > 0
@@ -5837,37 +5841,42 @@ const ClassifierPane = ({ limit, className }: ClassifierPaneProps) => {
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          <>
+          <div className="data-table-wrap" ref={state.classifierScroll.listRef}>
+            <div className="data-table data-table-classifier" role="table" aria-label="Classifier hits">
+              <div className="data-table-head" role="row">
+                <span className="data-table-cell">TIME</span>
+                <span className="data-table-cell">RULE</span>
+                <span className="data-table-cell">DIR</span>
+                <span className="data-table-cell">CONF</span>
+                <span className="data-table-cell">NOTE</span>
+              </div>
             {virtual.topSpacerHeight > 0 ? (
-              <div style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
+              <div className="data-table-spacer" style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
             ) : null}
             {virtual.visibleItems.map((hit) => {
             const direction = normalizeDirection(hit.direction);
             return (
               <button
-                className="row row-button"
+                className={`data-table-row data-table-row-button data-table-row-classifier data-table-row-direction-${direction}`}
                 key={`${hit.trace_id}-${hit.seq}`}
                 type="button"
                 onClick={() => state.openFromClassifierHit(hit)}
               >
-                <div>
-                  <div className="contract">{humanizeClassifierId(hit.classifier_id)}</div>
-                  <div className="meta">
-                    <span className={`pill direction-${direction}`}>{direction}</span>
-                    <span>Confidence {formatConfidence(hit.confidence)}</span>
-                  </div>
-                  {hit.explanations?.[0] ? <div className="note">{hit.explanations[0]}</div> : null}
-                </div>
-                <div className="time">{formatTime(hit.source_ts)}</div>
+                <span className="data-table-cell data-table-cell-number">{formatTime(hit.source_ts)}</span>
+                <span className="data-table-cell">{humanizeClassifierId(hit.classifier_id)}</span>
+                <span className="data-table-cell">{direction}</span>
+                <span className="data-table-cell data-table-cell-number">{formatConfidence(hit.confidence)}</span>
+                <span className="data-table-cell">{hit.explanations?.[0] ?? "--"}</span>
               </button>
             );
             })}
             {virtual.bottomSpacerHeight > 0 ? (
-              <div style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
+              <div className="data-table-spacer" style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
             ) : null}
-            {!limit ? <LoadOlderControl channel="classifier-hits" /> : null}
-          </>
+            </div>
+          </div>
         )}
+        {!limit ? <LoadOlderControl channel="classifier-hits" /> : null}
       </div>
     </Pane>
   );
@@ -5881,7 +5890,7 @@ type DarkPaneProps = {
 const DarkPane = ({ limit, className }: DarkPaneProps) => {
   const state = useTerminal();
   const items = limit ? state.filteredInferredDark.slice(0, limit) : state.filteredInferredDark;
-  const virtual = useVirtualList(items, state.darkScroll.listRef, !limit, 88);
+  const virtual = useVirtualList(items, state.darkScroll.listRef, !limit, 44);
 
   return (
     <Pane
@@ -5908,7 +5917,7 @@ const DarkPane = ({ limit, className }: DarkPaneProps) => {
         />
       }
     >
-      <div className="list terminal-list" ref={state.darkScroll.listRef}>
+      <div className="data-table-shell">
         {items.length === 0 ? (
           <div className="empty">
             {state.tickerSet.size > 0
@@ -5918,9 +5927,18 @@ const DarkPane = ({ limit, className }: DarkPaneProps) => {
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          <>
+          <div className="data-table-wrap" ref={state.darkScroll.listRef}>
+            <div className="data-table data-table-dark" role="table" aria-label="Dark events">
+              <div className="data-table-head" role="row">
+                <span className="data-table-cell">TIME</span>
+                <span className="data-table-cell">TYPE</span>
+                <span className="data-table-cell">SYM</span>
+                <span className="data-table-cell">CONF</span>
+                <span className="data-table-cell">EVIDENCE</span>
+                <span className="data-table-cell">NOTE</span>
+              </div>
             {virtual.topSpacerHeight > 0 ? (
-              <div style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
+              <div className="data-table-spacer" style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
             ) : null}
             {virtual.visibleItems.map((event) => {
             const underlying = inferDarkUnderlying(event, state.equityPrintMap, state.equityJoinMap);
@@ -5928,7 +5946,7 @@ const DarkPane = ({ limit, className }: DarkPaneProps) => {
 
             return (
               <button
-                className="row row-button"
+                className="data-table-row data-table-row-button data-table-row-dark"
                 key={`${event.trace_id}-${event.seq}`}
                 type="button"
                 onClick={() => {
@@ -5937,25 +5955,22 @@ const DarkPane = ({ limit, className }: DarkPaneProps) => {
                   state.setSelectedDarkEvent(event);
                 }}
               >
-                <div>
-                  <div className="contract">{humanizeClassifierId(event.type)}</div>
-                  <div className="meta">
-                    {underlying ? <span>{underlying}</span> : <span className="pill">Unknown</span>}
-                    <span>Confidence {formatConfidence(event.confidence)}</span>
-                    <span>Evidence {evidenceCount}</span>
-                  </div>
-                  {underlying ? null : <div className="note">Underlying not in current equity cache.</div>}
-                </div>
-                <div className="time">{formatTime(event.source_ts)}</div>
+                <span className="data-table-cell data-table-cell-number">{formatTime(event.source_ts)}</span>
+                <span className="data-table-cell">{humanizeClassifierId(event.type)}</span>
+                <span className="data-table-cell">{underlying ?? "Unknown"}</span>
+                <span className="data-table-cell data-table-cell-number">{formatConfidence(event.confidence)}</span>
+                <span className="data-table-cell data-table-cell-number">{evidenceCount}</span>
+                <span className="data-table-cell">{underlying ? "--" : "Underlying not in current equity cache."}</span>
               </button>
             );
             })}
             {virtual.bottomSpacerHeight > 0 ? (
-              <div style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
+              <div className="data-table-spacer" style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
             ) : null}
-            {!limit ? <LoadOlderControl channel="inferred-dark" /> : null}
-          </>
+            </div>
+          </div>
         )}
+        {!limit ? <LoadOlderControl channel="inferred-dark" /> : null}
       </div>
     </Pane>
   );
