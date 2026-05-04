@@ -338,7 +338,8 @@ export class LiveStateManager {
     genericHydrateFromRedis: 0,
     genericHydrateFromClickHouse: 0,
     trimOperations: 0,
-    cacheDepthByKey: new Map<string, number>()
+    cacheDepthByKey: new Map<string, number>(),
+    freshnessAgeMsByKey: new Map<string, number>()
   };
 
   constructor(
@@ -354,13 +355,28 @@ export class LiveStateManager {
     genericHydrateFromClickHouse: number;
     trimOperations: number;
     cacheDepthByKey: Record<string, number>;
+    freshnessAgeMsByKey: Record<string, number>;
   } {
     return {
       genericHydrateFromRedis: this.stats.genericHydrateFromRedis,
       genericHydrateFromClickHouse: this.stats.genericHydrateFromClickHouse,
       trimOperations: this.stats.trimOperations,
-      cacheDepthByKey: Object.fromEntries(this.stats.cacheDepthByKey)
+      cacheDepthByKey: Object.fromEntries(this.stats.cacheDepthByKey),
+      freshnessAgeMsByKey: Object.fromEntries(this.stats.freshnessAgeMsByKey)
     };
+  }
+
+  private updateFreshnessMetric(listKey: string, channel: LiveChannel, item: unknown, now = Date.now()): void {
+    const ts =
+      channel === "equity-candles" || channel === "equity-overlay"
+        ? typeof (item as { ts?: unknown })?.ts === "number"
+          ? ((item as { ts: number }).ts as number)
+          : null
+        : extractFreshnessTs(channel, item);
+
+    if (typeof ts === "number" && Number.isFinite(ts)) {
+      this.stats.freshnessAgeMsByKey.set(listKey, Math.max(0, now - ts));
+    }
   }
 
   async hydrate(): Promise<void> {
@@ -383,6 +399,7 @@ export class LiveStateManager {
         this.genericItems.set(channel, cached);
         this.stats.genericHydrateFromRedis += 1;
         this.stats.cacheDepthByKey.set(config.redisKey, cached.length);
+        this.updateFreshnessMetric(config.redisKey, channel, cached[0]);
         this.genericCursors.set(config.cursorField, parseCursor(await this.redis.hGet(CURSOR_HASH_KEY, config.cursorField)));
         await this.persistList(
           config.redisKey,
@@ -405,6 +422,9 @@ export class LiveStateManager {
     this.stats.genericHydrateFromClickHouse += 1;
     this.stats.cacheDepthByKey.set(config.redisKey, fresh.length);
     this.genericItems.set(channel, fresh);
+    if (fresh.length > 0) {
+      this.updateFreshnessMetric(config.redisKey, channel, fresh[0]);
+    }
     const watermark = fresh[0] ? config.cursor(fresh[0]) : null;
     this.genericCursors.set(config.cursorField, watermark);
     await this.persistList(config.redisKey, config.cursorField, fresh, config.limit, watermark);
@@ -542,6 +562,7 @@ export class LiveStateManager {
         const candle = EquityCandleSchema.parse(item);
         const key = candleRedisKey(candle.underlying_id, candle.interval_ms);
         const cursorField = candleCursorField(candle.underlying_id, candle.interval_ms);
+        const previousCursor = this.candleCursors.get(cursorField) ?? null;
         const items = this.candleItems.get(key) ?? [];
         const next = [candle, ...items]
           .sort((a, b) => (b.ts - a.ts) || (b.seq - a.seq))
@@ -550,13 +571,22 @@ export class LiveStateManager {
         this.stats.cacheDepthByKey.set(key, next.length);
         const cursor = { ts: candle.ts, seq: candle.seq };
         this.candleCursors.set(cursorField, cursor);
-        await this.persistList(key, cursorField, next, CHART_LIMITS.candles, cursor);
+        if (next.length > 0) {
+          this.updateFreshnessMetric(key, "equity-candles", next[0]);
+        }
+        const outOfOrder = previousCursor ? compareCursors(cursor, previousCursor) > 0 : false;
+        if (outOfOrder) {
+          await this.persistList(key, cursorField, next, CHART_LIMITS.candles, cursor);
+        } else {
+          await this.persistItem(key, cursorField, candle, CHART_LIMITS.candles, cursor, next.length);
+        }
         return cursor;
       }
       case "equity-overlay": {
         const print = EquityPrintSchema.parse(item);
         const key = overlayRedisKey(print.underlying_id);
         const cursorField = overlayCursorField(print.underlying_id);
+        const previousCursor = this.overlayCursors.get(cursorField) ?? null;
         const items = this.overlayItems.get(key) ?? [];
         const next = [print, ...items]
           .sort((a, b) => (b.ts - a.ts) || (b.seq - a.seq))
@@ -565,7 +595,15 @@ export class LiveStateManager {
         this.stats.cacheDepthByKey.set(key, next.length);
         const cursor = { ts: print.ts, seq: print.seq };
         this.overlayCursors.set(cursorField, cursor);
-        await this.persistList(key, cursorField, next, CHART_LIMITS.overlay, cursor);
+        if (next.length > 0) {
+          this.updateFreshnessMetric(key, "equity-overlay", next[0]);
+        }
+        const outOfOrder = previousCursor ? compareCursors(cursor, previousCursor) > 0 : false;
+        if (outOfOrder) {
+          await this.persistList(key, cursorField, next, CHART_LIMITS.overlay, cursor);
+        } else {
+          await this.persistItem(key, cursorField, print, CHART_LIMITS.overlay, cursor, next.length);
+        }
         return cursor;
       }
       default: {
@@ -574,13 +612,22 @@ export class LiveStateManager {
         if (!isWithinLiveFeedLookback(channel, parsed)) {
           return null;
         }
+        const previousCursor = this.genericCursors.get(config.cursorField) ?? null;
         const items = this.genericItems.get(channel) ?? [];
         const next = normalizeGenericItems(channel, [parsed, ...items], config);
         this.genericItems.set(channel, next);
         this.stats.cacheDepthByKey.set(config.redisKey, next.length);
         const cursor = config.cursor(parsed);
         this.genericCursors.set(config.cursorField, cursor);
-        await this.persistList(config.redisKey, config.cursorField, next, config.limit, cursor);
+        if (next.length > 0) {
+          this.updateFreshnessMetric(config.redisKey, channel, next[0]);
+        }
+        const outOfOrder = previousCursor ? compareCursors(cursor, previousCursor) > 0 : false;
+        if (channel === "nbbo" || outOfOrder) {
+          await this.persistList(config.redisKey, config.cursorField, next, config.limit, cursor);
+        } else {
+          await this.persistItem(config.redisKey, config.cursorField, parsed, config.limit, cursor, next.length);
+        }
         return cursor;
       }
     }
@@ -595,6 +642,7 @@ export class LiveStateManager {
       if (cached.length > 0) {
         this.candleItems.set(key, cached);
         this.stats.cacheDepthByKey.set(key, cached.length);
+        this.updateFreshnessMetric(key, "equity-candles", cached[0]);
         this.candleCursors.set(cursorField, parseCursor(await this.redis.hGet(CURSOR_HASH_KEY, cursorField)));
         return;
       }
@@ -603,6 +651,9 @@ export class LiveStateManager {
     const fresh = await fetchRecentEquityCandles(this.clickhouse, underlyingId, intervalMs, CHART_LIMITS.candles);
     this.candleItems.set(key, fresh);
     this.stats.cacheDepthByKey.set(key, fresh.length);
+    if (fresh.length > 0) {
+      this.updateFreshnessMetric(key, "equity-candles", fresh[0]);
+    }
     const watermark = fresh[0] ? { ts: fresh[0].ts, seq: fresh[0].seq } : null;
     this.candleCursors.set(cursorField, watermark);
     await this.persistList(key, cursorField, fresh, CHART_LIMITS.candles, watermark);
@@ -617,6 +668,7 @@ export class LiveStateManager {
       if (cached.length > 0) {
         this.overlayItems.set(key, cached);
         this.stats.cacheDepthByKey.set(key, cached.length);
+        this.updateFreshnessMetric(key, "equity-overlay", cached[0]);
         this.overlayCursors.set(cursorField, parseCursor(await this.redis.hGet(CURSOR_HASH_KEY, cursorField)));
         return;
       }
@@ -627,9 +679,31 @@ export class LiveStateManager {
     );
     this.overlayItems.set(key, fresh);
     this.stats.cacheDepthByKey.set(key, fresh.length);
+    if (fresh.length > 0) {
+      this.updateFreshnessMetric(key, "equity-overlay", fresh[0]);
+    }
     const watermark = fresh[0] ? { ts: fresh[0].ts, seq: fresh[0].seq } : null;
     this.overlayCursors.set(cursorField, watermark);
     await this.persistList(key, cursorField, fresh, CHART_LIMITS.overlay, watermark);
+  }
+
+  private async persistItem<T>(
+    listKey: string,
+    cursorField: string,
+    item: T,
+    limit: number,
+    cursor: Cursor | null,
+    depth: number
+  ): Promise<void> {
+    if (!this.redis?.isOpen) {
+      return;
+    }
+
+    await this.redis.lPush(listKey, JSON.stringify(item));
+    await this.redis.lTrim(listKey, 0, limit - 1);
+    this.stats.trimOperations += 1;
+    this.stats.cacheDepthByKey.set(listKey, Math.min(depth, limit));
+    await this.redis.hSet(CURSOR_HASH_KEY, cursorField, JSON.stringify(cursor));
   }
 
   private async persistList<T>(

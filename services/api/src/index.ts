@@ -116,7 +116,8 @@ const envSchema = z.object({
   REDIS_URL: z.string().default("redis://127.0.0.1:6379"),
   REST_DEFAULT_LIMIT: z.coerce.number().int().positive().default(200),
   API_DELIVER_POLICY: DeliverPolicySchema.default("new"),
-  API_CONSUMER_RESET: z.coerce.boolean().default(false)
+  API_CONSUMER_RESET: z.coerce.boolean().default(false),
+  LIVE_LAG_WARN_MS: z.coerce.number().int().positive().default(120_000)
 });
 
 const env = readEnv(envSchema);
@@ -125,6 +126,13 @@ const state = {
   shuttingDown: false,
   shutdownPromise: null as Promise<void> | null
 };
+
+const HOT_LIVE_REDIS_KEYS = {
+  options: "live:options",
+  equities: "live:equities",
+  flow: "live:flow",
+  nbbo: "live:nbbo"
+} as const;
 
 const getErrorMessage = (error: unknown): string => {
   return error instanceof Error ? error.message : String(error);
@@ -835,9 +843,38 @@ const run = async () => {
 
   const liveState = new LiveStateManager(clickhouse, redis);
   await liveState.hydrate();
+  const warnLiveLag = (
+    channel: keyof typeof HOT_LIVE_REDIS_KEYS,
+    ageMs: number | null | undefined
+  ) => {
+    if (typeof ageMs !== "number" || !Number.isFinite(ageMs)) {
+      return;
+    }
+    if (ageMs < env.LIVE_LAG_WARN_MS) {
+      return;
+    }
+    logger.warn("live feed lag exceeded threshold", {
+      channel,
+      age_ms: ageMs,
+      threshold_ms: env.LIVE_LAG_WARN_MS
+    });
+  };
   const liveStateMetricsTimer = setInterval(() => {
     const snapshot = liveState.getStatsSnapshot();
-    logger.info("live cache metrics", snapshot);
+    const hotFeedLagMs = {
+      options: snapshot.freshnessAgeMsByKey[HOT_LIVE_REDIS_KEYS.options] ?? null,
+      equities: snapshot.freshnessAgeMsByKey[HOT_LIVE_REDIS_KEYS.equities] ?? null,
+      flow: snapshot.freshnessAgeMsByKey[HOT_LIVE_REDIS_KEYS.flow] ?? null,
+      nbbo: snapshot.freshnessAgeMsByKey[HOT_LIVE_REDIS_KEYS.nbbo] ?? null
+    };
+    logger.info("live cache metrics", {
+      ...snapshot,
+      hotFeedLagMs
+    });
+    warnLiveLag("options", hotFeedLagMs.options);
+    warnLiveLag("equities", hotFeedLagMs.equities);
+    warnLiveLag("flow", hotFeedLagMs.flow);
+    warnLiveLag("nbbo", hotFeedLagMs.nbbo);
   }, 60000);
 
   const consumerBindings = [
