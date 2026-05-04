@@ -97,6 +97,15 @@ const CANDLE_INTERVALS = [
   { label: "1m", ms: 60000 },
   { label: "5m", ms: 300000 }
 ];
+const LIVE_SESSION_IDLE_RECONNECT_MS = 12_000;
+const LIVE_SESSION_IDLE_CHECK_MS = 3_000;
+const LIVE_SESSION_HOT_CHANNELS = new Set<LiveSubscription["channel"]>([
+  "options",
+  "nbbo",
+  "equities",
+  "flow",
+  "equity-overlay"
+]);
 
 type CandlestickSeries = ReturnType<IChartApi["addCandlestickSeries"]>;
 
@@ -2329,6 +2338,9 @@ const useLiveSession = (
   const [chartOverlay, setChartOverlay] = useState<EquityPrint[]>([]);
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<number | null>(null);
+  const idleWatchdogRef = useRef<number | null>(null);
+  const connectedAtRef = useRef<number | null>(null);
+  const lastEventAtRef = useRef<number | null>(null);
   const subscribedKeysRef = useRef<Set<string>>(new Set());
   const subscribedMapRef = useRef<Map<string, LiveSubscription>>(new Map());
   const manifest = useMemo(
@@ -2366,6 +2378,12 @@ const useLiveSession = (
         window.clearTimeout(reconnectRef.current);
         reconnectRef.current = null;
       }
+      if (idleWatchdogRef.current !== null) {
+        window.clearInterval(idleWatchdogRef.current);
+        idleWatchdogRef.current = null;
+      }
+      connectedAtRef.current = null;
+      lastEventAtRef.current = null;
       return;
     }
 
@@ -2474,6 +2492,7 @@ const useLiveSession = (
       }
 
       if (items.length > 0) {
+        lastEventAtRef.current = updateAt;
         setLastEventByChannel((current) => ({
           ...current,
           [subscription.channel]: updateAt
@@ -2496,7 +2515,10 @@ const useLiveSession = (
           return;
         }
         setStatus("connected");
-        setConnectedAt(Date.now());
+        const now = Date.now();
+        setConnectedAt(now);
+        connectedAtRef.current = now;
+        lastEventAtRef.current = null;
         syncSubscriptions(socket);
       };
 
@@ -2518,6 +2540,8 @@ const useLiveSession = (
         }
         setStatus("disconnected");
         setConnectedAt(null);
+        connectedAtRef.current = null;
+        lastEventAtRef.current = null;
         subscribedKeysRef.current = new Set();
         subscribedMapRef.current = new Map();
         reconnectRef.current = window.setTimeout(connect, 1000);
@@ -2529,14 +2553,43 @@ const useLiveSession = (
         }
         setStatus("disconnected");
         setConnectedAt(null);
+        connectedAtRef.current = null;
+        lastEventAtRef.current = null;
         socket.close();
       };
     };
 
     connect();
+    idleWatchdogRef.current = window.setInterval(() => {
+      if (!active) {
+        return;
+      }
+      const socket = socketRef.current;
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        return;
+      }
+      const hasHotSubscription = Array.from(subscribedMapRef.current.values()).some((sub) =>
+        LIVE_SESSION_HOT_CHANNELS.has(sub.channel)
+      );
+      if (!hasHotSubscription) {
+        return;
+      }
+      const baseline = lastEventAtRef.current ?? connectedAtRef.current;
+      if (baseline === null) {
+        return;
+      }
+      if (Date.now() - baseline >= LIVE_SESSION_IDLE_RECONNECT_MS) {
+        console.warn("Live socket idle; reconnecting");
+        socket.close();
+      }
+    }, LIVE_SESSION_IDLE_CHECK_MS);
 
     return () => {
       active = false;
+      if (idleWatchdogRef.current !== null) {
+        window.clearInterval(idleWatchdogRef.current);
+        idleWatchdogRef.current = null;
+      }
       if (reconnectRef.current !== null) {
         window.clearTimeout(reconnectRef.current);
       }
