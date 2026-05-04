@@ -1,6 +1,11 @@
 import { describe, expect, it } from "bun:test";
 import type { ClickHouseClient } from "@islandflow/storage";
-import { LiveStateManager, isLiveItemFresh, resolveGenericLiveLimits } from "../src/live";
+import {
+  LiveStateManager,
+  isLiveItemFresh,
+  resolveGenericLiveLimits,
+  shouldFanoutLiveEvent
+} from "../src/live";
 
 const makeClickHouse = (): ClickHouseClient =>
   ({
@@ -567,9 +572,15 @@ describe("LiveStateManager", () => {
     expect(persisted).toHaveLength(1);
   });
 
-  it("exposes freshness helper for event fanout gating", () => {
+  it("exposes freshness helper for feed status", () => {
     expect(isLiveItemFresh("options", { ts: 1000 }, 1010)).toBe(true);
     expect(isLiveItemFresh("options", { ts: 1000 }, 20_001)).toBe(false);
     expect(isLiveItemFresh("equity-joins", { source_ts: 1 }, 1_000_000)).toBe(true);
+  });
+
+  it("fans out stale live events so delayed data remains visible without refresh", () => {
+    expect(shouldFanoutLiveEvent("options", { ts: 1000 })).toBe(true);
+    expect(shouldFanoutLiveEvent("equities", { ts: 1000 })).toBe(true);
+    expect(shouldFanoutLiveEvent("flow", { source_ts: 1000 })).toBe(true);
   });
 });

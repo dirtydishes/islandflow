@@ -289,6 +289,8 @@ export const isLiveItemFresh = (
   return now - ts <= thresholdMs;
 };
 
+export const shouldFanoutLiveEvent = (_channel: LiveChannel, _item: unknown): boolean => true;
+
 const nextBeforeForItems = <T>(items: T[], cursorOf: (item: T) => Cursor): Cursor | null => {
   const last = items.at(-1);
   return last ? cursorOf(last) : null;
