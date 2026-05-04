@@ -898,28 +898,33 @@ h3 {
 }
 
 .options-table-wrap {
+  display: flex;
+  flex: 1 1 auto;
   min-height: 0;
-  overflow: auto;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .options-table {
-  min-width: 1040px;
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .options-table-head,
 .options-table-row {
   display: grid;
-  grid-template-columns: 88px 72px 76px 72px 44px 76px 130px 70px 82px 64px 56px minmax(150px, 1fr);
+  grid-template-columns: minmax(72px, 0.8fr) minmax(50px, 0.55fr) minmax(64px, 0.7fr) minmax(58px, 0.6fr) minmax(34px, 0.35fr) minmax(62px, 0.65fr) minmax(104px, 1fr) minmax(54px, 0.55fr) minmax(66px, 0.7fr) minmax(48px, 0.5fr) minmax(42px, 0.45fr) minmax(92px, 0.9fr);
   align-items: center;
-  column-gap: 10px;
+  column-gap: 8px;
 }
 
 .options-table-head {
-  position: sticky;
-  top: 0;
-  z-index: 2;
+  flex: 0 0 auto;
   height: 30px;
-  padding: 0 10px;
+  padding: 0 8px;
   border-bottom: 1px solid var(--border);
   background: rgba(8, 11, 16, 0.98);
   color: var(--muted);
@@ -928,10 +933,17 @@ h3 {
   letter-spacing: 0.08em;
 }
 
+.options-table-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
 .options-table-row {
   width: 100%;
   min-height: 34px;
-  padding: 0 10px;
+  padding: 0 8px;
   border: 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.055);
   background:

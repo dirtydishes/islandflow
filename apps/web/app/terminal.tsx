@@ -5369,7 +5369,7 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
         />
       }
     >
-      <div className="options-table-wrap" ref={state.optionsScroll.listRef}>
+      <div className="options-table-wrap">
         {items.length === 0 ? (
           <div className="empty">
             {state.tickerSet.size > 0
@@ -5396,10 +5396,11 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
               <span>IV</span>
               <span>CLASSIFIER</span>
             </div>
-            {virtual.topSpacerHeight > 0 ? (
-              <div style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
-            ) : null}
-            {virtual.visibleItems.map((print) => {
+            <div className="options-table-body" ref={state.optionsScroll.listRef}>
+              {virtual.topSpacerHeight > 0 ? (
+                <div style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
+              ) : null}
+              {virtual.visibleItems.map((print) => {
               const contractId = normalizeContractId(print.option_contract_id);
               const parsed = parseOptionContractId(contractId);
               const contractDisplay = formatOptionContractLabel(contractId);
@@ -5462,10 +5463,11 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
                   {cells}
                 </div>
               );
-            })}
-            {virtual.bottomSpacerHeight > 0 ? (
-              <div style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
-            ) : null}
+              })}
+              {virtual.bottomSpacerHeight > 0 ? (
+                <div style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
+              ) : null}
+            </div>
           </div>
         )}
         {!limit ? <LoadOlderControl channel="options" /> : null}
