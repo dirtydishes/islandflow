@@ -5,6 +5,7 @@ import {
   EquityCandleSchema,
   EquityPrintJoinSchema,
   EquityPrintSchema,
+  EquityQuoteSchema,
   FlowPacketSchema,
   InferredDarkEventSchema,
   OptionNBBOSchema,
@@ -26,6 +27,7 @@ export const LiveGenericChannelSchema = z.enum([
   "options",
   "nbbo",
   "equities",
+  "equity-quotes",
   "equity-joins",
   "flow",
   "classifier-hits",
@@ -37,6 +39,7 @@ export const LiveChannelSchema = z.enum([
   "options",
   "nbbo",
   "equities",
+  "equity-quotes",
   "equity-joins",
   "flow",
   "classifier-hits",
@@ -59,7 +62,7 @@ export const LiveSubscriptionSchema = z.discriminatedUnion("channel", [
     filters: OptionFlowFiltersSchema.optional()
   }),
   z.object({
-    channel: z.enum(["nbbo", "equities", "equity-joins", "classifier-hits", "alerts", "inferred-dark"])
+    channel: z.enum(["nbbo", "equities", "equity-quotes", "equity-joins", "classifier-hits", "alerts", "inferred-dark"])
   }),
   z.object({
     channel: z.literal("equity-candles"),
@@ -78,6 +81,7 @@ const livePayloadSchemas = {
   options: OptionPrintSchema,
   nbbo: OptionNBBOSchema,
   equities: EquityPrintSchema,
+  "equity-quotes": EquityQuoteSchema,
   "equity-joins": EquityPrintJoinSchema,
   flow: FlowPacketSchema,
   "classifier-hits": ClassifierHitEventSchema,

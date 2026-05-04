@@ -60,6 +60,7 @@ import {
   fetchEquityPrintsBefore,
   fetchEquityPrintsRange,
   fetchEquityPrintJoinsAfter,
+  fetchEquityQuotesBefore,
   fetchEquityQuotesAfter,
   fetchInferredDarkBefore,
   fetchInferredDarkAfter,
@@ -977,19 +978,21 @@ const run = async () => {
   const fanoutLive = async (
     subscription: LiveSubscription,
     item: unknown,
-    ingestChannel: "options" | "nbbo" | "equities" | "equity-candles" | "equity-overlay" | "equity-joins" | "flow" | "classifier-hits" | "alerts" | "inferred-dark"
+    ingestChannel: "options" | "nbbo" | "equities" | "equity-quotes" | "equity-candles" | "equity-overlay" | "equity-joins" | "flow" | "classifier-hits" | "alerts" | "inferred-dark"
   ) => {
+    const watermark = await liveState.ingest(ingestChannel, item);
+
     if (
       (ingestChannel === "options" ||
         ingestChannel === "nbbo" ||
         ingestChannel === "equities" ||
+        ingestChannel === "equity-quotes" ||
         ingestChannel === "flow") &&
       !isLiveItemFresh(ingestChannel, item)
     ) {
       return;
     }
 
-    const watermark = await liveState.ingest(ingestChannel, item);
     const matchingSubscriptions =
       subscription.channel === "options" || subscription.channel === "flow"
         ? [...subscriptionDefinitions.entries()].filter(([, candidate]) => candidate.channel === subscription.channel)
@@ -1088,6 +1091,7 @@ const run = async () => {
       try {
         const payload = EquityQuoteSchema.parse(equityQuoteSubscription.decode(msg));
         broadcast(equityQuoteSockets, { type: "equity-quote", payload });
+        await fanoutLive({ channel: "equity-quotes" }, payload, "equity-quotes");
         msg.ack();
       } catch (error) {
         logger.error("failed to process equity quote", {
@@ -1377,6 +1381,12 @@ const run = async () => {
       if (req.method === "GET" && url.pathname === "/history/equities") {
         const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
         const data = await fetchEquityPrintsBefore(clickhouse, beforeTs, beforeSeq, limit);
+        return jsonResponse(buildHistoryResponse(data, (item) => ({ ts: item.ts, seq: item.seq })));
+      }
+
+      if (req.method === "GET" && url.pathname === "/history/equity-quotes") {
+        const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
+        const data = await fetchEquityQuotesBefore(clickhouse, beforeTs, beforeSeq, limit);
         return jsonResponse(buildHistoryResponse(data, (item) => ({ ts: item.ts, seq: item.seq })));
       }
 

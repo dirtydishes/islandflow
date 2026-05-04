@@ -783,6 +783,30 @@ h3 {
   white-space: nowrap;
 }
 
+.load-older {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 4px 0 0;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.load-older button {
+  min-width: 112px;
+  white-space: nowrap;
+}
+
+.load-older span {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--danger);
+}
+
 .missed-count {
   width: 86px;
   font-size: 0.72rem;

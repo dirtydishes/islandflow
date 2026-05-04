@@ -1264,6 +1264,22 @@ export const fetchEquityPrintsBefore = async (
   return EquityPrintSchema.array().parse(rows.map(normalizeEquityRow));
 };
 
+export const fetchEquityQuotesBefore = async (
+  client: ClickHouseClient,
+  beforeTs: number,
+  beforeSeq: number,
+  limit: number
+): Promise<EquityQuote[]> => {
+  const safeLimit = clampLimit(limit);
+  const result = await client.query({
+    query: `SELECT * FROM ${EQUITY_QUOTES_TABLE} WHERE ${buildBeforeTupleCondition("ts", "seq", beforeTs, beforeSeq)} ORDER BY ts DESC, seq DESC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  return EquityQuoteSchema.array().parse(rows.map(normalizeEquityQuoteRow));
+};
+
 export const fetchEquityPrintJoinsBefore = async (
   client: ClickHouseClient,
   beforeTs: number,

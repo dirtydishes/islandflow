@@ -58,6 +58,7 @@ describe("LiveStateManager", () => {
     expect(limits.options).toBe(777);
     expect(limits.nbbo).toBe(100000);
     expect(limits.flow).toBe(10000);
+    expect(limits["equity-quotes"]).toBe(10000);
     expect(limits.alerts).toBe(10000);
   });
 
@@ -145,6 +146,7 @@ describe("LiveStateManager", () => {
         options: 10000,
         nbbo: 10000,
         equities: 10000,
+        "equity-quotes": 10000,
         "equity-joins": 10000,
         flow: 2,
         "classifier-hits": 10000,
@@ -277,7 +279,7 @@ describe("LiveStateManager", () => {
     expect(flowSnapshot.items).toHaveLength(1);
   });
 
-  it("suppresses stale items from live snapshots while preserving fresh ones", async () => {
+  it("keeps stale persisted items in live snapshots", async () => {
     const manager = new LiveStateManager(makeClickHouse(), null);
     const now = Date.now();
 
@@ -383,16 +385,20 @@ describe("LiveStateManager", () => {
     ]);
 
     expect((optionsSnapshot.items as Array<{ trace_id: string }>).map((item) => item.trace_id)).toEqual([
-      "opt-fresh"
+      "opt-fresh",
+      "opt-stale"
     ]);
     expect((nbboSnapshot.items as Array<{ trace_id: string }>).map((item) => item.trace_id)).toEqual([
-      "nbbo-fresh"
+      "nbbo-fresh",
+      "nbbo-stale"
     ]);
     expect((equitiesSnapshot.items as Array<{ trace_id: string }>).map((item) => item.trace_id)).toEqual([
-      "eq-fresh"
+      "eq-fresh",
+      "eq-stale"
     ]);
     expect((flowSnapshot.items as Array<{ id: string }>).map((item) => item.id)).toEqual([
-      "flow-fresh"
+      "flow-fresh",
+      "flow-stale"
     ]);
   });
 
@@ -476,7 +482,7 @@ describe("LiveStateManager", () => {
     ]);
   });
 
-  it("rejects stale ingest for freshness-gated channels", async () => {
+  it("stores older valid ingest for freshness-gated channels", async () => {
     const manager = new LiveStateManager(makeClickHouse(), null);
     const now = Date.now();
 
@@ -494,7 +500,71 @@ describe("LiveStateManager", () => {
     });
 
     const snapshot = await manager.getSnapshot({ channel: "equities" });
-    expect(snapshot.items).toHaveLength(0);
+    expect(snapshot.items).toHaveLength(1);
+    expect(snapshot.next_before).toEqual({ ts: now - 60_000, seq: 1 });
+  });
+
+  it("hydrates equity quotes from redis", async () => {
+    const redis = makeRedis();
+    const now = Date.now();
+    await redis.lPush(
+      "live:equity-quotes",
+      JSON.stringify({
+        source_ts: now,
+        ingest_ts: now + 1,
+        seq: 1,
+        trace_id: "quote-1",
+        ts: now,
+        underlying_id: "SPY",
+        bid: 450,
+        ask: 450.01
+      })
+    );
+    await redis.hSet("live:cursors", "equity-quotes", JSON.stringify({ ts: now, seq: 1 }));
+
+    const manager = new LiveStateManager(makeClickHouse(), redis as never);
+    await manager.hydrate();
+    const snapshot = await manager.getSnapshot({ channel: "equity-quotes" });
+
+    expect(snapshot.items).toHaveLength(1);
+    expect(snapshot.watermark).toEqual({ ts: now, seq: 1 });
+    expect(snapshot.next_before).toEqual({ ts: now, seq: 1 });
+  });
+
+  it("hydrates equity quotes from clickhouse when redis is empty and persists hot cache", async () => {
+    const redis = makeRedis();
+    const now = Date.now();
+    const clickhouse = {
+      ...makeClickHouse(),
+      query: async ({ query }: { query: string }) => ({
+        async json<T>() {
+          if (query.includes("equity_quotes")) {
+            return [
+              {
+                source_ts: now,
+                ingest_ts: now + 1,
+                seq: 2,
+                trace_id: "quote-2",
+                ts: now,
+                underlying_id: "SPY",
+                bid: 451,
+                ask: 451.01
+              }
+            ] as T;
+          }
+          return [] as T;
+        }
+      })
+    } as ClickHouseClient;
+
+    const manager = new LiveStateManager(clickhouse, redis as never);
+    await manager.hydrate();
+    const snapshot = await manager.getSnapshot({ channel: "equity-quotes" });
+    const persisted = await redis.lRange("live:equity-quotes", 0, 10);
+
+    expect(snapshot.items).toHaveLength(1);
+    expect(snapshot.watermark).toEqual({ ts: now, seq: 2 });
+    expect(persisted).toHaveLength(1);
   });
 
   it("exposes freshness helper for event fanout gating", () => {

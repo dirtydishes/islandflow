@@ -5,6 +5,7 @@ import {
   fetchRecentEquityCandles,
   fetchRecentEquityPrintJoins,
   fetchRecentEquityPrints,
+  fetchRecentEquityQuotes,
   fetchRecentFlowPackets,
   fetchRecentInferredDark,
   fetchRecentOptionNBBO,
@@ -18,6 +19,7 @@ import {
   EquityCandleSchema,
   EquityPrintJoinSchema,
   EquityPrintSchema,
+  EquityQuoteSchema,
   FeedSnapshot,
   FlowPacketSchema,
   InferredDarkEventSchema,
@@ -44,6 +46,7 @@ const GENERIC_LIMIT_ENV_KEYS: Record<LiveGenericChannel, string> = {
   options: "LIVE_LIMIT_OPTIONS",
   nbbo: "LIVE_LIMIT_NBBO",
   equities: "LIVE_LIMIT_EQUITIES",
+  "equity-quotes": "LIVE_LIMIT_EQUITY_QUOTES",
   "equity-joins": "LIVE_LIMIT_EQUITY_JOINS",
   flow: "LIVE_LIMIT_FLOW",
   "classifier-hits": "LIVE_LIMIT_CLASSIFIER_HITS",
@@ -69,6 +72,7 @@ export const LIVE_FRESHNESS_THRESHOLDS: Partial<Record<LiveGenericChannel, numbe
   options: 15_000,
   nbbo: 15_000,
   equities: 15_000,
+  "equity-quotes": 15_000,
   flow: 30_000
 };
 
@@ -102,6 +106,7 @@ export const resolveGenericLiveLimits = (env: NodeJS.ProcessEnv = process.env): 
   options: parseGenericLimit(env, "options", DEFAULT_GENERIC_LIMIT),
   nbbo: parseGenericLimit(env, "nbbo", DEFAULT_GENERIC_LIMIT),
   equities: parseGenericLimit(env, "equities", DEFAULT_GENERIC_LIMIT),
+  "equity-quotes": parseGenericLimit(env, "equity-quotes", DEFAULT_GENERIC_LIMIT),
   "equity-joins": parseGenericLimit(env, "equity-joins", DEFAULT_GENERIC_LIMIT),
   flow: parseGenericLimit(env, "flow", DEFAULT_GENERIC_LIMIT),
   "classifier-hits": parseGenericLimit(env, "classifier-hits", DEFAULT_GENERIC_LIMIT),
@@ -153,6 +158,14 @@ const getGenericConfig = (limits: GenericLiveLimits): {
     parse: (value) => EquityPrintSchema.parse(value),
     cursor: (item) => ({ ts: item.ts, seq: item.seq }),
     fetchRecent: fetchRecentEquityPrints
+  },
+  "equity-quotes": {
+    redisKey: "live:equity-quotes",
+    cursorField: "equity-quotes",
+    limit: limits["equity-quotes"],
+    parse: (value) => EquityQuoteSchema.parse(value),
+    cursor: (item) => ({ ts: item.ts, seq: item.seq }),
+    fetchRecent: fetchRecentEquityQuotes
   },
   "equity-joins": {
     redisKey: "live:equity-joins",
@@ -251,6 +264,7 @@ const extractFreshnessTs = (channel: LiveGenericChannel, item: any): number | nu
     case "options":
     case "nbbo":
     case "equities":
+    case "equity-quotes":
       return typeof item.ts === "number" ? item.ts : null;
     case "flow":
       return typeof item.source_ts === "number" ? item.source_ts : null;
@@ -273,19 +287,6 @@ export const isLiveItemFresh = (
     return false;
   }
   return now - ts <= thresholdMs;
-};
-
-const filterFreshGenericItems = <T>(
-  channel: LiveGenericChannel,
-  items: T[],
-  now = Date.now()
-): T[] => {
-  const thresholdMs = LIVE_FRESHNESS_THRESHOLDS[channel];
-  if (!thresholdMs) {
-    return items;
-  }
-
-  return items.filter((item) => isLiveItemFresh(channel, item, now));
 };
 
 const nextBeforeForItems = <T>(items: T[], cursorOf: (item: T) => Cursor): Cursor | null => {
@@ -396,21 +397,17 @@ export class LiveStateManager {
             undefined,
             storageFilters
           );
-          const freshItems = filterFreshGenericItems("options", items);
           return {
             subscription,
-            items: freshItems,
+            items,
             watermark: items[0] ? { ts: items[0].ts, seq: items[0].seq } : null,
-            next_before: nextBeforeForItems(freshItems, (item) => ({ ts: item.ts, seq: item.seq }))
+            next_before: nextBeforeForItems(items, (item) => ({ ts: item.ts, seq: item.seq }))
           };
         }
 
         const config = this.generic.options;
-        const items = filterFreshGenericItems(
-          "options",
-          (this.genericItems.get("options") ?? []).filter((item) =>
-            matchesOptionPrintFilters(item, subscription.filters)
-          )
+        const items = (this.genericItems.get("options") ?? []).filter((item) =>
+          matchesOptionPrintFilters(item, subscription.filters)
         );
         return {
           subscription,
@@ -421,11 +418,8 @@ export class LiveStateManager {
       }
       case "flow": {
         const config = this.generic.flow;
-        const items = filterFreshGenericItems(
-          "flow",
-          (this.genericItems.get("flow") ?? []).filter((item) =>
-            matchesFlowPacketFilters(item, subscription.filters)
-          )
+        const items = (this.genericItems.get("flow") ?? []).filter((item) =>
+          matchesFlowPacketFilters(item, subscription.filters)
         );
         return {
           subscription,
@@ -464,10 +458,7 @@ export class LiveStateManager {
       }
       default: {
         const config = this.generic[subscription.channel];
-        const items = filterFreshGenericItems(
-          subscription.channel,
-          this.genericItems.get(subscription.channel) ?? []
-        );
+        const items = this.genericItems.get(subscription.channel) ?? [];
         return {
           subscription,
           items,
@@ -513,9 +504,6 @@ export class LiveStateManager {
       default: {
         const config = this.generic[channel];
         const parsed = config.parse(item);
-        if (!isLiveItemFresh(channel, parsed)) {
-          return this.genericCursors.get(config.cursorField) ?? null;
-        }
         const items = this.genericItems.get(channel) ?? [];
         const next = normalizeGenericItems(channel, [parsed, ...items], config);
         this.genericItems.set(channel, next);

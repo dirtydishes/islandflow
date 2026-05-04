@@ -23,6 +23,7 @@ import type {
   EquityCandle,
   EquityPrint,
   EquityPrintJoin,
+  EquityQuote,
   FlowPacket,
   InferredDarkEvent,
   LiveServerMessage,
@@ -2173,9 +2174,15 @@ type LiveSessionState = {
   connectedAt: number | null;
   lastUpdate: number | null;
   lastEventByChannel: Partial<Record<LiveSubscription["channel"], number>>;
+  manifest: LiveSubscription[];
+  historyCursors: Partial<Record<string, Cursor | null>>;
+  historyLoading: Partial<Record<string, boolean>>;
+  historyErrors: Partial<Record<string, string | null>>;
+  loadOlder: (channel: LiveSubscription["channel"]) => Promise<void>;
   options: OptionPrint[];
   nbbo: OptionNBBO[];
   equities: EquityPrint[];
+  equityQuotes: EquityQuote[];
   equityJoins: EquityPrintJoin[];
   flow: FlowPacket[];
   classifierHits: ClassifierHitEvent[];
@@ -2183,6 +2190,46 @@ type LiveSessionState = {
   inferredDark: InferredDarkEvent[];
   chartCandles: EquityCandle[];
   chartOverlay: EquityPrint[];
+};
+
+type LiveHistoryResponse<T> = {
+  data: T[];
+  next_before: Cursor | null;
+};
+
+const LIVE_HISTORY_ENDPOINTS: Partial<Record<LiveSubscription["channel"], string>> = {
+  options: "/history/options",
+  nbbo: "/history/nbbo",
+  equities: "/history/equities",
+  "equity-quotes": "/history/equity-quotes",
+  "equity-joins": "/history/equity-joins",
+  flow: "/history/flow",
+  "classifier-hits": "/history/classifier-hits",
+  alerts: "/history/alerts",
+  "inferred-dark": "/history/inferred-dark"
+};
+
+const appendOptionFlowFilters = (params: URLSearchParams, filters: OptionFlowFilters | undefined): void => {
+  if (!filters) {
+    return;
+  }
+  if (filters.view) {
+    params.set("view", filters.view);
+  }
+  if (filters.securityTypes?.length === 1) {
+    params.set("security", filters.securityTypes[0]);
+  } else if (filters.securityTypes && filters.securityTypes.length > 1) {
+    params.set("security", "all");
+  }
+  if (filters.nbboSides?.length) {
+    params.set("side", filters.nbboSides.join(","));
+  }
+  if (filters.optionTypes?.length) {
+    params.set("type", filters.optionTypes.join(","));
+  }
+  if (typeof filters.minNotional === "number") {
+    params.set("min_notional", String(filters.minNotional));
+  }
 };
 
 const dedupeLiveSubscriptions = (subscriptions: LiveSubscription[]): LiveSubscription[] => {
@@ -2266,9 +2313,13 @@ const useLiveSession = (
   const [lastEventByChannel, setLastEventByChannel] = useState<
     Partial<Record<LiveSubscription["channel"], number>>
   >({});
+  const [historyCursors, setHistoryCursors] = useState<Partial<Record<string, Cursor | null>>>({});
+  const [historyLoading, setHistoryLoading] = useState<Partial<Record<string, boolean>>>({});
+  const [historyErrors, setHistoryErrors] = useState<Partial<Record<string, string | null>>>({});
   const [options, setOptions] = useState<OptionPrint[]>([]);
   const [nbbo, setNbbo] = useState<OptionNBBO[]>([]);
   const [equities, setEquities] = useState<EquityPrint[]>([]);
+  const [equityQuotes, setEquityQuotes] = useState<EquityQuote[]>([]);
   const [equityJoins, setEquityJoins] = useState<EquityPrintJoin[]>([]);
   const [flow, setFlow] = useState<FlowPacket[]>([]);
   const [classifierHits, setClassifierHits] = useState<ClassifierHitEvent[]>([]);
@@ -2291,9 +2342,13 @@ const useLiveSession = (
       setConnectedAt(null);
       setLastUpdate(null);
       setLastEventByChannel({});
+      setHistoryCursors({});
+      setHistoryLoading({});
+      setHistoryErrors({});
       setOptions([]);
       setNbbo([]);
       setEquities([]);
+      setEquityQuotes([]);
       setEquityJoins([]);
       setFlow([]);
       setClassifierHits([]);
@@ -2347,6 +2402,7 @@ const useLiveSession = (
 
       const subscription = message.op === "snapshot" ? message.snapshot.subscription : message.subscription;
       const items = message.op === "snapshot" ? message.snapshot.items : [message.item];
+      const subscriptionKey = getLiveSubscriptionKey(subscription);
       const updateAt = Date.now();
 
       const mergeItems = <T extends SortableItem>(
@@ -2380,6 +2436,9 @@ const useLiveSession = (
         case "equities":
           mergeItems(setEquities, items as EquityPrint[]);
           break;
+        case "equity-quotes":
+          mergeItems(setEquityQuotes, items as EquityQuote[]);
+          break;
         case "equity-joins":
           mergeItems(setEquityJoins, items as EquityPrintJoin[]);
           break;
@@ -2401,6 +2460,17 @@ const useLiveSession = (
         case "equity-overlay":
           mergeItems(setChartOverlay, items as EquityPrint[]);
           break;
+      }
+
+      if (message.op === "snapshot") {
+        setHistoryCursors((current) => ({
+          ...current,
+          [subscriptionKey]: message.snapshot.next_before
+        }));
+        setHistoryErrors((current) => ({
+          ...current,
+          [subscriptionKey]: null
+        }));
       }
 
       if (items.length > 0) {
@@ -2503,14 +2573,114 @@ const useLiveSession = (
     subscribedMapRef.current = nextMap;
   }, [enabled, manifest]);
 
+  const loadOlder = useCallback(
+    async (channel: LiveSubscription["channel"]) => {
+      const subscription = manifest.find((candidate) => candidate.channel === channel);
+      if (!enabled || !subscription) {
+        return;
+      }
+      const endpoint = LIVE_HISTORY_ENDPOINTS[subscription.channel];
+      if (!endpoint) {
+        return;
+      }
+      const key = getLiveSubscriptionKey(subscription);
+      const cursor = historyCursors[key];
+      if (!cursor || historyLoading[key]) {
+        return;
+      }
+
+      setHistoryLoading((current) => ({ ...current, [key]: true }));
+      setHistoryErrors((current) => ({ ...current, [key]: null }));
+
+      try {
+        const params = new URLSearchParams({
+          before_ts: String(cursor.ts),
+          before_seq: String(cursor.seq),
+          limit: String(subscription.channel === "options" ? 500 : 200)
+        });
+        if (subscription.channel === "options" || subscription.channel === "flow") {
+          appendOptionFlowFilters(params, subscription.filters);
+        }
+        const response = await fetch(buildApiUrl(`${endpoint}?${params.toString()}`));
+        if (!response.ok) {
+          const detail = await readErrorDetail(response);
+          throw new Error(detail || `HTTP ${response.status}`);
+        }
+        const payload = (await response.json()) as LiveHistoryResponse<SortableItem>;
+        const older = payload.data ?? [];
+
+        const mergeOlder = <T extends SortableItem>(
+          setter: Dispatch<SetStateAction<T[]>>,
+          limit: number
+        ) => {
+          setter((prev) =>
+            mergeNewest(older as T[], prev, limit, (evicted) =>
+              incrementRetentionMetric("hotWindowEvictions", evicted)
+            )
+          );
+        };
+
+        switch (subscription.channel) {
+          case "options":
+            mergeOlder(setOptions, LIVE_HOT_WINDOW_OPTIONS);
+            break;
+          case "nbbo":
+            mergeOlder(setNbbo, LIVE_HOT_WINDOW);
+            break;
+          case "equities":
+            mergeOlder(setEquities, LIVE_HOT_WINDOW);
+            break;
+          case "equity-quotes":
+            mergeOlder(setEquityQuotes, LIVE_HOT_WINDOW);
+            break;
+          case "equity-joins":
+            mergeOlder(setEquityJoins, LIVE_HOT_WINDOW);
+            break;
+          case "flow":
+            mergeOlder(setFlow, LIVE_HOT_WINDOW);
+            break;
+          case "classifier-hits":
+            mergeOlder(setClassifierHits, LIVE_HOT_WINDOW);
+            break;
+          case "alerts":
+            mergeOlder(setAlerts, LIVE_HOT_WINDOW);
+            break;
+          case "inferred-dark":
+            mergeOlder(setInferredDark, LIVE_HOT_WINDOW);
+            break;
+        }
+
+        setHistoryCursors((current) => ({
+          ...current,
+          [key]: older.length > 0 ? payload.next_before : null
+        }));
+        setLastUpdate(Date.now());
+      } catch (error) {
+        setHistoryErrors((current) => ({
+          ...current,
+          [key]: error instanceof Error ? error.message : String(error)
+        }));
+      } finally {
+        setHistoryLoading((current) => ({ ...current, [key]: false }));
+      }
+    },
+    [enabled, manifest, historyCursors, historyLoading]
+  );
+
   return {
     status,
     connectedAt,
     lastUpdate,
     lastEventByChannel,
+    manifest,
+    historyCursors,
+    historyLoading,
+    historyErrors,
+    loadOlder,
     options,
     nbbo,
     equities,
+    equityQuotes,
     equityJoins,
     flow,
     classifierHits,
@@ -2578,6 +2748,39 @@ const TapeControls = ({ paused, onTogglePause, isAtTop, missed, onJump }: TapeCo
         Jump to top
       </button>
       <span className="missed-count">{active ? `+${missed} new` : ""}</span>
+    </div>
+  );
+};
+
+type LoadOlderControlProps = {
+  channel: LiveSubscription["channel"];
+};
+
+const LoadOlderControl = ({ channel }: LoadOlderControlProps) => {
+  const state = useTerminal();
+  const subscription = state.liveSession.manifest.find((candidate) => candidate.channel === channel);
+  if (state.mode !== "live" || !subscription || !(subscription.channel in LIVE_HISTORY_ENDPOINTS)) {
+    return null;
+  }
+
+  const key = getLiveSubscriptionKey(subscription);
+  const cursor = state.liveSession.historyCursors[key];
+  const loading = Boolean(state.liveSession.historyLoading[key]);
+  const error = state.liveSession.historyErrors[key];
+  if (!cursor && !loading && !error) {
+    return null;
+  }
+
+  return (
+    <div className="load-older">
+      <button
+        type="button"
+        onClick={() => void state.liveSession.loadOlder(channel)}
+        disabled={!cursor || loading}
+      >
+        {loading ? "Loading older" : cursor ? "Load older" : "No more history"}
+      </button>
+      {error ? <span>{error}</span> : null}
     </div>
   );
 };
@@ -5265,6 +5468,7 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
             ) : null}
           </div>
         )}
+        {!limit ? <LoadOlderControl channel="options" /> : null}
       </div>
     </Pane>
   );
@@ -5342,6 +5546,7 @@ const EquitiesPane = ({ limit }: EquitiesPaneProps) => {
             {virtual.bottomSpacerHeight > 0 ? (
               <div style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
             ) : null}
+            {!limit ? <LoadOlderControl channel="equities" /> : null}
           </>
         )}
       </div>
@@ -5481,6 +5686,7 @@ const FlowPane = ({ limit, title = "Flow" }: FlowPaneProps) => {
             {virtual.bottomSpacerHeight > 0 ? (
               <div style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
             ) : null}
+            {!limit ? <LoadOlderControl channel="flow" /> : null}
           </>
         )}
       </div>
@@ -5576,6 +5782,7 @@ const AlertsPane = ({ limit, withStrip = false, className }: AlertsPaneProps) =>
             {virtual.bottomSpacerHeight > 0 ? (
               <div style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
             ) : null}
+            {!limit ? <LoadOlderControl channel="alerts" /> : null}
           </>
         )}
       </div>
@@ -5656,6 +5863,7 @@ const ClassifierPane = ({ limit, className }: ClassifierPaneProps) => {
             {virtual.bottomSpacerHeight > 0 ? (
               <div style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
             ) : null}
+            {!limit ? <LoadOlderControl channel="classifier-hits" /> : null}
           </>
         )}
       </div>
@@ -5743,6 +5951,7 @@ const DarkPane = ({ limit, className }: DarkPaneProps) => {
             {virtual.bottomSpacerHeight > 0 ? (
               <div style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
             ) : null}
+            {!limit ? <LoadOlderControl channel="inferred-dark" /> : null}
           </>
         )}
       </div>
