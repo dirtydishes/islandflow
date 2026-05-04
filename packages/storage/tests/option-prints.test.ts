@@ -25,10 +25,20 @@ describe("option-prints storage helpers", () => {
     expect(normalized.conditions).toEqual([]);
   });
 
+  it("normalizes legacy rows with missing execution context", () => {
+    const normalized = normalizeOptionPrint(basePrint);
+    expect(normalized.execution_nbbo_bid).toBeUndefined();
+    expect(normalized.execution_underlying_spot).toBeUndefined();
+    expect(normalized.execution_iv).toBeUndefined();
+  });
+
   it("includes the correct table name in the DDL", () => {
     const ddl = optionPrintsTableDDL();
     expect(ddl).toContain(OPTION_PRINTS_TABLE);
     expect(ddl).toContain("CREATE TABLE IF NOT EXISTS");
+    expect(ddl).toContain("execution_nbbo_bid Nullable(Float64)");
+    expect(ddl).toContain("execution_underlying_spot Nullable(Float64)");
+    expect(ddl).toContain("execution_iv Nullable(Float64)");
   });
 
   it("builds before/history and trace lookup queries", async () => {

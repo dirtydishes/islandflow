@@ -11,6 +11,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type Dispatch,
   type ReactNode,
   type SetStateAction
@@ -982,7 +983,8 @@ const LIVE_SNAPSHOT_HISTORY_CHANNELS = new Set<LiveSubscription["channel"]>([
   "options",
   "nbbo",
   "equities",
-  "flow"
+  "flow",
+  "classifier-hits"
 ]);
 
 export const shouldRetainLiveSnapshotHistory = (
@@ -1025,6 +1027,80 @@ const classifyNbboSide = (price: number, quote: OptionNBBO | null | undefined): 
 
   const mid = (bid + ask) / 2;
   return price >= mid ? "A" : "B";
+};
+
+type ClassifierDecor = {
+  hit: ClassifierHitEvent;
+  family: string;
+  tone: string;
+  intensity: number;
+};
+
+const CLASSIFIER_FAMILY_TONES: Record<string, string> = {
+  large_bullish_call_sweep: "green",
+  large_bearish_put_sweep: "red",
+  unusual_contract_spike: "amber",
+  large_call_sell_overwrite: "copper",
+  large_put_sell_write: "copper",
+  straddle: "blue",
+  strangle: "blue",
+  vertical_spread: "teal",
+  ladder_accumulation: "yellowgreen",
+  roll_up_down_out: "violet",
+  far_dated_conviction: "cyan",
+  zero_dte_gamma_punch: "magenta"
+};
+
+export const selectPrimaryClassifierHit = (
+  hits: readonly ClassifierHitEvent[]
+): ClassifierHitEvent | null => {
+  if (hits.length === 0) {
+    return null;
+  }
+  return [...hits].sort((a, b) => {
+    const confidenceDelta = b.confidence - a.confidence;
+    if (confidenceDelta !== 0) {
+      return confidenceDelta;
+    }
+    const tsDelta = b.source_ts - a.source_ts;
+    if (tsDelta !== 0) {
+      return tsDelta;
+    }
+    return b.seq - a.seq;
+  })[0];
+};
+
+export const classifierToneForFamily = (classifierId: string): string =>
+  CLASSIFIER_FAMILY_TONES[classifierId] ?? "neutral";
+
+const buildClassifierDecor = (hit: ClassifierHitEvent): ClassifierDecor => ({
+  hit,
+  family: hit.classifier_id,
+  tone: classifierToneForFamily(hit.classifier_id),
+  intensity: clamp(hit.confidence, 0.25, 1)
+});
+
+export const getOptionTableSnapshot = (
+  print: Pick<
+    OptionPrint,
+    | "price"
+    | "size"
+    | "notional"
+    | "nbbo_side"
+    | "execution_nbbo_side"
+    | "execution_underlying_spot"
+    | "execution_iv"
+  >,
+  fallbackSide: OptionNbboSide | null = null
+): { spot: string; iv: string; side: string; details: string; value: string } => {
+  const side = print.execution_nbbo_side ?? print.nbbo_side ?? fallbackSide ?? "--";
+  return {
+    spot: typeof print.execution_underlying_spot === "number" ? formatPrice(print.execution_underlying_spot) : "--",
+    iv: typeof print.execution_iv === "number" ? formatPct(print.execution_iv) : "--",
+    side,
+    details: `${formatSize(print.size)}@${formatPrice(print.price)}_${side}`,
+    value: formatCompactUsd(print.notional ?? print.price * print.size * 100)
+  };
 };
 
 type ListScrollState = {
@@ -2125,7 +2201,8 @@ const getLiveManifest = (
       { channel: "options", filters: flowFilters },
       { channel: "nbbo" },
       { channel: "equities" },
-      { channel: "flow", filters: flowFilters }
+      { channel: "flow", filters: flowFilters },
+      { channel: "classifier-hits" }
     ];
   }
 
@@ -4157,6 +4234,39 @@ const useTerminalState = () => {
     return traceId.slice(idx);
   }, []);
 
+  const classifierHitsByPacketId = useMemo(() => {
+    const map = new Map<string, ClassifierHitEvent[]>();
+    for (const hit of classifierHitsFeed.items) {
+      const packetId = extractPacketIdFromClassifierHitTrace(hit.trace_id);
+      if (!packetId) {
+        continue;
+      }
+      map.set(packetId, [...(map.get(packetId) ?? []), hit]);
+    }
+    return map;
+  }, [classifierHitsFeed.items, extractPacketIdFromClassifierHitTrace]);
+
+  const packetIdByOptionTraceId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const packet of flowFeed.items) {
+      for (const member of packet.members) {
+        map.set(member, packet.id);
+      }
+    }
+    return map;
+  }, [flowFeed.items]);
+
+  const classifierDecorByOptionTraceId = useMemo(() => {
+    const map = new Map<string, ClassifierDecor>();
+    for (const [traceId, packetId] of packetIdByOptionTraceId) {
+      const primary = selectPrimaryClassifierHit(classifierHitsByPacketId.get(packetId) ?? []);
+      if (primary) {
+        map.set(traceId, buildClassifierDecor(primary));
+      }
+    }
+    return map;
+  }, [classifierHitsByPacketId, packetIdByOptionTraceId]);
+
   const selectedClassifierPacketId = useMemo(() => {
     if (!selectedClassifierHit) {
       return null;
@@ -4632,6 +4742,9 @@ const useTerminalState = () => {
     equityPrintMap,
     equityJoinMap: resolvedEquityJoinMap,
     flowPacketMap: resolvedFlowPacketMap,
+    classifierHitsByPacketId,
+    packetIdByOptionTraceId,
+    classifierDecorByOptionTraceId,
     selectedEvidence,
     selectedFlowPacket,
     selectedDarkEvidence,
@@ -5002,7 +5115,7 @@ type OptionsPaneProps = {
 const OptionsPane = ({ limit }: OptionsPaneProps) => {
   const state = useTerminal();
   const items = limit ? state.filteredOptions.slice(0, limit) : state.filteredOptions;
-  const virtual = useVirtualList(items, state.optionsScroll.listRef, !limit, 96);
+  const virtual = useVirtualList(items, state.optionsScroll.listRef, !limit, 34);
 
   return (
     <Pane
@@ -5028,7 +5141,7 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
         />
       }
     >
-      <div className="list terminal-list" ref={state.optionsScroll.listRef}>
+      <div className="options-table-wrap" ref={state.optionsScroll.listRef}>
         {items.length === 0 ? (
           <div className="empty">
             {state.tickerSet.size > 0
@@ -5040,103 +5153,92 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          <>
+          <div className="options-table" role="table" aria-label="Options tape">
+            <div className="options-table-head" role="row">
+              <span>TIME</span>
+              <span>SYM</span>
+              <span>EXP</span>
+              <span>STRIKE</span>
+              <span>C/P</span>
+              <span>SPOT</span>
+              <span>DETAILS</span>
+              <span>TYPE</span>
+              <span>VALUE</span>
+              <span>SIDE</span>
+              <span>IV</span>
+              <span>CLASSIFIER</span>
+            </div>
             {virtual.topSpacerHeight > 0 ? (
               <div style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
             ) : null}
             {virtual.visibleItems.map((print) => {
-            const contractId = normalizeContractId(print.option_contract_id);
-            const contractDisplay = formatOptionContractLabel(contractId);
-            const quote = state.nbboMap.get(contractId);
-            const nbboAge = quote ? Math.abs(print.ts - quote.ts) : null;
-            const nbboStale = nbboAge !== null && nbboAge > NBBO_MAX_AGE_MS_SAFE;
-            const nbboMid = quote ? (quote.bid + quote.ask) / 2 : null;
-            const nbboSide = print.nbbo_side ?? classifyNbboSide(print.price, quote);
-            const notional = print.notional ?? print.price * print.size * 100;
-
-            return (
-              <div className="row" key={`${print.trace_id}-${print.seq}`}>
-                <div>
-                  <div className={`contract${contractDisplay ? " option-contract" : ""}`}>
-                    {contractDisplay ? (
-                      <>
-                        <span>{contractDisplay.ticker}</span>
-                        <span>{contractDisplay.strike}</span>
-                        <span>{contractDisplay.expiration}</span>
-                      </>
+              const contractId = normalizeContractId(print.option_contract_id);
+              const parsed = parseOptionContractId(contractId);
+              const contractDisplay = formatOptionContractLabel(contractId);
+              const quote = state.nbboMap.get(contractId);
+              const hasPreservedNbbo = typeof print.execution_nbbo_side === "string";
+              const nbboSide =
+                print.execution_nbbo_side ??
+                print.nbbo_side ??
+                (!hasPreservedNbbo ? classifyNbboSide(print.price, quote) : null);
+              const notional = print.notional ?? print.price * print.size * 100;
+              const spot = print.execution_underlying_spot;
+              const iv = print.execution_iv;
+              const decor = state.classifierDecorByOptionTraceId.get(print.trace_id);
+              const commonProps = {
+                className: `options-table-row${decor ? ` is-classified classifier-${decor.tone}` : ""}`,
+                style: decor ? ({ "--classifier-intensity": decor.intensity } as CSSProperties) : undefined
+              };
+              const cells = (
+                <>
+                  <span className="mono">{formatTime(print.ts)}</span>
+                  <span>{contractDisplay?.ticker ?? parsed?.root ?? formatContractLabel(contractId)}</span>
+                  <span>{contractDisplay?.expiration ?? parsed?.expiry ?? "--"}</span>
+                  <span>{contractDisplay?.strike.replace(/[CP]$/, "") ?? "--"}</span>
+                  <span>{parsed?.right ?? contractDisplay?.strike.slice(-1) ?? "--"}</span>
+                  <span>{typeof spot === "number" ? formatPrice(spot) : "--"}</span>
+                  <span className="mono">
+                    {formatSize(print.size)}@{formatPrice(print.price)}_{nbboSide ?? "--"}
+                  </span>
+                  <span>{print.option_type ?? "--"}</span>
+                  <span className="notional-emphasis">${formatCompactUsd(notional)}</span>
+                  <span>
+                    {nbboSide ? (
+                      <span className={`nbbo-tag nbbo-tag-${nbboSide.toLowerCase()}`}>{nbboSide}</span>
                     ) : (
-                      formatContractLabel(contractId)
+                      "--"
                     )}
-                  </div>
-                  <div className="meta">
-                    <span>${formatPrice(print.price)}</span>
-                    <span>{formatSize(print.size)}x</span>
-                    <span>{print.exchange}</span>
-                    <span className="notional-emphasis">Notional ${formatCompactUsd(notional)}</span>
-                    {print.conditions?.map((condition) => {
-                      const normalized = condition.toUpperCase();
-                      const tone =
-                        normalized === "SWEEP"
-                          ? "condition-sweep"
-                          : normalized === "ISO"
-                            ? "condition-iso"
-                            : "condition-neutral";
-                      return (
-                        <span className={`condition-chip ${tone}`} key={`${print.trace_id}-${condition}`}>
-                          {normalized}
-                        </span>
-                      );
-                    })}
-                  </div>
-                  {quote ? (
-                    <div className="meta nbbo-meta">
-                      <span>Bid ${formatPrice(quote.bid)}</span>
-                      <span>Ask ${formatPrice(quote.ask)}</span>
-                      <span>Mid ${formatPrice(nbboMid ?? 0)}</span>
-                      <span>{Math.round(nbboAge ?? 0)}ms</span>
-                      {nbboSide ? (
-                        <span className="nbbo-side" tabIndex={0} aria-label="NBBO side legend">
-                          <span className={`nbbo-tag nbbo-tag-${nbboSide.toLowerCase()}`}>
-                            {nbboSide}
-                          </span>
-                          <span className="nbbo-tooltip" role="tooltip">
-                            <span className="nbbo-tooltip-row">
-                              <span className="nbbo-tag nbbo-tag-a">A</span>
-                              <span>Ask</span>
-                            </span>
-                            <span className="nbbo-tooltip-row">
-                              <span className="nbbo-tag nbbo-tag-aa">AA</span>
-                              <span>Above Ask</span>
-                            </span>
-                            <span className="nbbo-tooltip-row">
-                              <span className="nbbo-tag nbbo-tag-b">B</span>
-                              <span>Bid</span>
-                            </span>
-                            <span className="nbbo-tooltip-row">
-                              <span className="nbbo-tag nbbo-tag-bb">BB</span>
-                              <span>Below Bid</span>
-                            </span>
-                          </span>
-                        </span>
-                      ) : null}
-                      {print.nbbo_side === "STALE" || nbboStale ? <span className="pill nbbo-stale">Stale</span> : null}
-                    </div>
-                  ) : (
-                    <div className="meta nbbo-meta">
-                      <span className="pill nbbo-missing">
-                        {print.nbbo_side === "STALE" ? "NBBO stale" : "NBBO missing"}
-                      </span>
-                    </div>
-                  )}
+                  </span>
+                  <span>{typeof iv === "number" ? formatPct(iv) : "--"}</span>
+                  <span>{decor ? humanizeClassifierId(decor.family) : "--"}</span>
+                </>
+              );
+
+              return decor ? (
+                <button
+                  type="button"
+                  {...commonProps}
+                  key={`${print.trace_id}-${print.seq}`}
+                  onClick={() => state.openFromClassifierHit(decor.hit)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      state.openFromClassifierHit(decor.hit);
+                    }
+                  }}
+                >
+                  {cells}
+                </button>
+              ) : (
+                <div {...commonProps} key={`${print.trace_id}-${print.seq}`}>
+                  {cells}
                 </div>
-                <div className="time">{formatTime(print.ts)}</div>
-              </div>
-            );
+              );
             })}
             {virtual.bottomSpacerHeight > 0 ? (
               <div style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
             ) : null}
-          </>
+          </div>
         )}
       </div>
     </Pane>

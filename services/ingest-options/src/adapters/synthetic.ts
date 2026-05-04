@@ -13,6 +13,9 @@ type SyntheticOptionsAdapterConfig = {
 
 type Burst = {
   contractId: string;
+  underlying: number;
+  expiryOffsetDays: number;
+  strike: number;
   basePrice: number;
   baseSize: number;
   exchange: string;
@@ -23,7 +26,16 @@ type Burst = {
   seed: number;
 };
 
+export type SyntheticContractIvState = {
+  iv: number;
+  pressure: number;
+  lastTs: number;
+};
+
 const OPTION_CONTRACT_MULTIPLIER = 100;
+const IV_MIN = 0.05;
+const IV_MAX = 2.5;
+const IV_DECAY_HALF_LIFE_MS = 60_000;
 
 const SYNTHETIC_SYMBOLS = ["SPY", ...(SP500_SYMBOLS as readonly string[])];
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -36,7 +48,7 @@ type SyntheticOptionsProfile = {
   pricePlacements: Record<string, WeightedValue<PricePlacement>[]>;
 };
 
-type PricePlacement = "AA" | "A" | "MID" | "B" | "BB";
+export type PricePlacement = "AA" | "A" | "MID" | "B" | "BB";
 
 type WeightedValue<T> = {
   value: T;
@@ -347,6 +359,55 @@ const formatExpiry = (now: number, offsetDays: number): string => {
   return expiryDate.toISOString().slice(0, 10);
 };
 
+const clampValue = (value: number, min: number, max: number): number => {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+  return Math.max(min, Math.min(max, value));
+};
+
+const initializeSyntheticIv = (dteDays: number, moneyness: number): number => {
+  const dteBoost = dteDays <= 0 ? 0.22 : dteDays <= 7 ? 0.14 : dteDays <= 30 ? 0.06 : 0;
+  const moneynessBoost = clampValue(Math.abs(moneyness - 1) * 0.8, 0, 0.2);
+  return clampValue(0.24 + dteBoost + moneynessBoost, 0.18, 0.65);
+};
+
+export const updateSyntheticIvForTest = (
+  state: SyntheticContractIvState | undefined,
+  input: {
+    ts: number;
+    placement: PricePlacement;
+    size: number;
+    notional: number;
+    dteDays: number;
+    moneyness: number;
+  }
+): SyntheticContractIvState => {
+  const previous = state ?? {
+    iv: initializeSyntheticIv(input.dteDays, input.moneyness),
+    pressure: 0,
+    lastTs: input.ts
+  };
+  const elapsed = Math.max(0, input.ts - previous.lastTs);
+  const decay = Math.pow(0.5, elapsed / IV_DECAY_HALF_LIFE_MS);
+  let pressure = previous.pressure * decay;
+
+  if (input.placement === "AA" || input.placement === "A") {
+    const sizeImpact = Math.log10(Math.max(10, input.size)) * 0.012;
+    const notionalImpact = Math.log10(Math.max(1_000, input.notional)) * 0.01;
+    pressure += input.placement === "AA" ? sizeImpact + notionalImpact : (sizeImpact + notionalImpact) * 0.65;
+  } else if (input.placement === "MID") {
+    pressure += 0.001;
+  } else {
+    pressure -= input.placement === "BB" ? 0.018 : 0.01;
+  }
+
+  pressure = clampValue(pressure, -0.25, 1.85);
+  const baseline = initializeSyntheticIv(input.dteDays, input.moneyness);
+  const iv = clampValue(baseline + pressure * 0.42, IV_MIN, IV_MAX);
+  return { iv: Number(iv.toFixed(4)), pressure, lastTs: input.ts };
+};
+
 const buildBurst = (burstIndex: number, now: number, profile: SyntheticOptionsProfile): Burst => {
   const symbol = SYNTHETIC_SYMBOLS[burstIndex % SYNTHETIC_SYMBOLS.length];
   const symbolHash = hashSymbol(symbol);
@@ -392,6 +453,9 @@ const buildBurst = (burstIndex: number, now: number, profile: SyntheticOptionsPr
 
   return {
     contractId,
+    underlying: baseUnderlying,
+    expiryOffsetDays: expiryOffset,
+    strike,
     basePrice: basePricePer,
     baseSize,
     exchange,
@@ -420,6 +484,7 @@ export const createSyntheticOptionsAdapter = (
       let nbboSeq = 0;
       let burstIndex = 0;
       let currentBurst: Burst | null = null;
+      const ivByContract = new Map<string, SyntheticContractIvState>();
       let remainingRuns = 0;
       let timer: ReturnType<typeof setInterval> | null = null;
       let stopped = false;
@@ -448,12 +513,28 @@ export const createSyntheticOptionsAdapter = (
           const priceJitter = ((i % 3) - 1) * 0.004;
           const sizeJitter = ((i % 3) - 1) * 0.08;
           const priceMultiplier = 1 + burst.priceStep * i + priceJitter;
-          const mid = Math.max(0.05, Number((burst.basePrice * priceMultiplier).toFixed(2)));
-          const spread = Math.max(0.02, Number((mid * 0.02).toFixed(2)));
+          const placement = pickPlacement(burst, i, profile);
+          const size = Math.max(1, Math.round(burst.baseSize * (1 + sizeJitter)));
+          const previousIv = ivByContract.get(burst.contractId);
+          const provisionalNotional = burst.basePrice * size * OPTION_CONTRACT_MULTIPLIER;
+          const ivState = updateSyntheticIvForTest(previousIv, {
+            ts: now + i * 5,
+            placement,
+            size,
+            notional: provisionalNotional,
+            dteDays: burst.expiryOffsetDays,
+            moneyness: burst.strike / burst.underlying
+          });
+          ivByContract.set(burst.contractId, ivState);
+          const ivDrift = Math.max(0, ivState.iv - initializeSyntheticIv(burst.expiryOffsetDays, burst.strike / burst.underlying));
+          const mid = Math.max(
+            0.05,
+            Number((burst.basePrice * priceMultiplier * (1 + ivDrift * 1.15)).toFixed(2))
+          );
+          const spread = Math.max(0.02, Number((mid * (0.02 + Math.min(0.035, ivState.iv * 0.01))).toFixed(2)));
           const bid = Math.max(0.01, Number((mid - spread / 2).toFixed(2)));
           const ask = Math.max(bid + 0.01, Number((mid + spread / 2).toFixed(2)));
           const tick = Math.max(0.01, Number((spread * 0.25).toFixed(2)));
-          const placement = pickPlacement(burst, i, profile);
           let tradePrice = mid;
 
           if (placement === "AA") {
@@ -476,9 +557,11 @@ export const createSyntheticOptionsAdapter = (
             ts: now + i * 5,
             option_contract_id: burst.contractId,
             price: tradePrice,
-            size: Math.max(1, Math.round(burst.baseSize * (1 + sizeJitter))),
+            size,
             exchange: burst.exchange,
-            conditions: burst.conditions
+            conditions: burst.conditions,
+            execution_iv: ivState.iv,
+            execution_iv_source: "synthetic_pressure_model"
           };
 
           if (handlers.onNBBO) {

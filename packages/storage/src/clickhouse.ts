@@ -512,7 +512,23 @@ const normalizeOptionRow = (row: unknown): unknown => {
       "ts",
       "price",
       "size",
-      "notional"
+      "notional",
+      "execution_nbbo_bid",
+      "execution_nbbo_ask",
+      "execution_nbbo_mid",
+      "execution_nbbo_spread",
+      "execution_nbbo_bid_size",
+      "execution_nbbo_ask_size",
+      "execution_nbbo_ts",
+      "execution_nbbo_age_ms",
+      "execution_underlying_spot",
+      "execution_underlying_bid",
+      "execution_underlying_ask",
+      "execution_underlying_mid",
+      "execution_underlying_spread",
+      "execution_underlying_ts",
+      "execution_underlying_age_ms",
+      "execution_iv"
     ]);
 
     if ("is_etf" in record) {

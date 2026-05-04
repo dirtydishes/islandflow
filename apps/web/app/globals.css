@@ -873,6 +873,89 @@ h3 {
   background: linear-gradient(180deg, rgba(245, 166, 35, 0.07), rgba(255, 255, 255, 0.018));
 }
 
+.options-table-wrap {
+  min-height: 0;
+  overflow: auto;
+}
+
+.options-table {
+  min-width: 1040px;
+}
+
+.options-table-head,
+.options-table-row {
+  display: grid;
+  grid-template-columns: 88px 72px 76px 72px 44px 76px 130px 70px 82px 64px 56px minmax(150px, 1fr);
+  align-items: center;
+  column-gap: 10px;
+}
+
+.options-table-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: 30px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(8, 11, 16, 0.98);
+  color: var(--muted);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.options-table-row {
+  width: 100%;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+  background:
+    linear-gradient(90deg, rgba(var(--classifier-rgb, 192, 200, 210), calc(0.02 + var(--classifier-intensity, 0) * 0.12)), transparent 62%),
+    rgba(255, 255, 255, 0.012);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.options-table-row:hover,
+.options-table-row:focus-visible {
+  outline: none;
+  background:
+    linear-gradient(90deg, rgba(var(--classifier-rgb, 192, 200, 210), calc(0.04 + var(--classifier-intensity, 0) * 0.18)), transparent 68%),
+    rgba(255, 255, 255, 0.03);
+}
+
+.options-table-row.is-classified {
+  cursor: pointer;
+  border-left: 3px solid rgba(var(--classifier-rgb), calc(0.35 + var(--classifier-intensity) * 0.45));
+  padding-left: 7px;
+}
+
+.options-table-row > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.72rem;
+}
+
+.mono {
+  font-variant-numeric: tabular-nums;
+}
+
+.classifier-green { --classifier-rgb: 37, 193, 122; }
+.classifier-red { --classifier-rgb: 255, 107, 95; }
+.classifier-amber { --classifier-rgb: 245, 166, 35; }
+.classifier-copper { --classifier-rgb: 198, 122, 75; }
+.classifier-blue { --classifier-rgb: 77, 163, 255; }
+.classifier-teal { --classifier-rgb: 64, 210, 190; }
+.classifier-yellowgreen { --classifier-rgb: 174, 210, 78; }
+.classifier-violet { --classifier-rgb: 170, 130, 255; }
+.classifier-cyan { --classifier-rgb: 94, 214, 255; }
+.classifier-magenta { --classifier-rgb: 255, 92, 205; }
+.classifier-neutral { --classifier-rgb: 192, 200, 210; }
+
 .contract,
 .drawer-row-title {
   margin-bottom: 6px;

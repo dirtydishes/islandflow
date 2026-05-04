@@ -1,12 +1,14 @@
 import { describe, expect, it } from "bun:test";
 import {
   buildDefaultFlowFilters,
+  classifierToneForFamily,
   deriveAlertDirection,
   countActiveFlowFilterGroups,
   formatCompactUsd,
   formatOptionContractLabel,
   flushPausableTapeData,
   getAlertWindowAnchorTs,
+  getOptionTableSnapshot,
   getLiveFeedStatus,
   normalizeAlertSeverity,
   nextFlowFilterPopoverState,
@@ -14,6 +16,7 @@ import {
   reducePausableTapeData,
   shouldRetainLiveSnapshotHistory,
   shouldShowEquitiesSilentFeedWarning,
+  selectPrimaryClassifierHit,
   statusLabel,
   toggleFilterValue
 } from "./terminal";
@@ -170,6 +173,54 @@ describe("options display formatters", () => {
     expect(formatCompactUsd(11_430)).toBe("11.4K");
     expect(formatCompactUsd(1_250_000)).toBe("1.3M");
     expect(formatCompactUsd(Number.NaN)).toBe("0.00");
+  });
+
+  it("renders options table snapshot values from preserved spot and IV", () => {
+    expect(
+      getOptionTableSnapshot({
+        price: 1.25,
+        size: 10,
+        notional: 12_500,
+        execution_nbbo_side: "A",
+        execution_underlying_spot: 450.05,
+        execution_iv: 0.42
+      })
+    ).toEqual({
+      spot: "450.05",
+      iv: "42%",
+      side: "A",
+      details: "10@1.25_A",
+      value: "12.5K"
+    });
+  });
+
+  it("renders legacy options table snapshot spot and IV as dashes", () => {
+    const snapshot = getOptionTableSnapshot({
+      price: 1,
+      size: 2
+    });
+
+    expect(snapshot.spot).toBe("--");
+    expect(snapshot.iv).toBe("--");
+  });
+});
+
+describe("classifier row decoration helpers", () => {
+  it("maps classifier families to row tones", () => {
+    expect(classifierToneForFamily("large_bullish_call_sweep")).toBe("green");
+    expect(classifierToneForFamily("large_bearish_put_sweep")).toBe("red");
+    expect(classifierToneForFamily("straddle")).toBe("blue");
+    expect(classifierToneForFamily("unknown_family")).toBe("neutral");
+  });
+
+  it("selects primary hits by confidence, source timestamp, then seq", () => {
+    const hit = selectPrimaryClassifierHit([
+      { ...makeAlert({ classifier_id: "old", confidence: 0.9, source_ts: 1_000, seq: 1 }), direction: "bullish", explanations: [] },
+      { ...makeAlert({ classifier_id: "new", confidence: 0.9, source_ts: 2_000, seq: 1 }), direction: "bullish", explanations: [] },
+      { ...makeAlert({ classifier_id: "low", confidence: 0.5, source_ts: 3_000, seq: 9 }), direction: "bullish", explanations: [] }
+    ]);
+
+    expect(hit?.classifier_id).toBe("new");
   });
 });
 
