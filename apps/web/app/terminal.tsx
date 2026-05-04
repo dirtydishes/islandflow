@@ -2185,47 +2185,72 @@ type LiveSessionState = {
   chartOverlay: EquityPrint[];
 };
 
-const getLiveManifest = (
+const dedupeLiveSubscriptions = (subscriptions: LiveSubscription[]): LiveSubscription[] => {
+  const seen = new Set<string>();
+  return subscriptions.filter((subscription) => {
+    const key = getLiveSubscriptionKey(subscription);
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+};
+
+export const getLiveManifest = (
   pathname: string,
   chartTicker: string,
   chartIntervalMs: number,
   flowFilters: OptionFlowFilters
 ): LiveSubscription[] => {
+  const baselineSubs: LiveSubscription[] = [{ channel: "options", filters: flowFilters }];
   const chartSubs: LiveSubscription[] = [
     { channel: "equity-candles", underlying_id: chartTicker, interval_ms: chartIntervalMs },
     { channel: "equity-overlay", underlying_id: chartTicker }
   ];
 
   if (pathname === "/tape") {
-    return [
+    return dedupeLiveSubscriptions([
+      ...baselineSubs,
       { channel: "options", filters: flowFilters },
       { channel: "nbbo" },
       { channel: "equities" },
       { channel: "flow", filters: flowFilters },
       { channel: "classifier-hits" }
-    ];
+    ]);
   }
 
   if (pathname === "/signals") {
-    return [{ channel: "alerts" }, { channel: "classifier-hits" }, { channel: "inferred-dark" }];
+    return dedupeLiveSubscriptions([
+      ...baselineSubs,
+      { channel: "alerts" },
+      { channel: "classifier-hits" },
+      { channel: "inferred-dark" }
+    ]);
   }
 
   if (pathname === "/charts") {
-    return [...chartSubs, { channel: "classifier-hits" }, { channel: "inferred-dark" }];
+    return dedupeLiveSubscriptions([
+      ...baselineSubs,
+      ...chartSubs,
+      { channel: "classifier-hits" },
+      { channel: "inferred-dark" }
+    ]);
   }
 
   if (pathname === "/replay") {
-    return [];
+    return baselineSubs;
   }
 
-  return [
+  return dedupeLiveSubscriptions([
+    ...baselineSubs,
     { channel: "equities" },
     { channel: "flow" },
     { channel: "alerts" },
     { channel: "classifier-hits" },
     { channel: "inferred-dark" },
     ...chartSubs
-  ];
+  ]);
 };
 
 const useLiveSession = (

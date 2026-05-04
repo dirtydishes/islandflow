@@ -10,6 +10,7 @@ import {
   getAlertWindowAnchorTs,
   getOptionTableSnapshot,
   getLiveFeedStatus,
+  getLiveManifest,
   normalizeAlertSeverity,
   nextFlowFilterPopoverState,
   projectPausableTapeState,
@@ -37,6 +38,42 @@ const makeAlert = (overrides: Record<string, unknown> = {}) =>
     hits: [],
     ...overrides
   }) as any;
+
+describe("live manifest", () => {
+  it("includes options on every live route", () => {
+    const filters = buildDefaultFlowFilters();
+    for (const pathname of ["/", "/tape", "/signals", "/charts", "/replay"]) {
+      expect(
+        getLiveManifest(pathname, "SPY", 60000, filters).some(
+          (subscription) => subscription.channel === "options"
+        )
+      ).toBe(true);
+    }
+  });
+
+  it("dedupes tape options subscription", () => {
+    const tapeOptionsSubscriptions = getLiveManifest(
+      "/tape",
+      "SPY",
+      60000,
+      buildDefaultFlowFilters()
+    ).filter((subscription) => subscription.channel === "options");
+    expect(tapeOptionsSubscriptions).toHaveLength(1);
+  });
+
+  it("keeps option filters on baseline subscription", () => {
+    const filters = {
+      ...buildDefaultFlowFilters(),
+      minNotional: 125_000
+    };
+
+    const optionsSubscription = getLiveManifest("/signals", "SPY", 60000, filters).find(
+      (subscription) => subscription.channel === "options"
+    );
+
+    expect(optionsSubscription?.filters).toBe(filters);
+  });
+});
 
 describe("live tape pausable helpers", () => {
   it("queues new items while paused and flushes them on resume", () => {
