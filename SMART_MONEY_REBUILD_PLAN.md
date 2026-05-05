@@ -36,9 +36,9 @@ Acceptance: missing event-calendar fields produce neutral `null` feature values 
 Acceptance: abstained events do not emit legacy classifier hits.
 
 ### Phase 5: Synthetic Market Redesign
-- [ ] Rework synthetic options adapter around labeled parent-event templates.
-- [ ] Add deterministic scenario families for all six profiles.
-- [ ] Add test/demo operating modes with hidden labels.
+- [x] Rework synthetic options adapter around labeled parent-event templates.
+- [x] Add deterministic scenario families for all six profiles.
+- [x] Add test/demo operating modes with hidden labels.
 
 Acceptance: scenario tests assert intended profile wins and wrong nearby profiles remain below threshold.
 
