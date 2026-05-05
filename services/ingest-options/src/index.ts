@@ -50,8 +50,6 @@ const envSchema = z.object({
   CLICKHOUSE_DATABASE: z.string().default("default"),
   OPTIONS_INGEST_ADAPTER: z.string().min(1).default("synthetic"),
   ALPACA_API_KEY: z.string().default(""),
-  ALPACA_KEY_ID: z.string().default(""),
-  ALPACA_SECRET_KEY: z.string().default(""),
   ALPACA_REST_URL: z.string().default("https://data.alpaca.markets"),
   ALPACA_WS_BASE_URL: z.string().default("wss://stream.data.alpaca.markets/v1beta1"),
   ALPACA_FEED: z.enum(["indicative", "opra"]).default("indicative"),
@@ -230,19 +228,15 @@ const selectAdapter = (name: string): OptionIngestAdapter => {
   }
 
   if (name === "alpaca") {
-    const hasApiKey = Boolean(env.ALPACA_API_KEY);
-    const hasKeyPair = Boolean(env.ALPACA_KEY_ID && env.ALPACA_SECRET_KEY);
-    if (!hasApiKey && !hasKeyPair) {
-      logger.warn("alpaca credentials missing; set ALPACA_API_KEY or ALPACA_KEY_ID and ALPACA_SECRET_KEY");
-      throw new Error("ALPACA_API_KEY or ALPACA_KEY_ID and ALPACA_SECRET_KEY are required for the alpaca adapter.");
+    if (!env.ALPACA_API_KEY) {
+      logger.warn("alpaca credentials missing; set ALPACA_API_KEY");
+      throw new Error("ALPACA_API_KEY is required for the alpaca adapter.");
     }
 
     const underlyings = env.ALPACA_UNDERLYINGS.split(",").map((symbol) => symbol.trim());
 
     return createAlpacaOptionsAdapter({
       apiKey: env.ALPACA_API_KEY,
-      keyId: env.ALPACA_KEY_ID,
-      secretKey: env.ALPACA_SECRET_KEY,
       restUrl: env.ALPACA_REST_URL,
       wsBaseUrl: env.ALPACA_WS_BASE_URL,
       feed: env.ALPACA_FEED,

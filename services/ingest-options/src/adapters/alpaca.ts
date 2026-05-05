@@ -7,8 +7,6 @@ type AlpacaFeed = "indicative" | "opra";
 
 type AlpacaOptionsAdapterConfig = {
   apiKey: string;
-  keyId: string;
-  secretKey: string;
   restUrl: string;
   wsBaseUrl: string;
   feed: AlpacaFeed;
@@ -150,15 +148,8 @@ const normalizeUnderlyings = (value: string[]): string[] => {
 };
 
 const buildHeaders = (config: AlpacaOptionsAdapterConfig): Record<string, string> => {
-  if (config.apiKey) {
-    return {
-      Authorization: `Bearer ${config.apiKey}`
-    };
-  }
-
   return {
-    "APCA-API-KEY-ID": config.keyId,
-    "APCA-API-SECRET-KEY": config.secretKey
+    Authorization: `Bearer ${config.apiKey}`
   };
 };
 
@@ -407,8 +398,8 @@ export const createAlpacaOptionsAdapter = (
   return {
     name: "alpaca",
     start: async (handlers: OptionIngestHandlers) => {
-      if (!config.apiKey && (!config.keyId || !config.secretKey)) {
-        throw new Error("Alpaca adapter requires ALPACA_API_KEY or ALPACA_KEY_ID and ALPACA_SECRET_KEY.");
+      if (!config.apiKey) {
+        throw new Error("Alpaca adapter requires ALPACA_API_KEY.");
       }
 
       const underlyings = normalizeUnderlyings(config.underlyings);

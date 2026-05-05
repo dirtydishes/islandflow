@@ -7,8 +7,6 @@ export type AlpacaEquitiesFeed = "iex" | "sip";
 
 export type AlpacaEquitiesAdapterConfig = {
   apiKey: string;
-  keyId: string;
-  secretKey: string;
   restUrl: string;
   wsBaseUrl: string;
   feed: AlpacaEquitiesFeed;
@@ -65,15 +63,8 @@ const normalizeSymbols = (symbols: string[]): string[] => {
 };
 
 const buildHeaders = (config: AlpacaEquitiesAdapterConfig): Record<string, string> => {
-  if (config.apiKey) {
-    return {
-      Authorization: `Bearer ${config.apiKey}`
-    };
-  }
-
   return {
-    "APCA-API-KEY-ID": config.keyId,
-    "APCA-API-SECRET-KEY": config.secretKey
+    Authorization: `Bearer ${config.apiKey}`
   };
 };
 
@@ -193,10 +184,8 @@ export const createAlpacaEquitiesAdapter = (
   return {
     name: "alpaca",
     start: async (handlers: EquityIngestHandlers) => {
-      if (!config.apiKey && (!config.keyId || !config.secretKey)) {
-        throw new Error(
-          "Alpaca equities adapter requires ALPACA_API_KEY or ALPACA_KEY_ID and ALPACA_SECRET_KEY."
-        );
+      if (!config.apiKey) {
+        throw new Error("Alpaca equities adapter requires ALPACA_API_KEY.");
       }
 
       const symbols = normalizeSymbols(config.symbols);
@@ -218,8 +207,8 @@ export const createAlpacaEquitiesAdapter = (
         ws.send(
           JSON.stringify({
             action: "auth",
-            key: config.apiKey || config.keyId,
-            secret: config.apiKey ? "" : config.secretKey
+            key: config.apiKey,
+            secret: ""
           })
         );
       });
