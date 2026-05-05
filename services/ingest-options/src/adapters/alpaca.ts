@@ -6,6 +6,7 @@ import WebSocket from "ws";
 type AlpacaFeed = "indicative" | "opra";
 
 type AlpacaOptionsAdapterConfig = {
+  apiKey: string;
   keyId: string;
   secretKey: string;
   restUrl: string;
@@ -148,10 +149,18 @@ const normalizeUnderlyings = (value: string[]): string[] => {
   return result;
 };
 
-const buildHeaders = (config: AlpacaOptionsAdapterConfig): Record<string, string> => ({
-  "APCA-API-KEY-ID": config.keyId,
-  "APCA-API-SECRET-KEY": config.secretKey
-});
+const buildHeaders = (config: AlpacaOptionsAdapterConfig): Record<string, string> => {
+  if (config.apiKey) {
+    return {
+      Authorization: `Bearer ${config.apiKey}`
+    };
+  }
+
+  return {
+    "APCA-API-KEY-ID": config.keyId,
+    "APCA-API-SECRET-KEY": config.secretKey
+  };
+};
 
 const fetchJson = async <T>(
   url: URL,
@@ -398,8 +407,8 @@ export const createAlpacaOptionsAdapter = (
   return {
     name: "alpaca",
     start: async (handlers: OptionIngestHandlers) => {
-      if (!config.keyId || !config.secretKey) {
-        throw new Error("Alpaca adapter requires ALPACA_KEY_ID and ALPACA_SECRET_KEY.");
+      if (!config.apiKey && (!config.keyId || !config.secretKey)) {
+        throw new Error("Alpaca adapter requires ALPACA_API_KEY or ALPACA_KEY_ID and ALPACA_SECRET_KEY.");
       }
 
       const underlyings = normalizeUnderlyings(config.underlyings);

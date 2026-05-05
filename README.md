@@ -148,8 +148,9 @@ Synthetic profile intent:
 
 | Variable | Default | What it controls |
 | --- | --- | --- |
-| `ALPACA_KEY_ID` | empty | Alpaca API key for options/equities adapters. Required when `*_INGEST_ADAPTER=alpaca`. |
-| `ALPACA_SECRET_KEY` | empty | Alpaca API secret for options/equities adapters. Required when `*_INGEST_ADAPTER=alpaca`. |
+| `ALPACA_API_KEY` | empty | Single-token Alpaca API auth for options/equities adapters. Use this when your account provides one API key value. |
+| `ALPACA_KEY_ID` | empty | Alpaca key-pair auth key id (legacy/auth-pair mode). |
+| `ALPACA_SECRET_KEY` | empty | Alpaca key-pair auth secret (legacy/auth-pair mode). |
 | `ALPACA_REST_URL` | `https://data.alpaca.markets` | Alpaca REST base URL for contract discovery/reference calls. |
 | `ALPACA_WS_BASE_URL` | `wss://stream.data.alpaca.markets/v1beta1` (options), `wss://stream.data.alpaca.markets` (equities) | Alpaca websocket base URL. |
 | `ALPACA_FEED` | `indicative` | Options feed tier for Alpaca options (`indicative` or `opra`). |
@@ -160,6 +161,8 @@ Synthetic profile intent:
 | `ALPACA_MONEYNESS_FALLBACK_PCT` | `0.1` | Wider fallback moneyness filter if candidate set is too sparse. |
 | `ALPACA_MAX_QUOTES` | `200` | Upper bound on selected Alpaca options contracts/quotes per cycle. |
 | `ALPACA_EQUITIES_FEED` | `iex` | Alpaca equities feed (`iex` free tier, `sip` paid consolidated feed). |
+
+For Alpaca adapters, configure either `ALPACA_API_KEY` or the `ALPACA_KEY_ID` + `ALPACA_SECRET_KEY` pair.
 
 ### Databento replay adapter configuration
 
