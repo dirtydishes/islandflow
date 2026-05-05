@@ -34,7 +34,9 @@ import type {
   OptionSecurityType,
   OptionType,
   OptionNBBO,
-  OptionPrint
+  OptionPrint,
+  SmartMoneyEvent,
+  SmartMoneyProfileId
 } from "@islandflow/types";
 import {
   getSubscriptionKey as getLiveSubscriptionKey,
@@ -239,6 +241,7 @@ type MessageType =
   | "equity-candle"
   | "equity-join"
   | "flow-packet"
+  | "smart-money"
   | "inferred-dark"
   | "classifier-hit"
   | "alert";
@@ -1006,6 +1009,7 @@ const LIVE_SNAPSHOT_HISTORY_CHANNELS = new Set<LiveSubscription["channel"]>([
   "nbbo",
   "equities",
   "flow",
+  "smart-money",
   "classifier-hits"
 ]);
 
@@ -1052,10 +1056,20 @@ const classifyNbboSide = (price: number, quote: OptionNBBO | null | undefined): 
 };
 
 type ClassifierDecor = {
-  hit: ClassifierHitEvent;
+  hit?: ClassifierHitEvent;
+  smartMoney?: SmartMoneyEvent;
   family: string;
   tone: string;
   intensity: number;
+};
+
+const SMART_MONEY_PROFILE_TONES: Record<SmartMoneyProfileId, string> = {
+  institutional_directional: "green",
+  retail_whale: "amber",
+  event_driven: "blue",
+  vol_seller: "copper",
+  arbitrage: "teal",
+  hedge_reactive: "magenta"
 };
 
 const CLASSIFIER_FAMILY_TONES: Record<string, string> = {
@@ -1095,12 +1109,30 @@ export const selectPrimaryClassifierHit = (
 export const classifierToneForFamily = (classifierId: string): string =>
   CLASSIFIER_FAMILY_TONES[classifierId] ?? "neutral";
 
+export const smartMoneyToneForProfile = (profileId: SmartMoneyProfileId | null): string =>
+  profileId ? SMART_MONEY_PROFILE_TONES[profileId] ?? "neutral" : "neutral";
+
+export const smartMoneyProfileLabel = (profileId: SmartMoneyProfileId | null): string =>
+  profileId ? humanizeClassifierId(profileId) : "Abstained";
+
 const buildClassifierDecor = (hit: ClassifierHitEvent): ClassifierDecor => ({
   hit,
   family: hit.classifier_id,
   tone: classifierToneForFamily(hit.classifier_id),
   intensity: clamp(hit.confidence, 0.25, 1)
 });
+
+const buildSmartMoneyDecor = (event: SmartMoneyEvent): ClassifierDecor => {
+  const primaryScore =
+    event.profile_scores.find((score) => score.profile_id === event.primary_profile_id) ??
+    event.profile_scores[0];
+  return {
+    smartMoney: event,
+    family: event.primary_profile_id ?? primaryScore?.profile_id ?? "abstained",
+    tone: event.abstained ? "neutral" : smartMoneyToneForProfile(event.primary_profile_id),
+    intensity: clamp(primaryScore?.probability ?? 0.25, 0.25, 1)
+  };
+};
 
 export const getOptionTableSnapshot = (
   print: Pick<
@@ -2230,6 +2262,7 @@ type LiveSessionState = {
   equityQuotes: EquityQuote[];
   equityJoins: EquityPrintJoin[];
   flow: FlowPacket[];
+  smartMoney: SmartMoneyEvent[];
   classifierHits: ClassifierHitEvent[];
   alerts: AlertEvent[];
   inferredDark: InferredDarkEvent[];
@@ -2249,6 +2282,7 @@ const LIVE_HISTORY_ENDPOINTS: Partial<Record<LiveSubscription["channel"], string
   "equity-quotes": "/history/equity-quotes",
   "equity-joins": "/history/equity-joins",
   flow: "/history/flow",
+  "smart-money": "/history/smart-money",
   "classifier-hits": "/history/classifier-hits",
   alerts: "/history/alerts",
   "inferred-dark": "/history/inferred-dark"
@@ -2318,6 +2352,7 @@ export const getLiveManifest = (
       { channel: "nbbo" },
       { channel: "equities", ...equityScope },
       { channel: "flow", filters: flowFilters },
+      { channel: "smart-money" },
       { channel: "classifier-hits" }
     ]);
   }
@@ -2327,6 +2362,7 @@ export const getLiveManifest = (
     { channel: "equities", ...equityScope },
     { channel: "flow", filters: flowFilters },
     { channel: "alerts" },
+    { channel: "smart-money" },
     { channel: "classifier-hits" },
     { channel: "inferred-dark" },
     ...chartSubs
@@ -2357,6 +2393,7 @@ const useLiveSession = (
   const [equityQuotes, setEquityQuotes] = useState<EquityQuote[]>([]);
   const [equityJoins, setEquityJoins] = useState<EquityPrintJoin[]>([]);
   const [flow, setFlow] = useState<FlowPacket[]>([]);
+  const [smartMoney, setSmartMoney] = useState<SmartMoneyEvent[]>([]);
   const [classifierHits, setClassifierHits] = useState<ClassifierHitEvent[]>([]);
   const [alerts, setAlerts] = useState<AlertEvent[]>([]);
   const [inferredDark, setInferredDark] = useState<InferredDarkEvent[]>([]);
@@ -2389,6 +2426,7 @@ const useLiveSession = (
       setEquityQuotes([]);
       setEquityJoins([]);
       setFlow([]);
+      setSmartMoney([]);
       setClassifierHits([]);
       setAlerts([]);
       setInferredDark([]);
@@ -2488,6 +2526,9 @@ const useLiveSession = (
           break;
         case "flow":
           mergeItems(setFlow, items as FlowPacket[]);
+          break;
+        case "smart-money":
+          mergeItems(setSmartMoney, items as SmartMoneyEvent[]);
           break;
         case "classifier-hits":
           mergeItems(setClassifierHits, items as ClassifierHitEvent[]);
@@ -2757,6 +2798,9 @@ const useLiveSession = (
           case "flow":
             mergeOlder(setFlow, LIVE_HOT_WINDOW);
             break;
+          case "smart-money":
+            mergeOlder(setSmartMoney, LIVE_HOT_WINDOW);
+            break;
           case "classifier-hits":
             mergeOlder(setClassifierHits, LIVE_HOT_WINDOW);
             break;
@@ -2801,6 +2845,7 @@ const useLiveSession = (
     equityQuotes,
     equityJoins,
     flow,
+    smartMoney,
     classifierHits,
     alerts,
     inferredDark,
@@ -2879,14 +2924,14 @@ type CandleChartProps = {
   replayTime?: number | null;
   liveCandles?: EquityCandle[];
   liveOverlayPrints?: EquityPrint[];
-  classifierHits: ClassifierHitEvent[];
+  smartMoneyEvents: SmartMoneyEvent[];
   inferredDark: InferredDarkEvent[];
-  onClassifierHitClick: (hit: ClassifierHitEvent) => void;
+  onSmartMoneyClick: (event: SmartMoneyEvent) => void;
   onInferredDarkClick: (event: InferredDarkEvent) => void;
 };
 
 type MarkerAction =
-  | { kind: "hit"; hit: ClassifierHitEvent }
+  | { kind: "smart-money"; event: SmartMoneyEvent }
   | { kind: "dark"; event: InferredDarkEvent };
 
 const CandleChart = ({
@@ -2896,9 +2941,9 @@ const CandleChart = ({
   replayTime = null,
   liveCandles = [],
   liveOverlayPrints = [],
-  classifierHits,
+  smartMoneyEvents,
   inferredDark,
-  onClassifierHitClick,
+  onSmartMoneyClick,
   onInferredDarkClick
 }: CandleChartProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -2912,7 +2957,7 @@ const CandleChart = ({
 
   const markerLookupRef = useRef<Map<string, MarkerAction>>(new Map());
   const [visibleRangeMs, setVisibleRangeMs] = useState<{ from: number; to: number } | null>(null);
-  const onHitClickRef = useRef(onClassifierHitClick);
+  const onSmartMoneyClickRef = useRef(onSmartMoneyClick);
   const onDarkClickRef = useRef(onInferredDarkClick);
 
   const overlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -2990,8 +3035,8 @@ const CandleChart = ({
   }, [drawOverlay, ticker, intervalMs, mode]);
 
   useEffect(() => {
-    onHitClickRef.current = onClassifierHitClick;
-  }, [onClassifierHitClick]);
+    onSmartMoneyClickRef.current = onSmartMoneyClick;
+  }, [onSmartMoneyClick]);
 
   useEffect(() => {
     onDarkClickRef.current = onInferredDarkClick;
@@ -3006,8 +3051,8 @@ const CandleChart = ({
     }
 
     const { from, to } = visibleRangeMs;
-    const inRangeHits = classifierHits
-      .filter((hit) => hit.source_ts >= from && hit.source_ts <= to)
+    const inRangeSmartMoney = smartMoneyEvents
+      .filter((event) => event.source_ts >= from && event.source_ts <= to)
       .sort((a, b) => {
         const delta = a.source_ts - b.source_ts;
         if (delta !== 0) {
@@ -3025,27 +3070,27 @@ const CandleChart = ({
         return a.seq - b.seq;
       });
 
-    const MAX_HIT_MARKERS = 220;
+    const MAX_SMART_MONEY_MARKERS = 220;
     const MAX_DARK_MARKERS = 120;
     const MAX_TOTAL_MARKERS = 320;
 
-    const cappedHits =
-      inRangeHits.length > MAX_HIT_MARKERS
-        ? inRangeHits.slice(inRangeHits.length - MAX_HIT_MARKERS)
-        : inRangeHits;
+    const cappedSmartMoney =
+      inRangeSmartMoney.length > MAX_SMART_MONEY_MARKERS
+        ? inRangeSmartMoney.slice(inRangeSmartMoney.length - MAX_SMART_MONEY_MARKERS)
+        : inRangeSmartMoney;
     const cappedDark =
       inRangeDark.length > MAX_DARK_MARKERS
         ? inRangeDark.slice(inRangeDark.length - MAX_DARK_MARKERS)
         : inRangeDark;
 
-    for (const hit of cappedHits) {
-      const direction = normalizeDirection(hit.direction);
-      const markerId = `hit:${hit.trace_id}:${hit.seq}`;
-      lookup.set(markerId, { kind: "hit", hit });
+    for (const event of cappedSmartMoney) {
+      const direction = normalizeDirection(event.primary_direction);
+      const markerId = `smart-money:${event.trace_id}:${event.seq}`;
+      lookup.set(markerId, { kind: "smart-money", event });
 
       markers.push({
         id: markerId,
-        time: toChartTime(hit.source_ts),
+        time: toChartTime(event.source_ts),
         position: direction === "bullish" ? "belowBar" : "aboveBar",
         color:
           direction === "bullish"
@@ -3059,7 +3104,11 @@ const CandleChart = ({
             : direction === "bearish"
               ? "arrowDown"
               : "circle",
-        text: hit.classifier_id ? hit.classifier_id.slice(0, 3).toUpperCase() : "H"
+        text: event.abstained
+          ? "ABS"
+          : event.primary_profile_id
+            ? event.primary_profile_id.slice(0, 3).toUpperCase()
+            : "SM"
       });
     }
 
@@ -3105,7 +3154,7 @@ const CandleChart = ({
     }
 
     return { markers: cappedMarkers, lookup };
-  }, [classifierHits, inferredDark, visibleRangeMs]);
+  }, [smartMoneyEvents, inferredDark, visibleRangeMs]);
 
   useEffect(() => {
     if (!seriesRef.current) {
@@ -3221,8 +3270,8 @@ const CandleChart = ({
       if (!action) {
         return;
       }
-      if (action.kind === "hit") {
-        onHitClickRef.current(action.hit);
+      if (action.kind === "smart-money") {
+        onSmartMoneyClickRef.current(action.event);
       } else {
         onDarkClickRef.current(action.event);
       }
@@ -3882,6 +3931,109 @@ const ClassifierHitDrawer = ({ hit, flowPacket, evidence, onClose }: ClassifierH
   );
 };
 
+type SmartMoneyDrawerProps = {
+  event: SmartMoneyEvent;
+  flowPacket: FlowPacket | null;
+  evidence: EvidenceItem[];
+  onClose: () => void;
+};
+
+const SmartMoneyDrawer = ({ event, flowPacket, evidence, onClose }: SmartMoneyDrawerProps) => {
+  const primaryScore =
+    event.profile_scores.find((score) => score.profile_id === event.primary_profile_id) ??
+    event.profile_scores[0];
+  const direction = normalizeDirection(event.primary_direction);
+  const evidencePrints = evidence.filter((item) => item.kind === "print");
+  const unknownCount = evidence.filter((item) => item.kind === "unknown").length;
+
+  return (
+    <aside className="drawer">
+      <div className="drawer-header">
+        <div>
+          <p className="drawer-eyebrow">Smart money profile</p>
+          <h3>{smartMoneyProfileLabel(event.primary_profile_id)}</h3>
+          <p className="drawer-subtitle">{formatDateTime(event.source_ts)}</p>
+        </div>
+        <button className="drawer-close" type="button" onClick={onClose}>
+          Close
+        </button>
+      </div>
+
+      <div className="drawer-meta">
+        <span className={`pill direction-${direction}`}>{direction}</span>
+        <span className="drawer-chip">
+          Probability {primaryScore ? formatConfidence(primaryScore.probability) : "--"}
+        </span>
+        {event.abstained ? <span className="drawer-chip">Abstained</span> : null}
+      </div>
+
+      <div className="drawer-section">
+        <h4>Profile ladder</h4>
+        <div className="drawer-list">
+          {event.profile_scores.slice(0, 6).map((score) => (
+            <div className="drawer-row" key={`${event.event_id}-${score.profile_id}`}>
+              <div className="drawer-row-title">{smartMoneyProfileLabel(score.profile_id)}</div>
+              <div className="drawer-row-meta">
+                <span className={`pill direction-${normalizeDirection(score.direction)}`}>
+                  {normalizeDirection(score.direction)}
+                </span>
+                <span>{formatConfidence(score.probability)}</span>
+                <span>{score.confidence_band}</span>
+              </div>
+              {score.reasons[0] ? <p className="drawer-note">{score.reasons[0]}</p> : null}
+            </div>
+          ))}
+        </div>
+        {event.suppressed_reasons.length > 0 ? (
+          <p className="drawer-empty">Suppressed: {event.suppressed_reasons.join(", ")}</p>
+        ) : null}
+      </div>
+
+      <div className="drawer-section">
+        <h4>Parent event</h4>
+        <div className="drawer-row">
+          <div className="drawer-row-title">{event.underlying_id}</div>
+          <div className="drawer-row-meta">
+            <span>{formatFlowMetric(event.features.print_count)} prints</span>
+            <span>{formatFlowMetric(event.features.total_size)} size</span>
+            <span>${formatCompactUsd(event.features.total_premium)}</span>
+          </div>
+          <p className="drawer-note">
+            Window {formatFlowMetric(event.event_window_ms, "ms")} · {event.event_kind}
+          </p>
+        </div>
+        {flowPacket ? (
+          <p className="drawer-note">Flow packet {flowPacket.id}</p>
+        ) : null}
+      </div>
+
+      <div className="drawer-section">
+        <h4>Evidence prints</h4>
+        {evidencePrints.length === 0 ? (
+          <p className="drawer-empty">No linked option prints in the live cache yet.</p>
+        ) : (
+          <div className="drawer-list">
+            {evidencePrints.slice(0, 6).map((item) => (
+              <div className="drawer-row" key={item.id}>
+                <div className="drawer-row-title">{item.print.option_contract_id}</div>
+                <div className="drawer-row-meta">
+                  <span>${formatPrice(item.print.price)}</span>
+                  <span>{formatSize(item.print.size)}x</span>
+                  <span>{item.print.exchange}</span>
+                </div>
+                <p className="drawer-note">{formatTime(item.print.ts)}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        {unknownCount > 0 ? (
+          <p className="drawer-empty">+{unknownCount} evidence prints not in cache.</p>
+        ) : null}
+      </div>
+    </aside>
+  );
+};
+
 type DarkDrawerProps = {
   event: InferredDarkEvent;
   evidence: DarkEvidenceItem[];
@@ -4009,6 +4161,7 @@ const useTerminalState = () => {
   const [selectedAlert, setSelectedAlert] = useState<AlertEvent | null>(null);
   const [selectedDarkEvent, setSelectedDarkEvent] = useState<InferredDarkEvent | null>(null);
   const [selectedClassifierHit, setSelectedClassifierHit] = useState<ClassifierHitEvent | null>(null);
+  const [selectedSmartMoneyEvent, setSelectedSmartMoneyEvent] = useState<SmartMoneyEvent | null>(null);
   const [selectedInstrument, setSelectedInstrument] = useState<SelectedInstrument>(null);
   const [filterInput, setFilterInput] = useState<string>("");
   const [flowFilters, setFlowFilters] = useState<OptionFlowFilters>(() => buildDefaultFlowFilters());
@@ -4078,13 +4231,14 @@ const useTerminalState = () => {
   }, [mode]);
 
   useEffect(() => {
-    if (!selectedAlert && !selectedClassifierHit && !selectedDarkEvent) {
+    if (!selectedAlert && !selectedClassifierHit && !selectedDarkEvent && !selectedSmartMoneyEvent) {
       return;
     }
 
     const dismissDrawers = () => {
       setSelectedAlert(null);
       setSelectedClassifierHit(null);
+      setSelectedSmartMoneyEvent(null);
       setSelectedDarkEvent(null);
     };
 
@@ -4108,7 +4262,7 @@ const useTerminalState = () => {
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [selectedAlert, selectedClassifierHit, selectedDarkEvent]);
+  }, [selectedAlert, selectedClassifierHit, selectedDarkEvent, selectedSmartMoneyEvent]);
 
   const optionsScroll = useListScroll();
   const equitiesScroll = useListScroll();
@@ -4250,6 +4404,19 @@ const useTerminalState = () => {
     onNewItems: classifierScroll.onNewItems,
     getReplayKey: disableReplayGrouping
   });
+  const smartMoney = useTape<SmartMoneyEvent>({
+    mode,
+    liveEnabled: false,
+    wsPath: "/ws/smart-money",
+    replayPath: "/replay/smart-money",
+    latestPath: "/flow/smart-money",
+    expectedType: "smart-money",
+    batchSize: mode === "replay" ? 120 : undefined,
+    pollMs: mode === "replay" ? 200 : undefined,
+    captureScroll: classifierAnchor.capture,
+    onNewItems: classifierScroll.onNewItems,
+    getReplayKey: disableReplayGrouping
+  });
 
   const liveOptions = usePausableTapeView<OptionPrint>({
     enabled: mode === "live",
@@ -4302,6 +4469,10 @@ const useTerminalState = () => {
     mode === "live"
       ? toStaticTapeState(liveSession.status, liveSession.classifierHits, liveSession.lastUpdate)
       : classifierHits;
+  const smartMoneyFeed =
+    mode === "live"
+      ? toStaticTapeState(liveSession.status, liveSession.smartMoney, liveSession.lastUpdate)
+      : smartMoney;
   const inferredDarkFeed =
     mode === "live"
       ? toStaticTapeState(liveSession.status, liveSession.inferredDark, liveSession.lastUpdate)
@@ -4329,7 +4500,7 @@ const useTerminalState = () => {
 
   useLayoutEffect(() => {
     classifierAnchor.apply();
-  }, [classifierHitsFeed.items, classifierAnchor.apply]);
+  }, [smartMoneyFeed.items, classifierHitsFeed.items, classifierAnchor.apply]);
 
   const nbboMap = useMemo(() => {
     const map = new Map<string, OptionNBBO>();
@@ -4595,6 +4766,7 @@ const useTerminalState = () => {
     }
     setSelectedDarkEvent(null);
     setSelectedClassifierHit(null);
+    setSelectedSmartMoneyEvent(null);
   }, [mode]);
 
   const extractPacketContract = useCallback((packet: FlowPacket): string => {
@@ -4634,6 +4806,19 @@ const useTerminalState = () => {
     return map;
   }, [classifierHitsFeed.items, extractPacketIdFromClassifierHitTrace]);
 
+  const smartMoneyByPacketId = useMemo(() => {
+    const map = new Map<string, SmartMoneyEvent>();
+    for (const event of smartMoneyFeed.items) {
+      for (const packetId of event.packet_ids) {
+        const existing = map.get(packetId);
+        if (!existing || event.source_ts > existing.source_ts || event.seq > existing.seq) {
+          map.set(packetId, event);
+        }
+      }
+    }
+    return map;
+  }, [smartMoneyFeed.items]);
+
   const packetIdByOptionTraceId = useMemo(() => {
     const map = new Map<string, string>();
     for (const packet of flowFeed.items) {
@@ -4647,13 +4832,18 @@ const useTerminalState = () => {
   const classifierDecorByOptionTraceId = useMemo(() => {
     const map = new Map<string, ClassifierDecor>();
     for (const [traceId, packetId] of packetIdByOptionTraceId) {
+      const smartMoneyEvent = smartMoneyByPacketId.get(packetId);
+      if (smartMoneyEvent) {
+        map.set(traceId, buildSmartMoneyDecor(smartMoneyEvent));
+        continue;
+      }
       const primary = selectPrimaryClassifierHit(classifierHitsByPacketId.get(packetId) ?? []);
       if (primary) {
         map.set(traceId, buildClassifierDecor(primary));
       }
     }
     return map;
-  }, [classifierHitsByPacketId, packetIdByOptionTraceId]);
+  }, [classifierHitsByPacketId, packetIdByOptionTraceId, smartMoneyByPacketId]);
 
   const selectedClassifierPacketId = useMemo(() => {
     if (!selectedClassifierHit) {
@@ -4720,6 +4910,90 @@ const useTerminalState = () => {
       return { kind: "unknown", id };
     });
   }, [resolvedFlowPacketMap, resolvedOptionPrintMap, selectedClassifierHit, selectedClassifierPacketId]);
+
+  const selectedSmartMoneyFlowPacket = useMemo(() => {
+    const packetId = selectedSmartMoneyEvent?.packet_ids[0];
+    return packetId ? resolvedFlowPacketMap.get(packetId) ?? null : null;
+  }, [resolvedFlowPacketMap, selectedSmartMoneyEvent]);
+
+  const selectedSmartMoneyEvidence = useMemo((): EvidenceItem[] => {
+    if (!selectedSmartMoneyEvent) {
+      return [];
+    }
+    return selectedSmartMoneyEvent.member_print_ids.map((id) => {
+      const print = resolvedOptionPrintMap.get(id);
+      if (print) {
+        return { kind: "print", id, print };
+      }
+      return { kind: "unknown", id };
+    });
+  }, [resolvedOptionPrintMap, selectedSmartMoneyEvent]);
+
+  useEffect(() => {
+    if (!selectedSmartMoneyEvent || mode !== "live") {
+      return;
+    }
+
+    const missingPacketIds = selectedSmartMoneyEvent.packet_ids.filter((id) => !resolvedFlowPacketMap.has(id));
+    if (missingPacketIds.length > 0) {
+      incrementRetentionMetric("pinnedFetchMisses", missingPacketIds.length);
+      void Promise.all(
+        missingPacketIds.map(async (packetId) => {
+          const response = await fetch(buildApiUrl(`/flow/packets/${encodeURIComponent(packetId)}`));
+          if (!response.ok) {
+            throw new Error(await readErrorDetail(response));
+          }
+          const payload = (await response.json()) as { data?: FlowPacket | null };
+          return payload.data ?? null;
+        })
+      )
+        .then((packets) => {
+          const next = new Map<string, FlowPacket>();
+          for (const packet of packets) {
+            if (packet) {
+              next.set(packet.id, packet);
+            }
+          }
+          if (next.size > 0) {
+            setPinnedFlowPacketMap((prev) => upsertPinnedEntries(prev, next, Date.now()));
+          }
+        })
+        .catch((error) => {
+          incrementRetentionMetric("pinnedFetchFailures", 1);
+          console.warn("Failed to fetch smart-money flow packets", error);
+        });
+    }
+
+    const missingPrintIds = selectedSmartMoneyEvent.member_print_ids.filter((id) => !resolvedOptionPrintMap.has(id));
+    if (missingPrintIds.length === 0) {
+      return;
+    }
+    incrementRetentionMetric("pinnedFetchMisses", missingPrintIds.length);
+    const url = new URL(buildApiUrl("/option-prints/by-trace"));
+    for (const traceId of missingPrintIds) {
+      url.searchParams.append("trace_id", traceId);
+    }
+    void fetch(url.toString())
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(await readErrorDetail(response));
+        }
+        return response.json();
+      })
+      .then((payload: { data?: OptionPrint[] }) => {
+        const next = new Map<string, OptionPrint>();
+        for (const item of payload.data ?? []) {
+          next.set(item.trace_id, item);
+        }
+        if (next.size > 0) {
+          setPinnedOptionPrintMap((prev) => upsertPinnedEntries(prev, next, Date.now()));
+        }
+      })
+      .catch((error) => {
+        incrementRetentionMetric("pinnedFetchFailures", 1);
+        console.warn("Failed to fetch smart-money option prints", error);
+      });
+  }, [mode, resolvedFlowPacketMap, resolvedOptionPrintMap, selectedSmartMoneyEvent]);
 
   const inferAlertUnderlying = useCallback(
     (alert: AlertEvent): string | null => {
@@ -4932,6 +5206,9 @@ const useTerminalState = () => {
     if (selectedClassifierPacketId) {
       keys.add(selectedClassifierPacketId);
     }
+    for (const packetId of selectedSmartMoneyEvent?.packet_ids ?? []) {
+      keys.add(packetId);
+    }
     for (const alert of visibleAlerts) {
       const packetId = alert.evidence_refs[0];
       if (packetId) {
@@ -4939,7 +5216,7 @@ const useTerminalState = () => {
       }
     }
     return keys;
-  }, [selectedAlert, selectedClassifierPacketId, visibleAlerts]);
+  }, [selectedAlert, selectedClassifierPacketId, selectedSmartMoneyEvent, visibleAlerts]);
 
   const activePinnedOptionKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -4953,11 +5230,14 @@ const useTerminalState = () => {
         keys.add(id);
       }
     }
+    for (const id of selectedSmartMoneyEvent?.member_print_ids ?? []) {
+      keys.add(id);
+    }
     for (const id of visibleAlertEvidenceRefs) {
       keys.add(id);
     }
     return keys;
-  }, [selectedAlert, selectedClassifierFlowPacket, visibleAlertEvidenceRefs]);
+  }, [selectedAlert, selectedClassifierFlowPacket, selectedSmartMoneyEvent, visibleAlertEvidenceRefs]);
 
   const activePinnedJoinKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -5009,10 +5289,17 @@ const useTerminalState = () => {
     });
   }, [classifierHitsFeed.items, extractUnderlyingFromTrace, matchesTicker, tickerSet]);
 
-  const chartClassifierHits = useMemo(() => {
+  const filteredSmartMoneyEvents = useMemo(() => {
+    if (tickerSet.size === 0) {
+      return smartMoneyFeed.items;
+    }
+    return smartMoneyFeed.items.filter((event) => matchesTicker(event.underlying_id));
+  }, [matchesTicker, smartMoneyFeed.items, tickerSet]);
+
+  const chartSmartMoneyEvents = useMemo(() => {
     const desired = chartTicker.toUpperCase();
-    return classifierHitsFeed.items
-      .filter((hit) => extractUnderlyingFromTrace(hit.trace_id) === desired)
+    return smartMoneyFeed.items
+      .filter((event) => event.underlying_id.toUpperCase() === desired)
       .sort((a, b) => {
         const delta = a.source_ts - b.source_ts;
         if (delta !== 0) {
@@ -5020,7 +5307,7 @@ const useTerminalState = () => {
         }
         return a.seq - b.seq;
       });
-  }, [chartTicker, classifierHitsFeed.items, extractUnderlyingFromTrace]);
+  }, [chartTicker, smartMoneyFeed.items]);
 
   const chartInferredDark = useMemo(() => {
     const desired = chartTicker.toUpperCase();
@@ -5058,27 +5345,37 @@ const useTerminalState = () => {
       if (alert) {
         setSelectedClassifierHit(null);
         setSelectedDarkEvent(null);
+        setSelectedSmartMoneyEvent(null);
         setSelectedAlert(alert);
         return;
       }
 
       setSelectedAlert(null);
       setSelectedDarkEvent(null);
+      setSelectedSmartMoneyEvent(null);
       setSelectedClassifierHit(hit);
     },
     [findAlertForClassifierHit]
   );
 
-  const handleClassifierMarkerClick = useCallback(
-    (hit: ClassifierHitEvent) => {
-      openFromClassifierHit(hit);
+  const openFromSmartMoneyEvent = useCallback((event: SmartMoneyEvent) => {
+    setSelectedAlert(null);
+    setSelectedClassifierHit(null);
+    setSelectedDarkEvent(null);
+    setSelectedSmartMoneyEvent(event);
+  }, []);
+
+  const handleSmartMoneyMarkerClick = useCallback(
+    (event: SmartMoneyEvent) => {
+      openFromSmartMoneyEvent(event);
     },
-    [openFromClassifierHit]
+    [openFromSmartMoneyEvent]
   );
 
   const handleDarkMarkerClick = useCallback((event: InferredDarkEvent) => {
     setSelectedAlert(null);
     setSelectedClassifierHit(null);
+    setSelectedSmartMoneyEvent(null);
     setSelectedDarkEvent(event);
   }, []);
 
@@ -5089,6 +5386,7 @@ const useTerminalState = () => {
       inferredDarkFeed.lastUpdate,
       flowFeed.lastUpdate,
       alertsFeed.lastUpdate,
+      smartMoneyFeed.lastUpdate,
       classifierHitsFeed.lastUpdate
     ]
       .filter((value): value is number => value !== null)
@@ -5099,6 +5397,7 @@ const useTerminalState = () => {
     inferredDarkFeed.lastUpdate,
     flowFeed.lastUpdate,
     alertsFeed.lastUpdate,
+    smartMoneyFeed.lastUpdate,
     classifierHitsFeed.lastUpdate
   ]);
 
@@ -5113,6 +5412,8 @@ const useTerminalState = () => {
     setSelectedDarkEvent,
     selectedClassifierHit,
     setSelectedClassifierHit,
+    selectedSmartMoneyEvent,
+    setSelectedSmartMoneyEvent,
     selectedInstrument,
     setSelectedInstrument,
     selectedInstrumentLabel,
@@ -5135,6 +5436,7 @@ const useTerminalState = () => {
     inferredDark: inferredDarkFeed,
     flow: flowFeed,
     alerts: alertsFeed,
+    smartMoney: smartMoneyFeed,
     classifierHits: classifierHitsFeed,
     liveSession,
     activeTickers,
@@ -5155,17 +5457,21 @@ const useTerminalState = () => {
     selectedClassifierPacketId,
     selectedClassifierFlowPacket,
     selectedClassifierEvidence,
+    selectedSmartMoneyFlowPacket,
+    selectedSmartMoneyEvidence,
     filteredOptions,
     filteredEquities,
     equitiesSilentWarning,
     filteredInferredDark,
     filteredFlow,
     filteredAlerts,
+    filteredSmartMoneyEvents,
     filteredClassifierHits,
-    chartClassifierHits,
+    chartSmartMoneyEvents,
     chartInferredDark,
+    openFromSmartMoneyEvent,
     openFromClassifierHit,
-    handleClassifierMarkerClick,
+    handleSmartMoneyMarkerClick,
     handleDarkMarkerClick,
     lastSeen,
     toggleMode: () => {
@@ -5618,11 +5924,21 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
                   type="button"
                   {...commonProps}
                   key={`${print.trace_id}-${print.seq}`}
-                  onClick={() => state.openFromClassifierHit(decor.hit)}
+                  onClick={() =>
+                    decor.smartMoney
+                      ? state.openFromSmartMoneyEvent(decor.smartMoney)
+                      : decor.hit
+                        ? state.openFromClassifierHit(decor.hit)
+                        : undefined
+                  }
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
-                      state.openFromClassifierHit(decor.hit);
+                      if (decor.smartMoney) {
+                        state.openFromSmartMoneyEvent(decor.smartMoney);
+                      } else if (decor.hit) {
+                        state.openFromClassifierHit(decor.hit);
+                      }
                     }
                   }}
                 >
@@ -5951,6 +6267,7 @@ const AlertsPane = ({ limit, withStrip = false, className }: AlertsPaneProps) =>
                 onClick={() => {
                   state.setSelectedDarkEvent(null);
                   state.setSelectedClassifierHit(null);
+                  state.setSelectedSmartMoneyEvent(null);
                   state.setSelectedAlert(alert);
                 }}
               >
@@ -5982,8 +6299,22 @@ type ClassifierPaneProps = {
 
 const ClassifierPane = ({ limit, className }: ClassifierPaneProps) => {
   const state = useTerminal();
-  const items = limit ? state.filteredClassifierHits.slice(0, limit) : state.filteredClassifierHits;
-  const virtual = useVirtualList(items, state.classifierScroll.listRef, !limit, 44);
+  const smartMoneyItems = limit ? state.filteredSmartMoneyEvents.slice(0, limit) : state.filteredSmartMoneyEvents;
+  const legacyItems =
+    smartMoneyItems.length === 0
+      ? limit
+        ? state.filteredClassifierHits.slice(0, limit)
+        : state.filteredClassifierHits
+      : [];
+  const items: Array<SmartMoneyEvent | ClassifierHitEvent> =
+    smartMoneyItems.length > 0 ? smartMoneyItems : legacyItems;
+  const virtual = useVirtualList<SmartMoneyEvent | ClassifierHitEvent>(
+    items,
+    state.classifierScroll.listRef,
+    !limit,
+    44
+  );
+  const showingSmartMoney = smartMoneyItems.length > 0;
 
   return (
     <Pane
@@ -5991,19 +6322,19 @@ const ClassifierPane = ({ limit, className }: ClassifierPaneProps) => {
       title="Rules"
       status={
         <TapeStatus
-          status={state.classifierHits.status}
-          lastUpdate={state.classifierHits.lastUpdate}
-          replayTime={state.classifierHits.replayTime}
-          replayComplete={state.classifierHits.replayComplete}
-          paused={state.classifierHits.paused}
-          dropped={state.classifierHits.dropped}
+          status={state.smartMoney.status}
+          lastUpdate={state.smartMoney.lastUpdate ?? state.classifierHits.lastUpdate}
+          replayTime={state.smartMoney.replayTime ?? state.classifierHits.replayTime}
+          replayComplete={state.smartMoney.replayComplete || state.classifierHits.replayComplete}
+          paused={state.smartMoney.paused}
+          dropped={state.smartMoney.dropped}
           mode={state.mode}
         />
       }
       actions={
         <TapeControls
-          paused={state.classifierHits.paused}
-          onTogglePause={state.classifierHits.togglePause}
+          paused={state.smartMoney.paused}
+          onTogglePause={state.smartMoney.togglePause}
           isAtTop={state.classifierScroll.isAtTop}
           missed={state.classifierScroll.missed}
           onJump={state.classifierScroll.jumpToTop}
@@ -6016,38 +6347,63 @@ const ClassifierPane = ({ limit, className }: ClassifierPaneProps) => {
             {state.tickerSet.size > 0
               ? "No classifier hits match the current filter."
               : state.mode === "live"
-                ? "No classifier hits yet. Start compute."
+                ? "No smart-money profiles yet. Start compute."
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
           <div className="data-table-wrap" ref={state.classifierScroll.setListRef}>
-            <div className="data-table data-table-classifier" role="table" aria-label="Classifier hits">
+            <div className="data-table data-table-classifier" role="table" aria-label="Smart money profiles">
               <div className="data-table-head" role="row">
                 <span className="data-table-cell">TIME</span>
-                <span className="data-table-cell">RULE</span>
+                <span className="data-table-cell">PROFILE</span>
                 <span className="data-table-cell">DIR</span>
-                <span className="data-table-cell">CONF</span>
+                <span className="data-table-cell">PROB</span>
                 <span className="data-table-cell">NOTE</span>
               </div>
             {virtual.topSpacerHeight > 0 ? (
               <div className="data-table-spacer" style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
             ) : null}
-            {virtual.visibleItems.map((hit) => {
-            const direction = normalizeDirection(hit.direction);
+            {showingSmartMoney ? (virtual.visibleItems as SmartMoneyEvent[]).map((event) => {
+            const primaryScore =
+              event.profile_scores.find((score) => score.profile_id === event.primary_profile_id) ??
+              event.profile_scores[0];
+            const direction = normalizeDirection(event.primary_direction);
             return (
               <button
                 className={`data-table-row data-table-row-button data-table-row-classifier data-table-row-direction-${direction}`}
-                key={`${hit.trace_id}-${hit.seq}`}
+                key={`${event.trace_id}-${event.seq}`}
                 type="button"
-                onClick={() => state.openFromClassifierHit(hit)}
+                onClick={() => state.openFromSmartMoneyEvent(event)}
               >
-                <span className="data-table-cell data-table-cell-number">{formatTime(hit.source_ts)}</span>
-                <span className="data-table-cell">{humanizeClassifierId(hit.classifier_id)}</span>
+                <span className="data-table-cell data-table-cell-number">{formatTime(event.source_ts)}</span>
+                <span className="data-table-cell">{smartMoneyProfileLabel(event.primary_profile_id)}</span>
                 <span className="data-table-cell">{direction}</span>
-                <span className="data-table-cell data-table-cell-number">{formatConfidence(hit.confidence)}</span>
-                <span className="data-table-cell">{hit.explanations?.[0] ?? "--"}</span>
+                <span className="data-table-cell data-table-cell-number">
+                  {primaryScore ? formatConfidence(primaryScore.probability) : "--"}
+                </span>
+                <span className="data-table-cell">
+                  {event.abstained
+                    ? event.suppressed_reasons[0] ?? "abstained"
+                    : primaryScore?.reasons[0] ?? primaryScore?.confidence_band ?? "--"}
+                </span>
               </button>
             );
+            }) : (virtual.visibleItems as ClassifierHitEvent[]).map((hit) => {
+              const direction = normalizeDirection(hit.direction);
+              return (
+                <button
+                  className={`data-table-row data-table-row-button data-table-row-classifier data-table-row-direction-${direction}`}
+                  key={`${hit.trace_id}-${hit.seq}`}
+                  type="button"
+                  onClick={() => state.openFromClassifierHit(hit)}
+                >
+                  <span className="data-table-cell data-table-cell-number">{formatTime(hit.source_ts)}</span>
+                  <span className="data-table-cell">{humanizeClassifierId(hit.classifier_id)}</span>
+                  <span className="data-table-cell">{direction}</span>
+                  <span className="data-table-cell data-table-cell-number">{formatConfidence(hit.confidence)}</span>
+                  <span className="data-table-cell">{hit.explanations?.[0] ?? "--"}</span>
+                </button>
+              );
             })}
             {virtual.bottomSpacerHeight > 0 ? (
               <div className="data-table-spacer" style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
@@ -6130,6 +6486,7 @@ const DarkPane = ({ limit, className }: DarkPaneProps) => {
                 onClick={() => {
                   state.setSelectedAlert(null);
                   state.setSelectedClassifierHit(null);
+                  state.setSelectedSmartMoneyEvent(null);
                   state.setSelectedDarkEvent(event);
                 }}
               >
@@ -6188,9 +6545,9 @@ const ChartPane = ({ title = "Chart" }: ChartPaneProps) => {
         replayTime={state.equities.replayTime}
         liveCandles={state.liveSession.chartCandles}
         liveOverlayPrints={state.liveSession.chartOverlay}
-        classifierHits={state.chartClassifierHits}
+        smartMoneyEvents={state.chartSmartMoneyEvents}
         inferredDark={state.chartInferredDark}
-        onClassifierHitClick={state.handleClassifierMarkerClick}
+        onSmartMoneyClick={state.handleSmartMoneyMarkerClick}
         onInferredDarkClick={state.handleDarkMarkerClick}
       />
     </Pane>
@@ -6199,7 +6556,7 @@ const ChartPane = ({ title = "Chart" }: ChartPaneProps) => {
 
 const FocusPane = () => {
   const state = useTerminal();
-  const hits = state.chartClassifierHits.slice(-10).reverse();
+  const hits = state.chartSmartMoneyEvents.slice(-10).reverse();
   const dark = state.chartInferredDark.slice(-10).reverse();
 
   return (
@@ -6220,13 +6577,13 @@ const FocusPane = () => {
                   className="row row-button"
                   key={`${hit.trace_id}-${hit.seq}`}
                   type="button"
-                  onClick={() => state.openFromClassifierHit(hit)}
+                  onClick={() => state.openFromSmartMoneyEvent(hit)}
                 >
                   <div>
-                    <div className="contract">{humanizeClassifierId(hit.classifier_id)}</div>
+                    <div className="contract">{smartMoneyProfileLabel(hit.primary_profile_id)}</div>
                     <div className="meta">
-                      <span className={`pill direction-${normalizeDirection(hit.direction)}`}>
-                        {normalizeDirection(hit.direction)}
+                      <span className={`pill direction-${normalizeDirection(hit.primary_direction)}`}>
+                        {normalizeDirection(hit.primary_direction)}
                       </span>
                       <span>{formatTime(hit.source_ts)}</span>
                     </div>
@@ -6393,6 +6750,15 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
             flowPacket={state.selectedClassifierFlowPacket}
             evidence={state.selectedClassifierEvidence}
             onClose={() => state.setSelectedClassifierHit(null)}
+          />
+        ) : null}
+
+        {state.selectedSmartMoneyEvent ? (
+          <SmartMoneyDrawer
+            event={state.selectedSmartMoneyEvent}
+            flowPacket={state.selectedSmartMoneyFlowPacket}
+            evidence={state.selectedSmartMoneyEvidence}
+            onClose={() => state.setSelectedSmartMoneyEvent(null)}
           />
         ) : null}
 

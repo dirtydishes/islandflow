@@ -46,7 +46,7 @@ Acceptance: scenario tests assert intended profile wins and wrong nearby profile
 - [x] Emit `SmartMoneyEvent` first in compute.
 - [x] Derive compatibility `ClassifierHitEvent` and `AlertEvent`.
 - [x] Add REST/history/replay/ws/live support for smart-money events.
-- [ ] Migrate terminal UI to profile-aware display.
+- [x] Migrate terminal UI to profile-aware display.
 
 Acceptance: old classifier and alert endpoints still work while `/flow/smart-money`, `/history/smart-money`, `/replay/smart-money`, and `/ws/smart-money` expose the new model.
 
