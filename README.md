@@ -239,6 +239,10 @@ Default `smart-money` policy rejects lower-information prints and keeps high-con
 | `CLASSIFIER_0DTE_MAX_ATM_PCT` | `0.01` | Max distance-from-ATM to qualify as near-ATM 0DTE event. |
 | `CLASSIFIER_0DTE_MIN_PREMIUM` | `20000` | Minimum premium for 0DTE classifier events. |
 | `CLASSIFIER_0DTE_MIN_SIZE` | `400` | Minimum size for 0DTE classifier events. |
+| `SMART_MONEY_EVENT_CALENDAR_PATH` | empty | Optional JSON event-calendar file used by compute to enrich event-driven smart-money profile features. |
+| `REFDATA_EVENT_CALENDAR_PATH` | empty | Optional JSON event-calendar file for refdata service startup validation; falls back to `SMART_MONEY_EVENT_CALENDAR_PATH` when unset. |
+
+Event-calendar rows may use `symbol`, `underlying`, or `underlying_id`; `event_date`, `event_time`, or `event_ts`; and `announced_ts`, `available_ts`, `as_of_ts`, or `created_ts`. Compute only uses events already available at the packet timestamp, so missing or unavailable rows leave event-alignment features as neutral `null` values.
 
 ### Candle service configuration
 
