@@ -19,6 +19,8 @@ import {
   shouldRetainLiveSnapshotHistory,
   shouldShowEquitiesSilentFeedWarning,
   selectPrimaryClassifierHit,
+  smartMoneyProfileLabel,
+  smartMoneyToneForProfile,
   statusLabel,
   toggleFilterValue
 } from "./terminal";
@@ -315,6 +317,15 @@ describe("classifier row decoration helpers", () => {
     ]);
 
     expect(hit?.classifier_id).toBe("new");
+  });
+});
+
+describe("smart-money profile helpers", () => {
+  it("labels and colors primary profiles", () => {
+    expect(smartMoneyProfileLabel("institutional_directional")).toBe("Institutional Directional");
+    expect(smartMoneyProfileLabel(null)).toBe("Abstained");
+    expect(smartMoneyToneForProfile("event_driven")).toBe("blue");
+    expect(smartMoneyToneForProfile(null)).toBe("neutral");
   });
 });
 

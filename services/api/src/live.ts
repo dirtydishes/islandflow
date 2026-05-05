@@ -9,6 +9,7 @@ import {
   fetchRecentFlowPackets,
   fetchRecentInferredDark,
   fetchRecentOptionNBBO,
+  fetchRecentSmartMoneyEvents,
   type ClickHouseClient
 } from "@islandflow/storage";
 import type { OptionPrintQueryFilters } from "@islandflow/storage";
@@ -30,6 +31,7 @@ import {
   matchesOptionPrintFilters,
   OptionNBBOSchema,
   OptionPrintSchema,
+  SmartMoneyEventSchema,
   type OptionFlowFilters,
   type Cursor,
   type EquityCandle,
@@ -51,6 +53,7 @@ const GENERIC_LIMIT_ENV_KEYS: Record<LiveGenericChannel, string> = {
   "equity-quotes": "LIVE_LIMIT_EQUITY_QUOTES",
   "equity-joins": "LIVE_LIMIT_EQUITY_JOINS",
   flow: "LIVE_LIMIT_FLOW",
+  "smart-money": "LIVE_LIMIT_SMART_MONEY",
   "classifier-hits": "LIVE_LIMIT_CLASSIFIER_HITS",
   alerts: "LIVE_LIMIT_ALERTS",
   "inferred-dark": "LIVE_LIMIT_INFERRED_DARK"
@@ -111,6 +114,7 @@ export const resolveGenericLiveLimits = (env: NodeJS.ProcessEnv = process.env): 
   "equity-quotes": parseGenericLimit(env, "equity-quotes", DEFAULT_GENERIC_LIMIT),
   "equity-joins": parseGenericLimit(env, "equity-joins", DEFAULT_GENERIC_LIMIT),
   flow: parseGenericLimit(env, "flow", DEFAULT_GENERIC_LIMIT),
+  "smart-money": parseGenericLimit(env, "smart-money", DEFAULT_GENERIC_LIMIT),
   "classifier-hits": parseGenericLimit(env, "classifier-hits", DEFAULT_GENERIC_LIMIT),
   alerts: parseGenericLimit(env, "alerts", DEFAULT_GENERIC_LIMIT),
   "inferred-dark": parseGenericLimit(env, "inferred-dark", DEFAULT_GENERIC_LIMIT)
@@ -184,6 +188,14 @@ const getGenericConfig = (limits: GenericLiveLimits): {
     parse: (value) => FlowPacketSchema.parse(value),
     cursor: (item) => ({ ts: item.source_ts, seq: item.seq }),
     fetchRecent: fetchRecentFlowPackets
+  },
+  "smart-money": {
+    redisKey: "live:smart-money",
+    cursorField: "smart-money",
+    limit: limits["smart-money"],
+    parse: (value) => SmartMoneyEventSchema.parse(value),
+    cursor: (item) => ({ ts: item.source_ts, seq: item.seq }),
+    fetchRecent: fetchRecentSmartMoneyEvents
   },
   "classifier-hits": {
     redisKey: "live:classifier-hits",

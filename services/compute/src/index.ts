@@ -1,6 +1,11 @@
 import { readEnv } from "@islandflow/config";
 import { createLogger } from "@islandflow/observability";
 import {
+  createEmptyEventCalendarProvider,
+  loadEventCalendarProviderFromFile,
+  type EventCalendarProvider
+} from "@islandflow/refdata/event-calendar";
+import {
   SUBJECT_ALERTS,
   SUBJECT_CLASSIFIER_HITS,
   SUBJECT_EQUITY_JOINS,
@@ -8,6 +13,7 @@ import {
   SUBJECT_EQUITY_QUOTES,
   SUBJECT_INFERRED_DARK,
   SUBJECT_FLOW_PACKETS,
+  SUBJECT_SMART_MONEY_EVENTS,
   SUBJECT_OPTION_NBBO,
   SUBJECT_OPTION_SIGNAL_PRINTS,
   STREAM_ALERTS,
@@ -17,6 +23,7 @@ import {
   STREAM_EQUITY_QUOTES,
   STREAM_INFERRED_DARK,
   STREAM_FLOW_PACKETS,
+  STREAM_SMART_MONEY_EVENTS,
   STREAM_OPTION_NBBO,
   STREAM_OPTION_SIGNAL_PRINTS,
   buildDurableConsumer,
@@ -32,11 +39,13 @@ import {
   ensureEquityPrintJoinsTable,
   ensureInferredDarkTable,
   ensureFlowPacketsTable,
+  ensureSmartMoneyEventsTable,
   insertAlert,
   insertClassifierHit,
   insertEquityPrintJoin,
   insertInferredDark,
-  insertFlowPacket
+  insertFlowPacket,
+  insertSmartMoneyEvent
 } from "@islandflow/storage";
 import {
   AlertEventSchema,
@@ -46,6 +55,7 @@ import {
   EquityQuoteSchema,
   InferredDarkEventSchema,
   FlowPacketSchema,
+  SmartMoneyEventSchema,
   OptionNBBOSchema,
   OptionPrintSchema,
   type AlertEvent,
@@ -55,11 +65,16 @@ import {
   type EquityPrintJoin,
   type InferredDarkEvent,
   type FlowPacket,
+  type SmartMoneyEvent,
   type OptionNBBO,
   type OptionPrint
 } from "@islandflow/types";
 import { z } from "zod";
-import { evaluateClassifiers, type ClassifierConfig } from "./classifiers";
+import type { ClassifierConfig } from "./classifiers";
+import {
+  buildSmartMoneyEventFromPacket,
+  deriveClassifierHitsFromSmartMoneyEvent
+} from "./parent-events";
 import { parseContractId } from "./contracts";
 import {
   createDarkInferenceState,
@@ -125,10 +140,12 @@ const envSchema = z.object({
   CLASSIFIER_MIN_AGGRESSOR_RATIO: z.coerce.number().min(0).max(1).default(0.55),
   CLASSIFIER_0DTE_MAX_ATM_PCT: z.coerce.number().min(0).max(1).default(0.01),
   CLASSIFIER_0DTE_MIN_PREMIUM: z.coerce.number().positive().default(20_000),
-  CLASSIFIER_0DTE_MIN_SIZE: z.coerce.number().int().positive().default(400)
+  CLASSIFIER_0DTE_MIN_SIZE: z.coerce.number().int().positive().default(400),
+  SMART_MONEY_EVENT_CALENDAR_PATH: z.string().optional()
 });
 
 const env = readEnv(envSchema);
+let eventCalendarProvider: EventCalendarProvider = createEmptyEventCalendarProvider();
 
 const classifierConfig: ClassifierConfig = {
   sweepMinPremium: env.CLASSIFIER_SWEEP_MIN_PREMIUM,
@@ -886,7 +903,32 @@ const emitClassifiers = async (
   js: Awaited<ReturnType<typeof connectJetStreamWithRetry>>["js"],
   packet: FlowPacket
 ): Promise<void> => {
-  const hits = evaluateClassifiers(packet, classifierConfig);
+  let smartMoneyEvent: SmartMoneyEvent;
+  try {
+    const underlyingId =
+      typeof packet.features.underlying_id === "string"
+        ? packet.features.underlying_id
+        : parseContractId(typeof packet.features.option_contract_id === "string" ? packet.features.option_contract_id : "")?.root;
+    const referenceTs =
+      typeof packet.features.end_ts === "number" && Number.isFinite(packet.features.end_ts)
+        ? packet.features.end_ts
+        : packet.source_ts;
+    const eventCalendarMatch = underlyingId ? eventCalendarProvider.findNextEvent(underlyingId, referenceTs) : null;
+    smartMoneyEvent = SmartMoneyEventSchema.parse(buildSmartMoneyEventFromPacket(packet, { eventCalendarMatch }));
+    await insertSmartMoneyEvent(clickhouse, smartMoneyEvent);
+    await publishJson(js, SUBJECT_SMART_MONEY_EVENTS, smartMoneyEvent);
+  } catch (error) {
+    if (isExpectedShutdownNatsError(error)) {
+      return;
+    }
+    logger.error("failed to emit smart money event", {
+      error: error instanceof Error ? error.message : String(error),
+      packet_id: packet.id
+    });
+    return;
+  }
+
+  const hits = deriveClassifierHitsFromSmartMoneyEvent(smartMoneyEvent);
   if (hits.length === 0) {
     return;
   }
@@ -922,7 +964,7 @@ const emitClassifiers = async (
     source_ts: packet.source_ts,
     ingest_ts: packet.ingest_ts,
     seq: packet.seq,
-    trace_id: `alert:${packet.id}`,
+    trace_id: `alert:${smartMoneyEvent.event_id}`,
     score,
     severity,
     hits: hitEvents.map((hit) => ({
@@ -931,7 +973,11 @@ const emitClassifiers = async (
       direction: hit.direction,
       explanations: hit.explanations
     })),
-    evidence_refs: [packet.id, ...packet.members]
+    evidence_refs: [smartMoneyEvent.event_id, packet.id, ...packet.members],
+    ...(smartMoneyEvent.primary_profile_id
+      ? { primary_profile_id: smartMoneyEvent.primary_profile_id }
+      : {}),
+    profile_scores: smartMoneyEvent.profile_scores
   });
 
   try {
@@ -1101,6 +1147,19 @@ const run = async () => {
   });
 
   await ensureStream(jsm, {
+    name: STREAM_SMART_MONEY_EVENTS,
+    subjects: [SUBJECT_SMART_MONEY_EVENTS],
+    retention: "limits",
+    storage: "file",
+    discard: "old",
+    max_msgs_per_subject: -1,
+    max_msgs: -1,
+    max_bytes: -1,
+    max_age: 0,
+    num_replicas: 1
+  });
+
+  await ensureStream(jsm, {
     name: STREAM_EQUITY_JOINS,
     subjects: [SUBJECT_EQUITY_JOINS],
     retention: "limits",
@@ -1157,6 +1216,19 @@ const run = async () => {
     database: env.CLICKHOUSE_DATABASE
   });
 
+  if (env.SMART_MONEY_EVENT_CALENDAR_PATH) {
+    try {
+      eventCalendarProvider = await loadEventCalendarProviderFromFile(env.SMART_MONEY_EVENT_CALENDAR_PATH);
+      logger.info("smart money event calendar loaded", { path: env.SMART_MONEY_EVENT_CALENDAR_PATH });
+    } catch (error) {
+      eventCalendarProvider = createEmptyEventCalendarProvider();
+      logger.warn("smart money event calendar unavailable; scoring will use neutral event features", {
+        path: env.SMART_MONEY_EVENT_CALENDAR_PATH,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
   const redis = createRedisClient(env.REDIS_URL);
   redis.on("error", (error) => {
     logger.warn("redis client error", { error: error instanceof Error ? error.message : String(error) });
@@ -1173,6 +1245,7 @@ const run = async () => {
 
   await retry("clickhouse table init", 120, 500, async () => {
     await ensureFlowPacketsTable(clickhouse);
+    await ensureSmartMoneyEventsTable(clickhouse);
     await ensureEquityPrintJoinsTable(clickhouse);
     await ensureInferredDarkTable(clickhouse);
     await ensureClassifierHitsTable(clickhouse);

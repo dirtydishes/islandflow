@@ -6,8 +6,7 @@ import WebSocket from "ws";
 export type AlpacaEquitiesFeed = "iex" | "sip";
 
 export type AlpacaEquitiesAdapterConfig = {
-  keyId: string;
-  secretKey: string;
+  apiKey: string;
   restUrl: string;
   wsBaseUrl: string;
   feed: AlpacaEquitiesFeed;
@@ -63,10 +62,11 @@ const normalizeSymbols = (symbols: string[]): string[] => {
   return result;
 };
 
-const buildHeaders = (config: AlpacaEquitiesAdapterConfig): Record<string, string> => ({
-  "APCA-API-KEY-ID": config.keyId,
-  "APCA-API-SECRET-KEY": config.secretKey
-});
+const buildHeaders = (config: AlpacaEquitiesAdapterConfig): Record<string, string> => {
+  return {
+    Authorization: `Bearer ${config.apiKey}`
+  };
+};
 
 const parseTimestamp = (value: string): number => {
   const parsed = Date.parse(value);
@@ -184,8 +184,8 @@ export const createAlpacaEquitiesAdapter = (
   return {
     name: "alpaca",
     start: async (handlers: EquityIngestHandlers) => {
-      if (!config.keyId || !config.secretKey) {
-        throw new Error("Alpaca equities adapter requires ALPACA_KEY_ID and ALPACA_SECRET_KEY.");
+      if (!config.apiKey) {
+        throw new Error("Alpaca equities adapter requires ALPACA_API_KEY.");
       }
 
       const symbols = normalizeSymbols(config.symbols);
@@ -195,7 +195,9 @@ export const createAlpacaEquitiesAdapter = (
 
       const exchangeNameMap = await fetchExchangeMeta(config);
       const wsUrl = buildWsUrl(config.wsBaseUrl, config.feed);
-      const ws = new WebSocket(wsUrl);
+      const ws = new WebSocket(wsUrl, {
+        headers: buildHeaders(config)
+      });
 
       let seq = 0;
       let stopped = false;
@@ -205,8 +207,8 @@ export const createAlpacaEquitiesAdapter = (
         ws.send(
           JSON.stringify({
             action: "auth",
-            key: config.keyId,
-            secret: config.secretKey
+            key: config.apiKey,
+            secret: ""
           })
         );
       });

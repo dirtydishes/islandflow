@@ -148,8 +148,7 @@ Synthetic profile intent:
 
 | Variable | Default | What it controls |
 | --- | --- | --- |
-| `ALPACA_KEY_ID` | empty | Alpaca API key for options/equities adapters. Required when `*_INGEST_ADAPTER=alpaca`. |
-| `ALPACA_SECRET_KEY` | empty | Alpaca API secret for options/equities adapters. Required when `*_INGEST_ADAPTER=alpaca`. |
+| `ALPACA_API_KEY` | empty | Single-token Alpaca API auth for options/equities adapters. Use this when your account provides one API key value. |
 | `ALPACA_REST_URL` | `https://data.alpaca.markets` | Alpaca REST base URL for contract discovery/reference calls. |
 | `ALPACA_WS_BASE_URL` | `wss://stream.data.alpaca.markets/v1beta1` (options), `wss://stream.data.alpaca.markets` (equities) | Alpaca websocket base URL. |
 | `ALPACA_FEED` | `indicative` | Options feed tier for Alpaca options (`indicative` or `opra`). |
@@ -160,6 +159,8 @@ Synthetic profile intent:
 | `ALPACA_MONEYNESS_FALLBACK_PCT` | `0.1` | Wider fallback moneyness filter if candidate set is too sparse. |
 | `ALPACA_MAX_QUOTES` | `200` | Upper bound on selected Alpaca options contracts/quotes per cycle. |
 | `ALPACA_EQUITIES_FEED` | `iex` | Alpaca equities feed (`iex` free tier, `sip` paid consolidated feed). |
+
+For Alpaca adapters, configure `ALPACA_API_KEY`.
 
 ### Databento replay adapter configuration
 
@@ -239,6 +240,15 @@ Default `smart-money` policy rejects lower-information prints and keeps high-con
 | `CLASSIFIER_0DTE_MAX_ATM_PCT` | `0.01` | Max distance-from-ATM to qualify as near-ATM 0DTE event. |
 | `CLASSIFIER_0DTE_MIN_PREMIUM` | `20000` | Minimum premium for 0DTE classifier events. |
 | `CLASSIFIER_0DTE_MIN_SIZE` | `400` | Minimum size for 0DTE classifier events. |
+| `SMART_MONEY_EVENT_CALENDAR_PATH` | empty | Optional JSON event-calendar file used by compute to enrich event-driven smart-money profile features. |
+| `REFDATA_EVENT_CALENDAR_PATH` | empty | Optional JSON event-calendar file for refdata service startup validation; falls back to `SMART_MONEY_EVENT_CALENDAR_PATH` when unset. |
+| `REFDATA_EVENT_CALENDAR_PROVIDER` | empty | Set to `alpha_vantage` to have refdata refresh the calendar cache from Alpha Vantage. |
+| `ALPHA_VANTAGE_API_KEY` | empty | Alpha Vantage key used when `REFDATA_EVENT_CALENDAR_PROVIDER=alpha_vantage`. |
+| `ALPHA_VANTAGE_EARNINGS_HORIZON` | `3month` | Alpha Vantage earnings horizon: `3month`, `6month`, or `12month`. |
+| `ALPHA_VANTAGE_EARNINGS_SYMBOL` | empty | Optional single-symbol Alpha Vantage earnings query; empty fetches the full scheduled earnings list. |
+| `REFDATA_EVENT_CALENDAR_REFRESH_MS` | `86400000` | Refdata refresh cadence for provider-backed event-calendar cache writes. |
+
+Event-calendar rows may use `symbol`, `underlying`, or `underlying_id`; `event_date`, `event_time`, or `event_ts`; and `announced_ts`, `available_ts`, `as_of_ts`, or `created_ts`. Compute only uses events already available at the packet timestamp, so missing or unavailable rows leave event-alignment features as neutral `null` values.
 
 ### Candle service configuration
 
