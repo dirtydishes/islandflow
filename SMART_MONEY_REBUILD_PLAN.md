@@ -52,8 +52,8 @@ Acceptance: old classifier and alert endpoints still work while `/flow/smart-mon
 
 ### Phase 7: Evaluation and Replay
 - [x] Add deterministic unit tests for parent-event scoring and storage.
-- [ ] Add replay-style live-vs-batch consistency tests.
-- [ ] Add evaluation utilities for calibration, abstention rate, and economic sanity checks.
+- [x] Add replay-style live-vs-batch consistency tests.
+- [x] Add evaluation utilities for calibration, abstention rate, and economic sanity checks.
 
 ## Migration Notes
 
