@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { createStaticEventCalendarProvider, parseEventCalendarEntries } from "../src/event-calendar";
+import {
+  createStaticEventCalendarProvider,
+  parseAlphaVantageEarningsCalendar,
+  parseEventCalendarEntries
+} from "../src/event-calendar";
 
 describe("event calendar refdata", () => {
   it("parses provider rows and filters by timestamp availability", () => {
@@ -27,5 +31,25 @@ describe("event calendar refdata", () => {
     expect(afterAnnouncement?.event_kind).toBe("earnings");
     expect(afterAnnouncement?.underlying_id).toBe("AAPL");
     expect(afterAnnouncement?.days_to_event).toBeGreaterThan(0);
+  });
+
+  it("normalizes Alpha Vantage earnings CSV rows", () => {
+    const entries = parseAlphaVantageEarningsCalendar(
+      [
+        "symbol,name,reportDate,fiscalDateEnding,estimate,currency",
+        "aapl,Apple Inc,2025-01-31,2024-12-31,2.11,USD",
+        "MSFT,Microsoft Corp,2025-02-05,2024-12-31,3.04,USD"
+      ].join("\n"),
+      Date.parse("2025-01-15T12:00:00Z")
+    );
+
+    expect(entries).toHaveLength(2);
+    expect(entries[0]).toMatchObject({
+      underlying_id: "AAPL",
+      event_kind: "earnings",
+      announced_ts: Date.parse("2025-01-15T12:00:00Z"),
+      source: "alpha_vantage",
+      source_event_id: "AAPL:2025-01-31:earnings"
+    });
   });
 });

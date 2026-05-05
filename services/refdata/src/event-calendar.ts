@@ -1,3 +1,5 @@
+import { mkdir } from "node:fs/promises";
+
 export type EventCalendarKind = "earnings" | "dividend" | "corporate_action" | "m_and_a" | "news" | "other";
 
 export type EventCalendarEntry = {
@@ -17,7 +19,16 @@ export type EventCalendarProvider = {
   findNextEvent(underlyingId: string, asOfTs: number): EventCalendarMatch | null;
 };
 
+export type AlphaVantageEarningsCalendarOptions = {
+  apiKey: string;
+  horizon?: "3month" | "6month" | "12month";
+  symbol?: string;
+  nowTs?: number;
+  fetchFn?: typeof fetch;
+};
+
 const MS_PER_DAY = 86_400_000;
+const ALPHA_VANTAGE_URL = "https://www.alphavantage.co/query";
 
 const EVENT_KINDS = new Set<EventCalendarKind>([
   "earnings",
@@ -46,6 +57,77 @@ const asNumber = (value: unknown): number | null => {
 };
 
 const asString = (value: unknown): string | null => (typeof value === "string" && value.trim() ? value.trim() : null);
+
+const parseCsvLine = (line: string): string[] => {
+  const values: string[] = [];
+  let current = "";
+  let quoted = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    const next = line[index + 1];
+    if (char === '"' && quoted && next === '"') {
+      current += '"';
+      index += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === "," && !quoted) {
+      values.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+
+  values.push(current);
+  return values.map((value) => value.trim());
+};
+
+const parseCsv = (csv: string): Record<string, string>[] => {
+  const lines = csv
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const [headerLine, ...dataLines] = lines;
+  if (!headerLine) {
+    return [];
+  }
+
+  const headers = parseCsvLine(headerLine);
+  return dataLines.map((line) => {
+    const values = parseCsvLine(line);
+    return Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""]));
+  });
+};
+
+export const parseAlphaVantageEarningsCalendar = (
+  csv: string,
+  announcedTs: number = Date.now()
+): EventCalendarEntry[] => {
+  return parseCsv(csv).flatMap((row): EventCalendarEntry[] => {
+    const symbol = asString(row.symbol);
+    const reportDate = asString(row.reportDate);
+    if (!symbol || !reportDate) {
+      return [];
+    }
+
+    const eventTs = Date.parse(`${reportDate}T21:00:00Z`);
+    if (!Number.isFinite(eventTs)) {
+      return [];
+    }
+
+    return [
+      {
+        underlying_id: normalizeUnderlying(symbol),
+        event_ts: eventTs,
+        event_kind: "earnings",
+        announced_ts: Math.trunc(announcedTs),
+        source: "alpha_vantage",
+        source_event_id: `${normalizeUnderlying(symbol)}:${reportDate}:earnings`
+      }
+    ];
+  });
+};
 
 export const parseEventCalendarEntries = (value: unknown): EventCalendarEntry[] => {
   const rows = Array.isArray(value) ? value : [];
@@ -113,4 +195,37 @@ export const createEmptyEventCalendarProvider = (): EventCalendarProvider => cre
 export const loadEventCalendarProviderFromFile = async (path: string): Promise<EventCalendarProvider> => {
   const text = await Bun.file(path).text();
   return createStaticEventCalendarProvider(parseEventCalendarEntries(JSON.parse(text)));
+};
+
+export const fetchAlphaVantageEarningsCalendar = async (
+  options: AlphaVantageEarningsCalendarOptions
+): Promise<EventCalendarEntry[]> => {
+  const horizon = options.horizon ?? "3month";
+  const url = new URL(ALPHA_VANTAGE_URL);
+  url.searchParams.set("function", "EARNINGS_CALENDAR");
+  url.searchParams.set("horizon", horizon);
+  url.searchParams.set("apikey", options.apiKey);
+  if (options.symbol) {
+    url.searchParams.set("symbol", normalizeUnderlying(options.symbol));
+  }
+
+  const response = await (options.fetchFn ?? fetch)(url);
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(`Alpha Vantage earnings calendar request failed: ${response.status} ${text.slice(0, 160)}`);
+  }
+  if (/^(?:\s*\{|\s*Thank you for using Alpha Vantage)/i.test(text)) {
+    throw new Error(`Alpha Vantage returned a non-calendar response: ${text.slice(0, 200)}`);
+  }
+
+  return parseAlphaVantageEarningsCalendar(text, options.nowTs ?? Date.now());
+};
+
+export const writeEventCalendarEntries = async (path: string, entries: EventCalendarEntry[]): Promise<void> => {
+  const directory = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
+  if (directory) {
+    await mkdir(directory, { recursive: true });
+  }
+  const file = Bun.file(path);
+  await Bun.write(file, `${JSON.stringify(entries, null, 2)}\n`);
 };
