@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   createContext,
@@ -7000,13 +7001,13 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
             {NAV_ITEMS.map((item) => {
               const active = pathname === item.href;
               return (
-                <a
+                <Link
                   className={`terminal-nav-link${active ? " terminal-nav-link-active" : ""}`}
                   href={item.href}
                   key={item.href}
                 >
                   {item.label}
-                </a>
+                </Link>
               );
             })}
           </nav>
