@@ -112,7 +112,7 @@ import {
 } from "@islandflow/types";
 import { createClient } from "redis";
 import { z } from "zod";
-import { LiveStateManager, shouldFanoutLiveEvent } from "./live";
+import { HOT_LIVE_REDIS_KEYS, LiveStateManager, shouldFanoutLiveEvent } from "./live";
 
 const service = "api";
 const logger = createLogger({ service });
@@ -137,13 +137,6 @@ const state = {
   shuttingDown: false,
   shutdownPromise: null as Promise<void> | null
 };
-
-const HOT_LIVE_REDIS_KEYS = {
-  options: "live:options",
-  equities: "live:equities",
-  flow: "live:flow",
-  nbbo: "live:nbbo"
-} as const;
 
 const getErrorMessage = (error: unknown): string => {
   return error instanceof Error ? error.message : String(error);
@@ -908,6 +901,7 @@ const run = async () => {
   };
   const liveStateMetricsTimer = setInterval(() => {
     const snapshot = liveState.getStatsSnapshot();
+    const hotFeedHealth = liveState.getHotChannelHealth();
     const hotFeedLagMs = {
       options: snapshot.freshnessAgeMsByKey[HOT_LIVE_REDIS_KEYS.options] ?? null,
       equities: snapshot.freshnessAgeMsByKey[HOT_LIVE_REDIS_KEYS.equities] ?? null,
@@ -916,7 +910,12 @@ const run = async () => {
     };
     logger.info("live cache metrics", {
       ...snapshot,
-      hotFeedLagMs
+      hotFeedLagMs,
+      hotFeedHealth,
+      snapshotSourceCounts: {
+        generic_cache_snapshot: snapshot.genericCacheSnapshots,
+        scoped_clickhouse_snapshot: snapshot.scopedClickHouseSnapshots
+      }
     });
     warnLiveLag("options", hotFeedLagMs.options);
     warnLiveLag("equities", hotFeedLagMs.equities);
@@ -1892,9 +1891,13 @@ const run = async () => {
     websocket: {
       open: (socket: any) => {
         if (socket.data.channel === "live") {
-          sendLiveMessage(socket, { op: "ready" });
+          sendLiveMessage(socket, { op: "ready", channel_health: liveState.getHotChannelHealth() });
           const heartbeat = setInterval(() => {
-            sendLiveMessage(socket, { op: "heartbeat", ts: Date.now() });
+            sendLiveMessage(socket, {
+              op: "heartbeat",
+              ts: Date.now(),
+              channel_health: liveState.getHotChannelHealth()
+            });
           }, 15000);
           liveHeartbeats.set(socket, heartbeat);
         } else if (socket.data.channel === "options") {
@@ -1935,7 +1938,11 @@ const run = async () => {
               : new TextDecoder().decode(message instanceof Uint8Array ? message : new Uint8Array(message));
           const parsed = LiveClientMessageSchema.parse(JSON.parse(payload));
           if (parsed.op === "ping") {
-            sendLiveMessage(socket, { op: "heartbeat", ts: Date.now() });
+            sendLiveMessage(socket, {
+              op: "heartbeat",
+              ts: Date.now(),
+              channel_health: liveState.getHotChannelHealth()
+            });
             return;
           }
 

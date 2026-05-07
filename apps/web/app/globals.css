@@ -967,6 +967,11 @@ h3 {
   min-width: 980px;
 }
 
+.data-table-body {
+  position: relative;
+  min-width: 100%;
+}
+
 .data-table-options {
   min-width: 1280px;
 }
@@ -1024,8 +1029,14 @@ h3 {
   text-align: left;
 }
 
-.data-table-row:nth-child(even) {
+.data-table-row.is-even {
   background: rgba(255, 255, 255, 0.022);
+}
+
+.data-table-virtual-row {
+  position: absolute;
+  left: 0;
+  width: 100%;
 }
 
 .data-table-row:hover,

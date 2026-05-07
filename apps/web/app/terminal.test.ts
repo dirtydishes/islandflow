@@ -5,12 +5,15 @@ import {
   appendHistoryTail,
   buildDefaultFlowFilters,
   classifierToneForFamily,
+  composeTapeItems,
   deriveAlertDirection,
   countActiveFlowFilterGroups,
+  findAnchorRestoreIndex,
   formatCompactUsd,
   formatOptionContractLabel,
   flushPausableTapeData,
   getAlertWindowAnchorTs,
+  getHotChannelFeedStatus,
   getScopedLiveAutoHydrationChannels,
   getLiveHistoryRetentionCap,
   getOptionTableSnapshot,
@@ -246,6 +249,37 @@ describe("live tape pausable helpers", () => {
 });
 
 describe("live tape history helpers", () => {
+  it("composes tape items across seed, live, and history without seam duplicates", () => {
+    const seed = [makeItem("seed", 1, 100), makeItem("dup", 2, 200)];
+    const live = [makeItem("live", 5, 500), makeItem("dup", 2, 200)];
+    const history = [makeItem("old", 0, 50), makeItem("mid", 3, 300)];
+
+    expect(composeTapeItems(seed, live, history).map((item) => item.trace_id)).toEqual([
+      "live",
+      "mid",
+      "dup",
+      "seed",
+      "old"
+    ]);
+  });
+
+  it("keeps a clicked seed row visible before scoped live and history arrive", () => {
+    const clicked = makeItem("clicked", 3, 300);
+
+    expect(composeTapeItems([clicked], [], []).map((item) => item.trace_id)).toEqual(["clicked"]);
+  });
+
+  it("drops focus seed duplicates once equivalent live or history rows arrive", () => {
+    const clicked = makeItem("clicked", 3, 300);
+    const live = [makeItem("new", 4, 400)];
+    const history = [makeItem("clicked", 3, 300)];
+
+    expect(composeTapeItems([clicked], live, history).map((item) => item.trace_id)).toEqual([
+      "new",
+      "clicked"
+    ]);
+  });
+
   it("promotes hot-window overflow into the history tail", () => {
     const currentHot = [makeItem("hot-3", 3, 300), makeItem("hot-2", 2, 200), makeItem("hot-1", 1, 100)];
     const incoming = [makeItem("hot-4", 4, 400)];
@@ -361,6 +395,21 @@ describe("live tape history helpers", () => {
         [getLiveSubscriptionKey(manifest.find((subscription) => subscription.channel === "equities")!)]: null
       }, {})
     ).toEqual(["options"]);
+  });
+
+  it("restores the same anchor key after live insertions at the top", () => {
+    const nextKeys = ["new-1", "new-2", "anchor", "after-1", "after-2"];
+    expect(findAnchorRestoreIndex(nextKeys, "anchor", ["anchor", "after-1", "after-2"])).toBe(2);
+  });
+
+  it("falls forward to the nearest surviving key when the anchor is evicted", () => {
+    const nextKeys = ["new-1", "after-1", "after-2"];
+    expect(findAnchorRestoreIndex(nextKeys, "anchor", ["anchor", "after-1", "after-2"])).toBe(1);
+  });
+
+  it("keeps the same anchor when history is appended at the bottom", () => {
+    const nextKeys = ["anchor", "after-1", "after-2", "older-1", "older-2"];
+    expect(findAnchorRestoreIndex(nextKeys, "anchor", ["anchor", "after-1", "after-2"])).toBe(0);
   });
 });
 
@@ -532,5 +581,14 @@ describe("signals helpers", () => {
   it("returns connected/stale live status labels without live wording", () => {
     expect(statusLabel("connected", false, "live")).toBe("Connected");
     expect(statusLabel("stale", false, "live")).toBe("Feed behind");
+  });
+
+  it("treats healthy scoped channels as connected even when no matching rows are visible", () => {
+    expect(getHotChannelFeedStatus("connected", { healthy: true })).toBe("connected");
+  });
+
+  it("surfaces feed behind only when the backend channel health is stale", () => {
+    expect(getHotChannelFeedStatus("connected", { healthy: false })).toBe("stale");
+    expect(getHotChannelFeedStatus("disconnected", { healthy: true })).toBe("disconnected");
   });
 });

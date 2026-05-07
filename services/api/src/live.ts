@@ -25,7 +25,10 @@ import {
   FeedSnapshot,
   FlowPacketSchema,
   InferredDarkEventSchema,
+  LiveChannelHealth,
   LiveGenericChannel,
+  LiveHotChannel,
+  LiveHotChannelHealthMap,
   LiveSubscription,
   matchesFlowPacketFilters,
   matchesOptionPrintFilters,
@@ -80,6 +83,13 @@ export const LIVE_FRESHNESS_THRESHOLDS: Partial<Record<LiveGenericChannel, numbe
   "equity-quotes": 15_000,
   flow: 30_000
 };
+
+export const HOT_LIVE_REDIS_KEYS = {
+  options: "live:options",
+  equities: "live:equities",
+  flow: "live:flow",
+  nbbo: "live:nbbo"
+} as const satisfies Record<LiveHotChannel, string>;
 
 export type GenericLiveLimits = Record<LiveGenericChannel, number>;
 
@@ -357,6 +367,8 @@ export class LiveStateManager {
   private readonly stats = {
     genericHydrateFromRedis: 0,
     genericHydrateFromClickHouse: 0,
+    genericCacheSnapshots: 0,
+    scopedClickHouseSnapshots: 0,
     trimOperations: 0,
     cacheDepthByKey: new Map<string, number>(),
     freshnessAgeMsByKey: new Map<string, number>()
@@ -373,6 +385,8 @@ export class LiveStateManager {
   getStatsSnapshot(): {
     genericHydrateFromRedis: number;
     genericHydrateFromClickHouse: number;
+    genericCacheSnapshots: number;
+    scopedClickHouseSnapshots: number;
     trimOperations: number;
     cacheDepthByKey: Record<string, number>;
     freshnessAgeMsByKey: Record<string, number>;
@@ -380,9 +394,34 @@ export class LiveStateManager {
     return {
       genericHydrateFromRedis: this.stats.genericHydrateFromRedis,
       genericHydrateFromClickHouse: this.stats.genericHydrateFromClickHouse,
+      genericCacheSnapshots: this.stats.genericCacheSnapshots,
+      scopedClickHouseSnapshots: this.stats.scopedClickHouseSnapshots,
       trimOperations: this.stats.trimOperations,
       cacheDepthByKey: Object.fromEntries(this.stats.cacheDepthByKey),
       freshnessAgeMsByKey: Object.fromEntries(this.stats.freshnessAgeMsByKey)
+    };
+  }
+
+  getHotChannelHealth(): LiveHotChannelHealthMap {
+    return {
+      options: this.getChannelHealth("options"),
+      nbbo: this.getChannelHealth("nbbo"),
+      equities: this.getChannelHealth("equities"),
+      flow: this.getChannelHealth("flow")
+    };
+  }
+
+  private getChannelHealth(channel: LiveHotChannel): LiveChannelHealth {
+    const listKey = HOT_LIVE_REDIS_KEYS[channel];
+    const thresholdMs = LIVE_FRESHNESS_THRESHOLDS[channel];
+    const freshnessAgeMs = this.stats.freshnessAgeMsByKey.get(listKey) ?? null;
+    return {
+      freshness_age_ms: freshnessAgeMs,
+      healthy:
+        freshnessAgeMs !== null &&
+        typeof thresholdMs === "number" &&
+        Number.isFinite(freshnessAgeMs) &&
+        freshnessAgeMs <= thresholdMs
     };
   }
 
@@ -448,6 +487,7 @@ export class LiveStateManager {
         const scoped =
           Boolean(subscription.underlying_ids?.length) || Boolean(subscription.option_contract_id);
         if (subscription.filters?.view === "raw" || scoped) {
+          this.stats.scopedClickHouseSnapshots += 1;
           const limit = snapshotLimitFor(subscription, this.generic.options.limit);
           const storageFilters: OptionPrintQueryFilters = {
             view: subscription.filters?.view ?? "signal",
@@ -476,6 +516,7 @@ export class LiveStateManager {
         }
 
         const config = this.generic.options;
+        this.stats.genericCacheSnapshots += 1;
         const limit = snapshotLimitFor(subscription, config.limit);
         const items = (this.genericItems.get("options") ?? []).filter((item) =>
           matchesOptionPrintFilters(item, subscription.filters)
@@ -489,6 +530,7 @@ export class LiveStateManager {
       }
       case "flow": {
         const config = this.generic.flow;
+        this.stats.genericCacheSnapshots += 1;
         const limit = snapshotLimitFor(subscription, config.limit);
         const items = (this.genericItems.get("flow") ?? []).filter((item) =>
           matchesFlowPacketFilters(item, subscription.filters)
@@ -504,6 +546,7 @@ export class LiveStateManager {
         const config = this.generic.equities;
         const limit = snapshotLimitFor(subscription, config.limit);
         if (subscription.underlying_ids?.length) {
+          this.stats.scopedClickHouseSnapshots += 1;
           const filters: EquityPrintQueryFilters = {
             underlyingIds: subscription.underlying_ids
           };
@@ -515,6 +558,7 @@ export class LiveStateManager {
             next_before: nextBeforeForItems(items, config.cursor)
           };
         }
+        this.stats.genericCacheSnapshots += 1;
         const items = (this.genericItems.get("equities") ?? []).slice(0, limit);
         return {
           subscription,
@@ -553,6 +597,7 @@ export class LiveStateManager {
       }
       default: {
         const config = this.generic[subscription.channel];
+        this.stats.genericCacheSnapshots += 1;
         const limit = snapshotLimitFor(subscription, config.limit);
         const items = (this.genericItems.get(subscription.channel) ?? []).slice(0, limit);
         return {

@@ -17,6 +17,7 @@ import {
   type ReactNode,
   type SetStateAction
 } from "react";
+import { useVirtualizer, type Virtualizer } from "@tanstack/react-virtual";
 import type {
   AlertEvent,
   ClassifierHitEvent,
@@ -28,6 +29,7 @@ import type {
   FlowPacket,
   InferredDarkEvent,
   LiveServerMessage,
+  LiveHotChannelHealthMap,
   LiveSubscription,
   OptionFlowFilters,
   OptionNbboSide,
@@ -62,10 +64,10 @@ const parseBoundedInt = (
   return Math.max(min, Math.min(max, Math.floor(parsed)));
 };
 
-const LIVE_HOT_WINDOW = parseBoundedInt(process.env.NEXT_PUBLIC_LIVE_HOT_WINDOW, 100, 1, 100000);
+const LIVE_HOT_WINDOW = parseBoundedInt(process.env.NEXT_PUBLIC_LIVE_HOT_WINDOW, 600, 1, 100000);
 const LIVE_HOT_WINDOW_OPTIONS = parseBoundedInt(
   process.env.NEXT_PUBLIC_LIVE_HOT_WINDOW_OPTIONS,
-  100,
+  1200,
   1,
   100000
 );
@@ -144,6 +146,11 @@ type SelectedInstrument =
   | null
   | { kind: "equity"; underlyingId: string }
   | { kind: "option-contract"; contractId: string; underlyingId: string };
+
+type TapeFocusSeed<T> = {
+  scopeKey: string;
+  items: T[];
+};
 
 const formatIntervalLabel = (intervalMs: number): string => {
   const match = CANDLE_INTERVALS.find((interval) => interval.ms === intervalMs);
@@ -343,6 +350,42 @@ const frontendRetentionMetrics: Record<RetentionMetricKey, number> = {
   pinnedStoreSize: 0
 };
 
+const DEV_TAPE_DEBUG = process.env.NODE_ENV !== "production";
+
+type TapeDebugMetricKey =
+  | "anchorRestoreCount"
+  | "anchorRestoreFallbackCount"
+  | "virtualRowMeasurementCount"
+  | "focusSeedRowCount"
+  | "scopedQuietTransitions";
+
+const frontendTapeDebugMetrics: Record<TapeDebugMetricKey, number> = {
+  anchorRestoreCount: 0,
+  anchorRestoreFallbackCount: 0,
+  virtualRowMeasurementCount: 0,
+  focusSeedRowCount: 0,
+  scopedQuietTransitions: 0
+};
+
+const bumpTapeDebugMetric = (key: TapeDebugMetricKey, count = 1): void => {
+  frontendTapeDebugMetrics[key] += count;
+  if (DEV_TAPE_DEBUG && typeof window !== "undefined") {
+    (window as typeof window & { __IF_TAPE_DEBUG__?: Record<TapeDebugMetricKey, number> }).__IF_TAPE_DEBUG__ =
+      frontendTapeDebugMetrics;
+  }
+};
+
+const logTapeDebug = (message: string, payload?: Record<string, unknown>): void => {
+  if (!DEV_TAPE_DEBUG) {
+    return;
+  }
+  if (payload) {
+    console.debug(`[tape] ${message}`, payload);
+    return;
+  }
+  console.debug(`[tape] ${message}`);
+};
+
 const incrementRetentionMetric = (key: RetentionMetricKey, count = 1): void => {
   frontendRetentionMetrics[key] += count;
 };
@@ -424,6 +467,24 @@ const mergeNewest = <T extends SortableItem>(
 
 const getTapeItemKey = (item: SortableItem): string => {
   return buildItemKey(item) ?? `${extractSortTs(item)}:${extractSortSeq(item)}`;
+};
+
+export const composeTapeItems = <T extends SortableItem>(
+  seedItems: T[],
+  liveItems: T[],
+  historyItems: T[]
+): T[] => {
+  const deduped = new Map<string, T>();
+  for (const item of [...seedItems, ...liveItems, ...historyItems]) {
+    deduped.set(getTapeItemKey(item), item);
+  }
+  return Array.from(deduped.values()).sort((a, b) => {
+    const delta = extractSortTs(b) - extractSortTs(a);
+    if (delta !== 0) {
+      return delta;
+    }
+    return extractSortSeq(b) - extractSortSeq(a);
+  });
 };
 
 type PausableTapeData<T> = {
@@ -618,9 +679,45 @@ export const getLiveFeedStatus = (
   return behindMs > behindDelayMs ? "stale" : "connected";
 };
 
+export const getHotChannelFeedStatus = (
+  sourceStatus: WsStatus,
+  health: { healthy: boolean } | null | undefined
+): WsStatus => {
+  if (sourceStatus !== "connected") {
+    return sourceStatus;
+  }
+  if (!health) {
+    return "connected";
+  }
+  return health.healthy ? "connected" : "stale";
+};
+
+export const findAnchorRestoreIndex = (
+  keys: string[],
+  anchorKey: string,
+  fallbackKeys: string[]
+): number => {
+  const directIndex = keys.indexOf(anchorKey);
+  if (directIndex >= 0) {
+    return directIndex;
+  }
+
+  const indexByKey = new Map(keys.map((key, index) => [key, index]));
+  for (const key of fallbackKeys) {
+    const index = indexByKey.get(key);
+    if (typeof index === "number") {
+      return index;
+    }
+  }
+
+  return -1;
+};
+
 type TapeState<T> = {
   status: WsStatus;
   items: T[];
+  liveItems?: T[];
+  historyItems?: T[];
   lastUpdate: number | null;
   replayTime: number | null;
   replayComplete: boolean;
@@ -1380,7 +1477,26 @@ const useScrollAnchor = (
   listRef: React.RefObject<HTMLDivElement>,
   isAtTopRef: React.MutableRefObject<boolean>
 ) => {
-  const pendingRef = useRef<{ height: number } | null>(null);
+  const pendingRef = useRef<{
+    key: string;
+    offset: number;
+    fallbackKeys: string[];
+  } | null>(null);
+
+  const readRenderedRows = useCallback((element: HTMLDivElement) => {
+    return Array.from(element.querySelectorAll<HTMLElement>("[data-tape-key][data-row-start][data-row-size]"))
+      .map((node) => {
+        const key = node.dataset.tapeKey;
+        const start = Number(node.dataset.rowStart);
+        const size = Number(node.dataset.rowSize);
+        if (!key || !Number.isFinite(start) || !Number.isFinite(size)) {
+          return null;
+        }
+        return { key, start, size };
+      })
+      .filter((row): row is { key: string; start: number; size: number } => row !== null)
+      .sort((a, b) => a.start - b.start);
+  }, []);
 
   const capture = useCallback(() => {
     if (isAtTopRef.current) {
@@ -1393,10 +1509,27 @@ const useScrollAnchor = (
       return;
     }
 
+    const rows = readRenderedRows(el);
+    if (rows.length === 0) {
+      pendingRef.current = null;
+      return;
+    }
+
+    const scrollTop = el.scrollTop;
+    const anchorIndex = rows.findIndex((row) => row.start + row.size > scrollTop);
+    const resolvedIndex = anchorIndex >= 0 ? anchorIndex : 0;
+    const anchorRow = rows[resolvedIndex];
+    if (!anchorRow) {
+      pendingRef.current = null;
+      return;
+    }
+
     pendingRef.current = {
-      height: el.scrollHeight
+      key: anchorRow.key,
+      offset: Math.max(0, scrollTop - anchorRow.start),
+      fallbackKeys: rows.slice(resolvedIndex).map((row) => row.key)
     };
-  }, [isAtTopRef, listRef]);
+  }, [isAtTopRef, listRef, readRenderedRows]);
 
   const apply = useCallback(() => {
     const pending = pendingRef.current;
@@ -1414,20 +1547,41 @@ const useScrollAnchor = (
       return;
     }
 
-    const delta = el.scrollHeight - pending.height;
-    if (delta !== 0) {
-      el.scrollTop = Math.max(0, el.scrollTop + delta);
+    const rows = readRenderedRows(el);
+    if (rows.length === 0) {
+      return;
+    }
+
+    const keys = rows.map((row) => row.key);
+    const restoreIndex = findAnchorRestoreIndex(keys, pending.key, pending.fallbackKeys);
+    if (restoreIndex < 0) {
+      return;
+    }
+
+    const row = rows[restoreIndex];
+    if (!row) {
+      return;
+    }
+
+    el.scrollTop = Math.max(0, row.start + pending.offset);
+    bumpTapeDebugMetric("anchorRestoreCount", 1);
+    if (row.key !== pending.key) {
+      bumpTapeDebugMetric("anchorRestoreFallbackCount", 1);
+      logTapeDebug("anchor restore fallback", {
+        requested_key: pending.key,
+        restored_key: row.key
+      });
     }
     pendingRef.current = null;
-  }, [isAtTopRef, listRef]);
+  }, [isAtTopRef, listRef, readRenderedRows]);
 
   return { capture, apply };
 };
 
-const useBottomHistoryGate = (
-  listRef: React.RefObject<HTMLDivElement>,
-  listNode: HTMLDivElement | null,
+const useVirtualHistoryGate = (
   enabled: boolean,
+  itemCount: number,
+  lastVirtualIndex: number,
   onLoadOlder: () => void
 ): void => {
   const loadRef = useRef(onLoadOlder);
@@ -1436,107 +1590,97 @@ const useBottomHistoryGate = (
   }, [onLoadOlder]);
 
   useEffect(() => {
-    if (!enabled) {
+    if (!enabled || itemCount === 0) {
       return;
     }
-    const element = listNode ?? listRef.current;
-    if (!element) {
+    if (lastVirtualIndex < itemCount - 1) {
       return;
     }
-
-    const maybeLoad = () => {
-      const threshold = Math.max(240, element.clientHeight * 0.5);
-      if (element.scrollTop + element.clientHeight >= element.scrollHeight - threshold) {
-        loadRef.current();
-      }
-    };
-
-    maybeLoad();
-    element.addEventListener("scroll", maybeLoad);
-    return () => {
-      element.removeEventListener("scroll", maybeLoad);
-    };
-  }, [enabled, listNode, listRef]);
+    loadRef.current();
+  }, [enabled, itemCount, lastVirtualIndex]);
 };
 
-type VirtualListResult<T> = {
-  visibleItems: T[];
-  topSpacerHeight: number;
-  bottomSpacerHeight: number;
+type MeasuredVirtualListResult<T> = {
+  totalSize: number;
+  virtualItems: MeasuredVirtualRow<T>[];
+  measureElement: (node: HTMLElement | null) => void;
+  virtualizer: Virtualizer<HTMLDivElement, HTMLElement>;
 };
 
-const useVirtualList = <T,>(
+type MeasuredVirtualRow<T> = {
+  item: T;
+  key: string;
+  index: number;
+  start: number;
+  size: number;
+  end: number;
+};
+
+const useMeasuredVirtualList = <T extends SortableItem>(
   items: T[],
   listRef: React.RefObject<HTMLDivElement>,
-  enabled: boolean,
-  rowHeight: number,
-  overscan = 8
-): VirtualListResult<T> => {
-  const [range, setRange] = useState<{ start: number; end: number }>({
-    start: 0,
-    end: items.length
+  estimateSize: number,
+  overscan: number,
+  debugLabel: string
+): MeasuredVirtualListResult<T> => {
+  const virtualizer = useVirtualizer<HTMLDivElement, HTMLElement>({
+    count: items.length,
+    getScrollElement: () => listRef.current,
+    estimateSize: () => estimateSize,
+    overscan,
+    getItemKey: (index) => getTapeItemKey(items[index] as SortableItem),
+    measureElement: (node) => {
+      bumpTapeDebugMetric("virtualRowMeasurementCount", 1);
+      return node.getBoundingClientRect().height;
+    }
   });
 
-  const recompute = useCallback(() => {
-    if (!enabled) {
-      setRange({ start: 0, end: items.length });
-      return;
+  const virtualItems: MeasuredVirtualRow<T>[] = virtualizer.getVirtualItems().map((virtualItem) => {
+    const item = items[virtualItem.index] as T | undefined;
+    if (!item) {
+      return null;
     }
-
-    const element = listRef.current;
-    if (!element) {
-      setRange({ start: 0, end: Math.min(items.length, 80) });
-      return;
-    }
-
-    const viewportHeight = Math.max(rowHeight, element.clientHeight);
-    const visibleCount = Math.ceil(viewportHeight / rowHeight);
-    const start = Math.max(0, Math.floor(element.scrollTop / rowHeight) - overscan);
-    const end = Math.min(items.length, start + visibleCount + overscan * 2);
-    setRange({ start, end });
-  }, [enabled, items.length, listRef, overscan, rowHeight]);
-
-  useEffect(() => {
-    recompute();
-  }, [items.length, recompute]);
-
-  useEffect(() => {
-    if (!enabled) {
-      return;
-    }
-
-    const element = listRef.current;
-    if (!element) {
-      return;
-    }
-
-    const onScroll = () => recompute();
-    const onResize = () => recompute();
-
-    element.addEventListener("scroll", onScroll);
-    window.addEventListener("resize", onResize);
-
-    return () => {
-      element.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onResize);
-    };
-  }, [enabled, listRef, recompute]);
-
-  if (!enabled) {
     return {
-      visibleItems: items,
-      topSpacerHeight: 0,
-      bottomSpacerHeight: 0
+      item,
+      key: getTapeItemKey(item),
+      index: virtualItem.index,
+      start: virtualItem.start,
+      size: virtualItem.size,
+      end: virtualItem.end
     };
-  }
+  }).filter((virtualItem): virtualItem is MeasuredVirtualRow<T> => virtualItem !== null);
 
-  const start = Math.min(range.start, items.length);
-  const end = Math.min(Math.max(range.end, start), items.length);
+  useEffect(() => {
+    if (!DEV_TAPE_DEBUG || items.length === 0) {
+      return;
+    }
+    const element = listRef.current;
+    if (!element) {
+      return;
+    }
+    const first = virtualItems[0];
+    const last = virtualItems.at(-1);
+    if (!first || !last) {
+      return;
+    }
+    const visibleTopGap = Math.max(0, first.start - element.scrollTop);
+    const visibleBottomGap = Math.max(0, element.scrollTop + element.clientHeight - last.end);
+    if (visibleTopGap > element.clientHeight || visibleBottomGap > element.clientHeight) {
+      console.warn("[tape] false-gap watchdog", {
+        pane: debugLabel,
+        item_count: items.length,
+        visible_top_gap: visibleTopGap,
+        visible_bottom_gap: visibleBottomGap,
+        viewport_height: element.clientHeight
+      });
+    }
+  }, [debugLabel, items.length, listRef, virtualItems]);
 
   return {
-    visibleItems: items.slice(start, end),
-    topSpacerHeight: start * rowHeight,
-    bottomSpacerHeight: Math.max(0, (items.length - end) * rowHeight)
+    totalSize: virtualizer.getTotalSize(),
+    virtualItems,
+    measureElement: virtualizer.measureElement,
+    virtualizer
   };
 };
 
@@ -2018,6 +2162,8 @@ const toStaticTapeState = <T,>(
 ): TapeState<T> => ({
   status,
   items,
+  liveItems: items,
+  historyItems: [],
   lastUpdate,
   replayTime: null,
   replayComplete: false,
@@ -2032,10 +2178,8 @@ type PausableTapeViewConfig<T extends SortableItem & { seq: number }> = {
   sourceItems: T[];
   historyTail?: T[];
   lastUpdate: number | null;
-  freshnessMs: number;
   onNewItems?: (count: number) => void;
   captureScroll?: () => void;
-  getItemTs?: (item: T) => number;
   retentionLimit?: number;
   shouldHold?: () => boolean;
   resumeSignal?: number;
@@ -2046,17 +2190,6 @@ const usePausableTapeView = <T extends SortableItem & { seq: number }>(
 ): TapeState<T> => {
   const [paused, setPaused] = useState(false);
   const [data, setData] = useState<PausableTapeData<T>>(EMPTY_PAUSABLE_TAPE);
-  const [clock, setClock] = useState(() => Date.now());
-
-  useEffect(() => {
-    const handle = window.setInterval(() => {
-      setClock(Date.now());
-    }, 1000);
-
-    return () => {
-      window.clearInterval(handle);
-    };
-  }, []);
 
   useEffect(() => {
     if (!config.enabled) {
@@ -2132,38 +2265,16 @@ const usePausableTapeView = <T extends SortableItem & { seq: number }>(
     setPaused((current) => !current);
   }, []);
 
-  const getItemTs = config.getItemTs ?? extractSortTs;
-  const freshestTs = useMemo(() => {
-    if (config.sourceItems.length === 0) {
-      return null;
-    }
-
-    let newest = Number.NEGATIVE_INFINITY;
-    for (const item of config.sourceItems) {
-      newest = Math.max(newest, getItemTs(item));
-    }
-
-    return Number.isFinite(newest) ? newest : null;
-  }, [config.sourceItems, getItemTs]);
-
-  const status = config.enabled
-    ? getLiveFeedStatus(
-        config.sourceStatus,
-        freshestTs,
-        config.freshnessMs,
-        clock,
-        LIVE_FEED_BEHIND_DELAY_MS
-      )
-    : "disconnected";
+  const status = config.enabled ? config.sourceStatus : "disconnected";
   const projected = projectPausableTapeState(data.visible, status, config.lastUpdate);
-  const items = useMemo(
-    () => [...projected.items, ...(config.historyTail ?? [])],
-    [projected.items, config.historyTail]
-  );
+  const historyItems = config.historyTail ?? [];
+  const items = useMemo(() => composeTapeItems([], projected.items, historyItems), [projected.items, historyItems]);
 
   return {
     status,
     items,
+    liveItems: projected.items,
+    historyItems,
     lastUpdate: projected.lastUpdate,
     replayTime: null,
     replayComplete: false,
@@ -2412,6 +2523,7 @@ type LiveSessionState = {
   status: WsStatus;
   connectedAt: number | null;
   lastUpdate: number | null;
+  channelHealth: LiveHotChannelHealthMap;
   lastEventByChannel: Partial<Record<LiveSubscription["channel"], number>>;
   manifest: LiveSubscription[];
   historyCursors: Partial<Record<string, Cursor | null>>;
@@ -2561,6 +2673,12 @@ const useLiveSession = (
   const [status, setStatus] = useState<WsStatus>(enabled ? "connecting" : "disconnected");
   const [connectedAt, setConnectedAt] = useState<number | null>(null);
   const [lastUpdate, setLastUpdate] = useState<number | null>(null);
+  const [channelHealth, setChannelHealth] = useState<LiveHotChannelHealthMap>({
+    options: { freshness_age_ms: null, healthy: false },
+    nbbo: { freshness_age_ms: null, healthy: false },
+    equities: { freshness_age_ms: null, healthy: false },
+    flow: { freshness_age_ms: null, healthy: false }
+  });
   const [lastEventByChannel, setLastEventByChannel] = useState<
     Partial<Record<LiveSubscription["channel"], number>>
   >({});
@@ -2647,6 +2765,12 @@ const useLiveSession = (
       setStatus("disconnected");
       setConnectedAt(null);
       setLastUpdate(null);
+      setChannelHealth({
+        options: { freshness_age_ms: null, healthy: false },
+        nbbo: { freshness_age_ms: null, healthy: false },
+        equities: { freshness_age_ms: null, healthy: false },
+        flow: { freshness_age_ms: null, healthy: false }
+      });
       setLastEventByChannel({});
       setHistoryCursors({});
       setHistoryLoading({});
@@ -2736,6 +2860,7 @@ const useLiveSession = (
 
     const handleMessage = (message: LiveServerMessage) => {
       if (message.op === "ready" || message.op === "heartbeat") {
+        setChannelHealth(message.channel_health);
         return;
       }
       if (message.op === "error") {
@@ -3173,6 +3298,7 @@ const useLiveSession = (
     status,
     connectedAt,
     lastUpdate,
+    channelHealth,
     lastEventByChannel,
     manifest,
     historyCursors,
@@ -4512,6 +4638,8 @@ const useTerminalState = () => {
   const [selectedClassifierHit, setSelectedClassifierHit] = useState<ClassifierHitEvent | null>(null);
   const [selectedSmartMoneyEvent, setSelectedSmartMoneyEvent] = useState<SmartMoneyEvent | null>(null);
   const [selectedInstrument, setSelectedInstrument] = useState<SelectedInstrument>(null);
+  const [optionFocusSeed, setOptionFocusSeed] = useState<TapeFocusSeed<OptionPrint> | null>(null);
+  const [equityFocusSeed, setEquityFocusSeed] = useState<TapeFocusSeed<EquityPrint> | null>(null);
   const [filterInput, setFilterInput] = useState<string>("");
   const [flowFilters, setFlowFilters] = useState<OptionFlowFilters>(() => buildDefaultFlowFilters());
   const [chartIntervalMs, setChartIntervalMs] = useState<number>(CANDLE_INTERVALS[0].ms);
@@ -4524,6 +4652,14 @@ const useTerminalState = () => {
   }, [filterInput]);
   const tickerSet = useMemo(() => new Set(activeTickers), [activeTickers]);
   const instrumentUnderlying = selectedInstrument?.underlyingId.toUpperCase() ?? null;
+  const optionFocusScopeKey =
+    selectedInstrument?.kind === "option-contract"
+      ? `option-contract:${selectedInstrument.contractId}`
+      : null;
+  const equityFocusScopeKey =
+    selectedInstrument?.kind === "equity"
+      ? `equity:${selectedInstrument.underlyingId.toUpperCase()}`
+      : null;
   const optionScope = useMemo(
     () => ({
       underlying_ids: activeTickers.length > 0 ? activeTickers : instrumentUnderlying ? [instrumentUnderlying] : undefined,
@@ -4767,13 +4903,19 @@ const useTerminalState = () => {
     getReplayKey: disableReplayGrouping
   });
 
+  const optionsChannelStatus = getHotChannelFeedStatus(liveSession.status, liveSession.channelHealth.options);
+  const equitiesChannelStatus = getHotChannelFeedStatus(
+    liveSession.status,
+    liveSession.channelHealth.equities
+  );
+  const flowChannelStatus = getHotChannelFeedStatus(liveSession.status, liveSession.channelHealth.flow);
+
   const liveOptions = usePausableTapeView<OptionPrint>({
     enabled: mode === "live",
-    sourceStatus: liveSession.status,
+    sourceStatus: optionsChannelStatus,
     sourceItems: liveSession.options,
     historyTail: liveSession.optionsHistory,
     lastUpdate: liveSession.lastUpdate,
-    freshnessMs: LIVE_OPTIONS_STALE_MS,
     retentionLimit: LIVE_HOT_WINDOW_OPTIONS,
     captureScroll: optionsAnchor.capture,
     onNewItems: optionsScroll.onNewItems,
@@ -4782,11 +4924,10 @@ const useTerminalState = () => {
   });
   const liveEquities = usePausableTapeView<EquityPrint>({
     enabled: mode === "live",
-    sourceStatus: liveSession.status,
+    sourceStatus: equitiesChannelStatus,
     sourceItems: liveSession.equities,
     historyTail: liveSession.equitiesHistory,
     lastUpdate: liveSession.lastUpdate,
-    freshnessMs: LIVE_EQUITIES_STALE_MS,
     captureScroll: equitiesAnchor.capture,
     onNewItems: equitiesScroll.onNewItems,
     shouldHold: () => !equitiesScroll.isAtTopRef.current,
@@ -4794,40 +4935,87 @@ const useTerminalState = () => {
   });
   const liveFlow = usePausableTapeView<FlowPacket>({
     enabled: mode === "live",
-    sourceStatus: liveSession.status,
+    sourceStatus: flowChannelStatus,
     sourceItems: liveSession.flow,
     historyTail: liveSession.flowHistory,
     lastUpdate: liveSession.lastUpdate,
-    freshnessMs: LIVE_FLOW_STALE_MS,
     captureScroll: flowAnchor.capture,
     onNewItems: flowScroll.onNewItems,
     shouldHold: () => !flowScroll.isAtTopRef.current,
-    resumeSignal: flowScroll.resumeTick,
-    getItemTs: (item) => item.source_ts
+    resumeSignal: flowScroll.resumeTick
   });
 
-  const optionsFeed = mode === "live" ? liveOptions : options;
+  const seededLiveOptionsItems = useMemo(
+    () =>
+      composeTapeItems(
+        optionFocusSeed?.scopeKey === optionFocusScopeKey ? optionFocusSeed.items : [],
+        liveOptions.liveItems ?? [],
+        liveOptions.historyItems ?? []
+      ),
+    [liveOptions.historyItems, liveOptions.liveItems, optionFocusScopeKey, optionFocusSeed]
+  );
+  const seededLiveEquitiesItems = useMemo(
+    () =>
+      composeTapeItems(
+        equityFocusSeed?.scopeKey === equityFocusScopeKey ? equityFocusSeed.items : [],
+        liveEquities.liveItems ?? [],
+        liveEquities.historyItems ?? []
+      ),
+    [equityFocusScopeKey, equityFocusSeed, liveEquities.historyItems, liveEquities.liveItems]
+  );
+
+  const optionsFeed =
+    mode === "live" ? { ...liveOptions, items: seededLiveOptionsItems } : options;
   const nbboFeed =
-    mode === "live" ? toStaticTapeState(liveSession.status, [...liveSession.nbbo, ...liveSession.nbboHistory], liveSession.lastUpdate) : nbbo;
-  const equitiesFeed = mode === "live" ? liveEquities : equities;
+    mode === "live"
+      ? toStaticTapeState(
+          getHotChannelFeedStatus(liveSession.status, liveSession.channelHealth.nbbo),
+          composeTapeItems([], liveSession.nbbo, liveSession.nbboHistory),
+          liveSession.lastUpdate
+        )
+      : nbbo;
+  const equitiesFeed =
+    mode === "live" ? { ...liveEquities, items: seededLiveEquitiesItems } : equities;
   const equityJoinsFeed =
     mode === "live"
-      ? toStaticTapeState(liveSession.status, [...liveSession.equityJoins, ...liveSession.equityJoinsHistory], liveSession.lastUpdate)
+      ? toStaticTapeState(
+          liveSession.status,
+          composeTapeItems([], liveSession.equityJoins, liveSession.equityJoinsHistory),
+          liveSession.lastUpdate
+        )
       : equityJoins;
   const flowFeed = mode === "live" ? liveFlow : flow;
   const alertsFeed =
-    mode === "live" ? toStaticTapeState(liveSession.status, [...liveSession.alerts, ...liveSession.alertsHistory], liveSession.lastUpdate) : alerts;
+    mode === "live"
+      ? toStaticTapeState(
+          liveSession.status,
+          composeTapeItems([], liveSession.alerts, liveSession.alertsHistory),
+          liveSession.lastUpdate
+        )
+      : alerts;
   const classifierHitsFeed =
     mode === "live"
-      ? toStaticTapeState(liveSession.status, [...liveSession.classifierHits, ...liveSession.classifierHitsHistory], liveSession.lastUpdate)
+      ? toStaticTapeState(
+          liveSession.status,
+          composeTapeItems([], liveSession.classifierHits, liveSession.classifierHitsHistory),
+          liveSession.lastUpdate
+        )
       : classifierHits;
   const smartMoneyFeed =
     mode === "live"
-      ? toStaticTapeState(liveSession.status, [...liveSession.smartMoney, ...liveSession.smartMoneyHistory], liveSession.lastUpdate)
+      ? toStaticTapeState(
+          liveSession.status,
+          composeTapeItems([], liveSession.smartMoney, liveSession.smartMoneyHistory),
+          liveSession.lastUpdate
+        )
       : smartMoney;
   const inferredDarkFeed =
     mode === "live"
-      ? toStaticTapeState(liveSession.status, [...liveSession.inferredDark, ...liveSession.inferredDarkHistory], liveSession.lastUpdate)
+      ? toStaticTapeState(
+          liveSession.status,
+          composeTapeItems([], liveSession.inferredDark, liveSession.inferredDarkHistory),
+          liveSession.lastUpdate
+        )
       : inferredDark;
 
   useLayoutEffect(() => {
@@ -5528,12 +5716,126 @@ const useTerminalState = () => {
     return equitiesFeed.items.filter((print) => matchesTicker(print.underlying_id));
   }, [equitiesFeed.items, matchesTicker, tickerSet, instrumentUnderlying]);
 
+  useEffect(() => {
+    if (!optionFocusSeed) {
+      return;
+    }
+    if (optionFocusSeed.scopeKey !== optionFocusScopeKey) {
+      setOptionFocusSeed(null);
+      return;
+    }
+    const composedBaseItems = composeTapeItems([], liveOptions.liveItems ?? [], liveOptions.historyItems ?? []);
+    const liveKeys = new Set(composedBaseItems.map((item) => getTapeItemKey(item)));
+    if (optionFocusSeed.items.every((item) => liveKeys.has(getTapeItemKey(item)))) {
+      setOptionFocusSeed(null);
+    }
+  }, [liveOptions.historyItems, liveOptions.liveItems, optionFocusScopeKey, optionFocusSeed]);
+
+  useEffect(() => {
+    if (!equityFocusSeed) {
+      return;
+    }
+    if (equityFocusSeed.scopeKey !== equityFocusScopeKey) {
+      setEquityFocusSeed(null);
+      return;
+    }
+    const composedBaseItems = composeTapeItems([], liveEquities.liveItems ?? [], liveEquities.historyItems ?? []);
+    const liveKeys = new Set(composedBaseItems.map((item) => getTapeItemKey(item)));
+    if (equityFocusSeed.items.every((item) => liveKeys.has(getTapeItemKey(item)))) {
+      setEquityFocusSeed(null);
+    }
+  }, [equityFocusScopeKey, equityFocusSeed, liveEquities.historyItems, liveEquities.liveItems]);
+
+  const focusOptionContract = useCallback(
+    (print: OptionPrint) => {
+      const contractId = normalizeContractId(print.option_contract_id);
+      const parsed = parseOptionContractId(contractId);
+      const underlyingId = (print.underlying_id ?? parsed?.root ?? extractUnderlying(contractId)).toUpperCase();
+      const scopeKey = `option-contract:${contractId}`;
+      const seedItems = composeTapeItems(
+        [print],
+        filteredOptions.filter((candidate) => normalizeContractId(candidate.option_contract_id) === contractId),
+        []
+      );
+      setOptionFocusSeed({ scopeKey, items: seedItems });
+      bumpTapeDebugMetric("focusSeedRowCount", seedItems.length);
+      logTapeDebug("option focus seed captured", {
+        contract_id: contractId,
+        row_count: seedItems.length
+      });
+      setSelectedInstrument({
+        kind: "option-contract",
+        contractId,
+        underlyingId
+      });
+    },
+    [filteredOptions]
+  );
+
+  const focusEquityTicker = useCallback(
+    (print: EquityPrint) => {
+      const underlyingId = print.underlying_id.toUpperCase();
+      const scopeKey = `equity:${underlyingId}`;
+      const seedItems = composeTapeItems(
+        [print],
+        filteredEquities.filter((candidate) => candidate.underlying_id.toUpperCase() === underlyingId),
+        []
+      );
+      setEquityFocusSeed({ scopeKey, items: seedItems });
+      bumpTapeDebugMetric("focusSeedRowCount", seedItems.length);
+      logTapeDebug("equity focus seed captured", {
+        underlying_id: underlyingId,
+        row_count: seedItems.length
+      });
+      setSelectedInstrument({
+        kind: "equity",
+        underlyingId
+      });
+    },
+    [filteredEquities]
+  );
+
   const equitiesSilentWarning = shouldShowEquitiesSilentFeedWarning({
     wsStatus: liveSession.status,
     equitiesSubscribed: mode === "live" && equitiesLiveSubscriptionActive,
     connectedAt: liveSession.connectedAt,
     lastEquitiesEventAt: liveSession.lastEventByChannel.equities ?? null
   });
+  const optionsScopeActive = Boolean(
+    optionScope.option_contract_id || optionScope.underlying_ids?.length
+  );
+  const equitiesScopeActive = Boolean(equityScope.underlying_ids?.length);
+  const optionsScopedQuiet =
+    mode === "live" &&
+    optionsScopeActive &&
+    optionsChannelStatus === "connected" &&
+    filteredOptions.length === 0;
+  const equitiesScopedQuiet =
+    mode === "live" &&
+    equitiesScopeActive &&
+    equitiesChannelStatus === "connected" &&
+    filteredEquities.length === 0;
+
+  const previousScopedQuietRef = useRef({
+    options: optionsScopedQuiet,
+    equities: equitiesScopedQuiet
+  });
+
+  useEffect(() => {
+    const previous = previousScopedQuietRef.current;
+    if (previous.options !== optionsScopedQuiet) {
+      bumpTapeDebugMetric("scopedQuietTransitions", 1);
+      logTapeDebug("options scoped quiet transition", { active: optionsScopedQuiet });
+    }
+    if (previous.equities !== equitiesScopedQuiet) {
+      bumpTapeDebugMetric("scopedQuietTransitions", 1);
+      logTapeDebug("equities scoped quiet transition", { active: equitiesScopedQuiet });
+    }
+    previousScopedQuietRef.current = {
+      options: optionsScopedQuiet,
+      equities: equitiesScopedQuiet
+    };
+  }, [equitiesScopedQuiet, optionsScopedQuiet]);
 
   const filteredInferredDark = useMemo(() => {
     if (tickerSet.size === 0) {
@@ -5924,6 +6226,8 @@ const useTerminalState = () => {
     selectedSmartMoneyEvidence,
     filteredOptions,
     filteredEquities,
+    optionsScopedQuiet,
+    equitiesScopedQuiet,
     equitiesSilentWarning,
     filteredInferredDark,
     filteredFlow,
@@ -5932,6 +6236,8 @@ const useTerminalState = () => {
     filteredClassifierHits,
     chartSmartMoneyEvents,
     chartInferredDark,
+    focusOptionContract,
+    focusEquityTicker,
     openFromSmartMoneyEvent,
     openFromClassifierHit,
     handleSmartMoneyMarkerClick,
@@ -6257,8 +6563,8 @@ type OptionsPaneProps = {
 const OptionsPane = ({ limit }: OptionsPaneProps) => {
   const state = useTerminal();
   const items = limit ? state.filteredOptions.slice(0, limit) : state.filteredOptions;
-  const virtual = useVirtualList(items, state.optionsScroll.listRef, !limit, 36);
-  useBottomHistoryGate(state.optionsScroll.listRef, state.optionsScroll.listNode, state.mode === "live" && !limit, () =>
+  const virtual = useMeasuredVirtualList(items, state.optionsScroll.listRef, 36, 12, "options");
+  useVirtualHistoryGate(state.mode === "live" && !limit, items.length, virtual.virtualItems.at(-1)?.index ?? -1, () =>
     void state.liveSession.loadOlder("options")
   );
 
@@ -6289,12 +6595,16 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
       <div className="data-table-shell">
         {items.length === 0 ? (
           <div className="empty">
-            {state.tickerSet.size > 0
-              ? "No option prints match the current filter."
-              : state.mode === "live"
-                ? state.options.status === "stale"
-                  ? "Feed behind. Waiting for fresh option prints."
-                  : "No option prints yet. Start ingest-options."
+            {state.mode === "live"
+              ? state.options.status === "stale"
+                ? "Feed behind. Waiting for fresh option prints."
+                : state.optionsScopedQuiet
+                  ? "No recent option prints for this scope yet."
+                  : state.tickerSet.size > 0
+                    ? "No option prints match the current filter."
+                    : "No option prints yet. Start ingest-options."
+              : state.tickerSet.size > 0
+                ? "No option prints match the current filter."
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
@@ -6314,10 +6624,12 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
                 <span className="data-table-cell">IV</span>
                 <span className="data-table-cell">CLASSIFIER</span>
               </div>
-              {virtual.topSpacerHeight > 0 ? (
-                <div className="data-table-spacer" style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
-              ) : null}
-              {virtual.visibleItems.map((print) => {
+              <div
+                className="data-table-body"
+                style={{ height: `${virtual.totalSize}px` }}
+                aria-hidden={virtual.virtualItems.length === 0}
+              >
+              {virtual.virtualItems.map(({ item: print, key, index, start, size }) => {
               const contractId = normalizeContractId(print.option_contract_id);
               const parsed = parseOptionContractId(contractId);
               const contractDisplay = formatOptionContractLabel(contractId);
@@ -6334,15 +6646,21 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
               const underlyingId = (print.underlying_id ?? parsed?.root ?? extractUnderlying(contractId)).toUpperCase();
               const focusContract = (event: ReactMouseEvent<HTMLButtonElement>) => {
                 event.stopPropagation();
-                state.setSelectedInstrument({
-                  kind: "option-contract",
-                  contractId,
-                  underlyingId
-                });
+                state.focusOptionContract(print);
               };
+              const rowStyle = {
+                ...(decor
+                  ? ({ "--classifier-intensity": decor.intensity } as CSSProperties)
+                  : undefined),
+                top: `${start}px`
+              } as CSSProperties;
               const commonProps = {
-                className: `data-table-row data-table-row-button data-table-row-classified data-table-row-options${decor ? ` is-classified classifier-${decor.tone}` : ""}`,
-                style: decor ? ({ "--classifier-intensity": decor.intensity } as CSSProperties) : undefined
+                className: `data-table-row data-table-row-button data-table-row-classified data-table-row-options data-table-virtual-row${index % 2 === 1 ? " is-even" : ""}${decor ? ` is-classified classifier-${decor.tone}` : ""}`,
+                style: rowStyle,
+                "data-row-start": String(start),
+                "data-row-size": String(size),
+                "data-tape-key": key,
+                ref: virtual.measureElement
               };
               const cells = (
                 <>
@@ -6389,7 +6707,7 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
                 <button
                   type="button"
                   {...commonProps}
-                  key={`${print.trace_id}-${print.seq}`}
+                  key={key}
                   onClick={() =>
                     decor.smartMoney
                       ? state.openFromSmartMoneyEvent(decor.smartMoney)
@@ -6411,14 +6729,12 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
                   {cells}
                 </button>
               ) : (
-                <div {...commonProps} key={`${print.trace_id}-${print.seq}`}>
+                <div {...commonProps} key={key}>
                   {cells}
                 </div>
               );
               })}
-              {virtual.bottomSpacerHeight > 0 ? (
-                <div className="data-table-spacer" style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
-              ) : null}
+              </div>
             </div>
           </div>
         )}
@@ -6434,8 +6750,8 @@ type EquitiesPaneProps = {
 const EquitiesPane = ({ limit }: EquitiesPaneProps) => {
   const state = useTerminal();
   const items = limit ? state.filteredEquities.slice(0, limit) : state.filteredEquities;
-  const virtual = useVirtualList(items, state.equitiesScroll.listRef, !limit, 36);
-  useBottomHistoryGate(state.equitiesScroll.listRef, state.equitiesScroll.listNode, state.mode === "live" && !limit, () =>
+  const virtual = useMeasuredVirtualList(items, state.equitiesScroll.listRef, 36, 10, "equities");
+  useVirtualHistoryGate(state.mode === "live" && !limit, items.length, virtual.virtualItems.at(-1)?.index ?? -1, () =>
     void state.liveSession.loadOlder("equities")
   );
 
@@ -6466,14 +6782,18 @@ const EquitiesPane = ({ limit }: EquitiesPaneProps) => {
       <div className="data-table-shell">
         {items.length === 0 ? (
           <div className="empty">
-            {state.tickerSet.size > 0
-              ? "No equity prints match the current filter."
-              : state.mode === "live"
-                ? state.equitiesSilentWarning
-                  ? "Connected but no equity prints received. Check ingest-equities."
-                : state.equities.status === "stale"
-                  ? "Feed behind. Waiting for fresh equity prints."
-                  : "No equity prints yet. Start ingest-equities."
+            {state.mode === "live"
+              ? state.equities.status === "stale"
+                ? "Feed behind. Waiting for fresh equity prints."
+                : state.equitiesScopedQuiet
+                  ? "No recent equity prints for this scope yet."
+                  : state.tickerSet.size > 0
+                    ? "No equity prints match the current filter."
+                    : state.equitiesSilentWarning
+                      ? "Connected but no equity prints received. Check ingest-equities."
+                      : "No equity prints yet. Start ingest-equities."
+              : state.tickerSet.size > 0
+                ? "No equity prints match the current filter."
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
@@ -6487,22 +6807,23 @@ const EquitiesPane = ({ limit }: EquitiesPaneProps) => {
                 <span className="data-table-cell">VENUE</span>
                 <span className="data-table-cell">TAPE</span>
               </div>
-            {virtual.topSpacerHeight > 0 ? (
-              <div className="data-table-spacer" style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
-            ) : null}
-            {virtual.visibleItems.map((print) => (
-              <div className="data-table-row data-table-row-equities" key={`${print.trace_id}-${print.seq}`}>
+            <div className="data-table-body" style={{ height: `${virtual.totalSize}px` }}>
+            {virtual.virtualItems.map(({ item: print, key, index, start, size }) => (
+              <div
+                className={`data-table-row data-table-row-equities data-table-virtual-row${index % 2 === 1 ? " is-even" : ""}`}
+                key={key}
+                ref={virtual.measureElement}
+                data-row-start={String(start)}
+                data-row-size={String(size)}
+                data-tape-key={key}
+                style={{ top: `${start}px` }}
+              >
                 <span className="data-table-cell data-table-cell-number">{formatTime(print.ts)}</span>
                 <span className="data-table-cell">
                   <button
                     className="instrument-cell-button"
                     type="button"
-                    onClick={() =>
-                      state.setSelectedInstrument({
-                        kind: "equity",
-                        underlyingId: print.underlying_id.toUpperCase()
-                      })
-                    }
+                    onClick={() => state.focusEquityTicker(print)}
                   >
                     {print.underlying_id}
                   </button>
@@ -6513,9 +6834,7 @@ const EquitiesPane = ({ limit }: EquitiesPaneProps) => {
                 <span className="data-table-cell">{print.offExchangeFlag ? "Off-Ex" : "Lit"}</span>
               </div>
             ))}
-            {virtual.bottomSpacerHeight > 0 ? (
-              <div className="data-table-spacer" style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
-            ) : null}
+            </div>
             </div>
           </div>
         )}
@@ -6532,8 +6851,8 @@ type FlowPaneProps = {
 const FlowPane = ({ limit, title = "Flow" }: FlowPaneProps) => {
   const state = useTerminal();
   const items = limit ? state.filteredFlow.slice(0, limit) : state.filteredFlow;
-  const virtual = useVirtualList(items, state.flowScroll.listRef, !limit, 44);
-  useBottomHistoryGate(state.flowScroll.listRef, state.flowScroll.listNode, state.mode === "live" && !limit, () =>
+  const virtual = useMeasuredVirtualList(items, state.flowScroll.listRef, 44, 8, "flow");
+  useVirtualHistoryGate(state.mode === "live" && !limit, items.length, virtual.virtualItems.at(-1)?.index ?? -1, () =>
     void state.liveSession.loadOlder("flow")
   );
 
@@ -6586,10 +6905,8 @@ const FlowPane = ({ limit, title = "Flow" }: FlowPaneProps) => {
                 <span className="data-table-cell">NBBO</span>
                 <span className="data-table-cell">QUALITY</span>
               </div>
-            {virtual.topSpacerHeight > 0 ? (
-              <div className="data-table-spacer" style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
-            ) : null}
-            {virtual.visibleItems.map((packet) => {
+            <div className="data-table-body" style={{ height: `${virtual.totalSize}px` }}>
+            {virtual.virtualItems.map(({ item: packet, key, index, start, size }) => {
             const features = packet.features ?? {};
             const contract = String(features.option_contract_id ?? packet.id ?? "unknown");
             const count = parseNumber(features.count, packet.members.length);
@@ -6641,7 +6958,15 @@ const FlowPane = ({ limit, title = "Flow" }: FlowPaneProps) => {
             ].filter(Boolean).join(" | ");
 
             return (
-              <div className={`data-table-row data-table-row-flow${nbboStale || nbboMissing ? " data-table-row-warn" : ""}`} key={packet.id}>
+              <div
+                className={`data-table-row data-table-row-flow data-table-virtual-row${index % 2 === 1 ? " is-even" : ""}${nbboStale || nbboMissing ? " data-table-row-warn" : ""}`}
+                key={key}
+                ref={virtual.measureElement}
+                data-row-start={String(start)}
+                data-row-size={String(size)}
+                data-tape-key={key}
+                style={{ top: `${start}px` }}
+              >
                 <span className="data-table-cell data-table-cell-number">{formatTime(startTs)} → {formatTime(endTs)}</span>
                 <span className="data-table-cell">{contract}</span>
                 <span className="data-table-cell data-table-cell-number">{formatFlowMetric(count)}</span>
@@ -6654,9 +6979,7 @@ const FlowPane = ({ limit, title = "Flow" }: FlowPaneProps) => {
               </div>
             );
             })}
-            {virtual.bottomSpacerHeight > 0 ? (
-              <div className="data-table-spacer" style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
-            ) : null}
+            </div>
             </div>
           </div>
         )}
@@ -6674,8 +6997,8 @@ type AlertsPaneProps = {
 const AlertsPane = ({ limit, withStrip = false, className }: AlertsPaneProps) => {
   const state = useTerminal();
   const items = limit ? state.filteredAlerts.slice(0, limit) : state.filteredAlerts;
-  const virtual = useVirtualList(items, state.alertsScroll.listRef, !limit, 46);
-  useBottomHistoryGate(state.alertsScroll.listRef, state.alertsScroll.listNode, state.mode === "live" && !limit, () =>
+  const virtual = useMeasuredVirtualList(items, state.alertsScroll.listRef, 46, 8, "alerts");
+  useVirtualHistoryGate(state.mode === "live" && !limit, items.length, virtual.virtualItems.at(-1)?.index ?? -1, () =>
     void state.liveSession.loadOlder("alerts")
   );
 
@@ -6726,19 +7049,22 @@ const AlertsPane = ({ limit, withStrip = false, className }: AlertsPaneProps) =>
                 <span className="data-table-cell">DIR</span>
                 <span className="data-table-cell">NOTE</span>
               </div>
-            {virtual.topSpacerHeight > 0 ? (
-              <div className="data-table-spacer" style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
-            ) : null}
-            {virtual.visibleItems.map((alert) => {
+            <div className="data-table-body" style={{ height: `${virtual.totalSize}px` }}>
+            {virtual.virtualItems.map(({ item: alert, key, index, start, size }) => {
             const primary = alert.hits[0];
             const direction = deriveAlertDirection(alert);
             const severity = normalizeAlertSeverity(alert);
 
             return (
               <button
-                className={`data-table-row data-table-row-button data-table-row-alerts data-table-row-severity-${severity}`}
-                key={`${alert.trace_id}-${alert.seq}`}
+                className={`data-table-row data-table-row-button data-table-row-alerts data-table-virtual-row${index % 2 === 1 ? " is-even" : ""} data-table-row-severity-${severity}`}
+                key={key}
                 type="button"
+                ref={virtual.measureElement}
+                data-row-start={String(start)}
+                data-row-size={String(size)}
+                data-tape-key={key}
+                style={{ top: `${start}px` }}
                 onClick={() => {
                   state.setSelectedDarkEvent(null);
                   state.setSelectedClassifierHit(null);
@@ -6756,9 +7082,7 @@ const AlertsPane = ({ limit, withStrip = false, className }: AlertsPaneProps) =>
               </button>
             );
             })}
-            {virtual.bottomSpacerHeight > 0 ? (
-              <div className="data-table-spacer" style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
-            ) : null}
+            </div>
             </div>
           </div>
         )}
@@ -6774,10 +7098,6 @@ type ClassifierPaneProps = {
 
 const ClassifierPane = ({ limit, className }: ClassifierPaneProps) => {
   const state = useTerminal();
-  useBottomHistoryGate(state.classifierScroll.listRef, state.classifierScroll.listNode, state.mode === "live" && !limit, () => {
-    void state.liveSession.loadOlder("smart-money");
-    void state.liveSession.loadOlder("classifier-hits");
-  });
   const smartMoneyItems = limit ? state.filteredSmartMoneyEvents.slice(0, limit) : state.filteredSmartMoneyEvents;
   const legacyItems =
     smartMoneyItems.length === 0
@@ -6787,12 +7107,11 @@ const ClassifierPane = ({ limit, className }: ClassifierPaneProps) => {
       : [];
   const items: Array<SmartMoneyEvent | ClassifierHitEvent> =
     smartMoneyItems.length > 0 ? smartMoneyItems : legacyItems;
-  const virtual = useVirtualList<SmartMoneyEvent | ClassifierHitEvent>(
-    items,
-    state.classifierScroll.listRef,
-    !limit,
-    44
-  );
+  const virtual = useMeasuredVirtualList(items, state.classifierScroll.listRef, 44, 8, "classifier");
+  useVirtualHistoryGate(state.mode === "live" && !limit, items.length, virtual.virtualItems.at(-1)?.index ?? -1, () => {
+    void state.liveSession.loadOlder("smart-money");
+    void state.liveSession.loadOlder("classifier-hits");
+  });
   const showingSmartMoney = smartMoneyItems.length > 0;
 
   return (
@@ -6839,19 +7158,23 @@ const ClassifierPane = ({ limit, className }: ClassifierPaneProps) => {
                 <span className="data-table-cell">PROB</span>
                 <span className="data-table-cell">NOTE</span>
               </div>
-            {virtual.topSpacerHeight > 0 ? (
-              <div className="data-table-spacer" style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
-            ) : null}
-            {showingSmartMoney ? (virtual.visibleItems as SmartMoneyEvent[]).map((event) => {
+            <div className="data-table-body" style={{ height: `${virtual.totalSize}px` }}>
+            {showingSmartMoney ? virtual.virtualItems.map(({ item, key, index, start, size }) => {
+            const event = item as SmartMoneyEvent;
             const primaryScore =
               event.profile_scores.find((score) => score.profile_id === event.primary_profile_id) ??
               event.profile_scores[0];
             const direction = normalizeDirection(event.primary_direction);
             return (
               <button
-                className={`data-table-row data-table-row-button data-table-row-classifier data-table-row-direction-${direction}`}
-                key={`${event.trace_id}-${event.seq}`}
+                className={`data-table-row data-table-row-button data-table-row-classifier data-table-virtual-row${index % 2 === 1 ? " is-even" : ""} data-table-row-direction-${direction}`}
+                key={key}
                 type="button"
+                ref={virtual.measureElement}
+                data-row-start={String(start)}
+                data-row-size={String(size)}
+                data-tape-key={key}
+                style={{ top: `${start}px` }}
                 onClick={() => state.openFromSmartMoneyEvent(event)}
               >
                 <span className="data-table-cell data-table-cell-number">{formatTime(event.source_ts)}</span>
@@ -6867,13 +7190,19 @@ const ClassifierPane = ({ limit, className }: ClassifierPaneProps) => {
                 </span>
               </button>
             );
-            }) : (virtual.visibleItems as ClassifierHitEvent[]).map((hit) => {
+            }) : virtual.virtualItems.map(({ item, key, index, start, size }) => {
+              const hit = item as ClassifierHitEvent;
               const direction = normalizeDirection(hit.direction);
               return (
                 <button
-                  className={`data-table-row data-table-row-button data-table-row-classifier data-table-row-direction-${direction}`}
-                  key={`${hit.trace_id}-${hit.seq}`}
+                  className={`data-table-row data-table-row-button data-table-row-classifier data-table-virtual-row${index % 2 === 1 ? " is-even" : ""} data-table-row-direction-${direction}`}
+                  key={key}
                   type="button"
+                  ref={virtual.measureElement}
+                  data-row-start={String(start)}
+                  data-row-size={String(size)}
+                  data-tape-key={key}
+                  style={{ top: `${start}px` }}
                   onClick={() => state.openFromClassifierHit(hit)}
                 >
                   <span className="data-table-cell data-table-cell-number">{formatTime(hit.source_ts)}</span>
@@ -6884,9 +7213,7 @@ const ClassifierPane = ({ limit, className }: ClassifierPaneProps) => {
                 </button>
               );
             })}
-            {virtual.bottomSpacerHeight > 0 ? (
-              <div className="data-table-spacer" style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
-            ) : null}
+            </div>
             </div>
           </div>
         )}
@@ -6903,8 +7230,8 @@ type DarkPaneProps = {
 const DarkPane = ({ limit, className }: DarkPaneProps) => {
   const state = useTerminal();
   const items = limit ? state.filteredInferredDark.slice(0, limit) : state.filteredInferredDark;
-  const virtual = useVirtualList(items, state.darkScroll.listRef, !limit, 44);
-  useBottomHistoryGate(state.darkScroll.listRef, state.darkScroll.listNode, state.mode === "live" && !limit, () =>
+  const virtual = useMeasuredVirtualList(items, state.darkScroll.listRef, 44, 8, "dark");
+  useVirtualHistoryGate(state.mode === "live" && !limit, items.length, virtual.virtualItems.at(-1)?.index ?? -1, () =>
     void state.liveSession.loadOlder("inferred-dark")
   );
 
@@ -6953,18 +7280,21 @@ const DarkPane = ({ limit, className }: DarkPaneProps) => {
                 <span className="data-table-cell">EVIDENCE</span>
                 <span className="data-table-cell">NOTE</span>
               </div>
-            {virtual.topSpacerHeight > 0 ? (
-              <div className="data-table-spacer" style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
-            ) : null}
-            {virtual.visibleItems.map((event) => {
+            <div className="data-table-body" style={{ height: `${virtual.totalSize}px` }}>
+            {virtual.virtualItems.map(({ item: event, key, index, start, size }) => {
             const underlying = inferDarkUnderlying(event, state.equityPrintMap, state.equityJoinMap);
             const evidenceCount = event.evidence_refs.length;
 
             return (
               <button
-                className="data-table-row data-table-row-button data-table-row-dark"
-                key={`${event.trace_id}-${event.seq}`}
+                className={`data-table-row data-table-row-button data-table-row-dark data-table-virtual-row${index % 2 === 1 ? " is-even" : ""}`}
+                key={key}
                 type="button"
+                ref={virtual.measureElement}
+                data-row-start={String(start)}
+                data-row-size={String(size)}
+                data-tape-key={key}
+                style={{ top: `${start}px` }}
                 onClick={() => {
                   state.setSelectedAlert(null);
                   state.setSelectedClassifierHit(null);
@@ -6981,9 +7311,7 @@ const DarkPane = ({ limit, className }: DarkPaneProps) => {
               </button>
             );
             })}
-            {virtual.bottomSpacerHeight > 0 ? (
-              <div className="data-table-spacer" style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
-            ) : null}
+            </div>
             </div>
           </div>
         )}

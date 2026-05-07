@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import type { ClickHouseClient } from "@islandflow/storage";
 import {
+  HOT_LIVE_REDIS_KEYS,
   LiveStateManager,
   isLiveItemFresh,
   resolveGenericLiveLimits,
@@ -727,6 +728,122 @@ describe("LiveStateManager", () => {
     expect(snapshot.items).toHaveLength(1);
     expect(snapshot.watermark).toEqual({ ts: now, seq: 2 });
     expect(persisted).toHaveLength(1);
+  });
+
+  it("includes hot-channel health for options, nbbo, equities, and flow", async () => {
+    const manager = new LiveStateManager(makeClickHouse(), null);
+    const now = Date.now();
+
+    await manager.ingest("options", {
+      source_ts: now,
+      ingest_ts: now + 1,
+      seq: 1,
+      trace_id: "opt-health",
+      ts: now,
+      option_contract_id: "AAPL-2025-01-17-200-C",
+      price: 1,
+      size: 10,
+      exchange: "X"
+    });
+    await manager.ingest("nbbo", {
+      source_ts: now,
+      ingest_ts: now + 1,
+      seq: 1,
+      trace_id: "nbbo-health",
+      ts: now,
+      option_contract_id: "AAPL-2025-01-17-200-C",
+      bid: 1,
+      ask: 1.1,
+      bidSize: 10,
+      askSize: 10
+    });
+    await manager.ingest("equities", {
+      source_ts: now,
+      ingest_ts: now + 1,
+      seq: 1,
+      trace_id: "eq-health",
+      ts: now,
+      underlying_id: "AAPL",
+      price: 100,
+      size: 10,
+      exchange: "X",
+      offExchangeFlag: false
+    });
+    await manager.ingest("flow", {
+      source_ts: now,
+      ingest_ts: now + 1,
+      seq: 1,
+      trace_id: "flow-health",
+      id: "flow-health",
+      members: [],
+      features: {},
+      join_quality: {}
+    });
+
+    const health = manager.getHotChannelHealth();
+    expect(health.options.healthy).toBe(true);
+    expect(health.nbbo.healthy).toBe(true);
+    expect(health.equities.healthy).toBe(true);
+    expect(health.flow.healthy).toBe(true);
+    expect(health.options.freshness_age_ms).not.toBeNull();
+    expect(health.nbbo.freshness_age_ms).not.toBeNull();
+    expect(health.equities.freshness_age_ms).not.toBeNull();
+    expect(health.flow.freshness_age_ms).not.toBeNull();
+  });
+
+  it("tracks generic cache and scoped clickhouse snapshot sources separately", async () => {
+    const manager = new LiveStateManager(makeClickHouse(() => []), null);
+    const now = Date.now();
+
+    await manager.ingest("options", {
+      source_ts: now,
+      ingest_ts: now + 1,
+      seq: 1,
+      trace_id: "opt-snapshot",
+      ts: now,
+      option_contract_id: "SPY-2025-01-17-500-C",
+      price: 1,
+      size: 10,
+      exchange: "X"
+    });
+
+    await manager.getSnapshot({ channel: "options" });
+    await manager.getSnapshot({
+      channel: "options",
+      underlying_ids: ["QQQ"],
+      option_contract_id: "QQQ-2025-01-17-400-C"
+    });
+
+    const stats = manager.getStatsSnapshot();
+    expect(stats.genericCacheSnapshots).toBe(1);
+    expect(stats.scopedClickHouseSnapshots).toBe(1);
+  });
+
+  it("keeps backend channel health healthy when a scoped query is quiet", async () => {
+    const manager = new LiveStateManager(makeClickHouse(() => []), null);
+    const now = Date.now();
+
+    await manager.ingest("options", {
+      source_ts: now,
+      ingest_ts: now + 1,
+      seq: 1,
+      trace_id: "opt-global",
+      ts: now,
+      option_contract_id: "SPY-2025-01-17-500-C",
+      price: 1,
+      size: 10,
+      exchange: "X"
+    });
+
+    const quietSnapshot = await manager.getSnapshot({
+      channel: "options",
+      underlying_ids: ["QQQ"],
+      option_contract_id: "QQQ-2025-01-17-400-C"
+    });
+
+    expect(quietSnapshot.items).toEqual([]);
+    expect(manager.getHotChannelHealth().options.healthy).toBe(true);
+    expect(manager.getStatsSnapshot().freshnessAgeMsByKey[HOT_LIVE_REDIS_KEYS.options]).toBeLessThanOrEqual(50);
   });
 
   it("exposes freshness helper for feed status", () => {
