@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { getSubscriptionKey as getLiveSubscriptionKey } from "@islandflow/types";
 import {
   NAV_ITEMS,
   appendHistoryTail,
@@ -10,10 +11,12 @@ import {
   formatOptionContractLabel,
   flushPausableTapeData,
   getAlertWindowAnchorTs,
+  getScopedLiveAutoHydrationChannels,
   getLiveHistoryRetentionCap,
   getOptionTableSnapshot,
   getLiveFeedStatus,
   getLiveManifest,
+  mergeNewestWithOverflow,
   normalizeAlertSeverity,
   nextFlowFilterPopoverState,
   projectPausableTapeState,
@@ -243,6 +246,36 @@ describe("live tape pausable helpers", () => {
 });
 
 describe("live tape history helpers", () => {
+  it("promotes hot-window overflow into the history tail", () => {
+    const currentHot = [makeItem("hot-3", 3, 300), makeItem("hot-2", 2, 200), makeItem("hot-1", 1, 100)];
+    const incoming = [makeItem("hot-4", 4, 400)];
+
+    const { kept, evicted } = mergeNewestWithOverflow(incoming, currentHot, 3);
+    const nextHistory = appendHistoryTail([], evicted, kept, 5000);
+
+    expect(kept.map((item) => item.trace_id)).toEqual(["hot-4", "hot-3", "hot-2"]);
+    expect(nextHistory.map((item) => item.trace_id)).toEqual(["hot-1"]);
+  });
+
+  it("keeps the combined tape continuous beyond the hot live window", () => {
+    let hot: Array<ReturnType<typeof makeItem>> = [];
+    let history: Array<ReturnType<typeof makeItem>> = [];
+
+    for (let seq = 1; seq <= 5; seq += 1) {
+      const { kept, evicted } = mergeNewestWithOverflow([makeItem(`row-${seq}`, seq, seq * 100)], hot, 2);
+      hot = kept;
+      history = appendHistoryTail(history, evicted, hot, 5000);
+    }
+
+    expect([...hot, ...history].map((item) => item.trace_id)).toEqual([
+      "row-5",
+      "row-4",
+      "row-3",
+      "row-2",
+      "row-1"
+    ]);
+  });
+
   it("appends older scoped rows behind the hot live head", () => {
     const liveHead = Array.from({ length: 100 }, (_, idx) =>
       makeItem(`hot-${idx}`, 200 - idx, 2_000 - idx)
@@ -261,6 +294,16 @@ describe("live tape history helpers", () => {
     const next = appendHistoryTail([], older, liveHead, 5000);
 
     expect(next.map((item) => item.trace_id)).toEqual(["older"]);
+  });
+
+  it("dedupes the seam between promoted overflow and fetched history", () => {
+    const currentHot = [makeItem("hot-3", 3, 300), makeItem("hot-2", 2, 200), makeItem("hot-1", 1, 100)];
+    const { kept, evicted } = mergeNewestWithOverflow([makeItem("hot-4", 4, 400)], currentHot, 3);
+    const promoted = appendHistoryTail([], evicted, kept, 5000);
+    const merged = appendHistoryTail(promoted, [makeItem("hot-1", 1, 100), makeItem("older", 0, 50)], kept, 5000);
+
+    expect(merged.map((item) => item.trace_id)).toEqual(["hot-1", "older"]);
+    expect(new Set([...kept, ...merged].map((item) => item.trace_id)).size).toBe(kept.length + merged.length);
   });
 
   it("trims the history tail to the soft cap", () => {
@@ -286,6 +329,38 @@ describe("live tape history helpers", () => {
         underlying_ids: ["AAPL"]
       } as any)
     ).toBeGreaterThan(0);
+  });
+
+  it("keeps auto-hydrating scoped live history while next_before exists", () => {
+    const manifest = getLiveManifest(
+      "/tape",
+      "AAPL",
+      60000,
+      buildDefaultFlowFilters(),
+      {
+        underlying_ids: ["AAPL"],
+        option_contract_id: "AAPL-2025-01-17-200-C"
+      },
+      { underlying_ids: ["AAPL"] }
+    );
+    const historyCursors = Object.fromEntries(
+      manifest.map((subscription) => [getLiveSubscriptionKey(subscription), { ts: 1, seq: 1 }])
+    );
+
+    expect(
+      getScopedLiveAutoHydrationChannels(true, "/tape", manifest, historyCursors, {})
+    ).toEqual(["options", "equities"]);
+    expect(
+      getScopedLiveAutoHydrationChannels(true, "/tape", manifest, historyCursors, {
+        [getLiveSubscriptionKey(manifest.find((subscription) => subscription.channel === "options")!)]: true
+      })
+    ).toEqual(["equities"]);
+    expect(
+      getScopedLiveAutoHydrationChannels(true, "/tape", manifest, {
+        ...historyCursors,
+        [getLiveSubscriptionKey(manifest.find((subscription) => subscription.channel === "equities")!)]: null
+      }, {})
+    ).toEqual(["options"]);
   });
 });
 

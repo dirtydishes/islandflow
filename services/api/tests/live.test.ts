@@ -7,15 +7,17 @@ import {
   shouldFanoutLiveEvent
 } from "../src/live";
 
-const makeClickHouse = (): ClickHouseClient =>
+const makeClickHouse = (
+  queryResolver?: (query: string) => unknown[]
+): ClickHouseClient =>
   ({
     exec: async () => {},
     insert: async () => {},
     ping: async () => ({ success: true }),
     close: async () => {},
-    query: async () => ({
+    query: async ({ query }: { query: string }) => ({
       async json<T>() {
-        return [] as T;
+        return (queryResolver?.(query) ?? []) as T;
       }
     })
   }) as ClickHouseClient;
@@ -406,6 +408,160 @@ describe("LiveStateManager", () => {
       "flow-fresh",
       "flow-stale"
     ]);
+  });
+
+  it("seeds scoped option snapshots from clickhouse rows older than 24h", async () => {
+    const now = Date.now();
+    const staleTs = now - 25 * 60 * 60 * 1000;
+    const manager = new LiveStateManager(
+      makeClickHouse((query) =>
+        query.includes("FROM option_prints")
+          ? [
+              {
+                source_ts: staleTs,
+                ingest_ts: staleTs + 1,
+                seq: 1,
+                trace_id: "opt-ancient",
+                ts: staleTs,
+                option_contract_id: "AAPL-2025-01-17-200-C",
+                underlying_id: "AAPL",
+                price: 1,
+                size: 10,
+                exchange: "X",
+                signal_pass: true
+              }
+            ]
+          : []
+      ),
+      null
+    );
+
+    const snapshot = await manager.getSnapshot({
+      channel: "options",
+      underlying_ids: ["AAPL"],
+      option_contract_id: "AAPL-2025-01-17-200-C"
+    });
+
+    expect((snapshot.items as Array<{ trace_id: string }>).map((item) => item.trace_id)).toEqual([
+      "opt-ancient"
+    ]);
+    expect(snapshot.next_before).toEqual({ ts: staleTs, seq: 1 });
+    expect(isLiveItemFresh("options", snapshot.items[0], now)).toBe(false);
+  });
+
+  it("seeds scoped equity snapshots from clickhouse rows older than 24h", async () => {
+    const now = Date.now();
+    const staleTs = now - 25 * 60 * 60 * 1000;
+    const manager = new LiveStateManager(
+      makeClickHouse((query) =>
+        query.includes("FROM equity_prints")
+          ? [
+              {
+                source_ts: staleTs,
+                ingest_ts: staleTs + 1,
+                seq: 1,
+                trace_id: "eq-ancient",
+                ts: staleTs,
+                underlying_id: "AAPL",
+                price: 100,
+                size: 10,
+                exchange: "X",
+                offExchangeFlag: false
+              }
+            ]
+          : []
+      ),
+      null
+    );
+
+    const snapshot = await manager.getSnapshot({
+      channel: "equities",
+      underlying_ids: ["AAPL"]
+    });
+
+    expect((snapshot.items as Array<{ trace_id: string }>).map((item) => item.trace_id)).toEqual([
+      "eq-ancient"
+    ]);
+    expect(snapshot.next_before).toEqual({ ts: staleTs, seq: 1 });
+    expect(isLiveItemFresh("equities", snapshot.items[0], now)).toBe(false);
+  });
+
+  it("hydrates retained rows older than 24h into generic live snapshots and keeps them stale", async () => {
+    const redis = makeRedis();
+    const now = Date.now();
+    const staleTs = now - 25 * 60 * 60 * 1000;
+
+    await redis.lPush(
+      "live:options",
+      JSON.stringify({
+        source_ts: staleTs,
+        ingest_ts: staleTs + 1,
+        seq: 1,
+        trace_id: "opt-retained",
+        ts: staleTs,
+        option_contract_id: "AAPL-2025-01-17-200-C",
+        underlying_id: "AAPL",
+        price: 1,
+        size: 10,
+        exchange: "X",
+        signal_pass: true
+      })
+    );
+    await redis.hSet("live:cursors", "options", JSON.stringify({ ts: staleTs, seq: 1 }));
+
+    await redis.lPush(
+      "live:equities",
+      JSON.stringify({
+        source_ts: staleTs,
+        ingest_ts: staleTs + 1,
+        seq: 2,
+        trace_id: "eq-retained",
+        ts: staleTs,
+        underlying_id: "AAPL",
+        price: 100,
+        size: 10,
+        exchange: "X",
+        offExchangeFlag: false
+      })
+    );
+    await redis.hSet("live:cursors", "equities", JSON.stringify({ ts: staleTs, seq: 2 }));
+
+    await redis.lPush(
+      "live:flow",
+      JSON.stringify({
+        source_ts: staleTs,
+        ingest_ts: staleTs + 1,
+        seq: 3,
+        trace_id: "flow-retained",
+        id: "flow-retained",
+        members: ["opt-retained"],
+        features: {},
+        join_quality: {}
+      })
+    );
+    await redis.hSet("live:cursors", "flow", JSON.stringify({ ts: staleTs, seq: 3 }));
+
+    const manager = new LiveStateManager(makeClickHouse(), redis as never);
+    await manager.hydrate();
+
+    const [optionsSnapshot, equitiesSnapshot, flowSnapshot] = await Promise.all([
+      manager.getSnapshot({ channel: "options" }),
+      manager.getSnapshot({ channel: "equities" }),
+      manager.getSnapshot({ channel: "flow" })
+    ]);
+
+    expect((optionsSnapshot.items as Array<{ trace_id: string }>).map((item) => item.trace_id)).toEqual([
+      "opt-retained"
+    ]);
+    expect((equitiesSnapshot.items as Array<{ trace_id: string }>).map((item) => item.trace_id)).toEqual([
+      "eq-retained"
+    ]);
+    expect((flowSnapshot.items as Array<{ id: string }>).map((item) => item.id)).toEqual([
+      "flow-retained"
+    ]);
+    expect(isLiveItemFresh("options", optionsSnapshot.items[0], now)).toBe(false);
+    expect(isLiveItemFresh("equities", equitiesSnapshot.items[0], now)).toBe(false);
+    expect(isLiveItemFresh("flow", flowSnapshot.items[0], now)).toBe(false);
   });
 
   it("keeps only the newest NBBO quote per contract across hydrate and ingest", async () => {

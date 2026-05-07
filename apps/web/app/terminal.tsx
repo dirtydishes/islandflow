@@ -368,15 +368,15 @@ const buildItemKey = (item: SortableItem): string | null => {
   return null;
 };
 
-const mergeNewest = <T extends SortableItem>(
+export const mergeNewestWithOverflow = <T extends SortableItem>(
   incoming: T[],
   existing: T[],
   limit = LIVE_HOT_WINDOW,
   onTrim?: (evicted: number) => void
-): T[] => {
+): { kept: T[]; evicted: T[] } => {
   const combined = [...incoming, ...existing];
   if (combined.length === 0) {
-    return combined;
+    return { kept: combined, evicted: [] };
   }
 
   const seen = new Set<string>();
@@ -402,12 +402,24 @@ const mergeNewest = <T extends SortableItem>(
   });
 
   const safeLimit = Math.max(1, Math.floor(limit));
-  const evicted = Math.max(0, deduped.length - safeLimit);
-  if (evicted > 0) {
-    onTrim?.(evicted);
+  const evicted = deduped.slice(safeLimit);
+  if (evicted.length > 0) {
+    onTrim?.(evicted.length);
   }
 
-  return deduped.slice(0, safeLimit);
+  return {
+    kept: deduped.slice(0, safeLimit),
+    evicted
+  };
+};
+
+const mergeNewest = <T extends SortableItem>(
+  incoming: T[],
+  existing: T[],
+  limit = LIVE_HOT_WINDOW,
+  onTrim?: (evicted: number) => void
+): T[] => {
+  return mergeNewestWithOverflow(incoming, existing, limit, onTrim).kept;
 };
 
 const getTapeItemKey = (item: SortableItem): string => {
@@ -520,25 +532,27 @@ export const appendHistoryTail = <T extends SortableItem>(
     return current;
   }
 
-  const seen = new Set<string>();
-  for (const item of liveHead) {
-    seen.add(getTapeItemKey(item));
-  }
-  for (const item of current) {
-    seen.add(getTapeItemKey(item));
-  }
+  const seen = new Set<string>(liveHead.map((item) => getTapeItemKey(item)));
+  const combined: T[] = [];
 
-  const appended = [...current];
-  for (const item of incoming) {
+  for (const item of [...current, ...incoming]) {
     const key = getTapeItemKey(item);
     if (seen.has(key)) {
       continue;
     }
     seen.add(key);
-    appended.push(item);
+    combined.push(item);
   }
 
-  return cap > 0 ? appended.slice(0, cap) : appended;
+  combined.sort((a, b) => {
+    const delta = extractSortTs(b) - extractSortTs(a);
+    if (delta !== 0) {
+      return delta;
+    }
+    return extractSortSeq(b) - extractSortSeq(a);
+  });
+
+  return cap > 0 ? combined.slice(0, cap) : combined;
 };
 
 export const getLiveHistoryRetentionCap = (subscription: LiveSubscription): number => {
@@ -549,6 +563,36 @@ export const getLiveHistoryRetentionCap = (subscription: LiveSubscription): numb
     default:
       return LIVE_HISTORY_SOFT_CAP;
   }
+};
+
+export const getScopedLiveAutoHydrationChannels = (
+  enabled: boolean,
+  pathname: string,
+  manifest: LiveSubscription[],
+  historyCursors: Partial<Record<string, Cursor | null>>,
+  historyLoading: Partial<Record<string, boolean>>
+): Array<Extract<LiveSubscription["channel"], "options" | "equities">> => {
+  if (!enabled || pathname !== "/tape") {
+    return [];
+  }
+
+  const channels: Array<Extract<LiveSubscription["channel"], "options" | "equities">> = [];
+  for (const subscription of manifest) {
+    const scoped =
+      (subscription.channel === "options" &&
+        (subscription.underlying_ids?.length || subscription.option_contract_id)) ||
+      (subscription.channel === "equities" && subscription.underlying_ids?.length);
+    if (!scoped) {
+      continue;
+    }
+
+    const key = getLiveSubscriptionKey(subscription);
+    if (historyCursors[key] && !historyLoading[key]) {
+      channels.push(subscription.channel);
+    }
+  }
+
+  return channels;
 };
 
 export const getLiveFeedStatus = (
@@ -2544,6 +2588,27 @@ const useLiveSession = (
   const [inferredDarkHistory, setInferredDarkHistory] = useState<InferredDarkEvent[]>([]);
   const [chartCandles, setChartCandles] = useState<EquityCandle[]>([]);
   const [chartOverlay, setChartOverlay] = useState<EquityPrint[]>([]);
+  const optionsRef = useRef<OptionPrint[]>([]);
+  const nbboRef = useRef<OptionNBBO[]>([]);
+  const equitiesRef = useRef<EquityPrint[]>([]);
+  const equityQuotesRef = useRef<EquityQuote[]>([]);
+  const equityJoinsRef = useRef<EquityPrintJoin[]>([]);
+  const flowRef = useRef<FlowPacket[]>([]);
+  const smartMoneyRef = useRef<SmartMoneyEvent[]>([]);
+  const classifierHitsRef = useRef<ClassifierHitEvent[]>([]);
+  const alertsRef = useRef<AlertEvent[]>([]);
+  const inferredDarkRef = useRef<InferredDarkEvent[]>([]);
+  const chartCandlesRef = useRef<EquityCandle[]>([]);
+  const chartOverlayRef = useRef<EquityPrint[]>([]);
+  const optionsHistoryRef = useRef<OptionPrint[]>([]);
+  const nbboHistoryRef = useRef<OptionNBBO[]>([]);
+  const equitiesHistoryRef = useRef<EquityPrint[]>([]);
+  const equityJoinsHistoryRef = useRef<EquityPrintJoin[]>([]);
+  const flowHistoryRef = useRef<FlowPacket[]>([]);
+  const smartMoneyHistoryRef = useRef<SmartMoneyEvent[]>([]);
+  const classifierHitsHistoryRef = useRef<ClassifierHitEvent[]>([]);
+  const alertsHistoryRef = useRef<AlertEvent[]>([]);
+  const inferredDarkHistoryRef = useRef<InferredDarkEvent[]>([]);
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<number | null>(null);
   const idleWatchdogRef = useRef<number | null>(null);
@@ -2555,6 +2620,27 @@ const useLiveSession = (
     () => getLiveManifest(pathname, chartTicker.toUpperCase(), chartIntervalMs, flowFilters, optionScope, equityScope),
     [pathname, chartTicker, chartIntervalMs, flowFilters, optionScope, equityScope]
   );
+
+  const replaceArrayState = <T,>(
+    setter: Dispatch<SetStateAction<T[]>>,
+    ref: { current: T[] },
+    next: T[]
+  ): void => {
+    ref.current = next;
+    setter(next);
+  };
+
+  const mergeHistoryState = <T extends SortableItem>(
+    setter: Dispatch<SetStateAction<T[]>>,
+    ref: { current: T[] },
+    incoming: T[],
+    liveHead: T[],
+    cap = LIVE_HISTORY_SOFT_CAP
+  ): void => {
+    const next = appendHistoryTail(ref.current, incoming, liveHead, cap);
+    ref.current = next;
+    setter(next);
+  };
 
   useEffect(() => {
     if (!enabled) {
@@ -2586,6 +2672,27 @@ const useLiveSession = (
       setInferredDarkHistory([]);
       setChartCandles([]);
       setChartOverlay([]);
+      optionsRef.current = [];
+      nbboRef.current = [];
+      equitiesRef.current = [];
+      equityQuotesRef.current = [];
+      equityJoinsRef.current = [];
+      flowRef.current = [];
+      smartMoneyRef.current = [];
+      classifierHitsRef.current = [];
+      alertsRef.current = [];
+      inferredDarkRef.current = [];
+      chartCandlesRef.current = [];
+      chartOverlayRef.current = [];
+      optionsHistoryRef.current = [];
+      nbboHistoryRef.current = [];
+      equitiesHistoryRef.current = [];
+      equityJoinsHistoryRef.current = [];
+      flowHistoryRef.current = [];
+      smartMoneyHistoryRef.current = [];
+      classifierHitsHistoryRef.current = [];
+      alertsHistoryRef.current = [];
+      inferredDarkHistoryRef.current = [];
       subscribedKeysRef.current = new Set();
       subscribedMapRef.current = new Map();
       if (socketRef.current) {
@@ -2642,62 +2749,112 @@ const useLiveSession = (
       const updateAt = Date.now();
 
       const mergeItems = <T extends SortableItem>(
-        setter: React.Dispatch<React.SetStateAction<T[]>>,
+        setter: Dispatch<SetStateAction<T[]>>,
+        ref: { current: T[] },
         nextItems: T[],
-        retentionLimit = LIVE_HOT_WINDOW
+        retentionLimit = LIVE_HOT_WINDOW,
+        history?: {
+          setter: Dispatch<SetStateAction<T[]>>;
+          ref: { current: T[] };
+          cap?: number;
+        }
       ) => {
-        setter((prev) =>
-          message.op === "snapshot"
-            ? shouldRetainLiveSnapshotHistory(
-                subscription.channel,
-                true,
-                nextItems.length,
-                prev.length
-              )
-              ? prev
-              : (nextItems as T[])
-            : mergeNewest(nextItems as T[], prev, retentionLimit, (evicted) =>
-                incrementRetentionMetric("hotWindowEvictions", evicted)
-              )
+        if (message.op === "snapshot") {
+          const next = shouldRetainLiveSnapshotHistory(
+            subscription.channel,
+            true,
+            nextItems.length,
+            ref.current.length
+          )
+            ? ref.current
+            : nextItems;
+          replaceArrayState(setter, ref, next);
+          return;
+        }
+
+        const { kept, evicted } = mergeNewestWithOverflow(
+          nextItems,
+          ref.current,
+          retentionLimit,
+          (evictedCount) => incrementRetentionMetric("hotWindowEvictions", evictedCount)
         );
+        replaceArrayState(setter, ref, kept);
+        if (history && evicted.length > 0) {
+          mergeHistoryState(history.setter, history.ref, evicted, kept, history.cap);
+        }
       };
 
       switch (subscription.channel) {
         case "options":
-          mergeItems(setOptions, items as OptionPrint[], LIVE_HOT_WINDOW_OPTIONS);
+          mergeItems(setOptions, optionsRef, items as OptionPrint[], LIVE_HOT_WINDOW_OPTIONS, {
+            setter: setOptionsHistory,
+            ref: optionsHistoryRef,
+            cap: getLiveHistoryRetentionCap(subscription)
+          });
           break;
         case "nbbo":
-          mergeItems(setNbbo, items as OptionNBBO[]);
+          mergeItems(setNbbo, nbboRef, items as OptionNBBO[], LIVE_HOT_WINDOW, {
+            setter: setNbboHistory,
+            ref: nbboHistoryRef
+          });
           break;
         case "equities":
-          mergeItems(setEquities, items as EquityPrint[]);
+          mergeItems(setEquities, equitiesRef, items as EquityPrint[], LIVE_HOT_WINDOW, {
+            setter: setEquitiesHistory,
+            ref: equitiesHistoryRef,
+            cap: getLiveHistoryRetentionCap(subscription)
+          });
           break;
         case "equity-quotes":
-          mergeItems(setEquityQuotes, items as EquityQuote[]);
+          mergeItems(setEquityQuotes, equityQuotesRef, items as EquityQuote[]);
           break;
         case "equity-joins":
-          mergeItems(setEquityJoins, items as EquityPrintJoin[]);
+          mergeItems(setEquityJoins, equityJoinsRef, items as EquityPrintJoin[], LIVE_HOT_WINDOW, {
+            setter: setEquityJoinsHistory,
+            ref: equityJoinsHistoryRef
+          });
           break;
         case "flow":
-          mergeItems(setFlow, items as FlowPacket[]);
+          mergeItems(setFlow, flowRef, items as FlowPacket[], LIVE_HOT_WINDOW, {
+            setter: setFlowHistory,
+            ref: flowHistoryRef
+          });
           break;
         case "smart-money":
-          mergeItems(setSmartMoney, items as SmartMoneyEvent[]);
+          mergeItems(setSmartMoney, smartMoneyRef, items as SmartMoneyEvent[], LIVE_HOT_WINDOW, {
+            setter: setSmartMoneyHistory,
+            ref: smartMoneyHistoryRef
+          });
           break;
         case "classifier-hits":
-          mergeItems(setClassifierHits, items as ClassifierHitEvent[]);
+          mergeItems(
+            setClassifierHits,
+            classifierHitsRef,
+            items as ClassifierHitEvent[],
+            LIVE_HOT_WINDOW,
+            {
+              setter: setClassifierHitsHistory,
+              ref: classifierHitsHistoryRef
+            }
+          );
           break;
         case "alerts":
-          mergeItems(setAlerts, items as AlertEvent[]);
+          mergeItems(setAlerts, alertsRef, items as AlertEvent[], LIVE_HOT_WINDOW, {
+            setter: setAlertsHistory,
+            ref: alertsHistoryRef
+          });
           break;
         case "inferred-dark":
-          mergeItems(setInferredDark, items as InferredDarkEvent[]);
+          mergeItems(setInferredDark, inferredDarkRef, items as InferredDarkEvent[], LIVE_HOT_WINDOW, {
+            setter: setInferredDarkHistory,
+            ref: inferredDarkHistoryRef
+          });
           break;
         case "equity-candles":
-          mergeItems(setChartCandles, items as EquityCandle[]);
+          mergeItems(setChartCandles, chartCandlesRef, items as EquityCandle[]);
           break;
         case "equity-overlay":
-          mergeItems(setChartOverlay, items as EquityPrint[]);
+          mergeItems(setChartOverlay, chartOverlayRef, items as EquityPrint[]);
           break;
       }
 
@@ -2839,10 +2996,14 @@ const useLiveSession = (
         .filter((channel) => channel === "options" || channel === "equities")
     );
     if (resetScopedChannels.has("options")) {
+      optionsRef.current = [];
+      optionsHistoryRef.current = [];
       setOptions([]);
       setOptionsHistory([]);
     }
     if (resetScopedChannels.has("equities")) {
+      equitiesRef.current = [];
+      equitiesHistoryRef.current = [];
       setEquities([]);
       setEquitiesHistory([]);
     }
@@ -2926,41 +3087,56 @@ const useLiveSession = (
 
         const mergeOlder = <T extends SortableItem>(
           setter: Dispatch<SetStateAction<T[]>>,
+          ref: { current: T[] },
           liveHead: T[],
           cap = LIVE_HISTORY_SOFT_CAP
         ) => {
-          setter((prev) => appendHistoryTail(prev, older as T[], liveHead, cap));
+          mergeHistoryState(setter, ref, older as T[], liveHead, cap);
         };
 
         switch (subscription.channel) {
           case "options":
-            mergeOlder(setOptionsHistory, options, getLiveHistoryRetentionCap(subscription));
+            mergeOlder(
+              setOptionsHistory,
+              optionsHistoryRef,
+              optionsRef.current,
+              getLiveHistoryRetentionCap(subscription)
+            );
             break;
           case "nbbo":
-            mergeOlder(setNbboHistory, nbbo);
+            mergeOlder(setNbboHistory, nbboHistoryRef, nbboRef.current);
             break;
           case "equities":
-            mergeOlder(setEquitiesHistory, equities, getLiveHistoryRetentionCap(subscription));
+            mergeOlder(
+              setEquitiesHistory,
+              equitiesHistoryRef,
+              equitiesRef.current,
+              getLiveHistoryRetentionCap(subscription)
+            );
             break;
           case "equity-quotes":
             break;
           case "equity-joins":
-            mergeOlder(setEquityJoinsHistory, equityJoins);
+            mergeOlder(setEquityJoinsHistory, equityJoinsHistoryRef, equityJoinsRef.current);
             break;
           case "flow":
-            mergeOlder(setFlowHistory, flow);
+            mergeOlder(setFlowHistory, flowHistoryRef, flowRef.current);
             break;
           case "smart-money":
-            mergeOlder(setSmartMoneyHistory, smartMoney);
+            mergeOlder(setSmartMoneyHistory, smartMoneyHistoryRef, smartMoneyRef.current);
             break;
           case "classifier-hits":
-            mergeOlder(setClassifierHitsHistory, classifierHits);
+            mergeOlder(
+              setClassifierHitsHistory,
+              classifierHitsHistoryRef,
+              classifierHitsRef.current
+            );
             break;
           case "alerts":
-            mergeOlder(setAlertsHistory, alerts);
+            mergeOlder(setAlertsHistory, alertsHistoryRef, alertsRef.current);
             break;
           case "inferred-dark":
-            mergeOlder(setInferredDarkHistory, inferredDark);
+            mergeOlder(setInferredDarkHistory, inferredDarkHistoryRef, inferredDarkRef.current);
             break;
         }
 
@@ -2978,41 +3154,18 @@ const useLiveSession = (
         setHistoryLoading((current) => ({ ...current, [key]: false }));
       }
     },
-    [
-      enabled,
-      manifest,
-      historyCursors,
-      historyLoading,
-      options,
-      nbbo,
-      equities,
-      equityJoins,
-      flow,
-      smartMoney,
-      classifierHits,
-      alerts,
-      inferredDark
-    ]
+    [enabled, manifest, historyCursors, historyLoading]
   );
 
   useEffect(() => {
-    if (!enabled || pathname !== "/tape") {
-      return;
-    }
-    const scoped = manifest.filter(
-      (subscription) =>
-        (subscription.channel === "options" &&
-          (subscription.underlying_ids?.length || subscription.option_contract_id)) ||
-        (subscription.channel === "equities" && subscription.underlying_ids?.length)
-    );
-    if (scoped.length === 0) {
-      return;
-    }
-    for (const subscription of scoped) {
-      const key = getLiveSubscriptionKey(subscription);
-      if (historyCursors[key] && !historyLoading[key]) {
-        void loadOlder(subscription.channel);
-      }
+    for (const channel of getScopedLiveAutoHydrationChannels(
+      enabled,
+      pathname,
+      manifest,
+      historyCursors,
+      historyLoading
+    )) {
+      void loadOlder(channel);
     }
   }, [enabled, pathname, manifest, historyCursors, historyLoading, loadOlder]);
 

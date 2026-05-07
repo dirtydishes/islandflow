@@ -112,7 +112,7 @@ import {
 } from "@islandflow/types";
 import { createClient } from "redis";
 import { z } from "zod";
-import { LIVE_FEED_LOOKBACK_MS, LiveStateManager, shouldFanoutLiveEvent } from "./live";
+import { LiveStateManager, shouldFanoutLiveEvent } from "./live";
 
 const service = "api";
 const logger = createLogger({ service });
@@ -617,14 +617,12 @@ const parseLiveOptionPrintFilters = (url: URL): OptionPrintQueryFilters => {
   return {
     ...storageFilters,
     underlyingIds: parseScopeList(url, "underlying_id", "underlying_ids"),
-    optionContractId: url.searchParams.get("option_contract_id") ?? undefined,
-    sinceTs: Date.now() - LIVE_FEED_LOOKBACK_MS
+    optionContractId: url.searchParams.get("option_contract_id") ?? undefined
   };
 };
 
 const parseLiveEquityPrintFilters = (url: URL): EquityPrintQueryFilters => ({
-  underlyingIds: parseScopeList(url, "underlying_id", "underlying_ids"),
-  sinceTs: Date.now() - LIVE_FEED_LOOKBACK_MS
+  underlyingIds: parseScopeList(url, "underlying_id", "underlying_ids")
 });
 
 const matchesScopedOptionSubscription = (

@@ -408,13 +408,7 @@ export class LiveStateManager {
     const config = this.generic[channel];
     if (this.redis?.isOpen) {
       const payloads = await this.redis.lRange(config.redisKey, 0, config.limit - 1);
-      const cached = normalizeGenericItems(
-        channel,
-        parseJsonList(payloads, config.parse).filter((item) =>
-          isWithinLiveFeedLookback(channel, item)
-        ),
-        config
-      );
+      const cached = normalizeGenericItems(channel, parseJsonList(payloads, config.parse), config);
       if (cached.length > 0) {
         this.genericItems.set(channel, cached);
         this.stats.genericHydrateFromRedis += 1;
@@ -434,9 +428,7 @@ export class LiveStateManager {
 
     const fresh = normalizeGenericItems(
       channel,
-      (await config.fetchRecent(this.clickhouse, config.limit)).filter((item) =>
-        isWithinLiveFeedLookback(channel, item)
-      ),
+      await config.fetchRecent(this.clickhouse, config.limit),
       config
     );
     this.stats.genericHydrateFromClickHouse += 1;
@@ -467,8 +459,7 @@ export class LiveStateManager {
             optionTypes: subscription.filters?.optionTypes,
             minNotional: subscription.filters?.minNotional,
             underlyingIds: subscription.underlying_ids,
-            optionContractId: subscription.option_contract_id,
-            sinceTs: Date.now() - LIVE_FEED_LOOKBACK_MS
+            optionContractId: subscription.option_contract_id
           };
           const items = await fetchRecentOptionPrints(
             this.clickhouse,
@@ -487,7 +478,6 @@ export class LiveStateManager {
         const config = this.generic.options;
         const limit = snapshotLimitFor(subscription, config.limit);
         const items = (this.genericItems.get("options") ?? []).filter((item) =>
-          isWithinLiveFeedLookback("options", item) &&
           matchesOptionPrintFilters(item, subscription.filters)
         ).slice(0, limit);
         return {
@@ -501,7 +491,6 @@ export class LiveStateManager {
         const config = this.generic.flow;
         const limit = snapshotLimitFor(subscription, config.limit);
         const items = (this.genericItems.get("flow") ?? []).filter((item) =>
-          isWithinLiveFeedLookback("flow", item) &&
           matchesFlowPacketFilters(item, subscription.filters)
         ).slice(0, limit);
         return {
@@ -516,8 +505,7 @@ export class LiveStateManager {
         const limit = snapshotLimitFor(subscription, config.limit);
         if (subscription.underlying_ids?.length) {
           const filters: EquityPrintQueryFilters = {
-            underlyingIds: subscription.underlying_ids,
-            sinceTs: Date.now() - LIVE_FEED_LOOKBACK_MS
+            underlyingIds: subscription.underlying_ids
           };
           const items = await fetchRecentEquityPrints(this.clickhouse, limit, filters);
           return {
@@ -527,9 +515,7 @@ export class LiveStateManager {
             next_before: nextBeforeForItems(items, config.cursor)
           };
         }
-        const items = (this.genericItems.get("equities") ?? []).filter((item) =>
-          isWithinLiveFeedLookback("equities", item)
-        ).slice(0, limit);
+        const items = (this.genericItems.get("equities") ?? []).slice(0, limit);
         return {
           subscription,
           items,
@@ -568,9 +554,7 @@ export class LiveStateManager {
       default: {
         const config = this.generic[subscription.channel];
         const limit = snapshotLimitFor(subscription, config.limit);
-        const items = (this.genericItems.get(subscription.channel) ?? []).filter((item) =>
-          isWithinLiveFeedLookback(subscription.channel, item)
-        ).slice(0, limit);
+        const items = (this.genericItems.get(subscription.channel) ?? []).slice(0, limit);
         return {
           subscription,
           items,
