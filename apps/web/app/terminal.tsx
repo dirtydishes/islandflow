@@ -234,19 +234,31 @@ const sampleToLimit = <T,>(items: T[], limit: number): T[] => {
 };
 
 const readErrorDetail = async (response: Response): Promise<string> => {
+  const statusLabel = `HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ""}`;
   const text = await response.text();
   if (!text) {
-    return "";
+    return statusLabel;
   }
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+  const trimmed = text.trimStart();
+  const truncated = text.length > 600 ? `${text.slice(0, 600)}...` : text;
+
+  if (!contentType.includes("application/json")) {
+    if (/^<!doctype html/i.test(trimmed) || /^<html/i.test(trimmed)) {
+      return `${statusLabel}: received HTML response instead of JSON`;
+    }
+    return `${statusLabel}: ${truncated}`;
+  }
+
   try {
     const payload = JSON.parse(text) as {
       detail?: string;
       error?: string;
       message?: string;
     };
-    return payload.detail ?? payload.error ?? payload.message ?? text;
+    return payload.detail ?? payload.error ?? payload.message ?? `${statusLabel}: ${truncated}`;
   } catch {
-    return text;
+    return `${statusLabel}: ${truncated}`;
   }
 };
 
@@ -5194,6 +5206,9 @@ const useTerminalState = () => {
         .then((payload: { data?: OptionPrint[] }) => {
           const next = new Map<string, OptionPrint>();
           for (const item of payload.data ?? []) {
+            if (!item || !item.trace_id) {
+              continue;
+            }
             next.set(item.trace_id, item);
           }
           if (next.size > 0) {
@@ -5241,6 +5256,9 @@ const useTerminalState = () => {
       .then((payload: { data?: EquityPrintJoin[] }) => {
         const next = new Map<string, EquityPrintJoin>();
         for (const item of payload.data ?? []) {
+          if (!item || !item.id || !item.trace_id) {
+            continue;
+          }
           next.set(item.id, item);
           next.set(item.trace_id, item);
           if (item.print_trace_id) {
@@ -5441,6 +5459,12 @@ const useTerminalState = () => {
         if (!response.ok) {
           throw new Error(await readErrorDetail(response));
         }
+        const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+        if (!contentType.includes("application/json")) {
+          throw new Error(
+            `Unexpected content type from /lookup/options-support: ${contentType || "unknown"}`
+          );
+        }
         return response.json() as Promise<{
           packets?: FlowPacket[];
           smart_money?: SmartMoneyEvent[];
@@ -5455,19 +5479,28 @@ const useTerminalState = () => {
         const now = Date.now();
         const packetMap = new Map<string, FlowPacket>();
         for (const packet of payload.packets ?? []) {
+          if (!packet || !packet.id) {
+            continue;
+          }
           packetMap.set(packet.id, packet);
         }
         if (packetMap.size > 0) {
           setPinnedFlowPacketMap((prev) => upsertPinnedEntries(prev, packetMap, now));
         }
         if (payload.smart_money?.length) {
+          const filtered = payload.smart_money.filter((item): item is SmartMoneyEvent =>
+            Boolean(item && item.trace_id)
+          );
           setOptionSupportSmartMoney((prev) =>
-            mergeNewest(payload.smart_money ?? [], prev, PINNED_EVIDENCE_MAX_ITEMS)
+            mergeNewest(filtered, prev, PINNED_EVIDENCE_MAX_ITEMS)
           );
         }
         if (payload.classifier_hits?.length) {
+          const filtered = payload.classifier_hits.filter((item): item is ClassifierHitEvent =>
+            Boolean(item && item.trace_id)
+          );
           setOptionSupportClassifierHits((prev) =>
-            mergeNewest(payload.classifier_hits ?? [], prev, PINNED_EVIDENCE_MAX_ITEMS)
+            mergeNewest(filtered, prev, PINNED_EVIDENCE_MAX_ITEMS)
           );
         }
         if (payload.nbbo_by_trace_id) {
@@ -5630,11 +5663,14 @@ const useTerminalState = () => {
         }
         return response.json();
       })
-      .then((payload: { data?: OptionPrint[] }) => {
-        const next = new Map<string, OptionPrint>();
-        for (const item of payload.data ?? []) {
-          next.set(item.trace_id, item);
-        }
+        .then((payload: { data?: OptionPrint[] }) => {
+          const next = new Map<string, OptionPrint>();
+          for (const item of payload.data ?? []) {
+            if (!item || !item.trace_id) {
+              continue;
+            }
+            next.set(item.trace_id, item);
+          }
         if (next.size > 0) {
           setPinnedOptionPrintMap((prev) => upsertPinnedEntries(prev, next, Date.now()));
         }
@@ -5939,11 +5975,14 @@ const useTerminalState = () => {
         }
         return response.json();
       })
-      .then((payload: { data?: OptionPrint[] }) => {
-        const next = new Map<string, OptionPrint>();
-        for (const item of payload.data ?? []) {
-          next.set(item.trace_id, item);
-        }
+        .then((payload: { data?: OptionPrint[] }) => {
+          const next = new Map<string, OptionPrint>();
+          for (const item of payload.data ?? []) {
+            if (!item || !item.trace_id) {
+              continue;
+            }
+            next.set(item.trace_id, item);
+          }
         if (next.size > 0) {
           const now = Date.now();
           setPinnedOptionPrintMap((prev) => upsertPinnedEntries(prev, next, now));
@@ -6657,6 +6696,7 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
               const commonProps = {
                 className: `data-table-row data-table-row-button data-table-row-classified data-table-row-options data-table-virtual-row${index % 2 === 1 ? " is-even" : ""}${decor ? ` is-classified classifier-${decor.tone}` : ""}`,
                 style: rowStyle,
+                "data-index": index,
                 "data-row-start": String(start),
                 "data-row-size": String(size),
                 "data-tape-key": key,
@@ -6813,6 +6853,7 @@ const EquitiesPane = ({ limit }: EquitiesPaneProps) => {
                 className={`data-table-row data-table-row-equities data-table-virtual-row${index % 2 === 1 ? " is-even" : ""}`}
                 key={key}
                 ref={virtual.measureElement}
+                data-index={index}
                 data-row-start={String(start)}
                 data-row-size={String(size)}
                 data-tape-key={key}
@@ -6962,6 +7003,7 @@ const FlowPane = ({ limit, title = "Flow" }: FlowPaneProps) => {
                 className={`data-table-row data-table-row-flow data-table-virtual-row${index % 2 === 1 ? " is-even" : ""}${nbboStale || nbboMissing ? " data-table-row-warn" : ""}`}
                 key={key}
                 ref={virtual.measureElement}
+                data-index={index}
                 data-row-start={String(start)}
                 data-row-size={String(size)}
                 data-tape-key={key}
@@ -7061,6 +7103,7 @@ const AlertsPane = ({ limit, withStrip = false, className }: AlertsPaneProps) =>
                 key={key}
                 type="button"
                 ref={virtual.measureElement}
+                data-index={index}
                 data-row-start={String(start)}
                 data-row-size={String(size)}
                 data-tape-key={key}
@@ -7171,6 +7214,7 @@ const ClassifierPane = ({ limit, className }: ClassifierPaneProps) => {
                 key={key}
                 type="button"
                 ref={virtual.measureElement}
+                data-index={index}
                 data-row-start={String(start)}
                 data-row-size={String(size)}
                 data-tape-key={key}
@@ -7199,6 +7243,7 @@ const ClassifierPane = ({ limit, className }: ClassifierPaneProps) => {
                   key={key}
                   type="button"
                   ref={virtual.measureElement}
+                  data-index={index}
                   data-row-start={String(start)}
                   data-row-size={String(size)}
                   data-tape-key={key}
@@ -7291,6 +7336,7 @@ const DarkPane = ({ limit, className }: DarkPaneProps) => {
                 key={key}
                 type="button"
                 ref={virtual.measureElement}
+                data-index={index}
                 data-row-start={String(start)}
                 data-row-size={String(size)}
                 data-tape-key={key}
