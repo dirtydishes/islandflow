@@ -185,6 +185,11 @@ describe("live tape pausable helpers", () => {
     expect(getLiveFeedStatus("disconnected", 1000, 500, 1601)).toBe("disconnected");
   });
 
+  it("waits for an additional behind-delay before surfacing stale", () => {
+    expect(getLiveFeedStatus("connected", 1000, 500, 2000, 15_000)).toBe("connected");
+    expect(getLiveFeedStatus("connected", 1000, 500, 16_501, 15_000)).toBe("stale");
+  });
+
   it("keeps visible history even when live status is stale", () => {
     const projected = projectPausableTapeState([makeItem("stale", 7, 1000)], "stale", 2000);
     expect(projected.items.map((item) => item.trace_id)).toEqual(["stale"]);

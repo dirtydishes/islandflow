@@ -1,9 +1,17 @@
+import { rm } from "node:fs/promises";
+
 const run = async () => {
   const port = 3000;
+  const distDir = ".next-dev";
   console.log(`[web] starting Next.js dev server on port ${port}`);
 
   const path = Bun.env.PATH ?? "";
   const cwd = `${import.meta.dir}/..`;
+  const distPath = `${cwd}/${distDir}`;
+
+  // Clear potentially stale dev artifacts from interrupted prior runs.
+  await rm(distPath, { recursive: true, force: true });
+  console.log(`[web] cleared stale Next.js dev artifacts at ${distDir}`);
 
   const child = Bun.spawn(["next", "dev", "-p", String(port)], {
     cwd,

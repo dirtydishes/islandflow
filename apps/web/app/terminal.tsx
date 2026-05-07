@@ -72,6 +72,7 @@ const LIVE_HOT_WINDOW_OPTIONS = parseBoundedInt(
 const LIVE_OPTIONS_STALE_MS = 15_000;
 const LIVE_NBBO_STALE_MS = 15_000;
 const LIVE_EQUITIES_STALE_MS = 15_000;
+const LIVE_FEED_BEHIND_DELAY_MS = 15_000;
 const LIVE_EQUITIES_SILENT_WARNING_MS = parseBoundedInt(
   process.env.NEXT_PUBLIC_LIVE_EQUITIES_SILENT_WARNING_MS,
   25_000,
@@ -491,7 +492,8 @@ export const getLiveFeedStatus = (
   sourceStatus: WsStatus,
   freshestTs: number | null,
   thresholdMs: number,
-  now = Date.now()
+  now = Date.now(),
+  behindDelayMs = 0
 ): WsStatus => {
   if (sourceStatus !== "connected") {
     return sourceStatus;
@@ -499,7 +501,14 @@ export const getLiveFeedStatus = (
   if (freshestTs === null) {
     return "connected";
   }
-  return isFreshLiveItem(freshestTs, thresholdMs, now) ? "connected" : "stale";
+
+  const ageMs = now - freshestTs;
+  if (ageMs <= thresholdMs) {
+    return "connected";
+  }
+
+  const behindMs = ageMs - thresholdMs;
+  return behindMs > behindDelayMs ? "stale" : "connected";
 };
 
 type TapeState<T> = {
@@ -944,8 +953,6 @@ export const countActiveFlowFilterGroups = (filters: OptionFlowFilters): number 
 
   return count;
 };
-
-const isFreshLiveItem = (ts: number, thresholdMs: number, now = Date.now()): boolean => now - ts <= thresholdMs;
 
 export const toggleFilterValue = <T extends string>(
   values: T[] | undefined,
@@ -1995,7 +2002,13 @@ const usePausableTapeView = <T extends SortableItem & { seq: number }>(
   }, [config.sourceItems, getItemTs]);
 
   const status = config.enabled
-    ? getLiveFeedStatus(config.sourceStatus, freshestTs, config.freshnessMs, clock)
+    ? getLiveFeedStatus(
+        config.sourceStatus,
+        freshestTs,
+        config.freshnessMs,
+        clock,
+        LIVE_FEED_BEHIND_DELAY_MS
+      )
     : "disconnected";
   const projected = projectPausableTapeState(data.visible, status, config.lastUpdate);
 

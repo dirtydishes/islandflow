@@ -11,6 +11,7 @@ coverage/
 logs/
 .tmp/
 apps/web/.next/
+apps/web/.next-dev/
 
 # Local assistant artifacts
 session-ses_*.md
