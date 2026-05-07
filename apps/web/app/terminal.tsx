@@ -1218,6 +1218,7 @@ export const getOptionTableSnapshot = (
 
 type ListScrollState = {
   listRef: React.RefObject<HTMLDivElement>;
+  listNode: HTMLDivElement | null;
   setListRef: (node: HTMLDivElement | null) => void;
   isAtTop: boolean;
   isAtTopRef: React.MutableRefObject<boolean>;
@@ -1309,6 +1310,7 @@ const useListScroll = (): ListScrollState => {
 
   return {
     listRef,
+    listNode,
     setListRef,
     isAtTop,
     isAtTopRef,
@@ -1369,6 +1371,7 @@ const useScrollAnchor = (
 
 const useBottomHistoryGate = (
   listRef: React.RefObject<HTMLDivElement>,
+  listNode: HTMLDivElement | null,
   enabled: boolean,
   onLoadOlder: () => void
 ): void => {
@@ -1381,7 +1384,7 @@ const useBottomHistoryGate = (
     if (!enabled) {
       return;
     }
-    const element = listRef.current;
+    const element = listNode ?? listRef.current;
     if (!element) {
       return;
     }
@@ -1398,7 +1401,7 @@ const useBottomHistoryGate = (
     return () => {
       element.removeEventListener("scroll", maybeLoad);
     };
-  }, [enabled, listRef]);
+  }, [enabled, listNode, listRef]);
 };
 
 type VirtualListResult<T> = {
@@ -6099,7 +6102,7 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
   const state = useTerminal();
   const items = limit ? state.filteredOptions.slice(0, limit) : state.filteredOptions;
   const virtual = useVirtualList(items, state.optionsScroll.listRef, !limit, 36);
-  useBottomHistoryGate(state.optionsScroll.listRef, state.mode === "live" && !limit, () =>
+  useBottomHistoryGate(state.optionsScroll.listRef, state.optionsScroll.listNode, state.mode === "live" && !limit, () =>
     void state.liveSession.loadOlder("options")
   );
 
@@ -6276,7 +6279,7 @@ const EquitiesPane = ({ limit }: EquitiesPaneProps) => {
   const state = useTerminal();
   const items = limit ? state.filteredEquities.slice(0, limit) : state.filteredEquities;
   const virtual = useVirtualList(items, state.equitiesScroll.listRef, !limit, 36);
-  useBottomHistoryGate(state.equitiesScroll.listRef, state.mode === "live" && !limit, () =>
+  useBottomHistoryGate(state.equitiesScroll.listRef, state.equitiesScroll.listNode, state.mode === "live" && !limit, () =>
     void state.liveSession.loadOlder("equities")
   );
 
@@ -6374,7 +6377,7 @@ const FlowPane = ({ limit, title = "Flow" }: FlowPaneProps) => {
   const state = useTerminal();
   const items = limit ? state.filteredFlow.slice(0, limit) : state.filteredFlow;
   const virtual = useVirtualList(items, state.flowScroll.listRef, !limit, 44);
-  useBottomHistoryGate(state.flowScroll.listRef, state.mode === "live" && !limit, () =>
+  useBottomHistoryGate(state.flowScroll.listRef, state.flowScroll.listNode, state.mode === "live" && !limit, () =>
     void state.liveSession.loadOlder("flow")
   );
 
@@ -6516,7 +6519,7 @@ const AlertsPane = ({ limit, withStrip = false, className }: AlertsPaneProps) =>
   const state = useTerminal();
   const items = limit ? state.filteredAlerts.slice(0, limit) : state.filteredAlerts;
   const virtual = useVirtualList(items, state.alertsScroll.listRef, !limit, 46);
-  useBottomHistoryGate(state.alertsScroll.listRef, state.mode === "live" && !limit, () =>
+  useBottomHistoryGate(state.alertsScroll.listRef, state.alertsScroll.listNode, state.mode === "live" && !limit, () =>
     void state.liveSession.loadOlder("alerts")
   );
 
@@ -6615,7 +6618,7 @@ type ClassifierPaneProps = {
 
 const ClassifierPane = ({ limit, className }: ClassifierPaneProps) => {
   const state = useTerminal();
-  useBottomHistoryGate(state.classifierScroll.listRef, state.mode === "live" && !limit, () => {
+  useBottomHistoryGate(state.classifierScroll.listRef, state.classifierScroll.listNode, state.mode === "live" && !limit, () => {
     void state.liveSession.loadOlder("smart-money");
     void state.liveSession.loadOlder("classifier-hits");
   });
@@ -6745,7 +6748,7 @@ const DarkPane = ({ limit, className }: DarkPaneProps) => {
   const state = useTerminal();
   const items = limit ? state.filteredInferredDark.slice(0, limit) : state.filteredInferredDark;
   const virtual = useVirtualList(items, state.darkScroll.listRef, !limit, 44);
-  useBottomHistoryGate(state.darkScroll.listRef, state.mode === "live" && !limit, () =>
+  useBottomHistoryGate(state.darkScroll.listRef, state.darkScroll.listNode, state.mode === "live" && !limit, () =>
     void state.liveSession.loadOlder("inferred-dark")
   );
 
