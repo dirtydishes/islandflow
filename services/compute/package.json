@@ -9,6 +9,7 @@
     "@islandflow/bus": "workspace:*",
     "@islandflow/config": "workspace:*",
     "@islandflow/observability": "workspace:*",
+    "@islandflow/refdata": "workspace:*",
     "@islandflow/storage": "workspace:*",
     "@islandflow/types": "workspace:*",
     "redis": "^5.10.0",

@@ -1,7 +1,9 @@
 import {
   SP500_SYMBOLS,
+  type FlowPacket,
   type OptionNBBO,
   type OptionPrint,
+  type SmartMoneyProfileId,
   type SyntheticMarketMode
 } from "@islandflow/types";
 import type { OptionIngestAdapter, OptionIngestHandlers } from "./types";
@@ -23,7 +25,9 @@ type Burst = {
   printCount: number;
   priceStep: number;
   scenarioId: string;
+  label: SyntheticScenarioLabel;
   seed: number;
+  flowFeatures: FlowPacket["features"];
 };
 
 export type SyntheticContractIvState = {
@@ -58,73 +62,157 @@ type WeightedValue<T> = {
 type Scenario = {
   id: string;
   weight: number;
+  label: SyntheticScenarioLabel;
   right: "C" | "P" | "either";
   countRange: [number, number];
   sizeRange: [number, number];
   targetNotionalRange: [number, number];
   priceTrend: "up" | "down" | "flat";
+  expiryOffsets?: number[];
+  underlying?: number;
+  strikeMoneyness?: number;
+  flowFeatures: FlowPacket["features"];
   conditions?: string[];
 };
+
+export type SyntheticScenarioLabel = SmartMoneyProfileId | "neutral_noise";
+
+export type SyntheticSmartMoneyScenario = {
+  id: string;
+  label: SyntheticScenarioLabel;
+  hiddenLabel: SyntheticScenarioLabel;
+};
+
+const SMART_MONEY_SCENARIO_IDS = [
+  "institutional_directional",
+  "retail_whale",
+  "event_driven",
+  "vol_seller",
+  "arbitrage",
+  "hedge_reactive",
+  "neutral_noise"
+] as const;
 
 const REALISTIC_SCENARIOS: Scenario[] = [
   {
     id: "ask_lift",
     weight: 18,
+    label: "institutional_directional",
     right: "either",
     countRange: [1, 2],
     sizeRange: [30, 180],
     targetNotionalRange: [9_000, 35_000],
     priceTrend: "flat",
+    flowFeatures: {
+      nbbo_coverage_ratio: 0.88,
+      nbbo_aggressive_ratio: 0.7,
+      nbbo_aggressive_buy_ratio: 0.66,
+      nbbo_aggressive_sell_ratio: 0.08,
+      nbbo_inside_ratio: 0.12,
+      venue_count: 2
+    },
     conditions: ["FILL"]
   },
   {
     id: "mid_block",
     weight: 14,
+    label: "arbitrage",
     right: "either",
     countRange: [1, 2],
     sizeRange: [120, 480],
     targetNotionalRange: [12_000, 45_000],
     priceTrend: "flat",
+    flowFeatures: {
+      structure_type: "vertical",
+      structure_legs: 2,
+      structure_strikes: 2,
+      same_size_leg_symmetry: 0.74,
+      nbbo_coverage_ratio: 0.82,
+      nbbo_aggressive_ratio: 0.26,
+      nbbo_aggressive_buy_ratio: 0.3,
+      nbbo_aggressive_sell_ratio: 0.24,
+      nbbo_inside_ratio: 0.42,
+      venue_count: 2
+    },
     conditions: ["FILL"]
   },
   {
     id: "bullish_sweep",
     weight: 8,
+    label: "institutional_directional",
     right: "C",
     countRange: [2, 3],
     sizeRange: [180, 520],
     targetNotionalRange: [25_000, 90_000],
     priceTrend: "up",
+    flowFeatures: {
+      nbbo_coverage_ratio: 0.9,
+      nbbo_aggressive_ratio: 0.82,
+      nbbo_aggressive_buy_ratio: 0.78,
+      nbbo_aggressive_sell_ratio: 0.04,
+      nbbo_inside_ratio: 0.08,
+      venue_count: 4
+    },
     conditions: ["SWEEP"]
   },
   {
     id: "bearish_sweep",
     weight: 8,
+    label: "institutional_directional",
     right: "P",
     countRange: [2, 3],
     sizeRange: [180, 520],
     targetNotionalRange: [25_000, 90_000],
     priceTrend: "up",
+    flowFeatures: {
+      nbbo_coverage_ratio: 0.9,
+      nbbo_aggressive_ratio: 0.82,
+      nbbo_aggressive_buy_ratio: 0.78,
+      nbbo_aggressive_sell_ratio: 0.04,
+      nbbo_inside_ratio: 0.08,
+      venue_count: 4
+    },
     conditions: ["SWEEP"]
   },
   {
     id: "contract_spike",
     weight: 6,
+    label: "retail_whale",
     right: "either",
     countRange: [2, 3],
     sizeRange: [500, 900],
     targetNotionalRange: [18_000, 70_000],
     priceTrend: "flat",
+    expiryOffsets: [0, 1, 7],
+    strikeMoneyness: 1.08,
+    flowFeatures: {
+      nbbo_coverage_ratio: 0.76,
+      nbbo_aggressive_ratio: 0.68,
+      nbbo_aggressive_buy_ratio: 0.62,
+      nbbo_aggressive_sell_ratio: 0.08,
+      nbbo_inside_ratio: 0.12,
+      execution_iv_shock: 0.16,
+      venue_count: 3
+    },
     conditions: ["ISO"]
   },
   {
     id: "noise",
     weight: 46,
+    label: "neutral_noise",
     right: "either",
     countRange: [1, 2],
     sizeRange: [5, 60],
     targetNotionalRange: [500, 6_000],
     priceTrend: "flat",
+    flowFeatures: {
+      nbbo_coverage_ratio: 0.76,
+      nbbo_aggressive_ratio: 0.24,
+      nbbo_aggressive_buy_ratio: 0.24,
+      nbbo_aggressive_sell_ratio: 0.18,
+      nbbo_inside_ratio: 0.52,
+      venue_count: 1
+    },
     conditions: ["FILL"]
   }
 ];
@@ -133,41 +221,246 @@ const ACTIVE_SCENARIOS: Scenario[] = [
   {
     id: "bullish_sweep",
     weight: 35,
+    label: "institutional_directional",
     right: "C",
     countRange: [7, 10],
     sizeRange: [600, 1800],
     targetNotionalRange: [120_000, 240_000],
     priceTrend: "up",
+    flowFeatures: {
+      nbbo_coverage_ratio: 0.94,
+      nbbo_aggressive_ratio: 0.86,
+      nbbo_aggressive_buy_ratio: 0.82,
+      nbbo_aggressive_sell_ratio: 0.03,
+      nbbo_inside_ratio: 0.06,
+      venue_count: 5
+    },
     conditions: ["SWEEP"]
   },
   {
     id: "bearish_sweep",
     weight: 35,
+    label: "institutional_directional",
     right: "P",
     countRange: [7, 10],
     sizeRange: [600, 1800],
     targetNotionalRange: [120_000, 240_000],
     priceTrend: "up",
+    flowFeatures: {
+      nbbo_coverage_ratio: 0.94,
+      nbbo_aggressive_ratio: 0.86,
+      nbbo_aggressive_buy_ratio: 0.82,
+      nbbo_aggressive_sell_ratio: 0.03,
+      nbbo_inside_ratio: 0.06,
+      venue_count: 5
+    },
     conditions: ["SWEEP"]
   },
   {
     id: "contract_spike",
     weight: 20,
+    label: "retail_whale",
     right: "either",
     countRange: [5, 8],
     sizeRange: [1200, 3200],
     targetNotionalRange: [60_000, 140_000],
     priceTrend: "flat",
+    expiryOffsets: [0, 1, 7],
+    strikeMoneyness: 1.08,
+    flowFeatures: {
+      nbbo_coverage_ratio: 0.78,
+      nbbo_aggressive_ratio: 0.72,
+      nbbo_aggressive_buy_ratio: 0.66,
+      nbbo_aggressive_sell_ratio: 0.06,
+      nbbo_inside_ratio: 0.1,
+      execution_iv_shock: 0.19,
+      venue_count: 4
+    },
     conditions: ["ISO"]
   },
   {
     id: "noise",
     weight: 10,
+    label: "neutral_noise",
     right: "either",
     countRange: [2, 4],
     sizeRange: [10, 200],
     targetNotionalRange: [500, 5000],
     priceTrend: "flat",
+    flowFeatures: {
+      nbbo_coverage_ratio: 0.72,
+      nbbo_aggressive_ratio: 0.24,
+      nbbo_aggressive_buy_ratio: 0.24,
+      nbbo_aggressive_sell_ratio: 0.2,
+      nbbo_inside_ratio: 0.52,
+      venue_count: 1
+    },
+    conditions: ["FILL"]
+  }
+];
+
+const SMART_MONEY_TEMPLATE_SCENARIOS: Scenario[] = [
+  {
+    id: "institutional_directional",
+    weight: 18,
+    label: "institutional_directional",
+    right: "C",
+    countRange: [8, 10],
+    sizeRange: [1600, 2400],
+    targetNotionalRange: [170_000, 230_000],
+    priceTrend: "up",
+    expiryOffsets: [28, 45],
+    strikeMoneyness: 1.01,
+    flowFeatures: {
+      nbbo_coverage_ratio: 0.94,
+      nbbo_aggressive_ratio: 0.86,
+      nbbo_aggressive_buy_ratio: 0.82,
+      nbbo_aggressive_sell_ratio: 0.04,
+      nbbo_inside_ratio: 0.06,
+      venue_count: 5
+    },
+    conditions: ["SWEEP"]
+  },
+  {
+    id: "retail_whale",
+    weight: 14,
+    label: "retail_whale",
+    right: "C",
+    countRange: [9, 12],
+    sizeRange: [450, 850],
+    targetNotionalRange: [35_000, 75_000],
+    priceTrend: "up",
+    expiryOffsets: [1, 7],
+    strikeMoneyness: 1.1,
+    flowFeatures: {
+      nbbo_coverage_ratio: 0.82,
+      nbbo_aggressive_ratio: 0.74,
+      nbbo_aggressive_buy_ratio: 0.68,
+      nbbo_aggressive_sell_ratio: 0.04,
+      nbbo_inside_ratio: 0.08,
+      execution_iv_shock: 0.19,
+      venue_count: 4
+    },
+    conditions: ["ISO"]
+  },
+  {
+    id: "event_driven",
+    weight: 12,
+    label: "event_driven",
+    right: "C",
+    countRange: [1, 2],
+    sizeRange: [700, 1100],
+    targetNotionalRange: [72_000, 88_000],
+    priceTrend: "flat",
+    expiryOffsets: [28, 45],
+    strikeMoneyness: 1.0,
+    flowFeatures: {
+      corporate_event_ts_offset_days: 14,
+      nbbo_coverage_ratio: 0.38,
+      nbbo_aggressive_ratio: 0.32,
+      nbbo_aggressive_buy_ratio: 0.3,
+      nbbo_aggressive_sell_ratio: 0.08,
+      nbbo_inside_ratio: 0.28,
+      nbbo_spread_z: 0.12,
+      venue_count: 2
+    },
+    conditions: ["FILL"]
+  },
+  {
+    id: "vol_seller",
+    weight: 12,
+    label: "vol_seller",
+    right: "either",
+    countRange: [4, 6],
+    sizeRange: [1300, 2100],
+    targetNotionalRange: [150_000, 210_000],
+    priceTrend: "down",
+    expiryOffsets: [28, 45],
+    strikeMoneyness: 1.0,
+    flowFeatures: {
+      structure_type: "straddle",
+      structure_legs: 2,
+      structure_strikes: 1,
+      structure_rights: "CP",
+      conditions: "COMPLEX",
+      nbbo_coverage_ratio: 0.9,
+      nbbo_aggressive_ratio: 0.72,
+      nbbo_aggressive_buy_ratio: 0.08,
+      nbbo_aggressive_sell_ratio: 0.7,
+      nbbo_inside_ratio: 0.1,
+      same_size_leg_symmetry: 0.66,
+      venue_count: 3
+    },
+    conditions: ["FILL"]
+  },
+  {
+    id: "arbitrage",
+    weight: 12,
+    label: "arbitrage",
+    right: "either",
+    countRange: [4, 6],
+    sizeRange: [900, 1400],
+    targetNotionalRange: [70_000, 115_000],
+    priceTrend: "flat",
+    expiryOffsets: [28, 45],
+    strikeMoneyness: 1.0,
+    flowFeatures: {
+      structure_type: "vertical",
+      structure_legs: 2,
+      structure_strikes: 2,
+      structure_rights: "CP",
+      conditions: "COMPLEX",
+      nbbo_coverage_ratio: 0.86,
+      nbbo_aggressive_ratio: 0.4,
+      nbbo_aggressive_buy_ratio: 0.42,
+      nbbo_aggressive_sell_ratio: 0.38,
+      nbbo_inside_ratio: 0.32,
+      same_size_leg_symmetry: 0.92,
+      venue_count: 3
+    },
+    conditions: ["FILL"]
+  },
+  {
+    id: "hedge_reactive",
+    weight: 12,
+    label: "hedge_reactive",
+    right: "P",
+    countRange: [1, 2],
+    sizeRange: [2600, 3400],
+    targetNotionalRange: [35_000, 50_000],
+    priceTrend: "up",
+    expiryOffsets: [0, 1],
+    strikeMoneyness: 1.0,
+    flowFeatures: {
+      nbbo_coverage_ratio: 0.86,
+      nbbo_aggressive_ratio: 0.58,
+      nbbo_aggressive_buy_ratio: 0.54,
+      nbbo_aggressive_sell_ratio: 0.12,
+      nbbo_inside_ratio: 0.16,
+      underlying_move_bps: -72,
+      venue_count: 3
+    },
+    conditions: ["FILL"]
+  },
+  {
+    id: "neutral_noise",
+    weight: 20,
+    label: "neutral_noise",
+    right: "either",
+    countRange: [1, 2],
+    sizeRange: [10, 70],
+    targetNotionalRange: [800, 7_000],
+    priceTrend: "flat",
+    expiryOffsets: [14, 28, 45, 60],
+    strikeMoneyness: 1.02,
+    flowFeatures: {
+      nbbo_coverage_ratio: 0.78,
+      nbbo_aggressive_ratio: 0.22,
+      nbbo_aggressive_buy_ratio: 0.22,
+      nbbo_aggressive_sell_ratio: 0.18,
+      nbbo_inside_ratio: 0.58,
+      venue_count: 1
+    },
     conditions: ["FILL"]
   }
 ];
@@ -289,6 +582,25 @@ const SYNTHETIC_PROFILES: Record<SyntheticMarketMode, SyntheticOptionsProfile> =
           }
     ),
     pricePlacements: FIREHOSE_PRICE_PLACEMENTS
+  }
+};
+
+const SMART_MONEY_TEMPLATE_PROFILE: SyntheticOptionsProfile = {
+  burstRunRange: [1, 1],
+  scenarios: SMART_MONEY_TEMPLATE_SCENARIOS,
+  pricePlacements: {
+    ...ACTIVE_PRICE_PLACEMENTS,
+    institutional_directional: ACTIVE_PRICE_PLACEMENTS.bullish_sweep,
+    retail_whale: ACTIVE_PRICE_PLACEMENTS.contract_spike,
+    event_driven: REALISTIC_PRICE_PLACEMENTS.ask_lift,
+    vol_seller: [
+      { value: "B", weight: 45 },
+      { value: "BB", weight: 35 },
+      { value: "MID", weight: 20 }
+    ],
+    arbitrage: REALISTIC_PRICE_PLACEMENTS.mid_block,
+    hedge_reactive: ACTIVE_PRICE_PLACEMENTS.bullish_sweep,
+    neutral_noise: REALISTIC_PRICE_PLACEMENTS.noise
   }
 };
 
@@ -414,14 +726,18 @@ const buildBurst = (burstIndex: number, now: number, profile: SyntheticOptionsPr
   const seed = symbolHash + burstIndex * 7;
   const scenario = pickWeighted(profile.scenarios, seed);
   const baseUnderlying = 30 + (symbolHash % 470);
-  const expiryOffset = pick(EXPIRY_OFFSETS, symbolHash + burstIndex);
+  const expiryOffset = pick(scenario.expiryOffsets ?? EXPIRY_OFFSETS, symbolHash + burstIndex);
   const expiry = formatExpiry(now, expiryOffset);
   const strikeStep = baseUnderlying >= 200 ? 10 : baseUnderlying >= 100 ? 5 : 2.5;
   const moneynessSteps = scenario.id === "noise" ? 5 : 2;
   const strikeOffset = pickInt(-moneynessSteps, moneynessSteps, symbolHash + burstIndex * 11);
+  const templateStrike =
+    scenario.strikeMoneyness !== undefined
+      ? Math.round((baseUnderlying * scenario.strikeMoneyness) / strikeStep) * strikeStep
+      : null;
   const strike = Math.max(
     1,
-    Math.round(baseUnderlying / strikeStep) * strikeStep + strikeOffset * strikeStep
+    templateStrike ?? Math.round(baseUnderlying / strikeStep) * strikeStep + strikeOffset * strikeStep
   );
   const right =
     scenario.right === "either"
@@ -463,6 +779,8 @@ const buildBurst = (burstIndex: number, now: number, profile: SyntheticOptionsPr
     printCount,
     priceStep,
     scenarioId: scenario.id,
+    label: scenario.label,
+    flowFeatures: scenario.flowFeatures,
     seed
   };
 };
@@ -472,6 +790,68 @@ export const buildSyntheticBurstForTest = (
   now: number,
   mode: SyntheticMarketMode
 ): Burst => buildBurst(burstIndex, now, SYNTHETIC_PROFILES[mode]);
+
+export const listSyntheticSmartMoneyScenariosForTest = (): SyntheticSmartMoneyScenario[] =>
+  SMART_MONEY_SCENARIO_IDS.map((id) => ({
+    id,
+    label: id,
+    hiddenLabel: id
+  }));
+
+export const buildSyntheticSmartMoneyBurstForTest = (
+  scenarioId: (typeof SMART_MONEY_SCENARIO_IDS)[number],
+  now: number
+): Burst => {
+  const scenarioIndex = SMART_MONEY_TEMPLATE_SCENARIOS.findIndex((scenario) => scenario.id === scenarioId);
+  if (scenarioIndex < 0) {
+    throw new Error(`Unknown synthetic smart-money scenario: ${scenarioId}`);
+  }
+  return buildBurst(scenarioIndex, now, {
+    ...SMART_MONEY_TEMPLATE_PROFILE,
+    scenarios: [SMART_MONEY_TEMPLATE_SCENARIOS[scenarioIndex]]
+  });
+};
+
+export const buildSyntheticFlowPacketForTest = (
+  scenarioId: (typeof SMART_MONEY_SCENARIO_IDS)[number],
+  now: number
+): { packet: FlowPacket; hiddenLabel: SyntheticScenarioLabel } => {
+  const burst = buildSyntheticSmartMoneyBurstForTest(scenarioId, now);
+  const corporateEventOffset = Number(burst.flowFeatures.corporate_event_ts_offset_days ?? 0);
+  const flowFeatures: FlowPacket["features"] = {
+    option_contract_id: burst.contractId,
+    underlying_id: burst.contractId.split("-")[0],
+    underlying_mid: burst.underlying,
+    count: burst.printCount,
+    window_ms: Math.max(0, (burst.printCount - 1) * 45),
+    total_size: burst.baseSize * burst.printCount,
+    total_premium: Number((burst.basePrice * burst.baseSize * burst.printCount * OPTION_CONTRACT_MULTIPLIER).toFixed(2)),
+    total_notional: Number((burst.underlying * burst.baseSize * burst.printCount * OPTION_CONTRACT_MULTIPLIER).toFixed(2)),
+    first_price: burst.basePrice,
+    last_price: Number((burst.basePrice * (1 + burst.priceStep * Math.max(0, burst.printCount - 1))).toFixed(2)),
+    nbbo_missing_count: 0,
+    nbbo_stale_count: 0,
+    ...burst.flowFeatures
+  };
+  delete flowFeatures.corporate_event_ts_offset_days;
+  if (corporateEventOffset > 0) {
+    flowFeatures.corporate_event_ts = now + corporateEventOffset * MS_PER_DAY;
+  }
+
+  return {
+    hiddenLabel: burst.label,
+    packet: {
+      source_ts: now,
+      ingest_ts: now,
+      seq: SMART_MONEY_SCENARIO_IDS.indexOf(scenarioId) + 1,
+      trace_id: `synthetic-smart-money:${scenarioId}`,
+      id: `synthetic-smart-money:${scenarioId}:${now}`,
+      members: Array.from({ length: burst.printCount }, (_, index) => `${burst.contractId}:${index + 1}`),
+      features: flowFeatures,
+      join_quality: {}
+    }
+  };
+};
 
 export const createSyntheticOptionsAdapter = (
   config: SyntheticOptionsAdapterConfig

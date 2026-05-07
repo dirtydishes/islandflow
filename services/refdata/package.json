@@ -2,6 +2,9 @@
   "name": "@islandflow/refdata",
   "private": true,
   "type": "module",
+  "exports": {
+    "./event-calendar": "./src/event-calendar.ts"
+  },
   "scripts": {
     "dev": "bun run src/index.ts"
   },

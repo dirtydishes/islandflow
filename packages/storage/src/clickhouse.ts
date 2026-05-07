@@ -8,7 +8,8 @@ import {
   InferredDarkEventSchema,
   FlowPacketSchema,
   OptionNBBOSchema,
-  OptionPrintSchema
+  OptionPrintSchema,
+  SmartMoneyEventSchema
 } from "@islandflow/types";
 import type {
   AlertEvent,
@@ -19,6 +20,7 @@ import type {
   EquityPrintJoin,
   InferredDarkEvent,
   FlowPacket,
+  SmartMoneyEvent,
   OptionNBBO,
   OptionPrint,
   OptionFlowFilters,
@@ -76,11 +78,19 @@ import {
 } from "./classifier-hits";
 import {
   ALERTS_TABLE,
+  alertsTableMigrations,
   alertsTableDDL,
   fromAlertRecord,
   toAlertRecord,
   type AlertRecord
 } from "./alerts";
+import {
+  SMART_MONEY_EVENTS_TABLE,
+  smartMoneyEventsTableDDL,
+  fromSmartMoneyEventRecord,
+  toSmartMoneyEventRecord,
+  type SmartMoneyEventRecord
+} from "./smart-money-events";
 
 export type ClickHouseOptions = {
   url: string;
@@ -285,6 +295,14 @@ export const ensureFlowPacketsTable = async (
   });
 };
 
+export const ensureSmartMoneyEventsTable = async (
+  client: ClickHouseClient
+): Promise<void> => {
+  await client.exec({
+    query: smartMoneyEventsTableDDL()
+  });
+};
+
 export const ensureClassifierHitsTable = async (
   client: ClickHouseClient
 ): Promise<void> => {
@@ -297,6 +315,9 @@ export const ensureAlertsTable = async (client: ClickHouseClient): Promise<void>
   await client.exec({
     query: alertsTableDDL()
   });
+  for (const query of alertsTableMigrations()) {
+    await client.exec({ query });
+  }
 };
 
 export const insertOptionPrint = async (
@@ -390,6 +411,18 @@ export const insertFlowPacket = async (
   const record = toFlowPacketRecord(packet);
   await client.insert({
     table: FLOW_PACKETS_TABLE,
+    values: [record],
+    format: "JSONEachRow"
+  });
+};
+
+export const insertSmartMoneyEvent = async (
+  client: ClickHouseClient,
+  event: SmartMoneyEvent
+): Promise<void> => {
+  const record = toSmartMoneyEventRecord(event);
+  await client.insert({
+    table: SMART_MONEY_EVENTS_TABLE,
     values: [record],
     format: "JSONEachRow"
   });
@@ -777,6 +810,34 @@ const normalizeClassifierHitRow = (row: unknown): ClassifierHitRecord | null => 
   };
 };
 
+const normalizeSmartMoneyEventRow = (row: unknown): SmartMoneyEventRecord | null => {
+  if (!row || typeof row !== "object") {
+    return null;
+  }
+
+  const record = row as Record<string, unknown>;
+  return {
+    source_ts: coerceNumber(record.source_ts) as number,
+    ingest_ts: coerceNumber(record.ingest_ts) as number,
+    seq: coerceNumber(record.seq) as number,
+    trace_id: String(record.trace_id ?? ""),
+    event_id: String(record.event_id ?? ""),
+    packet_ids: Array.isArray(record.packet_ids) ? record.packet_ids.map((value) => String(value)) : [],
+    member_print_ids: Array.isArray(record.member_print_ids)
+      ? record.member_print_ids.map((value) => String(value))
+      : [],
+    underlying_id: String(record.underlying_id ?? ""),
+    event_kind: String(record.event_kind ?? ""),
+    event_window_ms: coerceNumber(record.event_window_ms) as number,
+    features_json: String(record.features_json ?? "{}"),
+    profile_scores_json: String(record.profile_scores_json ?? "[]"),
+    primary_profile_id: String(record.primary_profile_id ?? ""),
+    primary_direction: String(record.primary_direction ?? "unknown"),
+    abstained: Boolean(record.abstained),
+    suppressed_reasons_json: String(record.suppressed_reasons_json ?? "[]")
+  };
+};
+
 const normalizeAlertRow = (row: unknown): AlertRecord | null => {
   if (!row || typeof row !== "object") {
     return null;
@@ -791,7 +852,9 @@ const normalizeAlertRow = (row: unknown): AlertRecord | null => {
     score: Number(coerceNumber(record.score) ?? 0),
     severity: String(record.severity ?? ""),
     hits_json: String(record.hits_json ?? "[]"),
-    evidence_refs_json: String(record.evidence_refs_json ?? "[]")
+    evidence_refs_json: String(record.evidence_refs_json ?? "[]"),
+    primary_profile_id: String(record.primary_profile_id ?? ""),
+    profile_scores_json: String(record.profile_scores_json ?? "[]")
   };
 };
 
@@ -949,6 +1012,23 @@ export const fetchRecentClassifierHits = async (
     .filter((record): record is ClassifierHitRecord => record !== null);
   const hits = records.map(fromClassifierHitRecord);
   return ClassifierHitEventSchema.array().parse(hits);
+};
+
+export const fetchRecentSmartMoneyEvents = async (
+  client: ClickHouseClient,
+  limit: number
+): Promise<SmartMoneyEvent[]> => {
+  const safeLimit = clampLimit(limit);
+  const result = await client.query({
+    query: `SELECT * FROM ${SMART_MONEY_EVENTS_TABLE} ORDER BY source_ts DESC, seq DESC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  const records = rows
+    .map(normalizeSmartMoneyEventRow)
+    .filter((record): record is SmartMoneyEventRecord => record !== null);
+  return SmartMoneyEventSchema.array().parse(records.map(fromSmartMoneyEventRecord));
 };
 
 export const fetchRecentAlerts = async (
@@ -1222,6 +1302,28 @@ export const fetchClassifierHitsAfter = async (
   return ClassifierHitEventSchema.array().parse(hits);
 };
 
+export const fetchSmartMoneyEventsAfter = async (
+  client: ClickHouseClient,
+  afterTs: number,
+  afterSeq: number,
+  limit: number
+): Promise<SmartMoneyEvent[]> => {
+  const safeLimit = clampLimit(limit);
+  const safeAfterTs = clampCursor(afterTs);
+  const safeAfterSeq = clampCursor(afterSeq);
+
+  const result = await client.query({
+    query: `SELECT * FROM ${SMART_MONEY_EVENTS_TABLE} WHERE (source_ts, seq) > (${safeAfterTs}, ${safeAfterSeq}) ORDER BY source_ts ASC, seq ASC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  const records = rows
+    .map(normalizeSmartMoneyEventRow)
+    .filter((record): record is SmartMoneyEventRecord => record !== null);
+  return SmartMoneyEventSchema.array().parse(records.map(fromSmartMoneyEventRecord));
+};
+
 export const fetchAlertsAfter = async (
   client: ClickHouseClient,
   afterTs: number,
@@ -1383,6 +1485,25 @@ export const fetchClassifierHitsBefore = async (
     .map(normalizeClassifierHitRow)
     .filter((record): record is ClassifierHitRecord => record !== null);
   return ClassifierHitEventSchema.array().parse(records.map(fromClassifierHitRecord));
+};
+
+export const fetchSmartMoneyEventsBefore = async (
+  client: ClickHouseClient,
+  beforeTs: number,
+  beforeSeq: number,
+  limit: number
+): Promise<SmartMoneyEvent[]> => {
+  const safeLimit = clampLimit(limit);
+  const result = await client.query({
+    query: `SELECT * FROM ${SMART_MONEY_EVENTS_TABLE} WHERE ${buildBeforeTupleCondition("source_ts", "seq", beforeTs, beforeSeq)} ORDER BY source_ts DESC, seq DESC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  const records = rows
+    .map(normalizeSmartMoneyEventRow)
+    .filter((record): record is SmartMoneyEventRecord => record !== null);
+  return SmartMoneyEventSchema.array().parse(records.map(fromSmartMoneyEventRecord));
 };
 
 export const fetchAlertsBefore = async (

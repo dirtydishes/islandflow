@@ -154,6 +154,7 @@ describe("LiveStateManager", () => {
         "equity-quotes": 10000,
         "equity-joins": 10000,
         flow: 2,
+        "smart-money": 10000,
         "classifier-hits": 10000,
         alerts: 10000,
         "inferred-dark": 10000

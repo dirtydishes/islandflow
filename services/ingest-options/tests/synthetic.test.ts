@@ -1,5 +1,13 @@
 import { describe, expect, it } from "bun:test";
-import { buildSyntheticBurstForTest, updateSyntheticIvForTest } from "../src/adapters/synthetic";
+import type { OptionPrint } from "@islandflow/types";
+import { buildSmartMoneyEventFromPacket } from "../../compute/src/parent-events";
+import {
+  buildSyntheticBurstForTest,
+  buildSyntheticFlowPacketForTest,
+  createSyntheticOptionsAdapter,
+  listSyntheticSmartMoneyScenariosForTest,
+  updateSyntheticIvForTest
+} from "../src/adapters/synthetic";
 
 const totalBurstNotional = (burst: {
   basePrice: number;
@@ -85,5 +93,78 @@ describe("synthetic options IV model", () => {
 
     expect(state.iv).toBeGreaterThanOrEqual(0.05);
     expect(state.iv).toBeLessThanOrEqual(2.5);
+  });
+});
+
+describe("synthetic smart-money scenarios", () => {
+  it("provides deterministic labeled parent-event templates for all core profiles plus noise", () => {
+    const scenarios = listSyntheticSmartMoneyScenariosForTest();
+
+    expect(scenarios.map((scenario) => scenario.id)).toEqual([
+      "institutional_directional",
+      "retail_whale",
+      "event_driven",
+      "vol_seller",
+      "arbitrage",
+      "hedge_reactive",
+      "neutral_noise"
+    ]);
+  });
+
+  it("scores each labeled scenario as its intended primary profile", () => {
+    const now = Date.parse("2026-01-02T15:00:00Z");
+    const scenarios = listSyntheticSmartMoneyScenariosForTest().filter(
+      (scenario) => scenario.hiddenLabel !== "neutral_noise"
+    );
+
+    for (const scenario of scenarios) {
+      const { packet, hiddenLabel } = buildSyntheticFlowPacketForTest(scenario.id, now);
+      const event = buildSmartMoneyEventFromPacket(packet);
+      const winningScore = event.profile_scores[0];
+      const nearbyWrongScores = event.profile_scores.filter(
+        (score) => score.profile_id !== hiddenLabel && score.probability >= 0.5
+      );
+
+      expect(event.abstained, scenario.id).toBe(false);
+      expect(event.primary_profile_id, scenario.id).toBe(hiddenLabel);
+      expect(winningScore?.profile_id, scenario.id).toBe(hiddenLabel);
+      expect(winningScore?.probability ?? 0, scenario.id).toBeGreaterThanOrEqual(0.5);
+      expect(nearbyWrongScores, scenario.id).toEqual([]);
+    }
+  });
+
+  it("keeps neutral background noise below the emission threshold", () => {
+    const { packet } = buildSyntheticFlowPacketForTest(
+      "neutral_noise",
+      Date.parse("2026-01-02T15:00:00Z")
+    );
+
+    const event = buildSmartMoneyEventFromPacket(packet);
+
+    expect(event.abstained).toBe(true);
+    expect(event.primary_profile_id).toBeNull();
+    expect(event.profile_scores[0]?.probability ?? 1).toBeLessThan(0.42);
+  });
+
+  it("does not expose hidden labels on emitted option prints", async () => {
+    const adapter = createSyntheticOptionsAdapter({
+      emitIntervalMs: 1,
+      mode: "active"
+    });
+    const trades: OptionPrint[] = [];
+    const stop = adapter.start({
+      onTrade: (trade) => {
+        trades.push(trade);
+      }
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    stop();
+
+    expect(trades.length).toBeGreaterThan(0);
+    for (const trade of trades) {
+      expect("hiddenLabel" in trade).toBe(false);
+      expect("label" in trade).toBe(false);
+    }
   });
 });
