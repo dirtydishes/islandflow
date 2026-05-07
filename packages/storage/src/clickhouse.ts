@@ -1560,6 +1560,104 @@ export const fetchFlowPacketById = async (
   return record ? FlowPacketSchema.parse(fromFlowPacketRecord(record)) : null;
 };
 
+export const fetchFlowPacketsByMemberTraceIds = async (
+  client: ClickHouseClient,
+  traceIds: string[]
+): Promise<FlowPacket[]> => {
+  const ids = Array.from(new Set(traceIds.map((id) => id.trim()).filter(Boolean)));
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const memberPredicates = ids.map((id) => `has(members, ${quoteString(id)})`);
+  const result = await client.query({
+    query: `SELECT * FROM ${FLOW_PACKETS_TABLE} WHERE ${memberPredicates.join(" OR ")} ORDER BY source_ts DESC, seq DESC LIMIT ${clampLookupLimit(ids.length * 4)}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  const records = rows
+    .map(normalizeFlowPacketRow)
+    .filter((record): record is FlowPacketRecord => record !== null);
+  return FlowPacketSchema.array().parse(records.map(fromFlowPacketRecord));
+};
+
+export const fetchSmartMoneyEventsByPacketIds = async (
+  client: ClickHouseClient,
+  packetIds: string[]
+): Promise<SmartMoneyEvent[]> => {
+  const ids = Array.from(new Set(packetIds.map((id) => id.trim()).filter(Boolean)));
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const packetPredicates = ids.map((id) => `has(packet_ids, ${quoteString(id)})`);
+  const result = await client.query({
+    query: `SELECT * FROM ${SMART_MONEY_EVENTS_TABLE} WHERE ${packetPredicates.join(" OR ")} ORDER BY source_ts DESC, seq DESC LIMIT ${clampLookupLimit(ids.length * 4)}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  const records = rows
+    .map(normalizeSmartMoneyEventRow)
+    .filter((record): record is SmartMoneyEventRecord => record !== null);
+  return SmartMoneyEventSchema.array().parse(records.map(fromSmartMoneyEventRecord));
+};
+
+export const fetchClassifierHitsByPacketIds = async (
+  client: ClickHouseClient,
+  packetIds: string[]
+): Promise<ClassifierHitEvent[]> => {
+  const ids = Array.from(new Set(packetIds.map((id) => id.trim()).filter(Boolean)));
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const tracePredicates = ids.map((id) => `position(trace_id, ${quoteString(id)}) > 0`);
+  const result = await client.query({
+    query: `SELECT * FROM ${CLASSIFIER_HITS_TABLE} WHERE ${tracePredicates.join(" OR ")} ORDER BY source_ts DESC, seq DESC LIMIT ${clampLookupLimit(ids.length * 4)}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  const records = rows
+    .map(normalizeClassifierHitRow)
+    .filter((record): record is ClassifierHitRecord => record !== null);
+  return ClassifierHitEventSchema.array().parse(records.map(fromClassifierHitRecord));
+};
+
+export const fetchNearestOptionNBBOForPrints = async (
+  client: ClickHouseClient,
+  inputs: Array<{ trace_id: string; option_contract_id: string; ts: number }>
+): Promise<Record<string, OptionNBBO | null>> => {
+  const normalized = inputs
+    .map((item) => ({
+      trace_id: item.trace_id.trim(),
+      option_contract_id: item.option_contract_id.trim(),
+      ts: clampCursor(item.ts)
+    }))
+    .filter((item) => item.trace_id && item.option_contract_id);
+  if (normalized.length === 0) {
+    return {};
+  }
+
+  const byTraceId: Record<string, OptionNBBO | null> = Object.fromEntries(
+    normalized.map((item) => [item.trace_id, null])
+  );
+  await Promise.all(
+    normalized.map(async (item) => {
+      const result = await client.query({
+        query: `SELECT * FROM ${OPTION_NBBO_TABLE} WHERE option_contract_id = ${quoteString(item.option_contract_id)} AND ts <= ${item.ts} ORDER BY ts DESC, seq DESC LIMIT 1`,
+        format: "JSONEachRow"
+      });
+      const rows = await result.json<unknown[]>();
+      const quote = OptionNBBOSchema.array().parse(rows.map(normalizeOptionNbboRow))[0] ?? null;
+      byTraceId[item.trace_id] = quote;
+    })
+  );
+  return byTraceId;
+};
+
 export const fetchOptionPrintsByTraceIds = async (
   client: ClickHouseClient,
   traceIds: string[]

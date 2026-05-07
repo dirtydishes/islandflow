@@ -49,6 +49,7 @@ import {
   fetchSmartMoneyEventsBefore,
   fetchFlowPacketsAfter,
   fetchFlowPacketById,
+  fetchFlowPacketsByMemberTraceIds,
   fetchFlowPacketsBefore,
   fetchRecentAlerts,
   fetchRecentClassifierHits,
@@ -76,6 +77,9 @@ import {
   fetchOptionPrintsBefore,
   fetchOptionPrintsAfter,
   fetchOptionPrintsByTraceIds,
+  fetchNearestOptionNBBOForPrints,
+  fetchSmartMoneyEventsByPacketIds,
+  fetchClassifierHitsByPacketIds,
   fetchRecentOptionPrints
 } from "@islandflow/storage";
 import type { EquityPrintQueryFilters, OptionPrintQueryFilters } from "@islandflow/storage";
@@ -302,6 +306,28 @@ const jsonResponse = (body: unknown, status = 200): Response => {
     }
   });
 };
+
+const readJsonBody = async (req: Request): Promise<unknown> => {
+  const text = await req.text();
+  if (!text.trim()) {
+    return {};
+  }
+  return JSON.parse(text);
+};
+
+const optionsSupportLookupSchema = z.object({
+  trace_ids: z.array(z.string().min(1)).default([]),
+  nbbo_context: z
+    .array(
+      z.object({
+        trace_id: z.string().min(1),
+        option_contract_id: z.string().min(1),
+        ts: z.number().int().nonnegative()
+      })
+    )
+    .optional()
+    .default([])
+});
 
 const parseLimit = (value: string | null): number => {
   if (value === null) {
@@ -1606,6 +1632,33 @@ const run = async () => {
         const traceIds = url.searchParams.getAll("trace_id");
         const data = await fetchOptionPrintsByTraceIds(clickhouse, traceIds);
         return jsonResponse({ data });
+      }
+
+      if (req.method === "POST" && url.pathname === "/lookup/options-support") {
+        try {
+          const body = optionsSupportLookupSchema.parse(await readJsonBody(req));
+          const packets = await fetchFlowPacketsByMemberTraceIds(clickhouse, body.trace_ids);
+          const packetIds = packets.map((packet) => packet.id);
+          const [smartMoney, classifierHits, nbboByTraceId] = await Promise.all([
+            fetchSmartMoneyEventsByPacketIds(clickhouse, packetIds),
+            fetchClassifierHitsByPacketIds(clickhouse, packetIds),
+            fetchNearestOptionNBBOForPrints(clickhouse, body.nbbo_context)
+          ]);
+          return jsonResponse({
+            packets,
+            smart_money: smartMoney,
+            classifier_hits: classifierHits,
+            nbbo_by_trace_id: nbboByTraceId
+          });
+        } catch (error) {
+          return jsonResponse(
+            {
+              error: "invalid options support lookup",
+              detail: error instanceof Error ? error.message : String(error)
+            },
+            400
+          );
+        }
       }
 
       if (req.method === "GET" && url.pathname === "/equity-joins/by-id") {
