@@ -5663,14 +5663,14 @@ const useTerminalState = () => {
         }
         return response.json();
       })
-        .then((payload: { data?: OptionPrint[] }) => {
-          const next = new Map<string, OptionPrint>();
-          for (const item of payload.data ?? []) {
-            if (!item || !item.trace_id) {
-              continue;
-            }
-            next.set(item.trace_id, item);
+      .then((payload: { data?: OptionPrint[] }) => {
+        const next = new Map<string, OptionPrint>();
+        for (const item of payload.data ?? []) {
+          if (!item || !item.trace_id) {
+            continue;
           }
+          next.set(item.trace_id, item);
+        }
         if (next.size > 0) {
           setPinnedOptionPrintMap((prev) => upsertPinnedEntries(prev, next, Date.now()));
         }
@@ -5975,14 +5975,14 @@ const useTerminalState = () => {
         }
         return response.json();
       })
-        .then((payload: { data?: OptionPrint[] }) => {
-          const next = new Map<string, OptionPrint>();
-          for (const item of payload.data ?? []) {
-            if (!item || !item.trace_id) {
-              continue;
-            }
-            next.set(item.trace_id, item);
+      .then((payload: { data?: OptionPrint[] }) => {
+        const next = new Map<string, OptionPrint>();
+        for (const item of payload.data ?? []) {
+          if (!item || !item.trace_id) {
+            continue;
           }
+          next.set(item.trace_id, item);
+        }
         if (next.size > 0) {
           const now = Date.now();
           setPinnedOptionPrintMap((prev) => upsertPinnedEntries(prev, next, now));
