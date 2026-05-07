@@ -60,21 +60,26 @@ export const LiveSubscriptionSchema = z.discriminatedUnion("channel", [
     channel: z.literal("options"),
     filters: OptionFlowFiltersSchema.optional(),
     underlying_ids: z.array(z.string().min(1)).optional(),
-    option_contract_id: z.string().min(1).optional()
+    option_contract_id: z.string().min(1).optional(),
+    snapshot_limit: z.number().int().positive().optional()
   }),
   z.object({
     channel: z.literal("flow"),
-    filters: OptionFlowFiltersSchema.optional()
+    filters: OptionFlowFiltersSchema.optional(),
+    snapshot_limit: z.number().int().positive().optional()
   }),
   z.object({
-    channel: z.literal("smart-money")
+    channel: z.literal("smart-money"),
+    snapshot_limit: z.number().int().positive().optional()
   }),
   z.object({
-    channel: z.enum(["nbbo", "equity-quotes", "equity-joins", "classifier-hits", "alerts", "inferred-dark"])
+    channel: z.enum(["nbbo", "equity-quotes", "equity-joins", "classifier-hits", "alerts", "inferred-dark"]),
+    snapshot_limit: z.number().int().positive().optional()
   }),
   z.object({
     channel: z.literal("equities"),
-    underlying_ids: z.array(z.string().min(1)).optional()
+    underlying_ids: z.array(z.string().min(1)).optional(),
+    snapshot_limit: z.number().int().positive().optional()
   }),
   z.object({
     channel: z.literal("equity-candles"),
