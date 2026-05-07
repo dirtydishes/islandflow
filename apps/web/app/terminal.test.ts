@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   NAV_ITEMS,
+  appendHistoryTail,
   buildDefaultFlowFilters,
   classifierToneForFamily,
   deriveAlertDirection,
@@ -9,6 +10,7 @@ import {
   formatOptionContractLabel,
   flushPausableTapeData,
   getAlertWindowAnchorTs,
+  getLiveHistoryRetentionCap,
   getOptionTableSnapshot,
   getLiveFeedStatus,
   getLiveManifest,
@@ -237,6 +239,53 @@ describe("live tape pausable helpers", () => {
     expect(shouldRetainLiveSnapshotHistory("alerts", true, 0, 3)).toBe(false);
     expect(shouldRetainLiveSnapshotHistory("options", true, 1, 3)).toBe(false);
     expect(shouldRetainLiveSnapshotHistory("options", false, 0, 3)).toBe(false);
+  });
+});
+
+describe("live tape history helpers", () => {
+  it("appends older scoped rows behind the hot live head", () => {
+    const liveHead = Array.from({ length: 100 }, (_, idx) =>
+      makeItem(`hot-${idx}`, 200 - idx, 2_000 - idx)
+    );
+    const older = [makeItem("older-1", 99, 999), makeItem("older-2", 98, 998)];
+
+    const next = appendHistoryTail([], older, liveHead, 5000);
+
+    expect(next.map((item) => item.trace_id)).toEqual(["older-1", "older-2"]);
+  });
+
+  it("skips duplicates already present in the live head", () => {
+    const liveHead = [makeItem("latest", 3, 300), makeItem("duplicate", 2, 200)];
+    const older = [makeItem("duplicate", 2, 200), makeItem("older", 1, 100)];
+
+    const next = appendHistoryTail([], older, liveHead, 5000);
+
+    expect(next.map((item) => item.trace_id)).toEqual(["older"]);
+  });
+
+  it("trims the history tail to the soft cap", () => {
+    const current = [makeItem("existing", 4, 400)];
+    const older = [makeItem("older-1", 3, 300), makeItem("older-2", 2, 200)];
+
+    const next = appendHistoryTail(current, older, [], 2);
+
+    expect(next.map((item) => item.trace_id)).toEqual(["existing", "older-1"]);
+  });
+
+  it("keeps scoped option and equity history on the normal retention cap", () => {
+    expect(
+      getLiveHistoryRetentionCap({
+        channel: "options",
+        underlying_ids: ["AAPL"],
+        option_contract_id: "AAPL-2025-01-17-200-C"
+      } as any)
+    ).toBeGreaterThan(0);
+    expect(
+      getLiveHistoryRetentionCap({
+        channel: "equities",
+        underlying_ids: ["AAPL"]
+      } as any)
+    ).toBeGreaterThan(0);
   });
 });
 

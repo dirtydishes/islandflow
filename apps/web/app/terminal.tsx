@@ -510,7 +510,7 @@ const EMPTY_PAUSABLE_TAPE = {
   dropped: 0
 };
 
-const appendHistoryTail = <T extends SortableItem>(
+export const appendHistoryTail = <T extends SortableItem>(
   current: T[],
   incoming: T[],
   liveHead: T[],
@@ -539,6 +539,16 @@ const appendHistoryTail = <T extends SortableItem>(
   }
 
   return cap > 0 ? appended.slice(0, cap) : appended;
+};
+
+export const getLiveHistoryRetentionCap = (subscription: LiveSubscription): number => {
+  switch (subscription.channel) {
+    case "options":
+    case "equities":
+      return LIVE_HISTORY_SOFT_CAP;
+    default:
+      return LIVE_HISTORY_SOFT_CAP;
+  }
 };
 
 export const getLiveFeedStatus = (
@@ -2924,21 +2934,13 @@ const useLiveSession = (
 
         switch (subscription.channel) {
           case "options":
-            mergeOlder(
-              setOptionsHistory,
-              options,
-              subscription.underlying_ids?.length || subscription.option_contract_id ? 0 : LIVE_HISTORY_SOFT_CAP
-            );
+            mergeOlder(setOptionsHistory, options, getLiveHistoryRetentionCap(subscription));
             break;
           case "nbbo":
             mergeOlder(setNbboHistory, nbbo);
             break;
           case "equities":
-            mergeOlder(
-              setEquitiesHistory,
-              equities,
-              subscription.underlying_ids?.length ? 0 : LIVE_HISTORY_SOFT_CAP
-            );
+            mergeOlder(setEquitiesHistory, equities, getLiveHistoryRetentionCap(subscription));
             break;
           case "equity-quotes":
             break;
