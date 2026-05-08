@@ -1,16 +1,15 @@
 # Docker Deployment
 
-This directory contains a VPS-oriented Docker deployment for the full Islandflow stack.
+This directory is the supported VPS deployment path for Islandflow.
 
-It is separate from the repo-root `docker-compose.yml`, which is still the lightweight local infra stack for development.
+The repo no longer ships or supports a separate `deployment/npm` stack. Docker Compose is the deployment surface; if you want a reverse proxy, point it at the host ports published by this stack.
+
+It is separate from the repo-root `docker-compose.yml`, which remains the lightweight local infra stack for development.
 
 ## What this stack does
 
-- Assumes Nginx Proxy Manager is the edge proxy and runs on a shared user-defined Docker network.
-- Keeps `web` and `api` internal to the Docker network instead of publishing host ports.
-- Targets a two-subdomain routing model by default:
-  - `app.<domain>` -> `web:3000`
-  - `api.<domain>` -> `api:4000`
+- Builds and runs the full Islandflow stack with Docker Compose.
+- Publishes `web` and `api` to host ports, bound to loopback by default.
 - Runs ClickHouse, Redis, and NATS JetStream with persistent Docker volumes.
 - Runs the core runtime services: `ingest-options`, `ingest-equities`, `compute`, `candles`, `api`, and `web`.
 - Keeps `replay` opt-in through a Compose profile, because the current replay service starts immediately when the container is enabled.
@@ -29,12 +28,11 @@ It is separate from the repo-root `docker-compose.yml`, which is still the light
 
 - A Linux VPS with Docker Engine and Docker Compose v2 installed
 - Enough RAM for ClickHouse plus the Bun services
-- Nginx Proxy Manager running in Docker on the same host
-- A shared user-defined Docker network for NPM and this stack
 
 Optional:
 
 - A DNS record pointed at the VPS
+- Any reverse proxy or load balancer you prefer
 - Alpaca, Databento, or IBKR credentials if you are not using the synthetic adapters
 
 ## First deployment
@@ -51,22 +49,13 @@ cp .env.example .env
 Important defaults:
 
 - `NATS_URL`, `CLICKHOUSE_URL`, and `REDIS_URL` should stay on the internal container hostnames unless you intentionally split infra out.
-- `OPTIONS_INGEST_ADAPTER=synthetic` and `EQUITIES_INGEST_ADAPTER=synthetic` are the safest first boot settings.
-- `NPM_SHARED_NETWORK=npm-shared` is the recommended external Docker network name for NPM and this stack.
-- `NEXT_PUBLIC_API_URL=https://api.example.com` uses a two-subdomain setup (`app` + `api`).
-- `NEXT_PUBLIC_API_URL=` (empty) uses same-origin mode where the app host also proxies API paths to `api:4000`.
+- `OPTIONS_INGEST_ADAPTER=synthetic` and `EQUITIES_INGEST_ADAPTER=synthetic` are the safest first-boot settings.
+- `WEB_BIND_IP=127.0.0.1` and `API_BIND_IP=127.0.0.1` keep the published ports local to the host by default.
+- `WEB_HOST_PORT=3000` and `API_HOST_PORT=4000` control the host-side published ports.
+- `NEXT_PUBLIC_API_URL=https://api.example.com` fits a two-origin setup where the browser reaches the API on a separate public origin.
+- `NEXT_PUBLIC_API_URL=` (empty) fits same-origin mode where your edge layer proxies API paths from the app origin to the API host port.
 
 3. Build and start the stack:
-
-If you have not created the shared Docker network yet, do that once first:
-
-```bash
-docker network create npm-shared
-```
-
-Then make sure `.env` keeps `NPM_SHARED_NETWORK=npm-shared`, or set it to whatever user-defined network you want to share with NPM.
-
-Now build and start the stack:
 
 ```bash
 docker compose up -d --build
@@ -86,31 +75,44 @@ docker compose ps
 docker compose logs -f api web compute candles ingest-options ingest-equities
 ```
 
-5. Make sure NPM can reach the stack network.
+5. Open the app.
 
-This deployment attaches `web` and `api` to the external Docker network named by `NPM_SHARED_NETWORK`, in addition to the stack-local network.
+With the default loopback binding:
 
-If your NPM container is not already attached to that network, connect it once:
+- UI: `http://127.0.0.1:3000/`
+- Health check: `http://127.0.0.1:4000/health`
 
-```bash
-docker network connect npm-shared <npm-container-name>
-```
+If you want direct remote access without a reverse proxy, change `WEB_BIND_IP` and `API_BIND_IP` to `0.0.0.0` and restrict exposure with your firewall.
 
-If you want to use a different network name, set `NPM_SHARED_NETWORK` in `.env` and make sure that external Docker network already exists. The important part is that NPM, `web`, and `api` all share the same user-defined Docker network.
+## Access patterns
 
-6. Create these NPM proxy hosts:
+### Direct host-port mode
 
-- `app.example.com` -> forward to `web` (or `islandflow-vps-web-1`), port `3000`
-- `api.example.com` -> forward to `api` (or `islandflow-vps-api-1`), port `4000`
+Use this when you want Docker alone to serve the app:
 
-For the API host, enable websocket support.
+- set `WEB_BIND_IP=0.0.0.0`
+- set `API_BIND_IP=0.0.0.0`
+- optionally change `WEB_HOST_PORT` / `API_HOST_PORT`
+- point DNS or clients at the host directly
 
-If NPM is attached to multiple Docker networks and another stack also has an `api` container alias, prefer the explicit container name (`islandflow-vps-api-1`) to avoid DNS collisions.
+### Reverse proxy mode
 
-7. Open the app:
+If you use Caddy, Nginx, Traefik, a cloud load balancer, or another edge layer, proxy to the published host ports from this stack. The repo does not require or manage any specific proxy anymore.
 
-- `https://app.example.com/`
-- Health check: `https://api.example.com/health`
+Supported routing modes:
+
+1. Two-origin mode
+   - `app.<domain>` -> host `WEB_HOST_PORT`
+   - `api.<domain>` -> host `API_HOST_PORT`
+   - Build web with `NEXT_PUBLIC_API_URL=https://api.<domain>`.
+
+2. Same-origin mode
+   - Build web with `NEXT_PUBLIC_API_URL=` (empty).
+   - Point `app.<domain>` at the web host port.
+   - Proxy these API routes from the app origin to the API host port:
+     - `/ws/*`, `/replay/*`, `/prints/*`, `/joins/*`, `/nbbo/*`, `/dark/*`, `/flow/*`, `/candles/*`
+
+Enable websocket support on whichever host serves `/ws/*`.
 
 ## Replay service
 
@@ -163,30 +165,9 @@ If IBKR is running somewhere else, change:
 - `IBKR_HOST`
 - `IBKR_PORT`
 
-## NPM routing
-
-The Islandflow stack expects an external NPM instance on the shared Docker network. The dedicated NPM stack now lives in `../npm`.
-
-Supported routing modes:
-
-1. Two-subdomain mode
-   - `app.<domain>` -> `web:3000`
-   - `api.<domain>` -> `api:4000`
-   - Build web with `NEXT_PUBLIC_API_URL=https://api.<domain>`.
-
-2. Same-origin fallback mode
-   - Build web with `NEXT_PUBLIC_API_URL=` (empty).
-   - Keep `app.<domain>` -> web.
-   - Add path-based proxy rules on `app.<domain>` for API routes to `api:4000`:
-     - `/ws/*`, `/replay/*`, `/prints/*`, `/joins/*`, `/nbbo/*`, `/dark/*`, `/flow/*`, `/candles/*`
-
-Use websocket support on whichever host serves `/ws/*`.
-
-If NPM is on multiple networks and names collide (for example another stack also exposes `api`), target explicit container names (`islandflow-vps-api-1`, `islandflow-vps-web-1`) instead of generic aliases.
-
 ## Updating the deployment
 
-This deployment installs dependencies from `deployment/docker/workspace-root/bun.lock` (not the repo-root lockfile).
+This deployment installs dependencies from `deployment/docker/workspace-root/bun.lock` rather than the repo-root lockfile.
 
 When dependencies change in any workspace used by Docker builds, refresh and validate the deployment snapshot first:
 
@@ -210,9 +191,8 @@ The checked-in deploy helper is meant to run from your local repo checkout, not 
 - SSH key: `~/.ssh/delta_ed25519`
 - Live repo checkout: `/home/delta/islandflow`
 - Live compose directory: `/home/delta/islandflow/deployment/docker`
-- Shared proxy network: `npm-shared`
 
-It preserves the current proxy topology, reuses the existing Docker Compose project, and avoids destructive cleanup on the server.
+It preserves the current Docker Compose project and avoids destructive cleanup on the server.
 
 ### Deploy `origin/main`
 
@@ -271,11 +251,11 @@ The helper always does the final public verification against:
 - `https://flow.deltaisland.io`
 - `https://api.flow.deltaisland.io/health`
 
-It also uses container-local health checks inside `islandflow-vps-api-1` and `islandflow-vps-web-1`, because host loopback `127.0.0.1:4000` is not the right primary check for this topology.
+Those checks assume your current edge routing already forwards those domains to the host ports published by this stack.
 
 ## Manual server fallback
 
-If you need to run the rollout steps manually over SSH, use the same live checkout and compose directory. Avoid `git clean -fd`, `git reset --hard`, proxy changes, or Docker network recreation during normal app rollouts.
+If you need to run the rollout steps manually over SSH, use the same live checkout and compose directory. Avoid `git clean -fd`, `git reset --hard`, or other destructive cleanup during normal app rollouts.
 
 Deploy `main` manually:
 
@@ -349,16 +329,16 @@ Only use `-v` if you intentionally want to wipe ClickHouse, Redis, and JetStream
 ## Known caveats
 
 - The root `.env.example` still contains a `REPLAY_ENABLED` comment, but the current replay service does not read that variable. Use the Compose replay profile instead.
-- This stack does not publish `web` or `api` to host ports. NPM must be able to resolve `web` and `api` over the shared user-defined network from `NPM_SHARED_NETWORK`.
-- If NPM is attached to more than one application network, generic upstream aliases like `api` can resolve to the wrong stack. Prefer explicit container names in NPM upstream settings.
+- `web` and `api` bind to loopback by default. External access requires changing the bind IPs or placing a reverse proxy in front of the published host ports.
 - Some hosts disable IPv6 inside containers; the bundled ClickHouse config pins `listen_host` to `0.0.0.0` so the API can reach ClickHouse reliably over Docker networking.
 - The stack assumes a single-node VPS deployment. If you later split infra or add external managed services, update the three core connection URLs in `.env`.
 
 ## Smoke checks
 
-After NPM is wired up:
+After the stack is up:
 
-- `https://app.<domain>/` should load the UI.
-- In two-subdomain mode, browser requests should target `https://api.<domain>/...` and live feeds should use `wss://api.<domain>/ws/...`.
+- `docker compose ps` should show healthy `api`, `web`, `clickhouse`, and `redis` services.
+- `curl http://127.0.0.1:4000/health` should return a healthy response on the server.
+- `curl -I http://127.0.0.1:3000/` should return a successful HTTP status on the server.
+- In two-origin mode, browser requests should target `https://api.<domain>/...` and live feeds should use `wss://api.<domain>/ws/...`.
 - In same-origin mode, browser requests should target `https://app.<domain>/...` for API paths and live feeds should use `wss://app.<domain>/ws/...`.
-- `docker compose ps` should show no service publishing host port `80`.
