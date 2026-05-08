@@ -954,6 +954,7 @@ h3 {
 }
 
 .data-table-wrap {
+  display: flex;
   flex: 1 1 auto;
   min-height: 0;
   overflow-x: auto;
@@ -965,7 +966,9 @@ h3 {
 
 .data-table {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
+  height: 100%;
   min-height: 0;
   min-width: 980px;
 }
