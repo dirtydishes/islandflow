@@ -42,8 +42,9 @@ services:
     init: true
     expose:
       - "3000"
-    ports:
-      - "${WEB_BIND_IP:-127.0.0.1}:${WEB_HOST_PORT:-3000}:3000"
+    networks:
+      - default
+      - shared
     depends_on:
       api:
         condition: service_healthy
@@ -65,8 +66,9 @@ services:
     command: ["services/api/src/index.ts"]
     expose:
       - "4000"
-    ports:
-      - "${API_BIND_IP:-127.0.0.1}:${API_HOST_PORT:-4000}:4000"
+    networks:
+      - default
+      - shared
     healthcheck:
       test:
         [
@@ -163,6 +165,11 @@ services:
     command: ["-js", "-sd", "/data"]
     volumes:
       - nats-data:/data
+
+networks:
+  shared:
+    external: true
+    name: ${NPM_SHARED_NETWORK:-npm-shared}
 
 volumes:
   clickhouse-data:

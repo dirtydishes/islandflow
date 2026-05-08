@@ -12,7 +12,10 @@ const REMOTE_REPO = "/home/delta/islandflow";
 const REMOTE_DEPLOYMENT = "/home/delta/islandflow/deployment/docker";
 const SSH_KEY = path.join(process.env.HOME ?? "", ".ssh", "delta_ed25519");
 const SSH_OPTIONS = ["-i", SSH_KEY, "-o", "IdentitiesOnly=yes", "-o", "BatchMode=yes"];
-const ALLOWED_REMOTE_UNTRACKED = "deployment/docker/signal-cli-0.14.3-Linux-native.tar.gz";
+const ALLOWED_REMOTE_UNTRACKED = new Set([
+  "deployment/docker/signal-cli-0.14.3-Linux-native.tar.gz",
+  "deployment/npm/"
+]);
 const API_CONTAINER = "islandflow-vps-api-1";
 const WEB_CONTAINER = "islandflow-vps-web-1";
 const PUBLIC_APP_URL = "https://flow.deltaisland.io";
@@ -190,11 +193,18 @@ while IFS= read -r line; do
   case "$line" in
     '## '*)
       ;;
-    '?? ${ALLOWED_REMOTE_UNTRACKED}')
-      ;;
     '?? '*)
-      echo "Refusing rollout: unexpected untracked path on server: \${line#?? }" >&2
-      exit 1
+      path="\${line#?? }"
+      case "$path" in
+${Array.from(ALLOWED_REMOTE_UNTRACKED)
+  .map((path) => `        ${shellPattern(path)})`)
+  .join("\n")}
+          ;;
+        *)
+          echo "Refusing rollout: unexpected untracked path on server: $path" >&2
+          exit 1
+          ;;
+      esac
       ;;
     *)
       echo "Refusing rollout: tracked local modifications on server: $line" >&2
@@ -255,6 +265,10 @@ function shellEscape(value: string): string {
   if (value.length === 0) {
     return "''";
   }
+  return `'${value.replace(/'/g, `'\"'\"'`)}'`;
+}
+
+function shellPattern(value: string): string {
   return `'${value.replace(/'/g, `'\"'\"'`)}'`;
 }
 
