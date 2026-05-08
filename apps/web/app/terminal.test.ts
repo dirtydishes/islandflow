@@ -19,12 +19,15 @@ import {
   getOptionTableSnapshot,
   getLiveFeedStatus,
   getLiveManifest,
+  getRouteFeatures,
+  getTapeVirtualConfig,
   mergeNewestWithOverflow,
   normalizeAlertSeverity,
   nextFlowFilterPopoverState,
   projectPausableTapeState,
   reducePausableTapeData,
   shouldRetainLiveSnapshotHistory,
+  shouldIncludeEquitiesForDarkUnderlyingFallback,
   shouldShowEquitiesSilentFeedWarning,
   selectPrimaryClassifierHit,
   smartMoneyProfileLabel,
@@ -51,15 +54,13 @@ const makeAlert = (overrides: Record<string, unknown> = {}) =>
   }) as any;
 
 describe("live manifest", () => {
-  it("includes options on home and tape", () => {
+  it("includes only tape channels on /tape", () => {
     const filters = buildDefaultFlowFilters();
-    for (const pathname of ["/", "/tape"]) {
-      expect(
-        getLiveManifest(pathname, "SPY", 60000, filters).some(
-          (subscription) => subscription.channel === "options"
-        )
-      ).toBe(true);
-    }
+    const channels = getLiveManifest("/tape", "SPY", 60000, filters).map(
+      (subscription) => subscription.channel
+    );
+
+    expect(channels).toEqual(["options", "nbbo", "equities", "flow"]);
   });
 
   it("dedupes tape options subscription", () => {
@@ -72,37 +73,29 @@ describe("live manifest", () => {
     expect(tapeOptionsSubscriptions).toHaveLength(1);
   });
 
-  it("keeps option filters on baseline subscription across page changes", () => {
+  it("keeps option filters on /tape options subscriptions", () => {
     const filters = {
       ...buildDefaultFlowFilters(),
       minNotional: 125_000
     };
 
-    const homeOptionsSubscription = getLiveManifest("/", "SPY", 60000, filters).find(
-      (subscription) => subscription.channel === "options"
-    );
     const tapeOptionsSubscription = getLiveManifest("/tape", "SPY", 60000, filters).find(
       (subscription) => subscription.channel === "options"
     );
 
-    expect(homeOptionsSubscription?.filters).toBe(filters);
     expect(tapeOptionsSubscription?.filters).toBe(filters);
   });
 
-  it("applies global flow filters to flow subscriptions on home and tape", () => {
+  it("applies global flow filters to flow subscriptions on /tape", () => {
     const filters = {
       ...buildDefaultFlowFilters(),
       minNotional: 50_000
     };
 
-    const homeFlowSubscription = getLiveManifest("/", "SPY", 60000, filters).find(
-      (subscription) => subscription.channel === "flow"
-    );
     const tapeFlowSubscription = getLiveManifest("/tape", "SPY", 60000, filters).find(
       (subscription) => subscription.channel === "flow"
     );
 
-    expect(homeFlowSubscription?.filters).toBe(filters);
     expect(tapeFlowSubscription?.filters).toBe(filters);
   });
 
@@ -130,6 +123,90 @@ describe("live manifest", () => {
     expect(optionsSubscription?.underlying_ids).toEqual(["AAPL"]);
     expect(optionsSubscription?.option_contract_id).toBe("AAPL-2025-01-17-200-C");
     expect(equitiesSubscription?.underlying_ids).toEqual(["AAPL"]);
+  });
+
+  it("scopes /signals subscriptions to signals channels only", () => {
+    const channels = getLiveManifest("/signals", "SPY", 60000, buildDefaultFlowFilters()).map(
+      (subscription) => subscription.channel
+    );
+
+    expect(channels).toEqual([
+      "alerts",
+      "smart-money",
+      "classifier-hits",
+      "inferred-dark",
+      "equity-joins"
+    ]);
+  });
+
+  it("scopes /charts subscriptions to chart channels only", () => {
+    const channels = getLiveManifest("/charts", "SPY", 60000, buildDefaultFlowFilters()).map(
+      (subscription) => subscription.channel
+    );
+
+    expect(channels).toEqual([
+      "smart-money",
+      "inferred-dark",
+      "equity-joins",
+      "equity-candles",
+      "equity-overlay"
+    ]);
+  });
+});
+
+describe("route feature map", () => {
+  it("maps /tape to tape panes and dependencies", () => {
+    const features = getRouteFeatures("/tape");
+    expect(features.showOptionsPane).toBe(true);
+    expect(features.showEquitiesPane).toBe(true);
+    expect(features.showFlowPane).toBe(true);
+    expect(features.needsClassifierDecor).toBe(true);
+    expect(features.alerts).toBe(false);
+  });
+
+  it("maps /signals to signal panes and dependencies", () => {
+    const features = getRouteFeatures("/signals");
+    expect(features.showAlertsPane).toBe(true);
+    expect(features.showClassifierPane).toBe(true);
+    expect(features.showDarkPane).toBe(true);
+    expect(features.options).toBe(false);
+    expect(features.equityJoins).toBe(true);
+  });
+
+  it("maps /charts to chart panes and dependencies", () => {
+    const features = getRouteFeatures("/charts");
+    expect(features.showChartPane).toBe(true);
+    expect(features.showFocusPane).toBe(true);
+    expect(features.equityCandles).toBe(true);
+    expect(features.equityOverlay).toBe(true);
+    expect(features.alerts).toBe(false);
+  });
+});
+
+describe("fixed tape virtualization config", () => {
+  it("uses expected fixed row heights and overscan by table", () => {
+    expect(getTapeVirtualConfig("options")).toEqual({ rowHeight: 36, overscan: 24, debugLabel: "options" });
+    expect(getTapeVirtualConfig("equities")).toEqual({ rowHeight: 36, overscan: 20, debugLabel: "equities" });
+    expect(getTapeVirtualConfig("flow")).toEqual({ rowHeight: 44, overscan: 16, debugLabel: "flow" });
+    expect(getTapeVirtualConfig("alerts")).toEqual({ rowHeight: 44, overscan: 16, debugLabel: "alerts" });
+    expect(getTapeVirtualConfig("classifier")).toEqual({ rowHeight: 44, overscan: 16, debugLabel: "classifier" });
+    expect(getTapeVirtualConfig("dark")).toEqual({ rowHeight: 44, overscan: 16, debugLabel: "dark" });
+  });
+});
+
+describe("dark underlying route dependency helper", () => {
+  it("does not keep extra equities subscriptions when joins+trace fallback are sufficient", () => {
+    expect(shouldIncludeEquitiesForDarkUnderlyingFallback()).toBe(false);
+    expect(
+      getLiveManifest("/signals", "SPY", 60000, buildDefaultFlowFilters()).some(
+        (subscription) => subscription.channel === "equities"
+      )
+    ).toBe(false);
+    expect(
+      getLiveManifest("/charts", "SPY", 60000, buildDefaultFlowFilters()).some(
+        (subscription) => subscription.channel === "equities"
+      )
+    ).toBe(false);
   });
 });
 

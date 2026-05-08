@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   createContext,
+  memo,
   useCallback,
   useContext,
   useEffect,
@@ -17,7 +18,7 @@ import {
   type ReactNode,
   type SetStateAction
 } from "react";
-import { useVirtualizer, type Virtualizer } from "@tanstack/react-virtual";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import type {
   AlertEvent,
   ClassifierHitEvent,
@@ -124,6 +125,206 @@ const LIVE_SESSION_HOT_CHANNELS = new Set<LiveSubscription["channel"]>([
   "flow",
   "equity-overlay"
 ]);
+
+type TapeVirtualPane = "options" | "equities" | "flow" | "alerts" | "classifier" | "dark";
+
+type TapeVirtualListConfig = {
+  rowHeight: number;
+  overscan: number;
+  debugLabel: TapeVirtualPane;
+};
+
+const TAPE_VIRTUAL_CONFIG: Record<TapeVirtualPane, TapeVirtualListConfig> = {
+  options: { rowHeight: 36, overscan: 24, debugLabel: "options" },
+  equities: { rowHeight: 36, overscan: 20, debugLabel: "equities" },
+  flow: { rowHeight: 44, overscan: 16, debugLabel: "flow" },
+  alerts: { rowHeight: 44, overscan: 16, debugLabel: "alerts" },
+  classifier: { rowHeight: 44, overscan: 16, debugLabel: "classifier" },
+  dark: { rowHeight: 44, overscan: 16, debugLabel: "dark" }
+};
+
+export const getTapeVirtualConfig = (pane: TapeVirtualPane): TapeVirtualListConfig =>
+  TAPE_VIRTUAL_CONFIG[pane];
+
+type RouteFeatures = {
+  options: boolean;
+  nbbo: boolean;
+  equities: boolean;
+  flow: boolean;
+  alerts: boolean;
+  smartMoney: boolean;
+  classifierHits: boolean;
+  inferredDark: boolean;
+  equityJoins: boolean;
+  equityCandles: boolean;
+  equityOverlay: boolean;
+  showOptionsPane: boolean;
+  showEquitiesPane: boolean;
+  showFlowPane: boolean;
+  showAlertsPane: boolean;
+  showClassifierPane: boolean;
+  showDarkPane: boolean;
+  showChartPane: boolean;
+  showFocusPane: boolean;
+  showReplayConsole: boolean;
+  needsClassifierDecor: boolean;
+  needsAlertEvidencePrefetch: boolean;
+  needsDarkUnderlying: boolean;
+};
+
+export const shouldIncludeEquitiesForDarkUnderlyingFallback = (): boolean => {
+  return false;
+};
+
+export const getRouteFeatures = (pathname: string): RouteFeatures => {
+  const includeEquitiesFallback = shouldIncludeEquitiesForDarkUnderlyingFallback();
+  const normalizedPath =
+    pathname === "/tape" ||
+    pathname === "/signals" ||
+    pathname === "/charts" ||
+    pathname === "/replay"
+      ? pathname
+      : "/";
+
+  switch (normalizedPath) {
+    case "/tape":
+      return {
+        options: true,
+        nbbo: true,
+        equities: true,
+        flow: true,
+        alerts: false,
+        smartMoney: false,
+        classifierHits: false,
+        inferredDark: false,
+        equityJoins: false,
+        equityCandles: false,
+        equityOverlay: false,
+        showOptionsPane: true,
+        showEquitiesPane: true,
+        showFlowPane: true,
+        showAlertsPane: false,
+        showClassifierPane: false,
+        showDarkPane: false,
+        showChartPane: false,
+        showFocusPane: false,
+        showReplayConsole: false,
+        needsClassifierDecor: true,
+        needsAlertEvidencePrefetch: false,
+        needsDarkUnderlying: false
+      };
+    case "/signals":
+      return {
+        options: false,
+        nbbo: false,
+        equities: includeEquitiesFallback,
+        flow: false,
+        alerts: true,
+        smartMoney: true,
+        classifierHits: true,
+        inferredDark: true,
+        equityJoins: true,
+        equityCandles: false,
+        equityOverlay: false,
+        showOptionsPane: false,
+        showEquitiesPane: false,
+        showFlowPane: false,
+        showAlertsPane: true,
+        showClassifierPane: true,
+        showDarkPane: true,
+        showChartPane: false,
+        showFocusPane: false,
+        showReplayConsole: false,
+        needsClassifierDecor: false,
+        needsAlertEvidencePrefetch: true,
+        needsDarkUnderlying: true
+      };
+    case "/charts":
+      return {
+        options: false,
+        nbbo: false,
+        equities: includeEquitiesFallback,
+        flow: false,
+        alerts: false,
+        smartMoney: true,
+        classifierHits: false,
+        inferredDark: true,
+        equityJoins: true,
+        equityCandles: true,
+        equityOverlay: true,
+        showOptionsPane: false,
+        showEquitiesPane: false,
+        showFlowPane: false,
+        showAlertsPane: false,
+        showClassifierPane: false,
+        showDarkPane: false,
+        showChartPane: true,
+        showFocusPane: true,
+        showReplayConsole: false,
+        needsClassifierDecor: false,
+        needsAlertEvidencePrefetch: false,
+        needsDarkUnderlying: true
+      };
+    case "/replay":
+      return {
+        options: false,
+        nbbo: false,
+        equities: false,
+        flow: false,
+        alerts: false,
+        smartMoney: false,
+        classifierHits: false,
+        inferredDark: false,
+        equityJoins: false,
+        equityCandles: false,
+        equityOverlay: false,
+        showOptionsPane: true,
+        showEquitiesPane: false,
+        showFlowPane: true,
+        showAlertsPane: true,
+        showClassifierPane: false,
+        showDarkPane: false,
+        showChartPane: false,
+        showFocusPane: false,
+        showReplayConsole: true,
+        needsClassifierDecor: true,
+        needsAlertEvidencePrefetch: true,
+        needsDarkUnderlying: false
+      };
+    case "/":
+    default:
+      return {
+        options: false,
+        nbbo: false,
+        equities: true,
+        flow: false,
+        alerts: true,
+        smartMoney: true,
+        classifierHits: false,
+        inferredDark: true,
+        equityJoins: true,
+        equityCandles: true,
+        equityOverlay: true,
+        showOptionsPane: false,
+        showEquitiesPane: true,
+        showFlowPane: false,
+        showAlertsPane: true,
+        showClassifierPane: false,
+        showDarkPane: false,
+        showChartPane: true,
+        showFocusPane: false,
+        showReplayConsole: false,
+        needsClassifierDecor: false,
+        needsAlertEvidencePrefetch: true,
+        needsDarkUnderlying: true
+      };
+  }
+};
+
+const EMPTY_ALERT_EVENTS: AlertEvent[] = [];
+const EMPTY_CLASSIFIER_HIT_EVENTS: ClassifierHitEvent[] = [];
+const EMPTY_SMART_MONEY_EVENTS: SmartMoneyEvent[] = [];
+const EMPTY_INFERRED_DARK_EVENTS: InferredDarkEvent[] = [];
 
 type CandlestickSeries = ReturnType<IChartApi["addCandlestickSeries"]>;
 
@@ -981,14 +1182,6 @@ const extractUnderlying = (contractId: string): string => {
   return contractId.split("-")[0]?.toUpperCase() ?? contractId.toUpperCase();
 };
 
-const extractEquityTraceFromJoin = (joinId: string): string | null => {
-  const match = joinId.match(/^equityjoin:(.+)$/);
-  if (match?.[1]) {
-    return match[1];
-  }
-  return joinId.trim().length > 0 ? joinId.trim() : null;
-};
-
 const normalizeJoinRefCandidates = (value: string): string[] => {
   const ref = value.trim();
   if (!ref) {
@@ -1042,7 +1235,6 @@ const formatDarkTrace = (traceId: string): string => {
 
 const inferDarkUnderlying = (
   event: InferredDarkEvent,
-  equityPrints: Map<string, EquityPrint>,
   equityJoins: Map<string, EquityPrintJoin>
 ): string | null => {
   for (const ref of event.evidence_refs) {
@@ -1059,17 +1251,6 @@ const inferDarkUnderlying = (
   const match = event.trace_id.match(/^dark:(?:stealth_accumulation|distribution):([^:]+):/);
   if (match?.[1]) {
     return match[1].toUpperCase();
-  }
-
-  for (const ref of event.evidence_refs) {
-    const traceId = extractEquityTraceFromJoin(ref);
-    if (!traceId) {
-      continue;
-    }
-    const print = equityPrints.get(traceId);
-    if (print) {
-      return print.underlying_id.toUpperCase();
-    }
   }
 
   return null;
@@ -1285,6 +1466,10 @@ type ClassifierDecor = {
   tone: string;
   intensity: number;
 };
+
+const EMPTY_CLASSIFIER_HITS_BY_PACKET_ID = new Map<string, ClassifierHitEvent[]>();
+const EMPTY_PACKET_ID_BY_OPTION_TRACE_ID = new Map<string, string>();
+const EMPTY_CLASSIFIER_DECOR_BY_OPTION_TRACE_ID = new Map<string, ClassifierDecor>();
 
 const SMART_MONEY_PROFILE_TONES: Record<SmartMoneyProfileId, string> = {
   institutional_directional: "green",
@@ -1612,14 +1797,12 @@ const useVirtualHistoryGate = (
   }, [enabled, itemCount, lastVirtualIndex]);
 };
 
-type MeasuredVirtualListResult<T> = {
+type TapeVirtualListResult<T> = {
   totalSize: number;
-  virtualItems: MeasuredVirtualRow<T>[];
-  measureElement: (node: HTMLElement | null) => void;
-  virtualizer: Virtualizer<HTMLDivElement, HTMLElement>;
+  virtualItems: TapeVirtualRow<T>[];
 };
 
-type MeasuredVirtualRow<T> = {
+type TapeVirtualRow<T> = {
   item: T;
   key: string;
   index: number;
@@ -1628,39 +1811,36 @@ type MeasuredVirtualRow<T> = {
   end: number;
 };
 
-const useMeasuredVirtualList = <T extends SortableItem>(
+const useTapeVirtualList = <T extends SortableItem>(
   items: T[],
   listRef: React.RefObject<HTMLDivElement>,
-  estimateSize: number,
-  overscan: number,
-  debugLabel: string
-): MeasuredVirtualListResult<T> => {
+  config: TapeVirtualListConfig
+): TapeVirtualListResult<T> => {
   const virtualizer = useVirtualizer<HTMLDivElement, HTMLElement>({
     count: items.length,
     getScrollElement: () => listRef.current,
-    estimateSize: () => estimateSize,
-    overscan,
-    getItemKey: (index) => getTapeItemKey(items[index] as SortableItem),
-    measureElement: (node) => {
-      bumpTapeDebugMetric("virtualRowMeasurementCount", 1);
-      return node.getBoundingClientRect().height;
-    }
+    estimateSize: () => config.rowHeight,
+    overscan: config.overscan,
+    getItemKey: (index) => getTapeItemKey(items[index] as SortableItem)
   });
 
-  const virtualItems: MeasuredVirtualRow<T>[] = virtualizer.getVirtualItems().map((virtualItem) => {
-    const item = items[virtualItem.index] as T | undefined;
-    if (!item) {
-      return null;
-    }
-    return {
-      item,
-      key: getTapeItemKey(item),
-      index: virtualItem.index,
-      start: virtualItem.start,
-      size: virtualItem.size,
-      end: virtualItem.end
-    };
-  }).filter((virtualItem): virtualItem is MeasuredVirtualRow<T> => virtualItem !== null);
+  const virtualItems: TapeVirtualRow<T>[] = virtualizer
+    .getVirtualItems()
+    .map((virtualItem) => {
+      const item = items[virtualItem.index] as T | undefined;
+      if (!item) {
+        return null;
+      }
+      return {
+        item,
+        key: getTapeItemKey(item),
+        index: virtualItem.index,
+        start: virtualItem.start,
+        size: virtualItem.size,
+        end: virtualItem.end
+      };
+    })
+    .filter((virtualItem): virtualItem is TapeVirtualRow<T> => virtualItem !== null);
 
   useEffect(() => {
     if (!DEV_TAPE_DEBUG || items.length === 0) {
@@ -1679,20 +1859,18 @@ const useMeasuredVirtualList = <T extends SortableItem>(
     const visibleBottomGap = Math.max(0, element.scrollTop + element.clientHeight - last.end);
     if (visibleTopGap > element.clientHeight || visibleBottomGap > element.clientHeight) {
       console.warn("[tape] false-gap watchdog", {
-        pane: debugLabel,
+        pane: config.debugLabel,
         item_count: items.length,
         visible_top_gap: visibleTopGap,
         visible_bottom_gap: visibleBottomGap,
         viewport_height: element.clientHeight
       });
     }
-  }, [debugLabel, items.length, listRef, virtualItems]);
+  }, [config.debugLabel, items.length, listRef, virtualItems]);
 
   return {
     totalSize: virtualizer.getTotalSize(),
-    virtualItems,
-    measureElement: virtualizer.measureElement,
-    virtualizer
+    virtualItems
   };
 };
 
@@ -2635,42 +2813,56 @@ export const getLiveManifest = (
   optionScope?: Pick<Extract<LiveSubscription, { channel: "options" }>, "underlying_ids" | "option_contract_id">,
   equityScope?: Pick<Extract<LiveSubscription, { channel: "equities" }>, "underlying_ids">
 ): LiveSubscription[] => {
-  const baselineSubs: LiveSubscription[] = [{ channel: "options", filters: flowFilters, ...optionScope }];
-  const chartSubs: LiveSubscription[] = [
-    { channel: "equity-candles", underlying_id: chartTicker, interval_ms: chartIntervalMs },
-    { channel: "equity-overlay", underlying_id: chartTicker }
-  ];
+  const features = getRouteFeatures(pathname);
+  const subscriptions: LiveSubscription[] = [];
 
-  if (pathname === "/tape") {
-    const optionsSub: Extract<LiveSubscription, { channel: "options" }> = {
+  if (features.options) {
+    subscriptions.push({
       channel: "options",
       filters: flowFilters,
       ...optionScope,
       snapshot_limit: LIVE_HOT_WINDOW_OPTIONS
-    };
-    const tapeSubs: LiveSubscription[] = [
-      optionsSub,
-      { channel: "nbbo", snapshot_limit: LIVE_HOT_WINDOW },
-      { channel: "equities", ...equityScope, snapshot_limit: LIVE_HOT_WINDOW },
-      { channel: "flow", filters: flowFilters, snapshot_limit: LIVE_HOT_WINDOW },
-      { channel: "smart-money", snapshot_limit: LIVE_HOT_WINDOW },
-      { channel: "classifier-hits", snapshot_limit: LIVE_HOT_WINDOW },
-      { channel: "alerts", snapshot_limit: LIVE_HOT_WINDOW },
-      { channel: "inferred-dark", snapshot_limit: LIVE_HOT_WINDOW }
-    ];
-    return dedupeLiveSubscriptions(tapeSubs);
+    });
+  }
+  if (features.nbbo) {
+    subscriptions.push({ channel: "nbbo", snapshot_limit: LIVE_HOT_WINDOW });
+  }
+  if (features.equities) {
+    subscriptions.push({ channel: "equities", ...equityScope, snapshot_limit: LIVE_HOT_WINDOW });
+  }
+  if (features.flow) {
+    subscriptions.push({ channel: "flow", filters: flowFilters, snapshot_limit: LIVE_HOT_WINDOW });
+  }
+  if (features.alerts) {
+    subscriptions.push({ channel: "alerts", snapshot_limit: LIVE_HOT_WINDOW });
+  }
+  if (features.smartMoney) {
+    subscriptions.push({ channel: "smart-money", snapshot_limit: LIVE_HOT_WINDOW });
+  }
+  if (features.classifierHits) {
+    subscriptions.push({ channel: "classifier-hits", snapshot_limit: LIVE_HOT_WINDOW });
+  }
+  if (features.inferredDark) {
+    subscriptions.push({ channel: "inferred-dark", snapshot_limit: LIVE_HOT_WINDOW });
+  }
+  if (features.equityJoins) {
+    subscriptions.push({ channel: "equity-joins", snapshot_limit: LIVE_HOT_WINDOW });
+  }
+  if (features.equityCandles) {
+    subscriptions.push({
+      channel: "equity-candles",
+      underlying_id: chartTicker,
+      interval_ms: chartIntervalMs
+    });
+  }
+  if (features.equityOverlay) {
+    subscriptions.push({
+      channel: "equity-overlay",
+      underlying_id: chartTicker
+    });
   }
 
-  return dedupeLiveSubscriptions([
-    ...baselineSubs,
-    { channel: "equities", ...equityScope },
-    { channel: "flow", filters: flowFilters },
-    { channel: "alerts" },
-    { channel: "smart-money" },
-    { channel: "classifier-hits" },
-    { channel: "inferred-dark" },
-    ...chartSubs
-  ]);
+  return dedupeLiveSubscriptions(subscriptions);
 };
 
 const useLiveSession = (
@@ -4643,6 +4835,7 @@ const formatFlowMetric = (value: number, suffix?: string): string => {
 
 const useTerminalState = () => {
   const pathname = usePathname();
+  const routeFeatures = useMemo(() => getRouteFeatures(pathname), [pathname]);
   const [mode, setMode] = useState<TapeMode>("live");
   const [replaySource, setReplaySource] = useState<string | null>(null);
   const [selectedAlert, setSelectedAlert] = useState<AlertEvent | null>(null);
@@ -4711,13 +4904,7 @@ const useTerminalState = () => {
     optionScope,
     equityScope
   );
-  const equitiesLiveSubscriptionActive = useMemo(
-    () =>
-      getLiveManifest(pathname, chartTicker.toUpperCase(), chartIntervalMs, flowFilters, optionScope, equityScope).some(
-        (sub) => sub.channel === "equities"
-      ),
-    [pathname, chartTicker, chartIntervalMs, flowFilters, optionScope, equityScope]
-  );
+  const equitiesLiveSubscriptionActive = routeFeatures.equities;
 
   const handleReplaySource = useCallback((value: string | null) => {
     setReplaySource(value);
@@ -5080,16 +5267,6 @@ const useTerminalState = () => {
     return map;
   }, [optionsFeed.items]);
 
-  const equityPrintMap = useMemo(() => {
-    const map = new Map<string, EquityPrint>();
-    for (const print of equitiesFeed.items) {
-      if (print.trace_id) {
-        map.set(print.trace_id, print);
-      }
-    }
-    return map;
-  }, [equitiesFeed.items]);
-
   const equityJoinMap = useMemo(() => {
     const map = new Map<string, EquityPrintJoin>();
     for (const join of equityJoinsFeed.items) {
@@ -5317,11 +5494,11 @@ const useTerminalState = () => {
   }, [selectedDarkEvent, resolvedEquityJoinMap]);
 
   const selectedDarkUnderlying = useMemo(() => {
-    if (!selectedDarkEvent) {
+    if (!routeFeatures.needsDarkUnderlying || !selectedDarkEvent) {
       return null;
     }
-    return inferDarkUnderlying(selectedDarkEvent, equityPrintMap, resolvedEquityJoinMap);
-  }, [selectedDarkEvent, resolvedEquityJoinMap, equityPrintMap]);
+    return inferDarkUnderlying(selectedDarkEvent, resolvedEquityJoinMap);
+  }, [routeFeatures.needsDarkUnderlying, selectedDarkEvent, resolvedEquityJoinMap]);
 
   useEffect(() => {
     if (mode !== "live") {
@@ -5358,6 +5535,9 @@ const useTerminalState = () => {
   }, []);
 
   const classifierHitsByPacketId = useMemo(() => {
+    if (!routeFeatures.needsClassifierDecor) {
+      return EMPTY_CLASSIFIER_HITS_BY_PACKET_ID;
+    }
     const map = new Map<string, ClassifierHitEvent[]>();
     for (const hit of [...classifierHitsFeed.items, ...optionSupportClassifierHits]) {
       const packetId = extractPacketIdFromClassifierHitTrace(hit.trace_id);
@@ -5367,9 +5547,17 @@ const useTerminalState = () => {
       map.set(packetId, [...(map.get(packetId) ?? []), hit]);
     }
     return map;
-  }, [classifierHitsFeed.items, optionSupportClassifierHits, extractPacketIdFromClassifierHitTrace]);
+  }, [
+    classifierHitsFeed.items,
+    optionSupportClassifierHits,
+    extractPacketIdFromClassifierHitTrace,
+    routeFeatures.needsClassifierDecor
+  ]);
 
   const smartMoneyByPacketId = useMemo(() => {
+    if (!routeFeatures.needsClassifierDecor) {
+      return new Map<string, SmartMoneyEvent>();
+    }
     const map = new Map<string, SmartMoneyEvent>();
     for (const event of [...smartMoneyFeed.items, ...optionSupportSmartMoney]) {
       for (const packetId of event.packet_ids) {
@@ -5380,9 +5568,12 @@ const useTerminalState = () => {
       }
     }
     return map;
-  }, [smartMoneyFeed.items, optionSupportSmartMoney]);
+  }, [smartMoneyFeed.items, optionSupportSmartMoney, routeFeatures.needsClassifierDecor]);
 
   const packetIdByOptionTraceId = useMemo(() => {
+    if (!routeFeatures.needsClassifierDecor) {
+      return EMPTY_PACKET_ID_BY_OPTION_TRACE_ID;
+    }
     const map = new Map<string, string>();
     for (const packet of resolvedFlowPacketMap.values()) {
       for (const member of packet.members) {
@@ -5390,9 +5581,12 @@ const useTerminalState = () => {
       }
     }
     return map;
-  }, [resolvedFlowPacketMap]);
+  }, [resolvedFlowPacketMap, routeFeatures.needsClassifierDecor]);
 
   const classifierDecorByOptionTraceId = useMemo(() => {
+    if (!routeFeatures.needsClassifierDecor) {
+      return EMPTY_CLASSIFIER_DECOR_BY_OPTION_TRACE_ID;
+    }
     const map = new Map<string, ClassifierDecor>();
     for (const [traceId, packetId] of packetIdByOptionTraceId) {
       const smartMoneyEvent = smartMoneyByPacketId.get(packetId);
@@ -5406,10 +5600,15 @@ const useTerminalState = () => {
       }
     }
     return map;
-  }, [classifierHitsByPacketId, packetIdByOptionTraceId, smartMoneyByPacketId]);
+  }, [
+    classifierHitsByPacketId,
+    packetIdByOptionTraceId,
+    smartMoneyByPacketId,
+    routeFeatures.needsClassifierDecor
+  ]);
 
   useEffect(() => {
-    if (mode !== "live" || optionsFeed.items.length === 0) {
+    if (!routeFeatures.needsClassifierDecor || mode !== "live" || optionsFeed.items.length === 0) {
       return;
     }
 
@@ -5525,7 +5724,8 @@ const useTerminalState = () => {
     optionsFeed.items,
     classifierDecorByOptionTraceId,
     packetIdByOptionTraceId,
-    historicalNbboByTraceId
+    historicalNbboByTraceId,
+    routeFeatures.needsClassifierDecor
   ]);
 
   const selectedClassifierPacketId = useMemo(() => {
@@ -5874,14 +6074,23 @@ const useTerminalState = () => {
   }, [equitiesScopedQuiet, optionsScopedQuiet]);
 
   const filteredInferredDark = useMemo(() => {
+    if (!routeFeatures.inferredDark) {
+      return EMPTY_INFERRED_DARK_EVENTS;
+    }
     if (tickerSet.size === 0) {
       return inferredDarkFeed.items;
     }
     return inferredDarkFeed.items.filter((event) => {
-      const underlying = inferDarkUnderlying(event, equityPrintMap, resolvedEquityJoinMap);
+      const underlying = inferDarkUnderlying(event, resolvedEquityJoinMap);
       return matchesTicker(underlying);
     });
-  }, [resolvedEquityJoinMap, equityPrintMap, inferredDarkFeed.items, matchesTicker, tickerSet]);
+  }, [
+    resolvedEquityJoinMap,
+    inferredDarkFeed.items,
+    matchesTicker,
+    tickerSet,
+    routeFeatures.inferredDark
+  ]);
 
   const filteredFlow = useMemo(() => {
     return flowFeed.items.filter((packet) => {
@@ -5896,13 +6105,31 @@ const useTerminalState = () => {
   }, [flowFeed.items, flowFilters, extractPacketContract, matchesTicker, tickerSet]);
 
   const filteredAlerts = useMemo(() => {
+    if (!routeFeatures.showAlertsPane && !routeFeatures.needsAlertEvidencePrefetch) {
+      return EMPTY_ALERT_EVENTS;
+    }
     if (tickerSet.size === 0) {
       return alertsFeed.items;
     }
     return alertsFeed.items.filter((alert) => matchesTicker(inferAlertUnderlying(alert)));
-  }, [alertsFeed.items, inferAlertUnderlying, matchesTicker, tickerSet]);
+  }, [
+    alertsFeed.items,
+    inferAlertUnderlying,
+    matchesTicker,
+    tickerSet,
+    routeFeatures.showAlertsPane,
+    routeFeatures.needsAlertEvidencePrefetch
+  ]);
 
-  const visibleAlerts = useMemo(() => filteredAlerts.slice(0, 12), [filteredAlerts]);
+  const visibleAlerts = useMemo(() => {
+    if (routeFeatures.needsAlertEvidencePrefetch) {
+      return filteredAlerts.slice(0, 12);
+    }
+    if (routeFeatures.showAlertsPane) {
+      return filteredAlerts.slice(0, 12);
+    }
+    return EMPTY_ALERT_EVENTS;
+  }, [filteredAlerts, routeFeatures.needsAlertEvidencePrefetch, routeFeatures.showAlertsPane]);
 
   const visibleAlertEvidenceRefs = useMemo(() => {
     const refs = new Set<string>();
@@ -5915,7 +6142,7 @@ const useTerminalState = () => {
   }, [visibleAlerts]);
 
   useEffect(() => {
-    if (mode !== "live" || visibleAlerts.length === 0) {
+    if (!routeFeatures.needsAlertEvidencePrefetch || mode !== "live" || visibleAlerts.length === 0) {
       return;
     }
 
@@ -5997,7 +6224,8 @@ const useTerminalState = () => {
     visibleAlerts,
     visibleAlertEvidenceRefs,
     resolvedFlowPacketMap,
-    resolvedOptionPrintMap
+    resolvedOptionPrintMap,
+    routeFeatures.needsAlertEvidencePrefetch
   ]);
 
   const activePinnedFlowKeys = useMemo(() => {
@@ -6083,6 +6311,9 @@ const useTerminalState = () => {
   }, []);
 
   const filteredClassifierHits = useMemo(() => {
+    if (!routeFeatures.classifierHits) {
+      return EMPTY_CLASSIFIER_HIT_EVENTS;
+    }
     if (tickerSet.size === 0) {
       return classifierHitsFeed.items;
     }
@@ -6090,16 +6321,28 @@ const useTerminalState = () => {
       const underlying = extractUnderlyingFromTrace(hit.trace_id);
       return matchesTicker(underlying);
     });
-  }, [classifierHitsFeed.items, extractUnderlyingFromTrace, matchesTicker, tickerSet]);
+  }, [
+    classifierHitsFeed.items,
+    extractUnderlyingFromTrace,
+    matchesTicker,
+    tickerSet,
+    routeFeatures.classifierHits
+  ]);
 
   const filteredSmartMoneyEvents = useMemo(() => {
+    if (!routeFeatures.smartMoney) {
+      return EMPTY_SMART_MONEY_EVENTS;
+    }
     if (tickerSet.size === 0) {
       return smartMoneyFeed.items;
     }
     return smartMoneyFeed.items.filter((event) => matchesTicker(event.underlying_id));
-  }, [matchesTicker, smartMoneyFeed.items, tickerSet]);
+  }, [matchesTicker, smartMoneyFeed.items, tickerSet, routeFeatures.smartMoney]);
 
   const chartSmartMoneyEvents = useMemo(() => {
+    if (!routeFeatures.showChartPane && !routeFeatures.showFocusPane) {
+      return EMPTY_SMART_MONEY_EVENTS;
+    }
     const desired = chartTicker.toUpperCase();
     return smartMoneyFeed.items
       .filter((event) => event.underlying_id.toUpperCase() === desired)
@@ -6110,12 +6353,15 @@ const useTerminalState = () => {
         }
         return a.seq - b.seq;
       });
-  }, [chartTicker, smartMoneyFeed.items]);
+  }, [chartTicker, smartMoneyFeed.items, routeFeatures.showChartPane, routeFeatures.showFocusPane]);
 
   const chartInferredDark = useMemo(() => {
+    if (!routeFeatures.showChartPane && !routeFeatures.showFocusPane) {
+      return EMPTY_INFERRED_DARK_EVENTS;
+    }
     const desired = chartTicker.toUpperCase();
     return inferredDarkFeed.items
-      .filter((event) => inferDarkUnderlying(event, equityPrintMap, resolvedEquityJoinMap) === desired)
+      .filter((event) => inferDarkUnderlying(event, resolvedEquityJoinMap) === desired)
       .sort((a, b) => {
         const delta = a.source_ts - b.source_ts;
         if (delta !== 0) {
@@ -6123,7 +6369,13 @@ const useTerminalState = () => {
         }
         return a.seq - b.seq;
       });
-  }, [chartTicker, inferredDarkFeed.items, resolvedEquityJoinMap, equityPrintMap]);
+  }, [
+    chartTicker,
+    inferredDarkFeed.items,
+    resolvedEquityJoinMap,
+    routeFeatures.showChartPane,
+    routeFeatures.showFocusPane
+  ]);
 
   const findAlertForClassifierHit = useCallback(
     (hit: ClassifierHitEvent): AlertEvent | null => {
@@ -6183,18 +6435,47 @@ const useTerminalState = () => {
   }, []);
 
   const lastSeen = useMemo(() => {
-    return [
-      optionsFeed.lastUpdate,
-      equitiesFeed.lastUpdate,
-      inferredDarkFeed.lastUpdate,
-      flowFeed.lastUpdate,
-      alertsFeed.lastUpdate,
-      smartMoneyFeed.lastUpdate,
-      classifierHitsFeed.lastUpdate
-    ]
+    const updates: Array<number | null> = [];
+    if (routeFeatures.options || routeFeatures.showOptionsPane) {
+      updates.push(optionsFeed.lastUpdate);
+    }
+    if (routeFeatures.equities || routeFeatures.showEquitiesPane) {
+      updates.push(equitiesFeed.lastUpdate);
+    }
+    if (routeFeatures.inferredDark || routeFeatures.showDarkPane || routeFeatures.showFocusPane) {
+      updates.push(inferredDarkFeed.lastUpdate);
+    }
+    if (routeFeatures.flow || routeFeatures.showFlowPane) {
+      updates.push(flowFeed.lastUpdate);
+    }
+    if (routeFeatures.alerts || routeFeatures.showAlertsPane) {
+      updates.push(alertsFeed.lastUpdate);
+    }
+    if (routeFeatures.smartMoney || routeFeatures.showClassifierPane || routeFeatures.showChartPane || routeFeatures.showFocusPane) {
+      updates.push(smartMoneyFeed.lastUpdate);
+    }
+    if (routeFeatures.classifierHits || routeFeatures.showClassifierPane) {
+      updates.push(classifierHitsFeed.lastUpdate);
+    }
+    return updates
       .filter((value): value is number => value !== null)
       .sort((a, b) => b - a)[0] ?? null;
   }, [
+    routeFeatures.options,
+    routeFeatures.showOptionsPane,
+    routeFeatures.equities,
+    routeFeatures.showEquitiesPane,
+    routeFeatures.inferredDark,
+    routeFeatures.showDarkPane,
+    routeFeatures.showFocusPane,
+    routeFeatures.flow,
+    routeFeatures.showFlowPane,
+    routeFeatures.alerts,
+    routeFeatures.showAlertsPane,
+    routeFeatures.smartMoney,
+    routeFeatures.showClassifierPane,
+    routeFeatures.showChartPane,
+    routeFeatures.classifierHits,
     optionsFeed.lastUpdate,
     equitiesFeed.lastUpdate,
     inferredDarkFeed.lastUpdate,
@@ -6242,13 +6523,13 @@ const useTerminalState = () => {
     smartMoney: smartMoneyFeed,
     classifierHits: classifierHitsFeed,
     liveSession,
+    routeFeatures,
     activeTickers,
     tickerSet,
     chartTicker,
     nbboMap,
     historicalNbboByTraceId,
     optionPrintMap: resolvedOptionPrintMap,
-    equityPrintMap,
     equityJoinMap: resolvedEquityJoinMap,
     flowPacketMap: resolvedFlowPacketMap,
     classifierHitsByPacketId,
@@ -6512,36 +6793,6 @@ export const FlowFilterPopover = ({ filters, onChange }: FlowFilterPopoverProps)
   );
 };
 
-const FlowFilterControls = () => {
-  const state = useTerminal();
-
-  return <FlowFilterPopover filters={state.flowFilters} onChange={state.setFlowFilters} />;
-};
-
-const ContractFilterControl = () => {
-  const state = useTerminal();
-  const selected = state.selectedInstrument;
-  const isContractFilterActive = selected?.kind === "option-contract";
-
-  return (
-    <button
-      className={`terminal-button contract-filter-button${isContractFilterActive ? " is-active" : ""}`}
-      type="button"
-      disabled={!isContractFilterActive}
-      onClick={() => state.setSelectedInstrument(null)}
-      title={
-        isContractFilterActive
-          ? "Clear active contract filter"
-          : "Contract filter activates when you focus a contract in the Options tape"
-      }
-    >
-      <span className="contract-filter-button-label">
-        {isContractFilterActive ? state.selectedInstrumentLabel : "Contract Filter"}
-      </span>
-    </button>
-  );
-};
-
 type PaneProps = {
   title: string;
   status?: ReactNode;
@@ -6596,13 +6847,13 @@ const ShellMetricStrip = () => {
 };
 
 type OptionsPaneProps = {
+  state: TerminalState;
   limit?: number;
 };
 
-const OptionsPane = ({ limit }: OptionsPaneProps) => {
-  const state = useTerminal();
+const OptionsPane = memo(({ state, limit }: OptionsPaneProps) => {
   const items = limit ? state.filteredOptions.slice(0, limit) : state.filteredOptions;
-  const virtual = useMeasuredVirtualList(items, state.optionsScroll.listRef, 36, 12, "options");
+  const virtual = useTapeVirtualList(items, state.optionsScroll.listRef, getTapeVirtualConfig("options"));
   useVirtualHistoryGate(state.mode === "live" && !limit, items.length, virtual.virtualItems.at(-1)?.index ?? -1, () =>
     void state.liveSession.loadOlder("options")
   );
@@ -6647,7 +6898,7 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          <div className="data-table-wrap" ref={state.optionsScroll.setListRef}>
+          <div className="data-table-wrap">
             <div className="data-table data-table-options" role="table" aria-label="Options tape">
               <div className="data-table-head" role="row">
                 <span className="data-table-cell">TIME</span>
@@ -6663,117 +6914,117 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
                 <span className="data-table-cell">IV</span>
                 <span className="data-table-cell">CLASSIFIER</span>
               </div>
-              <div
-                className="data-table-body"
-                style={{ height: `${virtual.totalSize}px` }}
-                aria-hidden={virtual.virtualItems.length === 0}
-              >
-              {virtual.virtualItems.map(({ item: print, key, index, start, size }) => {
-              const contractId = normalizeContractId(print.option_contract_id);
-              const parsed = parseOptionContractId(contractId);
-              const contractDisplay = formatOptionContractLabel(contractId);
-              const quote = state.historicalNbboByTraceId.get(print.trace_id) ?? state.nbboMap.get(contractId);
-              const hasPreservedNbbo = typeof print.execution_nbbo_side === "string";
-              const nbboSide =
-                print.execution_nbbo_side ??
-                print.nbbo_side ??
-                (!hasPreservedNbbo ? classifyNbboSide(print.price, quote) : null);
-              const notional = print.notional ?? print.price * print.size * 100;
-              const spot = print.execution_underlying_spot;
-              const iv = print.execution_iv;
-              const decor = state.classifierDecorByOptionTraceId.get(print.trace_id);
-              const underlyingId = (print.underlying_id ?? parsed?.root ?? extractUnderlying(contractId)).toUpperCase();
-              const focusContract = (event: ReactMouseEvent<HTMLButtonElement>) => {
-                event.stopPropagation();
-                state.focusOptionContract(print);
-              };
-              const rowStyle = {
-                ...(decor
-                  ? ({ "--classifier-intensity": decor.intensity } as CSSProperties)
-                  : undefined),
-                top: `${start}px`
-              } as CSSProperties;
-              const commonProps = {
-                className: `data-table-row data-table-row-button data-table-row-classified data-table-row-options data-table-virtual-row${index % 2 === 1 ? " is-even" : ""}${decor ? ` is-classified classifier-${decor.tone}` : ""}`,
-                style: rowStyle,
-                "data-index": index,
-                "data-row-start": String(start),
-                "data-row-size": String(size),
-                "data-tape-key": key,
-                ref: virtual.measureElement
-              };
-              const cells = (
-                <>
-                  <span className="data-table-cell data-table-cell-number">{formatTime(print.ts)}</span>
-                  <span className="data-table-cell">
-                    <button className="instrument-cell-button" type="button" onClick={focusContract}>
-                      {contractDisplay?.ticker ?? parsed?.root ?? formatContractLabel(contractId)}
-                    </button>
-                  </span>
-                  <span className="data-table-cell">
-                    <button className="instrument-cell-button" type="button" onClick={focusContract}>
-                      {contractDisplay?.expiration ?? parsed?.expiry ?? "--"}
-                    </button>
-                  </span>
-                  <span className="data-table-cell data-table-cell-number">
-                    <button className="instrument-cell-button" type="button" onClick={focusContract}>
-                      {contractDisplay?.strike.replace(/[CP]$/, "") ?? "--"}
-                    </button>
-                  </span>
-                  <span className="data-table-cell">
-                    <button className="instrument-cell-button" type="button" onClick={focusContract}>
-                      {parsed?.right ?? contractDisplay?.strike.slice(-1) ?? "--"}
-                    </button>
-                  </span>
-                  <span className="data-table-cell data-table-cell-number">{typeof spot === "number" ? formatPrice(spot) : "--"}</span>
-                  <span className="data-table-cell data-table-cell-number">
-                    {formatSize(print.size)}@{formatPrice(print.price)}_{nbboSide ?? "--"}
-                  </span>
-                  <span className="data-table-cell">{print.option_type ?? "--"}</span>
-                  <span className="data-table-cell data-table-cell-number notional-emphasis">${formatCompactUsd(notional)}</span>
-                  <span className="data-table-cell">
-                    {nbboSide ? (
-                      <span className={`nbbo-tag nbbo-tag-${nbboSide.toLowerCase()}`}>{nbboSide}</span>
-                    ) : (
-                      "--"
-                    )}
-                  </span>
-                  <span className="data-table-cell data-table-cell-number">{typeof iv === "number" ? formatPct(iv) : "--"}</span>
-                  <span className="data-table-cell">{decor ? humanizeClassifierId(decor.family) : "--"}</span>
-                </>
-              );
-
-              return decor ? (
-                <button
-                  type="button"
-                  {...commonProps}
-                  key={key}
-                  onClick={() =>
-                    decor.smartMoney
-                      ? state.openFromSmartMoneyEvent(decor.smartMoney)
-                      : decor.hit
-                        ? state.openFromClassifierHit(decor.hit)
-                        : undefined
-                  }
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      if (decor.smartMoney) {
-                        state.openFromSmartMoneyEvent(decor.smartMoney);
-                      } else if (decor.hit) {
-                        state.openFromClassifierHit(decor.hit);
-                      }
-                    }
-                  }}
+              <div className="data-table-scroll" ref={state.optionsScroll.setListRef}>
+                <div
+                  className="data-table-body"
+                  style={{ height: `${virtual.totalSize}px` }}
+                  aria-hidden={virtual.virtualItems.length === 0}
                 >
-                  {cells}
-                </button>
-              ) : (
-                <div {...commonProps} key={key}>
-                  {cells}
+                  {virtual.virtualItems.map(({ item: print, key, index, start, size }) => {
+                    const contractId = normalizeContractId(print.option_contract_id);
+                    const parsed = parseOptionContractId(contractId);
+                    const contractDisplay = formatOptionContractLabel(contractId);
+                    const quote = state.historicalNbboByTraceId.get(print.trace_id) ?? state.nbboMap.get(contractId);
+                    const hasPreservedNbbo = typeof print.execution_nbbo_side === "string";
+                    const nbboSide =
+                      print.execution_nbbo_side ??
+                      print.nbbo_side ??
+                      (!hasPreservedNbbo ? classifyNbboSide(print.price, quote) : null);
+                    const notional = print.notional ?? print.price * print.size * 100;
+                    const spot = print.execution_underlying_spot;
+                    const iv = print.execution_iv;
+                    const decor = state.classifierDecorByOptionTraceId.get(print.trace_id);
+                    const focusContract = (event: ReactMouseEvent<HTMLButtonElement>) => {
+                      event.stopPropagation();
+                      state.focusOptionContract(print);
+                    };
+                    const rowStyle = {
+                      ...(decor
+                        ? ({ "--classifier-intensity": decor.intensity } as CSSProperties)
+                        : undefined),
+                      transform: `translateY(${start}px)`
+                    } as CSSProperties;
+                    const commonProps = {
+                      className: `data-table-row data-table-row-button data-table-row-classified data-table-row-options data-table-virtual-row${index % 2 === 1 ? " is-even" : ""}${decor ? ` is-classified classifier-${decor.tone}` : ""}`,
+                      style: rowStyle,
+                      "data-index": index,
+                      "data-row-start": String(start),
+                      "data-row-size": String(size),
+                      "data-tape-key": key
+                    };
+                    const cells = (
+                      <>
+                        <span className="data-table-cell data-table-cell-number">{formatTime(print.ts)}</span>
+                        <span className="data-table-cell">
+                          <button className="instrument-cell-button" type="button" onClick={focusContract}>
+                            {contractDisplay?.ticker ?? parsed?.root ?? formatContractLabel(contractId)}
+                          </button>
+                        </span>
+                        <span className="data-table-cell">
+                          <button className="instrument-cell-button" type="button" onClick={focusContract}>
+                            {contractDisplay?.expiration ?? parsed?.expiry ?? "--"}
+                          </button>
+                        </span>
+                        <span className="data-table-cell data-table-cell-number">
+                          <button className="instrument-cell-button" type="button" onClick={focusContract}>
+                            {contractDisplay?.strike.replace(/[CP]$/, "") ?? "--"}
+                          </button>
+                        </span>
+                        <span className="data-table-cell">
+                          <button className="instrument-cell-button" type="button" onClick={focusContract}>
+                            {parsed?.right ?? contractDisplay?.strike.slice(-1) ?? "--"}
+                          </button>
+                        </span>
+                        <span className="data-table-cell data-table-cell-number">{typeof spot === "number" ? formatPrice(spot) : "--"}</span>
+                        <span className="data-table-cell data-table-cell-number">
+                          {formatSize(print.size)}@{formatPrice(print.price)}_{nbboSide ?? "--"}
+                        </span>
+                        <span className="data-table-cell">{print.option_type ?? "--"}</span>
+                        <span className="data-table-cell data-table-cell-number notional-emphasis">${formatCompactUsd(notional)}</span>
+                        <span className="data-table-cell">
+                          {nbboSide ? (
+                            <span className={`nbbo-tag nbbo-tag-${nbboSide.toLowerCase()}`}>{nbboSide}</span>
+                          ) : (
+                            "--"
+                          )}
+                        </span>
+                        <span className="data-table-cell data-table-cell-number">{typeof iv === "number" ? formatPct(iv) : "--"}</span>
+                        <span className="data-table-cell">{decor ? humanizeClassifierId(decor.family) : "--"}</span>
+                      </>
+                    );
+
+                    return decor ? (
+                      <button
+                        type="button"
+                        {...commonProps}
+                        key={key}
+                        onClick={() =>
+                          decor.smartMoney
+                            ? state.openFromSmartMoneyEvent(decor.smartMoney)
+                            : decor.hit
+                              ? state.openFromClassifierHit(decor.hit)
+                              : undefined
+                        }
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            if (decor.smartMoney) {
+                              state.openFromSmartMoneyEvent(decor.smartMoney);
+                            } else if (decor.hit) {
+                              state.openFromClassifierHit(decor.hit);
+                            }
+                          }
+                        }}
+                      >
+                        {cells}
+                      </button>
+                    ) : (
+                      <div {...commonProps} key={key}>
+                        {cells}
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-              })}
               </div>
             </div>
           </div>
@@ -6781,16 +7032,16 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
       </div>
     </Pane>
   );
-};
+});
 
 type EquitiesPaneProps = {
+  state: TerminalState;
   limit?: number;
 };
 
-const EquitiesPane = ({ limit }: EquitiesPaneProps) => {
-  const state = useTerminal();
+const EquitiesPane = memo(({ state, limit }: EquitiesPaneProps) => {
   const items = limit ? state.filteredEquities.slice(0, limit) : state.filteredEquities;
-  const virtual = useMeasuredVirtualList(items, state.equitiesScroll.listRef, 36, 10, "equities");
+  const virtual = useTapeVirtualList(items, state.equitiesScroll.listRef, getTapeVirtualConfig("equities"));
   useVirtualHistoryGate(state.mode === "live" && !limit, items.length, virtual.virtualItems.at(-1)?.index ?? -1, () =>
     void state.liveSession.loadOlder("equities")
   );
@@ -6837,7 +7088,7 @@ const EquitiesPane = ({ limit }: EquitiesPaneProps) => {
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          <div className="data-table-wrap" ref={state.equitiesScroll.setListRef}>
+          <div className="data-table-wrap">
             <div className="data-table data-table-equities" role="table" aria-label="Equity prints">
               <div className="data-table-head" role="row">
                 <span className="data-table-cell">TIME</span>
@@ -6847,52 +7098,53 @@ const EquitiesPane = ({ limit }: EquitiesPaneProps) => {
                 <span className="data-table-cell">VENUE</span>
                 <span className="data-table-cell">TAPE</span>
               </div>
-            <div className="data-table-body" style={{ height: `${virtual.totalSize}px` }}>
-            {virtual.virtualItems.map(({ item: print, key, index, start, size }) => (
-              <div
-                className={`data-table-row data-table-row-equities data-table-virtual-row${index % 2 === 1 ? " is-even" : ""}`}
-                key={key}
-                ref={virtual.measureElement}
-                data-index={index}
-                data-row-start={String(start)}
-                data-row-size={String(size)}
-                data-tape-key={key}
-                style={{ top: `${start}px` }}
-              >
-                <span className="data-table-cell data-table-cell-number">{formatTime(print.ts)}</span>
-                <span className="data-table-cell">
-                  <button
-                    className="instrument-cell-button"
-                    type="button"
-                    onClick={() => state.focusEquityTicker(print)}
-                  >
-                    {print.underlying_id}
-                  </button>
-                </span>
-                <span className="data-table-cell data-table-cell-number">${formatPrice(print.price)}</span>
-                <span className="data-table-cell data-table-cell-number">{formatSize(print.size)}x</span>
-                <span className="data-table-cell">{print.exchange}</span>
-                <span className="data-table-cell">{print.offExchangeFlag ? "Off-Ex" : "Lit"}</span>
+              <div className="data-table-scroll" ref={state.equitiesScroll.setListRef}>
+                <div className="data-table-body" style={{ height: `${virtual.totalSize}px` }}>
+                  {virtual.virtualItems.map(({ item: print, key, index, start, size }) => (
+                    <div
+                      className={`data-table-row data-table-row-equities data-table-virtual-row${index % 2 === 1 ? " is-even" : ""}`}
+                      key={key}
+                      data-index={index}
+                      data-row-start={String(start)}
+                      data-row-size={String(size)}
+                      data-tape-key={key}
+                      style={{ transform: `translateY(${start}px)` }}
+                    >
+                      <span className="data-table-cell data-table-cell-number">{formatTime(print.ts)}</span>
+                      <span className="data-table-cell">
+                        <button
+                          className="instrument-cell-button"
+                          type="button"
+                          onClick={() => state.focusEquityTicker(print)}
+                        >
+                          {print.underlying_id}
+                        </button>
+                      </span>
+                      <span className="data-table-cell data-table-cell-number">${formatPrice(print.price)}</span>
+                      <span className="data-table-cell data-table-cell-number">{formatSize(print.size)}x</span>
+                      <span className="data-table-cell">{print.exchange}</span>
+                      <span className="data-table-cell">{print.offExchangeFlag ? "Off-Ex" : "Lit"}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            ))}
-            </div>
             </div>
           </div>
         )}
       </div>
     </Pane>
   );
-};
+});
 
 type FlowPaneProps = {
+  state: TerminalState;
   limit?: number;
   title?: string;
 };
 
-const FlowPane = ({ limit, title = "Flow" }: FlowPaneProps) => {
-  const state = useTerminal();
+const FlowPane = memo(({ state, limit, title = "Flow" }: FlowPaneProps) => {
   const items = limit ? state.filteredFlow.slice(0, limit) : state.filteredFlow;
-  const virtual = useMeasuredVirtualList(items, state.flowScroll.listRef, 44, 8, "flow");
+  const virtual = useTapeVirtualList(items, state.flowScroll.listRef, getTapeVirtualConfig("flow"));
   useVirtualHistoryGate(state.mode === "live" && !limit, items.length, virtual.virtualItems.at(-1)?.index ?? -1, () =>
     void state.liveSession.loadOlder("flow")
   );
@@ -6933,7 +7185,7 @@ const FlowPane = ({ limit, title = "Flow" }: FlowPaneProps) => {
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          <div className="data-table-wrap" ref={state.flowScroll.setListRef}>
+          <div className="data-table-wrap">
             <div className="data-table data-table-flow" role="table" aria-label="Flow packets">
               <div className="data-table-head" role="row">
                 <span className="data-table-cell">TIME</span>
@@ -6946,100 +7198,101 @@ const FlowPane = ({ limit, title = "Flow" }: FlowPaneProps) => {
                 <span className="data-table-cell">NBBO</span>
                 <span className="data-table-cell">QUALITY</span>
               </div>
-            <div className="data-table-body" style={{ height: `${virtual.totalSize}px` }}>
-            {virtual.virtualItems.map(({ item: packet, key, index, start, size }) => {
-            const features = packet.features ?? {};
-            const contract = String(features.option_contract_id ?? packet.id ?? "unknown");
-            const count = parseNumber(features.count, packet.members.length);
-            const totalSize = parseNumber(features.total_size, 0);
-            const totalNotional = parseNumber(features.total_notional, Number.NaN);
-            const notional = Number.isFinite(totalNotional)
-              ? totalNotional
-              : parseNumber(features.total_premium, 0) * 100;
-            const startTs = parseNumber(features.start_ts, packet.source_ts);
-            const endTs = parseNumber(features.end_ts, startTs);
-            const windowMs = parseNumber(features.window_ms, 0);
-            const structureType =
-              typeof features.structure_type === "string" ? features.structure_type : "";
-            const structureLegs = parseNumber(features.structure_legs, 0);
-            const structureRights =
-              typeof features.structure_rights === "string" ? features.structure_rights : "";
-            const structureStrikes = parseNumber(features.structure_strikes, 0);
-            const nbboBid = parseNumber(features.nbbo_bid, Number.NaN);
-            const nbboAsk = parseNumber(features.nbbo_ask, Number.NaN);
-            const nbboMid = parseNumber(features.nbbo_mid, Number.NaN);
-            const nbboSpread = parseNumber(features.nbbo_spread, Number.NaN);
-            const aggressiveBuyRatio = parseNumber(features.nbbo_aggressive_buy_ratio, Number.NaN);
-            const aggressiveSellRatio = parseNumber(
-              features.nbbo_aggressive_sell_ratio,
-              Number.NaN
-            );
-            const aggressiveCoverage = parseNumber(features.nbbo_coverage_ratio, Number.NaN);
-            const insideRatio = parseNumber(features.nbbo_inside_ratio, Number.NaN);
-            const nbboAge = parseNumber(packet.join_quality.nbbo_age_ms, Number.NaN);
-            const nbboStale = parseNumber(packet.join_quality.nbbo_stale, 0) > 0;
-            const nbboMissing = parseNumber(packet.join_quality.nbbo_missing, 0) > 0;
-            const structureLabel = structureType
-              ? `${structureType.replace(/_/g, " ")}${structureRights ? ` ${structureRights}` : ""}${structureLegs > 0 ? ` ${structureLegs}L` : ""}${structureStrikes > 0 ? ` ${structureStrikes}K` : ""}`
-              : "--";
-            const nbboLabel = Number.isFinite(nbboBid) && Number.isFinite(nbboAsk)
-              ? `${formatPrice(nbboBid)} x ${formatPrice(nbboAsk)}`
-              : Number.isFinite(nbboMid)
-                ? `Mid ${formatPrice(nbboMid)}`
-                : "--";
-            const qualityLabel = [
-              Number.isFinite(aggressiveCoverage) && aggressiveCoverage > 0
-                ? `Agg ${formatPct(aggressiveBuyRatio)}/${formatPct(aggressiveSellRatio)} ${formatPct(aggressiveCoverage)} cov`
-                : null,
-              Number.isFinite(insideRatio) && insideRatio > 0 ? `In ${formatPct(insideRatio)}` : null,
-              Number.isFinite(nbboSpread) ? `Spr ${formatPrice(nbboSpread)}` : null,
-              Number.isFinite(nbboAge) ? `${Math.round(nbboAge)}ms` : null,
-              nbboStale ? "Stale" : null,
-              nbboMissing ? "Missing" : null
-            ].filter(Boolean).join(" | ");
+              <div className="data-table-scroll" ref={state.flowScroll.setListRef}>
+                <div className="data-table-body" style={{ height: `${virtual.totalSize}px` }}>
+                  {virtual.virtualItems.map(({ item: packet, key, index, start, size }) => {
+                    const features = packet.features ?? {};
+                    const contract = String(features.option_contract_id ?? packet.id ?? "unknown");
+                    const count = parseNumber(features.count, packet.members.length);
+                    const totalSize = parseNumber(features.total_size, 0);
+                    const totalNotional = parseNumber(features.total_notional, Number.NaN);
+                    const notional = Number.isFinite(totalNotional)
+                      ? totalNotional
+                      : parseNumber(features.total_premium, 0) * 100;
+                    const startTs = parseNumber(features.start_ts, packet.source_ts);
+                    const endTs = parseNumber(features.end_ts, startTs);
+                    const windowMs = parseNumber(features.window_ms, 0);
+                    const structureType =
+                      typeof features.structure_type === "string" ? features.structure_type : "";
+                    const structureLegs = parseNumber(features.structure_legs, 0);
+                    const structureRights =
+                      typeof features.structure_rights === "string" ? features.structure_rights : "";
+                    const structureStrikes = parseNumber(features.structure_strikes, 0);
+                    const nbboBid = parseNumber(features.nbbo_bid, Number.NaN);
+                    const nbboAsk = parseNumber(features.nbbo_ask, Number.NaN);
+                    const nbboMid = parseNumber(features.nbbo_mid, Number.NaN);
+                    const nbboSpread = parseNumber(features.nbbo_spread, Number.NaN);
+                    const aggressiveBuyRatio = parseNumber(features.nbbo_aggressive_buy_ratio, Number.NaN);
+                    const aggressiveSellRatio = parseNumber(
+                      features.nbbo_aggressive_sell_ratio,
+                      Number.NaN
+                    );
+                    const aggressiveCoverage = parseNumber(features.nbbo_coverage_ratio, Number.NaN);
+                    const insideRatio = parseNumber(features.nbbo_inside_ratio, Number.NaN);
+                    const nbboAge = parseNumber(packet.join_quality.nbbo_age_ms, Number.NaN);
+                    const nbboStale = parseNumber(packet.join_quality.nbbo_stale, 0) > 0;
+                    const nbboMissing = parseNumber(packet.join_quality.nbbo_missing, 0) > 0;
+                    const structureLabel = structureType
+                      ? `${structureType.replace(/_/g, " ")}${structureRights ? ` ${structureRights}` : ""}${structureLegs > 0 ? ` ${structureLegs}L` : ""}${structureStrikes > 0 ? ` ${structureStrikes}K` : ""}`
+                      : "--";
+                    const nbboLabel = Number.isFinite(nbboBid) && Number.isFinite(nbboAsk)
+                      ? `${formatPrice(nbboBid)} x ${formatPrice(nbboAsk)}`
+                      : Number.isFinite(nbboMid)
+                        ? `Mid ${formatPrice(nbboMid)}`
+                        : "--";
+                    const qualityLabel = [
+                      Number.isFinite(aggressiveCoverage) && aggressiveCoverage > 0
+                        ? `Agg ${formatPct(aggressiveBuyRatio)}/${formatPct(aggressiveSellRatio)} ${formatPct(aggressiveCoverage)} cov`
+                        : null,
+                      Number.isFinite(insideRatio) && insideRatio > 0 ? `In ${formatPct(insideRatio)}` : null,
+                      Number.isFinite(nbboSpread) ? `Spr ${formatPrice(nbboSpread)}` : null,
+                      Number.isFinite(nbboAge) ? `${Math.round(nbboAge)}ms` : null,
+                      nbboStale ? "Stale" : null,
+                      nbboMissing ? "Missing" : null
+                    ].filter(Boolean).join(" | ");
 
-            return (
-              <div
-                className={`data-table-row data-table-row-flow data-table-virtual-row${index % 2 === 1 ? " is-even" : ""}${nbboStale || nbboMissing ? " data-table-row-warn" : ""}`}
-                key={key}
-                ref={virtual.measureElement}
-                data-index={index}
-                data-row-start={String(start)}
-                data-row-size={String(size)}
-                data-tape-key={key}
-                style={{ top: `${start}px` }}
-              >
-                <span className="data-table-cell data-table-cell-number">{formatTime(startTs)} → {formatTime(endTs)}</span>
-                <span className="data-table-cell">{contract}</span>
-                <span className="data-table-cell data-table-cell-number">{formatFlowMetric(count)}</span>
-                <span className="data-table-cell data-table-cell-number">{formatFlowMetric(totalSize)}</span>
-                <span className="data-table-cell data-table-cell-number">${formatUsd(notional)}</span>
-                <span className="data-table-cell data-table-cell-number">{windowMs > 0 ? formatFlowMetric(windowMs, "ms") : "--"}</span>
-                <span className="data-table-cell">{structureLabel}</span>
-                <span className="data-table-cell data-table-cell-number">{nbboLabel}</span>
-                <span className="data-table-cell">{qualityLabel || "--"}</span>
+                    return (
+                      <div
+                        className={`data-table-row data-table-row-flow data-table-virtual-row${index % 2 === 1 ? " is-even" : ""}${nbboStale || nbboMissing ? " data-table-row-warn" : ""}`}
+                        key={key}
+                        data-index={index}
+                        data-row-start={String(start)}
+                        data-row-size={String(size)}
+                        data-tape-key={key}
+                        style={{ transform: `translateY(${start}px)` }}
+                      >
+                        <span className="data-table-cell data-table-cell-number">{formatTime(startTs)} → {formatTime(endTs)}</span>
+                        <span className="data-table-cell">{contract}</span>
+                        <span className="data-table-cell data-table-cell-number">{formatFlowMetric(count)}</span>
+                        <span className="data-table-cell data-table-cell-number">{formatFlowMetric(totalSize)}</span>
+                        <span className="data-table-cell data-table-cell-number">${formatUsd(notional)}</span>
+                        <span className="data-table-cell data-table-cell-number">{windowMs > 0 ? formatFlowMetric(windowMs, "ms") : "--"}</span>
+                        <span className="data-table-cell">{structureLabel}</span>
+                        <span className="data-table-cell data-table-cell-number">{nbboLabel}</span>
+                        <span className="data-table-cell">{qualityLabel || "--"}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            );
-            })}
-            </div>
             </div>
           </div>
         )}
       </div>
     </Pane>
   );
-};
+});
 
 type AlertsPaneProps = {
+  state: TerminalState;
   limit?: number;
   withStrip?: boolean;
   className?: string;
 };
 
-const AlertsPane = ({ limit, withStrip = false, className }: AlertsPaneProps) => {
-  const state = useTerminal();
+const AlertsPane = memo(({ state, limit, withStrip = false, className }: AlertsPaneProps) => {
   const items = limit ? state.filteredAlerts.slice(0, limit) : state.filteredAlerts;
-  const virtual = useMeasuredVirtualList(items, state.alertsScroll.listRef, 46, 8, "alerts");
+  const virtual = useTapeVirtualList(items, state.alertsScroll.listRef, getTapeVirtualConfig("alerts"));
   useVirtualHistoryGate(state.mode === "live" && !limit, items.length, virtual.virtualItems.at(-1)?.index ?? -1, () =>
     void state.liveSession.loadOlder("alerts")
   );
@@ -7080,7 +7333,7 @@ const AlertsPane = ({ limit, withStrip = false, className }: AlertsPaneProps) =>
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          <div className="data-table-wrap" ref={state.alertsScroll.setListRef}>
+          <div className="data-table-wrap">
             <div className="data-table data-table-alerts" role="table" aria-label="Alerts">
               <div className="data-table-head" role="row">
                 <span className="data-table-cell">TIME</span>
@@ -7091,56 +7344,57 @@ const AlertsPane = ({ limit, withStrip = false, className }: AlertsPaneProps) =>
                 <span className="data-table-cell">DIR</span>
                 <span className="data-table-cell">NOTE</span>
               </div>
-            <div className="data-table-body" style={{ height: `${virtual.totalSize}px` }}>
-            {virtual.virtualItems.map(({ item: alert, key, index, start, size }) => {
-            const primary = alert.hits[0];
-            const direction = deriveAlertDirection(alert);
-            const severity = normalizeAlertSeverity(alert);
+              <div className="data-table-scroll" ref={state.alertsScroll.setListRef}>
+                <div className="data-table-body" style={{ height: `${virtual.totalSize}px` }}>
+                  {virtual.virtualItems.map(({ item: alert, key, index, start, size }) => {
+                    const primary = alert.hits[0];
+                    const direction = deriveAlertDirection(alert);
+                    const severity = normalizeAlertSeverity(alert);
 
-            return (
-              <button
-                className={`data-table-row data-table-row-button data-table-row-alerts data-table-virtual-row${index % 2 === 1 ? " is-even" : ""} data-table-row-severity-${severity}`}
-                key={key}
-                type="button"
-                ref={virtual.measureElement}
-                data-index={index}
-                data-row-start={String(start)}
-                data-row-size={String(size)}
-                data-tape-key={key}
-                style={{ top: `${start}px` }}
-                onClick={() => {
-                  state.setSelectedDarkEvent(null);
-                  state.setSelectedClassifierHit(null);
-                  state.setSelectedSmartMoneyEvent(null);
-                  state.setSelectedAlert(alert);
-                }}
-              >
-                <span className="data-table-cell data-table-cell-number">{formatTime(alert.source_ts)}</span>
-                <span className="data-table-cell">{primary ? humanizeClassifierId(primary.classifier_id) : "Alert"}</span>
-                <span className="data-table-cell">{severity}</span>
-                <span className="data-table-cell data-table-cell-number">{Math.round(alert.score)}</span>
-                <span className="data-table-cell data-table-cell-number">{alert.hits.length}</span>
-                <span className="data-table-cell">{direction}</span>
-                <span className="data-table-cell">{primary?.explanations?.[0] ?? "--"}</span>
-              </button>
-            );
-            })}
-            </div>
+                    return (
+                      <button
+                        className={`data-table-row data-table-row-button data-table-row-alerts data-table-virtual-row${index % 2 === 1 ? " is-even" : ""} data-table-row-severity-${severity}`}
+                        key={key}
+                        type="button"
+                        data-index={index}
+                        data-row-start={String(start)}
+                        data-row-size={String(size)}
+                        data-tape-key={key}
+                        style={{ transform: `translateY(${start}px)` }}
+                        onClick={() => {
+                          state.setSelectedDarkEvent(null);
+                          state.setSelectedClassifierHit(null);
+                          state.setSelectedSmartMoneyEvent(null);
+                          state.setSelectedAlert(alert);
+                        }}
+                      >
+                        <span className="data-table-cell data-table-cell-number">{formatTime(alert.source_ts)}</span>
+                        <span className="data-table-cell">{primary ? humanizeClassifierId(primary.classifier_id) : "Alert"}</span>
+                        <span className="data-table-cell">{severity}</span>
+                        <span className="data-table-cell data-table-cell-number">{Math.round(alert.score)}</span>
+                        <span className="data-table-cell data-table-cell-number">{alert.hits.length}</span>
+                        <span className="data-table-cell">{direction}</span>
+                        <span className="data-table-cell">{primary?.explanations?.[0] ?? "--"}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         )}
       </div>
     </Pane>
   );
-};
+});
 
 type ClassifierPaneProps = {
+  state: TerminalState;
   limit?: number;
   className?: string;
 };
 
-const ClassifierPane = ({ limit, className }: ClassifierPaneProps) => {
-  const state = useTerminal();
+const ClassifierPane = memo(({ state, limit, className }: ClassifierPaneProps) => {
   const smartMoneyItems = limit ? state.filteredSmartMoneyEvents.slice(0, limit) : state.filteredSmartMoneyEvents;
   const legacyItems =
     smartMoneyItems.length === 0
@@ -7150,7 +7404,7 @@ const ClassifierPane = ({ limit, className }: ClassifierPaneProps) => {
       : [];
   const items: Array<SmartMoneyEvent | ClassifierHitEvent> =
     smartMoneyItems.length > 0 ? smartMoneyItems : legacyItems;
-  const virtual = useMeasuredVirtualList(items, state.classifierScroll.listRef, 44, 8, "classifier");
+  const virtual = useTapeVirtualList(items, state.classifierScroll.listRef, getTapeVirtualConfig("classifier"));
   useVirtualHistoryGate(state.mode === "live" && !limit, items.length, virtual.virtualItems.at(-1)?.index ?? -1, () => {
     void state.liveSession.loadOlder("smart-money");
     void state.liveSession.loadOlder("classifier-hits");
@@ -7192,7 +7446,7 @@ const ClassifierPane = ({ limit, className }: ClassifierPaneProps) => {
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          <div className="data-table-wrap" ref={state.classifierScroll.setListRef}>
+          <div className="data-table-wrap">
             <div className="data-table data-table-classifier" role="table" aria-label="Smart money profiles">
               <div className="data-table-head" role="row">
                 <span className="data-table-cell">TIME</span>
@@ -7201,81 +7455,81 @@ const ClassifierPane = ({ limit, className }: ClassifierPaneProps) => {
                 <span className="data-table-cell">PROB</span>
                 <span className="data-table-cell">NOTE</span>
               </div>
-            <div className="data-table-body" style={{ height: `${virtual.totalSize}px` }}>
-            {showingSmartMoney ? virtual.virtualItems.map(({ item, key, index, start, size }) => {
-            const event = item as SmartMoneyEvent;
-            const primaryScore =
-              event.profile_scores.find((score) => score.profile_id === event.primary_profile_id) ??
-              event.profile_scores[0];
-            const direction = normalizeDirection(event.primary_direction);
-            return (
-              <button
-                className={`data-table-row data-table-row-button data-table-row-classifier data-table-virtual-row${index % 2 === 1 ? " is-even" : ""} data-table-row-direction-${direction}`}
-                key={key}
-                type="button"
-                ref={virtual.measureElement}
-                data-index={index}
-                data-row-start={String(start)}
-                data-row-size={String(size)}
-                data-tape-key={key}
-                style={{ top: `${start}px` }}
-                onClick={() => state.openFromSmartMoneyEvent(event)}
-              >
-                <span className="data-table-cell data-table-cell-number">{formatTime(event.source_ts)}</span>
-                <span className="data-table-cell">{smartMoneyProfileLabel(event.primary_profile_id)}</span>
-                <span className="data-table-cell">{direction}</span>
-                <span className="data-table-cell data-table-cell-number">
-                  {primaryScore ? formatConfidence(primaryScore.probability) : "--"}
-                </span>
-                <span className="data-table-cell">
-                  {event.abstained
-                    ? event.suppressed_reasons[0] ?? "abstained"
-                    : primaryScore?.reasons[0] ?? primaryScore?.confidence_band ?? "--"}
-                </span>
-              </button>
-            );
-            }) : virtual.virtualItems.map(({ item, key, index, start, size }) => {
-              const hit = item as ClassifierHitEvent;
-              const direction = normalizeDirection(hit.direction);
-              return (
-                <button
-                  className={`data-table-row data-table-row-button data-table-row-classifier data-table-virtual-row${index % 2 === 1 ? " is-even" : ""} data-table-row-direction-${direction}`}
-                  key={key}
-                  type="button"
-                  ref={virtual.measureElement}
-                  data-index={index}
-                  data-row-start={String(start)}
-                  data-row-size={String(size)}
-                  data-tape-key={key}
-                  style={{ top: `${start}px` }}
-                  onClick={() => state.openFromClassifierHit(hit)}
-                >
-                  <span className="data-table-cell data-table-cell-number">{formatTime(hit.source_ts)}</span>
-                  <span className="data-table-cell">{humanizeClassifierId(hit.classifier_id)}</span>
-                  <span className="data-table-cell">{direction}</span>
-                  <span className="data-table-cell data-table-cell-number">{formatConfidence(hit.confidence)}</span>
-                  <span className="data-table-cell">{hit.explanations?.[0] ?? "--"}</span>
-                </button>
-              );
-            })}
-            </div>
+              <div className="data-table-scroll" ref={state.classifierScroll.setListRef}>
+                <div className="data-table-body" style={{ height: `${virtual.totalSize}px` }}>
+                  {showingSmartMoney ? virtual.virtualItems.map(({ item, key, index, start, size }) => {
+                    const event = item as SmartMoneyEvent;
+                    const primaryScore =
+                      event.profile_scores.find((score) => score.profile_id === event.primary_profile_id) ??
+                      event.profile_scores[0];
+                    const direction = normalizeDirection(event.primary_direction);
+                    return (
+                      <button
+                        className={`data-table-row data-table-row-button data-table-row-classifier data-table-virtual-row${index % 2 === 1 ? " is-even" : ""} data-table-row-direction-${direction}`}
+                        key={key}
+                        type="button"
+                        data-index={index}
+                        data-row-start={String(start)}
+                        data-row-size={String(size)}
+                        data-tape-key={key}
+                        style={{ transform: `translateY(${start}px)` }}
+                        onClick={() => state.openFromSmartMoneyEvent(event)}
+                      >
+                        <span className="data-table-cell data-table-cell-number">{formatTime(event.source_ts)}</span>
+                        <span className="data-table-cell">{smartMoneyProfileLabel(event.primary_profile_id)}</span>
+                        <span className="data-table-cell">{direction}</span>
+                        <span className="data-table-cell data-table-cell-number">
+                          {primaryScore ? formatConfidence(primaryScore.probability) : "--"}
+                        </span>
+                        <span className="data-table-cell">
+                          {event.abstained
+                            ? event.suppressed_reasons[0] ?? "abstained"
+                            : primaryScore?.reasons[0] ?? primaryScore?.confidence_band ?? "--"}
+                        </span>
+                      </button>
+                    );
+                  }) : virtual.virtualItems.map(({ item, key, index, start, size }) => {
+                    const hit = item as ClassifierHitEvent;
+                    const direction = normalizeDirection(hit.direction);
+                    return (
+                      <button
+                        className={`data-table-row data-table-row-button data-table-row-classifier data-table-virtual-row${index % 2 === 1 ? " is-even" : ""} data-table-row-direction-${direction}`}
+                        key={key}
+                        type="button"
+                        data-index={index}
+                        data-row-start={String(start)}
+                        data-row-size={String(size)}
+                        data-tape-key={key}
+                        style={{ transform: `translateY(${start}px)` }}
+                        onClick={() => state.openFromClassifierHit(hit)}
+                      >
+                        <span className="data-table-cell data-table-cell-number">{formatTime(hit.source_ts)}</span>
+                        <span className="data-table-cell">{humanizeClassifierId(hit.classifier_id)}</span>
+                        <span className="data-table-cell">{direction}</span>
+                        <span className="data-table-cell data-table-cell-number">{formatConfidence(hit.confidence)}</span>
+                        <span className="data-table-cell">{hit.explanations?.[0] ?? "--"}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         )}
       </div>
     </Pane>
   );
-};
+});
 
 type DarkPaneProps = {
+  state: TerminalState;
   limit?: number;
   className?: string;
 };
 
-const DarkPane = ({ limit, className }: DarkPaneProps) => {
-  const state = useTerminal();
+const DarkPane = memo(({ state, limit, className }: DarkPaneProps) => {
   const items = limit ? state.filteredInferredDark.slice(0, limit) : state.filteredInferredDark;
-  const virtual = useMeasuredVirtualList(items, state.darkScroll.listRef, 44, 8, "dark");
+  const virtual = useTapeVirtualList(items, state.darkScroll.listRef, getTapeVirtualConfig("dark"));
   useVirtualHistoryGate(state.mode === "live" && !limit, items.length, virtual.virtualItems.at(-1)?.index ?? -1, () =>
     void state.liveSession.loadOlder("inferred-dark")
   );
@@ -7315,7 +7569,7 @@ const DarkPane = ({ limit, className }: DarkPaneProps) => {
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          <div className="data-table-wrap" ref={state.darkScroll.setListRef}>
+          <div className="data-table-wrap">
             <div className="data-table data-table-dark" role="table" aria-label="Dark events">
               <div className="data-table-head" role="row">
                 <span className="data-table-cell">TIME</span>
@@ -7325,53 +7579,54 @@ const DarkPane = ({ limit, className }: DarkPaneProps) => {
                 <span className="data-table-cell">EVIDENCE</span>
                 <span className="data-table-cell">NOTE</span>
               </div>
-            <div className="data-table-body" style={{ height: `${virtual.totalSize}px` }}>
-            {virtual.virtualItems.map(({ item: event, key, index, start, size }) => {
-            const underlying = inferDarkUnderlying(event, state.equityPrintMap, state.equityJoinMap);
-            const evidenceCount = event.evidence_refs.length;
+              <div className="data-table-scroll" ref={state.darkScroll.setListRef}>
+                <div className="data-table-body" style={{ height: `${virtual.totalSize}px` }}>
+                  {virtual.virtualItems.map(({ item: event, key, index, start, size }) => {
+                    const underlying = inferDarkUnderlying(event, state.equityJoinMap);
+                    const evidenceCount = event.evidence_refs.length;
 
-            return (
-              <button
-                className={`data-table-row data-table-row-button data-table-row-dark data-table-virtual-row${index % 2 === 1 ? " is-even" : ""}`}
-                key={key}
-                type="button"
-                ref={virtual.measureElement}
-                data-index={index}
-                data-row-start={String(start)}
-                data-row-size={String(size)}
-                data-tape-key={key}
-                style={{ top: `${start}px` }}
-                onClick={() => {
-                  state.setSelectedAlert(null);
-                  state.setSelectedClassifierHit(null);
-                  state.setSelectedSmartMoneyEvent(null);
-                  state.setSelectedDarkEvent(event);
-                }}
-              >
-                <span className="data-table-cell data-table-cell-number">{formatTime(event.source_ts)}</span>
-                <span className="data-table-cell">{humanizeClassifierId(event.type)}</span>
-                <span className="data-table-cell">{underlying ?? "Unknown"}</span>
-                <span className="data-table-cell data-table-cell-number">{formatConfidence(event.confidence)}</span>
-                <span className="data-table-cell data-table-cell-number">{evidenceCount}</span>
-                <span className="data-table-cell">{underlying ? "--" : "Underlying not in current equity cache."}</span>
-              </button>
-            );
-            })}
-            </div>
+                    return (
+                      <button
+                        className={`data-table-row data-table-row-button data-table-row-dark data-table-virtual-row${index % 2 === 1 ? " is-even" : ""}`}
+                        key={key}
+                        type="button"
+                        data-index={index}
+                        data-row-start={String(start)}
+                        data-row-size={String(size)}
+                        data-tape-key={key}
+                        style={{ transform: `translateY(${start}px)` }}
+                        onClick={() => {
+                          state.setSelectedAlert(null);
+                          state.setSelectedClassifierHit(null);
+                          state.setSelectedSmartMoneyEvent(null);
+                          state.setSelectedDarkEvent(event);
+                        }}
+                      >
+                        <span className="data-table-cell data-table-cell-number">{formatTime(event.source_ts)}</span>
+                        <span className="data-table-cell">{humanizeClassifierId(event.type)}</span>
+                        <span className="data-table-cell">{underlying ?? "Unknown"}</span>
+                        <span className="data-table-cell data-table-cell-number">{formatConfidence(event.confidence)}</span>
+                        <span className="data-table-cell data-table-cell-number">{evidenceCount}</span>
+                        <span className="data-table-cell">{underlying ? "--" : "Underlying not in current join cache."}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         )}
       </div>
     </Pane>
   );
-};
+});
 
 type ChartPaneProps = {
+  state: TerminalState;
   title?: string;
 };
 
-const ChartPane = ({ title = "Chart" }: ChartPaneProps) => {
-  const state = useTerminal();
+const ChartPane = memo(({ state, title = "Chart" }: ChartPaneProps) => {
 
   return (
     <Pane
@@ -7408,10 +7663,9 @@ const ChartPane = ({ title = "Chart" }: ChartPaneProps) => {
       />
     </Pane>
   );
-};
+});
 
-const FocusPane = () => {
-  const state = useTerminal();
+const FocusPane = memo(({ state }: { state: TerminalState }) => {
   const hits = state.chartSmartMoneyEvents.slice(-10).reverse();
   const dark = state.chartInferredDark.slice(-10).reverse();
 
@@ -7477,10 +7731,9 @@ const FocusPane = () => {
       </div>
     </Pane>
   );
-};
+});
 
-const ReplayConsole = () => {
-  const state = useTerminal();
+const ReplayConsole = memo(({ state }: { state: TerminalState }) => {
   const replayActive = state.mode === "replay";
 
   return (
@@ -7512,7 +7765,7 @@ const ReplayConsole = () => {
       </div>
     </Pane>
   );
-};
+});
 
 export function TerminalAppShell({ children }: { children: ReactNode }) {
   const state = useTerminalState();
@@ -7632,68 +7885,89 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
 }
 
 export function OverviewRoute() {
+  const state = useTerminal();
   return (
     <PageFrame title="Home">
       <div className="page-grid page-grid-home">
-        <ChartPane />
-        <EquitiesPane />
-        <AlertsPane withStrip />
+        <ChartPane state={state} />
+        <EquitiesPane state={state} />
+        <AlertsPane state={state} withStrip />
       </div>
     </PageFrame>
   );
 }
 
 export function TapeRoute() {
+  const state = useTerminal();
   return (
     <PageFrame
       title="Tape"
       actions={
         <>
-          <ContractFilterControl />
-          <FlowFilterControls />
+          <button
+            className={`terminal-button contract-filter-button${state.selectedInstrument?.kind === "option-contract" ? " is-active" : ""}`}
+            type="button"
+            disabled={state.selectedInstrument?.kind !== "option-contract"}
+            onClick={() => state.setSelectedInstrument(null)}
+            title={
+              state.selectedInstrument?.kind === "option-contract"
+                ? "Clear active contract filter"
+                : "Contract filter activates when you focus a contract in the Options tape"
+            }
+          >
+            <span className="contract-filter-button-label">
+              {state.selectedInstrument?.kind === "option-contract"
+                ? state.selectedInstrumentLabel
+                : "Contract Filter"}
+            </span>
+          </button>
+          <FlowFilterPopover filters={state.flowFilters} onChange={state.setFlowFilters} />
         </>
       }
     >
       <div className="page-grid page-grid-tape">
-        <OptionsPane />
-        <EquitiesPane />
-        <FlowPane title="Packets" />
+        <OptionsPane state={state} />
+        <EquitiesPane state={state} />
+        <FlowPane state={state} title="Packets" />
       </div>
     </PageFrame>
   );
 }
 
 export function SignalsRoute() {
+  const state = useTerminal();
   return (
     <PageFrame title="Signals">
       <div className="page-grid page-grid-signals">
-        <AlertsPane withStrip className="signals-pane-alerts" />
-        <ClassifierPane className="signals-pane-rules" />
-        <DarkPane className="signals-pane-dark" />
+        <AlertsPane state={state} withStrip className="signals-pane-alerts" />
+        <ClassifierPane state={state} className="signals-pane-rules" />
+        <DarkPane state={state} className="signals-pane-dark" />
       </div>
     </PageFrame>
   );
 }
 
 export function ChartsRoute() {
+  const state = useTerminal();
   return (
     <PageFrame title="Charts">
       <div className="page-grid page-grid-charts">
-        <ChartPane title="Price" />
-        <FocusPane />
+        <ChartPane state={state} title="Price" />
+        <FocusPane state={state} />
       </div>
     </PageFrame>
   );
 }
 
 export function ReplayRoute() {
+  const state = useTerminal();
   return (
     <PageFrame title="Replay">
       <div className="page-grid page-grid-replay">
-        <ReplayConsole />
-        <AlertsPane limit={10} withStrip />
-        <FlowPane limit={12} />
-        <OptionsPane limit={12} />
+        <ReplayConsole state={state} />
+        <AlertsPane state={state} limit={10} withStrip />
+        <FlowPane state={state} limit={12} />
+        <OptionsPane state={state} limit={12} />
       </div>
     </PageFrame>
   );
