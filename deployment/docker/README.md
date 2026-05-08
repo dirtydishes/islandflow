@@ -202,22 +202,120 @@ cd deployment/docker
 docker compose build web
 ```
 
-When you pull new code:
+## Safe rollouts on `152.53.80.229`
+
+The checked-in deploy helper is meant to run from your local repo checkout, not from the VPS shell. It always targets:
+
+- SSH host: `delta@152.53.80.229`
+- SSH key: `~/.ssh/delta_ed25519`
+- Live repo checkout: `/home/delta/islandflow`
+- Live compose directory: `/home/delta/islandflow/deployment/docker`
+- Shared proxy network: `npm-shared`
+
+It preserves the current proxy topology, reuses the existing Docker Compose project, and avoids destructive cleanup on the server.
+
+### Deploy `origin/main`
 
 ```bash
-cd deployment/docker
+./deploy main
+```
+
+This flow:
+
+- fetches `origin` locally and shows the local branch state
+- checks the server checkout before switching anything
+- stops if the server has tracked local modifications
+- allows the known untracked tarball at `deployment/docker/signal-cli-0.14.3-Linux-native.tar.gz`
+- runs `git switch main`, `git pull --ff-only origin main`, and `docker compose up -d --build`
+- verifies the stack with `docker compose ps`, recent service logs, container-local health checks, and public HTTPS checks
+
+### Deploy the current local branch
+
+```bash
+./deploy current-branch
+```
+
+Alias:
+
+```bash
+./deploy current branch
+```
+
+This flow:
+
+- requires a clean local working tree so you only deploy committed state
+- pushes the current local branch to `origin`
+- uses `git push -u origin <branch>` automatically when the branch has no upstream yet
+- switches the server checkout to that same branch and keeps it there until you intentionally move it back
+- runs the same rebuild and verification steps as `main`
+
+### Escalation path
+
+Use force recreate only when a normal refresh does not update the services cleanly:
+
+```bash
+./deploy main --force-recreate
+./deploy current-branch --force-recreate
+```
+
+### Return the server to `main`
+
+If the live checkout is on a branch deploy and you want normal production tracking again:
+
+```bash
+./deploy main
+```
+
+The helper always does the final public verification against:
+
+- `https://flow.deltaisland.io`
+- `https://api.flow.deltaisland.io/health`
+
+It also uses container-local health checks inside `islandflow-vps-api-1` and `islandflow-vps-web-1`, because host loopback `127.0.0.1:4000` is not the right primary check for this topology.
+
+## Manual server fallback
+
+If you need to run the rollout steps manually over SSH, use the same live checkout and compose directory. Avoid `git clean -fd`, `git reset --hard`, proxy changes, or Docker network recreation during normal app rollouts.
+
+Deploy `main` manually:
+
+```bash
+ssh -i ~/.ssh/delta_ed25519 -o IdentitiesOnly=yes delta@152.53.80.229
+cd /home/delta/islandflow
+git fetch origin
+git switch main
+git pull --ff-only origin main
+
+cd /home/delta/islandflow/deployment/docker
 docker compose up -d --build
 ```
 
-If you changed only env values for the Bun services:
+Deploy the current branch manually:
 
 ```bash
+git push -u origin <current-branch>   # omit -u if upstream already exists
+
+ssh -i ~/.ssh/delta_ed25519 -o IdentitiesOnly=yes delta@152.53.80.229
+cd /home/delta/islandflow
+git fetch origin
+git switch <current-branch> || git switch -c <current-branch> --track origin/<current-branch>
+git pull --ff-only origin <current-branch>
+
+cd /home/delta/islandflow/deployment/docker
+docker compose up -d --build
+```
+
+If you changed only env values for the Bun services on the server:
+
+```bash
+cd /home/delta/islandflow/deployment/docker
 docker compose up -d
 ```
 
 If you changed `NEXT_PUBLIC_API_URL` or `NEXT_PUBLIC_NBBO_MAX_AGE_MS`, rebuild the web image because those are public Next.js build-time values:
 
 ```bash
+cd /home/delta/islandflow/deployment/docker
 docker compose build web
 docker compose up -d web
 ```
