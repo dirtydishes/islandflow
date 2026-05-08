@@ -4,19 +4,23 @@ import {
   NAV_ITEMS,
   appendHistoryTail,
   buildDefaultFlowFilters,
+  buildOptionTapeQueryParams,
   classifierToneForFamily,
   composeTapeItems,
   deriveAlertDirection,
   countActiveFlowFilterGroups,
+  filterOptionTapeItems,
   findAnchorRestoreIndex,
   formatCompactUsd,
   formatOptionContractLabel,
   flushPausableTapeData,
+  getEffectiveOptionPrintFilters,
   getAlertWindowAnchorTs,
   getHotChannelFeedStatus,
   getScopedLiveAutoHydrationChannels,
   getLiveHistoryRetentionCap,
   getOptionTableSnapshot,
+  getOptionScope,
   getLiveFeedStatus,
   getLiveManifest,
   getRouteFeatures,
@@ -30,6 +34,7 @@ import {
   shouldIncludeEquitiesForDarkUnderlyingFallback,
   shouldShowEquitiesSilentFeedWarning,
   selectPrimaryClassifierHit,
+  shouldClearOptionFocusSeed,
   smartMoneyProfileLabel,
   smartMoneyToneForProfile,
   statusLabel,
@@ -41,6 +46,25 @@ const makeItem = (traceId: string, seq: number, ts: number) => ({
   seq,
   ts
 });
+
+const makeOptionPrint = (overrides: Record<string, unknown> = {}) =>
+  ({
+    trace_id: "opt-1",
+    seq: 1,
+    ts: 1_000,
+    source_ts: 1_000,
+    ingest_ts: 1_001,
+    option_contract_id: "AAPL-2025-01-17-200-C",
+    underlying_id: "AAPL",
+    option_type: "call",
+    nbbo_side: "A",
+    notional: 250_000,
+    signal_pass: true,
+    price: 1,
+    size: 10,
+    exchange: "X",
+    ...overrides
+  }) as any;
 
 const makeAlert = (overrides: Record<string, unknown> = {}) =>
   ({
@@ -125,6 +149,31 @@ describe("live manifest", () => {
     expect(equitiesSubscription?.underlying_ids).toEqual(["AAPL"]);
   });
 
+  it("drops option-print filters for contract-focused options subscriptions but keeps flow filters", () => {
+    const filters = {
+      ...buildDefaultFlowFilters(),
+      minNotional: 500_000,
+      optionTypes: ["put"] as const
+    };
+    const manifest = getLiveManifest(
+      "/tape",
+      "AAPL",
+      60000,
+      filters,
+      {
+        underlying_ids: ["AAPL"],
+        option_contract_id: "AAPL-2025-01-17-200-C"
+      },
+      { underlying_ids: ["AAPL"] },
+      undefined
+    );
+    const optionsSubscription = manifest.find((subscription) => subscription.channel === "options");
+    const flowSubscription = manifest.find((subscription) => subscription.channel === "flow");
+
+    expect(optionsSubscription?.filters).toBeUndefined();
+    expect(flowSubscription?.filters).toBe(filters);
+  });
+
   it("scopes /signals subscriptions to signals channels only", () => {
     const channels = getLiveManifest("/signals", "SPY", 60000, buildDefaultFlowFilters()).map(
       (subscription) => subscription.channel
@@ -151,6 +200,130 @@ describe("live manifest", () => {
       "equity-candles",
       "equity-overlay"
     ]);
+  });
+});
+
+describe("contract-focused option helpers", () => {
+  it("uses the focused contract underlying for option scope even when ticker input differs", () => {
+    expect(
+      getOptionScope(["MSFT"], "AAPL", {
+        kind: "option-contract",
+        contractId: "AAPL-2025-01-17-200-C",
+        underlyingId: "AAPL"
+      })
+    ).toEqual({
+      underlying_ids: ["AAPL"],
+      option_contract_id: "AAPL-2025-01-17-200-C"
+    });
+  });
+
+  it("ignores broad flow filters for focused contract options", () => {
+    const filters = {
+      ...buildDefaultFlowFilters(),
+      minNotional: 500_000
+    };
+    const items = [
+      makeOptionPrint({
+        trace_id: "focused-low",
+        option_contract_id: "AAPL-2025-01-17-200-C",
+        notional: 100_000,
+        signal_pass: false
+      }),
+      makeOptionPrint({
+        trace_id: "focused-high",
+        seq: 2,
+        ts: 2_000,
+        option_contract_id: "AAPL-2025-01-17-200-C",
+        notional: 750_000
+      }),
+      makeOptionPrint({
+        trace_id: "other-contract",
+        seq: 3,
+        ts: 3_000,
+        option_contract_id: "MSFT-2025-01-17-300-C",
+        underlying_id: "MSFT",
+        notional: 900_000
+      })
+    ];
+
+    expect(
+      filterOptionTapeItems(
+        items,
+        getEffectiveOptionPrintFilters(filters, true),
+        {
+          kind: "option-contract",
+          contractId: "AAPL-2025-01-17-200-C",
+          underlyingId: "AAPL"
+        },
+        new Set(["MSFT"]),
+        "AAPL"
+      ).map((item) => item.trace_id)
+    ).toEqual(["focused-low", "focused-high"]);
+  });
+
+  it("includes option_contract_id and drops broad filters in focused replay query params", () => {
+    const filters = {
+      ...buildDefaultFlowFilters(),
+      minNotional: 500_000,
+      optionTypes: ["put"] as const
+    };
+
+    expect(
+      buildOptionTapeQueryParams(getEffectiveOptionPrintFilters(filters, true), {
+        underlying_ids: ["AAPL"],
+        option_contract_id: "AAPL-2025-01-17-200-C"
+      })
+    ).toEqual({
+      underlying_ids: "AAPL",
+      option_contract_id: "AAPL-2025-01-17-200-C"
+    });
+  });
+
+  it("keeps the focus seed until the matching scoped subscription has loaded it", () => {
+    const seedItem = makeOptionPrint({
+      trace_id: "focused-seed",
+      option_contract_id: "AAPL-2025-01-17-200-C"
+    });
+    const seed = {
+      scopeKey: "option-contract:AAPL-2025-01-17-200-C",
+      subscriptionKey: getLiveSubscriptionKey({
+        channel: "options",
+        underlying_ids: ["AAPL"],
+        option_contract_id: "AAPL-2025-01-17-200-C"
+      }),
+      items: [seedItem]
+    };
+
+    expect(
+      shouldClearOptionFocusSeed(
+        seed,
+        "option-contract:AAPL-2025-01-17-200-C",
+        getLiveSubscriptionKey({
+          channel: "options",
+          filters: {
+            ...buildDefaultFlowFilters(),
+            minNotional: 500_000
+          },
+          underlying_ids: ["AAPL"]
+        }),
+        [makeOptionPrint({ trace_id: "broad-old" })],
+        []
+      )
+    ).toBe(false);
+
+    expect(
+      shouldClearOptionFocusSeed(
+        seed,
+        "option-contract:AAPL-2025-01-17-200-C",
+        getLiveSubscriptionKey({
+          channel: "options",
+          underlying_ids: ["AAPL"],
+          option_contract_id: "AAPL-2025-01-17-200-C"
+        }),
+        [seedItem],
+        []
+      )
+    ).toBe(true);
   });
 });
 

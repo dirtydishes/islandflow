@@ -82,7 +82,7 @@ import {
   fetchClassifierHitsByPacketIds,
   fetchRecentOptionPrints
 } from "@islandflow/storage";
-import type { EquityPrintQueryFilters, OptionPrintQueryFilters } from "@islandflow/storage";
+import type { EquityPrintQueryFilters } from "@islandflow/storage";
 import {
   AlertEventSchema,
   ClassifierHitEventSchema,
@@ -99,11 +99,6 @@ import {
   LiveSubscriptionSchema,
   matchesFlowPacketFilters,
   matchesOptionPrintFilters,
-  OptionFlowFilters,
-  OptionFlowViewSchema,
-  OptionNbboSideSchema,
-  OptionSecurityTypeSchema,
-  OptionTypeSchema,
   FlowPacketSchema,
   SmartMoneyEventSchema,
   OptionNBBOSchema,
@@ -113,6 +108,7 @@ import {
 import { createClient } from "redis";
 import { z } from "zod";
 import { HOT_LIVE_REDIS_KEYS, LiveStateManager, shouldFanoutLiveEvent } from "./live";
+import { parseOptionPrintQuery } from "./option-queries";
 
 const service = "api";
 const logger = createLogger({ service });
@@ -224,33 +220,6 @@ const equityPrintRangeSchema = z.object({
   end_ts: z.coerce.number().int().nonnegative(),
   limit: limitSchema.optional()
 });
-const optionSideListSchema = z
-  .string()
-  .transform((value) =>
-    value
-      .split(",")
-      .map((entry) => entry.trim())
-      .filter(Boolean)
-  )
-  .pipe(z.array(OptionNbboSideSchema));
-const optionTypeListSchema = z
-  .string()
-  .transform((value) =>
-    value
-      .split(",")
-      .map((entry) => entry.trim())
-      .filter(Boolean)
-  )
-  .pipe(z.array(OptionTypeSchema));
-const optionSecuritySchema = z.enum(["stock", "etf", "all"]);
-const optionFilterQuerySchema = z.object({
-  view: OptionFlowViewSchema.optional(),
-  security: optionSecuritySchema.optional(),
-  side: optionSideListSchema.optional(),
-  type: optionTypeListSchema.optional(),
-  min_notional: z.coerce.number().nonnegative().optional()
-});
-
 type Channel =
   | "options"
   | "options-nbbo"
@@ -349,43 +318,6 @@ const applyDeliverPolicy = (
       opts.deliverNew();
       break;
   }
-};
-
-const parseOptionPrintFilters = (
-  url: URL
-): {
-  view: z.infer<typeof OptionFlowViewSchema>;
-  storageFilters: Parameters<typeof fetchRecentOptionPrints>[3];
-  liveFilters: OptionFlowFilters;
-} => {
-  const parsed = optionFilterQuerySchema.parse({
-    view: url.searchParams.get("view") ?? undefined,
-    security: url.searchParams.get("security") ?? undefined,
-    side: url.searchParams.get("side") ?? undefined,
-    type: url.searchParams.get("type") ?? undefined,
-    min_notional: url.searchParams.get("min_notional") ?? undefined
-  });
-  const view = parsed.view ?? "signal";
-  const security = parsed.security ?? (view === "raw" ? "all" : "stock");
-  const storageFilters = {
-    view,
-    security,
-    minNotional: parsed.min_notional,
-    nbboSides: parsed.side,
-    optionTypes: parsed.type
-  } as const;
-  const liveFilters: OptionFlowFilters = {
-    view,
-    securityTypes:
-      security === "all"
-        ? undefined
-        : ([security] as Array<z.infer<typeof OptionSecurityTypeSchema>>),
-    nbboSides: parsed.side,
-    optionTypes: parsed.type,
-    minNotional: parsed.min_notional
-  };
-
-  return { view, storageFilters, liveFilters };
 };
 
 const parseReplayParams = (url: URL): { afterTs: number; afterSeq: number; limit: number } => {
@@ -603,15 +535,6 @@ const parseScopeList = (url: URL, ...keys: string[]): string[] | undefined => {
     .filter(Boolean);
   const unique = Array.from(new Set(values));
   return unique.length > 0 ? unique : undefined;
-};
-
-const parseLiveOptionPrintFilters = (url: URL): OptionPrintQueryFilters => {
-  const { storageFilters } = parseOptionPrintFilters(url);
-  return {
-    ...storageFilters,
-    underlyingIds: parseScopeList(url, "underlying_id", "underlying_ids"),
-    optionContractId: url.searchParams.get("option_contract_id") ?? undefined
-  };
 };
 
 const parseLiveEquityPrintFilters = (url: URL): EquityPrintQueryFilters => ({
@@ -1399,7 +1322,7 @@ const run = async () => {
         try {
           const limit = parseLimit(url.searchParams.get("limit"));
           const source = parseReplaySource(url) ?? undefined;
-          const { storageFilters } = parseOptionPrintFilters(url);
+          const { storageFilters } = parseOptionPrintQuery(url);
           const data = await fetchRecentOptionPrints(clickhouse, limit, source, storageFilters);
           return jsonResponse({ data });
         } catch (error) {
@@ -1525,7 +1448,7 @@ const run = async () => {
         try {
           const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
           const source = parseReplaySource(url) ?? undefined;
-          const storageFilters = parseLiveOptionPrintFilters(url);
+          const { storageFilters } = parseOptionPrintQuery(url);
           const data = await fetchOptionPrintsBefore(
             clickhouse,
             beforeTs,
@@ -1668,7 +1591,7 @@ const run = async () => {
         try {
           const { afterTs, afterSeq, limit } = parseReplayParams(url);
           const source = parseReplaySource(url) ?? undefined;
-          const { storageFilters } = parseOptionPrintFilters(url);
+          const { storageFilters } = parseOptionPrintQuery(url);
           const data = await fetchOptionPrintsAfter(
             clickhouse,
             afterTs,

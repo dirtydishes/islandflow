@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import type { ClickHouseClient } from "@islandflow/storage";
 import {
+  buildOptionSnapshotFilters,
   HOT_LIVE_REDIS_KEYS,
   LiveStateManager,
   isLiveItemFresh,
@@ -448,6 +449,74 @@ describe("LiveStateManager", () => {
     ]);
     expect(snapshot.next_before).toEqual({ ts: staleTs, seq: 1 });
     expect(isLiveItemFresh("options", snapshot.items[0], now)).toBe(false);
+  });
+
+  it("builds raw contract-only snapshot filters for focused option subscriptions", () => {
+    expect(
+      buildOptionSnapshotFilters({
+        channel: "options",
+        filters: {
+          view: "signal",
+          minNotional: 500_000,
+          nbboSides: ["A"],
+          optionTypes: ["call"],
+          securityTypes: ["stock"]
+        },
+        underlying_ids: ["AAPL"],
+        option_contract_id: "AAPL-2025-01-17-200-C"
+      })
+    ).toEqual({
+      view: "raw",
+      optionContractId: "AAPL-2025-01-17-200-C"
+    });
+  });
+
+  it("returns raw contract rows for focused option snapshots even when broad filters would reject them", async () => {
+    const manager = new LiveStateManager(
+      makeClickHouse((query) => {
+        expect(query).toContain("option_contract_id = 'AAPL-2025-01-17-200-C'");
+        expect(query).not.toContain("signal_pass = 1");
+        expect(query).not.toContain("notional >=");
+        expect(query).not.toContain("nbbo_side IN");
+        expect(query).not.toContain("option_type IN");
+        return [
+          {
+            source_ts: 1_000,
+            ingest_ts: 1_001,
+            seq: 1,
+            trace_id: "opt-raw",
+            ts: 1_000,
+            option_contract_id: "AAPL-2025-01-17-200-C",
+            underlying_id: "AAPL",
+            option_type: "put",
+            nbbo_side: "B",
+            notional: 50_000,
+            signal_pass: false,
+            price: 1,
+            size: 5,
+            exchange: "X"
+          }
+        ];
+      }),
+      null
+    );
+
+    const snapshot = await manager.getSnapshot({
+      channel: "options",
+      filters: {
+        view: "signal",
+        minNotional: 500_000,
+        nbboSides: ["A"],
+        optionTypes: ["call"],
+        securityTypes: ["stock"]
+      },
+      underlying_ids: ["AAPL"],
+      option_contract_id: "AAPL-2025-01-17-200-C"
+    });
+
+    expect((snapshot.items as Array<{ trace_id: string }>).map((item) => item.trace_id)).toEqual([
+      "opt-raw"
+    ]);
   });
 
   it("seeds scoped equity snapshots from clickhouse rows older than 24h", async () => {

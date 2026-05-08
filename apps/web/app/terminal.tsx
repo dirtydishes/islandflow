@@ -350,8 +350,16 @@ type SelectedInstrument =
 
 type TapeFocusSeed<T> = {
   scopeKey: string;
+  subscriptionKey?: string;
   items: T[];
 };
+
+type OptionScope = Pick<
+  Extract<LiveSubscription, { channel: "options" }>,
+  "underlying_ids" | "option_contract_id"
+>;
+
+type EquityScope = Pick<Extract<LiveSubscription, { channel: "equities" }>, "underlying_ids">;
 
 const formatIntervalLabel = (intervalMs: number): string => {
   const match = CANDLE_INTERVALS.find((interval) => interval.ms === intervalMs);
@@ -1956,6 +1964,13 @@ const useTape = <T extends SortableItem & { seq: number }>(
   const replaySourceKey = config.replaySourceKey ?? null;
   const onReplaySourceKey = config.onReplaySourceKey;
   const queryParams = config.queryParams;
+  const queryKey = useMemo(
+    () =>
+      JSON.stringify(
+        Object.entries(queryParams ?? {}).sort(([left], [right]) => left.localeCompare(right))
+      ),
+    [queryParams]
+  );
   const hotWindowLimit = config.hotWindowLimit ?? LIVE_HOT_WINDOW;
   const [status, setStatus] = useState<WsStatus>("connecting");
   const [items, setItems] = useState<T[]>([]);
@@ -2046,7 +2061,7 @@ const useTape = <T extends SortableItem & { seq: number }>(
     pendingRef.current = [];
     pendingCountRef.current = 0;
     cancelFlush();
-  }, [mode, replaySourceKey, cancelFlush]);
+  }, [mode, replaySourceKey, queryKey, cancelFlush]);
 
   useEffect(() => {
     if (mode !== "replay" || !latestPath) {
@@ -2091,7 +2106,7 @@ const useTape = <T extends SortableItem & { seq: number }>(
     return () => {
       active = false;
     };
-  }, [mode, latestPath, getItemTs, replaySourceKey, queryParams]);
+  }, [mode, latestPath, getItemTs, replaySourceKey, queryKey, queryParams]);
 
   useEffect(() => {
     if (mode !== "live" || config.liveEnabled === false) {
@@ -2242,9 +2257,14 @@ const useTape = <T extends SortableItem & { seq: number }>(
             }
           }
 
-          if (onReplaySourceKey && sourcePrefix && replaySourceNotifiedRef.current !== sourcePrefix) {
-            replaySourceNotifiedRef.current = sourcePrefix;
-            onReplaySourceKey(sourcePrefix);
+          if (onReplaySourceKey) {
+            if (sourcePrefix && replaySourceNotifiedRef.current !== sourcePrefix) {
+              replaySourceNotifiedRef.current = sourcePrefix;
+              onReplaySourceKey(sourcePrefix);
+            } else if (!sourcePrefix && replaySourceNotifiedRef.current !== null) {
+              replaySourceNotifiedRef.current = null;
+              onReplaySourceKey(null);
+            }
           }
 
           const filtered = sourcePrefix
@@ -2330,6 +2350,7 @@ const useTape = <T extends SortableItem & { seq: number }>(
     getReplayKey,
     replaySourceKey,
     onReplaySourceKey,
+    queryKey,
     queryParams
   ]);
 
@@ -2784,6 +2805,99 @@ const appendOptionFlowFilters = (params: URLSearchParams, filters: OptionFlowFil
   }
 };
 
+const appendOptionScopeParams = (
+  params: URLSearchParams,
+  optionScope: OptionScope | undefined
+): void => {
+  if (optionScope?.underlying_ids?.length) {
+    params.set("underlying_ids", optionScope.underlying_ids.join(","));
+  }
+  if (optionScope?.option_contract_id) {
+    params.set("option_contract_id", optionScope.option_contract_id);
+  }
+};
+
+export const getEffectiveOptionPrintFilters = (
+  flowFilters: OptionFlowFilters,
+  isOptionContractFocused: boolean
+): OptionFlowFilters | undefined => {
+  return isOptionContractFocused ? undefined : flowFilters;
+};
+
+export const getOptionScope = (
+  activeTickers: string[],
+  instrumentUnderlying: string | null,
+  selectedInstrument: SelectedInstrument
+): OptionScope => ({
+  underlying_ids:
+    selectedInstrument?.kind === "option-contract"
+      ? instrumentUnderlying
+        ? [instrumentUnderlying]
+        : undefined
+      : activeTickers.length > 0
+        ? activeTickers
+        : instrumentUnderlying
+          ? [instrumentUnderlying]
+          : undefined,
+  option_contract_id:
+    selectedInstrument?.kind === "option-contract" ? selectedInstrument.contractId : undefined
+});
+
+export const buildOptionTapeQueryParams = (
+  filters: OptionFlowFilters | undefined,
+  optionScope: OptionScope | undefined
+): Record<string, string | undefined> => {
+  const params = new URLSearchParams();
+  appendOptionFlowFilters(params, filters);
+  appendOptionScopeParams(params, optionScope);
+  return Object.fromEntries(params.entries());
+};
+
+export const filterOptionTapeItems = (
+  items: OptionPrint[],
+  filters: OptionFlowFilters | undefined,
+  selectedInstrument: SelectedInstrument,
+  tickerSet: Set<string>,
+  instrumentUnderlying: string | null
+): OptionPrint[] => {
+  return items.filter((print) => {
+    const contractId = normalizeContractId(print.option_contract_id);
+    if (selectedInstrument?.kind === "option-contract") {
+      return contractId === selectedInstrument.contractId;
+    }
+    if (!matchesOptionPrintFilters(print, filters)) {
+      return false;
+    }
+    const underlying = extractUnderlying(contractId);
+    if (tickerSet.size === 0) {
+      return !instrumentUnderlying || underlying === instrumentUnderlying;
+    }
+    return Boolean(underlying) && tickerSet.has(underlying.toUpperCase());
+  });
+};
+
+export const shouldClearOptionFocusSeed = (
+  seed: TapeFocusSeed<OptionPrint> | null,
+  optionFocusScopeKey: string | null,
+  currentOptionSubscriptionKey: string | null,
+  liveItems: OptionPrint[],
+  historyItems: OptionPrint[]
+): boolean => {
+  if (!seed) {
+    return false;
+  }
+  if (seed.scopeKey !== optionFocusScopeKey) {
+    return true;
+  }
+  if (seed.subscriptionKey && seed.subscriptionKey !== currentOptionSubscriptionKey) {
+    return false;
+  }
+  const liveKeys = new Set(
+    composeTapeItems([], liveItems, historyItems).map((item) => getTapeItemKey(item))
+  );
+  return seed.items.every((item) => liveKeys.has(getTapeItemKey(item)));
+};
+
 const appendLiveScopeParams = (params: URLSearchParams, subscription: LiveSubscription): void => {
   if ((subscription.channel === "options" || subscription.channel === "equities") && subscription.underlying_ids?.length) {
     params.set("underlying_ids", subscription.underlying_ids.join(","));
@@ -2810,8 +2924,9 @@ export const getLiveManifest = (
   chartTicker: string,
   chartIntervalMs: number,
   flowFilters: OptionFlowFilters,
-  optionScope?: Pick<Extract<LiveSubscription, { channel: "options" }>, "underlying_ids" | "option_contract_id">,
-  equityScope?: Pick<Extract<LiveSubscription, { channel: "equities" }>, "underlying_ids">
+  optionScope?: OptionScope,
+  equityScope?: EquityScope,
+  optionPrintFilters?: OptionFlowFilters
 ): LiveSubscription[] => {
   const features = getRouteFeatures(pathname);
   const subscriptions: LiveSubscription[] = [];
@@ -2819,7 +2934,10 @@ export const getLiveManifest = (
   if (features.options) {
     subscriptions.push({
       channel: "options",
-      filters: flowFilters,
+      filters:
+        optionScope?.option_contract_id && optionPrintFilters === undefined
+          ? undefined
+          : optionPrintFilters ?? flowFilters,
       ...optionScope,
       snapshot_limit: LIVE_HOT_WINDOW_OPTIONS
     });
@@ -2868,11 +2986,7 @@ export const getLiveManifest = (
 const useLiveSession = (
   enabled: boolean,
   pathname: string,
-  chartTicker: string,
-  chartIntervalMs: number,
-  flowFilters: OptionFlowFilters,
-  optionScope?: Pick<Extract<LiveSubscription, { channel: "options" }>, "underlying_ids" | "option_contract_id">,
-  equityScope?: Pick<Extract<LiveSubscription, { channel: "equities" }>, "underlying_ids">
+  manifest: LiveSubscription[]
 ): LiveSessionState => {
   const [status, setStatus] = useState<WsStatus>(enabled ? "connecting" : "disconnected");
   const [connectedAt, setConnectedAt] = useState<number | null>(null);
@@ -2938,11 +3052,6 @@ const useLiveSession = (
   const lastEventAtRef = useRef<number | null>(null);
   const subscribedKeysRef = useRef<Set<string>>(new Set());
   const subscribedMapRef = useRef<Map<string, LiveSubscription>>(new Map());
-  const manifest = useMemo(
-    () => getLiveManifest(pathname, chartTicker.toUpperCase(), chartIntervalMs, flowFilters, optionScope, equityScope),
-    [pathname, chartTicker, chartIntervalMs, flowFilters, optionScope, equityScope]
-  );
-
   const replaceArrayState = <T,>(
     setter: Dispatch<SetStateAction<T[]>>,
     ref: { current: T[] },
@@ -4857,20 +4966,21 @@ const useTerminalState = () => {
   }, [filterInput]);
   const tickerSet = useMemo(() => new Set(activeTickers), [activeTickers]);
   const instrumentUnderlying = selectedInstrument?.underlyingId.toUpperCase() ?? null;
+  const isOptionContractFocused = selectedInstrument?.kind === "option-contract";
+  const focusedOptionContractId =
+    selectedInstrument?.kind === "option-contract" ? selectedInstrument.contractId : null;
   const optionFocusScopeKey =
-    selectedInstrument?.kind === "option-contract"
-      ? `option-contract:${selectedInstrument.contractId}`
-      : null;
+    focusedOptionContractId ? `option-contract:${focusedOptionContractId}` : null;
   const equityFocusScopeKey =
     selectedInstrument?.kind === "equity"
       ? `equity:${selectedInstrument.underlyingId.toUpperCase()}`
       : null;
+  const effectiveOptionPrintFilters = useMemo(
+    () => getEffectiveOptionPrintFilters(flowFilters, isOptionContractFocused),
+    [flowFilters, isOptionContractFocused]
+  );
   const optionScope = useMemo(
-    () => ({
-      underlying_ids: activeTickers.length > 0 ? activeTickers : instrumentUnderlying ? [instrumentUnderlying] : undefined,
-      option_contract_id:
-        selectedInstrument?.kind === "option-contract" ? selectedInstrument.contractId : undefined
-    }),
+    () => getOptionScope(activeTickers, instrumentUnderlying, selectedInstrument),
     [activeTickers, instrumentUnderlying, selectedInstrument]
   );
   const equityScope = useMemo(
@@ -4895,14 +5005,39 @@ const useTerminalState = () => {
       ? `Contract: ${display.ticker} ${display.expiration} ${display.strike}`
       : `Contract: ${selectedInstrument.contractId}`;
   }, [selectedInstrument]);
-  const liveSession = useLiveSession(
-    mode === "live",
-    pathname,
-    chartTicker,
-    chartIntervalMs,
-    flowFilters,
-    optionScope,
-    equityScope
+  const liveManifest = useMemo(
+    () =>
+      getLiveManifest(
+        pathname,
+        chartTicker.toUpperCase(),
+        chartIntervalMs,
+        flowFilters,
+        optionScope,
+        equityScope,
+        effectiveOptionPrintFilters
+      ),
+    [
+      pathname,
+      chartTicker,
+      chartIntervalMs,
+      flowFilters,
+      optionScope,
+      equityScope,
+      effectiveOptionPrintFilters
+    ]
+  );
+  const liveSession = useLiveSession(mode === "live", pathname, liveManifest);
+  const currentOptionSubscription = useMemo(
+    () =>
+      liveManifest.find(
+        (subscription): subscription is Extract<LiveSubscription, { channel: "options" }> =>
+          subscription.channel === "options"
+      ) ?? null,
+    [liveManifest]
+  );
+  const currentOptionSubscriptionKey = useMemo(
+    () => (currentOptionSubscription ? getLiveSubscriptionKey(currentOptionSubscription) : null),
+    [currentOptionSubscription]
   );
   const equitiesLiveSubscriptionActive = routeFeatures.equities;
 
@@ -4966,18 +5101,8 @@ const useTerminalState = () => {
   );
   const disableReplayGrouping = useCallback(() => null, []);
   const optionQueryParams = useMemo<Record<string, string | undefined>>(
-    () => ({
-      view: flowFilters.view ?? "signal",
-      security:
-        flowFilters.securityTypes?.length === 1 ? flowFilters.securityTypes[0] : undefined,
-      side: flowFilters.nbboSides?.length ? flowFilters.nbboSides.join(",") : undefined,
-      type: flowFilters.optionTypes?.length ? flowFilters.optionTypes.join(",") : undefined,
-      min_notional:
-        typeof flowFilters.minNotional === "number"
-          ? String(flowFilters.minNotional)
-          : undefined
-    }),
-    [flowFilters]
+    () => buildOptionTapeQueryParams(effectiveOptionPrintFilters, optionScope),
+    [effectiveOptionPrintFilters, optionScope]
   );
 
   const options = useTape<OptionPrint>({
@@ -4992,9 +5117,10 @@ const useTerminalState = () => {
     pollMs: mode === "replay" ? 200 : undefined,
     captureScroll: optionsAnchor.capture,
     onNewItems: optionsScroll.onNewItems,
-    getReplayKey: extractReplaySource,
-    onReplaySourceKey: handleReplaySource,
-    queryParams: optionQueryParams
+    getReplayKey: isOptionContractFocused ? disableReplayGrouping : extractReplaySource,
+    onReplaySourceKey: isOptionContractFocused ? undefined : handleReplaySource,
+    queryParams: optionQueryParams,
+    replaySourceKey: isOptionContractFocused ? null : replaySource
   });
 
   const equities = useTape<EquityPrint>({
@@ -5009,6 +5135,12 @@ const useTerminalState = () => {
     captureScroll: equitiesAnchor.capture,
     onNewItems: equitiesScroll.onNewItems
   });
+
+  useEffect(() => {
+    if (isOptionContractFocused && replaySource !== null) {
+      setReplaySource(null);
+    }
+  }, [isOptionContractFocused, replaySource]);
 
   const equityJoins = useTape<EquityPrintJoin>({
     mode,
@@ -5922,25 +6054,20 @@ const useTerminalState = () => {
   );
 
   const filteredOptions = useMemo(() => {
-    return optionsFeed.items.filter((print) => {
-      if (!matchesOptionPrintFilters(print, flowFilters)) {
-        return false;
-      }
-      if (
-        selectedInstrument?.kind === "option-contract" &&
-        normalizeContractId(print.option_contract_id) !== selectedInstrument.contractId
-      ) {
-        return false;
-      }
-      if (tickerSet.size === 0) {
-        return (
-          !instrumentUnderlying ||
-          extractUnderlying(normalizeContractId(print.option_contract_id)) === instrumentUnderlying
-        );
-      }
-      return matchesTicker(extractUnderlying(normalizeContractId(print.option_contract_id)));
-    });
-  }, [flowFilters, optionsFeed.items, matchesTicker, tickerSet, selectedInstrument, instrumentUnderlying]);
+    return filterOptionTapeItems(
+      optionsFeed.items,
+      effectiveOptionPrintFilters,
+      selectedInstrument,
+      tickerSet,
+      instrumentUnderlying
+    );
+  }, [
+    effectiveOptionPrintFilters,
+    instrumentUnderlying,
+    optionsFeed.items,
+    selectedInstrument,
+    tickerSet
+  ]);
 
   const filteredEquities = useMemo(() => {
     if (tickerSet.size === 0) {
@@ -5956,16 +6083,24 @@ const useTerminalState = () => {
     if (!optionFocusSeed) {
       return;
     }
-    if (optionFocusSeed.scopeKey !== optionFocusScopeKey) {
+    if (
+      shouldClearOptionFocusSeed(
+        optionFocusSeed,
+        optionFocusScopeKey,
+        currentOptionSubscriptionKey,
+        liveOptions.liveItems ?? [],
+        liveOptions.historyItems ?? []
+      )
+    ) {
       setOptionFocusSeed(null);
-      return;
     }
-    const composedBaseItems = composeTapeItems([], liveOptions.liveItems ?? [], liveOptions.historyItems ?? []);
-    const liveKeys = new Set(composedBaseItems.map((item) => getTapeItemKey(item)));
-    if (optionFocusSeed.items.every((item) => liveKeys.has(getTapeItemKey(item)))) {
-      setOptionFocusSeed(null);
-    }
-  }, [liveOptions.historyItems, liveOptions.liveItems, optionFocusScopeKey, optionFocusSeed]);
+  }, [
+    currentOptionSubscriptionKey,
+    liveOptions.historyItems,
+    liveOptions.liveItems,
+    optionFocusScopeKey,
+    optionFocusSeed
+  ]);
 
   useEffect(() => {
     if (!equityFocusSeed) {
@@ -5988,15 +6123,21 @@ const useTerminalState = () => {
       const parsed = parseOptionContractId(contractId);
       const underlyingId = (print.underlying_id ?? parsed?.root ?? extractUnderlying(contractId)).toUpperCase();
       const scopeKey = `option-contract:${contractId}`;
+      const subscriptionKey = getLiveSubscriptionKey({
+        channel: "options",
+        underlying_ids: [underlyingId],
+        option_contract_id: contractId
+      });
       const seedItems = composeTapeItems(
         [print],
         filteredOptions.filter((candidate) => normalizeContractId(candidate.option_contract_id) === contractId),
         []
       );
-      setOptionFocusSeed({ scopeKey, items: seedItems });
+      setOptionFocusSeed({ scopeKey, subscriptionKey, items: seedItems });
       bumpTapeDebugMetric("focusSeedRowCount", seedItems.length);
       logTapeDebug("option focus seed captured", {
         contract_id: contractId,
+        subscription_key: subscriptionKey,
         row_count: seedItems.length
       });
       setSelectedInstrument({

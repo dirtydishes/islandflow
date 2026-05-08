@@ -345,6 +345,30 @@ const snapshotLimitFor = (subscription: LiveSubscription, configuredLimit: numbe
   return Math.max(1, Math.min(configuredLimit, Math.floor(requested)));
 };
 
+export const buildOptionSnapshotFilters = (
+  subscription: Extract<LiveSubscription, { channel: "options" }>
+): OptionPrintQueryFilters => {
+  if (subscription.option_contract_id) {
+    return {
+      view: "raw",
+      optionContractId: subscription.option_contract_id
+    };
+  }
+
+  return {
+    view: subscription.filters?.view ?? "signal",
+    security:
+      subscription.filters?.securityTypes?.length === 1
+        ? subscription.filters.securityTypes[0]
+        : "all",
+    nbboSides: subscription.filters?.nbboSides,
+    optionTypes: subscription.filters?.optionTypes,
+    minNotional: subscription.filters?.minNotional,
+    underlyingIds: subscription.underlying_ids,
+    optionContractId: subscription.option_contract_id
+  };
+};
+
 const candleRedisKey = (underlyingId: string, intervalMs: number): string =>
   `live:equity-candles:${underlyingId}:${intervalMs}`;
 
@@ -489,18 +513,7 @@ export class LiveStateManager {
         if (subscription.filters?.view === "raw" || scoped) {
           this.stats.scopedClickHouseSnapshots += 1;
           const limit = snapshotLimitFor(subscription, this.generic.options.limit);
-          const storageFilters: OptionPrintQueryFilters = {
-            view: subscription.filters?.view ?? "signal",
-            security:
-              subscription.filters?.securityTypes?.length === 1
-                ? subscription.filters.securityTypes[0]
-                : "all",
-            nbboSides: subscription.filters?.nbboSides,
-            optionTypes: subscription.filters?.optionTypes,
-            minNotional: subscription.filters?.minNotional,
-            underlyingIds: subscription.underlying_ids,
-            optionContractId: subscription.option_contract_id
-          };
+          const storageFilters = buildOptionSnapshotFilters(subscription);
           const items = await fetchRecentOptionPrints(
             this.clickhouse,
             limit,
