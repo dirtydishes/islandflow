@@ -13,6 +13,9 @@
     "dev:infra:down": "docker compose down",
     "dev:web": "bun --cwd=apps/web run dev",
     "dev:services": "bun run scripts/dev-services.ts",
+    "deploy": "bun run scripts/deploy.ts",
+    "deploy:main": "./deploy main",
+    "deploy:current-branch": "./deploy current-branch",
     "sync:docker-workspace": "bun run scripts/sync-docker-workspace.ts",
     "check:docker-workspace": "bun run scripts/check-docker-workspace.ts"
   },

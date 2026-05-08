@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-git fetch
-git pull
-docker compose up -d --build --force-recreate
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+exec "$repo_root/deploy" current-branch "$@"
