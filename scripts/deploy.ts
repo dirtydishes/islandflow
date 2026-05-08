@@ -18,8 +18,8 @@ const ALLOWED_REMOTE_UNTRACKED = new Set([
 ]);
 const API_CONTAINER = "islandflow-vps-api-1";
 const WEB_CONTAINER = "islandflow-vps-web-1";
-const PUBLIC_APP_URL = "https://flow.deltaisland.io";
-const PUBLIC_API_HEALTH_URL = "https://api.flow.deltaisland.io/health";
+const PUBLIC_APP_URL = process.env.DEPLOY_PUBLIC_APP_URL?.trim() || "https://flow.deltaisland.io";
+const PUBLIC_API_HEALTH_URL = process.env.DEPLOY_PUBLIC_API_HEALTH_URL?.trim() || null;
 const LOG_SERVICES = ["api", "web", "compute", "candles", "ingest-options", "ingest-equities"];
 
 const scriptPath = fileURLToPath(import.meta.url);
@@ -37,7 +37,11 @@ Modes:
 
 Options:
   --force-recreate  Escalation path for docker compose when a normal refresh is not enough.
-  --help            Show this help text.`);
+  --help            Show this help text.
+
+Environment:
+  DEPLOY_PUBLIC_APP_URL         Override the public app URL (default: https://flow.deltaisland.io).
+  DEPLOY_PUBLIC_API_HEALTH_URL  Optional separate public API health URL for two-origin deployments.`);
   process.exit(exitCode);
 }
 
@@ -260,7 +264,15 @@ docker exec ${WEB_CONTAINER} bun -e 'const r = await fetch("http://127.0.0.1:300
 function publicVerification(): void {
   section("Public Verification");
   runChecked("curl", ["-I", "-fksS", PUBLIC_APP_URL]);
-  runChecked("curl", ["-fksS", PUBLIC_API_HEALTH_URL]);
+
+  if (PUBLIC_API_HEALTH_URL) {
+    runChecked("curl", ["-fksS", PUBLIC_API_HEALTH_URL]);
+    return;
+  }
+
+  console.log(
+    "Skipping separate public API health check; same-origin mode relies on the public app check plus container-local API verification."
+  );
 }
 
 function shellEscape(value: string): string {

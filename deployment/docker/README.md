@@ -52,8 +52,8 @@ Important defaults:
 - `OPTIONS_INGEST_ADAPTER=synthetic` and `EQUITIES_INGEST_ADAPTER=synthetic` are the safest first-boot settings.
 - `WEB_BIND_IP=127.0.0.1` and `API_BIND_IP=127.0.0.1` keep the published ports local to the host by default.
 - `WEB_HOST_PORT=3000` and `API_HOST_PORT=4000` control the host-side published ports.
+- `NEXT_PUBLIC_API_URL=` (empty, the default in `.env.example`) fits same-origin mode where your edge layer proxies API paths from the app origin to the API host port.
 - `NEXT_PUBLIC_API_URL=https://api.example.com` fits a two-origin setup where the browser reaches the API on a separate public origin.
-- `NEXT_PUBLIC_API_URL=` (empty) fits same-origin mode where your edge layer proxies API paths from the app origin to the API host port.
 
 3. Build and start the stack:
 
@@ -249,9 +249,16 @@ If the live checkout is on a branch deploy and you want normal production tracki
 The helper always does the final public verification against:
 
 - `https://flow.deltaisland.io`
-- `https://api.flow.deltaisland.io/health`
 
-Those checks assume your current edge routing already forwards those domains to the host ports published by this stack.
+It also verifies API health from inside the `api` container during the remote verification step.
+
+If you intentionally run a separate public API origin, add an extra public API check by exporting `DEPLOY_PUBLIC_API_HEALTH_URL` before running the deploy:
+
+```bash
+DEPLOY_PUBLIC_API_HEALTH_URL=https://api.example.com/health ./deploy main
+```
+
+Same-origin deployments should leave that unset unless the edge layer exposes a public API health route on purpose.
 
 ## Manual server fallback
 
