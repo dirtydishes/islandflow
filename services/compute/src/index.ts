@@ -26,6 +26,7 @@ import {
   STREAM_SMART_MONEY_EVENTS,
   STREAM_OPTION_NBBO,
   STREAM_OPTION_SIGNAL_PRINTS,
+  buildStreamConfig,
   buildDurableConsumer,
   connectJetStreamWithRetry,
   ensureStream,
@@ -40,12 +41,13 @@ import {
   ensureInferredDarkTable,
   ensureFlowPacketsTable,
   ensureSmartMoneyEventsTable,
-  insertAlert,
-  insertClassifierHit,
-  insertEquityPrintJoin,
-  insertInferredDark,
-  insertFlowPacket,
-  insertSmartMoneyEvent
+  ClickHouseBatchWriter,
+  enqueueAlertInsert,
+  enqueueClassifierHitInsert,
+  enqueueEquityPrintJoinInsert,
+  enqueueFlowPacketInsert,
+  enqueueInferredDarkInsert,
+  enqueueSmartMoneyEventInsert,
 } from "@islandflow/storage";
 import {
   AlertEventSchema,
@@ -82,7 +84,12 @@ import {
   type DarkInferenceConfig
 } from "./dark-inference";
 import { buildEquityPrintJoin, type EquityQuoteJoin } from "./equity-joins";
-import { createRedisClient, updateRollingStats, type RollingStatsConfig } from "./rolling-stats";
+import {
+  createRedisClient,
+  RollingWindowStore,
+  type RollingStatsConfig,
+  type RollingWindowStoreConfig
+} from "./rolling-stats";
 import { summarizeStructure, type ContractLeg } from "./structures";
 import {
   buildStructureFlowPacket,
@@ -103,6 +110,8 @@ const envSchema = z.object({
   CLUSTER_WINDOW_MS: z.coerce.number().int().positive().default(500),
   ROLLING_WINDOW_SIZE: z.coerce.number().int().positive().default(50),
   ROLLING_TTL_SEC: z.coerce.number().int().nonnegative().default(86400),
+  ROLLING_CACHE_FLUSH_INTERVAL_MS: z.coerce.number().int().positive().default(30_000),
+  ROLLING_CACHE_MAX_KEYS: z.coerce.number().int().positive().default(20_000),
   COMPUTE_DELIVER_POLICY: z.enum(["new", "all", "last", "last_per_subject"]).default("new"),
   COMPUTE_CONSUMER_RESET: z
     .preprocess((value) => {
@@ -119,6 +128,8 @@ const envSchema = z.object({
     }, z.boolean())
     .default(false),
   NBBO_MAX_AGE_MS: z.coerce.number().int().positive().default(1000),
+  COMPUTE_NBBO_CACHE_MAX_KEYS: z.coerce.number().int().positive().default(20_000),
+  COMPUTE_NBBO_CACHE_TTL_MS: z.coerce.number().int().positive().default(900_000),
   EQUITY_QUOTE_MAX_AGE_MS: z.coerce.number().int().positive().default(1000),
   DARK_INFER_WINDOW_MS: z.coerce.number().int().positive().default(60000),
   DARK_INFER_COOLDOWN_MS: z.coerce.number().int().nonnegative().default(30000),
@@ -269,6 +280,9 @@ const clusters = new Map<string, ClusterState>();
 const nbboCache = new Map<string, OptionNBBO>();
 const equityQuoteCache = new Map<string, EquityQuote>();
 const darkInferenceState = createDarkInferenceState();
+const nbboCacheTouchedAt = new Map<string, number>();
+const equityQuoteCacheTouchedAt = new Map<string, number>();
+const darkInferenceTouchedAt = new Map<string, number>();
 const recentLegsByKey = new Map<string, LegEvidence[]>();
 const recentLegsByRoot = new Map<string, LegEvidence[]>();
 const recentStructureEmits = new Map<string, number>();
@@ -278,6 +292,20 @@ const runtimeState = {
 };
 
 const MAX_RECENT_LEGS = 20;
+const EQUITY_QUOTE_CACHE_MAX_KEYS = 2_000;
+const EQUITY_QUOTE_CACHE_TTL_MS = 900_000;
+const DARK_INFERENCE_TTL_MS = 900_000;
+const CACHE_PRUNE_INTERVAL_MS = 60_000;
+
+const emitCounters = {
+  flowPackets: 0,
+  structurePackets: 0,
+  smartMoneyEvents: 0,
+  classifierHits: 0,
+  alerts: 0,
+  equityJoins: 0,
+  darkEvents: 0
+};
 
 const rollingKey = (metric: string, contractId: string): string => {
   return `rolling:${metric}:${contractId}`;
@@ -479,8 +507,8 @@ const pruneRecentStructureEmits = (anchorTs: number): void => {
 };
 
 const emitStructurePacketIfNeeded = async (
-  clickhouse: ReturnType<typeof createClickHouseClient>,
   js: Awaited<ReturnType<typeof connectJetStreamWithRetry>>["js"],
+  batchWriter: ClickHouseBatchWriter,
   legs: LegEvidence[],
   summary: ReturnType<typeof summarizeStructure>,
   currentContractId: string
@@ -512,16 +540,11 @@ const emitStructurePacketIfNeeded = async (
   const packet = buildStructureFlowPacket(plan, summary);
   const validated = FlowPacketSchema.parse(packet);
 
-  await insertFlowPacket(clickhouse, validated);
+  enqueueFlowPacketInsert(batchWriter, validated);
   await publishJson(js, SUBJECT_FLOW_PACKETS, validated);
-  await emitClassifiers(clickhouse, js, validated);
-
-  logger.info("emitted structure flow packet", {
-    id: validated.id,
-    type: summary.type,
-    legs: summary.legs,
-    strikes: summary.strikes
-  });
+  emitCounters.flowPackets += 1;
+  emitCounters.structurePackets += 1;
+  await emitClassifiers(js, batchWriter, validated);
 };
 
 const applyDeliverPolicy = (
@@ -606,6 +629,7 @@ const updateNbboCache = (nbbo: OptionNBBO): void => {
     (nbbo.ts === existing.ts && nbbo.seq >= existing.seq)
   ) {
     nbboCache.set(nbbo.option_contract_id, nbbo);
+    nbboCacheTouchedAt.set(nbbo.option_contract_id, Date.now());
   }
 };
 
@@ -617,6 +641,7 @@ const updateEquityQuoteCache = (quote: EquityQuote): void => {
     (quote.ts === existing.ts && quote.seq >= existing.seq)
   ) {
     equityQuoteCache.set(quote.underlying_id, quote);
+    equityQuoteCacheTouchedAt.set(quote.underlying_id, Date.now());
   }
 };
 
@@ -626,6 +651,7 @@ const selectNbbo = (contractId: string, ts: number): NbboJoin => {
     return { nbbo: null, ageMs: env.NBBO_MAX_AGE_MS + 1, stale: true };
   }
 
+  nbboCacheTouchedAt.set(contractId, Date.now());
   const ageMs = Math.abs(ts - nbbo.ts);
   const stale = ageMs > env.NBBO_MAX_AGE_MS;
   return { nbbo, ageMs, stale };
@@ -637,9 +663,75 @@ const selectEquityQuote = (underlyingId: string, ts: number): EquityQuoteJoin =>
     return { quote: null, ageMs: env.EQUITY_QUOTE_MAX_AGE_MS + 1, stale: true };
   }
 
+  equityQuoteCacheTouchedAt.set(underlyingId, Date.now());
   const ageMs = Math.abs(ts - quote.ts);
   const stale = ageMs > env.EQUITY_QUOTE_MAX_AGE_MS;
   return { quote, ageMs, stale };
+};
+
+const pruneTimedMap = <T>(
+  values: Map<string, T>,
+  touchedAt: Map<string, number>,
+  maxKeys: number,
+  ttlMs: number,
+  now = Date.now()
+): number => {
+  let removed = 0;
+
+  for (const [key, touched] of touchedAt) {
+    if (now - touched > ttlMs) {
+      touchedAt.delete(key);
+      values.delete(key);
+      removed += 1;
+    }
+  }
+
+  if (values.size <= maxKeys) {
+    return removed;
+  }
+
+  const overflow = values.size - maxKeys;
+  const oldest = [...touchedAt.entries()].sort((a, b) => a[1] - b[1]).slice(0, overflow);
+  for (const [key] of oldest) {
+    touchedAt.delete(key);
+    values.delete(key);
+    removed += 1;
+  }
+
+  return removed;
+};
+
+const pruneComputeCaches = (rollingStore: RollingWindowStore, now = Date.now()) => {
+  const nbboRemoved = pruneTimedMap(
+    nbboCache,
+    nbboCacheTouchedAt,
+    env.COMPUTE_NBBO_CACHE_MAX_KEYS,
+    env.COMPUTE_NBBO_CACHE_TTL_MS,
+    now
+  );
+  const quoteRemoved = pruneTimedMap(
+    equityQuoteCache,
+    equityQuoteCacheTouchedAt,
+    EQUITY_QUOTE_CACHE_MAX_KEYS,
+    EQUITY_QUOTE_CACHE_TTL_MS,
+    now
+  );
+  const darkRemoved = pruneTimedMap(
+    darkInferenceState.lastEmittedByUnderlying,
+    darkInferenceTouchedAt,
+    EQUITY_QUOTE_CACHE_MAX_KEYS,
+    DARK_INFERENCE_TTL_MS,
+    now
+  );
+  const rollingRemoved = rollingStore.prune(now);
+
+  logger.info("compute cache summary", {
+    nbbo_cache_size: nbboCache.size,
+    equity_quote_cache_size: equityQuoteCache.size,
+    dark_inference_cache_size: darkInferenceState.lastEmittedByUnderlying.size,
+    rolling_cache_size: rollingStore.size,
+    removed: nbboRemoved + quoteRemoved + darkRemoved + rollingRemoved
+  });
 };
 
 const classifyPlacement = (price: number, join: NbboJoin): NbboPlacement => {
@@ -679,10 +771,9 @@ const classifyPlacement = (price: number, join: NbboJoin): NbboPlacement => {
 };
 
 const flushCluster = async (
-  clickhouse: ReturnType<typeof createClickHouseClient>,
   js: Awaited<ReturnType<typeof connectJetStreamWithRetry>>["js"],
-  redis: ReturnType<typeof createRedisClient>,
-  rollingConfig: RollingStatsConfig,
+  batchWriter: ClickHouseBatchWriter,
+  rollingStore: RollingWindowStore,
   cluster: ClusterState
 ): Promise<void> => {
   if (cluster.flushed) {
@@ -784,12 +875,7 @@ const flushCluster = async (
     prefix: string
   ): Promise<void> => {
     try {
-      const snapshot = await updateRollingStats(
-        redis,
-        rollingKey(metric, cluster.contractId),
-        value,
-        rollingConfig
-      );
+      const snapshot = rollingStore.update(rollingKey(metric, cluster.contractId), value);
       features[`${prefix}_mean`] = roundTo(snapshot.mean);
       features[`${prefix}_std`] = roundTo(snapshot.stddev);
       features[`${prefix}_z`] = roundTo(snapshot.zscore);
@@ -824,7 +910,7 @@ const flushCluster = async (
       features.structure_rights = summary.rights;
     }
 
-    await emitStructurePacketIfNeeded(clickhouse, js, legs, summary, currentLeg.contractId);
+    await emitStructurePacketIfNeeded(js, batchWriter, legs, summary, currentLeg.contractId);
 
     const rootKey = buildRootKey(currentLeg);
     const rootCandidates = [
@@ -834,7 +920,7 @@ const flushCluster = async (
     const rollLegs = [currentLeg, ...rootCandidates];
     const rollSummary = summarizeStructure(rollLegs);
     if (rollSummary?.type === "roll") {
-      await emitStructurePacketIfNeeded(clickhouse, js, rollLegs, rollSummary, currentLeg.contractId);
+      await emitStructurePacketIfNeeded(js, batchWriter, rollLegs, rollSummary, currentLeg.contractId);
     }
 
     storeRecentLeg(currentLeg, anchorTs);
@@ -873,16 +959,10 @@ const flushCluster = async (
 
   const validated = FlowPacketSchema.parse(packet);
   try {
-    await insertFlowPacket(clickhouse, validated);
+    enqueueFlowPacketInsert(batchWriter, validated);
     await publishJson(js, SUBJECT_FLOW_PACKETS, validated);
-
-    await emitClassifiers(clickhouse, js, validated);
-
-    logger.info("emitted flow packet", {
-      id: validated.id,
-      contract: cluster.contractId,
-      count: cluster.members.length
-    });
+    emitCounters.flowPackets += 1;
+    await emitClassifiers(js, batchWriter, validated);
   } catch (error) {
     if (isExpectedShutdownNatsError(error)) {
       logger.info("skipped flow packet publish during shutdown", {
@@ -899,8 +979,8 @@ const flushCluster = async (
 };
 
 const emitClassifiers = async (
-  clickhouse: ReturnType<typeof createClickHouseClient>,
   js: Awaited<ReturnType<typeof connectJetStreamWithRetry>>["js"],
+  batchWriter: ClickHouseBatchWriter,
   packet: FlowPacket
 ): Promise<void> => {
   let smartMoneyEvent: SmartMoneyEvent;
@@ -915,8 +995,9 @@ const emitClassifiers = async (
         : packet.source_ts;
     const eventCalendarMatch = underlyingId ? eventCalendarProvider.findNextEvent(underlyingId, referenceTs) : null;
     smartMoneyEvent = SmartMoneyEventSchema.parse(buildSmartMoneyEventFromPacket(packet, { eventCalendarMatch }));
-    await insertSmartMoneyEvent(clickhouse, smartMoneyEvent);
+    enqueueSmartMoneyEventInsert(batchWriter, smartMoneyEvent);
     await publishJson(js, SUBJECT_SMART_MONEY_EVENTS, smartMoneyEvent);
+    emitCounters.smartMoneyEvents += 1;
   } catch (error) {
     if (isExpectedShutdownNatsError(error)) {
       return;
@@ -945,8 +1026,9 @@ const emitClassifiers = async (
 
   for (const hit of hitEvents) {
     try {
-      await insertClassifierHit(clickhouse, hit);
+      enqueueClassifierHitInsert(batchWriter, hit);
       await publishJson(js, SUBJECT_CLASSIFIER_HITS, hit);
+      emitCounters.classifierHits += 1;
     } catch (error) {
       if (isExpectedShutdownNatsError(error)) {
         continue;
@@ -981,8 +1063,9 @@ const emitClassifiers = async (
   });
 
   try {
-    await insertAlert(clickhouse, alert);
+    enqueueAlertInsert(batchWriter, alert);
     await publishJson(js, SUBJECT_ALERTS, alert);
+    emitCounters.alerts += 1;
   } catch (error) {
     if (isExpectedShutdownNatsError(error)) {
       return;
@@ -995,17 +1078,21 @@ const emitClassifiers = async (
 };
 
 const emitEquityJoin = async (
-  clickhouse: ReturnType<typeof createClickHouseClient>,
   js: Awaited<ReturnType<typeof connectJetStreamWithRetry>>["js"],
+  batchWriter: ClickHouseBatchWriter,
   print: EquityPrint
 ): Promise<void> => {
   const join = selectEquityQuote(print.underlying_id, print.ts);
   const payload: EquityPrintJoin = EquityPrintJoinSchema.parse(buildEquityPrintJoin(print, join));
 
   try {
-    await insertEquityPrintJoin(clickhouse, payload);
+    enqueueEquityPrintJoinInsert(batchWriter, payload);
   } catch (error) {
-    logger.error("failed to emit equity print join", {
+    if (isExpectedShutdownNatsError(error)) {
+      return;
+    }
+
+    logger.error("failed to queue equity print join", {
       error: error instanceof Error ? error.message : String(error),
       trace_id: payload.trace_id
     });
@@ -1014,6 +1101,7 @@ const emitEquityJoin = async (
 
   try {
     await publishJson(js, SUBJECT_EQUITY_JOINS, payload);
+    emitCounters.equityJoins += 1;
   } catch (error) {
     if (isExpectedShutdownNatsError(error)) {
       return;
@@ -1024,20 +1112,26 @@ const emitEquityJoin = async (
     });
   }
 
-  await emitDarkInferences(clickhouse, js, payload);
+  await emitDarkInferences(js, batchWriter, payload);
 };
 
 const emitDarkInferences = async (
-  clickhouse: ReturnType<typeof createClickHouseClient>,
   js: Awaited<ReturnType<typeof connectJetStreamWithRetry>>["js"],
+  batchWriter: ClickHouseBatchWriter,
   join: EquityPrintJoin
 ): Promise<void> => {
   const events = evaluateDarkInferences(join, darkInferenceConfig, darkInferenceState);
   for (const event of events) {
     const validated: InferredDarkEvent = InferredDarkEventSchema.parse(event);
     try {
-      await insertInferredDark(clickhouse, validated);
+      enqueueInferredDarkInsert(batchWriter, validated);
       await publishJson(js, SUBJECT_INFERRED_DARK, validated);
+      emitCounters.darkEvents += 1;
+      const underlyingId =
+        typeof join.features?.underlying_id === "string" ? join.features.underlying_id : null;
+      if (underlyingId) {
+        darkInferenceTouchedAt.set(underlyingId, Date.now());
+      }
     } catch (error) {
       if (isExpectedShutdownNatsError(error)) {
         continue;
@@ -1051,10 +1145,9 @@ const emitDarkInferences = async (
 };
 
 const flushEligibleClusters = async (
-  clickhouse: ReturnType<typeof createClickHouseClient>,
   js: Awaited<ReturnType<typeof connectJetStreamWithRetry>>["js"],
-  redis: ReturnType<typeof createRedisClient>,
-  rollingConfig: RollingStatsConfig,
+  batchWriter: ClickHouseBatchWriter,
+  rollingStore: RollingWindowStore,
   currentTs: number,
   skipContractId: string
 ): Promise<void> => {
@@ -1065,7 +1158,7 @@ const flushEligibleClusters = async (
 
     if (currentTs - cluster.endTs > env.CLUSTER_WINDOW_MS) {
       clusters.delete(contractId);
-      await flushCluster(clickhouse, js, redis, rollingConfig, cluster);
+      await flushCluster(js, batchWriter, rollingStore, cluster);
     }
   }
 };
@@ -1081,135 +1174,16 @@ const run = async () => {
     { attempts: 120, delayMs: 500 }
   );
 
-  await ensureStream(jsm, {
-    name: STREAM_OPTION_SIGNAL_PRINTS,
-    subjects: [SUBJECT_OPTION_SIGNAL_PRINTS],
-    retention: "limits",
-    storage: "file",
-    discard: "old",
-    max_msgs_per_subject: -1,
-    max_msgs: -1,
-    max_bytes: -1,
-    max_age: 0,
-    num_replicas: 1
-  });
-
-  await ensureStream(jsm, {
-    name: STREAM_OPTION_NBBO,
-    subjects: [SUBJECT_OPTION_NBBO],
-    retention: "limits",
-    storage: "file",
-    discard: "old",
-    max_msgs_per_subject: -1,
-    max_msgs: -1,
-    max_bytes: -1,
-    max_age: 0,
-    num_replicas: 1
-  });
-
-  await ensureStream(jsm, {
-    name: STREAM_EQUITY_PRINTS,
-    subjects: [SUBJECT_EQUITY_PRINTS],
-    retention: "limits",
-    storage: "file",
-    discard: "old",
-    max_msgs_per_subject: -1,
-    max_msgs: -1,
-    max_bytes: -1,
-    max_age: 0,
-    num_replicas: 1
-  });
-
-  await ensureStream(jsm, {
-    name: STREAM_EQUITY_QUOTES,
-    subjects: [SUBJECT_EQUITY_QUOTES],
-    retention: "limits",
-    storage: "file",
-    discard: "old",
-    max_msgs_per_subject: -1,
-    max_msgs: -1,
-    max_bytes: -1,
-    max_age: 0,
-    num_replicas: 1
-  });
-
-  await ensureStream(jsm, {
-    name: STREAM_FLOW_PACKETS,
-    subjects: [SUBJECT_FLOW_PACKETS],
-    retention: "limits",
-    storage: "file",
-    discard: "old",
-    max_msgs_per_subject: -1,
-    max_msgs: -1,
-    max_bytes: -1,
-    max_age: 0,
-    num_replicas: 1
-  });
-
-  await ensureStream(jsm, {
-    name: STREAM_SMART_MONEY_EVENTS,
-    subjects: [SUBJECT_SMART_MONEY_EVENTS],
-    retention: "limits",
-    storage: "file",
-    discard: "old",
-    max_msgs_per_subject: -1,
-    max_msgs: -1,
-    max_bytes: -1,
-    max_age: 0,
-    num_replicas: 1
-  });
-
-  await ensureStream(jsm, {
-    name: STREAM_EQUITY_JOINS,
-    subjects: [SUBJECT_EQUITY_JOINS],
-    retention: "limits",
-    storage: "file",
-    discard: "old",
-    max_msgs_per_subject: -1,
-    max_msgs: -1,
-    max_bytes: -1,
-    max_age: 0,
-    num_replicas: 1
-  });
-
-  await ensureStream(jsm, {
-    name: STREAM_INFERRED_DARK,
-    subjects: [SUBJECT_INFERRED_DARK],
-    retention: "limits",
-    storage: "file",
-    discard: "old",
-    max_msgs_per_subject: -1,
-    max_msgs: -1,
-    max_bytes: -1,
-    max_age: 0,
-    num_replicas: 1
-  });
-
-  await ensureStream(jsm, {
-    name: STREAM_CLASSIFIER_HITS,
-    subjects: [SUBJECT_CLASSIFIER_HITS],
-    retention: "limits",
-    storage: "file",
-    discard: "old",
-    max_msgs_per_subject: -1,
-    max_msgs: -1,
-    max_bytes: -1,
-    max_age: 0,
-    num_replicas: 1
-  });
-
-  await ensureStream(jsm, {
-    name: STREAM_ALERTS,
-    subjects: [SUBJECT_ALERTS],
-    retention: "limits",
-    storage: "file",
-    discard: "old",
-    max_msgs_per_subject: -1,
-    max_msgs: -1,
-    max_bytes: -1,
-    max_age: 0,
-    num_replicas: 1
-  });
+  await ensureStream(jsm, buildStreamConfig(STREAM_OPTION_SIGNAL_PRINTS, SUBJECT_OPTION_SIGNAL_PRINTS, "derived"));
+  await ensureStream(jsm, buildStreamConfig(STREAM_OPTION_NBBO, SUBJECT_OPTION_NBBO, "raw"));
+  await ensureStream(jsm, buildStreamConfig(STREAM_EQUITY_PRINTS, SUBJECT_EQUITY_PRINTS, "raw"));
+  await ensureStream(jsm, buildStreamConfig(STREAM_EQUITY_QUOTES, SUBJECT_EQUITY_QUOTES, "raw"));
+  await ensureStream(jsm, buildStreamConfig(STREAM_FLOW_PACKETS, SUBJECT_FLOW_PACKETS, "derived"));
+  await ensureStream(jsm, buildStreamConfig(STREAM_SMART_MONEY_EVENTS, SUBJECT_SMART_MONEY_EVENTS, "derived"));
+  await ensureStream(jsm, buildStreamConfig(STREAM_EQUITY_JOINS, SUBJECT_EQUITY_JOINS, "derived"));
+  await ensureStream(jsm, buildStreamConfig(STREAM_INFERRED_DARK, SUBJECT_INFERRED_DARK, "derived"));
+  await ensureStream(jsm, buildStreamConfig(STREAM_CLASSIFIER_HITS, SUBJECT_CLASSIFIER_HITS, "derived"));
+  await ensureStream(jsm, buildStreamConfig(STREAM_ALERTS, SUBJECT_ALERTS, "derived"));
 
   const clickhouse = createClickHouseClient({
     url: env.CLICKHOUSE_URL,
@@ -1242,6 +1216,51 @@ const run = async () => {
     windowSize: env.ROLLING_WINDOW_SIZE,
     ttlSeconds: env.ROLLING_TTL_SEC
   };
+  const rollingStore = new RollingWindowStore({
+    ...rollingConfig,
+    flushIntervalMs: env.ROLLING_CACHE_FLUSH_INTERVAL_MS,
+    maxKeys: env.ROLLING_CACHE_MAX_KEYS
+  } satisfies RollingWindowStoreConfig);
+  const batchWriter = new ClickHouseBatchWriter(clickhouse, {
+    flushIntervalMs: 100,
+    maxRows: 250,
+    onError: (table, error, rowCount) => {
+      logger.error("batched clickhouse insert failed", {
+        table,
+        row_count: rowCount,
+        error: error instanceof Error ? error.message : String(error),
+        action: "dropped"
+      });
+    }
+  });
+  const rollingFlushTimer = setInterval(() => {
+    void rollingStore.flushToRedis(redis);
+  }, env.ROLLING_CACHE_FLUSH_INTERVAL_MS);
+  const pruneTimer = setInterval(() => {
+    pruneComputeCaches(rollingStore);
+  }, CACHE_PRUNE_INTERVAL_MS);
+  const summaryTimer = setInterval(() => {
+    logger.info("compute minute summary", {
+      flow_packets_emitted: emitCounters.flowPackets,
+      structure_packets_emitted: emitCounters.structurePackets,
+      smart_money_events_emitted: emitCounters.smartMoneyEvents,
+      classifier_hits_emitted: emitCounters.classifierHits,
+      alerts_emitted: emitCounters.alerts,
+      equity_joins_emitted: emitCounters.equityJoins,
+      dark_events_emitted: emitCounters.darkEvents,
+      rolling_stats_cache_size: rollingStore.size
+    });
+    emitCounters.flowPackets = 0;
+    emitCounters.structurePackets = 0;
+    emitCounters.smartMoneyEvents = 0;
+    emitCounters.classifierHits = 0;
+    emitCounters.alerts = 0;
+    emitCounters.equityJoins = 0;
+    emitCounters.darkEvents = 0;
+  }, 60_000);
+  rollingFlushTimer.unref?.();
+  pruneTimer.unref?.();
+  summaryTimer.unref?.();
 
   await retry("clickhouse table init", 120, 500, async () => {
     await ensureFlowPacketsTable(clickhouse);
@@ -1578,7 +1597,7 @@ const run = async () => {
 
       try {
         const print = EquityPrintSchema.parse(equitySubscription.decode(msg));
-        await emitEquityJoin(clickhouse, js, print);
+        await emitEquityJoin(js, batchWriter, print);
         msg.ack();
       } catch (error) {
         logger.error("failed to process equity print", {
@@ -1602,11 +1621,16 @@ const run = async () => {
     runtimeState.shuttingDown = true;
     runtimeState.shutdownPromise = (async () => {
       logger.info("service stopping", { signal });
+      clearInterval(rollingFlushTimer);
+      clearInterval(pruneTimer);
+      clearInterval(summaryTimer);
 
       for (const cluster of [...clusters.values()]) {
-        await flushCluster(clickhouse, js, redis, rollingConfig, cluster);
+        await flushCluster(js, batchWriter, rollingStore, cluster);
       }
       clusters.clear();
+      await batchWriter.close();
+      await rollingStore.flushToRedis(redis);
 
       try {
         await nc.drain();
@@ -1655,10 +1679,9 @@ const run = async () => {
     try {
       const print = OptionPrintSchema.parse(subscription.decode(msg));
       await flushEligibleClusters(
-        clickhouse,
         js,
-        redis,
-        rollingConfig,
+        batchWriter,
+        rollingStore,
         print.ts,
         print.option_contract_id
       );
@@ -1674,7 +1697,7 @@ const run = async () => {
         updateCluster(existing, print);
       } else {
         clusters.delete(print.option_contract_id);
-        await flushCluster(clickhouse, js, redis, rollingConfig, existing);
+        await flushCluster(js, batchWriter, rollingStore, existing);
         clusters.set(print.option_contract_id, buildCluster(print));
       }
 

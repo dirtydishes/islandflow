@@ -5,11 +5,22 @@ export type RollingStatsConfig = {
   ttlSeconds: number;
 };
 
+export type RollingWindowStoreConfig = RollingStatsConfig & {
+  flushIntervalMs: number;
+  maxKeys: number;
+};
+
 export type RollingSnapshot = {
   baselineCount: number;
   mean: number;
   stddev: number;
   zscore: number;
+};
+
+type RollingWindowEntry = {
+  values: number[];
+  updatedAt: number;
+  dirty: boolean;
 };
 
 const toNumbers = (values: string[]): number[] => {
@@ -49,26 +60,120 @@ export const createRedisClient = (url: string) => {
   return createClient({ url });
 };
 
-export const updateRollingStats = async (
-  client: ReturnType<typeof createClient>,
-  key: string,
-  value: number,
-  config: RollingStatsConfig
-): Promise<RollingSnapshot> => {
-  const limit = Math.max(0, config.windowSize - 1);
-  const existing = await client.lRange(key, 0, limit);
-  const baseline = toNumbers(existing);
-  const snapshot = computeSnapshot(baseline, value);
+const getOldestKey = (store: Map<string, RollingWindowEntry>): string | null => {
+  let oldestKey: string | null = null;
+  let oldestUpdatedAt = Number.POSITIVE_INFINITY;
 
-  const multi = client.multi();
-  multi.lPush(key, value.toString());
-  if (config.windowSize > 0) {
-    multi.lTrim(key, 0, config.windowSize - 1);
+  for (const [key, entry] of store) {
+    if (entry.updatedAt < oldestUpdatedAt) {
+      oldestUpdatedAt = entry.updatedAt;
+      oldestKey = key;
+    }
   }
-  if (config.ttlSeconds > 0) {
-    multi.expire(key, config.ttlSeconds);
-  }
-  await multi.exec();
 
-  return snapshot;
+  return oldestKey;
 };
+
+export class RollingWindowStore {
+  private readonly store = new Map<string, RollingWindowEntry>();
+  private readonly ttlMs: number;
+  private readonly windowSize: number;
+  private readonly maxKeys: number;
+
+  constructor(private readonly config: RollingWindowStoreConfig) {
+    this.ttlMs = Math.max(0, config.ttlSeconds * 1000);
+    this.windowSize = Math.max(1, config.windowSize);
+    this.maxKeys = Math.max(1, config.maxKeys);
+  }
+
+  get size(): number {
+    return this.store.size;
+  }
+
+  update(key: string, value: number, now = Date.now()): RollingSnapshot {
+    this.prune(now);
+
+    const existing = this.store.get(key);
+    const baseline = existing?.values ?? [];
+    const snapshot = computeSnapshot(baseline, value);
+    const nextValues = [value, ...baseline].slice(0, this.windowSize);
+
+    this.store.set(key, {
+      values: nextValues,
+      updatedAt: now,
+      dirty: true
+    });
+
+    this.enforceMaxKeys();
+    return snapshot;
+  }
+
+  prune(now = Date.now()): number {
+    if (this.ttlMs <= 0) {
+      return 0;
+    }
+
+    let removed = 0;
+    for (const [key, entry] of this.store) {
+      if (now - entry.updatedAt > this.ttlMs) {
+        this.store.delete(key);
+        removed += 1;
+      }
+    }
+    return removed;
+  }
+
+  async hydrateFromRedis(
+    client: ReturnType<typeof createClient>,
+    keys: string[],
+    now = Date.now()
+  ): Promise<void> {
+    for (const key of keys) {
+      const values = toNumbers(await client.lRange(key, 0, this.windowSize - 1));
+      if (values.length === 0) {
+        continue;
+      }
+      this.store.set(key, {
+        values,
+        updatedAt: now,
+        dirty: false
+      });
+    }
+    this.enforceMaxKeys();
+  }
+
+  async flushToRedis(client: ReturnType<typeof createClient>): Promise<number> {
+    let flushed = 0;
+    for (const [key, entry] of this.store) {
+      if (!entry.dirty) {
+        continue;
+      }
+
+      const multi = client.multi();
+      multi.lTrim(key, 1, 0);
+      for (let idx = entry.values.length - 1; idx >= 0; idx -= 1) {
+        const value = entry.values[idx];
+        if (typeof value === "number" && Number.isFinite(value)) {
+          multi.lPush(key, value.toString());
+        }
+      }
+      if (this.config.ttlSeconds > 0) {
+        multi.expire(key, this.config.ttlSeconds);
+      }
+      await multi.exec();
+      entry.dirty = false;
+      flushed += 1;
+    }
+    return flushed;
+  }
+
+  private enforceMaxKeys(): void {
+    while (this.store.size > this.maxKeys) {
+      const oldestKey = getOldestKey(this.store);
+      if (!oldestKey) {
+        break;
+      }
+      this.store.delete(oldestKey);
+    }
+  }
+}

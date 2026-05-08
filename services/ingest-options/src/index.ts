@@ -9,6 +9,7 @@ import {
   STREAM_OPTION_NBBO,
   STREAM_OPTION_PRINTS,
   STREAM_OPTION_SIGNAL_PRINTS,
+  buildStreamConfig,
   buildDurableConsumer,
   connectJetStreamWithRetry,
   ensureStream,
@@ -109,7 +110,9 @@ const envSchema = z.object({
       return value;
     }, z.boolean())
     .default(false),
-  TESTING_THROTTLE_MS: z.coerce.number().int().nonnegative().default(200)
+  TESTING_THROTTLE_MS: z.coerce.number().int().nonnegative().default(200),
+  OPTION_CONTEXT_MAX_KEYS: z.coerce.number().int().positive().default(20_000),
+  OPTION_CONTEXT_TTL_MS: z.coerce.number().int().positive().default(900_000)
 });
 
 const env = readEnv(envSchema);
@@ -143,6 +146,44 @@ const state = {
 
 const nbboHistoryByContract: ContextHistory<OptionNBBO> = new Map();
 const equityQuoteHistoryByUnderlying: ContextHistory<EquityQuote> = new Map();
+const OPTION_CONTEXT_PRUNE_INTERVAL_MS = 60_000;
+
+const pruneContextHistory = <T extends { ts: number }>(
+  history: ContextHistory<T>,
+  maxKeys: number,
+  ttlMs: number,
+  now = Date.now()
+): number => {
+  let removed = 0;
+  for (const [key, items] of history) {
+    const filtered = items.filter((item) => now - item.ts <= ttlMs);
+    if (filtered.length === 0) {
+      history.delete(key);
+      removed += 1;
+      continue;
+    }
+    if (filtered.length !== items.length) {
+      history.set(key, filtered);
+    }
+  }
+
+  if (history.size <= maxKeys) {
+    return removed;
+  }
+
+  const overflow = history.size - maxKeys;
+  const oldestKeys = [...history.entries()]
+    .map(([key, items]) => [key, items.at(-1)?.ts ?? Number.NEGATIVE_INFINITY] as const)
+    .sort((a, b) => a[1] - b[1])
+    .slice(0, overflow);
+
+  for (const [key] of oldestKeys) {
+    history.delete(key);
+    removed += 1;
+  }
+
+  return removed;
+};
 
 const getErrorMessage = (error: unknown): string => {
   return error instanceof Error ? error.message : String(error);
@@ -305,57 +346,10 @@ const run = async () => {
     { attempts: 120, delayMs: 500 }
   );
 
-  await ensureStream(jsm, {
-    name: STREAM_OPTION_PRINTS,
-    subjects: [SUBJECT_OPTION_PRINTS],
-    retention: "limits",
-    storage: "file",
-    discard: "old",
-    max_msgs_per_subject: -1,
-    max_msgs: -1,
-    max_bytes: -1,
-    max_age: 0,
-    num_replicas: 1
-  });
-
-  await ensureStream(jsm, {
-    name: STREAM_OPTION_NBBO,
-    subjects: [SUBJECT_OPTION_NBBO],
-    retention: "limits",
-    storage: "file",
-    discard: "old",
-    max_msgs_per_subject: -1,
-    max_msgs: -1,
-    max_bytes: -1,
-    max_age: 0,
-    num_replicas: 1
-  });
-
-  await ensureStream(jsm, {
-    name: STREAM_OPTION_SIGNAL_PRINTS,
-    subjects: [SUBJECT_OPTION_SIGNAL_PRINTS],
-    retention: "limits",
-    storage: "file",
-    discard: "old",
-    max_msgs_per_subject: -1,
-    max_msgs: -1,
-    max_bytes: -1,
-    max_age: 0,
-    num_replicas: 1
-  });
-
-  await ensureStream(jsm, {
-    name: STREAM_EQUITY_QUOTES,
-    subjects: [SUBJECT_EQUITY_QUOTES],
-    retention: "limits",
-    storage: "file",
-    discard: "old",
-    max_msgs_per_subject: -1,
-    max_msgs: -1,
-    max_bytes: -1,
-    max_age: 0,
-    num_replicas: 1
-  });
+  await ensureStream(jsm, buildStreamConfig(STREAM_OPTION_PRINTS, SUBJECT_OPTION_PRINTS, "raw"));
+  await ensureStream(jsm, buildStreamConfig(STREAM_OPTION_NBBO, SUBJECT_OPTION_NBBO, "raw"));
+  await ensureStream(jsm, buildStreamConfig(STREAM_OPTION_SIGNAL_PRINTS, SUBJECT_OPTION_SIGNAL_PRINTS, "derived"));
+  await ensureStream(jsm, buildStreamConfig(STREAM_EQUITY_QUOTES, SUBJECT_EQUITY_QUOTES, "raw"));
 
   const clickhouse = createClickHouseClient({
     url: env.CLICKHOUSE_URL,
@@ -400,14 +394,6 @@ const run = async () => {
         if (print.signal_pass) {
           await publishJson(js, SUBJECT_OPTION_SIGNAL_PRINTS, print);
         }
-        logger.info("published option print", {
-          trace_id: print.trace_id,
-          seq: print.seq,
-          option_contract_id: print.option_contract_id,
-          signal_pass: print.signal_pass,
-          nbbo_side: print.nbbo_side,
-          notional: print.notional
-        });
       } catch (error) {
         if (isExpectedShutdownError(error)) {
           return;
@@ -475,6 +461,18 @@ const run = async () => {
     }
   })();
 
+  const pruneTimer = setInterval(() => {
+    const removed =
+      pruneContextHistory(nbboHistoryByContract, env.OPTION_CONTEXT_MAX_KEYS, env.OPTION_CONTEXT_TTL_MS) +
+      pruneContextHistory(equityQuoteHistoryByUnderlying, env.OPTION_CONTEXT_MAX_KEYS, env.OPTION_CONTEXT_TTL_MS);
+    logger.info("option context cache summary", {
+      nbbo_context_keys: nbboHistoryByContract.size,
+      equity_quote_context_keys: equityQuoteHistoryByUnderlying.size,
+      removed
+    });
+  }, OPTION_CONTEXT_PRUNE_INTERVAL_MS);
+  pruneTimer.unref?.();
+
   const shutdown = async (signal: string) => {
     if (state.shutdownPromise) {
       return state.shutdownPromise;
@@ -483,6 +481,7 @@ const run = async () => {
     state.shuttingDown = true;
     state.shutdownPromise = (async () => {
       logger.info("service stopping", { signal });
+      clearInterval(pruneTimer);
       await stopAdapter();
 
       try {

@@ -66,9 +66,9 @@ describe("LiveStateManager", () => {
 
     expect(limits.options).toBe(777);
     expect(limits.nbbo).toBe(100000);
-    expect(limits.flow).toBe(10000);
-    expect(limits["equity-quotes"]).toBe(10000);
-    expect(limits.alerts).toBe(10000);
+    expect(limits.flow).toBe(500);
+    expect(limits["equity-quotes"]).toBe(500);
+    expect(limits.alerts).toBe(300);
   });
 
   it("hydrates snapshots from redis generic windows", async () => {
@@ -204,11 +204,119 @@ describe("LiveStateManager", () => {
     ]);
 
     const persisted = await redis.lRange("live:flow", 0, 99);
-    expect(persisted).toHaveLength(2);
+    await manager.flushRedisWrites();
+    const flushed = await redis.lRange("live:flow", 0, 99);
+    expect(persisted).toHaveLength(0);
+    expect(flushed).toHaveLength(2);
 
     const stats = manager.getStatsSnapshot();
     expect(stats.trimOperations).toBeGreaterThan(0);
+    expect(stats.redisFlushCount).toBeGreaterThan(0);
     expect(stats.cacheDepthByKey["live:flow"]).toBe(2);
+  });
+
+  it("reorders out-of-order live events without dropping newest-first semantics", async () => {
+    const now = Date.now();
+    const manager = new LiveStateManager(makeClickHouse(), null, {
+      limits: {
+        options: 1000,
+        nbbo: 1000,
+        equities: 1000,
+        "equity-quotes": 500,
+        "equity-joins": 500,
+        flow: 3,
+        "smart-money": 300,
+        "classifier-hits": 300,
+        alerts: 300,
+        "inferred-dark": 300
+      },
+      scopedCacheMaxKeys: 32,
+      redisFlushIntervalMs: 250,
+      redisFlushMaxItems: 100
+    });
+
+    await manager.ingest("flow", {
+      source_ts: now,
+      ingest_ts: now + 1,
+      seq: 2,
+      trace_id: "flow-2",
+      id: "flow-2",
+      members: [],
+      features: {},
+      join_quality: {}
+    });
+    await manager.ingest("flow", {
+      source_ts: now - 1_000,
+      ingest_ts: now - 999,
+      seq: 1,
+      trace_id: "flow-1",
+      id: "flow-1",
+      members: [],
+      features: {},
+      join_quality: {}
+    });
+
+    const snapshot = await manager.getSnapshot({ channel: "flow" });
+    expect((snapshot.items as Array<{ id: string }>).map((item) => item.id)).toEqual([
+      "flow-2",
+      "flow-1"
+    ]);
+    expect(manager.getStatsSnapshot().outOfOrderEvents).toBe(1);
+  });
+
+  it("evicts least-recently-used scoped candle caches past the configured key limit", async () => {
+    const manager = new LiveStateManager(makeClickHouse(), null, {
+      limits: resolveGenericLiveLimits(),
+      scopedCacheMaxKeys: 1,
+      redisFlushIntervalMs: 250,
+      redisFlushMaxItems: 100
+    });
+
+    await manager.ingest("equity-candles", {
+      source_ts: 100,
+      ingest_ts: 101,
+      seq: 1,
+      trace_id: "candle:SPY:60000:100",
+      ts: 100,
+      interval_ms: 60000,
+      underlying_id: "SPY",
+      open: 1,
+      high: 2,
+      low: 1,
+      close: 2,
+      volume: 10,
+      trade_count: 1
+    });
+    await manager.ingest("equity-candles", {
+      source_ts: 200,
+      ingest_ts: 201,
+      seq: 2,
+      trace_id: "candle:QQQ:60000:200",
+      ts: 200,
+      interval_ms: 60000,
+      underlying_id: "QQQ",
+      open: 3,
+      high: 4,
+      low: 3,
+      close: 4,
+      volume: 20,
+      trade_count: 2
+    });
+
+    const qqqSnapshot = await manager.getSnapshot({
+      channel: "equity-candles",
+      underlying_id: "QQQ",
+      interval_ms: 60000
+    });
+    const spySnapshot = await manager.getSnapshot({
+      channel: "equity-candles",
+      underlying_id: "SPY",
+      interval_ms: 60000
+    });
+
+    expect(qqqSnapshot.items).toHaveLength(1);
+    expect(spySnapshot.items).toEqual([]);
+    expect(manager.getStatsSnapshot().cacheEvictions).toBeGreaterThan(0);
   });
 
   it("filters option and flow snapshots using subscription filters", async () => {

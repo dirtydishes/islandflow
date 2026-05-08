@@ -11,6 +11,7 @@ import {
   STREAM_OPTION_NBBO,
   STREAM_OPTION_PRINTS,
   STREAM_OPTION_SIGNAL_PRINTS,
+  buildStreamConfig,
   connectJetStreamWithRetry,
   ensureStream,
   publishJson
@@ -180,19 +181,6 @@ const parseStreamList = (value: string): ReplayStreamKind[] => {
   return result;
 };
 
-const buildStreamConfig = (name: string, subject: string) => ({
-  name,
-  subjects: [subject],
-  retention: "limits",
-  storage: "file",
-  discard: "old",
-  max_msgs_per_subject: -1,
-  max_msgs: -1,
-  max_bytes: -1,
-  max_age: 0,
-  num_replicas: 1
-});
-
 const buildStartCursor = (startTs: number): ReplayCursor => {
   if (startTs <= 0) {
     return { ts: 0, seq: 0 };
@@ -304,10 +292,10 @@ const run = async () => {
 
   for (const kind of streamKinds) {
     const def = STREAM_DEFS[kind];
-    await ensureStream(jsm, buildStreamConfig(def.streamName, def.subject));
+    await ensureStream(jsm, buildStreamConfig(def.streamName, def.subject, "raw"));
   }
   if (streamKinds.includes("options")) {
-    await ensureStream(jsm, buildStreamConfig(STREAM_OPTION_SIGNAL_PRINTS, SUBJECT_OPTION_SIGNAL_PRINTS));
+    await ensureStream(jsm, buildStreamConfig(STREAM_OPTION_SIGNAL_PRINTS, SUBJECT_OPTION_SIGNAL_PRINTS, "derived"));
   }
 
   const clickhouse = createClickHouseClient({

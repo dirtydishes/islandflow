@@ -1,5 +1,5 @@
 import { readEnv } from "@islandflow/config";
-import { createLogger } from "@islandflow/observability";
+import { createLogger, createMetrics } from "@islandflow/observability";
 import {
   SUBJECT_ALERTS,
   SUBJECT_CLASSIFIER_HITS,
@@ -23,6 +23,7 @@ import {
   STREAM_SMART_MONEY_EVENTS,
   STREAM_OPTION_NBBO,
   STREAM_OPTION_SIGNAL_PRINTS,
+  buildStreamConfig,
   buildDurableConsumer,
   connectJetStreamWithRetry,
   ensureStream,
@@ -107,11 +108,17 @@ import {
 } from "@islandflow/types";
 import { createClient } from "redis";
 import { z } from "zod";
-import { HOT_LIVE_REDIS_KEYS, LiveStateManager, shouldFanoutLiveEvent } from "./live";
+import {
+  HOT_LIVE_REDIS_KEYS,
+  LiveStateManager,
+  resolveLiveStateConfig,
+  shouldFanoutLiveEvent
+} from "./live";
 import { parseOptionPrintQuery } from "./option-queries";
 
 const service = "api";
 const logger = createLogger({ service });
+const metrics = createMetrics({ service });
 
 const DeliverPolicySchema = z.enum(["new", "all", "last", "last_per_subject"]);
 
@@ -617,148 +624,17 @@ const run = async () => {
     { attempts: 120, delayMs: 500 }
   );
 
-  await ensureStream(jsm, {
-    name: STREAM_OPTION_SIGNAL_PRINTS,
-    subjects: [SUBJECT_OPTION_SIGNAL_PRINTS],
-    retention: "limits",
-    storage: "file",
-    discard: "old",
-    max_msgs_per_subject: -1,
-    max_msgs: -1,
-    max_bytes: -1,
-    max_age: 0,
-    num_replicas: 1
-  });
-
-  await ensureStream(jsm, {
-    name: STREAM_OPTION_NBBO,
-    subjects: [SUBJECT_OPTION_NBBO],
-    retention: "limits",
-    storage: "file",
-    discard: "old",
-    max_msgs_per_subject: -1,
-    max_msgs: -1,
-    max_bytes: -1,
-    max_age: 0,
-    num_replicas: 1
-  });
-
-  await ensureStream(jsm, {
-    name: STREAM_EQUITY_PRINTS,
-    subjects: [SUBJECT_EQUITY_PRINTS],
-    retention: "limits",
-    storage: "file",
-    discard: "old",
-    max_msgs_per_subject: -1,
-    max_msgs: -1,
-    max_bytes: -1,
-    max_age: 0,
-    num_replicas: 1
-  });
-
-  await ensureStream(jsm, {
-    name: STREAM_EQUITY_QUOTES,
-    subjects: [SUBJECT_EQUITY_QUOTES],
-    retention: "limits",
-    storage: "file",
-    discard: "old",
-    max_msgs_per_subject: -1,
-    max_msgs: -1,
-    max_bytes: -1,
-    max_age: 0,
-    num_replicas: 1
-  });
-
-  await ensureStream(jsm, {
-    name: STREAM_EQUITY_CANDLES,
-    subjects: [SUBJECT_EQUITY_CANDLES],
-    retention: "limits",
-    storage: "file",
-    discard: "old",
-    max_msgs_per_subject: -1,
-    max_msgs: -1,
-    max_bytes: -1,
-    max_age: 0,
-    num_replicas: 1
-  });
-
-  await ensureStream(jsm, {
-    name: STREAM_EQUITY_JOINS,
-    subjects: [SUBJECT_EQUITY_JOINS],
-    retention: "limits",
-    storage: "file",
-    discard: "old",
-    max_msgs_per_subject: -1,
-    max_msgs: -1,
-    max_bytes: -1,
-    max_age: 0,
-    num_replicas: 1
-  });
-
-  await ensureStream(jsm, {
-    name: STREAM_INFERRED_DARK,
-    subjects: [SUBJECT_INFERRED_DARK],
-    retention: "limits",
-    storage: "file",
-    discard: "old",
-    max_msgs_per_subject: -1,
-    max_msgs: -1,
-    max_bytes: -1,
-    max_age: 0,
-    num_replicas: 1
-  });
-
-  await ensureStream(jsm, {
-    name: STREAM_FLOW_PACKETS,
-    subjects: [SUBJECT_FLOW_PACKETS],
-    retention: "limits",
-    storage: "file",
-    discard: "old",
-    max_msgs_per_subject: -1,
-    max_msgs: -1,
-    max_bytes: -1,
-    max_age: 0,
-    num_replicas: 1
-  });
-
-  await ensureStream(jsm, {
-    name: STREAM_SMART_MONEY_EVENTS,
-    subjects: [SUBJECT_SMART_MONEY_EVENTS],
-    retention: "limits",
-    storage: "file",
-    discard: "old",
-    max_msgs_per_subject: -1,
-    max_msgs: -1,
-    max_bytes: -1,
-    max_age: 0,
-    num_replicas: 1
-  });
-
-  await ensureStream(jsm, {
-    name: STREAM_CLASSIFIER_HITS,
-    subjects: [SUBJECT_CLASSIFIER_HITS],
-    retention: "limits",
-    storage: "file",
-    discard: "old",
-    max_msgs_per_subject: -1,
-    max_msgs: -1,
-    max_bytes: -1,
-    max_age: 0,
-    num_replicas: 1
-  });
-
-  await ensureStream(jsm, {
-    name: STREAM_ALERTS,
-    subjects: [SUBJECT_ALERTS],
-    retention: "limits",
-    storage: "file",
-    discard: "old",
-    max_msgs_per_subject: -1,
-    max_msgs: -1,
-    max_bytes: -1,
-    max_age: 0,
-    num_replicas: 1
-  });
+  await ensureStream(jsm, buildStreamConfig(STREAM_OPTION_SIGNAL_PRINTS, SUBJECT_OPTION_SIGNAL_PRINTS, "derived"));
+  await ensureStream(jsm, buildStreamConfig(STREAM_OPTION_NBBO, SUBJECT_OPTION_NBBO, "raw"));
+  await ensureStream(jsm, buildStreamConfig(STREAM_EQUITY_PRINTS, SUBJECT_EQUITY_PRINTS, "raw"));
+  await ensureStream(jsm, buildStreamConfig(STREAM_EQUITY_QUOTES, SUBJECT_EQUITY_QUOTES, "raw"));
+  await ensureStream(jsm, buildStreamConfig(STREAM_EQUITY_CANDLES, SUBJECT_EQUITY_CANDLES, "derived"));
+  await ensureStream(jsm, buildStreamConfig(STREAM_EQUITY_JOINS, SUBJECT_EQUITY_JOINS, "derived"));
+  await ensureStream(jsm, buildStreamConfig(STREAM_INFERRED_DARK, SUBJECT_INFERRED_DARK, "derived"));
+  await ensureStream(jsm, buildStreamConfig(STREAM_FLOW_PACKETS, SUBJECT_FLOW_PACKETS, "derived"));
+  await ensureStream(jsm, buildStreamConfig(STREAM_SMART_MONEY_EVENTS, SUBJECT_SMART_MONEY_EVENTS, "derived"));
+  await ensureStream(jsm, buildStreamConfig(STREAM_CLASSIFIER_HITS, SUBJECT_CLASSIFIER_HITS, "derived"));
+  await ensureStream(jsm, buildStreamConfig(STREAM_ALERTS, SUBJECT_ALERTS, "derived"));
 
   const clickhouse = createClickHouseClient({
     url: env.CLICKHOUSE_URL,
@@ -804,7 +680,7 @@ const run = async () => {
     redis = null;
   }
 
-  const liveState = new LiveStateManager(clickhouse, redis);
+  const liveState = new LiveStateManager(clickhouse, redis, resolveLiveStateConfig());
   await liveState.hydrate();
   const warnLiveLag = (
     channel: keyof typeof HOT_LIVE_REDIS_KEYS,
@@ -1069,6 +945,11 @@ const run = async () => {
       return;
     }
 
+    const optionItem = ingestChannel === "options" ? (item as Parameters<typeof matchesOptionPrintFilters>[0]) : null;
+    const equityItem = ingestChannel === "equities" ? (item as Parameters<typeof matchesScopedEquitySubscription>[0]) : null;
+    const flowItem = ingestChannel === "flow" ? (item as Parameters<typeof matchesFlowPacketFilters>[0]) : null;
+    let matchedSubscriptions = 0;
+
     for (const [key, candidate] of matchingSubscriptions) {
       const sockets = subscriptionSockets.get(key);
       if (!sockets || sockets.size === 0) {
@@ -1077,25 +958,28 @@ const run = async () => {
 
       if (
         candidate.channel === "options" &&
-        (!matchesOptionPrintFilters(OptionPrintSchema.parse(item), candidate.filters) ||
-          !matchesScopedOptionSubscription(OptionPrintSchema.parse(item), candidate))
+        (!optionItem ||
+          !matchesOptionPrintFilters(optionItem, candidate.filters) ||
+          !matchesScopedOptionSubscription(optionItem, candidate))
       ) {
         continue;
       }
 
       if (
         candidate.channel === "equities" &&
-        !matchesScopedEquitySubscription(EquityPrintSchema.parse(item), candidate)
+        (!equityItem || !matchesScopedEquitySubscription(equityItem, candidate))
       ) {
         continue;
       }
 
       if (
         candidate.channel === "flow" &&
-        !matchesFlowPacketFilters(FlowPacketSchema.parse(item), candidate.filters)
+        (!flowItem || !matchesFlowPacketFilters(flowItem, candidate.filters))
       ) {
         continue;
       }
+
+      matchedSubscriptions += 1;
 
       for (const socket of sockets) {
         sendLiveMessage(socket, {
@@ -1105,6 +989,10 @@ const run = async () => {
           watermark
         });
       }
+    }
+
+    if (matchedSubscriptions > 0) {
+      metrics.count("api.live.subscription_match_count", matchedSubscriptions);
     }
   };
 
@@ -1931,6 +1819,7 @@ const run = async () => {
       logger.info("service stopping", { signal });
       server.stop();
       clearInterval(liveStateMetricsTimer);
+      await liveState.close();
 
       if (redis && redis.isOpen) {
         try {
