@@ -54,6 +54,24 @@ export const LiveChannelSchema = z.enum([
 
 export type LiveChannel = z.infer<typeof LiveChannelSchema>;
 export type LiveGenericChannel = z.infer<typeof LiveGenericChannelSchema>;
+export const LiveHotChannelSchema = z.enum(["options", "nbbo", "equities", "flow"]);
+export type LiveHotChannel = z.infer<typeof LiveHotChannelSchema>;
+
+export const LiveChannelHealthSchema = z.object({
+  freshness_age_ms: z.number().int().nonnegative().nullable(),
+  healthy: z.boolean()
+});
+
+export type LiveChannelHealth = z.infer<typeof LiveChannelHealthSchema>;
+
+export const LiveHotChannelHealthSchema = z.object({
+  options: LiveChannelHealthSchema,
+  nbbo: LiveChannelHealthSchema,
+  equities: LiveChannelHealthSchema,
+  flow: LiveChannelHealthSchema
+});
+
+export type LiveHotChannelHealthMap = z.infer<typeof LiveHotChannelHealthSchema>;
 
 export const LiveSubscriptionSchema = z.discriminatedUnion("channel", [
   z.object({
@@ -152,7 +170,8 @@ export const LiveClientMessageSchema = z.discriminatedUnion("op", [
 export type LiveClientMessage = z.infer<typeof LiveClientMessageSchema>;
 
 export const LiveReadyMessageSchema = z.object({
-  op: z.literal("ready")
+  op: z.literal("ready"),
+  channel_health: LiveHotChannelHealthSchema
 });
 
 export type LiveReadyMessage = z.infer<typeof LiveReadyMessageSchema>;
@@ -175,7 +194,8 @@ export type LiveEventMessage = z.infer<typeof LiveEventMessageSchema>;
 
 export const LiveHeartbeatMessageSchema = z.object({
   op: z.literal("heartbeat"),
-  ts: z.number().int().nonnegative()
+  ts: z.number().int().nonnegative(),
+  channel_health: LiveHotChannelHealthSchema
 });
 
 export type LiveHeartbeatMessage = z.infer<typeof LiveHeartbeatMessageSchema>;

@@ -449,6 +449,157 @@ export const insertAlert = async (client: ClickHouseClient, alert: AlertEvent): 
   });
 };
 
+export type ClickHouseBatchWriterOptions = {
+  flushIntervalMs?: number;
+  maxRows?: number;
+  onError?: (table: string, error: unknown, rowCount: number) => void;
+};
+
+type BatchState = {
+  rows: unknown[];
+  timer: ReturnType<typeof setTimeout> | null;
+  flushing: Promise<void> | null;
+};
+
+const createBatchState = (): BatchState => ({
+  rows: [],
+  timer: null,
+  flushing: null
+});
+
+export class ClickHouseBatchWriter {
+  private readonly flushIntervalMs: number;
+  private readonly maxRows: number;
+  private readonly states = new Map<string, BatchState>();
+
+  constructor(
+    private readonly client: ClickHouseClient,
+    options: ClickHouseBatchWriterOptions = {}
+  ) {
+    this.flushIntervalMs = Math.max(1, Math.floor(options.flushIntervalMs ?? 100));
+    this.maxRows = Math.max(1, Math.floor(options.maxRows ?? 250));
+    this.onError = options.onError;
+  }
+
+  private readonly onError?: (table: string, error: unknown, rowCount: number) => void;
+
+  enqueue(table: string, row: unknown): void {
+    const state = this.states.get(table) ?? createBatchState();
+    if (!this.states.has(table)) {
+      this.states.set(table, state);
+    }
+
+    state.rows.push(row);
+
+    if (state.rows.length >= this.maxRows) {
+      void this.flush(table);
+      return;
+    }
+
+    if (!state.timer) {
+      state.timer = setTimeout(() => {
+        state.timer = null;
+        void this.flush(table);
+      }, this.flushIntervalMs);
+    }
+  }
+
+  async flush(table: string): Promise<void> {
+    const state = this.states.get(table);
+    if (!state) {
+      return;
+    }
+
+    if (state.flushing) {
+      await state.flushing;
+      return;
+    }
+
+    if (state.timer) {
+      clearTimeout(state.timer);
+      state.timer = null;
+    }
+
+    if (state.rows.length === 0) {
+      return;
+    }
+
+    const rows = state.rows.splice(0, state.rows.length);
+    state.flushing = this.client
+      .insert({
+        table,
+        values: rows,
+        format: "JSONEachRow"
+      })
+      .catch((error) => {
+        this.onError?.(table, error, rows.length);
+      })
+      .finally(() => {
+        state.flushing = null;
+      });
+
+    await state.flushing;
+  }
+
+  async flushAll(): Promise<void> {
+    for (const table of this.states.keys()) {
+      await this.flush(table);
+    }
+  }
+
+  async close(): Promise<void> {
+    for (const state of this.states.values()) {
+      if (state.timer) {
+        clearTimeout(state.timer);
+        state.timer = null;
+      }
+    }
+    await this.flushAll();
+  }
+}
+
+export const enqueueEquityPrintJoinInsert = (
+  writer: ClickHouseBatchWriter,
+  join: EquityPrintJoin
+): void => {
+  writer.enqueue(EQUITY_PRINT_JOINS_TABLE, toEquityPrintJoinRecord(join));
+};
+
+export const enqueueInferredDarkInsert = (
+  writer: ClickHouseBatchWriter,
+  event: InferredDarkEvent
+): void => {
+  writer.enqueue(INFERRED_DARK_TABLE, toInferredDarkRecord(event));
+};
+
+export const enqueueFlowPacketInsert = (
+  writer: ClickHouseBatchWriter,
+  packet: FlowPacket
+): void => {
+  writer.enqueue(FLOW_PACKETS_TABLE, toFlowPacketRecord(packet));
+};
+
+export const enqueueSmartMoneyEventInsert = (
+  writer: ClickHouseBatchWriter,
+  event: SmartMoneyEvent
+): void => {
+  writer.enqueue(SMART_MONEY_EVENTS_TABLE, toSmartMoneyEventRecord(event));
+};
+
+export const enqueueClassifierHitInsert = (
+  writer: ClickHouseBatchWriter,
+  hit: ClassifierHitEvent
+): void => {
+  writer.enqueue(CLASSIFIER_HITS_TABLE, toClassifierHitRecord(hit));
+};
+
+export const enqueueAlertInsert = (
+  writer: ClickHouseBatchWriter,
+  alert: AlertEvent
+): void => {
+  writer.enqueue(ALERTS_TABLE, toAlertRecord(alert));
+};
+
 const clampLimit = (limit: number): number => {
   if (!Number.isFinite(limit)) {
     return 100;

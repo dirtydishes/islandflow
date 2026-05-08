@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   createContext,
+  memo,
   useCallback,
   useContext,
   useEffect,
@@ -17,6 +18,7 @@ import {
   type ReactNode,
   type SetStateAction
 } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import type {
   AlertEvent,
   ClassifierHitEvent,
@@ -28,6 +30,7 @@ import type {
   FlowPacket,
   InferredDarkEvent,
   LiveServerMessage,
+  LiveHotChannelHealthMap,
   LiveSubscription,
   OptionFlowFilters,
   OptionNbboSide,
@@ -62,10 +65,10 @@ const parseBoundedInt = (
   return Math.max(min, Math.min(max, Math.floor(parsed)));
 };
 
-const LIVE_HOT_WINDOW = parseBoundedInt(process.env.NEXT_PUBLIC_LIVE_HOT_WINDOW, 100, 1, 100000);
+const LIVE_HOT_WINDOW = parseBoundedInt(process.env.NEXT_PUBLIC_LIVE_HOT_WINDOW, 600, 1, 100000);
 const LIVE_HOT_WINDOW_OPTIONS = parseBoundedInt(
   process.env.NEXT_PUBLIC_LIVE_HOT_WINDOW_OPTIONS,
-  100,
+  1200,
   1,
   100000
 );
@@ -123,6 +126,206 @@ const LIVE_SESSION_HOT_CHANNELS = new Set<LiveSubscription["channel"]>([
   "equity-overlay"
 ]);
 
+type TapeVirtualPane = "options" | "equities" | "flow" | "alerts" | "classifier" | "dark";
+
+type TapeVirtualListConfig = {
+  rowHeight: number;
+  overscan: number;
+  debugLabel: TapeVirtualPane;
+};
+
+const TAPE_VIRTUAL_CONFIG: Record<TapeVirtualPane, TapeVirtualListConfig> = {
+  options: { rowHeight: 36, overscan: 24, debugLabel: "options" },
+  equities: { rowHeight: 36, overscan: 20, debugLabel: "equities" },
+  flow: { rowHeight: 44, overscan: 16, debugLabel: "flow" },
+  alerts: { rowHeight: 44, overscan: 16, debugLabel: "alerts" },
+  classifier: { rowHeight: 44, overscan: 16, debugLabel: "classifier" },
+  dark: { rowHeight: 44, overscan: 16, debugLabel: "dark" }
+};
+
+export const getTapeVirtualConfig = (pane: TapeVirtualPane): TapeVirtualListConfig =>
+  TAPE_VIRTUAL_CONFIG[pane];
+
+type RouteFeatures = {
+  options: boolean;
+  nbbo: boolean;
+  equities: boolean;
+  flow: boolean;
+  alerts: boolean;
+  smartMoney: boolean;
+  classifierHits: boolean;
+  inferredDark: boolean;
+  equityJoins: boolean;
+  equityCandles: boolean;
+  equityOverlay: boolean;
+  showOptionsPane: boolean;
+  showEquitiesPane: boolean;
+  showFlowPane: boolean;
+  showAlertsPane: boolean;
+  showClassifierPane: boolean;
+  showDarkPane: boolean;
+  showChartPane: boolean;
+  showFocusPane: boolean;
+  showReplayConsole: boolean;
+  needsClassifierDecor: boolean;
+  needsAlertEvidencePrefetch: boolean;
+  needsDarkUnderlying: boolean;
+};
+
+export const shouldIncludeEquitiesForDarkUnderlyingFallback = (): boolean => {
+  return false;
+};
+
+export const getRouteFeatures = (pathname: string): RouteFeatures => {
+  const includeEquitiesFallback = shouldIncludeEquitiesForDarkUnderlyingFallback();
+  const normalizedPath =
+    pathname === "/tape" ||
+    pathname === "/signals" ||
+    pathname === "/charts" ||
+    pathname === "/replay"
+      ? pathname
+      : "/";
+
+  switch (normalizedPath) {
+    case "/tape":
+      return {
+        options: true,
+        nbbo: true,
+        equities: true,
+        flow: true,
+        alerts: false,
+        smartMoney: false,
+        classifierHits: false,
+        inferredDark: false,
+        equityJoins: false,
+        equityCandles: false,
+        equityOverlay: false,
+        showOptionsPane: true,
+        showEquitiesPane: true,
+        showFlowPane: true,
+        showAlertsPane: false,
+        showClassifierPane: false,
+        showDarkPane: false,
+        showChartPane: false,
+        showFocusPane: false,
+        showReplayConsole: false,
+        needsClassifierDecor: true,
+        needsAlertEvidencePrefetch: false,
+        needsDarkUnderlying: false
+      };
+    case "/signals":
+      return {
+        options: false,
+        nbbo: false,
+        equities: includeEquitiesFallback,
+        flow: false,
+        alerts: true,
+        smartMoney: true,
+        classifierHits: true,
+        inferredDark: true,
+        equityJoins: true,
+        equityCandles: false,
+        equityOverlay: false,
+        showOptionsPane: false,
+        showEquitiesPane: false,
+        showFlowPane: false,
+        showAlertsPane: true,
+        showClassifierPane: true,
+        showDarkPane: true,
+        showChartPane: false,
+        showFocusPane: false,
+        showReplayConsole: false,
+        needsClassifierDecor: false,
+        needsAlertEvidencePrefetch: true,
+        needsDarkUnderlying: true
+      };
+    case "/charts":
+      return {
+        options: false,
+        nbbo: false,
+        equities: includeEquitiesFallback,
+        flow: false,
+        alerts: false,
+        smartMoney: true,
+        classifierHits: false,
+        inferredDark: true,
+        equityJoins: true,
+        equityCandles: true,
+        equityOverlay: true,
+        showOptionsPane: false,
+        showEquitiesPane: false,
+        showFlowPane: false,
+        showAlertsPane: false,
+        showClassifierPane: false,
+        showDarkPane: false,
+        showChartPane: true,
+        showFocusPane: true,
+        showReplayConsole: false,
+        needsClassifierDecor: false,
+        needsAlertEvidencePrefetch: false,
+        needsDarkUnderlying: true
+      };
+    case "/replay":
+      return {
+        options: false,
+        nbbo: false,
+        equities: false,
+        flow: false,
+        alerts: false,
+        smartMoney: false,
+        classifierHits: false,
+        inferredDark: false,
+        equityJoins: false,
+        equityCandles: false,
+        equityOverlay: false,
+        showOptionsPane: true,
+        showEquitiesPane: false,
+        showFlowPane: true,
+        showAlertsPane: true,
+        showClassifierPane: false,
+        showDarkPane: false,
+        showChartPane: false,
+        showFocusPane: false,
+        showReplayConsole: true,
+        needsClassifierDecor: true,
+        needsAlertEvidencePrefetch: true,
+        needsDarkUnderlying: false
+      };
+    case "/":
+    default:
+      return {
+        options: false,
+        nbbo: false,
+        equities: true,
+        flow: false,
+        alerts: true,
+        smartMoney: true,
+        classifierHits: false,
+        inferredDark: true,
+        equityJoins: true,
+        equityCandles: true,
+        equityOverlay: true,
+        showOptionsPane: false,
+        showEquitiesPane: true,
+        showFlowPane: false,
+        showAlertsPane: true,
+        showClassifierPane: false,
+        showDarkPane: false,
+        showChartPane: true,
+        showFocusPane: false,
+        showReplayConsole: false,
+        needsClassifierDecor: false,
+        needsAlertEvidencePrefetch: true,
+        needsDarkUnderlying: true
+      };
+  }
+};
+
+const EMPTY_ALERT_EVENTS: AlertEvent[] = [];
+const EMPTY_CLASSIFIER_HIT_EVENTS: ClassifierHitEvent[] = [];
+const EMPTY_SMART_MONEY_EVENTS: SmartMoneyEvent[] = [];
+const EMPTY_INFERRED_DARK_EVENTS: InferredDarkEvent[] = [];
+
 type CandlestickSeries = ReturnType<IChartApi["addCandlestickSeries"]>;
 
 type EquityOverlayPoint = {
@@ -144,6 +347,19 @@ type SelectedInstrument =
   | null
   | { kind: "equity"; underlyingId: string }
   | { kind: "option-contract"; contractId: string; underlyingId: string };
+
+type TapeFocusSeed<T> = {
+  scopeKey: string;
+  subscriptionKey?: string;
+  items: T[];
+};
+
+type OptionScope = Pick<
+  Extract<LiveSubscription, { channel: "options" }>,
+  "underlying_ids" | "option_contract_id"
+>;
+
+type EquityScope = Pick<Extract<LiveSubscription, { channel: "equities" }>, "underlying_ids">;
 
 const formatIntervalLabel = (intervalMs: number): string => {
   const match = CANDLE_INTERVALS.find((interval) => interval.ms === intervalMs);
@@ -227,19 +443,31 @@ const sampleToLimit = <T,>(items: T[], limit: number): T[] => {
 };
 
 const readErrorDetail = async (response: Response): Promise<string> => {
+  const statusLabel = `HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ""}`;
   const text = await response.text();
   if (!text) {
-    return "";
+    return statusLabel;
   }
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+  const trimmed = text.trimStart();
+  const truncated = text.length > 600 ? `${text.slice(0, 600)}...` : text;
+
+  if (!contentType.includes("application/json")) {
+    if (/^<!doctype html/i.test(trimmed) || /^<html/i.test(trimmed)) {
+      return `${statusLabel}: received HTML response instead of JSON`;
+    }
+    return `${statusLabel}: ${truncated}`;
+  }
+
   try {
     const payload = JSON.parse(text) as {
       detail?: string;
       error?: string;
       message?: string;
     };
-    return payload.detail ?? payload.error ?? payload.message ?? text;
+    return payload.detail ?? payload.error ?? payload.message ?? `${statusLabel}: ${truncated}`;
   } catch {
-    return text;
+    return `${statusLabel}: ${truncated}`;
   }
 };
 
@@ -343,6 +571,42 @@ const frontendRetentionMetrics: Record<RetentionMetricKey, number> = {
   pinnedStoreSize: 0
 };
 
+const DEV_TAPE_DEBUG = process.env.NODE_ENV !== "production";
+
+type TapeDebugMetricKey =
+  | "anchorRestoreCount"
+  | "anchorRestoreFallbackCount"
+  | "virtualRowMeasurementCount"
+  | "focusSeedRowCount"
+  | "scopedQuietTransitions";
+
+const frontendTapeDebugMetrics: Record<TapeDebugMetricKey, number> = {
+  anchorRestoreCount: 0,
+  anchorRestoreFallbackCount: 0,
+  virtualRowMeasurementCount: 0,
+  focusSeedRowCount: 0,
+  scopedQuietTransitions: 0
+};
+
+const bumpTapeDebugMetric = (key: TapeDebugMetricKey, count = 1): void => {
+  frontendTapeDebugMetrics[key] += count;
+  if (DEV_TAPE_DEBUG && typeof window !== "undefined") {
+    (window as typeof window & { __IF_TAPE_DEBUG__?: Record<TapeDebugMetricKey, number> }).__IF_TAPE_DEBUG__ =
+      frontendTapeDebugMetrics;
+  }
+};
+
+const logTapeDebug = (message: string, payload?: Record<string, unknown>): void => {
+  if (!DEV_TAPE_DEBUG) {
+    return;
+  }
+  if (payload) {
+    console.debug(`[tape] ${message}`, payload);
+    return;
+  }
+  console.debug(`[tape] ${message}`);
+};
+
 const incrementRetentionMetric = (key: RetentionMetricKey, count = 1): void => {
   frontendRetentionMetrics[key] += count;
 };
@@ -368,15 +632,15 @@ const buildItemKey = (item: SortableItem): string | null => {
   return null;
 };
 
-const mergeNewest = <T extends SortableItem>(
+export const mergeNewestWithOverflow = <T extends SortableItem>(
   incoming: T[],
   existing: T[],
   limit = LIVE_HOT_WINDOW,
   onTrim?: (evicted: number) => void
-): T[] => {
+): { kept: T[]; evicted: T[] } => {
   const combined = [...incoming, ...existing];
   if (combined.length === 0) {
-    return combined;
+    return { kept: combined, evicted: [] };
   }
 
   const seen = new Set<string>();
@@ -402,16 +666,46 @@ const mergeNewest = <T extends SortableItem>(
   });
 
   const safeLimit = Math.max(1, Math.floor(limit));
-  const evicted = Math.max(0, deduped.length - safeLimit);
-  if (evicted > 0) {
-    onTrim?.(evicted);
+  const evicted = deduped.slice(safeLimit);
+  if (evicted.length > 0) {
+    onTrim?.(evicted.length);
   }
 
-  return deduped.slice(0, safeLimit);
+  return {
+    kept: deduped.slice(0, safeLimit),
+    evicted
+  };
+};
+
+const mergeNewest = <T extends SortableItem>(
+  incoming: T[],
+  existing: T[],
+  limit = LIVE_HOT_WINDOW,
+  onTrim?: (evicted: number) => void
+): T[] => {
+  return mergeNewestWithOverflow(incoming, existing, limit, onTrim).kept;
 };
 
 const getTapeItemKey = (item: SortableItem): string => {
   return buildItemKey(item) ?? `${extractSortTs(item)}:${extractSortSeq(item)}`;
+};
+
+export const composeTapeItems = <T extends SortableItem>(
+  seedItems: T[],
+  liveItems: T[],
+  historyItems: T[]
+): T[] => {
+  const deduped = new Map<string, T>();
+  for (const item of [...seedItems, ...liveItems, ...historyItems]) {
+    deduped.set(getTapeItemKey(item), item);
+  }
+  return Array.from(deduped.values()).sort((a, b) => {
+    const delta = extractSortTs(b) - extractSortTs(a);
+    if (delta !== 0) {
+      return delta;
+    }
+    return extractSortSeq(b) - extractSortSeq(a);
+  });
 };
 
 type PausableTapeData<T> = {
@@ -510,7 +804,7 @@ const EMPTY_PAUSABLE_TAPE = {
   dropped: 0
 };
 
-const appendHistoryTail = <T extends SortableItem>(
+export const appendHistoryTail = <T extends SortableItem>(
   current: T[],
   incoming: T[],
   liveHead: T[],
@@ -520,25 +814,67 @@ const appendHistoryTail = <T extends SortableItem>(
     return current;
   }
 
-  const seen = new Set<string>();
-  for (const item of liveHead) {
-    seen.add(getTapeItemKey(item));
-  }
-  for (const item of current) {
-    seen.add(getTapeItemKey(item));
-  }
+  const seen = new Set<string>(liveHead.map((item) => getTapeItemKey(item)));
+  const combined: T[] = [];
 
-  const appended = [...current];
-  for (const item of incoming) {
+  for (const item of [...current, ...incoming]) {
     const key = getTapeItemKey(item);
     if (seen.has(key)) {
       continue;
     }
     seen.add(key);
-    appended.push(item);
+    combined.push(item);
   }
 
-  return cap > 0 ? appended.slice(0, cap) : appended;
+  combined.sort((a, b) => {
+    const delta = extractSortTs(b) - extractSortTs(a);
+    if (delta !== 0) {
+      return delta;
+    }
+    return extractSortSeq(b) - extractSortSeq(a);
+  });
+
+  return cap > 0 ? combined.slice(0, cap) : combined;
+};
+
+export const getLiveHistoryRetentionCap = (subscription: LiveSubscription): number => {
+  switch (subscription.channel) {
+    case "options":
+    case "equities":
+      return LIVE_HISTORY_SOFT_CAP;
+    default:
+      return LIVE_HISTORY_SOFT_CAP;
+  }
+};
+
+export const getScopedLiveAutoHydrationChannels = (
+  enabled: boolean,
+  pathname: string,
+  manifest: LiveSubscription[],
+  historyCursors: Partial<Record<string, Cursor | null>>,
+  historyLoading: Partial<Record<string, boolean>>
+): Array<Extract<LiveSubscription["channel"], "options" | "equities">> => {
+  if (!enabled || pathname !== "/tape") {
+    return [];
+  }
+
+  const channels: Array<Extract<LiveSubscription["channel"], "options" | "equities">> = [];
+  for (const subscription of manifest) {
+    const scoped =
+      (subscription.channel === "options" &&
+        (subscription.underlying_ids?.length || subscription.option_contract_id)) ||
+      (subscription.channel === "equities" && subscription.underlying_ids?.length);
+    if (!scoped) {
+      continue;
+    }
+
+    const key = getLiveSubscriptionKey(subscription);
+    if (historyCursors[key] && !historyLoading[key]) {
+      channels.push(subscription.channel);
+    }
+  }
+
+  return channels;
 };
 
 export const getLiveFeedStatus = (
@@ -564,9 +900,45 @@ export const getLiveFeedStatus = (
   return behindMs > behindDelayMs ? "stale" : "connected";
 };
 
+export const getHotChannelFeedStatus = (
+  sourceStatus: WsStatus,
+  health: { healthy: boolean } | null | undefined
+): WsStatus => {
+  if (sourceStatus !== "connected") {
+    return sourceStatus;
+  }
+  if (!health) {
+    return "connected";
+  }
+  return health.healthy ? "connected" : "stale";
+};
+
+export const findAnchorRestoreIndex = (
+  keys: string[],
+  anchorKey: string,
+  fallbackKeys: string[]
+): number => {
+  const directIndex = keys.indexOf(anchorKey);
+  if (directIndex >= 0) {
+    return directIndex;
+  }
+
+  const indexByKey = new Map(keys.map((key, index) => [key, index]));
+  for (const key of fallbackKeys) {
+    const index = indexByKey.get(key);
+    if (typeof index === "number") {
+      return index;
+    }
+  }
+
+  return -1;
+};
+
 type TapeState<T> = {
   status: WsStatus;
   items: T[];
+  liveItems?: T[];
+  historyItems?: T[];
   lastUpdate: number | null;
   replayTime: number | null;
   replayComplete: boolean;
@@ -818,14 +1190,6 @@ const extractUnderlying = (contractId: string): string => {
   return contractId.split("-")[0]?.toUpperCase() ?? contractId.toUpperCase();
 };
 
-const extractEquityTraceFromJoin = (joinId: string): string | null => {
-  const match = joinId.match(/^equityjoin:(.+)$/);
-  if (match?.[1]) {
-    return match[1];
-  }
-  return joinId.trim().length > 0 ? joinId.trim() : null;
-};
-
 const normalizeJoinRefCandidates = (value: string): string[] => {
   const ref = value.trim();
   if (!ref) {
@@ -879,7 +1243,6 @@ const formatDarkTrace = (traceId: string): string => {
 
 const inferDarkUnderlying = (
   event: InferredDarkEvent,
-  equityPrints: Map<string, EquityPrint>,
   equityJoins: Map<string, EquityPrintJoin>
 ): string | null => {
   for (const ref of event.evidence_refs) {
@@ -896,17 +1259,6 @@ const inferDarkUnderlying = (
   const match = event.trace_id.match(/^dark:(?:stealth_accumulation|distribution):([^:]+):/);
   if (match?.[1]) {
     return match[1].toUpperCase();
-  }
-
-  for (const ref of event.evidence_refs) {
-    const traceId = extractEquityTraceFromJoin(ref);
-    if (!traceId) {
-      continue;
-    }
-    const print = equityPrints.get(traceId);
-    if (print) {
-      return print.underlying_id.toUpperCase();
-    }
   }
 
   return null;
@@ -1123,6 +1475,10 @@ type ClassifierDecor = {
   intensity: number;
 };
 
+const EMPTY_CLASSIFIER_HITS_BY_PACKET_ID = new Map<string, ClassifierHitEvent[]>();
+const EMPTY_PACKET_ID_BY_OPTION_TRACE_ID = new Map<string, string>();
+const EMPTY_CLASSIFIER_DECOR_BY_OPTION_TRACE_ID = new Map<string, ClassifierDecor>();
+
 const SMART_MONEY_PROFILE_TONES: Record<SmartMoneyProfileId, string> = {
   institutional_directional: "green",
   retail_whale: "amber",
@@ -1219,6 +1575,7 @@ export const getOptionTableSnapshot = (
 
 type ListScrollState = {
   listRef: React.RefObject<HTMLDivElement>;
+  listNode: HTMLDivElement | null;
   setListRef: (node: HTMLDivElement | null) => void;
   isAtTop: boolean;
   isAtTopRef: React.MutableRefObject<boolean>;
@@ -1310,6 +1667,7 @@ const useListScroll = (): ListScrollState => {
 
   return {
     listRef,
+    listNode,
     setListRef,
     isAtTop,
     isAtTopRef,
@@ -1324,7 +1682,26 @@ const useScrollAnchor = (
   listRef: React.RefObject<HTMLDivElement>,
   isAtTopRef: React.MutableRefObject<boolean>
 ) => {
-  const pendingRef = useRef<{ height: number } | null>(null);
+  const pendingRef = useRef<{
+    key: string;
+    offset: number;
+    fallbackKeys: string[];
+  } | null>(null);
+
+  const readRenderedRows = useCallback((element: HTMLDivElement) => {
+    return Array.from(element.querySelectorAll<HTMLElement>("[data-tape-key][data-row-start][data-row-size]"))
+      .map((node) => {
+        const key = node.dataset.tapeKey;
+        const start = Number(node.dataset.rowStart);
+        const size = Number(node.dataset.rowSize);
+        if (!key || !Number.isFinite(start) || !Number.isFinite(size)) {
+          return null;
+        }
+        return { key, start, size };
+      })
+      .filter((row): row is { key: string; start: number; size: number } => row !== null)
+      .sort((a, b) => a.start - b.start);
+  }, []);
 
   const capture = useCallback(() => {
     if (isAtTopRef.current) {
@@ -1337,10 +1714,27 @@ const useScrollAnchor = (
       return;
     }
 
+    const rows = readRenderedRows(el);
+    if (rows.length === 0) {
+      pendingRef.current = null;
+      return;
+    }
+
+    const scrollTop = el.scrollTop;
+    const anchorIndex = rows.findIndex((row) => row.start + row.size > scrollTop);
+    const resolvedIndex = anchorIndex >= 0 ? anchorIndex : 0;
+    const anchorRow = rows[resolvedIndex];
+    if (!anchorRow) {
+      pendingRef.current = null;
+      return;
+    }
+
     pendingRef.current = {
-      height: el.scrollHeight
+      key: anchorRow.key,
+      offset: Math.max(0, scrollTop - anchorRow.start),
+      fallbackKeys: rows.slice(resolvedIndex).map((row) => row.key)
     };
-  }, [isAtTopRef, listRef]);
+  }, [isAtTopRef, listRef, readRenderedRows]);
 
   const apply = useCallback(() => {
     const pending = pendingRef.current;
@@ -1358,19 +1752,41 @@ const useScrollAnchor = (
       return;
     }
 
-    const delta = el.scrollHeight - pending.height;
-    if (delta !== 0) {
-      el.scrollTop = Math.max(0, el.scrollTop + delta);
+    const rows = readRenderedRows(el);
+    if (rows.length === 0) {
+      return;
+    }
+
+    const keys = rows.map((row) => row.key);
+    const restoreIndex = findAnchorRestoreIndex(keys, pending.key, pending.fallbackKeys);
+    if (restoreIndex < 0) {
+      return;
+    }
+
+    const row = rows[restoreIndex];
+    if (!row) {
+      return;
+    }
+
+    el.scrollTop = Math.max(0, row.start + pending.offset);
+    bumpTapeDebugMetric("anchorRestoreCount", 1);
+    if (row.key !== pending.key) {
+      bumpTapeDebugMetric("anchorRestoreFallbackCount", 1);
+      logTapeDebug("anchor restore fallback", {
+        requested_key: pending.key,
+        restored_key: row.key
+      });
     }
     pendingRef.current = null;
-  }, [isAtTopRef, listRef]);
+  }, [isAtTopRef, listRef, readRenderedRows]);
 
   return { capture, apply };
 };
 
-const useBottomHistoryGate = (
-  listRef: React.RefObject<HTMLDivElement>,
+const useVirtualHistoryGate = (
   enabled: boolean,
+  itemCount: number,
+  lastVirtualIndex: number,
   onLoadOlder: () => void
 ): void => {
   const loadRef = useRef(onLoadOlder);
@@ -1379,107 +1795,90 @@ const useBottomHistoryGate = (
   }, [onLoadOlder]);
 
   useEffect(() => {
-    if (!enabled) {
+    if (!enabled || itemCount === 0) {
       return;
     }
-    const element = listRef.current;
-    if (!element) {
+    if (lastVirtualIndex < itemCount - 1) {
       return;
     }
-
-    const maybeLoad = () => {
-      const threshold = Math.max(240, element.clientHeight * 0.5);
-      if (element.scrollTop + element.clientHeight >= element.scrollHeight - threshold) {
-        loadRef.current();
-      }
-    };
-
-    maybeLoad();
-    element.addEventListener("scroll", maybeLoad);
-    return () => {
-      element.removeEventListener("scroll", maybeLoad);
-    };
-  }, [enabled, listRef]);
+    loadRef.current();
+  }, [enabled, itemCount, lastVirtualIndex]);
 };
 
-type VirtualListResult<T> = {
-  visibleItems: T[];
-  topSpacerHeight: number;
-  bottomSpacerHeight: number;
+type TapeVirtualListResult<T> = {
+  totalSize: number;
+  virtualItems: TapeVirtualRow<T>[];
 };
 
-const useVirtualList = <T,>(
+type TapeVirtualRow<T> = {
+  item: T;
+  key: string;
+  index: number;
+  start: number;
+  size: number;
+  end: number;
+};
+
+const useTapeVirtualList = <T extends SortableItem>(
   items: T[],
   listRef: React.RefObject<HTMLDivElement>,
-  enabled: boolean,
-  rowHeight: number,
-  overscan = 8
-): VirtualListResult<T> => {
-  const [range, setRange] = useState<{ start: number; end: number }>({
-    start: 0,
-    end: items.length
+  config: TapeVirtualListConfig
+): TapeVirtualListResult<T> => {
+  const virtualizer = useVirtualizer<HTMLDivElement, HTMLElement>({
+    count: items.length,
+    getScrollElement: () => listRef.current,
+    estimateSize: () => config.rowHeight,
+    overscan: config.overscan,
+    getItemKey: (index) => getTapeItemKey(items[index] as SortableItem)
   });
 
-  const recompute = useCallback(() => {
-    if (!enabled) {
-      setRange({ start: 0, end: items.length });
-      return;
-    }
-
-    const element = listRef.current;
-    if (!element) {
-      setRange({ start: 0, end: Math.min(items.length, 80) });
-      return;
-    }
-
-    const viewportHeight = Math.max(rowHeight, element.clientHeight);
-    const visibleCount = Math.ceil(viewportHeight / rowHeight);
-    const start = Math.max(0, Math.floor(element.scrollTop / rowHeight) - overscan);
-    const end = Math.min(items.length, start + visibleCount + overscan * 2);
-    setRange({ start, end });
-  }, [enabled, items.length, listRef, overscan, rowHeight]);
-
-  useEffect(() => {
-    recompute();
-  }, [items.length, recompute]);
+  const virtualItems: TapeVirtualRow<T>[] = virtualizer
+    .getVirtualItems()
+    .map((virtualItem) => {
+      const item = items[virtualItem.index] as T | undefined;
+      if (!item) {
+        return null;
+      }
+      return {
+        item,
+        key: getTapeItemKey(item),
+        index: virtualItem.index,
+        start: virtualItem.start,
+        size: virtualItem.size,
+        end: virtualItem.end
+      };
+    })
+    .filter((virtualItem): virtualItem is TapeVirtualRow<T> => virtualItem !== null);
 
   useEffect(() => {
-    if (!enabled) {
+    if (!DEV_TAPE_DEBUG || items.length === 0) {
       return;
     }
-
     const element = listRef.current;
     if (!element) {
       return;
     }
-
-    const onScroll = () => recompute();
-    const onResize = () => recompute();
-
-    element.addEventListener("scroll", onScroll);
-    window.addEventListener("resize", onResize);
-
-    return () => {
-      element.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onResize);
-    };
-  }, [enabled, listRef, recompute]);
-
-  if (!enabled) {
-    return {
-      visibleItems: items,
-      topSpacerHeight: 0,
-      bottomSpacerHeight: 0
-    };
-  }
-
-  const start = Math.min(range.start, items.length);
-  const end = Math.min(Math.max(range.end, start), items.length);
+    const first = virtualItems[0];
+    const last = virtualItems.at(-1);
+    if (!first || !last) {
+      return;
+    }
+    const visibleTopGap = Math.max(0, first.start - element.scrollTop);
+    const visibleBottomGap = Math.max(0, element.scrollTop + element.clientHeight - last.end);
+    if (visibleTopGap > element.clientHeight || visibleBottomGap > element.clientHeight) {
+      console.warn("[tape] false-gap watchdog", {
+        pane: config.debugLabel,
+        item_count: items.length,
+        visible_top_gap: visibleTopGap,
+        visible_bottom_gap: visibleBottomGap,
+        viewport_height: element.clientHeight
+      });
+    }
+  }, [config.debugLabel, items.length, listRef, virtualItems]);
 
   return {
-    visibleItems: items.slice(start, end),
-    topSpacerHeight: start * rowHeight,
-    bottomSpacerHeight: Math.max(0, (items.length - end) * rowHeight)
+    totalSize: virtualizer.getTotalSize(),
+    virtualItems
   };
 };
 
@@ -1565,6 +1964,13 @@ const useTape = <T extends SortableItem & { seq: number }>(
   const replaySourceKey = config.replaySourceKey ?? null;
   const onReplaySourceKey = config.onReplaySourceKey;
   const queryParams = config.queryParams;
+  const queryKey = useMemo(
+    () =>
+      JSON.stringify(
+        Object.entries(queryParams ?? {}).sort(([left], [right]) => left.localeCompare(right))
+      ),
+    [queryParams]
+  );
   const hotWindowLimit = config.hotWindowLimit ?? LIVE_HOT_WINDOW;
   const [status, setStatus] = useState<WsStatus>("connecting");
   const [items, setItems] = useState<T[]>([]);
@@ -1655,7 +2061,7 @@ const useTape = <T extends SortableItem & { seq: number }>(
     pendingRef.current = [];
     pendingCountRef.current = 0;
     cancelFlush();
-  }, [mode, replaySourceKey, cancelFlush]);
+  }, [mode, replaySourceKey, queryKey, cancelFlush]);
 
   useEffect(() => {
     if (mode !== "replay" || !latestPath) {
@@ -1700,7 +2106,7 @@ const useTape = <T extends SortableItem & { seq: number }>(
     return () => {
       active = false;
     };
-  }, [mode, latestPath, getItemTs, replaySourceKey, queryParams]);
+  }, [mode, latestPath, getItemTs, replaySourceKey, queryKey, queryParams]);
 
   useEffect(() => {
     if (mode !== "live" || config.liveEnabled === false) {
@@ -1851,9 +2257,14 @@ const useTape = <T extends SortableItem & { seq: number }>(
             }
           }
 
-          if (onReplaySourceKey && sourcePrefix && replaySourceNotifiedRef.current !== sourcePrefix) {
-            replaySourceNotifiedRef.current = sourcePrefix;
-            onReplaySourceKey(sourcePrefix);
+          if (onReplaySourceKey) {
+            if (sourcePrefix && replaySourceNotifiedRef.current !== sourcePrefix) {
+              replaySourceNotifiedRef.current = sourcePrefix;
+              onReplaySourceKey(sourcePrefix);
+            } else if (!sourcePrefix && replaySourceNotifiedRef.current !== null) {
+              replaySourceNotifiedRef.current = null;
+              onReplaySourceKey(null);
+            }
           }
 
           const filtered = sourcePrefix
@@ -1939,6 +2350,7 @@ const useTape = <T extends SortableItem & { seq: number }>(
     getReplayKey,
     replaySourceKey,
     onReplaySourceKey,
+    queryKey,
     queryParams
   ]);
 
@@ -1961,6 +2373,8 @@ const toStaticTapeState = <T,>(
 ): TapeState<T> => ({
   status,
   items,
+  liveItems: items,
+  historyItems: [],
   lastUpdate,
   replayTime: null,
   replayComplete: false,
@@ -1975,10 +2389,8 @@ type PausableTapeViewConfig<T extends SortableItem & { seq: number }> = {
   sourceItems: T[];
   historyTail?: T[];
   lastUpdate: number | null;
-  freshnessMs: number;
   onNewItems?: (count: number) => void;
   captureScroll?: () => void;
-  getItemTs?: (item: T) => number;
   retentionLimit?: number;
   shouldHold?: () => boolean;
   resumeSignal?: number;
@@ -1989,17 +2401,6 @@ const usePausableTapeView = <T extends SortableItem & { seq: number }>(
 ): TapeState<T> => {
   const [paused, setPaused] = useState(false);
   const [data, setData] = useState<PausableTapeData<T>>(EMPTY_PAUSABLE_TAPE);
-  const [clock, setClock] = useState(() => Date.now());
-
-  useEffect(() => {
-    const handle = window.setInterval(() => {
-      setClock(Date.now());
-    }, 1000);
-
-    return () => {
-      window.clearInterval(handle);
-    };
-  }, []);
 
   useEffect(() => {
     if (!config.enabled) {
@@ -2075,38 +2476,16 @@ const usePausableTapeView = <T extends SortableItem & { seq: number }>(
     setPaused((current) => !current);
   }, []);
 
-  const getItemTs = config.getItemTs ?? extractSortTs;
-  const freshestTs = useMemo(() => {
-    if (config.sourceItems.length === 0) {
-      return null;
-    }
-
-    let newest = Number.NEGATIVE_INFINITY;
-    for (const item of config.sourceItems) {
-      newest = Math.max(newest, getItemTs(item));
-    }
-
-    return Number.isFinite(newest) ? newest : null;
-  }, [config.sourceItems, getItemTs]);
-
-  const status = config.enabled
-    ? getLiveFeedStatus(
-        config.sourceStatus,
-        freshestTs,
-        config.freshnessMs,
-        clock,
-        LIVE_FEED_BEHIND_DELAY_MS
-      )
-    : "disconnected";
+  const status = config.enabled ? config.sourceStatus : "disconnected";
   const projected = projectPausableTapeState(data.visible, status, config.lastUpdate);
-  const items = useMemo(
-    () => [...projected.items, ...(config.historyTail ?? [])],
-    [projected.items, config.historyTail]
-  );
+  const historyItems = config.historyTail ?? [];
+  const items = useMemo(() => composeTapeItems([], projected.items, historyItems), [projected.items, historyItems]);
 
   return {
     status,
     items,
+    liveItems: projected.items,
+    historyItems,
     lastUpdate: projected.lastUpdate,
     replayTime: null,
     replayComplete: false,
@@ -2355,6 +2734,7 @@ type LiveSessionState = {
   status: WsStatus;
   connectedAt: number | null;
   lastUpdate: number | null;
+  channelHealth: LiveHotChannelHealthMap;
   lastEventByChannel: Partial<Record<LiveSubscription["channel"], number>>;
   manifest: LiveSubscription[];
   historyCursors: Partial<Record<string, Cursor | null>>;
@@ -2425,6 +2805,99 @@ const appendOptionFlowFilters = (params: URLSearchParams, filters: OptionFlowFil
   }
 };
 
+const appendOptionScopeParams = (
+  params: URLSearchParams,
+  optionScope: OptionScope | undefined
+): void => {
+  if (optionScope?.underlying_ids?.length) {
+    params.set("underlying_ids", optionScope.underlying_ids.join(","));
+  }
+  if (optionScope?.option_contract_id) {
+    params.set("option_contract_id", optionScope.option_contract_id);
+  }
+};
+
+export const getEffectiveOptionPrintFilters = (
+  flowFilters: OptionFlowFilters,
+  isOptionContractFocused: boolean
+): OptionFlowFilters | undefined => {
+  return isOptionContractFocused ? undefined : flowFilters;
+};
+
+export const getOptionScope = (
+  activeTickers: string[],
+  instrumentUnderlying: string | null,
+  selectedInstrument: SelectedInstrument
+): OptionScope => ({
+  underlying_ids:
+    selectedInstrument?.kind === "option-contract"
+      ? instrumentUnderlying
+        ? [instrumentUnderlying]
+        : undefined
+      : activeTickers.length > 0
+        ? activeTickers
+        : instrumentUnderlying
+          ? [instrumentUnderlying]
+          : undefined,
+  option_contract_id:
+    selectedInstrument?.kind === "option-contract" ? selectedInstrument.contractId : undefined
+});
+
+export const buildOptionTapeQueryParams = (
+  filters: OptionFlowFilters | undefined,
+  optionScope: OptionScope | undefined
+): Record<string, string | undefined> => {
+  const params = new URLSearchParams();
+  appendOptionFlowFilters(params, filters);
+  appendOptionScopeParams(params, optionScope);
+  return Object.fromEntries(params.entries());
+};
+
+export const filterOptionTapeItems = (
+  items: OptionPrint[],
+  filters: OptionFlowFilters | undefined,
+  selectedInstrument: SelectedInstrument,
+  tickerSet: Set<string>,
+  instrumentUnderlying: string | null
+): OptionPrint[] => {
+  return items.filter((print) => {
+    const contractId = normalizeContractId(print.option_contract_id);
+    if (selectedInstrument?.kind === "option-contract") {
+      return contractId === selectedInstrument.contractId;
+    }
+    if (!matchesOptionPrintFilters(print, filters)) {
+      return false;
+    }
+    const underlying = extractUnderlying(contractId);
+    if (tickerSet.size === 0) {
+      return !instrumentUnderlying || underlying === instrumentUnderlying;
+    }
+    return Boolean(underlying) && tickerSet.has(underlying.toUpperCase());
+  });
+};
+
+export const shouldClearOptionFocusSeed = (
+  seed: TapeFocusSeed<OptionPrint> | null,
+  optionFocusScopeKey: string | null,
+  currentOptionSubscriptionKey: string | null,
+  liveItems: OptionPrint[],
+  historyItems: OptionPrint[]
+): boolean => {
+  if (!seed) {
+    return false;
+  }
+  if (seed.scopeKey !== optionFocusScopeKey) {
+    return true;
+  }
+  if (seed.subscriptionKey && seed.subscriptionKey !== currentOptionSubscriptionKey) {
+    return false;
+  }
+  const liveKeys = new Set(
+    composeTapeItems([], liveItems, historyItems).map((item) => getTapeItemKey(item))
+  );
+  return seed.items.every((item) => liveKeys.has(getTapeItemKey(item)));
+};
+
 const appendLiveScopeParams = (params: URLSearchParams, subscription: LiveSubscription): void => {
   if ((subscription.channel === "options" || subscription.channel === "equities") && subscription.underlying_ids?.length) {
     params.set("underlying_ids", subscription.underlying_ids.join(","));
@@ -2451,59 +2924,79 @@ export const getLiveManifest = (
   chartTicker: string,
   chartIntervalMs: number,
   flowFilters: OptionFlowFilters,
-  optionScope?: Pick<Extract<LiveSubscription, { channel: "options" }>, "underlying_ids" | "option_contract_id">,
-  equityScope?: Pick<Extract<LiveSubscription, { channel: "equities" }>, "underlying_ids">
+  optionScope?: OptionScope,
+  equityScope?: EquityScope,
+  optionPrintFilters?: OptionFlowFilters
 ): LiveSubscription[] => {
-  const baselineSubs: LiveSubscription[] = [{ channel: "options", filters: flowFilters, ...optionScope }];
-  const chartSubs: LiveSubscription[] = [
-    { channel: "equity-candles", underlying_id: chartTicker, interval_ms: chartIntervalMs },
-    { channel: "equity-overlay", underlying_id: chartTicker }
-  ];
+  const features = getRouteFeatures(pathname);
+  const subscriptions: LiveSubscription[] = [];
 
-  if (pathname === "/tape") {
-    const optionsSub: Extract<LiveSubscription, { channel: "options" }> = {
+  if (features.options) {
+    subscriptions.push({
       channel: "options",
-      filters: flowFilters,
+      filters:
+        optionScope?.option_contract_id && optionPrintFilters === undefined
+          ? undefined
+          : optionPrintFilters ?? flowFilters,
       ...optionScope,
       snapshot_limit: LIVE_HOT_WINDOW_OPTIONS
-    };
-    const tapeSubs: LiveSubscription[] = [
-      optionsSub,
-      { channel: "nbbo", snapshot_limit: LIVE_HOT_WINDOW },
-      { channel: "equities", ...equityScope, snapshot_limit: LIVE_HOT_WINDOW },
-      { channel: "flow", filters: flowFilters, snapshot_limit: LIVE_HOT_WINDOW },
-      { channel: "smart-money", snapshot_limit: LIVE_HOT_WINDOW },
-      { channel: "classifier-hits", snapshot_limit: LIVE_HOT_WINDOW },
-      { channel: "alerts", snapshot_limit: LIVE_HOT_WINDOW },
-      { channel: "inferred-dark", snapshot_limit: LIVE_HOT_WINDOW }
-    ];
-    return dedupeLiveSubscriptions(tapeSubs);
+    });
+  }
+  if (features.nbbo) {
+    subscriptions.push({ channel: "nbbo", snapshot_limit: LIVE_HOT_WINDOW });
+  }
+  if (features.equities) {
+    subscriptions.push({ channel: "equities", ...equityScope, snapshot_limit: LIVE_HOT_WINDOW });
+  }
+  if (features.flow) {
+    subscriptions.push({ channel: "flow", filters: flowFilters, snapshot_limit: LIVE_HOT_WINDOW });
+  }
+  if (features.alerts) {
+    subscriptions.push({ channel: "alerts", snapshot_limit: LIVE_HOT_WINDOW });
+  }
+  if (features.smartMoney) {
+    subscriptions.push({ channel: "smart-money", snapshot_limit: LIVE_HOT_WINDOW });
+  }
+  if (features.classifierHits) {
+    subscriptions.push({ channel: "classifier-hits", snapshot_limit: LIVE_HOT_WINDOW });
+  }
+  if (features.inferredDark) {
+    subscriptions.push({ channel: "inferred-dark", snapshot_limit: LIVE_HOT_WINDOW });
+  }
+  if (features.equityJoins) {
+    subscriptions.push({ channel: "equity-joins", snapshot_limit: LIVE_HOT_WINDOW });
+  }
+  if (features.equityCandles) {
+    subscriptions.push({
+      channel: "equity-candles",
+      underlying_id: chartTicker,
+      interval_ms: chartIntervalMs
+    });
+  }
+  if (features.equityOverlay) {
+    subscriptions.push({
+      channel: "equity-overlay",
+      underlying_id: chartTicker
+    });
   }
 
-  return dedupeLiveSubscriptions([
-    ...baselineSubs,
-    { channel: "equities", ...equityScope },
-    { channel: "flow", filters: flowFilters },
-    { channel: "alerts" },
-    { channel: "smart-money" },
-    { channel: "classifier-hits" },
-    { channel: "inferred-dark" },
-    ...chartSubs
-  ]);
+  return dedupeLiveSubscriptions(subscriptions);
 };
 
 const useLiveSession = (
   enabled: boolean,
   pathname: string,
-  chartTicker: string,
-  chartIntervalMs: number,
-  flowFilters: OptionFlowFilters,
-  optionScope?: Pick<Extract<LiveSubscription, { channel: "options" }>, "underlying_ids" | "option_contract_id">,
-  equityScope?: Pick<Extract<LiveSubscription, { channel: "equities" }>, "underlying_ids">
+  manifest: LiveSubscription[]
 ): LiveSessionState => {
   const [status, setStatus] = useState<WsStatus>(enabled ? "connecting" : "disconnected");
   const [connectedAt, setConnectedAt] = useState<number | null>(null);
   const [lastUpdate, setLastUpdate] = useState<number | null>(null);
+  const [channelHealth, setChannelHealth] = useState<LiveHotChannelHealthMap>({
+    options: { freshness_age_ms: null, healthy: false },
+    nbbo: { freshness_age_ms: null, healthy: false },
+    equities: { freshness_age_ms: null, healthy: false },
+    flow: { freshness_age_ms: null, healthy: false }
+  });
   const [lastEventByChannel, setLastEventByChannel] = useState<
     Partial<Record<LiveSubscription["channel"], number>>
   >({});
@@ -2531,6 +3024,27 @@ const useLiveSession = (
   const [inferredDarkHistory, setInferredDarkHistory] = useState<InferredDarkEvent[]>([]);
   const [chartCandles, setChartCandles] = useState<EquityCandle[]>([]);
   const [chartOverlay, setChartOverlay] = useState<EquityPrint[]>([]);
+  const optionsRef = useRef<OptionPrint[]>([]);
+  const nbboRef = useRef<OptionNBBO[]>([]);
+  const equitiesRef = useRef<EquityPrint[]>([]);
+  const equityQuotesRef = useRef<EquityQuote[]>([]);
+  const equityJoinsRef = useRef<EquityPrintJoin[]>([]);
+  const flowRef = useRef<FlowPacket[]>([]);
+  const smartMoneyRef = useRef<SmartMoneyEvent[]>([]);
+  const classifierHitsRef = useRef<ClassifierHitEvent[]>([]);
+  const alertsRef = useRef<AlertEvent[]>([]);
+  const inferredDarkRef = useRef<InferredDarkEvent[]>([]);
+  const chartCandlesRef = useRef<EquityCandle[]>([]);
+  const chartOverlayRef = useRef<EquityPrint[]>([]);
+  const optionsHistoryRef = useRef<OptionPrint[]>([]);
+  const nbboHistoryRef = useRef<OptionNBBO[]>([]);
+  const equitiesHistoryRef = useRef<EquityPrint[]>([]);
+  const equityJoinsHistoryRef = useRef<EquityPrintJoin[]>([]);
+  const flowHistoryRef = useRef<FlowPacket[]>([]);
+  const smartMoneyHistoryRef = useRef<SmartMoneyEvent[]>([]);
+  const classifierHitsHistoryRef = useRef<ClassifierHitEvent[]>([]);
+  const alertsHistoryRef = useRef<AlertEvent[]>([]);
+  const inferredDarkHistoryRef = useRef<InferredDarkEvent[]>([]);
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<number | null>(null);
   const idleWatchdogRef = useRef<number | null>(null);
@@ -2538,16 +3052,38 @@ const useLiveSession = (
   const lastEventAtRef = useRef<number | null>(null);
   const subscribedKeysRef = useRef<Set<string>>(new Set());
   const subscribedMapRef = useRef<Map<string, LiveSubscription>>(new Map());
-  const manifest = useMemo(
-    () => getLiveManifest(pathname, chartTicker.toUpperCase(), chartIntervalMs, flowFilters, optionScope, equityScope),
-    [pathname, chartTicker, chartIntervalMs, flowFilters, optionScope, equityScope]
-  );
+  const replaceArrayState = <T,>(
+    setter: Dispatch<SetStateAction<T[]>>,
+    ref: { current: T[] },
+    next: T[]
+  ): void => {
+    ref.current = next;
+    setter(next);
+  };
+
+  const mergeHistoryState = <T extends SortableItem>(
+    setter: Dispatch<SetStateAction<T[]>>,
+    ref: { current: T[] },
+    incoming: T[],
+    liveHead: T[],
+    cap = LIVE_HISTORY_SOFT_CAP
+  ): void => {
+    const next = appendHistoryTail(ref.current, incoming, liveHead, cap);
+    ref.current = next;
+    setter(next);
+  };
 
   useEffect(() => {
     if (!enabled) {
       setStatus("disconnected");
       setConnectedAt(null);
       setLastUpdate(null);
+      setChannelHealth({
+        options: { freshness_age_ms: null, healthy: false },
+        nbbo: { freshness_age_ms: null, healthy: false },
+        equities: { freshness_age_ms: null, healthy: false },
+        flow: { freshness_age_ms: null, healthy: false }
+      });
       setLastEventByChannel({});
       setHistoryCursors({});
       setHistoryLoading({});
@@ -2573,6 +3109,27 @@ const useLiveSession = (
       setInferredDarkHistory([]);
       setChartCandles([]);
       setChartOverlay([]);
+      optionsRef.current = [];
+      nbboRef.current = [];
+      equitiesRef.current = [];
+      equityQuotesRef.current = [];
+      equityJoinsRef.current = [];
+      flowRef.current = [];
+      smartMoneyRef.current = [];
+      classifierHitsRef.current = [];
+      alertsRef.current = [];
+      inferredDarkRef.current = [];
+      chartCandlesRef.current = [];
+      chartOverlayRef.current = [];
+      optionsHistoryRef.current = [];
+      nbboHistoryRef.current = [];
+      equitiesHistoryRef.current = [];
+      equityJoinsHistoryRef.current = [];
+      flowHistoryRef.current = [];
+      smartMoneyHistoryRef.current = [];
+      classifierHitsHistoryRef.current = [];
+      alertsHistoryRef.current = [];
+      inferredDarkHistoryRef.current = [];
       subscribedKeysRef.current = new Set();
       subscribedMapRef.current = new Map();
       if (socketRef.current) {
@@ -2616,6 +3173,7 @@ const useLiveSession = (
 
     const handleMessage = (message: LiveServerMessage) => {
       if (message.op === "ready" || message.op === "heartbeat") {
+        setChannelHealth(message.channel_health);
         return;
       }
       if (message.op === "error") {
@@ -2629,62 +3187,112 @@ const useLiveSession = (
       const updateAt = Date.now();
 
       const mergeItems = <T extends SortableItem>(
-        setter: React.Dispatch<React.SetStateAction<T[]>>,
+        setter: Dispatch<SetStateAction<T[]>>,
+        ref: { current: T[] },
         nextItems: T[],
-        retentionLimit = LIVE_HOT_WINDOW
+        retentionLimit = LIVE_HOT_WINDOW,
+        history?: {
+          setter: Dispatch<SetStateAction<T[]>>;
+          ref: { current: T[] };
+          cap?: number;
+        }
       ) => {
-        setter((prev) =>
-          message.op === "snapshot"
-            ? shouldRetainLiveSnapshotHistory(
-                subscription.channel,
-                true,
-                nextItems.length,
-                prev.length
-              )
-              ? prev
-              : (nextItems as T[])
-            : mergeNewest(nextItems as T[], prev, retentionLimit, (evicted) =>
-                incrementRetentionMetric("hotWindowEvictions", evicted)
-              )
+        if (message.op === "snapshot") {
+          const next = shouldRetainLiveSnapshotHistory(
+            subscription.channel,
+            true,
+            nextItems.length,
+            ref.current.length
+          )
+            ? ref.current
+            : nextItems;
+          replaceArrayState(setter, ref, next);
+          return;
+        }
+
+        const { kept, evicted } = mergeNewestWithOverflow(
+          nextItems,
+          ref.current,
+          retentionLimit,
+          (evictedCount) => incrementRetentionMetric("hotWindowEvictions", evictedCount)
         );
+        replaceArrayState(setter, ref, kept);
+        if (history && evicted.length > 0) {
+          mergeHistoryState(history.setter, history.ref, evicted, kept, history.cap);
+        }
       };
 
       switch (subscription.channel) {
         case "options":
-          mergeItems(setOptions, items as OptionPrint[], LIVE_HOT_WINDOW_OPTIONS);
+          mergeItems(setOptions, optionsRef, items as OptionPrint[], LIVE_HOT_WINDOW_OPTIONS, {
+            setter: setOptionsHistory,
+            ref: optionsHistoryRef,
+            cap: getLiveHistoryRetentionCap(subscription)
+          });
           break;
         case "nbbo":
-          mergeItems(setNbbo, items as OptionNBBO[]);
+          mergeItems(setNbbo, nbboRef, items as OptionNBBO[], LIVE_HOT_WINDOW, {
+            setter: setNbboHistory,
+            ref: nbboHistoryRef
+          });
           break;
         case "equities":
-          mergeItems(setEquities, items as EquityPrint[]);
+          mergeItems(setEquities, equitiesRef, items as EquityPrint[], LIVE_HOT_WINDOW, {
+            setter: setEquitiesHistory,
+            ref: equitiesHistoryRef,
+            cap: getLiveHistoryRetentionCap(subscription)
+          });
           break;
         case "equity-quotes":
-          mergeItems(setEquityQuotes, items as EquityQuote[]);
+          mergeItems(setEquityQuotes, equityQuotesRef, items as EquityQuote[]);
           break;
         case "equity-joins":
-          mergeItems(setEquityJoins, items as EquityPrintJoin[]);
+          mergeItems(setEquityJoins, equityJoinsRef, items as EquityPrintJoin[], LIVE_HOT_WINDOW, {
+            setter: setEquityJoinsHistory,
+            ref: equityJoinsHistoryRef
+          });
           break;
         case "flow":
-          mergeItems(setFlow, items as FlowPacket[]);
+          mergeItems(setFlow, flowRef, items as FlowPacket[], LIVE_HOT_WINDOW, {
+            setter: setFlowHistory,
+            ref: flowHistoryRef
+          });
           break;
         case "smart-money":
-          mergeItems(setSmartMoney, items as SmartMoneyEvent[]);
+          mergeItems(setSmartMoney, smartMoneyRef, items as SmartMoneyEvent[], LIVE_HOT_WINDOW, {
+            setter: setSmartMoneyHistory,
+            ref: smartMoneyHistoryRef
+          });
           break;
         case "classifier-hits":
-          mergeItems(setClassifierHits, items as ClassifierHitEvent[]);
+          mergeItems(
+            setClassifierHits,
+            classifierHitsRef,
+            items as ClassifierHitEvent[],
+            LIVE_HOT_WINDOW,
+            {
+              setter: setClassifierHitsHistory,
+              ref: classifierHitsHistoryRef
+            }
+          );
           break;
         case "alerts":
-          mergeItems(setAlerts, items as AlertEvent[]);
+          mergeItems(setAlerts, alertsRef, items as AlertEvent[], LIVE_HOT_WINDOW, {
+            setter: setAlertsHistory,
+            ref: alertsHistoryRef
+          });
           break;
         case "inferred-dark":
-          mergeItems(setInferredDark, items as InferredDarkEvent[]);
+          mergeItems(setInferredDark, inferredDarkRef, items as InferredDarkEvent[], LIVE_HOT_WINDOW, {
+            setter: setInferredDarkHistory,
+            ref: inferredDarkHistoryRef
+          });
           break;
         case "equity-candles":
-          mergeItems(setChartCandles, items as EquityCandle[]);
+          mergeItems(setChartCandles, chartCandlesRef, items as EquityCandle[]);
           break;
         case "equity-overlay":
-          mergeItems(setChartOverlay, items as EquityPrint[]);
+          mergeItems(setChartOverlay, chartOverlayRef, items as EquityPrint[]);
           break;
       }
 
@@ -2826,10 +3434,14 @@ const useLiveSession = (
         .filter((channel) => channel === "options" || channel === "equities")
     );
     if (resetScopedChannels.has("options")) {
+      optionsRef.current = [];
+      optionsHistoryRef.current = [];
       setOptions([]);
       setOptionsHistory([]);
     }
     if (resetScopedChannels.has("equities")) {
+      equitiesRef.current = [];
+      equitiesHistoryRef.current = [];
       setEquities([]);
       setEquitiesHistory([]);
     }
@@ -2913,49 +3525,56 @@ const useLiveSession = (
 
         const mergeOlder = <T extends SortableItem>(
           setter: Dispatch<SetStateAction<T[]>>,
+          ref: { current: T[] },
           liveHead: T[],
           cap = LIVE_HISTORY_SOFT_CAP
         ) => {
-          setter((prev) => appendHistoryTail(prev, older as T[], liveHead, cap));
+          mergeHistoryState(setter, ref, older as T[], liveHead, cap);
         };
 
         switch (subscription.channel) {
           case "options":
             mergeOlder(
               setOptionsHistory,
-              options,
-              subscription.underlying_ids?.length || subscription.option_contract_id ? 0 : LIVE_HISTORY_SOFT_CAP
+              optionsHistoryRef,
+              optionsRef.current,
+              getLiveHistoryRetentionCap(subscription)
             );
             break;
           case "nbbo":
-            mergeOlder(setNbboHistory, nbbo);
+            mergeOlder(setNbboHistory, nbboHistoryRef, nbboRef.current);
             break;
           case "equities":
             mergeOlder(
               setEquitiesHistory,
-              equities,
-              subscription.underlying_ids?.length ? 0 : LIVE_HISTORY_SOFT_CAP
+              equitiesHistoryRef,
+              equitiesRef.current,
+              getLiveHistoryRetentionCap(subscription)
             );
             break;
           case "equity-quotes":
             break;
           case "equity-joins":
-            mergeOlder(setEquityJoinsHistory, equityJoins);
+            mergeOlder(setEquityJoinsHistory, equityJoinsHistoryRef, equityJoinsRef.current);
             break;
           case "flow":
-            mergeOlder(setFlowHistory, flow);
+            mergeOlder(setFlowHistory, flowHistoryRef, flowRef.current);
             break;
           case "smart-money":
-            mergeOlder(setSmartMoneyHistory, smartMoney);
+            mergeOlder(setSmartMoneyHistory, smartMoneyHistoryRef, smartMoneyRef.current);
             break;
           case "classifier-hits":
-            mergeOlder(setClassifierHitsHistory, classifierHits);
+            mergeOlder(
+              setClassifierHitsHistory,
+              classifierHitsHistoryRef,
+              classifierHitsRef.current
+            );
             break;
           case "alerts":
-            mergeOlder(setAlertsHistory, alerts);
+            mergeOlder(setAlertsHistory, alertsHistoryRef, alertsRef.current);
             break;
           case "inferred-dark":
-            mergeOlder(setInferredDarkHistory, inferredDark);
+            mergeOlder(setInferredDarkHistory, inferredDarkHistoryRef, inferredDarkRef.current);
             break;
         }
 
@@ -2973,41 +3592,18 @@ const useLiveSession = (
         setHistoryLoading((current) => ({ ...current, [key]: false }));
       }
     },
-    [
-      enabled,
-      manifest,
-      historyCursors,
-      historyLoading,
-      options,
-      nbbo,
-      equities,
-      equityJoins,
-      flow,
-      smartMoney,
-      classifierHits,
-      alerts,
-      inferredDark
-    ]
+    [enabled, manifest, historyCursors, historyLoading]
   );
 
   useEffect(() => {
-    if (!enabled || pathname !== "/tape") {
-      return;
-    }
-    const scoped = manifest.filter(
-      (subscription) =>
-        (subscription.channel === "options" &&
-          (subscription.underlying_ids?.length || subscription.option_contract_id)) ||
-        (subscription.channel === "equities" && subscription.underlying_ids?.length)
-    );
-    if (scoped.length === 0) {
-      return;
-    }
-    for (const subscription of scoped) {
-      const key = getLiveSubscriptionKey(subscription);
-      if (historyCursors[key] && !historyLoading[key]) {
-        void loadOlder(subscription.channel);
-      }
+    for (const channel of getScopedLiveAutoHydrationChannels(
+      enabled,
+      pathname,
+      manifest,
+      historyCursors,
+      historyLoading
+    )) {
+      void loadOlder(channel);
     }
   }, [enabled, pathname, manifest, historyCursors, historyLoading, loadOlder]);
 
@@ -3015,6 +3611,7 @@ const useLiveSession = (
     status,
     connectedAt,
     lastUpdate,
+    channelHealth,
     lastEventByChannel,
     manifest,
     historyCursors,
@@ -4347,6 +4944,7 @@ const formatFlowMetric = (value: number, suffix?: string): string => {
 
 const useTerminalState = () => {
   const pathname = usePathname();
+  const routeFeatures = useMemo(() => getRouteFeatures(pathname), [pathname]);
   const [mode, setMode] = useState<TapeMode>("live");
   const [replaySource, setReplaySource] = useState<string | null>(null);
   const [selectedAlert, setSelectedAlert] = useState<AlertEvent | null>(null);
@@ -4354,6 +4952,8 @@ const useTerminalState = () => {
   const [selectedClassifierHit, setSelectedClassifierHit] = useState<ClassifierHitEvent | null>(null);
   const [selectedSmartMoneyEvent, setSelectedSmartMoneyEvent] = useState<SmartMoneyEvent | null>(null);
   const [selectedInstrument, setSelectedInstrument] = useState<SelectedInstrument>(null);
+  const [optionFocusSeed, setOptionFocusSeed] = useState<TapeFocusSeed<OptionPrint> | null>(null);
+  const [equityFocusSeed, setEquityFocusSeed] = useState<TapeFocusSeed<EquityPrint> | null>(null);
   const [filterInput, setFilterInput] = useState<string>("");
   const [flowFilters, setFlowFilters] = useState<OptionFlowFilters>(() => buildDefaultFlowFilters());
   const [chartIntervalMs, setChartIntervalMs] = useState<number>(CANDLE_INTERVALS[0].ms);
@@ -4366,12 +4966,21 @@ const useTerminalState = () => {
   }, [filterInput]);
   const tickerSet = useMemo(() => new Set(activeTickers), [activeTickers]);
   const instrumentUnderlying = selectedInstrument?.underlyingId.toUpperCase() ?? null;
+  const isOptionContractFocused = selectedInstrument?.kind === "option-contract";
+  const focusedOptionContractId =
+    selectedInstrument?.kind === "option-contract" ? selectedInstrument.contractId : null;
+  const optionFocusScopeKey =
+    focusedOptionContractId ? `option-contract:${focusedOptionContractId}` : null;
+  const equityFocusScopeKey =
+    selectedInstrument?.kind === "equity"
+      ? `equity:${selectedInstrument.underlyingId.toUpperCase()}`
+      : null;
+  const effectiveOptionPrintFilters = useMemo(
+    () => getEffectiveOptionPrintFilters(flowFilters, isOptionContractFocused),
+    [flowFilters, isOptionContractFocused]
+  );
   const optionScope = useMemo(
-    () => ({
-      underlying_ids: activeTickers.length > 0 ? activeTickers : instrumentUnderlying ? [instrumentUnderlying] : undefined,
-      option_contract_id:
-        selectedInstrument?.kind === "option-contract" ? selectedInstrument.contractId : undefined
-    }),
+    () => getOptionScope(activeTickers, instrumentUnderlying, selectedInstrument),
     [activeTickers, instrumentUnderlying, selectedInstrument]
   );
   const equityScope = useMemo(
@@ -4396,22 +5005,41 @@ const useTerminalState = () => {
       ? `Contract: ${display.ticker} ${display.expiration} ${display.strike}`
       : `Contract: ${selectedInstrument.contractId}`;
   }, [selectedInstrument]);
-  const liveSession = useLiveSession(
-    mode === "live",
-    pathname,
-    chartTicker,
-    chartIntervalMs,
-    flowFilters,
-    optionScope,
-    equityScope
-  );
-  const equitiesLiveSubscriptionActive = useMemo(
+  const liveManifest = useMemo(
     () =>
-      getLiveManifest(pathname, chartTicker.toUpperCase(), chartIntervalMs, flowFilters, optionScope, equityScope).some(
-        (sub) => sub.channel === "equities"
+      getLiveManifest(
+        pathname,
+        chartTicker.toUpperCase(),
+        chartIntervalMs,
+        flowFilters,
+        optionScope,
+        equityScope,
+        effectiveOptionPrintFilters
       ),
-    [pathname, chartTicker, chartIntervalMs, flowFilters, optionScope, equityScope]
+    [
+      pathname,
+      chartTicker,
+      chartIntervalMs,
+      flowFilters,
+      optionScope,
+      equityScope,
+      effectiveOptionPrintFilters
+    ]
   );
+  const liveSession = useLiveSession(mode === "live", pathname, liveManifest);
+  const currentOptionSubscription = useMemo(
+    () =>
+      liveManifest.find(
+        (subscription): subscription is Extract<LiveSubscription, { channel: "options" }> =>
+          subscription.channel === "options"
+      ) ?? null,
+    [liveManifest]
+  );
+  const currentOptionSubscriptionKey = useMemo(
+    () => (currentOptionSubscription ? getLiveSubscriptionKey(currentOptionSubscription) : null),
+    [currentOptionSubscription]
+  );
+  const equitiesLiveSubscriptionActive = routeFeatures.equities;
 
   const handleReplaySource = useCallback((value: string | null) => {
     setReplaySource(value);
@@ -4473,18 +5101,8 @@ const useTerminalState = () => {
   );
   const disableReplayGrouping = useCallback(() => null, []);
   const optionQueryParams = useMemo<Record<string, string | undefined>>(
-    () => ({
-      view: flowFilters.view ?? "signal",
-      security:
-        flowFilters.securityTypes?.length === 1 ? flowFilters.securityTypes[0] : undefined,
-      side: flowFilters.nbboSides?.length ? flowFilters.nbboSides.join(",") : undefined,
-      type: flowFilters.optionTypes?.length ? flowFilters.optionTypes.join(",") : undefined,
-      min_notional:
-        typeof flowFilters.minNotional === "number"
-          ? String(flowFilters.minNotional)
-          : undefined
-    }),
-    [flowFilters]
+    () => buildOptionTapeQueryParams(effectiveOptionPrintFilters, optionScope),
+    [effectiveOptionPrintFilters, optionScope]
   );
 
   const options = useTape<OptionPrint>({
@@ -4499,9 +5117,10 @@ const useTerminalState = () => {
     pollMs: mode === "replay" ? 200 : undefined,
     captureScroll: optionsAnchor.capture,
     onNewItems: optionsScroll.onNewItems,
-    getReplayKey: extractReplaySource,
-    onReplaySourceKey: handleReplaySource,
-    queryParams: optionQueryParams
+    getReplayKey: isOptionContractFocused ? disableReplayGrouping : extractReplaySource,
+    onReplaySourceKey: isOptionContractFocused ? undefined : handleReplaySource,
+    queryParams: optionQueryParams,
+    replaySourceKey: isOptionContractFocused ? null : replaySource
   });
 
   const equities = useTape<EquityPrint>({
@@ -4516,6 +5135,12 @@ const useTerminalState = () => {
     captureScroll: equitiesAnchor.capture,
     onNewItems: equitiesScroll.onNewItems
   });
+
+  useEffect(() => {
+    if (isOptionContractFocused && replaySource !== null) {
+      setReplaySource(null);
+    }
+  }, [isOptionContractFocused, replaySource]);
 
   const equityJoins = useTape<EquityPrintJoin>({
     mode,
@@ -4609,13 +5234,19 @@ const useTerminalState = () => {
     getReplayKey: disableReplayGrouping
   });
 
+  const optionsChannelStatus = getHotChannelFeedStatus(liveSession.status, liveSession.channelHealth.options);
+  const equitiesChannelStatus = getHotChannelFeedStatus(
+    liveSession.status,
+    liveSession.channelHealth.equities
+  );
+  const flowChannelStatus = getHotChannelFeedStatus(liveSession.status, liveSession.channelHealth.flow);
+
   const liveOptions = usePausableTapeView<OptionPrint>({
     enabled: mode === "live",
-    sourceStatus: liveSession.status,
+    sourceStatus: optionsChannelStatus,
     sourceItems: liveSession.options,
     historyTail: liveSession.optionsHistory,
     lastUpdate: liveSession.lastUpdate,
-    freshnessMs: LIVE_OPTIONS_STALE_MS,
     retentionLimit: LIVE_HOT_WINDOW_OPTIONS,
     captureScroll: optionsAnchor.capture,
     onNewItems: optionsScroll.onNewItems,
@@ -4624,11 +5255,10 @@ const useTerminalState = () => {
   });
   const liveEquities = usePausableTapeView<EquityPrint>({
     enabled: mode === "live",
-    sourceStatus: liveSession.status,
+    sourceStatus: equitiesChannelStatus,
     sourceItems: liveSession.equities,
     historyTail: liveSession.equitiesHistory,
     lastUpdate: liveSession.lastUpdate,
-    freshnessMs: LIVE_EQUITIES_STALE_MS,
     captureScroll: equitiesAnchor.capture,
     onNewItems: equitiesScroll.onNewItems,
     shouldHold: () => !equitiesScroll.isAtTopRef.current,
@@ -4636,40 +5266,87 @@ const useTerminalState = () => {
   });
   const liveFlow = usePausableTapeView<FlowPacket>({
     enabled: mode === "live",
-    sourceStatus: liveSession.status,
+    sourceStatus: flowChannelStatus,
     sourceItems: liveSession.flow,
     historyTail: liveSession.flowHistory,
     lastUpdate: liveSession.lastUpdate,
-    freshnessMs: LIVE_FLOW_STALE_MS,
     captureScroll: flowAnchor.capture,
     onNewItems: flowScroll.onNewItems,
     shouldHold: () => !flowScroll.isAtTopRef.current,
-    resumeSignal: flowScroll.resumeTick,
-    getItemTs: (item) => item.source_ts
+    resumeSignal: flowScroll.resumeTick
   });
 
-  const optionsFeed = mode === "live" ? liveOptions : options;
+  const seededLiveOptionsItems = useMemo(
+    () =>
+      composeTapeItems(
+        optionFocusSeed?.scopeKey === optionFocusScopeKey ? optionFocusSeed.items : [],
+        liveOptions.liveItems ?? [],
+        liveOptions.historyItems ?? []
+      ),
+    [liveOptions.historyItems, liveOptions.liveItems, optionFocusScopeKey, optionFocusSeed]
+  );
+  const seededLiveEquitiesItems = useMemo(
+    () =>
+      composeTapeItems(
+        equityFocusSeed?.scopeKey === equityFocusScopeKey ? equityFocusSeed.items : [],
+        liveEquities.liveItems ?? [],
+        liveEquities.historyItems ?? []
+      ),
+    [equityFocusScopeKey, equityFocusSeed, liveEquities.historyItems, liveEquities.liveItems]
+  );
+
+  const optionsFeed =
+    mode === "live" ? { ...liveOptions, items: seededLiveOptionsItems } : options;
   const nbboFeed =
-    mode === "live" ? toStaticTapeState(liveSession.status, [...liveSession.nbbo, ...liveSession.nbboHistory], liveSession.lastUpdate) : nbbo;
-  const equitiesFeed = mode === "live" ? liveEquities : equities;
+    mode === "live"
+      ? toStaticTapeState(
+          getHotChannelFeedStatus(liveSession.status, liveSession.channelHealth.nbbo),
+          composeTapeItems([], liveSession.nbbo, liveSession.nbboHistory),
+          liveSession.lastUpdate
+        )
+      : nbbo;
+  const equitiesFeed =
+    mode === "live" ? { ...liveEquities, items: seededLiveEquitiesItems } : equities;
   const equityJoinsFeed =
     mode === "live"
-      ? toStaticTapeState(liveSession.status, [...liveSession.equityJoins, ...liveSession.equityJoinsHistory], liveSession.lastUpdate)
+      ? toStaticTapeState(
+          liveSession.status,
+          composeTapeItems([], liveSession.equityJoins, liveSession.equityJoinsHistory),
+          liveSession.lastUpdate
+        )
       : equityJoins;
   const flowFeed = mode === "live" ? liveFlow : flow;
   const alertsFeed =
-    mode === "live" ? toStaticTapeState(liveSession.status, [...liveSession.alerts, ...liveSession.alertsHistory], liveSession.lastUpdate) : alerts;
+    mode === "live"
+      ? toStaticTapeState(
+          liveSession.status,
+          composeTapeItems([], liveSession.alerts, liveSession.alertsHistory),
+          liveSession.lastUpdate
+        )
+      : alerts;
   const classifierHitsFeed =
     mode === "live"
-      ? toStaticTapeState(liveSession.status, [...liveSession.classifierHits, ...liveSession.classifierHitsHistory], liveSession.lastUpdate)
+      ? toStaticTapeState(
+          liveSession.status,
+          composeTapeItems([], liveSession.classifierHits, liveSession.classifierHitsHistory),
+          liveSession.lastUpdate
+        )
       : classifierHits;
   const smartMoneyFeed =
     mode === "live"
-      ? toStaticTapeState(liveSession.status, [...liveSession.smartMoney, ...liveSession.smartMoneyHistory], liveSession.lastUpdate)
+      ? toStaticTapeState(
+          liveSession.status,
+          composeTapeItems([], liveSession.smartMoney, liveSession.smartMoneyHistory),
+          liveSession.lastUpdate
+        )
       : smartMoney;
   const inferredDarkFeed =
     mode === "live"
-      ? toStaticTapeState(liveSession.status, [...liveSession.inferredDark, ...liveSession.inferredDarkHistory], liveSession.lastUpdate)
+      ? toStaticTapeState(
+          liveSession.status,
+          composeTapeItems([], liveSession.inferredDark, liveSession.inferredDarkHistory),
+          liveSession.lastUpdate
+        )
       : inferredDark;
 
   useLayoutEffect(() => {
@@ -4721,16 +5398,6 @@ const useTerminalState = () => {
     }
     return map;
   }, [optionsFeed.items]);
-
-  const equityPrintMap = useMemo(() => {
-    const map = new Map<string, EquityPrint>();
-    for (const print of equitiesFeed.items) {
-      if (print.trace_id) {
-        map.set(print.trace_id, print);
-      }
-    }
-    return map;
-  }, [equitiesFeed.items]);
 
   const equityJoinMap = useMemo(() => {
     const map = new Map<string, EquityPrintJoin>();
@@ -4848,6 +5515,9 @@ const useTerminalState = () => {
         .then((payload: { data?: OptionPrint[] }) => {
           const next = new Map<string, OptionPrint>();
           for (const item of payload.data ?? []) {
+            if (!item || !item.trace_id) {
+              continue;
+            }
             next.set(item.trace_id, item);
           }
           if (next.size > 0) {
@@ -4895,6 +5565,9 @@ const useTerminalState = () => {
       .then((payload: { data?: EquityPrintJoin[] }) => {
         const next = new Map<string, EquityPrintJoin>();
         for (const item of payload.data ?? []) {
+          if (!item || !item.id || !item.trace_id) {
+            continue;
+          }
           next.set(item.id, item);
           next.set(item.trace_id, item);
           if (item.print_trace_id) {
@@ -4953,11 +5626,11 @@ const useTerminalState = () => {
   }, [selectedDarkEvent, resolvedEquityJoinMap]);
 
   const selectedDarkUnderlying = useMemo(() => {
-    if (!selectedDarkEvent) {
+    if (!routeFeatures.needsDarkUnderlying || !selectedDarkEvent) {
       return null;
     }
-    return inferDarkUnderlying(selectedDarkEvent, equityPrintMap, resolvedEquityJoinMap);
-  }, [selectedDarkEvent, resolvedEquityJoinMap, equityPrintMap]);
+    return inferDarkUnderlying(selectedDarkEvent, resolvedEquityJoinMap);
+  }, [routeFeatures.needsDarkUnderlying, selectedDarkEvent, resolvedEquityJoinMap]);
 
   useEffect(() => {
     if (mode !== "live") {
@@ -4994,6 +5667,9 @@ const useTerminalState = () => {
   }, []);
 
   const classifierHitsByPacketId = useMemo(() => {
+    if (!routeFeatures.needsClassifierDecor) {
+      return EMPTY_CLASSIFIER_HITS_BY_PACKET_ID;
+    }
     const map = new Map<string, ClassifierHitEvent[]>();
     for (const hit of [...classifierHitsFeed.items, ...optionSupportClassifierHits]) {
       const packetId = extractPacketIdFromClassifierHitTrace(hit.trace_id);
@@ -5003,9 +5679,17 @@ const useTerminalState = () => {
       map.set(packetId, [...(map.get(packetId) ?? []), hit]);
     }
     return map;
-  }, [classifierHitsFeed.items, optionSupportClassifierHits, extractPacketIdFromClassifierHitTrace]);
+  }, [
+    classifierHitsFeed.items,
+    optionSupportClassifierHits,
+    extractPacketIdFromClassifierHitTrace,
+    routeFeatures.needsClassifierDecor
+  ]);
 
   const smartMoneyByPacketId = useMemo(() => {
+    if (!routeFeatures.needsClassifierDecor) {
+      return new Map<string, SmartMoneyEvent>();
+    }
     const map = new Map<string, SmartMoneyEvent>();
     for (const event of [...smartMoneyFeed.items, ...optionSupportSmartMoney]) {
       for (const packetId of event.packet_ids) {
@@ -5016,9 +5700,12 @@ const useTerminalState = () => {
       }
     }
     return map;
-  }, [smartMoneyFeed.items, optionSupportSmartMoney]);
+  }, [smartMoneyFeed.items, optionSupportSmartMoney, routeFeatures.needsClassifierDecor]);
 
   const packetIdByOptionTraceId = useMemo(() => {
+    if (!routeFeatures.needsClassifierDecor) {
+      return EMPTY_PACKET_ID_BY_OPTION_TRACE_ID;
+    }
     const map = new Map<string, string>();
     for (const packet of resolvedFlowPacketMap.values()) {
       for (const member of packet.members) {
@@ -5026,9 +5713,12 @@ const useTerminalState = () => {
       }
     }
     return map;
-  }, [resolvedFlowPacketMap]);
+  }, [resolvedFlowPacketMap, routeFeatures.needsClassifierDecor]);
 
   const classifierDecorByOptionTraceId = useMemo(() => {
+    if (!routeFeatures.needsClassifierDecor) {
+      return EMPTY_CLASSIFIER_DECOR_BY_OPTION_TRACE_ID;
+    }
     const map = new Map<string, ClassifierDecor>();
     for (const [traceId, packetId] of packetIdByOptionTraceId) {
       const smartMoneyEvent = smartMoneyByPacketId.get(packetId);
@@ -5042,10 +5732,15 @@ const useTerminalState = () => {
       }
     }
     return map;
-  }, [classifierHitsByPacketId, packetIdByOptionTraceId, smartMoneyByPacketId]);
+  }, [
+    classifierHitsByPacketId,
+    packetIdByOptionTraceId,
+    smartMoneyByPacketId,
+    routeFeatures.needsClassifierDecor
+  ]);
 
   useEffect(() => {
-    if (mode !== "live" || optionsFeed.items.length === 0) {
+    if (!routeFeatures.needsClassifierDecor || mode !== "live" || optionsFeed.items.length === 0) {
       return;
     }
 
@@ -5095,6 +5790,12 @@ const useTerminalState = () => {
         if (!response.ok) {
           throw new Error(await readErrorDetail(response));
         }
+        const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+        if (!contentType.includes("application/json")) {
+          throw new Error(
+            `Unexpected content type from /lookup/options-support: ${contentType || "unknown"}`
+          );
+        }
         return response.json() as Promise<{
           packets?: FlowPacket[];
           smart_money?: SmartMoneyEvent[];
@@ -5109,19 +5810,28 @@ const useTerminalState = () => {
         const now = Date.now();
         const packetMap = new Map<string, FlowPacket>();
         for (const packet of payload.packets ?? []) {
+          if (!packet || !packet.id) {
+            continue;
+          }
           packetMap.set(packet.id, packet);
         }
         if (packetMap.size > 0) {
           setPinnedFlowPacketMap((prev) => upsertPinnedEntries(prev, packetMap, now));
         }
         if (payload.smart_money?.length) {
+          const filtered = payload.smart_money.filter((item): item is SmartMoneyEvent =>
+            Boolean(item && item.trace_id)
+          );
           setOptionSupportSmartMoney((prev) =>
-            mergeNewest(payload.smart_money ?? [], prev, PINNED_EVIDENCE_MAX_ITEMS)
+            mergeNewest(filtered, prev, PINNED_EVIDENCE_MAX_ITEMS)
           );
         }
         if (payload.classifier_hits?.length) {
+          const filtered = payload.classifier_hits.filter((item): item is ClassifierHitEvent =>
+            Boolean(item && item.trace_id)
+          );
           setOptionSupportClassifierHits((prev) =>
-            mergeNewest(payload.classifier_hits ?? [], prev, PINNED_EVIDENCE_MAX_ITEMS)
+            mergeNewest(filtered, prev, PINNED_EVIDENCE_MAX_ITEMS)
           );
         }
         if (payload.nbbo_by_trace_id) {
@@ -5146,7 +5856,8 @@ const useTerminalState = () => {
     optionsFeed.items,
     classifierDecorByOptionTraceId,
     packetIdByOptionTraceId,
-    historicalNbboByTraceId
+    historicalNbboByTraceId,
+    routeFeatures.needsClassifierDecor
   ]);
 
   const selectedClassifierPacketId = useMemo(() => {
@@ -5287,6 +5998,9 @@ const useTerminalState = () => {
       .then((payload: { data?: OptionPrint[] }) => {
         const next = new Map<string, OptionPrint>();
         for (const item of payload.data ?? []) {
+          if (!item || !item.trace_id) {
+            continue;
+          }
           next.set(item.trace_id, item);
         }
         if (next.size > 0) {
@@ -5340,25 +6054,20 @@ const useTerminalState = () => {
   );
 
   const filteredOptions = useMemo(() => {
-    return optionsFeed.items.filter((print) => {
-      if (!matchesOptionPrintFilters(print, flowFilters)) {
-        return false;
-      }
-      if (
-        selectedInstrument?.kind === "option-contract" &&
-        normalizeContractId(print.option_contract_id) !== selectedInstrument.contractId
-      ) {
-        return false;
-      }
-      if (tickerSet.size === 0) {
-        return (
-          !instrumentUnderlying ||
-          extractUnderlying(normalizeContractId(print.option_contract_id)) === instrumentUnderlying
-        );
-      }
-      return matchesTicker(extractUnderlying(normalizeContractId(print.option_contract_id)));
-    });
-  }, [flowFilters, optionsFeed.items, matchesTicker, tickerSet, selectedInstrument, instrumentUnderlying]);
+    return filterOptionTapeItems(
+      optionsFeed.items,
+      effectiveOptionPrintFilters,
+      selectedInstrument,
+      tickerSet,
+      instrumentUnderlying
+    );
+  }, [
+    effectiveOptionPrintFilters,
+    instrumentUnderlying,
+    optionsFeed.items,
+    selectedInstrument,
+    tickerSet
+  ]);
 
   const filteredEquities = useMemo(() => {
     if (tickerSet.size === 0) {
@@ -5370,22 +6079,159 @@ const useTerminalState = () => {
     return equitiesFeed.items.filter((print) => matchesTicker(print.underlying_id));
   }, [equitiesFeed.items, matchesTicker, tickerSet, instrumentUnderlying]);
 
+  useEffect(() => {
+    if (!optionFocusSeed) {
+      return;
+    }
+    if (
+      shouldClearOptionFocusSeed(
+        optionFocusSeed,
+        optionFocusScopeKey,
+        currentOptionSubscriptionKey,
+        liveOptions.liveItems ?? [],
+        liveOptions.historyItems ?? []
+      )
+    ) {
+      setOptionFocusSeed(null);
+    }
+  }, [
+    currentOptionSubscriptionKey,
+    liveOptions.historyItems,
+    liveOptions.liveItems,
+    optionFocusScopeKey,
+    optionFocusSeed
+  ]);
+
+  useEffect(() => {
+    if (!equityFocusSeed) {
+      return;
+    }
+    if (equityFocusSeed.scopeKey !== equityFocusScopeKey) {
+      setEquityFocusSeed(null);
+      return;
+    }
+    const composedBaseItems = composeTapeItems([], liveEquities.liveItems ?? [], liveEquities.historyItems ?? []);
+    const liveKeys = new Set(composedBaseItems.map((item) => getTapeItemKey(item)));
+    if (equityFocusSeed.items.every((item) => liveKeys.has(getTapeItemKey(item)))) {
+      setEquityFocusSeed(null);
+    }
+  }, [equityFocusScopeKey, equityFocusSeed, liveEquities.historyItems, liveEquities.liveItems]);
+
+  const focusOptionContract = useCallback(
+    (print: OptionPrint) => {
+      const contractId = normalizeContractId(print.option_contract_id);
+      const parsed = parseOptionContractId(contractId);
+      const underlyingId = (print.underlying_id ?? parsed?.root ?? extractUnderlying(contractId)).toUpperCase();
+      const scopeKey = `option-contract:${contractId}`;
+      const subscriptionKey = getLiveSubscriptionKey({
+        channel: "options",
+        underlying_ids: [underlyingId],
+        option_contract_id: contractId
+      });
+      const seedItems = composeTapeItems(
+        [print],
+        filteredOptions.filter((candidate) => normalizeContractId(candidate.option_contract_id) === contractId),
+        []
+      );
+      setOptionFocusSeed({ scopeKey, subscriptionKey, items: seedItems });
+      bumpTapeDebugMetric("focusSeedRowCount", seedItems.length);
+      logTapeDebug("option focus seed captured", {
+        contract_id: contractId,
+        subscription_key: subscriptionKey,
+        row_count: seedItems.length
+      });
+      setSelectedInstrument({
+        kind: "option-contract",
+        contractId,
+        underlyingId
+      });
+    },
+    [filteredOptions]
+  );
+
+  const focusEquityTicker = useCallback(
+    (print: EquityPrint) => {
+      const underlyingId = print.underlying_id.toUpperCase();
+      const scopeKey = `equity:${underlyingId}`;
+      const seedItems = composeTapeItems(
+        [print],
+        filteredEquities.filter((candidate) => candidate.underlying_id.toUpperCase() === underlyingId),
+        []
+      );
+      setEquityFocusSeed({ scopeKey, items: seedItems });
+      bumpTapeDebugMetric("focusSeedRowCount", seedItems.length);
+      logTapeDebug("equity focus seed captured", {
+        underlying_id: underlyingId,
+        row_count: seedItems.length
+      });
+      setSelectedInstrument({
+        kind: "equity",
+        underlyingId
+      });
+    },
+    [filteredEquities]
+  );
+
   const equitiesSilentWarning = shouldShowEquitiesSilentFeedWarning({
     wsStatus: liveSession.status,
     equitiesSubscribed: mode === "live" && equitiesLiveSubscriptionActive,
     connectedAt: liveSession.connectedAt,
     lastEquitiesEventAt: liveSession.lastEventByChannel.equities ?? null
   });
+  const optionsScopeActive = Boolean(
+    optionScope.option_contract_id || optionScope.underlying_ids?.length
+  );
+  const equitiesScopeActive = Boolean(equityScope.underlying_ids?.length);
+  const optionsScopedQuiet =
+    mode === "live" &&
+    optionsScopeActive &&
+    optionsChannelStatus === "connected" &&
+    filteredOptions.length === 0;
+  const equitiesScopedQuiet =
+    mode === "live" &&
+    equitiesScopeActive &&
+    equitiesChannelStatus === "connected" &&
+    filteredEquities.length === 0;
+
+  const previousScopedQuietRef = useRef({
+    options: optionsScopedQuiet,
+    equities: equitiesScopedQuiet
+  });
+
+  useEffect(() => {
+    const previous = previousScopedQuietRef.current;
+    if (previous.options !== optionsScopedQuiet) {
+      bumpTapeDebugMetric("scopedQuietTransitions", 1);
+      logTapeDebug("options scoped quiet transition", { active: optionsScopedQuiet });
+    }
+    if (previous.equities !== equitiesScopedQuiet) {
+      bumpTapeDebugMetric("scopedQuietTransitions", 1);
+      logTapeDebug("equities scoped quiet transition", { active: equitiesScopedQuiet });
+    }
+    previousScopedQuietRef.current = {
+      options: optionsScopedQuiet,
+      equities: equitiesScopedQuiet
+    };
+  }, [equitiesScopedQuiet, optionsScopedQuiet]);
 
   const filteredInferredDark = useMemo(() => {
+    if (!routeFeatures.inferredDark) {
+      return EMPTY_INFERRED_DARK_EVENTS;
+    }
     if (tickerSet.size === 0) {
       return inferredDarkFeed.items;
     }
     return inferredDarkFeed.items.filter((event) => {
-      const underlying = inferDarkUnderlying(event, equityPrintMap, resolvedEquityJoinMap);
+      const underlying = inferDarkUnderlying(event, resolvedEquityJoinMap);
       return matchesTicker(underlying);
     });
-  }, [resolvedEquityJoinMap, equityPrintMap, inferredDarkFeed.items, matchesTicker, tickerSet]);
+  }, [
+    resolvedEquityJoinMap,
+    inferredDarkFeed.items,
+    matchesTicker,
+    tickerSet,
+    routeFeatures.inferredDark
+  ]);
 
   const filteredFlow = useMemo(() => {
     return flowFeed.items.filter((packet) => {
@@ -5400,13 +6246,31 @@ const useTerminalState = () => {
   }, [flowFeed.items, flowFilters, extractPacketContract, matchesTicker, tickerSet]);
 
   const filteredAlerts = useMemo(() => {
+    if (!routeFeatures.showAlertsPane && !routeFeatures.needsAlertEvidencePrefetch) {
+      return EMPTY_ALERT_EVENTS;
+    }
     if (tickerSet.size === 0) {
       return alertsFeed.items;
     }
     return alertsFeed.items.filter((alert) => matchesTicker(inferAlertUnderlying(alert)));
-  }, [alertsFeed.items, inferAlertUnderlying, matchesTicker, tickerSet]);
+  }, [
+    alertsFeed.items,
+    inferAlertUnderlying,
+    matchesTicker,
+    tickerSet,
+    routeFeatures.showAlertsPane,
+    routeFeatures.needsAlertEvidencePrefetch
+  ]);
 
-  const visibleAlerts = useMemo(() => filteredAlerts.slice(0, 12), [filteredAlerts]);
+  const visibleAlerts = useMemo(() => {
+    if (routeFeatures.needsAlertEvidencePrefetch) {
+      return filteredAlerts.slice(0, 12);
+    }
+    if (routeFeatures.showAlertsPane) {
+      return filteredAlerts.slice(0, 12);
+    }
+    return EMPTY_ALERT_EVENTS;
+  }, [filteredAlerts, routeFeatures.needsAlertEvidencePrefetch, routeFeatures.showAlertsPane]);
 
   const visibleAlertEvidenceRefs = useMemo(() => {
     const refs = new Set<string>();
@@ -5419,7 +6283,7 @@ const useTerminalState = () => {
   }, [visibleAlerts]);
 
   useEffect(() => {
-    if (mode !== "live" || visibleAlerts.length === 0) {
+    if (!routeFeatures.needsAlertEvidencePrefetch || mode !== "live" || visibleAlerts.length === 0) {
       return;
     }
 
@@ -5482,6 +6346,9 @@ const useTerminalState = () => {
       .then((payload: { data?: OptionPrint[] }) => {
         const next = new Map<string, OptionPrint>();
         for (const item of payload.data ?? []) {
+          if (!item || !item.trace_id) {
+            continue;
+          }
           next.set(item.trace_id, item);
         }
         if (next.size > 0) {
@@ -5498,7 +6365,8 @@ const useTerminalState = () => {
     visibleAlerts,
     visibleAlertEvidenceRefs,
     resolvedFlowPacketMap,
-    resolvedOptionPrintMap
+    resolvedOptionPrintMap,
+    routeFeatures.needsAlertEvidencePrefetch
   ]);
 
   const activePinnedFlowKeys = useMemo(() => {
@@ -5584,6 +6452,9 @@ const useTerminalState = () => {
   }, []);
 
   const filteredClassifierHits = useMemo(() => {
+    if (!routeFeatures.classifierHits) {
+      return EMPTY_CLASSIFIER_HIT_EVENTS;
+    }
     if (tickerSet.size === 0) {
       return classifierHitsFeed.items;
     }
@@ -5591,16 +6462,28 @@ const useTerminalState = () => {
       const underlying = extractUnderlyingFromTrace(hit.trace_id);
       return matchesTicker(underlying);
     });
-  }, [classifierHitsFeed.items, extractUnderlyingFromTrace, matchesTicker, tickerSet]);
+  }, [
+    classifierHitsFeed.items,
+    extractUnderlyingFromTrace,
+    matchesTicker,
+    tickerSet,
+    routeFeatures.classifierHits
+  ]);
 
   const filteredSmartMoneyEvents = useMemo(() => {
+    if (!routeFeatures.smartMoney) {
+      return EMPTY_SMART_MONEY_EVENTS;
+    }
     if (tickerSet.size === 0) {
       return smartMoneyFeed.items;
     }
     return smartMoneyFeed.items.filter((event) => matchesTicker(event.underlying_id));
-  }, [matchesTicker, smartMoneyFeed.items, tickerSet]);
+  }, [matchesTicker, smartMoneyFeed.items, tickerSet, routeFeatures.smartMoney]);
 
   const chartSmartMoneyEvents = useMemo(() => {
+    if (!routeFeatures.showChartPane && !routeFeatures.showFocusPane) {
+      return EMPTY_SMART_MONEY_EVENTS;
+    }
     const desired = chartTicker.toUpperCase();
     return smartMoneyFeed.items
       .filter((event) => event.underlying_id.toUpperCase() === desired)
@@ -5611,12 +6494,15 @@ const useTerminalState = () => {
         }
         return a.seq - b.seq;
       });
-  }, [chartTicker, smartMoneyFeed.items]);
+  }, [chartTicker, smartMoneyFeed.items, routeFeatures.showChartPane, routeFeatures.showFocusPane]);
 
   const chartInferredDark = useMemo(() => {
+    if (!routeFeatures.showChartPane && !routeFeatures.showFocusPane) {
+      return EMPTY_INFERRED_DARK_EVENTS;
+    }
     const desired = chartTicker.toUpperCase();
     return inferredDarkFeed.items
-      .filter((event) => inferDarkUnderlying(event, equityPrintMap, resolvedEquityJoinMap) === desired)
+      .filter((event) => inferDarkUnderlying(event, resolvedEquityJoinMap) === desired)
       .sort((a, b) => {
         const delta = a.source_ts - b.source_ts;
         if (delta !== 0) {
@@ -5624,7 +6510,13 @@ const useTerminalState = () => {
         }
         return a.seq - b.seq;
       });
-  }, [chartTicker, inferredDarkFeed.items, resolvedEquityJoinMap, equityPrintMap]);
+  }, [
+    chartTicker,
+    inferredDarkFeed.items,
+    resolvedEquityJoinMap,
+    routeFeatures.showChartPane,
+    routeFeatures.showFocusPane
+  ]);
 
   const findAlertForClassifierHit = useCallback(
     (hit: ClassifierHitEvent): AlertEvent | null => {
@@ -5684,18 +6576,47 @@ const useTerminalState = () => {
   }, []);
 
   const lastSeen = useMemo(() => {
-    return [
-      optionsFeed.lastUpdate,
-      equitiesFeed.lastUpdate,
-      inferredDarkFeed.lastUpdate,
-      flowFeed.lastUpdate,
-      alertsFeed.lastUpdate,
-      smartMoneyFeed.lastUpdate,
-      classifierHitsFeed.lastUpdate
-    ]
+    const updates: Array<number | null> = [];
+    if (routeFeatures.options || routeFeatures.showOptionsPane) {
+      updates.push(optionsFeed.lastUpdate);
+    }
+    if (routeFeatures.equities || routeFeatures.showEquitiesPane) {
+      updates.push(equitiesFeed.lastUpdate);
+    }
+    if (routeFeatures.inferredDark || routeFeatures.showDarkPane || routeFeatures.showFocusPane) {
+      updates.push(inferredDarkFeed.lastUpdate);
+    }
+    if (routeFeatures.flow || routeFeatures.showFlowPane) {
+      updates.push(flowFeed.lastUpdate);
+    }
+    if (routeFeatures.alerts || routeFeatures.showAlertsPane) {
+      updates.push(alertsFeed.lastUpdate);
+    }
+    if (routeFeatures.smartMoney || routeFeatures.showClassifierPane || routeFeatures.showChartPane || routeFeatures.showFocusPane) {
+      updates.push(smartMoneyFeed.lastUpdate);
+    }
+    if (routeFeatures.classifierHits || routeFeatures.showClassifierPane) {
+      updates.push(classifierHitsFeed.lastUpdate);
+    }
+    return updates
       .filter((value): value is number => value !== null)
       .sort((a, b) => b - a)[0] ?? null;
   }, [
+    routeFeatures.options,
+    routeFeatures.showOptionsPane,
+    routeFeatures.equities,
+    routeFeatures.showEquitiesPane,
+    routeFeatures.inferredDark,
+    routeFeatures.showDarkPane,
+    routeFeatures.showFocusPane,
+    routeFeatures.flow,
+    routeFeatures.showFlowPane,
+    routeFeatures.alerts,
+    routeFeatures.showAlertsPane,
+    routeFeatures.smartMoney,
+    routeFeatures.showClassifierPane,
+    routeFeatures.showChartPane,
+    routeFeatures.classifierHits,
     optionsFeed.lastUpdate,
     equitiesFeed.lastUpdate,
     inferredDarkFeed.lastUpdate,
@@ -5743,13 +6664,13 @@ const useTerminalState = () => {
     smartMoney: smartMoneyFeed,
     classifierHits: classifierHitsFeed,
     liveSession,
+    routeFeatures,
     activeTickers,
     tickerSet,
     chartTicker,
     nbboMap,
     historicalNbboByTraceId,
     optionPrintMap: resolvedOptionPrintMap,
-    equityPrintMap,
     equityJoinMap: resolvedEquityJoinMap,
     flowPacketMap: resolvedFlowPacketMap,
     classifierHitsByPacketId,
@@ -5766,6 +6687,8 @@ const useTerminalState = () => {
     selectedSmartMoneyEvidence,
     filteredOptions,
     filteredEquities,
+    optionsScopedQuiet,
+    equitiesScopedQuiet,
     equitiesSilentWarning,
     filteredInferredDark,
     filteredFlow,
@@ -5774,6 +6697,8 @@ const useTerminalState = () => {
     filteredClassifierHits,
     chartSmartMoneyEvents,
     chartInferredDark,
+    focusOptionContract,
+    focusEquityTicker,
     openFromSmartMoneyEvent,
     openFromClassifierHit,
     handleSmartMoneyMarkerClick,
@@ -6009,36 +6934,6 @@ export const FlowFilterPopover = ({ filters, onChange }: FlowFilterPopoverProps)
   );
 };
 
-const FlowFilterControls = () => {
-  const state = useTerminal();
-
-  return <FlowFilterPopover filters={state.flowFilters} onChange={state.setFlowFilters} />;
-};
-
-const ContractFilterControl = () => {
-  const state = useTerminal();
-  const selected = state.selectedInstrument;
-  const isContractFilterActive = selected?.kind === "option-contract";
-
-  return (
-    <button
-      className={`terminal-button contract-filter-button${isContractFilterActive ? " is-active" : ""}`}
-      type="button"
-      disabled={!isContractFilterActive}
-      onClick={() => state.setSelectedInstrument(null)}
-      title={
-        isContractFilterActive
-          ? "Clear active contract filter"
-          : "Contract filter activates when you focus a contract in the Options tape"
-      }
-    >
-      <span className="contract-filter-button-label">
-        {isContractFilterActive ? state.selectedInstrumentLabel : "Contract Filter"}
-      </span>
-    </button>
-  );
-};
-
 type PaneProps = {
   title: string;
   status?: ReactNode;
@@ -6093,14 +6988,14 @@ const ShellMetricStrip = () => {
 };
 
 type OptionsPaneProps = {
+  state: TerminalState;
   limit?: number;
 };
 
-const OptionsPane = ({ limit }: OptionsPaneProps) => {
-  const state = useTerminal();
+const OptionsPane = memo(({ state, limit }: OptionsPaneProps) => {
   const items = limit ? state.filteredOptions.slice(0, limit) : state.filteredOptions;
-  const virtual = useVirtualList(items, state.optionsScroll.listRef, !limit, 36);
-  useBottomHistoryGate(state.optionsScroll.listRef, state.mode === "live" && !limit, () =>
+  const virtual = useTapeVirtualList(items, state.optionsScroll.listRef, getTapeVirtualConfig("options"));
+  useVirtualHistoryGate(state.mode === "live" && !limit, items.length, virtual.virtualItems.at(-1)?.index ?? -1, () =>
     void state.liveSession.loadOlder("options")
   );
 
@@ -6131,16 +7026,20 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
       <div className="data-table-shell">
         {items.length === 0 ? (
           <div className="empty">
-            {state.tickerSet.size > 0
-              ? "No option prints match the current filter."
-              : state.mode === "live"
-                ? state.options.status === "stale"
-                  ? "Feed behind. Waiting for fresh option prints."
-                  : "No option prints yet. Start ingest-options."
+            {state.mode === "live"
+              ? state.options.status === "stale"
+                ? "Feed behind. Waiting for fresh option prints."
+                : state.optionsScopedQuiet
+                  ? "No recent option prints for this scope yet."
+                  : state.tickerSet.size > 0
+                    ? "No option prints match the current filter."
+                    : "No option prints yet. Start ingest-options."
+              : state.tickerSet.size > 0
+                ? "No option prints match the current filter."
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          <div className="data-table-wrap" ref={state.optionsScroll.setListRef}>
+          <div className="data-table-wrap">
             <div className="data-table data-table-options" role="table" aria-label="Options tape">
               <div className="data-table-head" role="row">
                 <span className="data-table-cell">TIME</span>
@@ -6156,128 +7055,135 @@ const OptionsPane = ({ limit }: OptionsPaneProps) => {
                 <span className="data-table-cell">IV</span>
                 <span className="data-table-cell">CLASSIFIER</span>
               </div>
-              {virtual.topSpacerHeight > 0 ? (
-                <div className="data-table-spacer" style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
-              ) : null}
-              {virtual.visibleItems.map((print) => {
-              const contractId = normalizeContractId(print.option_contract_id);
-              const parsed = parseOptionContractId(contractId);
-              const contractDisplay = formatOptionContractLabel(contractId);
-              const quote = state.historicalNbboByTraceId.get(print.trace_id) ?? state.nbboMap.get(contractId);
-              const hasPreservedNbbo = typeof print.execution_nbbo_side === "string";
-              const nbboSide =
-                print.execution_nbbo_side ??
-                print.nbbo_side ??
-                (!hasPreservedNbbo ? classifyNbboSide(print.price, quote) : null);
-              const notional = print.notional ?? print.price * print.size * 100;
-              const spot = print.execution_underlying_spot;
-              const iv = print.execution_iv;
-              const decor = state.classifierDecorByOptionTraceId.get(print.trace_id);
-              const underlyingId = (print.underlying_id ?? parsed?.root ?? extractUnderlying(contractId)).toUpperCase();
-              const focusContract = (event: ReactMouseEvent<HTMLButtonElement>) => {
-                event.stopPropagation();
-                state.setSelectedInstrument({
-                  kind: "option-contract",
-                  contractId,
-                  underlyingId
-                });
-              };
-              const commonProps = {
-                className: `data-table-row data-table-row-button data-table-row-classified data-table-row-options${decor ? ` is-classified classifier-${decor.tone}` : ""}`,
-                style: decor ? ({ "--classifier-intensity": decor.intensity } as CSSProperties) : undefined
-              };
-              const cells = (
-                <>
-                  <span className="data-table-cell data-table-cell-number">{formatTime(print.ts)}</span>
-                  <span className="data-table-cell">
-                    <button className="instrument-cell-button" type="button" onClick={focusContract}>
-                      {contractDisplay?.ticker ?? parsed?.root ?? formatContractLabel(contractId)}
-                    </button>
-                  </span>
-                  <span className="data-table-cell">
-                    <button className="instrument-cell-button" type="button" onClick={focusContract}>
-                      {contractDisplay?.expiration ?? parsed?.expiry ?? "--"}
-                    </button>
-                  </span>
-                  <span className="data-table-cell data-table-cell-number">
-                    <button className="instrument-cell-button" type="button" onClick={focusContract}>
-                      {contractDisplay?.strike.replace(/[CP]$/, "") ?? "--"}
-                    </button>
-                  </span>
-                  <span className="data-table-cell">
-                    <button className="instrument-cell-button" type="button" onClick={focusContract}>
-                      {parsed?.right ?? contractDisplay?.strike.slice(-1) ?? "--"}
-                    </button>
-                  </span>
-                  <span className="data-table-cell data-table-cell-number">{typeof spot === "number" ? formatPrice(spot) : "--"}</span>
-                  <span className="data-table-cell data-table-cell-number">
-                    {formatSize(print.size)}@{formatPrice(print.price)}_{nbboSide ?? "--"}
-                  </span>
-                  <span className="data-table-cell">{print.option_type ?? "--"}</span>
-                  <span className="data-table-cell data-table-cell-number notional-emphasis">${formatCompactUsd(notional)}</span>
-                  <span className="data-table-cell">
-                    {nbboSide ? (
-                      <span className={`nbbo-tag nbbo-tag-${nbboSide.toLowerCase()}`}>{nbboSide}</span>
-                    ) : (
-                      "--"
-                    )}
-                  </span>
-                  <span className="data-table-cell data-table-cell-number">{typeof iv === "number" ? formatPct(iv) : "--"}</span>
-                  <span className="data-table-cell">{decor ? humanizeClassifierId(decor.family) : "--"}</span>
-                </>
-              );
-
-              return decor ? (
-                <button
-                  type="button"
-                  {...commonProps}
-                  key={`${print.trace_id}-${print.seq}`}
-                  onClick={() =>
-                    decor.smartMoney
-                      ? state.openFromSmartMoneyEvent(decor.smartMoney)
-                      : decor.hit
-                        ? state.openFromClassifierHit(decor.hit)
-                        : undefined
-                  }
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      if (decor.smartMoney) {
-                        state.openFromSmartMoneyEvent(decor.smartMoney);
-                      } else if (decor.hit) {
-                        state.openFromClassifierHit(decor.hit);
-                      }
-                    }
-                  }}
+              <div className="data-table-scroll" ref={state.optionsScroll.setListRef}>
+                <div
+                  className="data-table-body"
+                  style={{ height: `${virtual.totalSize}px` }}
+                  aria-hidden={virtual.virtualItems.length === 0}
                 >
-                  {cells}
-                </button>
-              ) : (
-                <div {...commonProps} key={`${print.trace_id}-${print.seq}`}>
-                  {cells}
+                  {virtual.virtualItems.map(({ item: print, key, index, start, size }) => {
+                    const contractId = normalizeContractId(print.option_contract_id);
+                    const parsed = parseOptionContractId(contractId);
+                    const contractDisplay = formatOptionContractLabel(contractId);
+                    const quote = state.historicalNbboByTraceId.get(print.trace_id) ?? state.nbboMap.get(contractId);
+                    const hasPreservedNbbo = typeof print.execution_nbbo_side === "string";
+                    const nbboSide =
+                      print.execution_nbbo_side ??
+                      print.nbbo_side ??
+                      (!hasPreservedNbbo ? classifyNbboSide(print.price, quote) : null);
+                    const notional = print.notional ?? print.price * print.size * 100;
+                    const spot = print.execution_underlying_spot;
+                    const iv = print.execution_iv;
+                    const decor = state.classifierDecorByOptionTraceId.get(print.trace_id);
+                    const focusContract = (event: ReactMouseEvent<HTMLButtonElement>) => {
+                      event.stopPropagation();
+                      state.focusOptionContract(print);
+                    };
+                    const rowStyle = {
+                      ...(decor
+                        ? ({ "--classifier-intensity": decor.intensity } as CSSProperties)
+                        : undefined),
+                      transform: `translateY(${start}px)`
+                    } as CSSProperties;
+                    const commonProps = {
+                      className: `data-table-row data-table-row-button data-table-row-classified data-table-row-options data-table-virtual-row${index % 2 === 1 ? " is-even" : ""}${decor ? ` is-classified classifier-${decor.tone}` : ""}`,
+                      style: rowStyle,
+                      "data-index": index,
+                      "data-row-start": String(start),
+                      "data-row-size": String(size),
+                      "data-tape-key": key
+                    };
+                    const cells = (
+                      <>
+                        <span className="data-table-cell data-table-cell-number">{formatTime(print.ts)}</span>
+                        <span className="data-table-cell">
+                          <button className="instrument-cell-button" type="button" onClick={focusContract}>
+                            {contractDisplay?.ticker ?? parsed?.root ?? formatContractLabel(contractId)}
+                          </button>
+                        </span>
+                        <span className="data-table-cell">
+                          <button className="instrument-cell-button" type="button" onClick={focusContract}>
+                            {contractDisplay?.expiration ?? parsed?.expiry ?? "--"}
+                          </button>
+                        </span>
+                        <span className="data-table-cell data-table-cell-number">
+                          <button className="instrument-cell-button" type="button" onClick={focusContract}>
+                            {contractDisplay?.strike.replace(/[CP]$/, "") ?? "--"}
+                          </button>
+                        </span>
+                        <span className="data-table-cell">
+                          <button className="instrument-cell-button" type="button" onClick={focusContract}>
+                            {parsed?.right ?? contractDisplay?.strike.slice(-1) ?? "--"}
+                          </button>
+                        </span>
+                        <span className="data-table-cell data-table-cell-number">{typeof spot === "number" ? formatPrice(spot) : "--"}</span>
+                        <span className="data-table-cell data-table-cell-number">
+                          {formatSize(print.size)}@{formatPrice(print.price)}_{nbboSide ?? "--"}
+                        </span>
+                        <span className="data-table-cell">{print.option_type ?? "--"}</span>
+                        <span className="data-table-cell data-table-cell-number notional-emphasis">${formatCompactUsd(notional)}</span>
+                        <span className="data-table-cell">
+                          {nbboSide ? (
+                            <span className={`nbbo-tag nbbo-tag-${nbboSide.toLowerCase()}`}>{nbboSide}</span>
+                          ) : (
+                            "--"
+                          )}
+                        </span>
+                        <span className="data-table-cell data-table-cell-number">{typeof iv === "number" ? formatPct(iv) : "--"}</span>
+                        <span className="data-table-cell">{decor ? humanizeClassifierId(decor.family) : "--"}</span>
+                      </>
+                    );
+
+                    return decor ? (
+                      <button
+                        type="button"
+                        {...commonProps}
+                        key={key}
+                        onClick={() =>
+                          decor.smartMoney
+                            ? state.openFromSmartMoneyEvent(decor.smartMoney)
+                            : decor.hit
+                              ? state.openFromClassifierHit(decor.hit)
+                              : undefined
+                        }
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            if (decor.smartMoney) {
+                              state.openFromSmartMoneyEvent(decor.smartMoney);
+                            } else if (decor.hit) {
+                              state.openFromClassifierHit(decor.hit);
+                            }
+                          }
+                        }}
+                      >
+                        {cells}
+                      </button>
+                    ) : (
+                      <div {...commonProps} key={key}>
+                        {cells}
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-              })}
-              {virtual.bottomSpacerHeight > 0 ? (
-                <div className="data-table-spacer" style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
-              ) : null}
+              </div>
             </div>
           </div>
         )}
       </div>
     </Pane>
   );
-};
+});
 
 type EquitiesPaneProps = {
+  state: TerminalState;
   limit?: number;
 };
 
-const EquitiesPane = ({ limit }: EquitiesPaneProps) => {
-  const state = useTerminal();
+const EquitiesPane = memo(({ state, limit }: EquitiesPaneProps) => {
   const items = limit ? state.filteredEquities.slice(0, limit) : state.filteredEquities;
-  const virtual = useVirtualList(items, state.equitiesScroll.listRef, !limit, 36);
-  useBottomHistoryGate(state.equitiesScroll.listRef, state.mode === "live" && !limit, () =>
+  const virtual = useTapeVirtualList(items, state.equitiesScroll.listRef, getTapeVirtualConfig("equities"));
+  useVirtualHistoryGate(state.mode === "live" && !limit, items.length, virtual.virtualItems.at(-1)?.index ?? -1, () =>
     void state.liveSession.loadOlder("equities")
   );
 
@@ -6308,18 +7214,22 @@ const EquitiesPane = ({ limit }: EquitiesPaneProps) => {
       <div className="data-table-shell">
         {items.length === 0 ? (
           <div className="empty">
-            {state.tickerSet.size > 0
-              ? "No equity prints match the current filter."
-              : state.mode === "live"
-                ? state.equitiesSilentWarning
-                  ? "Connected but no equity prints received. Check ingest-equities."
-                : state.equities.status === "stale"
-                  ? "Feed behind. Waiting for fresh equity prints."
-                  : "No equity prints yet. Start ingest-equities."
+            {state.mode === "live"
+              ? state.equities.status === "stale"
+                ? "Feed behind. Waiting for fresh equity prints."
+                : state.equitiesScopedQuiet
+                  ? "No recent equity prints for this scope yet."
+                  : state.tickerSet.size > 0
+                    ? "No equity prints match the current filter."
+                    : state.equitiesSilentWarning
+                      ? "Connected but no equity prints received. Check ingest-equities."
+                      : "No equity prints yet. Start ingest-equities."
+              : state.tickerSet.size > 0
+                ? "No equity prints match the current filter."
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          <div className="data-table-wrap" ref={state.equitiesScroll.setListRef}>
+          <div className="data-table-wrap">
             <div className="data-table data-table-equities" role="table" aria-label="Equity prints">
               <div className="data-table-head" role="row">
                 <span className="data-table-cell">TIME</span>
@@ -6329,53 +7239,54 @@ const EquitiesPane = ({ limit }: EquitiesPaneProps) => {
                 <span className="data-table-cell">VENUE</span>
                 <span className="data-table-cell">TAPE</span>
               </div>
-            {virtual.topSpacerHeight > 0 ? (
-              <div className="data-table-spacer" style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
-            ) : null}
-            {virtual.visibleItems.map((print) => (
-              <div className="data-table-row data-table-row-equities" key={`${print.trace_id}-${print.seq}`}>
-                <span className="data-table-cell data-table-cell-number">{formatTime(print.ts)}</span>
-                <span className="data-table-cell">
-                  <button
-                    className="instrument-cell-button"
-                    type="button"
-                    onClick={() =>
-                      state.setSelectedInstrument({
-                        kind: "equity",
-                        underlyingId: print.underlying_id.toUpperCase()
-                      })
-                    }
-                  >
-                    {print.underlying_id}
-                  </button>
-                </span>
-                <span className="data-table-cell data-table-cell-number">${formatPrice(print.price)}</span>
-                <span className="data-table-cell data-table-cell-number">{formatSize(print.size)}x</span>
-                <span className="data-table-cell">{print.exchange}</span>
-                <span className="data-table-cell">{print.offExchangeFlag ? "Off-Ex" : "Lit"}</span>
+              <div className="data-table-scroll" ref={state.equitiesScroll.setListRef}>
+                <div className="data-table-body" style={{ height: `${virtual.totalSize}px` }}>
+                  {virtual.virtualItems.map(({ item: print, key, index, start, size }) => (
+                    <div
+                      className={`data-table-row data-table-row-equities data-table-virtual-row${index % 2 === 1 ? " is-even" : ""}`}
+                      key={key}
+                      data-index={index}
+                      data-row-start={String(start)}
+                      data-row-size={String(size)}
+                      data-tape-key={key}
+                      style={{ transform: `translateY(${start}px)` }}
+                    >
+                      <span className="data-table-cell data-table-cell-number">{formatTime(print.ts)}</span>
+                      <span className="data-table-cell">
+                        <button
+                          className="instrument-cell-button"
+                          type="button"
+                          onClick={() => state.focusEquityTicker(print)}
+                        >
+                          {print.underlying_id}
+                        </button>
+                      </span>
+                      <span className="data-table-cell data-table-cell-number">${formatPrice(print.price)}</span>
+                      <span className="data-table-cell data-table-cell-number">{formatSize(print.size)}x</span>
+                      <span className="data-table-cell">{print.exchange}</span>
+                      <span className="data-table-cell">{print.offExchangeFlag ? "Off-Ex" : "Lit"}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            ))}
-            {virtual.bottomSpacerHeight > 0 ? (
-              <div className="data-table-spacer" style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
-            ) : null}
             </div>
           </div>
         )}
       </div>
     </Pane>
   );
-};
+});
 
 type FlowPaneProps = {
+  state: TerminalState;
   limit?: number;
   title?: string;
 };
 
-const FlowPane = ({ limit, title = "Flow" }: FlowPaneProps) => {
-  const state = useTerminal();
+const FlowPane = memo(({ state, limit, title = "Flow" }: FlowPaneProps) => {
   const items = limit ? state.filteredFlow.slice(0, limit) : state.filteredFlow;
-  const virtual = useVirtualList(items, state.flowScroll.listRef, !limit, 44);
-  useBottomHistoryGate(state.flowScroll.listRef, state.mode === "live" && !limit, () =>
+  const virtual = useTapeVirtualList(items, state.flowScroll.listRef, getTapeVirtualConfig("flow"));
+  useVirtualHistoryGate(state.mode === "live" && !limit, items.length, virtual.virtualItems.at(-1)?.index ?? -1, () =>
     void state.liveSession.loadOlder("flow")
   );
 
@@ -6415,7 +7326,7 @@ const FlowPane = ({ limit, title = "Flow" }: FlowPaneProps) => {
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          <div className="data-table-wrap" ref={state.flowScroll.setListRef}>
+          <div className="data-table-wrap">
             <div className="data-table data-table-flow" role="table" aria-label="Flow packets">
               <div className="data-table-head" role="row">
                 <span className="data-table-cell">TIME</span>
@@ -6428,96 +7339,102 @@ const FlowPane = ({ limit, title = "Flow" }: FlowPaneProps) => {
                 <span className="data-table-cell">NBBO</span>
                 <span className="data-table-cell">QUALITY</span>
               </div>
-            {virtual.topSpacerHeight > 0 ? (
-              <div className="data-table-spacer" style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
-            ) : null}
-            {virtual.visibleItems.map((packet) => {
-            const features = packet.features ?? {};
-            const contract = String(features.option_contract_id ?? packet.id ?? "unknown");
-            const count = parseNumber(features.count, packet.members.length);
-            const totalSize = parseNumber(features.total_size, 0);
-            const totalNotional = parseNumber(features.total_notional, Number.NaN);
-            const notional = Number.isFinite(totalNotional)
-              ? totalNotional
-              : parseNumber(features.total_premium, 0) * 100;
-            const startTs = parseNumber(features.start_ts, packet.source_ts);
-            const endTs = parseNumber(features.end_ts, startTs);
-            const windowMs = parseNumber(features.window_ms, 0);
-            const structureType =
-              typeof features.structure_type === "string" ? features.structure_type : "";
-            const structureLegs = parseNumber(features.structure_legs, 0);
-            const structureRights =
-              typeof features.structure_rights === "string" ? features.structure_rights : "";
-            const structureStrikes = parseNumber(features.structure_strikes, 0);
-            const nbboBid = parseNumber(features.nbbo_bid, Number.NaN);
-            const nbboAsk = parseNumber(features.nbbo_ask, Number.NaN);
-            const nbboMid = parseNumber(features.nbbo_mid, Number.NaN);
-            const nbboSpread = parseNumber(features.nbbo_spread, Number.NaN);
-            const aggressiveBuyRatio = parseNumber(features.nbbo_aggressive_buy_ratio, Number.NaN);
-            const aggressiveSellRatio = parseNumber(
-              features.nbbo_aggressive_sell_ratio,
-              Number.NaN
-            );
-            const aggressiveCoverage = parseNumber(features.nbbo_coverage_ratio, Number.NaN);
-            const insideRatio = parseNumber(features.nbbo_inside_ratio, Number.NaN);
-            const nbboAge = parseNumber(packet.join_quality.nbbo_age_ms, Number.NaN);
-            const nbboStale = parseNumber(packet.join_quality.nbbo_stale, 0) > 0;
-            const nbboMissing = parseNumber(packet.join_quality.nbbo_missing, 0) > 0;
-            const structureLabel = structureType
-              ? `${structureType.replace(/_/g, " ")}${structureRights ? ` ${structureRights}` : ""}${structureLegs > 0 ? ` ${structureLegs}L` : ""}${structureStrikes > 0 ? ` ${structureStrikes}K` : ""}`
-              : "--";
-            const nbboLabel = Number.isFinite(nbboBid) && Number.isFinite(nbboAsk)
-              ? `${formatPrice(nbboBid)} x ${formatPrice(nbboAsk)}`
-              : Number.isFinite(nbboMid)
-                ? `Mid ${formatPrice(nbboMid)}`
-                : "--";
-            const qualityLabel = [
-              Number.isFinite(aggressiveCoverage) && aggressiveCoverage > 0
-                ? `Agg ${formatPct(aggressiveBuyRatio)}/${formatPct(aggressiveSellRatio)} ${formatPct(aggressiveCoverage)} cov`
-                : null,
-              Number.isFinite(insideRatio) && insideRatio > 0 ? `In ${formatPct(insideRatio)}` : null,
-              Number.isFinite(nbboSpread) ? `Spr ${formatPrice(nbboSpread)}` : null,
-              Number.isFinite(nbboAge) ? `${Math.round(nbboAge)}ms` : null,
-              nbboStale ? "Stale" : null,
-              nbboMissing ? "Missing" : null
-            ].filter(Boolean).join(" | ");
+              <div className="data-table-scroll" ref={state.flowScroll.setListRef}>
+                <div className="data-table-body" style={{ height: `${virtual.totalSize}px` }}>
+                  {virtual.virtualItems.map(({ item: packet, key, index, start, size }) => {
+                    const features = packet.features ?? {};
+                    const contract = String(features.option_contract_id ?? packet.id ?? "unknown");
+                    const count = parseNumber(features.count, packet.members.length);
+                    const totalSize = parseNumber(features.total_size, 0);
+                    const totalNotional = parseNumber(features.total_notional, Number.NaN);
+                    const notional = Number.isFinite(totalNotional)
+                      ? totalNotional
+                      : parseNumber(features.total_premium, 0) * 100;
+                    const startTs = parseNumber(features.start_ts, packet.source_ts);
+                    const endTs = parseNumber(features.end_ts, startTs);
+                    const windowMs = parseNumber(features.window_ms, 0);
+                    const structureType =
+                      typeof features.structure_type === "string" ? features.structure_type : "";
+                    const structureLegs = parseNumber(features.structure_legs, 0);
+                    const structureRights =
+                      typeof features.structure_rights === "string" ? features.structure_rights : "";
+                    const structureStrikes = parseNumber(features.structure_strikes, 0);
+                    const nbboBid = parseNumber(features.nbbo_bid, Number.NaN);
+                    const nbboAsk = parseNumber(features.nbbo_ask, Number.NaN);
+                    const nbboMid = parseNumber(features.nbbo_mid, Number.NaN);
+                    const nbboSpread = parseNumber(features.nbbo_spread, Number.NaN);
+                    const aggressiveBuyRatio = parseNumber(features.nbbo_aggressive_buy_ratio, Number.NaN);
+                    const aggressiveSellRatio = parseNumber(
+                      features.nbbo_aggressive_sell_ratio,
+                      Number.NaN
+                    );
+                    const aggressiveCoverage = parseNumber(features.nbbo_coverage_ratio, Number.NaN);
+                    const insideRatio = parseNumber(features.nbbo_inside_ratio, Number.NaN);
+                    const nbboAge = parseNumber(packet.join_quality.nbbo_age_ms, Number.NaN);
+                    const nbboStale = parseNumber(packet.join_quality.nbbo_stale, 0) > 0;
+                    const nbboMissing = parseNumber(packet.join_quality.nbbo_missing, 0) > 0;
+                    const structureLabel = structureType
+                      ? `${structureType.replace(/_/g, " ")}${structureRights ? ` ${structureRights}` : ""}${structureLegs > 0 ? ` ${structureLegs}L` : ""}${structureStrikes > 0 ? ` ${structureStrikes}K` : ""}`
+                      : "--";
+                    const nbboLabel = Number.isFinite(nbboBid) && Number.isFinite(nbboAsk)
+                      ? `${formatPrice(nbboBid)} x ${formatPrice(nbboAsk)}`
+                      : Number.isFinite(nbboMid)
+                        ? `Mid ${formatPrice(nbboMid)}`
+                        : "--";
+                    const qualityLabel = [
+                      Number.isFinite(aggressiveCoverage) && aggressiveCoverage > 0
+                        ? `Agg ${formatPct(aggressiveBuyRatio)}/${formatPct(aggressiveSellRatio)} ${formatPct(aggressiveCoverage)} cov`
+                        : null,
+                      Number.isFinite(insideRatio) && insideRatio > 0 ? `In ${formatPct(insideRatio)}` : null,
+                      Number.isFinite(nbboSpread) ? `Spr ${formatPrice(nbboSpread)}` : null,
+                      Number.isFinite(nbboAge) ? `${Math.round(nbboAge)}ms` : null,
+                      nbboStale ? "Stale" : null,
+                      nbboMissing ? "Missing" : null
+                    ].filter(Boolean).join(" | ");
 
-            return (
-              <div className={`data-table-row data-table-row-flow${nbboStale || nbboMissing ? " data-table-row-warn" : ""}`} key={packet.id}>
-                <span className="data-table-cell data-table-cell-number">{formatTime(startTs)} → {formatTime(endTs)}</span>
-                <span className="data-table-cell">{contract}</span>
-                <span className="data-table-cell data-table-cell-number">{formatFlowMetric(count)}</span>
-                <span className="data-table-cell data-table-cell-number">{formatFlowMetric(totalSize)}</span>
-                <span className="data-table-cell data-table-cell-number">${formatUsd(notional)}</span>
-                <span className="data-table-cell data-table-cell-number">{windowMs > 0 ? formatFlowMetric(windowMs, "ms") : "--"}</span>
-                <span className="data-table-cell">{structureLabel}</span>
-                <span className="data-table-cell data-table-cell-number">{nbboLabel}</span>
-                <span className="data-table-cell">{qualityLabel || "--"}</span>
+                    return (
+                      <div
+                        className={`data-table-row data-table-row-flow data-table-virtual-row${index % 2 === 1 ? " is-even" : ""}${nbboStale || nbboMissing ? " data-table-row-warn" : ""}`}
+                        key={key}
+                        data-index={index}
+                        data-row-start={String(start)}
+                        data-row-size={String(size)}
+                        data-tape-key={key}
+                        style={{ transform: `translateY(${start}px)` }}
+                      >
+                        <span className="data-table-cell data-table-cell-number">{formatTime(startTs)} → {formatTime(endTs)}</span>
+                        <span className="data-table-cell">{contract}</span>
+                        <span className="data-table-cell data-table-cell-number">{formatFlowMetric(count)}</span>
+                        <span className="data-table-cell data-table-cell-number">{formatFlowMetric(totalSize)}</span>
+                        <span className="data-table-cell data-table-cell-number">${formatUsd(notional)}</span>
+                        <span className="data-table-cell data-table-cell-number">{windowMs > 0 ? formatFlowMetric(windowMs, "ms") : "--"}</span>
+                        <span className="data-table-cell">{structureLabel}</span>
+                        <span className="data-table-cell data-table-cell-number">{nbboLabel}</span>
+                        <span className="data-table-cell">{qualityLabel || "--"}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            );
-            })}
-            {virtual.bottomSpacerHeight > 0 ? (
-              <div className="data-table-spacer" style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
-            ) : null}
             </div>
           </div>
         )}
       </div>
     </Pane>
   );
-};
+});
 
 type AlertsPaneProps = {
+  state: TerminalState;
   limit?: number;
   withStrip?: boolean;
   className?: string;
 };
 
-const AlertsPane = ({ limit, withStrip = false, className }: AlertsPaneProps) => {
-  const state = useTerminal();
+const AlertsPane = memo(({ state, limit, withStrip = false, className }: AlertsPaneProps) => {
   const items = limit ? state.filteredAlerts.slice(0, limit) : state.filteredAlerts;
-  const virtual = useVirtualList(items, state.alertsScroll.listRef, !limit, 46);
-  useBottomHistoryGate(state.alertsScroll.listRef, state.mode === "live" && !limit, () =>
+  const virtual = useTapeVirtualList(items, state.alertsScroll.listRef, getTapeVirtualConfig("alerts"));
+  useVirtualHistoryGate(state.mode === "live" && !limit, items.length, virtual.virtualItems.at(-1)?.index ?? -1, () =>
     void state.liveSession.loadOlder("alerts")
   );
 
@@ -6557,7 +7474,7 @@ const AlertsPane = ({ limit, withStrip = false, className }: AlertsPaneProps) =>
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          <div className="data-table-wrap" ref={state.alertsScroll.setListRef}>
+          <div className="data-table-wrap">
             <div className="data-table data-table-alerts" role="table" aria-label="Alerts">
               <div className="data-table-head" role="row">
                 <span className="data-table-cell">TIME</span>
@@ -6568,58 +7485,57 @@ const AlertsPane = ({ limit, withStrip = false, className }: AlertsPaneProps) =>
                 <span className="data-table-cell">DIR</span>
                 <span className="data-table-cell">NOTE</span>
               </div>
-            {virtual.topSpacerHeight > 0 ? (
-              <div className="data-table-spacer" style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
-            ) : null}
-            {virtual.visibleItems.map((alert) => {
-            const primary = alert.hits[0];
-            const direction = deriveAlertDirection(alert);
-            const severity = normalizeAlertSeverity(alert);
+              <div className="data-table-scroll" ref={state.alertsScroll.setListRef}>
+                <div className="data-table-body" style={{ height: `${virtual.totalSize}px` }}>
+                  {virtual.virtualItems.map(({ item: alert, key, index, start, size }) => {
+                    const primary = alert.hits[0];
+                    const direction = deriveAlertDirection(alert);
+                    const severity = normalizeAlertSeverity(alert);
 
-            return (
-              <button
-                className={`data-table-row data-table-row-button data-table-row-alerts data-table-row-severity-${severity}`}
-                key={`${alert.trace_id}-${alert.seq}`}
-                type="button"
-                onClick={() => {
-                  state.setSelectedDarkEvent(null);
-                  state.setSelectedClassifierHit(null);
-                  state.setSelectedSmartMoneyEvent(null);
-                  state.setSelectedAlert(alert);
-                }}
-              >
-                <span className="data-table-cell data-table-cell-number">{formatTime(alert.source_ts)}</span>
-                <span className="data-table-cell">{primary ? humanizeClassifierId(primary.classifier_id) : "Alert"}</span>
-                <span className="data-table-cell">{severity}</span>
-                <span className="data-table-cell data-table-cell-number">{Math.round(alert.score)}</span>
-                <span className="data-table-cell data-table-cell-number">{alert.hits.length}</span>
-                <span className="data-table-cell">{direction}</span>
-                <span className="data-table-cell">{primary?.explanations?.[0] ?? "--"}</span>
-              </button>
-            );
-            })}
-            {virtual.bottomSpacerHeight > 0 ? (
-              <div className="data-table-spacer" style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
-            ) : null}
+                    return (
+                      <button
+                        className={`data-table-row data-table-row-button data-table-row-alerts data-table-virtual-row${index % 2 === 1 ? " is-even" : ""} data-table-row-severity-${severity}`}
+                        key={key}
+                        type="button"
+                        data-index={index}
+                        data-row-start={String(start)}
+                        data-row-size={String(size)}
+                        data-tape-key={key}
+                        style={{ transform: `translateY(${start}px)` }}
+                        onClick={() => {
+                          state.setSelectedDarkEvent(null);
+                          state.setSelectedClassifierHit(null);
+                          state.setSelectedSmartMoneyEvent(null);
+                          state.setSelectedAlert(alert);
+                        }}
+                      >
+                        <span className="data-table-cell data-table-cell-number">{formatTime(alert.source_ts)}</span>
+                        <span className="data-table-cell">{primary ? humanizeClassifierId(primary.classifier_id) : "Alert"}</span>
+                        <span className="data-table-cell">{severity}</span>
+                        <span className="data-table-cell data-table-cell-number">{Math.round(alert.score)}</span>
+                        <span className="data-table-cell data-table-cell-number">{alert.hits.length}</span>
+                        <span className="data-table-cell">{direction}</span>
+                        <span className="data-table-cell">{primary?.explanations?.[0] ?? "--"}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         )}
       </div>
     </Pane>
   );
-};
+});
 
 type ClassifierPaneProps = {
+  state: TerminalState;
   limit?: number;
   className?: string;
 };
 
-const ClassifierPane = ({ limit, className }: ClassifierPaneProps) => {
-  const state = useTerminal();
-  useBottomHistoryGate(state.classifierScroll.listRef, state.mode === "live" && !limit, () => {
-    void state.liveSession.loadOlder("smart-money");
-    void state.liveSession.loadOlder("classifier-hits");
-  });
+const ClassifierPane = memo(({ state, limit, className }: ClassifierPaneProps) => {
   const smartMoneyItems = limit ? state.filteredSmartMoneyEvents.slice(0, limit) : state.filteredSmartMoneyEvents;
   const legacyItems =
     smartMoneyItems.length === 0
@@ -6629,12 +7545,11 @@ const ClassifierPane = ({ limit, className }: ClassifierPaneProps) => {
       : [];
   const items: Array<SmartMoneyEvent | ClassifierHitEvent> =
     smartMoneyItems.length > 0 ? smartMoneyItems : legacyItems;
-  const virtual = useVirtualList<SmartMoneyEvent | ClassifierHitEvent>(
-    items,
-    state.classifierScroll.listRef,
-    !limit,
-    44
-  );
+  const virtual = useTapeVirtualList(items, state.classifierScroll.listRef, getTapeVirtualConfig("classifier"));
+  useVirtualHistoryGate(state.mode === "live" && !limit, items.length, virtual.virtualItems.at(-1)?.index ?? -1, () => {
+    void state.liveSession.loadOlder("smart-money");
+    void state.liveSession.loadOlder("classifier-hits");
+  });
   const showingSmartMoney = smartMoneyItems.length > 0;
 
   return (
@@ -6672,7 +7587,7 @@ const ClassifierPane = ({ limit, className }: ClassifierPaneProps) => {
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          <div className="data-table-wrap" ref={state.classifierScroll.setListRef}>
+          <div className="data-table-wrap">
             <div className="data-table data-table-classifier" role="table" aria-label="Smart money profiles">
               <div className="data-table-head" role="row">
                 <span className="data-table-cell">TIME</span>
@@ -6681,72 +7596,82 @@ const ClassifierPane = ({ limit, className }: ClassifierPaneProps) => {
                 <span className="data-table-cell">PROB</span>
                 <span className="data-table-cell">NOTE</span>
               </div>
-            {virtual.topSpacerHeight > 0 ? (
-              <div className="data-table-spacer" style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
-            ) : null}
-            {showingSmartMoney ? (virtual.visibleItems as SmartMoneyEvent[]).map((event) => {
-            const primaryScore =
-              event.profile_scores.find((score) => score.profile_id === event.primary_profile_id) ??
-              event.profile_scores[0];
-            const direction = normalizeDirection(event.primary_direction);
-            return (
-              <button
-                className={`data-table-row data-table-row-button data-table-row-classifier data-table-row-direction-${direction}`}
-                key={`${event.trace_id}-${event.seq}`}
-                type="button"
-                onClick={() => state.openFromSmartMoneyEvent(event)}
-              >
-                <span className="data-table-cell data-table-cell-number">{formatTime(event.source_ts)}</span>
-                <span className="data-table-cell">{smartMoneyProfileLabel(event.primary_profile_id)}</span>
-                <span className="data-table-cell">{direction}</span>
-                <span className="data-table-cell data-table-cell-number">
-                  {primaryScore ? formatConfidence(primaryScore.probability) : "--"}
-                </span>
-                <span className="data-table-cell">
-                  {event.abstained
-                    ? event.suppressed_reasons[0] ?? "abstained"
-                    : primaryScore?.reasons[0] ?? primaryScore?.confidence_band ?? "--"}
-                </span>
-              </button>
-            );
-            }) : (virtual.visibleItems as ClassifierHitEvent[]).map((hit) => {
-              const direction = normalizeDirection(hit.direction);
-              return (
-                <button
-                  className={`data-table-row data-table-row-button data-table-row-classifier data-table-row-direction-${direction}`}
-                  key={`${hit.trace_id}-${hit.seq}`}
-                  type="button"
-                  onClick={() => state.openFromClassifierHit(hit)}
-                >
-                  <span className="data-table-cell data-table-cell-number">{formatTime(hit.source_ts)}</span>
-                  <span className="data-table-cell">{humanizeClassifierId(hit.classifier_id)}</span>
-                  <span className="data-table-cell">{direction}</span>
-                  <span className="data-table-cell data-table-cell-number">{formatConfidence(hit.confidence)}</span>
-                  <span className="data-table-cell">{hit.explanations?.[0] ?? "--"}</span>
-                </button>
-              );
-            })}
-            {virtual.bottomSpacerHeight > 0 ? (
-              <div className="data-table-spacer" style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
-            ) : null}
+              <div className="data-table-scroll" ref={state.classifierScroll.setListRef}>
+                <div className="data-table-body" style={{ height: `${virtual.totalSize}px` }}>
+                  {showingSmartMoney ? virtual.virtualItems.map(({ item, key, index, start, size }) => {
+                    const event = item as SmartMoneyEvent;
+                    const primaryScore =
+                      event.profile_scores.find((score) => score.profile_id === event.primary_profile_id) ??
+                      event.profile_scores[0];
+                    const direction = normalizeDirection(event.primary_direction);
+                    return (
+                      <button
+                        className={`data-table-row data-table-row-button data-table-row-classifier data-table-virtual-row${index % 2 === 1 ? " is-even" : ""} data-table-row-direction-${direction}`}
+                        key={key}
+                        type="button"
+                        data-index={index}
+                        data-row-start={String(start)}
+                        data-row-size={String(size)}
+                        data-tape-key={key}
+                        style={{ transform: `translateY(${start}px)` }}
+                        onClick={() => state.openFromSmartMoneyEvent(event)}
+                      >
+                        <span className="data-table-cell data-table-cell-number">{formatTime(event.source_ts)}</span>
+                        <span className="data-table-cell">{smartMoneyProfileLabel(event.primary_profile_id)}</span>
+                        <span className="data-table-cell">{direction}</span>
+                        <span className="data-table-cell data-table-cell-number">
+                          {primaryScore ? formatConfidence(primaryScore.probability) : "--"}
+                        </span>
+                        <span className="data-table-cell">
+                          {event.abstained
+                            ? event.suppressed_reasons[0] ?? "abstained"
+                            : primaryScore?.reasons[0] ?? primaryScore?.confidence_band ?? "--"}
+                        </span>
+                      </button>
+                    );
+                  }) : virtual.virtualItems.map(({ item, key, index, start, size }) => {
+                    const hit = item as ClassifierHitEvent;
+                    const direction = normalizeDirection(hit.direction);
+                    return (
+                      <button
+                        className={`data-table-row data-table-row-button data-table-row-classifier data-table-virtual-row${index % 2 === 1 ? " is-even" : ""} data-table-row-direction-${direction}`}
+                        key={key}
+                        type="button"
+                        data-index={index}
+                        data-row-start={String(start)}
+                        data-row-size={String(size)}
+                        data-tape-key={key}
+                        style={{ transform: `translateY(${start}px)` }}
+                        onClick={() => state.openFromClassifierHit(hit)}
+                      >
+                        <span className="data-table-cell data-table-cell-number">{formatTime(hit.source_ts)}</span>
+                        <span className="data-table-cell">{humanizeClassifierId(hit.classifier_id)}</span>
+                        <span className="data-table-cell">{direction}</span>
+                        <span className="data-table-cell data-table-cell-number">{formatConfidence(hit.confidence)}</span>
+                        <span className="data-table-cell">{hit.explanations?.[0] ?? "--"}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         )}
       </div>
     </Pane>
   );
-};
+});
 
 type DarkPaneProps = {
+  state: TerminalState;
   limit?: number;
   className?: string;
 };
 
-const DarkPane = ({ limit, className }: DarkPaneProps) => {
-  const state = useTerminal();
+const DarkPane = memo(({ state, limit, className }: DarkPaneProps) => {
   const items = limit ? state.filteredInferredDark.slice(0, limit) : state.filteredInferredDark;
-  const virtual = useVirtualList(items, state.darkScroll.listRef, !limit, 44);
-  useBottomHistoryGate(state.darkScroll.listRef, state.mode === "live" && !limit, () =>
+  const virtual = useTapeVirtualList(items, state.darkScroll.listRef, getTapeVirtualConfig("dark"));
+  useVirtualHistoryGate(state.mode === "live" && !limit, items.length, virtual.virtualItems.at(-1)?.index ?? -1, () =>
     void state.liveSession.loadOlder("inferred-dark")
   );
 
@@ -6785,7 +7710,7 @@ const DarkPane = ({ limit, className }: DarkPaneProps) => {
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
-          <div className="data-table-wrap" ref={state.darkScroll.setListRef}>
+          <div className="data-table-wrap">
             <div className="data-table data-table-dark" role="table" aria-label="Dark events">
               <div className="data-table-head" role="row">
                 <span className="data-table-cell">TIME</span>
@@ -6795,51 +7720,54 @@ const DarkPane = ({ limit, className }: DarkPaneProps) => {
                 <span className="data-table-cell">EVIDENCE</span>
                 <span className="data-table-cell">NOTE</span>
               </div>
-            {virtual.topSpacerHeight > 0 ? (
-              <div className="data-table-spacer" style={{ height: `${virtual.topSpacerHeight}px` }} aria-hidden />
-            ) : null}
-            {virtual.visibleItems.map((event) => {
-            const underlying = inferDarkUnderlying(event, state.equityPrintMap, state.equityJoinMap);
-            const evidenceCount = event.evidence_refs.length;
+              <div className="data-table-scroll" ref={state.darkScroll.setListRef}>
+                <div className="data-table-body" style={{ height: `${virtual.totalSize}px` }}>
+                  {virtual.virtualItems.map(({ item: event, key, index, start, size }) => {
+                    const underlying = inferDarkUnderlying(event, state.equityJoinMap);
+                    const evidenceCount = event.evidence_refs.length;
 
-            return (
-              <button
-                className="data-table-row data-table-row-button data-table-row-dark"
-                key={`${event.trace_id}-${event.seq}`}
-                type="button"
-                onClick={() => {
-                  state.setSelectedAlert(null);
-                  state.setSelectedClassifierHit(null);
-                  state.setSelectedSmartMoneyEvent(null);
-                  state.setSelectedDarkEvent(event);
-                }}
-              >
-                <span className="data-table-cell data-table-cell-number">{formatTime(event.source_ts)}</span>
-                <span className="data-table-cell">{humanizeClassifierId(event.type)}</span>
-                <span className="data-table-cell">{underlying ?? "Unknown"}</span>
-                <span className="data-table-cell data-table-cell-number">{formatConfidence(event.confidence)}</span>
-                <span className="data-table-cell data-table-cell-number">{evidenceCount}</span>
-                <span className="data-table-cell">{underlying ? "--" : "Underlying not in current equity cache."}</span>
-              </button>
-            );
-            })}
-            {virtual.bottomSpacerHeight > 0 ? (
-              <div className="data-table-spacer" style={{ height: `${virtual.bottomSpacerHeight}px` }} aria-hidden />
-            ) : null}
+                    return (
+                      <button
+                        className={`data-table-row data-table-row-button data-table-row-dark data-table-virtual-row${index % 2 === 1 ? " is-even" : ""}`}
+                        key={key}
+                        type="button"
+                        data-index={index}
+                        data-row-start={String(start)}
+                        data-row-size={String(size)}
+                        data-tape-key={key}
+                        style={{ transform: `translateY(${start}px)` }}
+                        onClick={() => {
+                          state.setSelectedAlert(null);
+                          state.setSelectedClassifierHit(null);
+                          state.setSelectedSmartMoneyEvent(null);
+                          state.setSelectedDarkEvent(event);
+                        }}
+                      >
+                        <span className="data-table-cell data-table-cell-number">{formatTime(event.source_ts)}</span>
+                        <span className="data-table-cell">{humanizeClassifierId(event.type)}</span>
+                        <span className="data-table-cell">{underlying ?? "Unknown"}</span>
+                        <span className="data-table-cell data-table-cell-number">{formatConfidence(event.confidence)}</span>
+                        <span className="data-table-cell data-table-cell-number">{evidenceCount}</span>
+                        <span className="data-table-cell">{underlying ? "--" : "Underlying not in current join cache."}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         )}
       </div>
     </Pane>
   );
-};
+});
 
 type ChartPaneProps = {
+  state: TerminalState;
   title?: string;
 };
 
-const ChartPane = ({ title = "Chart" }: ChartPaneProps) => {
-  const state = useTerminal();
+const ChartPane = memo(({ state, title = "Chart" }: ChartPaneProps) => {
 
   return (
     <Pane
@@ -6876,10 +7804,9 @@ const ChartPane = ({ title = "Chart" }: ChartPaneProps) => {
       />
     </Pane>
   );
-};
+});
 
-const FocusPane = () => {
-  const state = useTerminal();
+const FocusPane = memo(({ state }: { state: TerminalState }) => {
   const hits = state.chartSmartMoneyEvents.slice(-10).reverse();
   const dark = state.chartInferredDark.slice(-10).reverse();
 
@@ -6945,10 +7872,9 @@ const FocusPane = () => {
       </div>
     </Pane>
   );
-};
+});
 
-const ReplayConsole = () => {
-  const state = useTerminal();
+const ReplayConsole = memo(({ state }: { state: TerminalState }) => {
   const replayActive = state.mode === "replay";
 
   return (
@@ -6980,7 +7906,7 @@ const ReplayConsole = () => {
       </div>
     </Pane>
   );
-};
+});
 
 export function TerminalAppShell({ children }: { children: ReactNode }) {
   const state = useTerminalState();
@@ -7100,68 +8026,89 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
 }
 
 export function OverviewRoute() {
+  const state = useTerminal();
   return (
     <PageFrame title="Home">
       <div className="page-grid page-grid-home">
-        <ChartPane />
-        <EquitiesPane />
-        <AlertsPane withStrip />
+        <ChartPane state={state} />
+        <EquitiesPane state={state} />
+        <AlertsPane state={state} withStrip />
       </div>
     </PageFrame>
   );
 }
 
 export function TapeRoute() {
+  const state = useTerminal();
   return (
     <PageFrame
       title="Tape"
       actions={
         <>
-          <ContractFilterControl />
-          <FlowFilterControls />
+          <button
+            className={`terminal-button contract-filter-button${state.selectedInstrument?.kind === "option-contract" ? " is-active" : ""}`}
+            type="button"
+            disabled={state.selectedInstrument?.kind !== "option-contract"}
+            onClick={() => state.setSelectedInstrument(null)}
+            title={
+              state.selectedInstrument?.kind === "option-contract"
+                ? "Clear active contract filter"
+                : "Contract filter activates when you focus a contract in the Options tape"
+            }
+          >
+            <span className="contract-filter-button-label">
+              {state.selectedInstrument?.kind === "option-contract"
+                ? state.selectedInstrumentLabel
+                : "Contract Filter"}
+            </span>
+          </button>
+          <FlowFilterPopover filters={state.flowFilters} onChange={state.setFlowFilters} />
         </>
       }
     >
       <div className="page-grid page-grid-tape">
-        <OptionsPane />
-        <EquitiesPane />
-        <FlowPane title="Packets" />
+        <OptionsPane state={state} />
+        <EquitiesPane state={state} />
+        <FlowPane state={state} title="Packets" />
       </div>
     </PageFrame>
   );
 }
 
 export function SignalsRoute() {
+  const state = useTerminal();
   return (
     <PageFrame title="Signals">
       <div className="page-grid page-grid-signals">
-        <AlertsPane withStrip className="signals-pane-alerts" />
-        <ClassifierPane className="signals-pane-rules" />
-        <DarkPane className="signals-pane-dark" />
+        <AlertsPane state={state} withStrip className="signals-pane-alerts" />
+        <ClassifierPane state={state} className="signals-pane-rules" />
+        <DarkPane state={state} className="signals-pane-dark" />
       </div>
     </PageFrame>
   );
 }
 
 export function ChartsRoute() {
+  const state = useTerminal();
   return (
     <PageFrame title="Charts">
       <div className="page-grid page-grid-charts">
-        <ChartPane title="Price" />
-        <FocusPane />
+        <ChartPane state={state} title="Price" />
+        <FocusPane state={state} />
       </div>
     </PageFrame>
   );
 }
 
 export function ReplayRoute() {
+  const state = useTerminal();
   return (
     <PageFrame title="Replay">
       <div className="page-grid page-grid-replay">
-        <ReplayConsole />
-        <AlertsPane limit={10} withStrip />
-        <FlowPane limit={12} />
-        <OptionsPane limit={12} />
+        <ReplayConsole state={state} />
+        <AlertsPane state={state} limit={10} withStrip />
+        <FlowPane state={state} limit={12} />
+        <OptionsPane state={state} limit={12} />
       </div>
     </PageFrame>
   );

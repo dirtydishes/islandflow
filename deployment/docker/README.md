@@ -21,6 +21,7 @@ It is separate from the repo-root `docker-compose.yml`, which is still the light
 - `deployment/docker/Dockerfile.service`: shared Bun runtime image for most services
 - `deployment/docker/Dockerfile.ingest-options`: Bun runtime plus Python dependencies for Databento and IBKR adapters
 - `deployment/docker/Dockerfile.web`: multi-stage build for the Next.js web app
+- `deployment/docker/workspace-root/`: deployment-specific workspace snapshot (`package.json`, `tsconfig.base.json`, `bun.lock`) used by Docker builds
 - `deployment/docker/clickhouse/listen.xml`: forces ClickHouse to listen on IPv4 for other containers on the Docker network
 - `deployment/docker/.env.example`: container-oriented environment template
 
@@ -184,6 +185,22 @@ Use websocket support on whichever host serves `/ws/*`.
 If NPM is on multiple networks and names collide (for example another stack also exposes `api`), target explicit container names (`islandflow-vps-api-1`, `islandflow-vps-web-1`) instead of generic aliases.
 
 ## Updating the deployment
+
+This deployment installs dependencies from `deployment/docker/workspace-root/bun.lock` (not the repo-root lockfile).
+
+When dependencies change in any workspace used by Docker builds, refresh and validate the deployment snapshot first:
+
+```bash
+bun run sync:docker-workspace
+bun run check:docker-workspace
+```
+
+Then validate the VPS build path:
+
+```bash
+cd deployment/docker
+docker compose build web
+```
 
 When you pull new code:
 

@@ -5,6 +5,7 @@ import {
   SUBJECT_EQUITY_PRINTS,
   STREAM_EQUITY_CANDLES,
   STREAM_EQUITY_PRINTS,
+  buildStreamConfig,
   buildDurableConsumer,
   connectJetStreamWithRetry,
   ensureStream,
@@ -240,31 +241,8 @@ const run = async () => {
     { attempts: 120, delayMs: 500 }
   );
 
-  await ensureStream(jsm, {
-    name: STREAM_EQUITY_PRINTS,
-    subjects: [SUBJECT_EQUITY_PRINTS],
-    retention: "limits",
-    storage: "file",
-    discard: "old",
-    max_msgs_per_subject: -1,
-    max_msgs: -1,
-    max_bytes: -1,
-    max_age: 0,
-    num_replicas: 1
-  });
-
-  await ensureStream(jsm, {
-    name: STREAM_EQUITY_CANDLES,
-    subjects: [SUBJECT_EQUITY_CANDLES],
-    retention: "limits",
-    storage: "file",
-    discard: "old",
-    max_msgs_per_subject: -1,
-    max_msgs: -1,
-    max_bytes: -1,
-    max_age: 0,
-    num_replicas: 1
-  });
+  await ensureStream(jsm, buildStreamConfig(STREAM_EQUITY_PRINTS, SUBJECT_EQUITY_PRINTS, "raw"));
+  await ensureStream(jsm, buildStreamConfig(STREAM_EQUITY_CANDLES, SUBJECT_EQUITY_CANDLES, "derived"));
 
   const clickhouse = createClickHouseClient({
     url: env.CLICKHOUSE_URL,

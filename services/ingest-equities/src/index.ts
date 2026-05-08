@@ -5,6 +5,7 @@ import {
   SUBJECT_EQUITY_QUOTES,
   STREAM_EQUITY_PRINTS,
   STREAM_EQUITY_QUOTES,
+  buildStreamConfig,
   connectJetStreamWithRetry,
   ensureStream,
   publishJson
@@ -194,31 +195,8 @@ const run = async () => {
     { attempts: 120, delayMs: 500 }
   );
 
-  await ensureStream(jsm, {
-    name: STREAM_EQUITY_PRINTS,
-    subjects: [SUBJECT_EQUITY_PRINTS],
-    retention: "limits",
-    storage: "file",
-    discard: "old",
-    max_msgs_per_subject: -1,
-    max_msgs: -1,
-    max_bytes: -1,
-    max_age: 0,
-    num_replicas: 1
-  });
-
-  await ensureStream(jsm, {
-    name: STREAM_EQUITY_QUOTES,
-    subjects: [SUBJECT_EQUITY_QUOTES],
-    retention: "limits",
-    storage: "file",
-    discard: "old",
-    max_msgs_per_subject: -1,
-    max_msgs: -1,
-    max_bytes: -1,
-    max_age: 0,
-    num_replicas: 1
-  });
+  await ensureStream(jsm, buildStreamConfig(STREAM_EQUITY_PRINTS, SUBJECT_EQUITY_PRINTS, "raw"));
+  await ensureStream(jsm, buildStreamConfig(STREAM_EQUITY_QUOTES, SUBJECT_EQUITY_QUOTES, "raw"));
 
   const clickhouse = createClickHouseClient({
     url: env.CLICKHOUSE_URL,
@@ -251,11 +229,6 @@ const run = async () => {
       try {
         await insertEquityPrint(clickhouse, print);
         await publishJson(js, SUBJECT_EQUITY_PRINTS, print);
-        logger.info("published equity print", {
-          trace_id: print.trace_id,
-          seq: print.seq,
-          underlying_id: print.underlying_id
-        });
       } catch (error) {
         if (isExpectedShutdownError(error)) {
           return;

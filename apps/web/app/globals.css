@@ -954,17 +954,35 @@ h3 {
 }
 
 .data-table-wrap {
+  display: flex;
   flex: 1 1 auto;
   min-height: 0;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
   background: rgba(5, 8, 12, 0.42);
 }
 
 .data-table {
-  display: block;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
   min-width: 980px;
+}
+
+.data-table-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.data-table-body {
+  position: relative;
+  min-width: 100%;
 }
 
 .data-table-options {
@@ -999,10 +1017,8 @@ h3 {
 }
 
 .data-table-head {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  min-height: 30px;
+  flex: 0 0 auto;
+  height: 30px;
   padding: 0 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.095);
   background: rgba(8, 11, 16, 0.98);
@@ -1014,7 +1030,7 @@ h3 {
 
 .data-table-row {
   width: 100%;
-  min-height: 40px;
+  height: 40px;
   padding: 0 10px;
   border: 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.055);
@@ -1024,8 +1040,15 @@ h3 {
   text-align: left;
 }
 
-.data-table-row:nth-child(even) {
+.data-table-row.is-even {
   background: rgba(255, 255, 255, 0.022);
+}
+
+.data-table-virtual-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
 }
 
 .data-table-row:hover,
@@ -1039,18 +1062,18 @@ h3 {
 }
 
 .data-table-row-options {
-  min-height: 36px;
+  height: 36px;
 }
 
 .data-table-row-equities {
-  min-height: 34px;
+  height: 36px;
 }
 
 .data-table-row-flow,
 .data-table-row-alerts,
 .data-table-row-classifier,
 .data-table-row-dark {
-  min-height: 44px;
+  height: 44px;
 }
 
 .data-table-row-classified {

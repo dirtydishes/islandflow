@@ -1,24 +1,40 @@
 import { describe, expect, it } from "bun:test";
+import { getSubscriptionKey as getLiveSubscriptionKey } from "@islandflow/types";
 import {
   NAV_ITEMS,
+  appendHistoryTail,
   buildDefaultFlowFilters,
+  buildOptionTapeQueryParams,
   classifierToneForFamily,
+  composeTapeItems,
   deriveAlertDirection,
   countActiveFlowFilterGroups,
+  filterOptionTapeItems,
+  findAnchorRestoreIndex,
   formatCompactUsd,
   formatOptionContractLabel,
   flushPausableTapeData,
+  getEffectiveOptionPrintFilters,
   getAlertWindowAnchorTs,
+  getHotChannelFeedStatus,
+  getScopedLiveAutoHydrationChannels,
+  getLiveHistoryRetentionCap,
   getOptionTableSnapshot,
+  getOptionScope,
   getLiveFeedStatus,
   getLiveManifest,
+  getRouteFeatures,
+  getTapeVirtualConfig,
+  mergeNewestWithOverflow,
   normalizeAlertSeverity,
   nextFlowFilterPopoverState,
   projectPausableTapeState,
   reducePausableTapeData,
   shouldRetainLiveSnapshotHistory,
+  shouldIncludeEquitiesForDarkUnderlyingFallback,
   shouldShowEquitiesSilentFeedWarning,
   selectPrimaryClassifierHit,
+  shouldClearOptionFocusSeed,
   smartMoneyProfileLabel,
   smartMoneyToneForProfile,
   statusLabel,
@@ -30,6 +46,25 @@ const makeItem = (traceId: string, seq: number, ts: number) => ({
   seq,
   ts
 });
+
+const makeOptionPrint = (overrides: Record<string, unknown> = {}) =>
+  ({
+    trace_id: "opt-1",
+    seq: 1,
+    ts: 1_000,
+    source_ts: 1_000,
+    ingest_ts: 1_001,
+    option_contract_id: "AAPL-2025-01-17-200-C",
+    underlying_id: "AAPL",
+    option_type: "call",
+    nbbo_side: "A",
+    notional: 250_000,
+    signal_pass: true,
+    price: 1,
+    size: 10,
+    exchange: "X",
+    ...overrides
+  }) as any;
 
 const makeAlert = (overrides: Record<string, unknown> = {}) =>
   ({
@@ -43,15 +78,13 @@ const makeAlert = (overrides: Record<string, unknown> = {}) =>
   }) as any;
 
 describe("live manifest", () => {
-  it("includes options on home and tape", () => {
+  it("includes only tape channels on /tape", () => {
     const filters = buildDefaultFlowFilters();
-    for (const pathname of ["/", "/tape"]) {
-      expect(
-        getLiveManifest(pathname, "SPY", 60000, filters).some(
-          (subscription) => subscription.channel === "options"
-        )
-      ).toBe(true);
-    }
+    const channels = getLiveManifest("/tape", "SPY", 60000, filters).map(
+      (subscription) => subscription.channel
+    );
+
+    expect(channels).toEqual(["options", "nbbo", "equities", "flow"]);
   });
 
   it("dedupes tape options subscription", () => {
@@ -64,37 +97,29 @@ describe("live manifest", () => {
     expect(tapeOptionsSubscriptions).toHaveLength(1);
   });
 
-  it("keeps option filters on baseline subscription across page changes", () => {
+  it("keeps option filters on /tape options subscriptions", () => {
     const filters = {
       ...buildDefaultFlowFilters(),
       minNotional: 125_000
     };
 
-    const homeOptionsSubscription = getLiveManifest("/", "SPY", 60000, filters).find(
-      (subscription) => subscription.channel === "options"
-    );
     const tapeOptionsSubscription = getLiveManifest("/tape", "SPY", 60000, filters).find(
       (subscription) => subscription.channel === "options"
     );
 
-    expect(homeOptionsSubscription?.filters).toBe(filters);
     expect(tapeOptionsSubscription?.filters).toBe(filters);
   });
 
-  it("applies global flow filters to flow subscriptions on home and tape", () => {
+  it("applies global flow filters to flow subscriptions on /tape", () => {
     const filters = {
       ...buildDefaultFlowFilters(),
       minNotional: 50_000
     };
 
-    const homeFlowSubscription = getLiveManifest("/", "SPY", 60000, filters).find(
-      (subscription) => subscription.channel === "flow"
-    );
     const tapeFlowSubscription = getLiveManifest("/tape", "SPY", 60000, filters).find(
       (subscription) => subscription.channel === "flow"
     );
 
-    expect(homeFlowSubscription?.filters).toBe(filters);
     expect(tapeFlowSubscription?.filters).toBe(filters);
   });
 
@@ -122,6 +147,239 @@ describe("live manifest", () => {
     expect(optionsSubscription?.underlying_ids).toEqual(["AAPL"]);
     expect(optionsSubscription?.option_contract_id).toBe("AAPL-2025-01-17-200-C");
     expect(equitiesSubscription?.underlying_ids).toEqual(["AAPL"]);
+  });
+
+  it("drops option-print filters for contract-focused options subscriptions but keeps flow filters", () => {
+    const filters = {
+      ...buildDefaultFlowFilters(),
+      minNotional: 500_000,
+      optionTypes: ["put"] as const
+    };
+    const manifest = getLiveManifest(
+      "/tape",
+      "AAPL",
+      60000,
+      filters,
+      {
+        underlying_ids: ["AAPL"],
+        option_contract_id: "AAPL-2025-01-17-200-C"
+      },
+      { underlying_ids: ["AAPL"] },
+      undefined
+    );
+    const optionsSubscription = manifest.find((subscription) => subscription.channel === "options");
+    const flowSubscription = manifest.find((subscription) => subscription.channel === "flow");
+
+    expect(optionsSubscription?.filters).toBeUndefined();
+    expect(flowSubscription?.filters).toBe(filters);
+  });
+
+  it("scopes /signals subscriptions to signals channels only", () => {
+    const channels = getLiveManifest("/signals", "SPY", 60000, buildDefaultFlowFilters()).map(
+      (subscription) => subscription.channel
+    );
+
+    expect(channels).toEqual([
+      "alerts",
+      "smart-money",
+      "classifier-hits",
+      "inferred-dark",
+      "equity-joins"
+    ]);
+  });
+
+  it("scopes /charts subscriptions to chart channels only", () => {
+    const channels = getLiveManifest("/charts", "SPY", 60000, buildDefaultFlowFilters()).map(
+      (subscription) => subscription.channel
+    );
+
+    expect(channels).toEqual([
+      "smart-money",
+      "inferred-dark",
+      "equity-joins",
+      "equity-candles",
+      "equity-overlay"
+    ]);
+  });
+});
+
+describe("contract-focused option helpers", () => {
+  it("uses the focused contract underlying for option scope even when ticker input differs", () => {
+    expect(
+      getOptionScope(["MSFT"], "AAPL", {
+        kind: "option-contract",
+        contractId: "AAPL-2025-01-17-200-C",
+        underlyingId: "AAPL"
+      })
+    ).toEqual({
+      underlying_ids: ["AAPL"],
+      option_contract_id: "AAPL-2025-01-17-200-C"
+    });
+  });
+
+  it("ignores broad flow filters for focused contract options", () => {
+    const filters = {
+      ...buildDefaultFlowFilters(),
+      minNotional: 500_000
+    };
+    const items = [
+      makeOptionPrint({
+        trace_id: "focused-low",
+        option_contract_id: "AAPL-2025-01-17-200-C",
+        notional: 100_000,
+        signal_pass: false
+      }),
+      makeOptionPrint({
+        trace_id: "focused-high",
+        seq: 2,
+        ts: 2_000,
+        option_contract_id: "AAPL-2025-01-17-200-C",
+        notional: 750_000
+      }),
+      makeOptionPrint({
+        trace_id: "other-contract",
+        seq: 3,
+        ts: 3_000,
+        option_contract_id: "MSFT-2025-01-17-300-C",
+        underlying_id: "MSFT",
+        notional: 900_000
+      })
+    ];
+
+    expect(
+      filterOptionTapeItems(
+        items,
+        getEffectiveOptionPrintFilters(filters, true),
+        {
+          kind: "option-contract",
+          contractId: "AAPL-2025-01-17-200-C",
+          underlyingId: "AAPL"
+        },
+        new Set(["MSFT"]),
+        "AAPL"
+      ).map((item) => item.trace_id)
+    ).toEqual(["focused-low", "focused-high"]);
+  });
+
+  it("includes option_contract_id and drops broad filters in focused replay query params", () => {
+    const filters = {
+      ...buildDefaultFlowFilters(),
+      minNotional: 500_000,
+      optionTypes: ["put"] as const
+    };
+
+    expect(
+      buildOptionTapeQueryParams(getEffectiveOptionPrintFilters(filters, true), {
+        underlying_ids: ["AAPL"],
+        option_contract_id: "AAPL-2025-01-17-200-C"
+      })
+    ).toEqual({
+      underlying_ids: "AAPL",
+      option_contract_id: "AAPL-2025-01-17-200-C"
+    });
+  });
+
+  it("keeps the focus seed until the matching scoped subscription has loaded it", () => {
+    const seedItem = makeOptionPrint({
+      trace_id: "focused-seed",
+      option_contract_id: "AAPL-2025-01-17-200-C"
+    });
+    const seed = {
+      scopeKey: "option-contract:AAPL-2025-01-17-200-C",
+      subscriptionKey: getLiveSubscriptionKey({
+        channel: "options",
+        underlying_ids: ["AAPL"],
+        option_contract_id: "AAPL-2025-01-17-200-C"
+      }),
+      items: [seedItem]
+    };
+
+    expect(
+      shouldClearOptionFocusSeed(
+        seed,
+        "option-contract:AAPL-2025-01-17-200-C",
+        getLiveSubscriptionKey({
+          channel: "options",
+          filters: {
+            ...buildDefaultFlowFilters(),
+            minNotional: 500_000
+          },
+          underlying_ids: ["AAPL"]
+        }),
+        [makeOptionPrint({ trace_id: "broad-old" })],
+        []
+      )
+    ).toBe(false);
+
+    expect(
+      shouldClearOptionFocusSeed(
+        seed,
+        "option-contract:AAPL-2025-01-17-200-C",
+        getLiveSubscriptionKey({
+          channel: "options",
+          underlying_ids: ["AAPL"],
+          option_contract_id: "AAPL-2025-01-17-200-C"
+        }),
+        [seedItem],
+        []
+      )
+    ).toBe(true);
+  });
+});
+
+describe("route feature map", () => {
+  it("maps /tape to tape panes and dependencies", () => {
+    const features = getRouteFeatures("/tape");
+    expect(features.showOptionsPane).toBe(true);
+    expect(features.showEquitiesPane).toBe(true);
+    expect(features.showFlowPane).toBe(true);
+    expect(features.needsClassifierDecor).toBe(true);
+    expect(features.alerts).toBe(false);
+  });
+
+  it("maps /signals to signal panes and dependencies", () => {
+    const features = getRouteFeatures("/signals");
+    expect(features.showAlertsPane).toBe(true);
+    expect(features.showClassifierPane).toBe(true);
+    expect(features.showDarkPane).toBe(true);
+    expect(features.options).toBe(false);
+    expect(features.equityJoins).toBe(true);
+  });
+
+  it("maps /charts to chart panes and dependencies", () => {
+    const features = getRouteFeatures("/charts");
+    expect(features.showChartPane).toBe(true);
+    expect(features.showFocusPane).toBe(true);
+    expect(features.equityCandles).toBe(true);
+    expect(features.equityOverlay).toBe(true);
+    expect(features.alerts).toBe(false);
+  });
+});
+
+describe("fixed tape virtualization config", () => {
+  it("uses expected fixed row heights and overscan by table", () => {
+    expect(getTapeVirtualConfig("options")).toEqual({ rowHeight: 36, overscan: 24, debugLabel: "options" });
+    expect(getTapeVirtualConfig("equities")).toEqual({ rowHeight: 36, overscan: 20, debugLabel: "equities" });
+    expect(getTapeVirtualConfig("flow")).toEqual({ rowHeight: 44, overscan: 16, debugLabel: "flow" });
+    expect(getTapeVirtualConfig("alerts")).toEqual({ rowHeight: 44, overscan: 16, debugLabel: "alerts" });
+    expect(getTapeVirtualConfig("classifier")).toEqual({ rowHeight: 44, overscan: 16, debugLabel: "classifier" });
+    expect(getTapeVirtualConfig("dark")).toEqual({ rowHeight: 44, overscan: 16, debugLabel: "dark" });
+  });
+});
+
+describe("dark underlying route dependency helper", () => {
+  it("does not keep extra equities subscriptions when joins+trace fallback are sufficient", () => {
+    expect(shouldIncludeEquitiesForDarkUnderlyingFallback()).toBe(false);
+    expect(
+      getLiveManifest("/signals", "SPY", 60000, buildDefaultFlowFilters()).some(
+        (subscription) => subscription.channel === "equities"
+      )
+    ).toBe(false);
+    expect(
+      getLiveManifest("/charts", "SPY", 60000, buildDefaultFlowFilters()).some(
+        (subscription) => subscription.channel === "equities"
+      )
+    ).toBe(false);
   });
 });
 
@@ -237,6 +495,171 @@ describe("live tape pausable helpers", () => {
     expect(shouldRetainLiveSnapshotHistory("alerts", true, 0, 3)).toBe(false);
     expect(shouldRetainLiveSnapshotHistory("options", true, 1, 3)).toBe(false);
     expect(shouldRetainLiveSnapshotHistory("options", false, 0, 3)).toBe(false);
+  });
+});
+
+describe("live tape history helpers", () => {
+  it("composes tape items across seed, live, and history without seam duplicates", () => {
+    const seed = [makeItem("seed", 1, 100), makeItem("dup", 2, 200)];
+    const live = [makeItem("live", 5, 500), makeItem("dup", 2, 200)];
+    const history = [makeItem("old", 0, 50), makeItem("mid", 3, 300)];
+
+    expect(composeTapeItems(seed, live, history).map((item) => item.trace_id)).toEqual([
+      "live",
+      "mid",
+      "dup",
+      "seed",
+      "old"
+    ]);
+  });
+
+  it("keeps a clicked seed row visible before scoped live and history arrive", () => {
+    const clicked = makeItem("clicked", 3, 300);
+
+    expect(composeTapeItems([clicked], [], []).map((item) => item.trace_id)).toEqual(["clicked"]);
+  });
+
+  it("drops focus seed duplicates once equivalent live or history rows arrive", () => {
+    const clicked = makeItem("clicked", 3, 300);
+    const live = [makeItem("new", 4, 400)];
+    const history = [makeItem("clicked", 3, 300)];
+
+    expect(composeTapeItems([clicked], live, history).map((item) => item.trace_id)).toEqual([
+      "new",
+      "clicked"
+    ]);
+  });
+
+  it("promotes hot-window overflow into the history tail", () => {
+    const currentHot = [makeItem("hot-3", 3, 300), makeItem("hot-2", 2, 200), makeItem("hot-1", 1, 100)];
+    const incoming = [makeItem("hot-4", 4, 400)];
+
+    const { kept, evicted } = mergeNewestWithOverflow(incoming, currentHot, 3);
+    const nextHistory = appendHistoryTail([], evicted, kept, 5000);
+
+    expect(kept.map((item) => item.trace_id)).toEqual(["hot-4", "hot-3", "hot-2"]);
+    expect(nextHistory.map((item) => item.trace_id)).toEqual(["hot-1"]);
+  });
+
+  it("keeps the combined tape continuous beyond the hot live window", () => {
+    let hot: Array<ReturnType<typeof makeItem>> = [];
+    let history: Array<ReturnType<typeof makeItem>> = [];
+
+    for (let seq = 1; seq <= 5; seq += 1) {
+      const { kept, evicted } = mergeNewestWithOverflow([makeItem(`row-${seq}`, seq, seq * 100)], hot, 2);
+      hot = kept;
+      history = appendHistoryTail(history, evicted, hot, 5000);
+    }
+
+    expect([...hot, ...history].map((item) => item.trace_id)).toEqual([
+      "row-5",
+      "row-4",
+      "row-3",
+      "row-2",
+      "row-1"
+    ]);
+  });
+
+  it("appends older scoped rows behind the hot live head", () => {
+    const liveHead = Array.from({ length: 100 }, (_, idx) =>
+      makeItem(`hot-${idx}`, 200 - idx, 2_000 - idx)
+    );
+    const older = [makeItem("older-1", 99, 999), makeItem("older-2", 98, 998)];
+
+    const next = appendHistoryTail([], older, liveHead, 5000);
+
+    expect(next.map((item) => item.trace_id)).toEqual(["older-1", "older-2"]);
+  });
+
+  it("skips duplicates already present in the live head", () => {
+    const liveHead = [makeItem("latest", 3, 300), makeItem("duplicate", 2, 200)];
+    const older = [makeItem("duplicate", 2, 200), makeItem("older", 1, 100)];
+
+    const next = appendHistoryTail([], older, liveHead, 5000);
+
+    expect(next.map((item) => item.trace_id)).toEqual(["older"]);
+  });
+
+  it("dedupes the seam between promoted overflow and fetched history", () => {
+    const currentHot = [makeItem("hot-3", 3, 300), makeItem("hot-2", 2, 200), makeItem("hot-1", 1, 100)];
+    const { kept, evicted } = mergeNewestWithOverflow([makeItem("hot-4", 4, 400)], currentHot, 3);
+    const promoted = appendHistoryTail([], evicted, kept, 5000);
+    const merged = appendHistoryTail(promoted, [makeItem("hot-1", 1, 100), makeItem("older", 0, 50)], kept, 5000);
+
+    expect(merged.map((item) => item.trace_id)).toEqual(["hot-1", "older"]);
+    expect(new Set([...kept, ...merged].map((item) => item.trace_id)).size).toBe(kept.length + merged.length);
+  });
+
+  it("trims the history tail to the soft cap", () => {
+    const current = [makeItem("existing", 4, 400)];
+    const older = [makeItem("older-1", 3, 300), makeItem("older-2", 2, 200)];
+
+    const next = appendHistoryTail(current, older, [], 2);
+
+    expect(next.map((item) => item.trace_id)).toEqual(["existing", "older-1"]);
+  });
+
+  it("keeps scoped option and equity history on the normal retention cap", () => {
+    expect(
+      getLiveHistoryRetentionCap({
+        channel: "options",
+        underlying_ids: ["AAPL"],
+        option_contract_id: "AAPL-2025-01-17-200-C"
+      } as any)
+    ).toBeGreaterThan(0);
+    expect(
+      getLiveHistoryRetentionCap({
+        channel: "equities",
+        underlying_ids: ["AAPL"]
+      } as any)
+    ).toBeGreaterThan(0);
+  });
+
+  it("keeps auto-hydrating scoped live history while next_before exists", () => {
+    const manifest = getLiveManifest(
+      "/tape",
+      "AAPL",
+      60000,
+      buildDefaultFlowFilters(),
+      {
+        underlying_ids: ["AAPL"],
+        option_contract_id: "AAPL-2025-01-17-200-C"
+      },
+      { underlying_ids: ["AAPL"] }
+    );
+    const historyCursors = Object.fromEntries(
+      manifest.map((subscription) => [getLiveSubscriptionKey(subscription), { ts: 1, seq: 1 }])
+    );
+
+    expect(
+      getScopedLiveAutoHydrationChannels(true, "/tape", manifest, historyCursors, {})
+    ).toEqual(["options", "equities"]);
+    expect(
+      getScopedLiveAutoHydrationChannels(true, "/tape", manifest, historyCursors, {
+        [getLiveSubscriptionKey(manifest.find((subscription) => subscription.channel === "options")!)]: true
+      })
+    ).toEqual(["equities"]);
+    expect(
+      getScopedLiveAutoHydrationChannels(true, "/tape", manifest, {
+        ...historyCursors,
+        [getLiveSubscriptionKey(manifest.find((subscription) => subscription.channel === "equities")!)]: null
+      }, {})
+    ).toEqual(["options"]);
+  });
+
+  it("restores the same anchor key after live insertions at the top", () => {
+    const nextKeys = ["new-1", "new-2", "anchor", "after-1", "after-2"];
+    expect(findAnchorRestoreIndex(nextKeys, "anchor", ["anchor", "after-1", "after-2"])).toBe(2);
+  });
+
+  it("falls forward to the nearest surviving key when the anchor is evicted", () => {
+    const nextKeys = ["new-1", "after-1", "after-2"];
+    expect(findAnchorRestoreIndex(nextKeys, "anchor", ["anchor", "after-1", "after-2"])).toBe(1);
+  });
+
+  it("keeps the same anchor when history is appended at the bottom", () => {
+    const nextKeys = ["anchor", "after-1", "after-2", "older-1", "older-2"];
+    expect(findAnchorRestoreIndex(nextKeys, "anchor", ["anchor", "after-1", "after-2"])).toBe(0);
   });
 });
 
@@ -408,5 +831,14 @@ describe("signals helpers", () => {
   it("returns connected/stale live status labels without live wording", () => {
     expect(statusLabel("connected", false, "live")).toBe("Connected");
     expect(statusLabel("stale", false, "live")).toBe("Feed behind");
+  });
+
+  it("treats healthy scoped channels as connected even when no matching rows are visible", () => {
+    expect(getHotChannelFeedStatus("connected", { healthy: true })).toBe("connected");
+  });
+
+  it("surfaces feed behind only when the backend channel health is stale", () => {
+    expect(getHotChannelFeedStatus("connected", { healthy: false })).toBe("stale");
+    expect(getHotChannelFeedStatus("disconnected", { healthy: true })).toBe("disconnected");
   });
 });

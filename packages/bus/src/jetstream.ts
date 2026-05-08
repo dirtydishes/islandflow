@@ -84,6 +84,50 @@ export const ensureStream = async (
   }
 };
 
+const parseBoundedNumber = (value: string | undefined, fallback: number): number => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return fallback;
+  }
+  return Math.floor(parsed);
+};
+
+export type StreamRetentionClass = "raw" | "derived";
+
+export const resolveStreamRetention = (
+  streamClass: StreamRetentionClass,
+  env: Record<string, string | undefined> = process.env
+): Pick<StreamConfig, "max_bytes" | "max_age"> => {
+  if (streamClass === "raw") {
+    return {
+      max_age: parseBoundedNumber(env.STREAM_RAW_MAX_AGE_MS, 7_200_000),
+      max_bytes: parseBoundedNumber(env.STREAM_RAW_MAX_BYTES, 1_073_741_824)
+    };
+  }
+
+  return {
+    max_age: parseBoundedNumber(env.STREAM_DERIVED_MAX_AGE_MS, 86_400_000),
+    max_bytes: parseBoundedNumber(env.STREAM_DERIVED_MAX_BYTES, 536_870_912)
+  };
+};
+
+export const buildStreamConfig = (
+  name: string,
+  subject: string,
+  streamClass: StreamRetentionClass,
+  env: Record<string, string | undefined> = process.env
+): StreamConfig => ({
+  name,
+  subjects: [subject],
+  retention: "limits",
+  storage: "file",
+  discard: "old",
+  max_msgs_per_subject: -1,
+  max_msgs: -1,
+  ...resolveStreamRetention(streamClass, env),
+  num_replicas: 1
+});
+
 export const buildDurableConsumer = (
   durableName: string,
   deliverSubject: string = createInbox()
