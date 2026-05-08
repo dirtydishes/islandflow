@@ -299,6 +299,48 @@ cd /home/delta/islandflow/deployment/docker
 docker compose up -d
 ```
 
+## JetStream retention rollout
+
+JetStream in this stack is the live event buffer between ingest, compute, candles, replay, and API services. ClickHouse remains the durable history layer; JetStream should stay bounded enough to protect the VPS during normal live operation.
+
+Why redeploy alone is not enough for old streams:
+
+- Older streams keep the retention settings they were created with.
+- A code deploy only helps new streams unless something explicitly reconciles existing stream configs.
+- This repo now includes both startup reconciliation and a manual audit/apply command so live streams can be corrected in place without deleting them.
+
+Target retention baseline:
+
+- Raw streams: `60m`, `512 MiB`
+- Derived streams: `12h`, `256 MiB`
+
+Audit current stream caps from a running service container:
+
+```bash
+cd deployment/docker
+docker compose exec api bun packages/bus/src/reconcile-streams.ts --check
+```
+
+Apply in-place reconciliation:
+
+```bash
+cd deployment/docker
+docker compose exec api bun packages/bus/src/reconcile-streams.ts --apply
+```
+
+Verify the rollout:
+
+1. Re-run `--check` and require all lines to report `✓`.
+2. Inspect service logs for any `structural-mismatch` line or reconciliation failure.
+3. Confirm the production `.env` keeps these values:
+   - `STREAM_RAW_MAX_AGE_MS=3600000`
+   - `STREAM_RAW_MAX_BYTES=536870912`
+   - `STREAM_DERIVED_MAX_AGE_MS=43200000`
+   - `STREAM_DERIVED_MAX_BYTES=268435456`
+4. Compare post-rollout `docker stats --no-stream` with the pre-rollout baseline and watch JetStream storage stabilize under the tighter caps.
+
+If any stream reports a structural mismatch, stop the rollout. Do not purge or recreate streams under this procedure; capture the stream name and mismatch details for follow-up.
+
 If you changed `NEXT_PUBLIC_API_URL` or `NEXT_PUBLIC_NBBO_MAX_AGE_MS`, rebuild the web image because those are public Next.js build-time values:
 
 ```bash

@@ -9,10 +9,9 @@ import {
   STREAM_OPTION_NBBO,
   STREAM_OPTION_PRINTS,
   STREAM_OPTION_SIGNAL_PRINTS,
-  buildStreamConfig,
   buildDurableConsumer,
   connectJetStreamWithRetry,
-  ensureStream,
+  ensureKnownStreams,
   publishJson,
   subscribeJson
 } from "@islandflow/bus";
@@ -346,10 +345,11 @@ const run = async () => {
     { attempts: 120, delayMs: 500 }
   );
 
-  await ensureStream(jsm, buildStreamConfig(STREAM_OPTION_PRINTS, SUBJECT_OPTION_PRINTS, "raw"));
-  await ensureStream(jsm, buildStreamConfig(STREAM_OPTION_NBBO, SUBJECT_OPTION_NBBO, "raw"));
-  await ensureStream(jsm, buildStreamConfig(STREAM_OPTION_SIGNAL_PRINTS, SUBJECT_OPTION_SIGNAL_PRINTS, "derived"));
-  await ensureStream(jsm, buildStreamConfig(STREAM_EQUITY_QUOTES, SUBJECT_EQUITY_QUOTES, "raw"));
+  await ensureKnownStreams(
+    jsm,
+    [STREAM_OPTION_PRINTS, STREAM_OPTION_NBBO, STREAM_OPTION_SIGNAL_PRINTS, STREAM_EQUITY_QUOTES],
+    { logger }
+  );
 
   const clickhouse = createClickHouseClient({
     url: env.CLICKHOUSE_URL,
