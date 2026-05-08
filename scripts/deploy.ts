@@ -178,6 +178,10 @@ function publishCurrentBranch(branch: string): void {
 }
 
 function remotePrecheck(): void {
+  const allowedRemoteUntrackedPattern = Array.from(ALLOWED_REMOTE_UNTRACKED)
+    .map((path) => shellPattern(path))
+    .join("|");
+
   runRemoteScript(
     "Remote Precheck",
     `#!/usr/bin/env bash
@@ -196,9 +200,7 @@ while IFS= read -r line; do
     '?? '*)
       path="\${line#?? }"
       case "$path" in
-${Array.from(ALLOWED_REMOTE_UNTRACKED)
-  .map((path) => `        ${shellPattern(path)})`)
-  .join("\n")}
+        ${allowedRemoteUntrackedPattern})
           ;;
         *)
           echo "Refusing rollout: unexpected untracked path on server: $path" >&2
