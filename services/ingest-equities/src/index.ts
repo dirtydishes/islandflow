@@ -5,9 +5,8 @@ import {
   SUBJECT_EQUITY_QUOTES,
   STREAM_EQUITY_PRINTS,
   STREAM_EQUITY_QUOTES,
-  buildStreamConfig,
   connectJetStreamWithRetry,
-  ensureStream,
+  ensureKnownStreams,
   publishJson
 } from "@islandflow/bus";
 import {
@@ -195,8 +194,7 @@ const run = async () => {
     { attempts: 120, delayMs: 500 }
   );
 
-  await ensureStream(jsm, buildStreamConfig(STREAM_EQUITY_PRINTS, SUBJECT_EQUITY_PRINTS, "raw"));
-  await ensureStream(jsm, buildStreamConfig(STREAM_EQUITY_QUOTES, SUBJECT_EQUITY_QUOTES, "raw"));
+  await ensureKnownStreams(jsm, [STREAM_EQUITY_PRINTS, STREAM_EQUITY_QUOTES], { logger });
 
   const clickhouse = createClickHouseClient({
     url: env.CLICKHOUSE_URL,

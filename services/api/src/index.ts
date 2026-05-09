@@ -23,10 +23,9 @@ import {
   STREAM_SMART_MONEY_EVENTS,
   STREAM_OPTION_NBBO,
   STREAM_OPTION_SIGNAL_PRINTS,
-  buildStreamConfig,
   buildDurableConsumer,
   connectJetStreamWithRetry,
-  ensureStream,
+  ensureKnownStreams,
   subscribeJson
 } from "@islandflow/bus";
 import {
@@ -624,17 +623,23 @@ const run = async () => {
     { attempts: 120, delayMs: 500 }
   );
 
-  await ensureStream(jsm, buildStreamConfig(STREAM_OPTION_SIGNAL_PRINTS, SUBJECT_OPTION_SIGNAL_PRINTS, "derived"));
-  await ensureStream(jsm, buildStreamConfig(STREAM_OPTION_NBBO, SUBJECT_OPTION_NBBO, "raw"));
-  await ensureStream(jsm, buildStreamConfig(STREAM_EQUITY_PRINTS, SUBJECT_EQUITY_PRINTS, "raw"));
-  await ensureStream(jsm, buildStreamConfig(STREAM_EQUITY_QUOTES, SUBJECT_EQUITY_QUOTES, "raw"));
-  await ensureStream(jsm, buildStreamConfig(STREAM_EQUITY_CANDLES, SUBJECT_EQUITY_CANDLES, "derived"));
-  await ensureStream(jsm, buildStreamConfig(STREAM_EQUITY_JOINS, SUBJECT_EQUITY_JOINS, "derived"));
-  await ensureStream(jsm, buildStreamConfig(STREAM_INFERRED_DARK, SUBJECT_INFERRED_DARK, "derived"));
-  await ensureStream(jsm, buildStreamConfig(STREAM_FLOW_PACKETS, SUBJECT_FLOW_PACKETS, "derived"));
-  await ensureStream(jsm, buildStreamConfig(STREAM_SMART_MONEY_EVENTS, SUBJECT_SMART_MONEY_EVENTS, "derived"));
-  await ensureStream(jsm, buildStreamConfig(STREAM_CLASSIFIER_HITS, SUBJECT_CLASSIFIER_HITS, "derived"));
-  await ensureStream(jsm, buildStreamConfig(STREAM_ALERTS, SUBJECT_ALERTS, "derived"));
+  await ensureKnownStreams(
+    jsm,
+    [
+      STREAM_OPTION_SIGNAL_PRINTS,
+      STREAM_OPTION_NBBO,
+      STREAM_EQUITY_PRINTS,
+      STREAM_EQUITY_QUOTES,
+      STREAM_EQUITY_CANDLES,
+      STREAM_EQUITY_JOINS,
+      STREAM_INFERRED_DARK,
+      STREAM_FLOW_PACKETS,
+      STREAM_SMART_MONEY_EVENTS,
+      STREAM_CLASSIFIER_HITS,
+      STREAM_ALERTS
+    ],
+    { logger }
+  );
 
   const clickhouse = createClickHouseClient({
     url: env.CLICKHOUSE_URL,
