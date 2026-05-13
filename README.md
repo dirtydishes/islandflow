@@ -75,6 +75,7 @@ Planned / not yet complete:
 ## Monorepo Layout
 
 - `apps/web` — Next.js UI shell/routes.
+- `apps/desktop` — Electron desktop shell that loads the hosted Islandflow app.
 - `services/ingest-options` — options print/NBBO ingest adapters.
 - `services/ingest-equities` — equity print/quote ingest adapters.
 - `services/compute` — clustering, structures, classifiers, alerts, inferred dark.
@@ -114,6 +115,48 @@ Start services only (assumes infra is already running):
 Start web only:
 
 - `bun run dev:web`
+
+## Desktop Shell
+
+Islandflow also includes a thin Electron desktop shell in `apps/desktop`.
+
+What it is:
+
+- a macOS-first wrapper around the hosted app at `https://flow.deltaisland.io`,
+- a native app window plus packaging/distribution shell,
+- a way to run the existing web UI inside Electron without local backend services.
+
+What it is not:
+
+- a bundled backend runtime,
+- a packaged local Next.js frontend in v1,
+- a desktop feature layer with notifications, preferences, or auto-updates yet.
+
+Run the desktop shell against a local web UI:
+
+- `bun run dev:desktop`
+
+This starts the local Next.js app, defaults `NEXT_PUBLIC_API_URL` to `https://flow.deltaisland.io` unless you already set it, waits for port `3000`, and then launches Electron against `http://127.0.0.1:3000`.
+
+Run the desktop shell directly against the hosted app:
+
+- `bun run dev:desktop:remote`
+
+Package the desktop shell:
+
+- `bun run package:desktop`
+- `bun run make:desktop`
+
+Desktop-specific environment:
+
+- `ISLANDFLOW_DESKTOP_START_URL` is only used by the Electron shell and is restricted to trusted Islandflow app origins.
+- `NEXT_PUBLIC_API_URL` remains the web app's API/WebSocket origin control and should usually point at `https://flow.deltaisland.io` when developing the local UI inside Electron.
+
+Current desktop limitations:
+
+- v1 builds are unsigned internal macOS artifacts only,
+- Forge currently makes a simple zip distributable for the current host architecture,
+- signing, notarization, auto-updates, remembered window state, and richer native integrations are intentionally deferred.
 
 ## Environment Configuration
 

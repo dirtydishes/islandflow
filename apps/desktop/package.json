@@ -1,0 +1,23 @@
+{
+  "name": "@islandflow/desktop",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "bun test src",
+    "start": "bun run build && electron-forge start",
+    "package": "bun run build && electron-forge package",
+    "make": "bun run build && electron-forge make"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "^7.8.1",
+    "@electron-forge/core": "^7.11.1",
+    "@electron-forge/maker-zip": "^7.8.1",
+    "@types/node": "^24.10.1",
+    "electron": "^39.2.0",
+    "typescript": "^5.9.3"
+  }
+}
