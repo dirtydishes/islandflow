@@ -28,6 +28,7 @@ import {
   mergeNewestWithOverflow,
   normalizeAlertSeverity,
   nextFlowFilterPopoverState,
+  prunePinnedEntries,
   projectPausableTapeState,
   reducePausableTapeData,
   shouldRetainLiveSnapshotHistory,
@@ -76,6 +77,20 @@ const makeAlert = (overrides: Record<string, unknown> = {}) =>
     hits: [],
     ...overrides
   }) as any;
+
+describe("pinned evidence pruning", () => {
+  it("returns the existing map when no entries need pruning", () => {
+    const now = 50_000;
+    const current = new Map([
+      ["flowpacket:1", { value: { id: "flowpacket:1" }, updatedAt: now - 500 }],
+      ["trace:2", { value: { id: "trace:2" }, updatedAt: now - 1_000 }]
+    ]);
+
+    const next = prunePinnedEntries(current, new Set(), now);
+
+    expect(next).toBe(current);
+  });
+});
 
 describe("live manifest", () => {
   it("includes only tape channels on /tape", () => {
