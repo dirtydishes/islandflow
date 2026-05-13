@@ -1894,7 +1894,7 @@ const upsertPinnedEntries = <T,>(
   return next;
 };
 
-const prunePinnedEntries = <T,>(
+export const prunePinnedEntries = <T,>(
   current: Map<string, PinnedEntry<T>>,
   activeKeys: Set<string>,
   now: number
@@ -1909,6 +1909,24 @@ const prunePinnedEntries = <T,>(
 
   surviving.sort((a, b) => b[1].updatedAt - a[1].updatedAt);
   const trimmed = surviving.slice(0, PINNED_EVIDENCE_MAX_ITEMS);
+
+  if (trimmed.length === current.size) {
+    let unchanged = true;
+    let index = 0;
+    for (const entry of current) {
+      const next = trimmed[index];
+      if (!next || next[0] !== entry[0] || next[1] !== entry[1]) {
+        unchanged = false;
+        break;
+      }
+      index += 1;
+    }
+
+    if (unchanged) {
+      return current;
+    }
+  }
+
   return new Map(trimmed);
 };
 
