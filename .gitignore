@@ -12,6 +12,7 @@ logs/
 .tmp/
 apps/web/.next/
 apps/web/.next-dev/
+apps/desktop/out/
 
 # Local assistant artifacts
 session-ses_*.md
