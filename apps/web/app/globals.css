@@ -1507,6 +1507,196 @@ h3 {
   z-index: 40;
 }
 
+.synthetic-control-gear {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(245, 166, 35, 0.24);
+  border-radius: 12px;
+  background: rgba(9, 13, 18, 0.96);
+  color: var(--accent);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.38);
+  z-index: 45;
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.synthetic-control-gear:hover,
+.synthetic-control-gear.is-open {
+  transform: translateY(-1px);
+  border-color: rgba(245, 166, 35, 0.4);
+  background: rgba(12, 18, 24, 0.98);
+}
+
+.synthetic-control-gear-mark {
+  display: inline-flex;
+  font-size: 1.05rem;
+  line-height: 1;
+  transform: rotate(45deg);
+}
+
+.synthetic-control-drawer {
+  position: fixed;
+  top: 84px;
+  right: 0;
+  bottom: 0;
+  width: min(388px, calc(100vw - 20px));
+  padding: 18px 18px 24px;
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  overflow: auto;
+  border-left: 1px solid rgba(245, 166, 35, 0.18);
+  background:
+    linear-gradient(180deg, rgba(245, 166, 35, 0.04), transparent 18%),
+    rgba(6, 9, 13, 0.98);
+  box-shadow: -18px 0 50px rgba(0, 0, 0, 0.34);
+  z-index: 42;
+}
+
+.synthetic-control-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.synthetic-control-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+}
+
+.synthetic-control-kicker {
+  margin: 0 0 6px;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.64rem;
+}
+
+.synthetic-control-section {
+  display: grid;
+  gap: 10px;
+  padding: 14px 14px 0;
+  border-top: 1px solid var(--border);
+}
+
+.synthetic-control-section-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.68rem;
+}
+
+.synthetic-control-select select,
+.synthetic-segment,
+.synthetic-control-toggle {
+  font: inherit;
+}
+
+.synthetic-control-select select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+}
+
+.synthetic-control-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-dim);
+}
+
+.synthetic-control-toggle input {
+  accent-color: var(--accent);
+}
+
+.synthetic-segment-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.synthetic-segment {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text-dim);
+}
+
+.synthetic-segment.is-active {
+  border-color: rgba(245, 166, 35, 0.44);
+  background: rgba(245, 166, 35, 0.12);
+  color: var(--text);
+}
+
+.synthetic-profile-grid,
+.synthetic-hit-list {
+  display: grid;
+  gap: 12px;
+}
+
+.synthetic-profile-row,
+.synthetic-hit-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.synthetic-profile-row > span,
+.synthetic-hit-row > span,
+.synthetic-status-grid span {
+  color: var(--text-dim);
+  font-size: 0.84rem;
+}
+
+.synthetic-status-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.synthetic-status-grid strong,
+.synthetic-hit-row strong {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.86rem;
+}
+
+.synthetic-control-disabled {
+  display: grid;
+  gap: 8px;
+  padding: 14px 14px 0;
+  border-top: 1px solid var(--border);
+}
+
+.synthetic-control-disabled p,
+.synthetic-control-disabled span {
+  margin: 0;
+}
+
+.synthetic-control-disabled-label {
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.68rem;
+}
+
+.synthetic-control-error {
+  color: var(--red);
+}
+
 .drawer-header {
   display: flex;
   align-items: flex-start;
@@ -1731,5 +1921,20 @@ h3 {
     width: auto;
     max-height: none;
     margin-top: 14px;
+  }
+
+  .synthetic-control-gear {
+    right: 14px;
+    bottom: 14px;
+  }
+
+  .synthetic-control-drawer {
+    top: auto;
+    left: 14px;
+    right: 14px;
+    bottom: 68px;
+    width: auto;
+    border: 1px solid rgba(245, 166, 35, 0.16);
+    border-radius: 14px;
   }
 }

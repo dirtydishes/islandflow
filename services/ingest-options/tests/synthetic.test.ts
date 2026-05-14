@@ -10,26 +10,43 @@ import {
 } from "../src/adapters/synthetic";
 
 const totalBurstNotional = (burst: {
-  basePrice: number;
-  baseSize: number;
-  printCount: number;
-}): number => burst.basePrice * burst.baseSize * burst.printCount * 100;
+  legs: Array<{
+    basePrice: number;
+    baseSize: number;
+  }>;
+  cycles: number;
+}): number =>
+  burst.legs.reduce((sum, leg) => sum + leg.basePrice * leg.baseSize * burst.cycles * 100, 0);
+
+const findBurst = (
+  mode: "realistic" | "active",
+  scenarioId: string,
+  now = Date.UTC(2026, 0, 2)
+) => {
+  for (let i = 1; i <= 360; i += 1) {
+    const burst = buildSyntheticBurstForTest(i, now + i * 1_000, mode);
+    if (burst.scenarioId === scenarioId) {
+      return burst;
+    }
+  }
+  throw new Error(`Unable to find synthetic scenario ${scenarioId} in mode ${mode}`);
+};
 
 describe("synthetic options burst sizing", () => {
-  it("keeps realistic-mode ask lifts inside the configured notional band", () => {
-    const burst = buildSyntheticBurstForTest(2, Date.UTC(2026, 0, 2), "realistic");
+  it("keeps realistic-mode ask-lift accumulation inside the configured notional band", () => {
+    const burst = findBurst("realistic", "ask_lift_accumulation");
 
-    expect(burst.scenarioId).toBe("ask_lift");
-    expect(totalBurstNotional(burst)).toBeGreaterThanOrEqual(9_000);
-    expect(totalBurstNotional(burst)).toBeLessThanOrEqual(35_000);
+    expect(burst.scenarioId).toBe("ask_lift_accumulation");
+    expect(totalBurstNotional(burst)).toBeGreaterThanOrEqual(12_000);
+    expect(totalBurstNotional(burst)).toBeLessThanOrEqual(90_000);
   });
 
-  it("keeps active-mode sweeps inside the configured notional band", () => {
-    const burst = buildSyntheticBurstForTest(1, Date.UTC(2026, 0, 2), "active");
+  it("keeps active-mode call sweeps inside the configured notional band", () => {
+    const burst = findBurst("active", "call_sweep");
 
-    expect(burst.scenarioId).toBe("bearish_sweep");
-    expect(totalBurstNotional(burst)).toBeGreaterThanOrEqual(120_000);
-    expect(totalBurstNotional(burst)).toBeLessThanOrEqual(240_000);
+    expect(burst.scenarioId).toBe("call_sweep");
+    expect(totalBurstNotional(burst)).toBeGreaterThanOrEqual(70_000);
+    expect(totalBurstNotional(burst)).toBeLessThanOrEqual(420_000);
   });
 });
 
@@ -114,7 +131,7 @@ describe("synthetic smart-money scenarios", () => {
   it("scores each labeled scenario as its intended primary profile", () => {
     const now = Date.parse("2026-01-02T15:00:00Z");
     const scenarios = listSyntheticSmartMoneyScenariosForTest().filter(
-      (scenario) => scenario.hiddenLabel !== "neutral_noise"
+      (scenario) => scenario.label !== "neutral_noise"
     );
 
     for (const scenario of scenarios) {
@@ -122,15 +139,60 @@ describe("synthetic smart-money scenarios", () => {
       const event = buildSmartMoneyEventFromPacket(packet);
       const winningScore = event.profile_scores[0];
       const nearbyWrongScores = event.profile_scores.filter(
-        (score) => score.profile_id !== hiddenLabel && score.probability >= 0.5
+        (score) => score.profile_id !== scenario.label && score.probability >= 0.5
       );
 
       expect(event.abstained, scenario.id).toBe(false);
-      expect(event.primary_profile_id, scenario.id).toBe(hiddenLabel);
-      expect(winningScore?.profile_id, scenario.id).toBe(hiddenLabel);
+      expect(event.primary_profile_id, scenario.id).toBe(scenario.label);
+      expect(winningScore?.profile_id, scenario.id).toBe(scenario.label);
       expect(winningScore?.probability ?? 0, scenario.id).toBeGreaterThanOrEqual(0.5);
+      expect(hiddenLabel.length, scenario.id).toBeGreaterThan(0);
       expect(nearbyWrongScores, scenario.id).toEqual([]);
     }
+  });
+
+  it("covers every smart-money label in active runtime mode over a deterministic sample", () => {
+    const seen = new Set<string>();
+    const now = Date.parse("2026-01-02T15:00:00Z");
+
+    for (let i = 1; i <= 120; i += 1) {
+      const burst = buildSyntheticBurstForTest(i, now + i * 1_000, "active");
+      seen.add(burst.label);
+    }
+
+    expect(seen).toEqual(
+      new Set([
+        "institutional_directional",
+        "retail_whale",
+        "event_driven",
+        "vol_seller",
+        "arbitrage",
+        "hedge_reactive",
+        "neutral_noise"
+      ])
+    );
+  });
+
+  it("covers every smart-money label in realistic mode within a default twenty-minute window", () => {
+    const seen = new Set<string>();
+    const now = Date.parse("2026-01-02T15:00:00Z");
+
+    for (let i = 1; i <= 120; i += 1) {
+      const burst = buildSyntheticBurstForTest(i, now + i * 10_000, "realistic");
+      seen.add(burst.label);
+    }
+
+    expect(seen).toEqual(
+      new Set([
+        "institutional_directional",
+        "retail_whale",
+        "event_driven",
+        "vol_seller",
+        "arbitrage",
+        "hedge_reactive",
+        "neutral_noise"
+      ])
+    );
   });
 
   it("keeps neutral background noise below the emission threshold", () => {
