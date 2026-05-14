@@ -27,8 +27,10 @@ import {
   getTapeVirtualConfig,
   mergeNewestWithOverflow,
   normalizeAlertSeverity,
+  normalizeTickerFilterInput,
   nextFlowFilterPopoverState,
   isSyntheticAdminVisible,
+  parseTickerFilterInput,
   prunePinnedEntries,
   projectPausableTapeState,
   reducePausableTapeData,
@@ -412,6 +414,17 @@ describe("synthetic admin visibility", () => {
   it("shows the internal control rail only when the public admin flag is enabled", () => {
     expect(isSyntheticAdminVisible("1")).toBe(true);
     expect(isSyntheticAdminVisible("0")).toBe(false);
+    expect(isSyntheticAdminVisible(undefined)).toBe(false);
+  });
+});
+
+describe("ticker filter helpers", () => {
+  it("normalizes pasted ticker input into a stable terminal format", () => {
+    expect(normalizeTickerFilterInput(" spy，\n nvda\u0000 aapl ")).toBe(" SPY, NVDA AAPL ");
+  });
+
+  it("parses, uppercases, and deduplicates ticker tokens", () => {
+    expect(parseTickerFilterInput("spy, nvda spy\nqqq")).toEqual(["SPY", "NVDA", "QQQ"]);
   });
 });
 

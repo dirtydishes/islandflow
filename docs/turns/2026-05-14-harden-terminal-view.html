@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Turn Document - Harden Terminal View</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #111820;
+        --panel-2: #0d141b;
+        --border: rgba(255, 255, 255, 0.1);
+        --text: #e6edf4;
+        --text-dim: #90a0b2;
+        --text-faint: #6e7b8c;
+        --accent: #f5a623;
+        --accent-soft: rgba(245, 166, 35, 0.14);
+        --green-soft: rgba(37, 193, 122, 0.16);
+        --red-soft: rgba(255, 107, 95, 0.16);
+        --blue-soft: rgba(77, 163, 255, 0.16);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "IBM Plex Sans", Inter, Arial, sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(245, 166, 35, 0.08), transparent 24%),
+          linear-gradient(180deg, #081017 0%, #05070a 100%);
+        color: var(--text);
+      }
+
+      main {
+        width: min(1040px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 28px 0 40px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p,
+      ul,
+      pre {
+        margin-top: 0;
+      }
+
+      h1,
+      h2 {
+        font-family: Quantico, "IBM Plex Sans", sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      h1 {
+        font-size: clamp(1.8rem, 3vw, 2.5rem);
+        margin-bottom: 10px;
+      }
+
+      h2 {
+        font-size: 1rem;
+        margin-bottom: 14px;
+      }
+
+      p,
+      li {
+        line-height: 1.6;
+      }
+
+      .summary,
+      .panel {
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.02));
+      }
+
+      .summary {
+        padding: 24px;
+        margin-bottom: 22px;
+      }
+
+      .panel {
+        padding: 22px 24px;
+        margin-bottom: 18px;
+        background: var(--panel);
+      }
+
+      .lede,
+      .meta,
+      .note {
+        color: var(--text-dim);
+      }
+
+      .meta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 16px 0 0;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 32px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.03);
+        font-size: 0.82rem;
+      }
+
+      .pill-accent {
+        border-color: rgba(245, 166, 35, 0.36);
+        background: var(--accent-soft);
+        color: #ffe2aa;
+      }
+
+      .pill-good {
+        background: var(--green-soft);
+      }
+
+      .pill-info {
+        background: var(--blue-soft);
+      }
+
+      .pill-risk {
+        background: var(--red-soft);
+      }
+
+      ul {
+        padding-left: 18px;
+        margin-bottom: 0;
+      }
+
+      li + li {
+        margin-top: 8px;
+      }
+
+      code,
+      pre {
+        font-family: "IBM Plex Mono", Menlo, monospace;
+      }
+
+      code {
+        color: #ffe2aa;
+      }
+
+      pre {
+        overflow-x: auto;
+        padding: 14px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--panel-2);
+        color: var(--text);
+      }
+
+      .two-col {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      @media (max-width: 760px) {
+        main {
+          width: min(100vw - 20px, 1040px);
+          padding: 20px 0 28px;
+        }
+
+        .summary,
+        .panel {
+          padding: 18px;
+        }
+
+        .two-col {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="summary">
+        <h1>Harden Terminal View</h1>
+        <p class="lede">
+          Turn document for the terminal shell hardening pass in <code>apps/web/app/terminal.tsx</code>,
+          <code>apps/web/app/globals.css</code>, and <code>apps/web/app/terminal.test.ts</code>.
+        </p>
+        <p>
+          The work focused on production resilience in the main terminal shell: keyboard access, focus visibility,
+          long-text behavior, topbar wrapping, and ticker filter normalization for pasted or malformed input.
+        </p>
+        <div class="meta-row">
+          <span class="pill pill-accent">Generated: 2026-05-14 11:24 EDT</span>
+          <span class="pill pill-good">Tests: Passed</span>
+          <span class="pill pill-good">Web Build: Passed</span>
+          <span class="pill pill-info">Beads: islandflow-6ri closed</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Summary</h2>
+        <p>
+          The terminal shell now behaves more predictably under constrained widths and less-perfect input. The
+          changes stay small and local, but improve accessibility and reduce UI breakage risk in the top-level
+          workflow.
+        </p>
+      </section>
+
+      <section class="panel">
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Added a skip link targeting the main terminal content region.</li>
+          <li>Added primary navigation semantics with <code>aria-label</code> and <code>aria-current</code>.</li>
+          <li>Added visible keyboard focus treatment for nav links, shell buttons, and the instrument chip action.</li>
+          <li>Allowed topbar action groups to wrap instead of forcing overflow at narrower widths.</li>
+          <li>Added long-text hardening for the brand name and selected instrument chip.</li>
+          <li>Added ticker filter input normalization, uppercase handling, control-character cleanup, and length limits.</li>
+          <li>Added unit tests for ticker filter normalization and parsing.</li>
+        </ul>
+      </section>
+
+      <section class="panel">
+        <h2>Context</h2>
+        <p>
+          Islandflow's terminal is an evidence-first product surface used under time pressure. The shell is not a
+          decorative wrapper. It controls navigation, global filter state, and mode switching, so failures here can
+          degrade every route at once.
+        </p>
+        <p>
+          The hardening pass stayed focused on shell-level reliability rather than introducing broader layout or
+          component refactors.
+        </p>
+      </section>
+
+      <section class="panel">
+        <h2>Important Implementation Details</h2>
+        <div class="two-col">
+          <div>
+            <p>
+              The ticker filter path now normalizes paste-heavy input before it reaches state-dependent parsing.
+              This covers full-width commas, repeated whitespace, control characters, and casing drift.
+            </p>
+            <pre><code>export const normalizeTickerFilterInput = (value: string): string =&gt;
+  value
+    .normalize("NFKC")
+    .replace(/[\u0000-\u001f\u007f]+/g, " ")
+    .replace(/，/g, ",")
+    .replace(/\s+/g, " ")
+    .toUpperCase()</code></pre>
+          </div>
+          <div>
+            <p>
+              Shell semantics were strengthened without changing the route structure. The new skip link and current-page
+              annotation improve keyboard and assistive navigation while staying visually quiet during normal use.
+            </p>
+            <pre><code>&lt;a class="skip-link" href="#terminal-content"&gt;Skip to terminal content&lt;/a&gt;
+
+&lt;nav aria-label="Primary" className="terminal-nav"&gt;
+  &lt;Link aria-current={active ? "page" : undefined} ... /&gt;
+&lt;/nav&gt;</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Validation</h2>
+        <ul>
+          <li><code>bun test apps/web/app/terminal.test.ts</code> passed.</li>
+          <li><code>bun --cwd=apps/web run build</code> passed.</li>
+          <li>Regression coverage was added for normalization and token parsing of ticker input.</li>
+        </ul>
+      </section>
+
+      <section class="panel">
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>
+            <strong>Dolt sync limitation:</strong> <code>bd dolt pull</code> failed earlier in the session because no Dolt
+            remote is configured in this workspace. The code work continued, but beads remote sync was not available.
+          </li>
+          <li>
+            <strong>Scope control:</strong> this pass hardened the shell only. It did not audit every downstream pane,
+            drawer, or popover for similar edge cases.
+          </li>
+          <li>
+            <strong>Workflow status:</strong> this document records the implementation and validation, but the work was not
+            committed or pushed as part of this turn.
+          </li>
+        </ul>
+      </section>
+
+      <section class="panel">
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>No follow-up issue was created from this hardening pass beyond the completed beads item <code>islandflow-6ri</code>.</li>
+          <li>If terminal adaptation work continues, the next pass should examine small-screen drawer behavior and popover placement under dense live states.</li>
+        </ul>
+        <p class="note">
+          Document created to satisfy the required turn-documentation step for implementation changes.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

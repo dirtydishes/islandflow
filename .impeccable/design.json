@@ -1,0 +1,210 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-14T08:06:45Z",
+  "title": "Design System: Islandflow Terminal",
+  "extensions": {
+    "colorMeta": {
+      "bg-core": {
+        "role": "neutral",
+        "displayName": "Command Black",
+        "canonical": "#06080b",
+        "tonalRamp": ["#050608", "#0b0f14", "#111821", "#1a2430", "#263445", "#394a5f", "#6f8095", "#dce3ea"]
+      },
+      "bg-pane": {
+        "role": "neutral",
+        "displayName": "Panel Graphite",
+        "canonical": "#111820",
+        "tonalRamp": ["#0b0f14", "#121922", "#1a2430", "#253444", "#314658", "#4a6076", "#7b90a5", "#dbe3ec"]
+      },
+      "text-primary": {
+        "role": "neutral",
+        "displayName": "Data Ink",
+        "canonical": "#e6edf4",
+        "tonalRamp": ["#1c232b", "#2a333e", "#3a4654", "#4f6072", "#6a7f93", "#92a4b5", "#bcc8d3", "#e6edf4"]
+      },
+      "signal-amber": {
+        "role": "primary",
+        "displayName": "Signal Amber",
+        "canonical": "#f5a623",
+        "tonalRamp": ["#2f1f06", "#5b3c0b", "#865913", "#b5761a", "#d89220", "#f5a623", "#f8c069", "#fce3bc"]
+      },
+      "confirm-green": {
+        "role": "tertiary",
+        "displayName": "Confirm Green",
+        "canonical": "#25c17a",
+        "tonalRamp": ["#062716", "#0d4b2a", "#13703f", "#1a9554", "#20ae6a", "#25c17a", "#6ed5a6", "#c9f1df"]
+      },
+      "risk-red": {
+        "role": "tertiary",
+        "displayName": "Risk Red",
+        "canonical": "#ff6b5f",
+        "tonalRamp": ["#320d0a", "#611914", "#91261f", "#bf362f", "#e04f48", "#ff6b5f", "#ff9b93", "#ffd9d5"]
+      },
+      "info-blue": {
+        "role": "secondary",
+        "displayName": "Info Blue",
+        "canonical": "#4da3ff",
+        "tonalRamp": ["#0a1f33", "#143c61", "#1f5a8f", "#2b78bd", "#3a91e0", "#4da3ff", "#8cc4ff", "#d8ebff"]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Primary wayfinding headers and route-level titles."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Default transactional and descriptive copy in panes and controls."
+      },
+      "label": {
+        "displayName": "Label/Mono",
+        "purpose": "Data labels, numeric cells, chips, and compact control text."
+      }
+    },
+    "shadows": [
+      {
+        "name": "overlay-lift",
+        "value": "0 24px 60px rgba(0, 0, 0, 0.42)",
+        "purpose": "Filter popover separation from live content."
+      },
+      {
+        "name": "drawer-lift",
+        "value": "0 24px 70px rgba(0, 0, 0, 0.5)",
+        "purpose": "Right-side detail drawer emphasis."
+      },
+      {
+        "name": "tooltip-lift",
+        "value": "0 16px 40px rgba(0, 0, 0, 0.45)",
+        "purpose": "Transient metadata tooltip depth."
+      }
+    ],
+    "motion": [
+      {
+        "name": "fast-state",
+        "value": "150ms ease",
+        "purpose": "Button and hover state transitions."
+      },
+      {
+        "name": "focus-rail",
+        "value": "160ms ease",
+        "purpose": "Input underline and glow transitions."
+      },
+      {
+        "name": "count-reveal",
+        "value": "180ms ease",
+        "purpose": "Missed counter width/position reveal."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "lg",
+        "value": "1180px"
+      },
+      {
+        "name": "md",
+        "value": "980px"
+      },
+      {
+        "name": "sm",
+        "value": "720px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Terminal Action Button",
+      "kind": "button",
+      "refersTo": "button-base",
+      "description": "Default compact control for tape actions and utility toggles.",
+      "html": "<button class=\"ds-btn\">Pause Tape</button>",
+      "css": ".ds-btn { border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 8px 10px; background: rgba(255,255,255,0.03); color: #e6edf4; font-family: var(--font-mono, 'IBM Plex Mono', monospace); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; cursor: pointer; transition: border-color 150ms ease, background 150ms ease, color 150ms ease; } .ds-btn:hover { border-color: rgba(255,177,48,0.35); background: rgba(245,166,35,0.08); color: #ffd89a; } .ds-btn:focus-visible { outline: none; border-color: rgba(255,177,48,0.45); box-shadow: 0 0 0 2px rgba(245,166,35,0.2); } .ds-btn:active { background: rgba(245,166,35,0.12); }"
+    },
+    {
+      "name": "Rail Navigation Link",
+      "kind": "nav",
+      "refersTo": "nav-link",
+      "description": "Primary route selector in the left terminal rail.",
+      "html": "<a class=\"ds-nav-link\" href=\"#\">Signals</a>",
+      "css": ".ds-nav-link { display: inline-block; padding: 12px 14px; border: 1px solid transparent; border-radius: 10px; color: #90a0b2; background: transparent; font-family: var(--font-mono, 'IBM Plex Mono', monospace); font-size: 0.78rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; text-decoration: none; transition: border-color 150ms ease, background 150ms ease, color 150ms ease; } .ds-nav-link:hover { border-color: rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); color: #e6edf4; } .ds-nav-link:focus-visible { outline: none; border-color: rgba(255,177,48,0.35); } .ds-nav-link.ds-nav-link-active { border-color: rgba(255,177,48,0.35); background: linear-gradient(90deg, rgba(245,166,35,0.12), rgba(245,166,35,0.04)); color: #e6edf4; }"
+    },
+    {
+      "name": "Filter Underline Input",
+      "kind": "input",
+      "refersTo": "pane-surface",
+      "description": "Global tape filter field with amber under-rail focus behavior.",
+      "html": "<label class=\"ds-filter\"><span class=\"ds-filter-label\">Contract Filter</span><span class=\"ds-filter-line\"><input class=\"ds-filter-input\" placeholder=\"Type symbol, contract, or expiry\" /></span></label>",
+      "css": ".ds-filter { display: inline-flex; flex-direction: column; gap: 4px; min-width: 260px; } .ds-filter-label { color: #6e7b8c; font-family: var(--font-mono, 'IBM Plex Mono', monospace); font-size: 0.68rem; letter-spacing: 0.16em; text-transform: uppercase; } .ds-filter-line { position: relative; display: block; padding-bottom: 6px; } .ds-filter-line::before { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: linear-gradient(90deg, rgba(245,166,35,0.88), rgba(245,166,35,0.14)); } .ds-filter-line::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: linear-gradient(90deg, rgba(255,216,154,0.98), rgba(245,166,35,0.92)); transform: scaleX(0.2); transform-origin: left center; opacity: 0; transition: transform 160ms ease, opacity 160ms ease, box-shadow 160ms ease; } .ds-filter-input { width: 100%; border: 0; background: transparent; color: #e6edf4; font-family: var(--font-mono, 'IBM Plex Mono', monospace); font-size: 0.92rem; font-weight: 600; letter-spacing: 0.01em; } .ds-filter-input::placeholder { color: rgba(193,203,224,0.58); font-size: 0.86rem; } .ds-filter-input:focus-visible { outline: none; } .ds-filter:focus-within .ds-filter-label { color: #ffd89a; } .ds-filter:focus-within .ds-filter-line::after { transform: scaleX(1); opacity: 1; box-shadow: 0 0 18px rgba(245,166,35,0.34); }"
+    },
+    {
+      "name": "Semantic Status Chip",
+      "kind": "chip",
+      "refersTo": "status-chip",
+      "description": "Pill used for direction, severity, and condition tags with explicit label text.",
+      "html": "<span class=\"ds-chip ds-chip-risk\">Bearish</span>",
+      "css": ".ds-chip { display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.08); font-family: var(--font-mono, 'IBM Plex Mono', monospace); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; } .ds-chip-neutral { background: rgba(77,163,255,0.14); border-color: rgba(77,163,255,0.26); color: #bddcff; } .ds-chip-good { background: rgba(37,193,122,0.12); border-color: rgba(37,193,122,0.34); color: #98f0c0; } .ds-chip-risk { background: rgba(255,107,95,0.14); border-color: rgba(255,107,95,0.34); color: #ffc3bd; }"
+    },
+    {
+      "name": "Terminal Pane",
+      "kind": "card",
+      "refersTo": "pane-surface",
+      "description": "Default data region container for tape, alerts, and chart modules.",
+      "html": "<section class=\"ds-pane\"><header class=\"ds-pane-head\"><h3 class=\"ds-pane-title\">Flow Packets</h3><button class=\"ds-btn-mini\">Refresh</button></header><div class=\"ds-pane-body\">Pane content</div></section>",
+      "css": ".ds-pane { border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; background: linear-gradient(180deg, rgba(255,255,255,0.03), transparent 40%), #111820; color: #e6edf4; overflow: hidden; } .ds-pane-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; border-bottom: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); } .ds-pane-title { margin: 0; font-family: var(--font-display, Quantico, sans-serif); font-size: 1rem; letter-spacing: 0.08em; text-transform: uppercase; } .ds-pane-body { padding: 16px 18px 18px; } .ds-btn-mini { border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 8px 10px; background: rgba(255,255,255,0.03); color: #e6edf4; font-family: var(--font-mono, 'IBM Plex Mono', monospace); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; cursor: pointer; transition: border-color 150ms ease, background 150ms ease; } .ds-btn-mini:hover { border-color: rgba(255,177,48,0.35); background: rgba(245,166,35,0.08); }"
+    },
+    {
+      "name": "Flow Filter Popover Surface",
+      "kind": "custom",
+      "refersTo": "pane-surface",
+      "description": "Floating filter inspector with dedicated overlay elevation.",
+      "html": "<aside class=\"ds-popover\"><h4 class=\"ds-popover-title\">Flow Filters</h4><p class=\"ds-popover-copy\">Changes apply immediately.</p></aside>",
+      "css": ".ds-popover { width: min(420px, 90vw); border: 1px solid rgba(245,166,35,0.24); border-radius: 18px; padding: 16px; background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)), rgba(11,16,22,0.92); box-shadow: 0 24px 60px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.04); backdrop-filter: blur(18px); color: #e6edf4; } .ds-popover-title { margin: 0; font-family: var(--font-display, Quantico, sans-serif); font-size: 0.9rem; letter-spacing: 0.12em; text-transform: uppercase; } .ds-popover-copy { margin: 6px 0 0; color: #90a0b2; font-family: var(--font-sans, 'IBM Plex Sans', sans-serif); font-size: 0.78rem; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Evidence Console",
+    "overview": "Islandflow's interface behaves like an investigation instrument, not a presentation layer. The system is tuned for fast read accuracy under volatility: hierarchy is built from contrast, casing, and spacing cadence rather than decorative effects.\n\nThe visual atmosphere is dark and controlled, with amber used as a directional signal rather than ambient decoration. Surfaces are compact and information-dense, but each zone is explicit about purpose so the user can move from detection to validation without losing context.\n\nThis system explicitly rejects the anti-references in PRODUCT.md: no meme-stock hype aesthetics, no generic SaaS card fog, and no Bloomberg cosplay density unless density is earning its keep with decision value.",
+    "keyCharacteristics": [
+      "Operational contrast over ornamental contrast.",
+      "Dense layout with stable rhythm.",
+      "Accent color treated as scarce signal.",
+      "Monospace-assisted precision for time, numeric, and status data.",
+      "Readability preserved during bursty live updates."
+    ],
+    "rules": [
+      {
+        "name": "The Signal Scarcity Rule",
+        "body": "Amber is a control and attention signal, not a wash. Keep it concentrated on actions, state edges, and critical counters.",
+        "section": "colors"
+      },
+      {
+        "name": "The Semantic Color Rule",
+        "body": "Red and green never stand alone for meaning. Every directional or severity cue must include text, shape, or positional confirmation.",
+        "section": "colors"
+      },
+      {
+        "name": "The Instrument Label Rule",
+        "body": "Labels are short, uppercase, and spaced. They identify system state fast, without narrative phrasing.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-By-Default Rule",
+        "body": "If a surface is not floating over active workflow content, it does not get shadow lift.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do keep status and direction semantic with both color and text labels (`severity-high`, `direction-bullish`, explicit words).",
+      "Do preserve compact control density (`8px-12px` padding range) so investigation actions stay within a short scan path.",
+      "Do use amber as a sparse decision signal for active controls, focus rails, and key counters.",
+      "Do keep overlays visually separated with dedicated shadow roles while leaving primary panes flat.",
+      "Do design live updates to avoid flashing, excessive animation, and layout shifts during high-volume periods."
+    ],
+    "donts": [
+      "Don't make Islandflow feel like a meme-stock or finfluencer trading app with hype, gamification, urgency theater, or promotional calls to action.",
+      "Don't make Islandflow feel like a generic SaaS analytics dashboard with decorative gradients, vague card stacks, and non-actionable vanity metrics.",
+      "Don't make Islandflow feel like Bloomberg-style visual density used as aesthetic cosplay instead of as a genuinely useful information structure.",
+      "Don't rely on red/green alone for directional meaning or severity.",
+      "Don't use colored side-stripe accents on rows/cards as the primary signifier; use complete semantic chips and labels instead."
+    ]
+  }
+}
