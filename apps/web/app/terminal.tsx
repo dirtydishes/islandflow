@@ -39,7 +39,11 @@ import type {
   OptionNBBO,
   OptionPrint,
   SmartMoneyEvent,
-  SmartMoneyProfileId
+  SmartMoneyProfileId,
+  SyntheticControlState,
+  SyntheticCoverageWindowMinutes,
+  SyntheticDerivedStatus,
+  SyntheticProfileWeightValue
 } from "@islandflow/types";
 import {
   getSubscriptionKey as getLiveSubscriptionKey,
@@ -987,6 +991,96 @@ const buildApiUrl = (path: string): string => {
 
   return `${httpProtocol}://${host}${path}`;
 };
+
+export const isSyntheticAdminVisible = (
+  value = process.env.NEXT_PUBLIC_SYNTHETIC_ADMIN
+): boolean => value === "1";
+
+type SyntheticAdminStatusResponse = {
+  enabled: boolean;
+  backend_mode: "synthetic" | "mixed" | "live";
+  adapters: {
+    options: string;
+    equities: string;
+  };
+  control: SyntheticControlState | null;
+  derived: SyntheticDerivedStatus | null;
+  disabled_reason?: string;
+};
+
+type SyntheticAdminControlResponse = {
+  control: SyntheticControlState;
+  derived?: SyntheticDerivedStatus | null;
+};
+
+const SYNTHETIC_ADMIN_PROXY_PATHS = {
+  status: "/api/admin/synthetic/status",
+  control: "/api/admin/synthetic/control"
+} as const;
+
+const SYNTHETIC_PROFILE_ORDER: Array<keyof SyntheticControlState["profile_weights"]> = [
+  "institutional_directional",
+  "retail_whale",
+  "event_driven",
+  "vol_seller",
+  "arbitrage",
+  "hedge_reactive"
+];
+
+const SYNTHETIC_PROFILE_LABELS: Record<
+  keyof SyntheticControlState["profile_weights"],
+  string
+> = {
+  institutional_directional: "Institutional Directional",
+  retail_whale: "Retail Whale",
+  event_driven: "Event Driven",
+  vol_seller: "Vol Seller",
+  arbitrage: "Arbitrage",
+  hedge_reactive: "Hedge Reactive"
+};
+
+const SYNTHETIC_PRESET_LABELS: Record<SyntheticControlState["preset_id"], string> = {
+  balanced_demo: "Balanced Demo",
+  event_day: "Event Day",
+  dealer_day: "Dealer Day",
+  retail_chase: "Retail Chase",
+  quiet_range: "Quiet Range"
+};
+
+const buildDefaultSyntheticControl = (): SyntheticControlState => ({
+  preset_id: "balanced_demo",
+  coverage_assist: true,
+  coverage_window_minutes: 20,
+  shared_seed: 11,
+  profile_weights: {
+    institutional_directional: 1.0,
+    retail_whale: 1.0,
+    event_driven: 1.0,
+    vol_seller: 1.0,
+    arbitrage: 1.0,
+    hedge_reactive: 1.0
+  },
+  updated_at: 0,
+  updated_by: "internal-ui"
+});
+
+type SyntheticControlPatch = Omit<Partial<SyntheticControlState>, "profile_weights"> & {
+  profile_weights?: Partial<SyntheticControlState["profile_weights"]>;
+};
+
+const createSyntheticControlDraft = (
+  current: SyntheticControlState,
+  patch: SyntheticControlPatch
+): SyntheticControlState => ({
+  ...current,
+  ...patch,
+  profile_weights: {
+    ...current.profile_weights,
+    ...(patch.profile_weights ?? {})
+  },
+  updated_at: Date.now(),
+  updated_by: "internal-ui"
+});
 
 const formatPrice = (price: number): string => {
   if (!Number.isFinite(price)) {
@@ -7926,6 +8020,331 @@ const ReplayConsole = memo(({ state }: { state: TerminalState }) => {
   );
 });
 
+function SyntheticControlDock() {
+  const visible = isSyntheticAdminVisible();
+  const [open, setOpen] = useState(false);
+  const [status, setStatus] = useState<SyntheticAdminStatusResponse | null>(null);
+  const [draft, setDraft] = useState<SyntheticControlState | null>(null);
+  const [saved, setSaved] = useState<SyntheticControlState | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const dirtyRef = useRef(false);
+  const savedRef = useRef<SyntheticControlState | null>(null);
+
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const response = await fetch(SYNTHETIC_ADMIN_PROXY_PATHS.status, {
+          cache: "no-store"
+        });
+        if (cancelled) {
+          return;
+        }
+        if (response.status === 404) {
+          setStatus({
+            enabled: false,
+            backend_mode: "live",
+            adapters: { options: "unknown", equities: "unknown" },
+            control: null,
+            derived: null,
+            disabled_reason: "Synthetic admin backend is disabled."
+          });
+          setLoading(false);
+          return;
+        }
+        const nextStatus = (await response.json()) as SyntheticAdminStatusResponse;
+        setStatus(nextStatus);
+        if (!dirtyRef.current) {
+          const nextControl = nextStatus.control ?? buildDefaultSyntheticControl();
+          setDraft(nextControl);
+          setSaved(nextControl);
+          savedRef.current = nextControl;
+        }
+      } catch (loadError) {
+        if (!cancelled) {
+          setError(loadError instanceof Error ? loadError.message : String(loadError));
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void load();
+    const timer = setInterval(() => {
+      void load();
+    }, 5_000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible || !status?.enabled || !draft || !dirtyRef.current) {
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      const nextDraft = draft;
+      setSaving(true);
+      setError(null);
+      void fetch(SYNTHETIC_ADMIN_PROXY_PATHS.control, {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify(nextDraft)
+      })
+        .then(async (response) => {
+          if (!response.ok) {
+            const body = await response.json().catch(() => null);
+            throw new Error(body?.detail ?? body?.error ?? "Synthetic control update failed");
+          }
+          return (await response.json()) as SyntheticAdminControlResponse;
+        })
+        .then((payload) => {
+          dirtyRef.current = false;
+          savedRef.current = payload.control;
+          setSaved(payload.control);
+          setDraft(payload.control);
+          setStatus((current) =>
+            current
+              ? {
+                  ...current,
+                  control: payload.control,
+                  derived: payload.derived ?? current.derived
+                }
+              : current
+          );
+        })
+        .catch((updateError) => {
+          dirtyRef.current = false;
+          setError(updateError instanceof Error ? updateError.message : String(updateError));
+          setDraft(savedRef.current);
+        })
+        .finally(() => {
+          setSaving(false);
+        });
+    }, 250);
+
+    return () => {
+      clearTimeout(timeout);
+    };
+  }, [draft, status?.enabled, visible]);
+
+  if (!visible) {
+    return null;
+  }
+
+  const currentControl = draft ?? saved ?? buildDefaultSyntheticControl();
+  const disabled = !status?.enabled;
+  const derived = status?.derived;
+
+  const updateControl = (
+    patch: SyntheticControlPatch
+  ) => {
+    dirtyRef.current = true;
+    setDraft((current) =>
+      createSyntheticControlDraft(current ?? buildDefaultSyntheticControl(), patch)
+    );
+  };
+
+  const updateProfileWeight = (
+    profileId: keyof SyntheticControlState["profile_weights"],
+    value: SyntheticProfileWeightValue
+  ) => {
+    updateControl({
+      profile_weights: {
+        [profileId]: value
+      } as Partial<SyntheticControlState["profile_weights"]>
+    });
+  };
+
+  return (
+    <>
+      <button
+        aria-expanded={open}
+        aria-label="Synthetic control"
+        className={`synthetic-control-gear${open ? " is-open" : ""}`}
+        onClick={() => setOpen((current) => !current)}
+        type="button"
+      >
+        <span className="synthetic-control-gear-mark">+</span>
+      </button>
+
+      {open ? (
+        <aside className="synthetic-control-drawer" aria-label="Synthetic control drawer">
+          <div className="synthetic-control-header">
+            <div>
+              <p className="synthetic-control-kicker">Synthetic Control</p>
+              <h3>Hosted tape operator rail</h3>
+            </div>
+            <button className="drawer-close" onClick={() => setOpen(false)} type="button">
+              Close
+            </button>
+          </div>
+
+          {loading ? (
+            <p className="drawer-note">Loading hosted synthetic status…</p>
+          ) : disabled ? (
+            <div className="synthetic-control-disabled">
+              <p className="synthetic-control-disabled-label">Unavailable</p>
+              <p>{status?.disabled_reason ?? "Synthetic control is currently unavailable."}</p>
+              <span>
+                Backend: {status?.backend_mode ?? "unknown"} · Options:{" "}
+                {status?.adapters.options ?? "unknown"} · Equities:{" "}
+                {status?.adapters.equities ?? "unknown"}
+              </span>
+            </div>
+          ) : (
+            <>
+              <section className="synthetic-control-section">
+                <div className="synthetic-control-section-head">
+                  <span>Preset</span>
+                  <span>{saving ? "Saving…" : "Live"}</span>
+                </div>
+                <label className="synthetic-control-select">
+                  <select
+                    onChange={(event) =>
+                      updateControl({
+                        preset_id: event.target.value as SyntheticControlState["preset_id"]
+                      })
+                    }
+                    value={currentControl.preset_id}
+                  >
+                    {Object.entries(SYNTHETIC_PRESET_LABELS).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </section>
+
+              <section className="synthetic-control-section">
+                <div className="synthetic-control-section-head">
+                  <span>Coverage</span>
+                  <span>{currentControl.coverage_window_minutes}m window</span>
+                </div>
+                <label className="synthetic-control-toggle">
+                  <input
+                    checked={currentControl.coverage_assist}
+                    onChange={(event) =>
+                      updateControl({ coverage_assist: event.target.checked })
+                    }
+                    type="checkbox"
+                  />
+                  <span>Coverage assist</span>
+                </label>
+                <div className="synthetic-segment-row">
+                  {[10, 20, 30].map((minutes) => (
+                    <button
+                      className={`synthetic-segment${currentControl.coverage_window_minutes === minutes ? " is-active" : ""}`}
+                      key={minutes}
+                      onClick={() =>
+                        updateControl({
+                          coverage_window_minutes:
+                            minutes as SyntheticCoverageWindowMinutes
+                        })
+                      }
+                      type="button"
+                    >
+                      {minutes}m
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section className="synthetic-control-section">
+                <div className="synthetic-control-section-head">
+                  <span>Profile Bias</span>
+                  <span>Low · Normal · High</span>
+                </div>
+                <div className="synthetic-profile-grid">
+                  {SYNTHETIC_PROFILE_ORDER.map((profileId) => (
+                    <div className="synthetic-profile-row" key={profileId}>
+                      <span>{SYNTHETIC_PROFILE_LABELS[profileId]}</span>
+                      <div className="synthetic-segment-row">
+                        {[
+                          { label: "Low", value: 0.6 },
+                          { label: "Normal", value: 1.0 },
+                          { label: "High", value: 1.6 }
+                        ].map((option) => (
+                          <button
+                            className={`synthetic-segment${currentControl.profile_weights[profileId] === option.value ? " is-active" : ""}`}
+                            key={option.label}
+                            onClick={() =>
+                              updateProfileWeight(
+                                profileId,
+                                option.value as SyntheticProfileWeightValue
+                              )
+                            }
+                            type="button"
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="synthetic-control-section">
+                <div className="synthetic-control-section-head">
+                  <span>Live Status</span>
+                  <span>{status?.backend_mode ?? "unknown"}</span>
+                </div>
+                <div className="synthetic-status-grid">
+                  <div>
+                    <span>Regime</span>
+                    <strong>{derived?.regime ?? "—"}</strong>
+                  </div>
+                  <div>
+                    <span>Session</span>
+                    <strong>{derived?.session_phase ?? "—"}</strong>
+                  </div>
+                  <div>
+                    <span>Focus</span>
+                    <strong>
+                      {derived?.focus_symbols?.length
+                        ? derived.focus_symbols.join(", ")
+                        : "—"}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Backend</span>
+                    <strong>{status?.enabled ? "Enabled" : "Disabled"}</strong>
+                  </div>
+                </div>
+                <div className="synthetic-hit-list">
+                  {SYNTHETIC_PROFILE_ORDER.map((profileId) => (
+                    <div className="synthetic-hit-row" key={profileId}>
+                      <span>{SYNTHETIC_PROFILE_LABELS[profileId]}</span>
+                      <strong>{derived?.profile_hit_counts?.[profileId] ?? 0}</strong>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              {error ? <p className="drawer-note synthetic-control-error">{error}</p> : null}
+            </>
+          )}
+        </aside>
+      ) : null}
+    </>
+  );
+}
+
 export function TerminalAppShell({ children }: { children: ReactNode }) {
   const state = useTerminalState();
   const pathname = usePathname();
@@ -8002,6 +8421,8 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
 
           <main className="terminal-content">{children}</main>
         </div>
+
+        <SyntheticControlDock />
 
         {state.selectedAlert ? (
           <AlertDrawer

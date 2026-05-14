@@ -11,9 +11,12 @@ import {
   STREAM_OPTION_SIGNAL_PRINTS,
   buildDurableConsumer,
   connectJetStreamWithRetry,
+  ensureSyntheticControlState,
   ensureKnownStreams,
+  openSyntheticControlKv,
   publishJson,
-  subscribeJson
+  subscribeJson,
+  watchSyntheticControlState
 } from "@islandflow/bus";
 import {
   createClickHouseClient,
@@ -26,12 +29,14 @@ import {
   OptionNBBOSchema,
   OptionPrintSchema,
   EquityQuoteSchema,
+  DEFAULT_SYNTHETIC_CONTROL_STATE,
   deriveOptionPrintMetadata,
   resolveSyntheticMarketModes,
   type EquityQuote,
   type OptionNBBO,
   type OptionPrint,
-  type OptionsSignalConfig
+  type OptionsSignalConfig,
+  type SyntheticControlState
 } from "@islandflow/types";
 import { createAlpacaOptionsAdapter } from "./adapters/alpaca";
 import { createDatabentoOptionsAdapter } from "./adapters/databento";
@@ -259,11 +264,15 @@ const retry = async <T>(
   throw lastError ?? new Error(`${label} failed after retries`);
 };
 
-const selectAdapter = (name: string): OptionIngestAdapter => {
+const selectAdapter = (
+  name: string,
+  getSyntheticControl: () => SyntheticControlState
+): OptionIngestAdapter => {
   if (name === "synthetic") {
     return createSyntheticOptionsAdapter({
       emitIntervalMs: env.EMIT_INTERVAL_MS,
-      mode: syntheticModes.options
+      mode: syntheticModes.options,
+      getControl: getSyntheticControl
     });
   }
 
@@ -351,6 +360,24 @@ const run = async () => {
     { logger }
   );
 
+  let syntheticControl = DEFAULT_SYNTHETIC_CONTROL_STATE;
+  let stopSyntheticControlWatch = async () => {};
+  if (env.OPTIONS_INGEST_ADAPTER === "synthetic") {
+    const syntheticControlKv = await openSyntheticControlKv(js);
+    syntheticControl = await ensureSyntheticControlState(syntheticControlKv);
+    stopSyntheticControlWatch = await watchSyntheticControlState(
+      syntheticControlKv,
+      (nextControl) => {
+        syntheticControl = nextControl;
+      },
+      (error) => {
+        logger.warn("synthetic control watch failed", {
+          error: getErrorMessage(error)
+        });
+      }
+    );
+  }
+
   const clickhouse = createClickHouseClient({
     url: env.CLICKHOUSE_URL,
     database: env.CLICKHOUSE_DATABASE
@@ -361,7 +388,10 @@ const run = async () => {
     await ensureOptionNBBOTable(clickhouse);
   });
 
-  const adapter = selectAdapter(env.OPTIONS_INGEST_ADAPTER);
+  const adapter = selectAdapter(
+    env.OPTIONS_INGEST_ADAPTER,
+    () => syntheticControl
+  );
   logger.info("ingest adapter selected", { adapter: adapter.name });
   const allowPublish = buildThrottle(env.TESTING_MODE, env.TESTING_THROTTLE_MS);
   const allowNbboPublish = buildThrottle(env.TESTING_MODE, env.TESTING_THROTTLE_MS);
@@ -482,6 +512,7 @@ const run = async () => {
     state.shutdownPromise = (async () => {
       logger.info("service stopping", { signal });
       clearInterval(pruneTimer);
+      await stopSyntheticControlWatch();
       await stopAdapter();
 
       try {

@@ -6,6 +6,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@islandflow/types": "workspace:*",
     "nats": "^2.24.0"
   }
 }

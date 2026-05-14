@@ -6,7 +6,10 @@ import {
   STREAM_EQUITY_PRINTS,
   STREAM_EQUITY_QUOTES,
   connectJetStreamWithRetry,
+  ensureSyntheticControlState,
   ensureKnownStreams,
+  openSyntheticControlKv,
+  watchSyntheticControlState,
   publishJson
 } from "@islandflow/bus";
 import {
@@ -19,9 +22,11 @@ import {
 import {
   EquityPrintSchema,
   EquityQuoteSchema,
+  DEFAULT_SYNTHETIC_CONTROL_STATE,
   resolveSyntheticMarketModes,
   type EquityPrint,
-  type EquityQuote
+  type EquityQuote,
+  type SyntheticControlState
 } from "@islandflow/types";
 import { createAlpacaEquitiesAdapter } from "./adapters/alpaca";
 import { createSyntheticEquitiesAdapter } from "./adapters/synthetic";
@@ -157,11 +162,15 @@ const parseSymbolList = (value: string): string[] => {
     .filter(Boolean);
 };
 
-const selectAdapter = (name: string): EquityIngestAdapter => {
+const selectAdapter = (
+  name: string,
+  getSyntheticControl: () => SyntheticControlState
+): EquityIngestAdapter => {
   if (name === "synthetic") {
     return createSyntheticEquitiesAdapter({
       emitIntervalMs: env.EMIT_INTERVAL_MS,
-      mode: syntheticModes.equities
+      mode: syntheticModes.equities,
+      getControl: getSyntheticControl
     });
   }
 
@@ -196,6 +205,24 @@ const run = async () => {
 
   await ensureKnownStreams(jsm, [STREAM_EQUITY_PRINTS, STREAM_EQUITY_QUOTES], { logger });
 
+  let syntheticControl = DEFAULT_SYNTHETIC_CONTROL_STATE;
+  let stopSyntheticControlWatch = async () => {};
+  if (env.EQUITIES_INGEST_ADAPTER === "synthetic") {
+    const syntheticControlKv = await openSyntheticControlKv(js);
+    syntheticControl = await ensureSyntheticControlState(syntheticControlKv);
+    stopSyntheticControlWatch = await watchSyntheticControlState(
+      syntheticControlKv,
+      (nextControl) => {
+        syntheticControl = nextControl;
+      },
+      (error) => {
+        logger.warn("synthetic control watch failed", {
+          error: getErrorMessage(error)
+        });
+      }
+    );
+  }
+
   const clickhouse = createClickHouseClient({
     url: env.CLICKHOUSE_URL,
     database: env.CLICKHOUSE_DATABASE
@@ -206,7 +233,10 @@ const run = async () => {
     await ensureEquityQuotesTable(clickhouse);
   });
 
-  const adapter = selectAdapter(env.EQUITIES_INGEST_ADAPTER);
+  const adapter = selectAdapter(
+    env.EQUITIES_INGEST_ADAPTER,
+    () => syntheticControl
+  );
   logger.info("ingest adapter selected", { adapter: adapter.name });
   const allowPublish = buildThrottle(env.TESTING_MODE, env.TESTING_THROTTLE_MS);
   const allowQuotePublish = buildThrottle(env.TESTING_MODE, env.TESTING_THROTTLE_MS);
@@ -274,6 +304,7 @@ const run = async () => {
     state.shuttingDown = true;
     state.shutdownPromise = (async () => {
       logger.info("service stopping", { signal });
+      await stopSyntheticControlWatch();
       await stopAdapter();
 
       try {

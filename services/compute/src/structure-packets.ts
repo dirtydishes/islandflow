@@ -46,6 +46,7 @@ export type StructurePacketPlan = {
   nbboAggressiveBuyRatio: number;
   nbboAggressiveSellRatio: number;
   nbboAggressiveRatio: number;
+  sameSizeLegSymmetry: number;
   source_ts: number;
   ingest_ts: number;
   seq: number;
@@ -130,6 +131,19 @@ const dayDiff = (from: string | null, to: string | null): number | null => {
   }
   const diffMs = toTs - fromTs;
   return Math.round(diffMs / 86_400_000);
+};
+
+const sameSizeLegSymmetry = (legs: LegEvidence[]): number => {
+  const sizes = legs.map((leg) => leg.totalSize).filter((value) => Number.isFinite(value) && value > 0);
+  if (sizes.length < 2) {
+    return 0;
+  }
+  const min = Math.min(...sizes);
+  const max = Math.max(...sizes);
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= 0) {
+    return 0;
+  }
+  return min / max;
 };
 
 export const shouldEmitStructurePacket = (legs: LegEvidence[], currentLegContractId: string): boolean => {
@@ -250,6 +264,7 @@ export const planStructurePacket = (
     nbboAggressiveBuyRatio,
     nbboAggressiveSellRatio,
     nbboAggressiveRatio,
+    sameSizeLegSymmetry: roundTo(sameSizeLegSymmetry(legs)),
     source_ts: Number.isFinite(source_ts) ? source_ts : 0,
     ingest_ts,
     seq
@@ -320,6 +335,7 @@ export const buildStructureFlowPacket = (
   features.nbbo_aggressive_buy_ratio = roundTo(plan.nbboAggressiveBuyRatio);
   features.nbbo_aggressive_sell_ratio = roundTo(plan.nbboAggressiveSellRatio);
   features.nbbo_aggressive_ratio = roundTo(plan.nbboAggressiveRatio);
+  features.same_size_leg_symmetry = roundTo(plan.sameSizeLegSymmetry);
 
   const join_quality: Record<string, number> = {
     nbbo_coverage_ratio: roundTo(plan.nbboCoverageRatio)

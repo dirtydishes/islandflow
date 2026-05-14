@@ -130,6 +130,7 @@ describe("structure packet planning", () => {
     expect(packet.features.nbbo_bb_count).toBe(1);
     expect(packet.features.nbbo_mid_count).toBe(1);
     expect(packet.features.nbbo_coverage_ratio).toBeCloseTo(1, 6);
+    expect(packet.features.same_size_leg_symmetry).toBeCloseTo(0.5, 4);
 
     // 2 aggressive (AA + BB) out of 3 classified (AA + BB + MID)
     expect(packet.features.nbbo_aggressive_ratio).toBeCloseTo(2 / 3, 4);

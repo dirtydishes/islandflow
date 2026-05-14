@@ -28,6 +28,7 @@ import {
   mergeNewestWithOverflow,
   normalizeAlertSeverity,
   nextFlowFilterPopoverState,
+  isSyntheticAdminVisible,
   prunePinnedEntries,
   projectPausableTapeState,
   reducePausableTapeData,
@@ -404,6 +405,13 @@ describe("terminal navigation", () => {
       { href: "/", label: "Home" },
       { href: "/tape", label: "Tape" }
     ]);
+  });
+});
+
+describe("synthetic admin visibility", () => {
+  it("shows the internal control rail only when the public admin flag is enabled", () => {
+    expect(isSyntheticAdminVisible("1")).toBe(true);
+    expect(isSyntheticAdminVisible("0")).toBe(false);
   });
 });
 

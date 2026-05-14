@@ -271,6 +271,14 @@ type ClusterState = {
   totalPremium: number;
   firstPrice: number;
   lastPrice: number;
+  conditions: Set<string>;
+  specialPrintCount: number;
+  firstExecutionIv: number | null;
+  lastExecutionIv: number | null;
+  minExecutionIv: number | null;
+  maxExecutionIv: number | null;
+  firstUnderlyingMid: number | null;
+  lastUnderlyingMid: number | null;
   placements: NbboPlacementCounts;
   flushed: boolean;
 };
@@ -328,6 +336,29 @@ const createPlacementCounts = (): NbboPlacementCounts => ({
   missing: 0,
   stale: 0
 });
+
+const SPECIAL_PRINT_CONDITIONS = new Set(["AUCTION", "CROSS", "OPENING", "CLOSING", "COMPLEX", "SPREAD"]);
+const SYNTHETIC_EVENT_CONDITION_RE = /^EVENT_(\d+)D$/i;
+
+const normalizeConditions = (conditions: readonly string[] | undefined): string[] =>
+  (conditions ?? []).map((condition) => condition.trim().toUpperCase()).filter(Boolean);
+
+const hasSpecialCondition = (conditions: readonly string[] | undefined): boolean =>
+  normalizeConditions(conditions).some((condition) => SPECIAL_PRINT_CONDITIONS.has(condition));
+
+const parseSyntheticEventOffsetDays = (conditions: Iterable<string>): number | null => {
+  for (const condition of conditions) {
+    const match = SYNTHETIC_EVENT_CONDITION_RE.exec(condition);
+    if (!match) {
+      continue;
+    }
+    const days = Number(match[1]);
+    if (Number.isFinite(days) && days > 0) {
+      return days;
+    }
+  }
+  return null;
+};
 
 const recordPlacement = (counts: NbboPlacementCounts, placement: NbboPlacement): void => {
   switch (placement) {
@@ -569,6 +600,12 @@ const applyDeliverPolicy = (
 
 const buildCluster = (print: OptionPrint): ClusterState => {
   const placements = createPlacementCounts();
+  const normalizedConditions = normalizeConditions(print.conditions);
+  const executionIv = typeof print.execution_iv === "number" && Number.isFinite(print.execution_iv) ? print.execution_iv : null;
+  const executionUnderlyingMid =
+    typeof print.execution_underlying_mid === "number" && Number.isFinite(print.execution_underlying_mid)
+      ? print.execution_underlying_mid
+      : null;
   recordPlacement(placements, classifyPlacement(print.price, selectNbbo(print.option_contract_id, print.ts)));
   return {
     contractId: print.option_contract_id,
@@ -585,6 +622,14 @@ const buildCluster = (print: OptionPrint): ClusterState => {
     totalPremium: print.price * print.size,
     firstPrice: print.price,
     lastPrice: print.price,
+    conditions: new Set(normalizedConditions),
+    specialPrintCount: hasSpecialCondition(print.conditions) ? 1 : 0,
+    firstExecutionIv: executionIv,
+    lastExecutionIv: executionIv,
+    minExecutionIv: executionIv,
+    maxExecutionIv: executionIv,
+    firstUnderlyingMid: executionUnderlyingMid,
+    lastUnderlyingMid: executionUnderlyingMid,
     placements,
     flushed: false
   };
@@ -607,6 +652,25 @@ const updateCluster = (cluster: ClusterState, print: OptionPrint): ClusterState 
   cluster.totalSize += print.size;
   cluster.totalPremium += print.price * print.size;
   cluster.lastPrice = print.price;
+  for (const condition of normalizeConditions(print.conditions)) {
+    cluster.conditions.add(condition);
+  }
+  if (hasSpecialCondition(print.conditions)) {
+    cluster.specialPrintCount += 1;
+  }
+  if (typeof print.execution_iv === "number" && Number.isFinite(print.execution_iv)) {
+    cluster.lastExecutionIv = print.execution_iv;
+    cluster.minExecutionIv =
+      cluster.minExecutionIv === null ? print.execution_iv : Math.min(cluster.minExecutionIv, print.execution_iv);
+    cluster.maxExecutionIv =
+      cluster.maxExecutionIv === null ? print.execution_iv : Math.max(cluster.maxExecutionIv, print.execution_iv);
+  }
+  if (typeof print.execution_underlying_mid === "number" && Number.isFinite(print.execution_underlying_mid)) {
+    if (cluster.firstUnderlyingMid === null) {
+      cluster.firstUnderlyingMid = print.execution_underlying_mid;
+    }
+    cluster.lastUnderlyingMid = print.execution_underlying_mid;
+  }
   recordPlacement(
     cluster.placements,
     classifyPlacement(print.price, selectNbbo(print.option_contract_id, print.ts))
@@ -835,6 +899,27 @@ const flushCluster = async (
   }
   if (cluster.isEtf !== null) {
     features.is_etf = cluster.isEtf;
+  }
+  if (cluster.conditions.size > 0) {
+    features.conditions = Array.from(cluster.conditions).sort().join(",");
+  }
+  if (cluster.specialPrintCount > 0) {
+    features.special_print_count = cluster.specialPrintCount;
+  }
+  if (cluster.minExecutionIv !== null && cluster.maxExecutionIv !== null) {
+    features.execution_iv_shock = roundTo(Math.max(0, cluster.maxExecutionIv - cluster.minExecutionIv));
+  }
+  if (
+    cluster.firstUnderlyingMid !== null &&
+    cluster.lastUnderlyingMid !== null &&
+    cluster.firstUnderlyingMid > 0
+  ) {
+    const moveBps = ((cluster.lastUnderlyingMid - cluster.firstUnderlyingMid) / cluster.firstUnderlyingMid) * 10_000;
+    features.underlying_move_bps = roundTo(moveBps);
+  }
+  const syntheticEventOffsetDays = parseSyntheticEventOffsetDays(cluster.conditions);
+  if (syntheticEventOffsetDays !== null) {
+    features.corporate_event_ts = cluster.endTs + syntheticEventOffsetDays * 86_400_000;
   }
 
   const placementTotal =

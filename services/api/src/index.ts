@@ -25,8 +25,12 @@ import {
   STREAM_OPTION_SIGNAL_PRINTS,
   buildDurableConsumer,
   connectJetStreamWithRetry,
+  ensureSyntheticControlState,
   ensureKnownStreams,
-  subscribeJson
+  openSyntheticControlKv,
+  subscribeJson,
+  watchSyntheticControlState,
+  writeSyntheticControlState
 } from "@islandflow/bus";
 import {
   createClickHouseClient,
@@ -100,6 +104,7 @@ import {
   matchesFlowPacketFilters,
   matchesOptionPrintFilters,
   FlowPacketSchema,
+  SyntheticControlStateSchema,
   SmartMoneyEventSchema,
   OptionNBBOSchema,
   OptionPrintSchema,
@@ -114,6 +119,13 @@ import {
   shouldFanoutLiveEvent
 } from "./live";
 import { parseOptionPrintQuery } from "./option-queries";
+import {
+  buildSyntheticDerivedStatus,
+  createRollingSyntheticProfileHits,
+  getSyntheticBackendDisabledReason,
+  recordSyntheticProfileHit,
+  resolveSyntheticBackendMode
+} from "./synthetic-control";
 
 const service = "api";
 const logger = createLogger({ service });
@@ -127,10 +139,27 @@ const envSchema = z.object({
   CLICKHOUSE_URL: z.string().default("http://127.0.0.1:8123"),
   CLICKHOUSE_DATABASE: z.string().default("default"),
   REDIS_URL: z.string().default("redis://127.0.0.1:6379"),
+  OPTIONS_INGEST_ADAPTER: z.string().min(1).default("synthetic"),
+  EQUITIES_INGEST_ADAPTER: z.string().min(1).default("synthetic"),
   REST_DEFAULT_LIMIT: z.coerce.number().int().positive().default(200),
   API_DELIVER_POLICY: DeliverPolicySchema.default("new"),
   API_CONSUMER_RESET: z.coerce.boolean().default(false),
-  LIVE_LAG_WARN_MS: z.coerce.number().int().positive().default(120_000)
+  LIVE_LAG_WARN_MS: z.coerce.number().int().positive().default(120_000),
+  SYNTHETIC_CONTROL_ENABLED: z
+    .preprocess((value) => {
+      if (typeof value === "string") {
+        const normalized = value.trim().toLowerCase();
+        if (["1", "true", "yes", "on"].includes(normalized)) {
+          return true;
+        }
+        if (["0", "false", "no", "off"].includes(normalized)) {
+          return false;
+        }
+      }
+      return value;
+    }, z.boolean())
+    .default(false),
+  SYNTHETIC_ADMIN_TOKEN: z.string().default("")
 });
 
 const env = readEnv(envSchema);
@@ -281,6 +310,14 @@ const readJsonBody = async (req: Request): Promise<unknown> => {
     return {};
   }
   return JSON.parse(text);
+};
+
+const getBearerToken = (req: Request): string => {
+  const authorization = req.headers.get("authorization") ?? "";
+  if (authorization.toLowerCase().startsWith("bearer ")) {
+    return authorization.slice(7).trim();
+  }
+  return req.headers.get("x-synthetic-admin-token")?.trim() ?? "";
 };
 
 const optionsSupportLookupSchema = z.object({
@@ -639,6 +676,27 @@ const run = async () => {
       STREAM_ALERTS
     ],
     { logger }
+  );
+
+  const syntheticBackendMode = resolveSyntheticBackendMode(
+    env.OPTIONS_INGEST_ADAPTER,
+    env.EQUITIES_INGEST_ADAPTER
+  );
+  const syntheticBackendDisabledReason =
+    getSyntheticBackendDisabledReason(syntheticBackendMode);
+  const syntheticControlKv = await openSyntheticControlKv(js);
+  let syntheticControl = await ensureSyntheticControlState(syntheticControlKv);
+  const syntheticProfileHits = createRollingSyntheticProfileHits();
+  const stopSyntheticControlWatch = await watchSyntheticControlState(
+    syntheticControlKv,
+    (nextControl) => {
+      syntheticControl = nextControl;
+    },
+    (error) => {
+      logger.warn("synthetic control watch failed", {
+        error: getErrorMessage(error)
+      });
+    }
   );
 
   const clickhouse = createClickHouseClient({
@@ -1146,6 +1204,7 @@ const run = async () => {
     for await (const msg of smartMoneySubscription.messages) {
       try {
         const payload = SmartMoneyEventSchema.parse(smartMoneySubscription.decode(msg));
+        recordSyntheticProfileHit(syntheticProfileHits, payload);
         broadcast(smartMoneySockets, { type: "smart-money", payload });
         await fanoutLive({ channel: "smart-money" }, payload, "smart-money");
         msg.ack();
@@ -1202,6 +1261,54 @@ const run = async () => {
   void pumpClassifierHits();
   void pumpAlerts();
 
+  const buildSyntheticStatusBody = () => {
+    const derived =
+      syntheticBackendMode === "synthetic"
+        ? buildSyntheticDerivedStatus(Date.now(), syntheticControl, syntheticProfileHits)
+        : null;
+    return {
+      enabled: env.SYNTHETIC_CONTROL_ENABLED && syntheticBackendMode === "synthetic",
+      backend_mode: syntheticBackendMode,
+      adapters: {
+        options: env.OPTIONS_INGEST_ADAPTER,
+        equities: env.EQUITIES_INGEST_ADAPTER
+      },
+      control: syntheticBackendMode === "synthetic" ? syntheticControl : null,
+      derived,
+      ...(syntheticBackendDisabledReason
+        ? { disabled_reason: syntheticBackendDisabledReason }
+        : {})
+    };
+  };
+
+  const authenticateSyntheticAdminRequest = (req: Request): Response | null => {
+    if (!env.SYNTHETIC_CONTROL_ENABLED) {
+      return jsonResponse({ error: "not found" }, 404);
+    }
+    if (!env.SYNTHETIC_ADMIN_TOKEN) {
+      return jsonResponse(
+        {
+          error: "synthetic admin misconfigured",
+          detail: "SYNTHETIC_ADMIN_TOKEN is required when synthetic control is enabled."
+        },
+        500
+      );
+    }
+    if (getBearerToken(req) !== env.SYNTHETIC_ADMIN_TOKEN) {
+      return jsonResponse({ error: "unauthorized" }, 401);
+    }
+    if (syntheticBackendMode !== "synthetic") {
+      return jsonResponse(
+        {
+          error: "synthetic backend unavailable",
+          ...buildSyntheticStatusBody()
+        },
+        409
+      );
+    }
+    return null;
+  };
+
   const server = Bun.serve<WsData | LiveWsData>({
     port: env.API_PORT,
     fetch: async (req: Request, serverRef: any) => {
@@ -1209,6 +1316,49 @@ const run = async () => {
 
       if (req.method === "GET" && url.pathname === "/health") {
         return jsonResponse({ status: "ok" });
+      }
+
+      if (req.method === "GET" && url.pathname === "/admin/synthetic/status") {
+        const authError = authenticateSyntheticAdminRequest(req);
+        if (authError) {
+          return authError;
+        }
+        return jsonResponse(buildSyntheticStatusBody());
+      }
+
+      if (req.method === "GET" && url.pathname === "/admin/synthetic/control") {
+        const authError = authenticateSyntheticAdminRequest(req);
+        if (authError) {
+          return authError;
+        }
+        return jsonResponse({ control: syntheticControl });
+      }
+
+      if (req.method === "PUT" && url.pathname === "/admin/synthetic/control") {
+        const authError = authenticateSyntheticAdminRequest(req);
+        if (authError) {
+          return authError;
+        }
+        try {
+          const payload = SyntheticControlStateSchema.parse(await readJsonBody(req));
+          syntheticControl = await writeSyntheticControlState(syntheticControlKv, payload);
+          return jsonResponse({
+            control: syntheticControl,
+            derived: buildSyntheticDerivedStatus(
+              Date.now(),
+              syntheticControl,
+              syntheticProfileHits
+            )
+          });
+        } catch (error) {
+          return jsonResponse(
+            {
+              error: "invalid synthetic control payload",
+              detail: getErrorMessage(error)
+            },
+            400
+          );
+        }
       }
 
       if (req.method === "GET" && url.pathname === "/prints/options") {
@@ -1824,6 +1974,7 @@ const run = async () => {
       logger.info("service stopping", { signal });
       server.stop();
       clearInterval(liveStateMetricsTimer);
+      await stopSyntheticControlWatch();
       await liveState.close();
 
       if (redis && redis.isOpen) {
