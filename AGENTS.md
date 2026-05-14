@@ -68,3 +68,18 @@ Working style that avoids common problems here:
 - Prefer editing in the touched workspace (`services/<name>`, `packages/<name>`, `apps/web`) and keep shared contract changes in `packages/types`.
 - Keep `.env` aligned with `.env.example`; adapters default to synthetic modes for local development.
 - Dev runners persist child PID state in `.tmp/`; if a previous run crashed, restart via the standard `bun run dev*` commands so stale processes are cleaned up.
+
+Always do the following when you finish a task and make a commit:
+- Document the changes in a user-readable format
+- Use the impeccable skill to structure the document as HTML 
+- Create a clear, concise summary of the changes at the top, followed by a detailed description of the changes, including any relevant context or background as well as specific code snippets or examples.
+- Note any relevant issues or limitations that were addressed or mitigated by the changes.
+- The document should be stored in the `docs/turns` directory.
+
+Always do the following when you finish a task and make a commit:
+- Give a conscise summary of the plan and the changes made.
+- Use the impeccable skill to structure the document as HTML 
+- Create a clear, concise summary of the changes at the top, followed by a detailed description of the changes, including any relevant context or background as well as specific code snippets or examples.
+- Note any relevant issues or limitations that would be addressed or mitigated by the changes.
+- The document should be stored in the `docs/plans` directory.
+- It should be labeled as a plan with a brief description of the changes.
