@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>2026-05-15: Dual-runtime deploy workflow</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #10131a;
+        --panel: #171c25;
+        --panel-2: #1e2531;
+        --text: #e8edf5;
+        --muted: #9fb0c8;
+        --accent: #7cc4ff;
+        --border: #2d3848;
+        --good: #7dd3a7;
+        --warn: #f6c177;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font: 16px/1.6 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: linear-gradient(180deg, #0c1016, var(--bg));
+        color: var(--text);
+      }
+      main {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 40px 20px 72px;
+      }
+      h1, h2 { line-height: 1.15; }
+      h1 { margin: 0 0 12px; font-size: 2rem; }
+      h2 { margin: 0 0 14px; font-size: 1.2rem; }
+      p, li { color: var(--text); }
+      .lede { color: var(--muted); max-width: 70ch; }
+      section {
+        margin-top: 24px;
+        padding: 22px 24px;
+        background: linear-gradient(180deg, var(--panel), var(--panel-2));
+        border: 1px solid var(--border);
+        border-radius: 18px;
+      }
+      code, pre {
+        font: 13px/1.5 "SFMono-Regular", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+      code {
+        padding: 0.15rem 0.35rem;
+        border-radius: 8px;
+        background: rgba(124, 196, 255, 0.12);
+        color: var(--accent);
+      }
+      pre {
+        margin: 14px 0 0;
+        padding: 14px 16px;
+        overflow: auto;
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        background: #0d1219;
+        color: #d7e7ff;
+      }
+      ul { margin: 0; padding-left: 1.2rem; }
+      .meta {
+        display: inline-flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+      }
+      .chip {
+        padding: 0.3rem 0.65rem;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        color: var(--muted);
+        background: rgba(255,255,255,0.03);
+      }
+      .good { color: var(--good); }
+      .warn { color: var(--warn); }
+      a { color: var(--accent); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="meta">
+        <span class="chip">Turn document</span>
+        <span class="chip">2026-05-15</span>
+        <span class="chip">Issue: islandflow-qh7</span>
+      </div>
+      <h1>Dual-runtime deploy workflow</h1>
+      <p class="lede">
+        Updated the root deploy flow so it can target either the existing Docker Compose VPS runtime or a new host-native Bun + systemd runtime, while also adding partial deploy scopes for faster iteration.
+      </p>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          The deploy helper now supports <code>--runtime docker</code> and <code>--runtime native</code>, keeps Docker as the default, and adds <code>--web-only</code>, <code>--api-only</code>, <code>--services-only</code>, and <code>--no-build</code>. Documentation now clearly separates fast local development from VPS rollout options.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Refactored <code>scripts/deploy.ts</code> into shared git/publish logic plus runtime-specific precheck, rollout, and verification paths.</li>
+          <li>Removed Docker verification’s dependence on hardcoded container names and switched to <code>docker compose exec</code>.</li>
+          <li>Added native deployment support that assumes Bun plus systemd-managed units on the VPS.</li>
+          <li>Added a new operator guide at <code>deployment/native/README.md</code>.</li>
+          <li>Updated <code>README.md</code> to emphasize the preferred fast local loop: Docker infra only, native Bun services, native web dev.</li>
+          <li>Updated <code>deployment/docker/README.md</code> to document Docker as the default runtime and show new partial rollout examples.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          The repo already separated local infra from application processes: the root <code>docker-compose.yml</code> is infra-only, while services and the web app run through Bun scripts. The old deploy helper still assumed every server rollout was Docker-only. This change makes the deploy workflow match the new operating model: fast native iteration locally, Docker still available in production, and a native VPS path available during transition.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <ul>
+          <li>Docker remains the default runtime, so <code>./deploy main</code> still works without extra flags.</li>
+          <li>Native rollouts are invoked with <code>./deploy main --runtime native</code> or <code>./deploy current-branch --runtime native</code>.</li>
+          <li>Partial scopes are mutually exclusive and intentionally simple:</li>
+        </ul>
+        <pre>./deploy main --runtime docker --web-only
+./deploy main --runtime native --api-only
+./deploy current-branch --runtime docker --services-only
+./deploy main --runtime native --web-only --no-build</pre>
+        <ul style="margin-top:14px;">
+          <li>Docker workspace snapshot validation now runs only when a Docker rollout will build images.</li>
+          <li>Native rollouts assume systemd unit names like <code>islandflow-web</code> and <code>islandflow-api</code>, but those names can be overridden with environment variables such as <code>DEPLOY_NATIVE_WEB_UNIT</code>.</li>
+          <li>The native path also allows overriding the systemctl wrapper via <code>DEPLOY_NATIVE_SYSTEMCTL_PREFIX</code>, which is useful for <code>systemctl --user</code> setups.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li class="good">Passed: <code>bun run scripts/deploy.ts --help</code></li>
+          <li class="good">Passed: <code>bun run check:docker-workspace</code></li>
+          <li class="good">Passed: invalid-flag guard for <code>--runtime native --force-recreate</code></li>
+          <li class="good">Passed: conflicting-scope guard for <code>--web-only --api-only</code></li>
+        </ul>
+        <pre>bun run scripts/deploy.ts --help
+bun run check:docker-workspace
+bun run scripts/deploy.ts main --runtime native --force-recreate
+bun run scripts/deploy.ts main --web-only --api-only</pre>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li><span class="warn">Native deploys assume server-side systemd units already exist.</span> Mitigation: added <code>deployment/native/README.md</code> documenting expected unit names and override variables.</li>
+          <li><span class="warn">Rollback is still manual.</span> Mitigation: both Docker and native docs now frame runtime selection as a transition path, with Docker preserved as a fallback.</li>
+          <li><span class="warn">No native service unit files were added in this change.</span> This keeps the scope focused on the deploy workflow itself.</li>
+          <li><span class="warn">Public verification still centers on the hosted app URL.</span> API verification remains local-to-runtime unless <code>DEPLOY_PUBLIC_API_HEALTH_URL</code> is configured.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>Implementation tracked in <code>islandflow-qh7</code> is complete for the deploy helper itself.</li>
+          <li>Open follow-up: <code>islandflow-38p</code>, add checked-in native deployment unit templates and rollback helpers.</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
