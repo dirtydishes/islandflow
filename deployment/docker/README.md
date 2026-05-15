@@ -1,8 +1,13 @@
 # Docker Deployment
 
-This directory is the supported VPS deployment path for Islandflow.
+This directory contains the Docker runtime for Islandflow VPS deployments.
 
-The repo no longer ships or supports a separate `deployment/npm` stack. Docker Compose is the deployment surface; if you want a reverse proxy, point it at the host ports published by this stack.
+Docker remains the default server rollout path, but the repo-root `deploy` helper can now target either:
+
+- `--runtime docker` for this Docker Compose stack
+- `--runtime native` for a host-native Bun + systemd rollout described in `deployment/native/README.md`
+
+The repo no longer ships or supports a separate `deployment/npm` stack. If you want a reverse proxy, point it at the host ports published by this stack.
 
 It is separate from the repo-root `docker-compose.yml`, which remains the lightweight local infra stack for development.
 
@@ -198,6 +203,7 @@ It preserves the current Docker Compose project and avoids destructive cleanup o
 
 ```bash
 ./deploy main
+./deploy main --runtime docker
 ```
 
 This flow:
@@ -213,6 +219,7 @@ This flow:
 
 ```bash
 ./deploy current-branch
+./deploy current-branch --runtime docker
 ```
 
 Alias:
@@ -229,13 +236,24 @@ This flow:
 - switches the server checkout to that same branch and keeps it there until you intentionally move it back
 - runs the same rebuild and verification steps as `main`
 
+### Partial Docker rollouts
+
+Examples:
+
+```bash
+./deploy main --runtime docker --web-only
+./deploy main --runtime docker --api-only
+./deploy current-branch --runtime docker --services-only
+./deploy main --runtime docker --web-only --no-build
+```
+
 ### Escalation path
 
 Use force recreate only when a normal refresh does not update the services cleanly:
 
 ```bash
-./deploy main --force-recreate
-./deploy current-branch --force-recreate
+./deploy main --runtime docker --force-recreate
+./deploy current-branch --runtime docker --force-recreate
 ```
 
 ### Return the server to `main`
@@ -244,6 +262,7 @@ If the live checkout is on a branch deploy and you want normal production tracki
 
 ```bash
 ./deploy main
+./deploy main --runtime docker
 ```
 
 The helper always does the final public verification against:

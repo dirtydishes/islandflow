@@ -116,6 +116,23 @@ Start web only:
 
 - `bun run dev:web`
 
+Recommended fast iteration loop:
+
+- `bun run dev:infra` for Docker-backed infra only
+- `bun run dev:services` for native Bun backend services
+- `bun run dev:web` for the local Next.js UI
+
+This keeps Docker in the local workflow where it helps most (NATS, ClickHouse, Redis) without forcing the app services themselves into slower container rebuild/restart loops.
+
+## Deployment Workflow
+
+- `./deploy main` keeps the current VPS Docker rollout path as the default.
+- `./deploy main --runtime native` targets a host-native Bun + systemd deployment.
+- `./deploy current-branch` and `./deploy current-branch --runtime native` keep branch deploys available during the transition.
+- Partial deploys are supported with `--web-only`, `--api-only`, `--services-only`, and `--no-build`.
+- Docker runtime details live in `deployment/docker/README.md`.
+- Native runtime expectations live in `deployment/native/README.md`.
+
 ## Desktop Shell
 
 Islandflow also includes a thin Electron desktop shell in `apps/desktop`.
