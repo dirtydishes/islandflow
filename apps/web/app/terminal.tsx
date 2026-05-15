@@ -8,6 +8,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -5054,6 +5055,25 @@ const formatFlowMetric = (value: number, suffix?: string): string => {
   return value.toLocaleString();
 };
 
+const TICKER_FILTER_INPUT_MAX_LENGTH = 120;
+
+export const normalizeTickerFilterInput = (value: string): string =>
+  value
+    .normalize("NFKC")
+    .replace(/[\u0000-\u001f\u007f]+/g, " ")
+    .replace(/，/g, ",")
+    .replace(/\s+/g, " ")
+    .toUpperCase()
+    .slice(0, TICKER_FILTER_INPUT_MAX_LENGTH);
+
+export const parseTickerFilterInput = (value: string): string[] => {
+  const parts = normalizeTickerFilterInput(value)
+    .split(/[,\s]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return Array.from(new Set(parts));
+};
+
 const useTerminalState = () => {
   const pathname = usePathname();
   const routeFeatures = useMemo(() => getRouteFeatures(pathname), [pathname]);
@@ -5069,13 +5089,7 @@ const useTerminalState = () => {
   const [filterInput, setFilterInput] = useState<string>("");
   const [flowFilters, setFlowFilters] = useState<OptionFlowFilters>(() => buildDefaultFlowFilters());
   const [chartIntervalMs, setChartIntervalMs] = useState<number>(CANDLE_INTERVALS[0].ms);
-  const activeTickers = useMemo(() => {
-    const parts = filterInput
-      .split(/[,\s]+/)
-      .map((value) => value.trim().toUpperCase())
-      .filter(Boolean);
-    return Array.from(new Set(parts));
-  }, [filterInput]);
+  const activeTickers = useMemo(() => parseTickerFilterInput(filterInput), [filterInput]);
   const tickerSet = useMemo(() => new Set(activeTickers), [activeTickers]);
   const instrumentUnderlying = selectedInstrument?.underlyingId.toUpperCase() ?? null;
   const isOptionContractFocused = selectedInstrument?.kind === "option-contract";
@@ -8348,20 +8362,26 @@ function SyntheticControlDock() {
 export function TerminalAppShell({ children }: { children: ReactNode }) {
   const state = useTerminalState();
   const pathname = usePathname();
+  const tickerFieldId = useId();
+  const tickerHintId = useId();
 
   return (
     <TerminalContext.Provider value={state}>
       <div className="terminal-shell">
+        <a className="skip-link" href="#terminal-content">
+          Skip to terminal content
+        </a>
         <aside className="terminal-rail">
           <div className="terminal-brand">
             <span className="terminal-brand-kicker">IF</span>
             <span className="terminal-brand-name">Islandflow</span>
           </div>
-          <nav className="terminal-nav">
+          <nav aria-label="Primary" className="terminal-nav">
             {NAV_ITEMS.map((item) => {
               const active = pathname === item.href;
               return (
                 <Link
+                  aria-current={active ? "page" : undefined}
                   className={`terminal-nav-link${active ? " terminal-nav-link-active" : ""}`}
                   href={item.href}
                   key={item.href}
@@ -8387,31 +8407,46 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
                   </span>
                 ) : null}
                 <label className="terminal-filter">
-                  <span className="terminal-filter-label">Ticker</span>
+                  <span className="terminal-filter-label" id={tickerHintId}>
+                    Ticker
+                  </span>
                   <span className="terminal-filter-field">
                     <input
+                      id={tickerFieldId}
+                      aria-describedby={tickerHintId}
+                      autoCapitalize="characters"
+                      autoComplete="off"
+                      autoCorrect="off"
                       className="terminal-input"
                       value={state.filterInput}
-                      onChange={(event) => state.setFilterInput(event.target.value)}
+                      inputMode="text"
+                      maxLength={TICKER_FILTER_INPUT_MAX_LENGTH}
+                      name="ticker-filter"
+                      onChange={(event) => state.setFilterInput(normalizeTickerFilterInput(event.target.value))}
                       placeholder="SPY, NVDA, AAPL"
                       spellCheck={false}
                     />
                   </span>
                 </label>
                 <button
+                  aria-label="Clear ticker filter"
                   className="terminal-button"
                   type="button"
                   onClick={() => state.setFilterInput("")}
                   disabled={state.filterInput.trim().length === 0}
+                  title="Clear ticker filter"
                 >
                   Clear
                 </button>
               </div>
               <div className="terminal-topbar-mode">
                 <button
+                  aria-label={state.mode === "live" ? "Switch to replay mode" : "Switch to live mode"}
+                  aria-pressed={state.mode !== "live"}
                   className="terminal-button terminal-button-primary"
                   type="button"
                   onClick={state.toggleMode}
+                  title={state.mode === "live" ? "Switch to replay mode" : "Switch to live mode"}
                 >
                   {state.mode === "live" ? "Replay" : "Live"}
                 </button>
@@ -8419,7 +8454,9 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
             </div>
           </header>
 
-          <main className="terminal-content">{children}</main>
+          <main className="terminal-content" id="terminal-content">
+            {children}
+          </main>
         </div>
 
         <SyntheticControlDock />

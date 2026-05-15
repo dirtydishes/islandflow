@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>2026-05-15 Quiet Terminal View</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0d1117;
+        --panel: #161b22;
+        --text: #e6edf3;
+        --muted: #9fb0c2;
+        --border: rgba(255,255,255,0.12);
+        --accent: #d9a441;
+      }
+      body {
+        margin: 0;
+        padding: 32px;
+        font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+      main {
+        max-width: 860px;
+        margin: 0 auto;
+      }
+      h1, h2 { line-height: 1.15; }
+      h1 { margin-top: 0; }
+      section {
+        margin: 24px 0;
+        padding: 20px 22px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: var(--panel);
+      }
+      p, li { color: var(--muted); }
+      strong { color: var(--text); }
+      code, pre {
+        font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      pre {
+        overflow: auto;
+        padding: 14px;
+        border-radius: 10px;
+        background: rgba(0,0,0,0.22);
+        border: 1px solid rgba(255,255,255,0.08);
+      }
+      .summary {
+        border-left: 4px solid var(--accent);
+        padding-left: 16px;
+        margin-bottom: 24px;
+      }
+      ul { padding-left: 20px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Quiet Terminal View</h1>
+      <p class="summary"><strong>Summary:</strong> Reduced chrome intensity across the Islandflow terminal by flattening backgrounds, softening amber usage, calming pane and overlay styling, and reducing motion emphasis so live data carries more of the visual weight.</p>
+
+      <section>
+        <h2>Summary</h2>
+        <p>The terminal now reads as a calmer product surface. The shell keeps its dark evidence-console identity, but the background texture, active-state glow, and overlay treatments no longer compete with the tape.</p>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Moved core surface tokens in <code>apps/web/app/globals.css</code> to a quieter OKLCH palette.</li>
+          <li>Removed the visible shell grid texture and reduced ambient chrome contrast.</li>
+          <li>Flattened the rail, top bar, panes, lists, tables, drawers, filter popover, and synthetic control drawer.</li>
+          <li>Reduced amber wash on active buttons, filters, chips, and selected states.</li>
+          <li>Lowered the visual intensity of classified rows and semantic row outlines without removing meaning.</li>
+          <li>Switched secondary panel titles and control headings to calmer sans-serif treatment.</li>
+          <li>Added a reduced-motion rule to stop the connecting pulse when the user prefers reduced motion.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>Product context and design context were loaded from <code>PRODUCT.md</code> and <code>DESIGN.md</code>. This is a product-register surface, so the goal was not to make the terminal decorative in a different way. The goal was to let the tool disappear further into the task.</p>
+        <p>Scene sentence used to anchor the theme choice: <strong>a trader is scanning live tape on a large monitor in a dim room before the open, trying to stay focused on evidence instead of chrome.</strong></p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <p>The main refinement was structural, not cosmetic. Instead of adding a new style layer, the change removes or softens existing intensity sources.</p>
+        <pre><code>:root {
+  --bg: oklch(0.12 0.01 250);
+  --bg-pane: oklch(0.18 0.013 250);
+  --accent: oklch(0.78 0.12 74);
+  --accent-soft: oklch(0.78 0.12 74 / 0.1);
+}
+
+.terminal-shell {
+  background: linear-gradient(180deg, oklch(0.14 0.011 250) 0%, oklch(0.11 0.01 250) 100%);
+}
+
+.terminal-pane-title {
+  font-family: var(--font-sans), sans-serif;
+  font-size: 0.94rem;
+  font-weight: 600;
+}</code></pre>
+        <p>Classifier and severity rows still carry semantic feedback, but with reduced fill and border intensity so they highlight evidence instead of reading like alerts by default.</p>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li><code>bun test apps/web/app/terminal.test.ts</code></li>
+          <li><code>bun --cwd=apps/web run build</code></li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>This pass is CSS-only, so it does not change layout structure or information density.</li>
+          <li>Some semantic chips still use stronger color than the surrounding chrome. That is intentional so status remains scannable.</li>
+          <li>No screenshot-based review was captured in this turn, so final visual tuning may still benefit from a quick browser pass.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>No follow-up issue created in this turn beyond the main work item.</li>
+          <li>If further quieting is wanted, the next pass should evaluate typography density inside tables and rail metrics rather than further reducing contrast globally.</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
