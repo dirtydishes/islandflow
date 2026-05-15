@@ -11,16 +11,32 @@ const REMOTE_HOST = "delta@152.53.80.229";
 const REMOTE_REPO = "/home/delta/islandflow";
 const REMOTE_DEPLOYMENT = "/home/delta/islandflow/deployment/docker";
 const SSH_KEY = path.join(process.env.HOME ?? "", ".ssh", "delta_ed25519");
-const SSH_OPTIONS = ["-i", SSH_KEY, "-o", "IdentitiesOnly=yes", "-o", "BatchMode=yes"];
+const SSH_OPTIONS = [
+  "-i",
+  SSH_KEY,
+  "-o",
+  "IdentitiesOnly=yes",
+  "-o",
+  "BatchMode=yes",
+];
 const ALLOWED_REMOTE_UNTRACKED = new Set([
   "deployment/docker/signal-cli-0.14.3-Linux-native.tar.gz",
-  "deployment/npm/"
+  "deployment/npm/",
 ]);
 const API_CONTAINER = "islandflow-vps-api-1";
 const WEB_CONTAINER = "islandflow-vps-web-1";
-const PUBLIC_APP_URL = process.env.DEPLOY_PUBLIC_APP_URL?.trim() || "https://flow.deltaisland.io";
-const PUBLIC_API_HEALTH_URL = process.env.DEPLOY_PUBLIC_API_HEALTH_URL?.trim() || null;
-const LOG_SERVICES = ["api", "web", "compute", "candles", "ingest-options", "ingest-equities"];
+const PUBLIC_APP_URL =
+  process.env.DEPLOY_PUBLIC_APP_URL?.trim() || "https://flow.deltaisland.io";
+const PUBLIC_API_HEALTH_URL =
+  process.env.DEPLOY_PUBLIC_API_HEALTH_URL?.trim() || null;
+const LOG_SERVICES = [
+  "api",
+  "web",
+  "compute",
+  "candles",
+  "ingest-options",
+  "ingest-equities",
+];
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(scriptPath), "..");
@@ -55,12 +71,16 @@ function formatCommand(command: string, args: string[]): string {
     .join(" ");
 }
 
-function runChecked(command: string, args: string[], options: SpawnSyncOptions = {}): void {
+function runChecked(
+  command: string,
+  args: string[],
+  options: SpawnSyncOptions = {},
+): void {
   console.log(`$ ${formatCommand(command, args)}`);
   const result = spawnSync(command, args, {
     cwd: repoRoot,
     stdio: "inherit",
-    ...options
+    ...options,
   });
 
   if (result.status !== 0) {
@@ -68,12 +88,16 @@ function runChecked(command: string, args: string[], options: SpawnSyncOptions =
   }
 }
 
-function captureChecked(command: string, args: string[], options: SpawnSyncOptions = {}): string {
+function captureChecked(
+  command: string,
+  args: string[],
+  options: SpawnSyncOptions = {},
+): string {
   const result = spawnSync(command, args, {
     cwd: repoRoot,
     encoding: "utf8",
     stdio: ["inherit", "pipe", "pipe"],
-    ...options
+    ...options,
   });
 
   if (result.status !== 0) {
@@ -84,7 +108,11 @@ function captureChecked(command: string, args: string[], options: SpawnSyncOptio
   return result.stdout ?? "";
 }
 
-function runRemoteScript(title: string, script: string, args: string[] = []): void {
+function runRemoteScript(
+  title: string,
+  script: string,
+  args: string[] = [],
+): void {
   section(title);
   const sshArgs = [...SSH_OPTIONS, REMOTE_HOST, "bash", "-s", "--", ...args];
   console.log(`$ ${formatCommand("ssh", sshArgs)}`);
@@ -92,7 +120,7 @@ function runRemoteScript(title: string, script: string, args: string[] = []): vo
     cwd: repoRoot,
     input: script,
     encoding: "utf8",
-    stdio: ["pipe", "inherit", "inherit"]
+    stdio: ["pipe", "inherit", "inherit"],
   });
 
   if (result.status !== 0) {
@@ -100,7 +128,10 @@ function runRemoteScript(title: string, script: string, args: string[] = []): vo
   }
 }
 
-function parseArgs(rawArgs: string[]): { mode: DeployMode; forceRecreate: boolean } {
+function parseArgs(rawArgs: string[]): {
+  mode: DeployMode;
+  forceRecreate: boolean;
+} {
   if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
     usage(0);
   }
@@ -114,7 +145,9 @@ function parseArgs(rawArgs: string[]): { mode: DeployMode; forceRecreate: boolea
 
   if (
     (positional.length === 1 && positional[0] === "current-branch") ||
-    (positional.length === 2 && positional[0] === "current" && positional[1] === "branch")
+    (positional.length === 2 &&
+      positional[0] === "current" &&
+      positional[1] === "branch")
   ) {
     return { mode: "current-branch", forceRecreate };
   }
@@ -129,12 +162,28 @@ function assertSshKeyExists(): void {
   }
 }
 
+function localWorkspaceSnapshotPrecheck(): void {
+  console.log("$ bun run check:docker-workspace");
+  const result = spawnSync("bun", ["run", "check:docker-workspace"], {
+    cwd: repoRoot,
+    stdio: "inherit",
+  });
+
+  if (result.status !== 0) {
+    console.error(
+      "Refusing deploy: deployment/docker/workspace-root is out of sync. Run `bun run sync:docker-workspace`, commit updated snapshot files, then retry deploy.",
+    );
+    process.exit(result.status ?? 1);
+  }
+}
+
 function localMainPrecheck(): void {
   section("Local Precheck");
   runChecked("git", ["fetch", "origin"]);
   runChecked("git", ["status", "--short", "--branch"]);
   runChecked("git", ["rev-parse", "--verify", "HEAD"]);
   runChecked("git", ["rev-parse", "origin/main"]);
+  localWorkspaceSnapshotPrecheck();
 }
 
 function currentBranchName(): string {
@@ -155,10 +204,12 @@ function localBranchPrecheck(branch: string): void {
   const porcelain = captureChecked("git", ["status", "--porcelain=v1"]).trim();
   if (porcelain) {
     console.error(
-      `Refusing to deploy ${branch} with uncommitted local changes. Commit the intended state first.`
+      `Refusing to deploy ${branch} with uncommitted local changes. Commit the intended state first.`,
     );
     process.exit(1);
   }
+
+  localWorkspaceSnapshotPrecheck();
 }
 
 function publishCurrentBranch(branch: string): void {
@@ -169,8 +220,8 @@ function publishCurrentBranch(branch: string): void {
     {
       cwd: repoRoot,
       encoding: "utf8",
-      stdio: ["inherit", "pipe", "pipe"]
-    }
+      stdio: ["inherit", "pipe", "pipe"],
+    },
   );
 
   if (upstreamResult.status === 0) {
@@ -218,12 +269,18 @@ while IFS= read -r line; do
       ;;
   esac
 done <<< "$status"
-`
+`,
   );
 }
 
-function remoteRollout(mode: DeployMode, branch: string | null, forceRecreate: boolean): void {
-  const composeArgs = forceRecreate ? "up -d --build --force-recreate" : "up -d --build";
+function remoteRollout(
+  mode: DeployMode,
+  branch: string | null,
+  forceRecreate: boolean,
+): void {
+  const composeArgs = forceRecreate
+    ? "up -d --build --force-recreate"
+    : "up -d --build";
   const switchCommand =
     mode === "main"
       ? `git switch main
@@ -242,7 +299,7 @@ ${switchCommand}
 
 cd "${REMOTE_DEPLOYMENT}"
 docker compose ${composeArgs}
-`
+`,
   );
 }
 
@@ -257,7 +314,7 @@ docker compose ps
 docker compose logs --tail=100 ${LOG_SERVICES.join(" ")}
 docker exec ${API_CONTAINER} bun -e 'const r = await fetch("http://127.0.0.1:4000/health"); console.log(await r.text())'
 docker exec ${WEB_CONTAINER} bun -e 'const r = await fetch("http://127.0.0.1:3000/"); console.log(r.status)'
-`
+`,
   );
 }
 
@@ -271,7 +328,7 @@ function publicVerification(): void {
   }
 
   console.log(
-    "Skipping separate public API health check; same-origin mode relies on the public app check plus container-local API verification."
+    "Skipping separate public API health check; same-origin mode relies on the public app check plus container-local API verification.",
   );
 }
 
@@ -293,7 +350,7 @@ function main(): void {
   console.log(
     mode === "main"
       ? "Deploying origin/main to the existing Islandflow VPS checkout."
-      : "Deploying the current local branch to the existing Islandflow VPS checkout."
+      : "Deploying the current local branch to the existing Islandflow VPS checkout.",
   );
 
   if (mode === "main") {

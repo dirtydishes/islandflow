@@ -39,6 +39,7 @@
     "packages/bus": {
       "name": "@islandflow/bus",
       "dependencies": {
+        "@islandflow/types": "workspace:*",
         "nats": "^2.24.0",
       },
     },
