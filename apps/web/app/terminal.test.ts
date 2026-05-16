@@ -164,6 +164,7 @@ describe("live manifest", () => {
 
     expect(optionsSubscription?.underlying_ids).toEqual(["AAPL"]);
     expect(optionsSubscription?.option_contract_id).toBe("AAPL-2025-01-17-200-C");
+    expect(optionsSubscription?.snapshot_limit).toBe(100);
     expect(equitiesSubscription?.underlying_ids).toEqual(["AAPL"]);
   });
 
@@ -635,23 +636,23 @@ describe("live tape history helpers", () => {
     expect(next.map((item) => item.trace_id)).toEqual(["existing", "older-1"]);
   });
 
-  it("keeps scoped option and equity history on the normal retention cap", () => {
+  it("keeps option and equity history effectively unbounded while scrolling", () => {
     expect(
       getLiveHistoryRetentionCap({
         channel: "options",
         underlying_ids: ["AAPL"],
         option_contract_id: "AAPL-2025-01-17-200-C"
       } as any)
-    ).toBeGreaterThan(0);
+    ).toBe(0);
     expect(
       getLiveHistoryRetentionCap({
         channel: "equities",
         underlying_ids: ["AAPL"]
       } as any)
-    ).toBeGreaterThan(0);
+    ).toBe(0);
   });
 
-  it("keeps auto-hydrating scoped live history while next_before exists", () => {
+  it("does not auto-hydrate scoped live history before the scroll gate is reached", () => {
     const manifest = getLiveManifest(
       "/tape",
       "AAPL",
@@ -669,18 +670,12 @@ describe("live tape history helpers", () => {
 
     expect(
       getScopedLiveAutoHydrationChannels(true, "/tape", manifest, historyCursors, {})
-    ).toEqual(["options", "equities"]);
+    ).toEqual([]);
     expect(
       getScopedLiveAutoHydrationChannels(true, "/tape", manifest, historyCursors, {
         [getLiveSubscriptionKey(manifest.find((subscription) => subscription.channel === "options")!)]: true
       })
-    ).toEqual(["equities"]);
-    expect(
-      getScopedLiveAutoHydrationChannels(true, "/tape", manifest, {
-        ...historyCursors,
-        [getLiveSubscriptionKey(manifest.find((subscription) => subscription.channel === "equities")!)]: null
-      }, {})
-    ).toEqual(["options"]);
+    ).toEqual([]);
   });
 
   it("restores the same anchor key after live insertions at the top", () => {
@@ -864,9 +859,15 @@ describe("signals helpers", () => {
     expect(getAlertWindowAnchorTs([], 42)).toBe(42);
   });
 
-  it("returns connected/stale live status labels without live wording", () => {
+  it("returns connected/held/stale live status labels without live wording", () => {
     expect(statusLabel("connected", false, "live")).toBe("Connected");
+    expect(statusLabel("connected", true, "live")).toBe("Held");
     expect(statusLabel("stale", false, "live")).toBe("Feed behind");
+    expect(statusLabel("stale", true, "live")).toBe("Feed behind");
+  });
+
+  it("keeps replay pause wording on replay tapes", () => {
+    expect(statusLabel("connected", true, "replay")).toBe("Paused");
   });
 
   it("treats healthy scoped channels as connected even when no matching rows are visible", () => {

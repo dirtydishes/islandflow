@@ -39,7 +39,8 @@ import {
   type Cursor,
   type EquityCandle,
   type EquityPrint,
-  type LiveChannel
+  type LiveChannel,
+  type OptionPrint
 } from "@islandflow/types";
 import { createMetrics } from "@islandflow/observability";
 import type { RedisClientType } from "redis";
@@ -456,6 +457,54 @@ export const buildOptionSnapshotFilters = (
   };
 };
 
+const matchesScopedOptionSnapshot = (
+  item: OptionPrint,
+  subscription: Extract<LiveSubscription, { channel: "options" }>
+): boolean => {
+  if (!matchesOptionPrintFilters(item, subscription.filters)) {
+    return false;
+  }
+
+  if (subscription.option_contract_id && item.option_contract_id !== subscription.option_contract_id) {
+    return false;
+  }
+
+  if (!subscription.underlying_ids?.length) {
+    return true;
+  }
+
+  const allowed = new Set(subscription.underlying_ids.map((value) => value.toUpperCase()));
+  return allowed.has(item.underlying_id.toUpperCase());
+};
+
+const matchesScopedEquitySnapshot = (
+  item: EquityPrint,
+  subscription: Extract<LiveSubscription, { channel: "equities" }>
+): boolean => {
+  if (!subscription.underlying_ids?.length) {
+    return true;
+  }
+
+  const allowed = new Set(subscription.underlying_ids.map((value) => value.toUpperCase()));
+  return allowed.has(item.underlying_id.toUpperCase());
+};
+
+const mergeSnapshotBackfill = <T>(
+  cached: T[],
+  backfill: T[],
+  limit: number,
+  cursorOf: (item: T) => Cursor
+): T[] => {
+  const deduped = new Map<string, T>();
+
+  for (const item of [...cached, ...backfill]) {
+    const cursor = cursorOf(item);
+    deduped.set(`${cursor.ts}:${cursor.seq}`, item);
+  }
+
+  return sortGenericItems(Array.from(deduped.values()), cursorOf).slice(0, limit);
+};
+
 const candleRedisKey = (underlyingId: string, intervalMs: number): string =>
   `live:equity-candles:${underlyingId}:${intervalMs}`;
 
@@ -740,12 +789,20 @@ export class LiveStateManager {
   async getSnapshot(subscription: LiveSubscription): Promise<FeedSnapshot<unknown>> {
     switch (subscription.channel) {
       case "options": {
+        const config = this.generic.options;
+        const limit = snapshotLimitFor(subscription, config.limit);
         const scoped = Boolean(subscription.underlying_ids?.length) || Boolean(subscription.option_contract_id);
         if (subscription.filters?.view === "raw" || scoped) {
-          this.stats.scopedClickHouseSnapshots += 1;
-          const limit = snapshotLimitFor(subscription, this.generic.options.limit);
-          const storageFilters = buildOptionSnapshotFilters(subscription);
-          const items = await fetchRecentOptionPrints(this.clickhouse, limit, undefined, storageFilters);
+          const cached = (this.genericItems.get("options") ?? [])
+            .filter((entry) => matchesScopedOptionSnapshot(entry, subscription))
+            .slice(0, limit);
+          let items = cached;
+          if (cached.length < limit) {
+            this.stats.scopedClickHouseSnapshots += 1;
+            const storageFilters = buildOptionSnapshotFilters(subscription);
+            const backfill = await fetchRecentOptionPrints(this.clickhouse, limit, undefined, storageFilters);
+            items = mergeSnapshotBackfill(cached, backfill, limit, (entry) => ({ ts: entry.ts, seq: entry.seq }));
+          }
           return {
             subscription,
             items,
@@ -754,9 +811,7 @@ export class LiveStateManager {
           };
         }
 
-        const config = this.generic.options;
         this.stats.genericCacheSnapshots += 1;
-        const limit = snapshotLimitFor(subscription, config.limit);
         const items = (this.genericItems.get("options") ?? [])
           .filter((entry) => matchesOptionPrintFilters(entry, subscription.filters))
           .slice(0, limit);
@@ -785,9 +840,16 @@ export class LiveStateManager {
         const config = this.generic.equities;
         const limit = snapshotLimitFor(subscription, config.limit);
         if (subscription.underlying_ids?.length) {
-          this.stats.scopedClickHouseSnapshots += 1;
-          const filters: EquityPrintQueryFilters = { underlyingIds: subscription.underlying_ids };
-          const items = await fetchRecentEquityPrints(this.clickhouse, limit, filters);
+          const cached = (this.genericItems.get("equities") ?? [])
+            .filter((entry) => matchesScopedEquitySnapshot(entry, subscription))
+            .slice(0, limit);
+          let items = cached;
+          if (cached.length < limit) {
+            this.stats.scopedClickHouseSnapshots += 1;
+            const filters: EquityPrintQueryFilters = { underlyingIds: subscription.underlying_ids };
+            const backfill = await fetchRecentEquityPrints(this.clickhouse, limit, filters);
+            items = mergeSnapshotBackfill(cached, backfill, limit, config.cursor);
+          }
           return {
             subscription,
             items,

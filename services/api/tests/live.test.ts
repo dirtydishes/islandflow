@@ -627,6 +627,57 @@ describe("LiveStateManager", () => {
     ]);
   });
 
+  it("prefers cached scoped option rows before clickhouse backfill", async () => {
+    const now = Date.now();
+    const manager = new LiveStateManager(
+      makeClickHouse((query) =>
+        query.includes("FROM option_prints")
+          ? [
+              {
+                source_ts: now - 1_000,
+                ingest_ts: now - 999,
+                seq: 1,
+                trace_id: "opt-backfill",
+                ts: now - 1_000,
+                option_contract_id: "AAPL-2025-01-17-200-C",
+                underlying_id: "AAPL",
+                price: 1,
+                size: 10,
+                exchange: "X",
+                signal_pass: false
+              }
+            ]
+          : []
+      ),
+      null
+    );
+
+    await manager.ingest("options", {
+      source_ts: now,
+      ingest_ts: now + 1,
+      seq: 2,
+      trace_id: "opt-hot",
+      ts: now,
+      option_contract_id: "AAPL-2025-01-17-200-C",
+      underlying_id: "AAPL",
+      price: 2,
+      size: 10,
+      exchange: "X",
+      signal_pass: true
+    });
+
+    const snapshot = await manager.getSnapshot({
+      channel: "options",
+      underlying_ids: ["AAPL"],
+      option_contract_id: "AAPL-2025-01-17-200-C"
+    });
+
+    expect((snapshot.items as Array<{ trace_id: string }>).map((item) => item.trace_id).slice(0, 2)).toEqual([
+      "opt-hot",
+      "opt-backfill"
+    ]);
+  });
+
   it("seeds scoped equity snapshots from clickhouse rows older than 24h", async () => {
     const now = Date.now();
     const staleTs = now - 25 * 60 * 60 * 1000;

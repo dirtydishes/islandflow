@@ -77,6 +77,7 @@ const LIVE_HOT_WINDOW_OPTIONS = parseBoundedInt(
   1,
   100000
 );
+const LIVE_OPTIONS_HEAD_LIMIT = 100;
 const LIVE_HISTORY_SOFT_CAP = parseBoundedInt(
   process.env.NEXT_PUBLIC_LIVE_HISTORY_SOFT_CAP,
   5000,
@@ -846,7 +847,7 @@ export const getLiveHistoryRetentionCap = (subscription: LiveSubscription): numb
   switch (subscription.channel) {
     case "options":
     case "equities":
-      return LIVE_HISTORY_SOFT_CAP;
+      return 0;
     default:
       return LIVE_HISTORY_SOFT_CAP;
   }
@@ -859,27 +860,12 @@ export const getScopedLiveAutoHydrationChannels = (
   historyCursors: Partial<Record<string, Cursor | null>>,
   historyLoading: Partial<Record<string, boolean>>
 ): Array<Extract<LiveSubscription["channel"], "options" | "equities">> => {
-  if (!enabled || pathname !== "/tape") {
-    return [];
-  }
-
-  const channels: Array<Extract<LiveSubscription["channel"], "options" | "equities">> = [];
-  for (const subscription of manifest) {
-    const scoped =
-      (subscription.channel === "options" &&
-        (subscription.underlying_ids?.length || subscription.option_contract_id)) ||
-      (subscription.channel === "equities" && subscription.underlying_ids?.length);
-    if (!scoped) {
-      continue;
-    }
-
-    const key = getLiveSubscriptionKey(subscription);
-    if (historyCursors[key] && !historyLoading[key]) {
-      channels.push(subscription.channel);
-    }
-  }
-
-  return channels;
+  void enabled;
+  void pathname;
+  void manifest;
+  void historyCursors;
+  void historyLoading;
+  return [];
 };
 
 export const getLiveFeedStatus = (
@@ -2027,7 +2013,10 @@ export const prunePinnedEntries = <T,>(
 
 export const statusLabel = (status: WsStatus, paused: boolean, mode: TapeMode): string => {
   if (paused) {
-    return "Paused";
+    if (mode === "replay") {
+      return "Paused";
+    }
+    return status === "connected" ? "Held" : statusLabel(status, false, mode);
   }
 
   if (mode === "replay") {
@@ -2512,22 +2501,20 @@ type PausableTapeViewConfig<T extends SortableItem & { seq: number }> = {
 const usePausableTapeView = <T extends SortableItem & { seq: number }>(
   config: PausableTapeViewConfig<T>
 ): TapeState<T> => {
-  const [paused, setPaused] = useState(false);
   const [data, setData] = useState<PausableTapeData<T>>(EMPTY_PAUSABLE_TAPE);
+  const holdForScroll = config.enabled ? (config.shouldHold ? config.shouldHold() : false) : false;
 
   useEffect(() => {
     if (!config.enabled) {
-      setPaused(false);
       setData(EMPTY_PAUSABLE_TAPE);
       return;
     }
 
-    const holdForScroll = config.shouldHold ? config.shouldHold() : false;
     setData((current) => {
       const next = reducePausableTapeData(
         current,
         config.sourceItems,
-        paused || holdForScroll,
+        holdForScroll,
         config.retentionLimit ?? LIVE_HOT_WINDOW
       );
       if (next === current) {
@@ -2535,7 +2522,7 @@ const usePausableTapeView = <T extends SortableItem & { seq: number }>(
       }
 
       const unseenCount = next.seenKeys.size - current.seenKeys.size;
-      if (!paused && unseenCount > 0) {
+      if (unseenCount > 0) {
         config.onNewItems?.(unseenCount);
         config.captureScroll?.();
       }
@@ -2548,17 +2535,11 @@ const usePausableTapeView = <T extends SortableItem & { seq: number }>(
     config.onNewItems,
     config.captureScroll,
     config.retentionLimit,
-    config.shouldHold,
-    paused
+    holdForScroll
   ]);
 
   useEffect(() => {
-    if (!config.enabled || paused) {
-      return;
-    }
-
-    const holdForScroll = config.shouldHold ? config.shouldHold() : false;
-    if (holdForScroll) {
+    if (!config.enabled || holdForScroll) {
       return;
     }
 
@@ -2581,13 +2562,8 @@ const usePausableTapeView = <T extends SortableItem & { seq: number }>(
     config.onNewItems,
     config.retentionLimit,
     config.resumeSignal,
-    config.shouldHold,
-    paused
+    holdForScroll
   ]);
-
-  const togglePause = useCallback(() => {
-    setPaused((current) => !current);
-  }, []);
 
   const status = config.enabled ? config.sourceStatus : "disconnected";
   const projected = projectPausableTapeState(data.visible, status, config.lastUpdate);
@@ -2602,9 +2578,9 @@ const usePausableTapeView = <T extends SortableItem & { seq: number }>(
     lastUpdate: projected.lastUpdate,
     replayTime: null,
     replayComplete: false,
-    paused,
+    paused: holdForScroll,
     dropped: data.dropped,
-    togglePause
+    togglePause: () => {}
   };
 };
 
@@ -3052,7 +3028,7 @@ export const getLiveManifest = (
           ? undefined
           : optionPrintFilters ?? flowFilters,
       ...optionScope,
-      snapshot_limit: LIVE_HOT_WINDOW_OPTIONS
+      snapshot_limit: LIVE_OPTIONS_HEAD_LIMIT
     });
   }
   if (features.nbbo) {
@@ -3337,7 +3313,7 @@ const useLiveSession = (
 
       switch (subscription.channel) {
         case "options":
-          mergeItems(setOptions, optionsRef, items as OptionPrint[], LIVE_HOT_WINDOW_OPTIONS, {
+          mergeItems(setOptions, optionsRef, items as OptionPrint[], LIVE_OPTIONS_HEAD_LIMIT, {
             setter: setOptionsHistory,
             ref: optionsHistoryRef,
             cap: getLiveHistoryRetentionCap(subscription)
@@ -3794,6 +3770,7 @@ const TapeStatus = ({
 };
 
 type TapeControlsProps = {
+  mode: TapeMode;
   paused: boolean;
   onTogglePause: () => void;
   isAtTop: boolean;
@@ -3801,13 +3778,15 @@ type TapeControlsProps = {
   onJump: () => void;
 };
 
-const TapeControls = ({ paused, onTogglePause, isAtTop, missed, onJump }: TapeControlsProps) => {
+const TapeControls = ({ mode, paused, onTogglePause, isAtTop, missed, onJump }: TapeControlsProps) => {
   const active = !isAtTop && missed > 0;
   return (
     <div className={`tape-controls${active ? " tape-controls-active" : ""}`}>
-      <button className="pause-button" type="button" onClick={onTogglePause}>
-        {paused ? "Resume" : "Pause"}
-      </button>
+      {mode === "replay" ? (
+        <button className="pause-button" type="button" onClick={onTogglePause}>
+          {paused ? "Resume" : "Pause"}
+        </button>
+      ) : null}
       <button className="jump-button" type="button" onClick={onJump} disabled={isAtTop}>
         Jump to top
       </button>
@@ -5373,7 +5352,7 @@ const useTerminalState = () => {
     sourceItems: liveSession.options,
     historyTail: liveSession.optionsHistory,
     lastUpdate: liveSession.lastUpdate,
-    retentionLimit: LIVE_HOT_WINDOW_OPTIONS,
+    retentionLimit: LIVE_OPTIONS_HEAD_LIMIT,
     captureScroll: optionsAnchor.capture,
     onNewItems: optionsScroll.onNewItems,
     shouldHold: () => !optionsScroll.isAtTopRef.current,
@@ -7141,6 +7120,7 @@ const OptionsPane = memo(({ state, limit }: OptionsPaneProps) => {
       }
       actions={
         <TapeControls
+          mode={state.mode}
           paused={state.options.paused}
           onTogglePause={state.options.togglePause}
           isAtTop={state.optionsScroll.isAtTop}
@@ -7329,6 +7309,7 @@ const EquitiesPane = memo(({ state, limit }: EquitiesPaneProps) => {
       }
       actions={
         <TapeControls
+          mode={state.mode}
           paused={state.equities.paused}
           onTogglePause={state.equities.togglePause}
           isAtTop={state.equitiesScroll.isAtTop}
@@ -7432,6 +7413,7 @@ const FlowPane = memo(({ state, limit, title = "Flow" }: FlowPaneProps) => {
       }
       actions={
         <TapeControls
+          mode={state.mode}
           paused={state.flow.paused}
           onTogglePause={state.flow.togglePause}
           isAtTop={state.flowScroll.isAtTop}
@@ -7581,6 +7563,7 @@ const AlertsPane = memo(({ state, limit, withStrip = false, className }: AlertsP
       }
       actions={
         <TapeControls
+          mode={state.mode}
           paused={state.alerts.paused}
           onTogglePause={state.alerts.togglePause}
           isAtTop={state.alertsScroll.isAtTop}
@@ -7695,6 +7678,7 @@ const ClassifierPane = memo(({ state, limit, className }: ClassifierPaneProps) =
       }
       actions={
         <TapeControls
+          mode={state.mode}
           paused={state.smartMoney.paused}
           onTogglePause={state.smartMoney.togglePause}
           isAtTop={state.classifierScroll.isAtTop}
@@ -7818,6 +7802,7 @@ const DarkPane = memo(({ state, limit, className }: DarkPaneProps) => {
       }
       actions={
         <TapeControls
+          mode={state.mode}
           paused={state.inferredDark.paused}
           onTogglePause={state.inferredDark.togglePause}
           isAtTop={state.darkScroll.isAtTop}
