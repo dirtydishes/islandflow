@@ -48,6 +48,25 @@ describe("option-prints storage helpers", () => {
       queries.push(query);
       return {
         async json<T>() {
+          if (query.includes("trace-ctx")) {
+            return [
+              {
+                ...basePrint,
+                trace_id: "trace-ctx",
+                conditions: [],
+                execution_nbbo_bid: "1.20",
+                execution_nbbo_ask: "1.30",
+                execution_nbbo_mid: "1.25",
+                execution_nbbo_side: "A",
+                execution_underlying_spot: "450.05",
+                execution_underlying_source: "equity_quote_mid",
+                execution_iv: "0.42",
+                execution_iv_source: "synthetic_pressure_model",
+                signal_reasons: ["large_notional"],
+                signal_pass: 1
+              }
+            ] as T;
+          }
           return [] as T;
         }
       };
@@ -63,8 +82,9 @@ describe("option-prints storage helpers", () => {
       optionContractId: "AAPL-2025-01-17-200-C",
       sinceTs: 123
     });
-    await fetchOptionPrintsBefore(client, 100, 5, 20, "alpaca");
+    await fetchOptionPrintsBefore(client, 100, 5, 20, "alpaca", { view: "raw" });
     await fetchOptionPrintsByTraceIds(client, ["trace-1", "trace-2"]);
+    const rows = await fetchRecentOptionPrints(client, 1, "trace-ctx", { view: "signal" });
 
     expect(queries[0]).toContain("signal_pass = 1");
     expect(queries[0]).toContain("(is_etf = 0 OR is_etf IS NULL)");
@@ -76,7 +96,12 @@ describe("option-prints storage helpers", () => {
     expect(queries[0]).toContain("ts >= 123");
     expect(queries[1]).toContain("(ts, seq) < (100, 5)");
     expect(queries[1]).toContain("startsWith(trace_id, 'alpaca')");
+    expect(queries[1]).not.toContain("signal_pass = 1");
     expect(queries[1]).toContain("ORDER BY ts DESC, seq DESC LIMIT 20");
     expect(queries[2]).toContain("trace_id IN ('trace-1', 'trace-2')");
+    expect(rows[0].execution_nbbo_side).toBe("A");
+    expect(rows[0].execution_underlying_spot).toBe(450.05);
+    expect(rows[0].execution_iv).toBe(0.42);
+    expect(rows[0].signal_reasons).toEqual(["large_notional"]);
   });
 });

@@ -69,6 +69,7 @@ describe("LiveStateManager", () => {
     expect(limits.flow).toBe(500);
     expect(limits["equity-quotes"]).toBe(500);
     expect(limits.alerts).toBe(300);
+    expect(resolveGenericLiveLimits({} as NodeJS.ProcessEnv).options).toBe(100);
   });
 
   it("hydrates snapshots from redis generic windows", async () => {
@@ -520,6 +521,32 @@ describe("LiveStateManager", () => {
     ]);
   });
 
+  it("caps generic options snapshots at the 100-row hot head by default", async () => {
+    const manager = new LiveStateManager(makeClickHouse(), null);
+    const now = Date.now();
+
+    for (let seq = 1; seq <= 150; seq += 1) {
+      await manager.ingest("options", {
+        source_ts: now + seq,
+        ingest_ts: now + seq,
+        seq,
+        trace_id: `opt-${seq}`,
+        ts: now + seq,
+        option_contract_id: "AAPL-2025-01-17-200-C",
+        price: 1,
+        size: 10,
+        exchange: "X",
+        signal_pass: true
+      });
+    }
+
+    const snapshot = await manager.getSnapshot({ channel: "options" });
+
+    expect(snapshot.items).toHaveLength(100);
+    expect((snapshot.items as Array<{ trace_id: string }>)[0].trace_id).toBe("opt-150");
+    expect(snapshot.next_before).toEqual({ ts: now + 51, seq: 51 });
+  });
+
   it("seeds scoped option snapshots from clickhouse rows older than 24h", async () => {
     const now = Date.now();
     const staleTs = now - 25 * 60 * 60 * 1000;
@@ -624,6 +651,57 @@ describe("LiveStateManager", () => {
 
     expect((snapshot.items as Array<{ trace_id: string }>).map((item) => item.trace_id)).toEqual([
       "opt-raw"
+    ]);
+  });
+
+  it("prefers cached scoped option rows before clickhouse backfill", async () => {
+    const now = Date.now();
+    const manager = new LiveStateManager(
+      makeClickHouse((query) =>
+        query.includes("FROM option_prints")
+          ? [
+              {
+                source_ts: now - 1_000,
+                ingest_ts: now - 999,
+                seq: 1,
+                trace_id: "opt-backfill",
+                ts: now - 1_000,
+                option_contract_id: "AAPL-2025-01-17-200-C",
+                underlying_id: "AAPL",
+                price: 1,
+                size: 10,
+                exchange: "X",
+                signal_pass: false
+              }
+            ]
+          : []
+      ),
+      null
+    );
+
+    await manager.ingest("options", {
+      source_ts: now,
+      ingest_ts: now + 1,
+      seq: 2,
+      trace_id: "opt-hot",
+      ts: now,
+      option_contract_id: "AAPL-2025-01-17-200-C",
+      underlying_id: "AAPL",
+      price: 2,
+      size: 10,
+      exchange: "X",
+      signal_pass: true
+    });
+
+    const snapshot = await manager.getSnapshot({
+      channel: "options",
+      underlying_ids: ["AAPL"],
+      option_contract_id: "AAPL-2025-01-17-200-C"
+    });
+
+    expect((snapshot.items as Array<{ trace_id: string }>).map((item) => item.trace_id).slice(0, 2)).toEqual([
+      "opt-hot",
+      "opt-backfill"
     ]);
   });
 

@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Turn Summary: Live tape scroll hold and lazy history</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b1016;
+        --panel: #111820;
+        --border: rgba(255,255,255,0.1);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --accent: #f5a623;
+        --accent-soft: rgba(245,166,35,0.16);
+        --ok: #25c17a;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 32px;
+        background: var(--bg);
+        color: var(--text);
+        font: 16px/1.55 "IBM Plex Sans", system-ui, sans-serif;
+      }
+      main { max-width: 980px; margin: 0 auto; }
+      h1, h2 { line-height: 1.15; }
+      h1 { margin: 0 0 8px; font-size: 2rem; }
+      h2 { margin: 32px 0 12px; font-size: 1.1rem; letter-spacing: 0.04em; text-transform: uppercase; }
+      p, li { color: var(--muted); }
+      .summary {
+        background: linear-gradient(180deg, rgba(245,166,35,0.14), rgba(245,166,35,0.05));
+        border: 1px solid rgba(245,166,35,0.24);
+        border-radius: 14px;
+        padding: 20px 22px;
+        margin-bottom: 28px;
+      }
+      .meta { color: var(--muted); font-size: 0.92rem; margin-bottom: 18px; }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 18px 20px;
+        margin-top: 14px;
+      }
+      code {
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        font-size: 0.92em;
+        color: var(--text);
+        background: rgba(255,255,255,0.06);
+        padding: 0.14rem 0.35rem;
+        border-radius: 6px;
+      }
+      pre {
+        margin: 0;
+        padding: 14px;
+        overflow: auto;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: rgba(0,0,0,0.22);
+      }
+      .ok { color: var(--ok); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="summary">
+        <h1>Live tape now holds on scroll, resumes at top, and lazy-loads deep history</h1>
+        <p>
+          The live tape no longer depends on a manual pause button in live mode. Scrolling away from the top now holds the
+          tape automatically, <code>Jump to top</code> resumes it, the options hot head is capped at 100 rows, and older
+          history is fetched from ClickHouse only when the scroll gate requests it.
+        </p>
+      </div>
+
+      <div class="meta">Created 2026-05-16 during issue <code>islandflow-0sa</code>.</div>
+
+      <section>
+        <h2>Summary</h2>
+        <div class="panel">
+          <p>
+            This change aligns the tape with the intended operator workflow: hold the live head while investigating older
+            rows, keep historical prints valid even when old, and avoid preloading a large ClickHouse backlog until the
+            user actually scrolls into it.
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <div class="panel">
+          <ul>
+            <li>Removed the live-mode Pause/Resume control from tape pane actions while keeping replay pause behavior intact.</li>
+            <li>Changed live tape status copy from manual <code>Paused</code> semantics to scroll-held <code>Held</code>.</li>
+            <li>Capped the live options head at <code>100</code> rows.</li>
+            <li>Stopped scoped live history from auto-hydrating in the background.</li>
+            <li>Made scoped options and equities snapshots prefer hot cached rows first, then backfill from ClickHouse when needed.</li>
+            <li>Made options and equities history retention effectively unbounded on the client so deep scrolling does not get trimmed away prematurely.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <div class="panel">
+          <p>
+            The tape previously mixed several behaviors: a manual pause button, automatic scroll holding, scoped background
+            auto-hydration, and a much deeper options hot head. That created two user-visible problems: the live control model
+            felt redundant, and older prints could disappear or feel inconsistent when switching views or waiting for newer
+            rows to arrive.
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <div class="panel">
+          <ul>
+            <li><code>apps/web/app/terminal.tsx</code>: live <code>usePausableTapeView</code> now treats scroll position as the hold source of truth.</li>
+            <li><code>apps/web/app/terminal.tsx</code>: options live snapshot and retention now use a strict <code>LIVE_OPTIONS_HEAD_LIMIT = 100</code>.</li>
+            <li><code>apps/web/app/terminal.tsx</code>: scoped history auto-hydration helper now returns no channels, so ClickHouse history stays lazy.</li>
+            <li><code>services/api/src/live.ts</code>: scoped option/equity snapshots now filter the hot cache first, then merge ClickHouse backfill without seam duplicates.</li>
+          </ul>
+          <pre><code>statusLabel("connected", true, "live") === "Held"
+statusLabel("connected", true, "replay") === "Paused"</code></pre>
+        </div>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <div class="panel">
+          <ul>
+            <li class="ok">Passed: <code>bun test apps/web/app/terminal.test.ts services/api/tests/live.test.ts</code></li>
+            <li class="ok">Passed: <code>bun --cwd=apps/web run build</code></li>
+          </ul>
+        </div>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <div class="panel">
+          <ul>
+            <li>Scoped snapshots can still backfill from ClickHouse when the hot cache does not have enough matching rows. This is intentional so focused views do not start empty.</li>
+            <li>Deep history is now lazy rather than eager, which reduces surprise and load, but the first deep-scroll request still depends on ClickHouse latency.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <div class="panel">
+          <p>No additional follow-up issues were created in this turn.</p>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

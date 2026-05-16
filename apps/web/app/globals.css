@@ -606,6 +606,13 @@ h3 {
   text-transform: uppercase;
 }
 
+.flow-filter-section-copy {
+  margin: -2px 0 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
 .flow-filter-checkbox-grid,
 .flow-filter-chip-grid {
   display: grid;
@@ -615,6 +622,10 @@ h3 {
 
 .flow-filter-checkbox-grid-wide {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.flow-filter-chip-grid-two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .flow-filter-check {
