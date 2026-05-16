@@ -101,6 +101,7 @@
         <h2>Changes Made</h2>
         <ul>
           <li>Refactored <code>scripts/deploy.ts</code> into shared git/publish logic plus runtime-specific precheck, rollout, and verification paths.</li>
+          <li>Fixed the repo-root <code>deploy</code> wrapper to forward flags such as <code>--runtime native</code> through Bun correctly.</li>
           <li>Removed Docker verification’s dependence on hardcoded container names and switched to <code>docker compose exec</code>.</li>
           <li>Added native deployment support that assumes Bun plus systemd-managed units on the VPS.</li>
           <li>Added a new operator guide at <code>deployment/native/README.md</code>.</li>
@@ -137,6 +138,7 @@
       <section>
         <h2>Validation</h2>
         <ul>
+          <li class="good">Passed: <code>./deploy --help</code></li>
           <li class="good">Passed: <code>bun run scripts/deploy.ts --help</code></li>
           <li class="good">Passed: <code>bun run check:docker-workspace</code></li>
           <li class="good">Passed: invalid-flag guard for <code>--runtime native --force-recreate</code></li>
