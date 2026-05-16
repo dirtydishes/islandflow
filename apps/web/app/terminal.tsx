@@ -34,6 +34,7 @@ import type {
   LiveHotChannelHealthMap,
   LiveSubscription,
   OptionFlowFilters,
+  OptionFlowView,
   OptionNbboSide,
   OptionSecurityType,
   OptionType,
@@ -853,21 +854,6 @@ export const getLiveHistoryRetentionCap = (subscription: LiveSubscription): numb
   }
 };
 
-export const getScopedLiveAutoHydrationChannels = (
-  enabled: boolean,
-  pathname: string,
-  manifest: LiveSubscription[],
-  historyCursors: Partial<Record<string, Cursor | null>>,
-  historyLoading: Partial<Record<string, boolean>>
-): Array<Extract<LiveSubscription["channel"], "options" | "equities">> => {
-  void enabled;
-  void pathname;
-  void manifest;
-  void historyCursors;
-  void historyLoading;
-  return [];
-};
-
 export const getLiveFeedStatus = (
   sourceStatus: WsStatus,
   freshestTs: number | null,
@@ -1434,6 +1420,9 @@ export const countActiveFlowFilterGroups = (filters: OptionFlowFilters): number 
     count += 1;
   }
   if ((filters.minNotional ?? undefined) !== (defaults.minNotional ?? undefined)) {
+    count += 1;
+  }
+  if ((filters.view ?? defaults.view) !== defaults.view) {
     count += 1;
   }
 
@@ -3683,18 +3672,6 @@ const useLiveSession = (
     },
     [enabled, manifest, historyCursors, historyLoading]
   );
-
-  useEffect(() => {
-    for (const channel of getScopedLiveAutoHydrationChannels(
-      enabled,
-      pathname,
-      manifest,
-      historyCursors,
-      historyLoading
-    )) {
-      void loadOlder(channel);
-    }
-  }, [enabled, pathname, manifest, historyCursors, historyLoading, loadOlder]);
 
   return {
     status,
@@ -6904,6 +6881,17 @@ export const FlowFilterPopover = ({ filters, onChange }: FlowFilterPopoverProps)
     }));
   };
 
+  const applyView = (view: OptionFlowView) => {
+    onChange((prev) => ({
+      ...prev,
+      view,
+      securityTypes: view === "raw" ? undefined : prev.securityTypes ?? DEFAULT_FLOW_SECURITY_TYPES,
+      nbboSides: view === "raw" ? undefined : prev.nbboSides,
+      optionTypes: view === "raw" ? undefined : prev.optionTypes,
+      minNotional: view === "raw" ? undefined : prev.minNotional
+    }));
+  };
+
   useEffect(() => {
     if (!open) {
       return;
@@ -6968,6 +6956,27 @@ export const FlowFilterPopover = ({ filters, onChange }: FlowFilterPopoverProps)
           </div>
 
           <div className="flow-filter-popover-body">
+            <FlowFilterSection title="Options View">
+              <div className="flow-filter-chip-grid flow-filter-chip-grid-two">
+                {[
+                  { label: "Signal", value: "signal" as const },
+                  { label: "All prints", value: "raw" as const }
+                ].map((preset) => (
+                  <button
+                    className={`filter-chip ${filters.view === preset.value ? "is-active" : ""}`}
+                    key={preset.value}
+                    type="button"
+                    onClick={() => applyView(preset.value)}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+              <p className="flow-filter-section-copy">
+                Signal keeps classifier-ready prints. All prints includes raw option tape rows.
+              </p>
+            </FlowFilterSection>
+
             <FlowFilterSection title="Security">
               <div className="flow-filter-checkbox-grid">
                 {(["stock", "etf"] as OptionSecurityType[]).map((value) => (

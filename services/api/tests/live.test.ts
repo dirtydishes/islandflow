@@ -69,6 +69,7 @@ describe("LiveStateManager", () => {
     expect(limits.flow).toBe(500);
     expect(limits["equity-quotes"]).toBe(500);
     expect(limits.alerts).toBe(300);
+    expect(resolveGenericLiveLimits({} as NodeJS.ProcessEnv).options).toBe(100);
   });
 
   it("hydrates snapshots from redis generic windows", async () => {
@@ -518,6 +519,32 @@ describe("LiveStateManager", () => {
       "flow-fresh",
       "flow-stale"
     ]);
+  });
+
+  it("caps generic options snapshots at the 100-row hot head by default", async () => {
+    const manager = new LiveStateManager(makeClickHouse(), null);
+    const now = Date.now();
+
+    for (let seq = 1; seq <= 150; seq += 1) {
+      await manager.ingest("options", {
+        source_ts: now + seq,
+        ingest_ts: now + seq,
+        seq,
+        trace_id: `opt-${seq}`,
+        ts: now + seq,
+        option_contract_id: "AAPL-2025-01-17-200-C",
+        price: 1,
+        size: 10,
+        exchange: "X",
+        signal_pass: true
+      });
+    }
+
+    const snapshot = await manager.getSnapshot({ channel: "options" });
+
+    expect(snapshot.items).toHaveLength(100);
+    expect((snapshot.items as Array<{ trace_id: string }>)[0].trace_id).toBe("opt-150");
+    expect(snapshot.next_before).toEqual({ ts: now + 51, seq: 51 });
   });
 
   it("seeds scoped option snapshots from clickhouse rows older than 24h", async () => {

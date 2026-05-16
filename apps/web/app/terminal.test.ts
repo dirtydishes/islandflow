@@ -17,7 +17,6 @@ import {
   getEffectiveOptionPrintFilters,
   getAlertWindowAnchorTs,
   getHotChannelFeedStatus,
-  getScopedLiveAutoHydrationChannels,
   getLiveHistoryRetentionCap,
   getOptionTableSnapshot,
   getOptionScope,
@@ -295,6 +294,24 @@ describe("contract-focused option helpers", () => {
     ).toEqual({
       underlying_ids: "AAPL",
       option_contract_id: "AAPL-2025-01-17-200-C"
+    });
+  });
+
+  it("includes the selected options view in tape query params", () => {
+    expect(
+      buildOptionTapeQueryParams(
+        {
+          ...buildDefaultFlowFilters(),
+          view: "raw",
+          securityTypes: undefined,
+          nbboSides: undefined,
+          optionTypes: undefined
+        },
+        { underlying_ids: ["AAPL"] }
+      )
+    ).toEqual({
+      view: "raw",
+      underlying_ids: "AAPL"
     });
   });
 
@@ -652,32 +669,6 @@ describe("live tape history helpers", () => {
     ).toBe(0);
   });
 
-  it("does not auto-hydrate scoped live history before the scroll gate is reached", () => {
-    const manifest = getLiveManifest(
-      "/tape",
-      "AAPL",
-      60000,
-      buildDefaultFlowFilters(),
-      {
-        underlying_ids: ["AAPL"],
-        option_contract_id: "AAPL-2025-01-17-200-C"
-      },
-      { underlying_ids: ["AAPL"] }
-    );
-    const historyCursors = Object.fromEntries(
-      manifest.map((subscription) => [getLiveSubscriptionKey(subscription), { ts: 1, seq: 1 }])
-    );
-
-    expect(
-      getScopedLiveAutoHydrationChannels(true, "/tape", manifest, historyCursors, {})
-    ).toEqual([]);
-    expect(
-      getScopedLiveAutoHydrationChannels(true, "/tape", manifest, historyCursors, {
-        [getLiveSubscriptionKey(manifest.find((subscription) => subscription.channel === "options")!)]: true
-      })
-    ).toEqual([]);
-  });
-
   it("restores the same anchor key after live insertions at the top", () => {
     const nextKeys = ["new-1", "new-2", "anchor", "after-1", "after-2"];
     expect(findAnchorRestoreIndex(nextKeys, "anchor", ["anchor", "after-1", "after-2"])).toBe(2);
@@ -806,6 +797,7 @@ describe("flow filter popup helpers", () => {
 
     expect(countActiveFlowFilterGroups(defaults)).toBe(0);
     expect(countActiveFlowFilterGroups(next)).toBe(3);
+    expect(countActiveFlowFilterGroups({ ...defaults, view: "raw" })).toBe(1);
     expect(buildDefaultFlowFilters()).toEqual(defaults);
   });
 });

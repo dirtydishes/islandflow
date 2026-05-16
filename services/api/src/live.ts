@@ -72,7 +72,7 @@ const CHART_LIMITS = {
 } as const;
 
 const DEFAULT_LIVE_LIMITS: GenericLiveLimits = {
-  options: 1000,
+  options: 100,
   nbbo: 1000,
   equities: 1000,
   "equity-quotes": 500,
