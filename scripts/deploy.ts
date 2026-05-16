@@ -38,7 +38,7 @@ const PUBLIC_APP_URL =
 const PUBLIC_API_HEALTH_URL =
   process.env.DEPLOY_PUBLIC_API_HEALTH_URL?.trim() || null;
 const NATIVE_SYSTEMCTL_PREFIX =
-  process.env.DEPLOY_NATIVE_SYSTEMCTL_PREFIX?.trim() || "sudo systemctl";
+  process.env.DEPLOY_NATIVE_SYSTEMCTL_PREFIX?.trim() || "sudo -n systemctl";
 const NATIVE_UNITS = {
   web: process.env.DEPLOY_NATIVE_WEB_UNIT?.trim() || "islandflow-web",
   api: process.env.DEPLOY_NATIVE_API_UNIT?.trim() || "islandflow-api",
@@ -79,8 +79,8 @@ Modes:
   current-branch  Push the current local branch, switch the server to it, and deploy it.
 
 Runtimes:
-  docker          Roll out from deployment/docker with Docker Compose (default).
-  native          Roll out host-native Bun services managed by systemd.
+  docker          Roll out from deployment/docker with Docker Compose (default, recommended).
+  native          Experimental host-native Bun services managed by systemd.
 
 Scopes:
   default         Full rollout (web + API + backend services).
@@ -97,7 +97,7 @@ Options:
 Environment:
   DEPLOY_PUBLIC_APP_URL             Override the public app URL (default: https://flow.deltaisland.io).
   DEPLOY_PUBLIC_API_HEALTH_URL      Optional separate public API health URL for two-origin deployments.
-  DEPLOY_NATIVE_SYSTEMCTL_PREFIX    Override systemctl invocation for native rollouts (default: sudo systemctl).
+  DEPLOY_NATIVE_SYSTEMCTL_PREFIX    Override systemctl invocation for native rollouts (default: sudo -n systemctl).
   DEPLOY_NATIVE_WEB_UNIT            Override native web systemd unit name.
   DEPLOY_NATIVE_API_UNIT            Override native api systemd unit name.
   DEPLOY_NATIVE_COMPUTE_UNIT        Override native compute systemd unit name.
@@ -277,7 +277,17 @@ function shellPattern(value: string): string {
 }
 
 function describeRuntime(runtime: DeployRuntime): string {
-  return runtime === "docker" ? "Docker Compose" : "native systemd/Bun";
+  return runtime === "docker" ? "Docker Compose" : "experimental native systemd/Bun";
+}
+
+function printRuntimeAdvisory(runtime: DeployRuntime): void {
+  if (runtime !== "native") {
+    return;
+  }
+
+  console.warn(
+    "[deploy] Native runtime is experimental. Use --runtime docker for the current supported VPS path unless Bun, systemd units, and proxy routing have been prepared intentionally."
+  );
 }
 
 function describeScope(scope: DeployScope): string {
@@ -497,8 +507,26 @@ docker compose version >/dev/null
 set -euo pipefail
 
 cd ${shellEscape(REMOTE_REPO)}
-command -v bun >/dev/null 2>&1
-command -v systemctl >/dev/null 2>&1
+
+if ! command -v bun >/dev/null 2>&1; then
+  echo "Refusing native rollout: bun is not installed on the server." >&2
+  echo "The current supported VPS path remains --runtime docker." >&2
+  echo "See deployment/native/README.md for native prerequisites." >&2
+  exit 1
+fi
+
+if ! command -v systemctl >/dev/null 2>&1; then
+  echo "Refusing native rollout: systemctl is not available on the server." >&2
+  echo "See deployment/native/README.md for native prerequisites." >&2
+  exit 1
+fi
+
+if ! ${NATIVE_SYSTEMCTL_PREFIX} --version >/dev/null 2>&1; then
+  echo "Refusing native rollout: cannot run ${NATIVE_SYSTEMCTL_PREFIX}." >&2
+  echo "If the server uses user units, try DEPLOY_NATIVE_SYSTEMCTL_PREFIX='systemctl --user'." >&2
+  echo "If the server uses system units, ensure passwordless sudo for this command or use --runtime docker." >&2
+  exit 1
+fi
 
 declare -a units=(${units})
 for unit in "\${units[@]}"; do
@@ -506,6 +534,7 @@ for unit in "\${units[@]}"; do
   if [[ -z "$load_state" || "$load_state" == "not-found" ]]; then
     echo "Refusing native rollout: missing systemd unit $unit" >&2
     echo "See deployment/native/README.md for expected unit names and overrides." >&2
+    echo "Use --runtime docker for the current supported VPS path." >&2
     exit 1
   fi
 done
@@ -696,6 +725,7 @@ function publicVerification(scope: DeployScope): void {
 function main(): void {
   const options = parseArgs(process.argv.slice(2));
   assertSshKeyExists();
+  printRuntimeAdvisory(options.runtime);
 
   console.log(
     `Deploying ${options.mode === "main" ? "origin/main" : "the current local branch"} ` +

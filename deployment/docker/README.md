@@ -2,10 +2,10 @@
 
 This directory contains the Docker runtime for Islandflow VPS deployments.
 
-Docker remains the default server rollout path, but the repo-root `deploy` helper can now target either:
+Docker remains the default and recommended server rollout path, but the repo-root `deploy` helper can now target either:
 
 - `--runtime docker` for this Docker Compose stack
-- `--runtime native` for a host-native Bun + systemd rollout described in `deployment/native/README.md`
+- `--runtime native` for an experimental host-native Bun + systemd rollout described in `deployment/native/README.md`
 
 The repo no longer ships or supports a separate `deployment/npm` stack. If you want a reverse proxy, point it at the host ports published by this stack.
 
@@ -189,6 +189,8 @@ docker compose build web
 ```
 
 ## Safe rollouts on `152.53.80.229`
+
+The current live VPS uses Nginx Proxy Manager on the shared Docker network and routes public traffic to the Docker `web` and `api` containers by container name. Because of that, this Docker path remains the operationally correct default for the live server today.
 
 The checked-in deploy helper is meant to run from your local repo checkout, not from the VPS shell. It always targets:
 

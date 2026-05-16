@@ -126,12 +126,12 @@ This keeps Docker in the local workflow where it helps most (NATS, ClickHouse, R
 
 ## Deployment Workflow
 
-- `./deploy main` keeps the current VPS Docker rollout path as the default.
-- `./deploy main --runtime native` targets a host-native Bun + systemd deployment.
-- `./deploy current-branch` and `./deploy current-branch --runtime native` keep branch deploys available during the transition.
+- `./deploy main` keeps the current VPS Docker rollout path as the default and recommended path.
+- `./deploy main --runtime native` targets an experimental host-native Bun + systemd deployment.
+- `./deploy current-branch` and `./deploy current-branch --runtime native` keep branch deploys available during the transition, but Docker remains the supported path for the current VPS.
 - Partial deploys are supported with `--web-only`, `--api-only`, `--services-only`, and `--no-build`.
 - Docker runtime details live in `deployment/docker/README.md`.
-- Native runtime expectations live in `deployment/native/README.md`.
+- Native runtime expectations and prerequisites live in `deployment/native/README.md`.
 
 ## Desktop Shell
 

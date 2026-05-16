@@ -1,13 +1,13 @@
 # Native Deployment
 
-This directory documents the host-native Islandflow rollout path used by:
+This directory documents the experimental host-native Islandflow rollout path used by:
 
 ```bash
 ./deploy main --runtime native
 ./deploy current-branch --runtime native
 ```
 
-This runtime is intended for faster server iteration during the transition away from Docker-only app rollouts. Local development should still prefer:
+This runtime is intended for faster server iteration during the transition away from Docker-only app rollouts. It is not the recommended path for the current production VPS, which still uses Nginx Proxy Manager to reach the Docker `web` and `api` containers by container name on the shared Docker network. Local development should still prefer:
 
 - Docker for infra (`bun run dev:infra`)
 - native Bun services (`bun run dev:services`)
@@ -57,7 +57,7 @@ Available overrides:
 By default the deploy helper uses:
 
 ```bash
-sudo systemctl
+sudo -n systemctl
 ```
 
 If the server uses user units or another wrapper, override it locally before invoking `./deploy`:
@@ -85,6 +85,23 @@ Scope behavior:
 - `--api-only`: restart only the API unit
 - `--services-only`: restart API + backend units without touching the web unit
 - `--no-build`: skip `bun install --frozen-lockfile` and skip the web build step
+
+## Current status
+
+On the current live VPS, native deploys should be treated as opt-in infrastructure work, not the default rollout path. Before a native deploy can succeed there, all of the following must be true at the same time:
+
+- Bun is installed on the host.
+- The selected `systemctl` command works non-interactively.
+- Islandflow systemd units exist for the requested scope.
+- Host-native services can reach the intended NATS, ClickHouse, and Redis endpoints.
+- If `web` or `api` move native, the reverse proxy topology is updated deliberately.
+
+Until that is prepared intentionally, prefer:
+
+```bash
+./deploy main --runtime docker
+./deploy current-branch --runtime docker
+```
 
 ## Server preparation checklist
 
@@ -115,7 +132,7 @@ Rollback remains manual for now:
 2. rerun the appropriate native deploy command
 3. if needed, restart only the affected units with `systemctl`
 
-Docker remains available as the fallback runtime during the transition:
+Docker remains the fallback and currently recommended runtime during the transition:
 
 ```bash
 ./deploy main --runtime docker
