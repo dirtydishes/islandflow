@@ -324,6 +324,15 @@ function dockerServicesForScope(scope: DeployScope): string[] {
   }
 }
 
+function dockerBuildServicesForScope(scope: DeployScope): string[] {
+  switch (scope) {
+    case "full":
+      return [...DOCKER_CORE_SERVICES];
+    default:
+      return dockerServicesForScope(scope);
+  }
+}
+
 function dockerLogServicesForScope(scope: DeployScope): string[] {
   switch (scope) {
     case "web":
@@ -565,15 +574,16 @@ function remoteDockerRollout(
   forceRecreate: boolean,
   noBuild: boolean
 ): void {
-  const services = dockerServicesForScope(scope);
-  const args = ["up", "-d"];
-  if (!noBuild) {
-    args.push("--build");
-  }
+  const rolloutServices = dockerServicesForScope(scope);
+  const upArgs = ["up", "-d"];
   if (forceRecreate) {
-    args.push("--force-recreate");
+    upArgs.push("--force-recreate");
   }
-  const command = `docker compose ${[...args, ...services].join(" ")}`;
+  const buildServices = dockerBuildServicesForScope(scope);
+  const buildCommand = noBuild
+    ? null
+    : `docker compose build ${buildServices.join(" ")}`;
+  const upCommand = `docker compose ${[...upArgs, ...rolloutServices].join(" ")}`;
 
   runRemoteScript(
     "Remote Rollout",
@@ -583,7 +593,7 @@ set -euo pipefail
 ${remoteGitUpdateScript(mode, branch)}
 
 cd ${shellEscape(REMOTE_DOCKER_DEPLOYMENT)}
-${command}
+${buildCommand ? `${buildCommand}\n` : ""}${upCommand}
 `
   );
 }

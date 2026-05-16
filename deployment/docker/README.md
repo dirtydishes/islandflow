@@ -65,14 +65,16 @@ Important defaults:
 3. Build and start the stack:
 
 ```bash
-docker compose up -d --build
+docker compose build api web compute candles ingest-options ingest-equities
+docker compose up -d
 ```
 
 If you are updating an existing deployment that already has failing `api` restart loops, do a full recreate so the ClickHouse config mount and dependency changes are applied cleanly:
 
 ```bash
 docker compose down
-docker compose up -d --build --force-recreate
+docker compose build api web compute candles ingest-options ingest-equities
+docker compose up -d --force-recreate
 ```
 
 4. Confirm the containers are healthy:
@@ -190,6 +192,19 @@ cd deployment/docker
 docker compose build web
 ```
 
+### Faster Docker builds
+
+The app images are structured so dependency installation is isolated from source code changes:
+
+- Docker first copies `package.json`, `bun.lock`, `tsconfig.base.json`, and workspace `package.json` files.
+- `bun install --frozen-lockfile` runs in a cacheable layer with a BuildKit Bun cache mount.
+- Source from `apps`, `services`, and `packages` is copied only after dependencies are installed.
+- `ingest-options` also installs its Python sidecar dependencies from `services/ingest-options/py/requirements.txt` before source copy, using a BuildKit pip cache mount.
+
+That means normal TypeScript edits should reuse dependency layers. The first build after a fresh server checkout, Docker cache cleanup, dependency change, or Python requirement change can still be slow; later deploys should spend their time on changed source and the specific service images being rolled out.
+
+BuildKit cache mounts require a modern Docker Engine with Dockerfile frontend support. Docker Compose v2 on the VPS path enables this by default.
+
 ## Safe rollouts on `152.53.80.229`
 
 The current live VPS uses Nginx Proxy Manager on the shared Docker network and routes public traffic to the Docker `web` and `api` containers by container name. Because of that, this Docker path remains the operationally correct default for the live server today.
@@ -218,7 +233,7 @@ This flow:
 - checks the server checkout before switching anything
 - stops if the server has tracked local modifications
 - allows the known untracked tarball at `deployment/docker/signal-cli-0.14.3-Linux-native.tar.gz`
-- runs `git switch main`, `git pull --ff-only origin main`, and `docker compose up -d --build`
+- runs `git switch main`, `git pull --ff-only origin main`, `docker compose build api web compute candles ingest-options ingest-equities`, and `docker compose up -d`
 - verifies the stack with `docker compose ps`, recent service logs, container-local health checks, and public HTTPS checks
 
 ### Deploy the current local branch
@@ -252,6 +267,14 @@ Examples:
 ./deploy current-branch --runtime docker --services-only
 ./deploy main --runtime docker --web-only --no-build
 ```
+
+Scoped Docker deploys now build only the selected image set and then restart only those services:
+
+- `--web-only`: `docker compose build web`, then `docker compose up -d web`
+- `--api-only`: `docker compose build api`, then `docker compose up -d api`
+- `--services-only`: builds and restarts `api`, `compute`, `candles`, `ingest-options`, and `ingest-equities`
+
+Use `--no-build` only when the image is already correct and you need Compose to recreate or restart containers, such as after changing server-side environment values that do not affect a Next.js build-time variable. Do not use `--no-build` for dependency changes, application source changes, or `NEXT_PUBLIC_*` changes.
 
 ### Escalation path
 
@@ -299,7 +322,8 @@ git switch main
 git pull --ff-only origin main
 
 cd /home/delta/islandflow/deployment/docker
-docker compose up -d --build
+docker compose build api web compute candles ingest-options ingest-equities
+docker compose up -d
 ```
 
 Deploy the current branch manually:
@@ -314,7 +338,8 @@ git switch <current-branch> || git switch -c <current-branch> --track origin/<cu
 git pull --ff-only origin <current-branch>
 
 cd /home/delta/islandflow/deployment/docker
-docker compose up -d --build
+docker compose build api web compute candles ingest-options ingest-equities
+docker compose up -d
 ```
 
 If you changed only env values for the Bun services on the server:
