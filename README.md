@@ -127,6 +127,7 @@ This keeps Docker in the local workflow where it helps most (NATS, ClickHouse, R
 ## Deployment Workflow
 
 - `./deploy main` keeps the current VPS Docker rollout path as the default and recommended path.
+- Do not run the repo-root `docker-compose.yml` on the VPS. That file is for local infra only and can create duplicate exposed NATS, ClickHouse, and Redis containers on the server.
 - `./deploy main --runtime native` targets an experimental host-native Bun + systemd deployment.
 - `./deploy current-branch` and `./deploy current-branch --runtime native` keep branch deploys available during the transition, but Docker remains the supported path for the current VPS.
 - Partial deploys are supported with `--web-only`, `--api-only`, `--services-only`, and `--no-build`.

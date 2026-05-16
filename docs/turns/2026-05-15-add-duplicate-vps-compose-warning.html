@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>2026-05-15: Warn about duplicate VPS compose stacks</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0f1319;
+        --panel: #171d26;
+        --panel-2: #1d2531;
+        --text: #e7edf6;
+        --muted: #9db0c9;
+        --accent: #8cc6ff;
+        --border: #2a3646;
+        --good: #7bd8a6;
+        --warn: #f2c078;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; font: 16px/1.6 Inter, ui-sans-serif, system-ui, sans-serif; background: linear-gradient(180deg, #0b1015, var(--bg)); color: var(--text); }
+      main { max-width: 920px; margin: 0 auto; padding: 40px 20px 72px; }
+      h1, h2 { line-height: 1.15; }
+      h1 { margin: 0 0 10px; font-size: 2rem; }
+      h2 { margin: 0 0 12px; font-size: 1.18rem; }
+      .lede { color: var(--muted); max-width: 72ch; }
+      section { margin-top: 22px; padding: 22px 24px; border: 1px solid var(--border); border-radius: 18px; background: linear-gradient(180deg, var(--panel), var(--panel-2)); }
+      code, pre { font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      code { padding: 0.14rem 0.35rem; border-radius: 8px; background: rgba(140, 198, 255, 0.12); color: var(--accent); }
+      pre { margin: 14px 0 0; padding: 14px 16px; overflow: auto; border-radius: 14px; border: 1px solid var(--border); background: #0c1118; }
+      ul { margin: 0; padding-left: 1.2rem; }
+      .meta { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+      .chip { padding: 0.3rem 0.65rem; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); background: rgba(255,255,255,0.03); }
+      .good { color: var(--good); }
+      .warn { color: var(--warn); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="meta">
+        <span class="chip">Turn document</span>
+        <span class="chip">2026-05-15</span>
+        <span class="chip">Issues: islandflow-c87, islandflow-2db</span>
+      </div>
+      <h1>Warn about duplicate VPS compose stacks</h1>
+      <p class="lede">
+        Investigated the live VPS, confirmed that a second compose project from the repo-root local-infra stack is still running there, attempted cleanup, and added deploy/docs guardrails so this state is easier to spot and less likely to be recreated accidentally.
+      </p>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          The live server currently has both <code>islandflow-vps</code> and an older <code>islandflow</code> compose project. The supported production traffic path uses <code>islandflow-vps</code>. I added a deploy-time warning and documentation updates so Docker remains the intended VPS path and the repo-root <code>docker-compose.yml</code> is clearly marked as local-only. I also attempted to remove the stale <code>islandflow</code> containers on the VPS, but Docker operations against them hung and timed out, so manual cleanup is tracked separately.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Updated <code>scripts/deploy.ts</code> so Docker runtime prechecks warn when the server also has a compose project named <code>islandflow</code>.</li>
+          <li>Updated <code>README.md</code> to explicitly say the repo-root <code>docker-compose.yml</code> is for local infra only and should not be run on the VPS.</li>
+          <li>Updated <code>deployment/docker/README.md</code> with the same warning and a note about the duplicate-project detector.</li>
+          <li>Inspected the live VPS and confirmed that Nginx Proxy Manager routes public traffic to <code>islandflow-vps</code> container names on the shared Docker network.</li>
+          <li>Attempted <code>docker compose down</code> and forced container removal for the stale <code>islandflow</code> project, but those operations timed out when run as the normal deploy user.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          The repo has two Docker entry points with different purposes. The root <code>docker-compose.yml</code> is a local development infra stack that publishes NATS, ClickHouse, and Redis on host ports. The supported VPS deployment lives under <code>deployment/docker/</code> and uses an <code>islandflow-vps</code> compose project, internal service-name routing, and Nginx Proxy Manager on the shared Docker network. Running both on the VPS creates duplicate infra and can make host-level debugging confusing.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <ul>
+          <li>The new warning is advisory only. It does not block Docker deploys, because the current live server still has the duplicate project and production deploys must keep working.</li>
+          <li>The detection looks for containers whose compose project label is <code>islandflow</code>, which matches the repo-root stack on the VPS.</li>
+          <li>The stale containers are still present as of this turn. Removal is blocked by hanging Docker operations and likely needs a maintenance window or host-level intervention.</li>
+        </ul>
+        <pre>[deploy] Warning: found an additional compose project named "islandflow" on the server.
+[deploy] The live VPS should normally use only the deployment/docker stack (compose project "islandflow-vps").
+[deploy] The repo-root docker-compose.yml is for local infra and can create duplicate exposed NATS, ClickHouse, and Redis services on the VPS.</pre>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li class="good">Passed: <code>./deploy --help</code></li>
+          <li class="good">Passed: <code>bun run check:docker-workspace</code></li>
+          <li class="good">Passed: live VPS inspection confirming duplicate compose containers still exist</li>
+          <li class="good">Passed: public app health check after the cleanup attempt, <code>https://flow.deltaisland.io</code> still returned HTTP 200</li>
+        </ul>
+        <pre>ssh di 'docker ps --format "{{.Names}} {{.Label \"com.docker.compose.project\"}}" | grep "^islandflow-.* islandflow$" || true'
+curl -I -fksS https://flow.deltaisland.io</pre>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li><span class="warn">The stale VPS containers were not removed in this turn.</span> Mitigation: tracked manual cleanup in <code>islandflow-2db</code>.</li>
+          <li><span class="warn">Docker commands targeting those old containers hung and timed out.</span> Mitigation: avoided risky broader actions that could impact the live <code>islandflow-vps</code> stack.</li>
+          <li><span class="warn">The deploy warning is non-blocking.</span> That is intentional so normal Docker deploys continue to work while the duplicate stack is still present.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>Open follow-up: <code>islandflow-2db</code>, manually remove the stale <code>islandflow</code> local-infra containers from the VPS during a maintenance window.</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

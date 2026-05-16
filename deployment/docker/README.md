@@ -11,6 +11,8 @@ The repo no longer ships or supports a separate `deployment/npm` stack. If you w
 
 It is separate from the repo-root `docker-compose.yml`, which remains the lightweight local infra stack for development.
 
+Do not run the repo-root `docker-compose.yml` on the VPS. On the live server that creates a second compose project with host-published NATS, ClickHouse, and Redis ports that are not part of the supported production topology.
+
 ## What this stack does
 
 - Builds and runs the full Islandflow stack with Docker Compose.
@@ -191,6 +193,8 @@ docker compose build web
 ## Safe rollouts on `152.53.80.229`
 
 The current live VPS uses Nginx Proxy Manager on the shared Docker network and routes public traffic to the Docker `web` and `api` containers by container name. Because of that, this Docker path remains the operationally correct default for the live server today.
+
+The deploy helper also warns if it detects a second compose project named `islandflow` on the server, because that usually means the repo-root local-infra stack was started on the VPS by mistake.
 
 The checked-in deploy helper is meant to run from your local repo checkout, not from the VPS shell. It always targets:
 

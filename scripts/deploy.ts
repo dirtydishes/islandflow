@@ -495,6 +495,12 @@ cd ${shellEscape(REMOTE_DOCKER_DEPLOYMENT)}
 command -v docker >/dev/null 2>&1
 
 docker compose version >/dev/null
+
+if docker ps --format '{{.Names}} {{.Label "com.docker.compose.project"}}' | grep -q '^islandflow-.* islandflow$'; then
+  echo '[deploy] Warning: found an additional compose project named "islandflow" on the server.' >&2
+  echo '[deploy] The live VPS should normally use only the deployment/docker stack (compose project "islandflow-vps").' >&2
+  echo '[deploy] The repo-root docker-compose.yml is for local infra and can create duplicate exposed NATS, ClickHouse, and Redis services on the VPS.' >&2
+fi
 `
     );
     return;
