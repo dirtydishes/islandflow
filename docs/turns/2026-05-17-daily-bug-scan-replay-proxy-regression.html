@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>2026-05-17 Daily Bug Scan: Replay Proxy Regression</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: oklch(0.97 0.01 250);
+        --panel: oklch(0.995 0.003 250);
+        --ink: oklch(0.24 0.02 250);
+        --muted: oklch(0.48 0.015 250);
+        --line: oklch(0.88 0.01 250);
+        --accent: oklch(0.57 0.18 246);
+        --warn: oklch(0.62 0.18 35);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+        background: linear-gradient(180deg, oklch(0.95 0.012 240), var(--bg));
+        color: var(--ink);
+      }
+
+      main {
+        width: min(900px, calc(100% - 32px));
+        margin: 40px auto 56px;
+      }
+
+      section,
+      header {
+        background: color-mix(in oklab, var(--panel) 92%, white);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 24px;
+        margin-bottom: 18px;
+      }
+
+      h1,
+      h2 {
+        margin: 0 0 12px;
+        font-weight: 700;
+        line-height: 1.1;
+      }
+
+      h1 {
+        font-size: clamp(2rem, 4vw, 2.8rem);
+      }
+
+      h2 {
+        font-size: 1.1rem;
+        color: var(--accent);
+      }
+
+      p,
+      li {
+        line-height: 1.65;
+        font-size: 1rem;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      code,
+      pre {
+        font-family: "SFMono-Regular", "SF Mono", Menlo, Consolas, monospace;
+        font-size: 0.92rem;
+      }
+
+      pre {
+        margin: 12px 0 0;
+        padding: 14px;
+        border-radius: 14px;
+        background: oklch(0.18 0.01 250);
+        color: oklch(0.96 0.01 250);
+        overflow-x: auto;
+      }
+
+      .summary {
+        font-size: 1.08rem;
+        color: var(--muted);
+      }
+
+      .flag {
+        display: inline-block;
+        margin-top: 10px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: color-mix(in oklab, var(--warn) 16%, white);
+        color: oklch(0.43 0.12 35);
+        font-size: 0.85rem;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Daily bug scan: public replay route regression</h1>
+        <p class="summary">
+          The scan found one concrete regression tied to recent durable-options routing work: the deployed
+          public route check now fails because <code>/replay/options</code> returns HTML instead of JSON on
+          <code>https://flow.deltaisland.io</code>.
+        </p>
+        <div class="flag">Recorded as Beads issue islandflow-r7n</div>
+      </header>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          I scanned the commits from the last 24 hours, focused on the recent options-history and live-tape
+          routing changes, and verified the new public route checker against the live app origin. The only
+          concrete failure was the replay endpoint check.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Created Beads bug <code>islandflow-r7n</code> to track the public replay proxy regression.</li>
+          <li>Added this turn document for the automation handoff.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          Commit <code>1424a27</code> added <code>scripts/check-public-api-routes.ts</code> and wired it into
+          deploy verification to catch same-origin routing mistakes after the durable options history work.
+          That script now provides a concrete signal that the public replay path is misrouted.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <ul>
+          <li><code>services/api/src/index.ts</code> does implement <code>GET /replay/options</code>.</li>
+          <li>
+            <code>deployment/docker/README.md</code> says same-origin proxy mode must forward
+            <code>/replay/*</code> to the API service.
+          </li>
+          <li>
+            The live check failed with HTML from the web app, which indicates the edge proxy is not forwarding
+            that path to the API host.
+          </li>
+        </ul>
+        <pre>bun run scripts/check-public-api-routes.ts https://flow.deltaisland.io
+...
+error: /replay/options returned non-JSON content (text/html; charset=UTF-8)</pre>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <p>
+          Replay-mode options data requested through the public app origin can land on the Next.js app instead
+          of the API, which breaks the endpoint and can leave replay experiences incomplete or empty.
+        </p>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li>Reviewed recent commits: <code>1424a27</code>, <code>d334e16</code>, <code>23ed380</code>.</li>
+          <li>
+            Ran <code>bun run scripts/check-public-api-routes.ts https://flow.deltaisland.io</code> and
+            reproduced the failing replay route.
+          </li>
+          <li>
+            Confirmed the API service route exists by inspecting <code>services/api/src/index.ts</code>.
+          </li>
+          <li>
+            Ran <code>bun test apps/web/app/terminal.test.ts</code>; it did not execute in isolation because
+            the file depends on workspace alias resolution for <code>@islandflow/types</code>.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>This appears to be an environment or edge-proxy regression, not a source-level API bug.</li>
+          <li>No repo code fix was applied because the failing behavior is coming from live routing outside this checkout.</li>
+          <li>The Beads issue includes the minimal mitigation: update the public proxy matcher, then rerun the route check.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li><code>islandflow-r7n</code>: update the live proxy so <code>/replay/*</code> reaches the API service.</li>
+          <li>Rerun <code>bun run check:public-api-routes</code> after the edge change to confirm recovery.</li>
+          <li>
+            Optionally coordinate with <code>islandflow-qd7</code> if the team still plans to move production to
+            <code>api.flow.deltaisland.io</code> and reduce same-origin proxy risk altogether.
+          </li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
