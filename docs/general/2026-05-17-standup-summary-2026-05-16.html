@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Standup Summary for 2026-05-16</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #111820;
+        --panel-2: #0d141b;
+        --border: rgba(255, 255, 255, 0.08);
+        --border-strong: rgba(245, 166, 35, 0.35);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --accent-soft: rgba(245, 166, 35, 0.12);
+        --green: #25c17a;
+        --blue: #4da3ff;
+        --red: #ff6b5f;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at top right, rgba(245, 166, 35, 0.12), transparent 28%),
+          linear-gradient(180deg, #091018 0%, var(--bg) 28%, #05070a 100%);
+        color: var(--text);
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+        line-height: 1.6;
+      }
+
+      main {
+        width: min(1080px, calc(100% - 40px));
+        margin: 32px auto 56px;
+      }
+
+      .hero,
+      section {
+        background: linear-gradient(180deg, rgba(17, 24, 32, 0.94), rgba(13, 20, 27, 0.96));
+        border: 1px solid var(--border);
+        border-radius: 18px;
+      }
+
+      .hero {
+        padding: 32px;
+        margin-bottom: 20px;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.32);
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 12px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        font-family: "Quantico", "Segoe UI", sans-serif;
+        letter-spacing: 0.04em;
+      }
+
+      h1 {
+        margin-top: 18px;
+        font-size: clamp(2rem, 4vw, 3rem);
+        line-height: 1.04;
+      }
+
+      h2 {
+        font-size: 1.25rem;
+        margin-bottom: 16px;
+      }
+
+      p {
+        margin: 0;
+        color: var(--muted);
+        max-width: 78ch;
+      }
+
+      .hero p {
+        margin-top: 14px;
+        font-size: 1rem;
+      }
+
+      .meta {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 12px;
+        margin-top: 24px;
+      }
+
+      .meta-card {
+        padding: 14px 16px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .meta-card strong {
+        display: block;
+        color: var(--text);
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.76rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+      }
+
+      section {
+        padding: 24px;
+        margin-top: 16px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+        color: var(--muted);
+      }
+
+      li + li {
+        margin-top: 10px;
+      }
+
+      .timeline {
+        display: grid;
+        gap: 14px;
+      }
+
+      .event {
+        padding: 16px 18px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.025);
+      }
+
+      .event header {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 14px;
+        align-items: baseline;
+        margin-bottom: 8px;
+      }
+
+      .event time,
+      .commit-id {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.76rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--faint);
+      }
+
+      .commit-id {
+        color: var(--blue);
+      }
+
+      .file-list {
+        margin-top: 10px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .file-pill {
+        padding: 5px 8px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.045);
+        border: 1px solid var(--border);
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.72rem;
+        color: var(--text);
+      }
+
+      .note {
+        margin-top: 12px;
+        padding: 14px 16px;
+        border-radius: 14px;
+        border: 1px solid rgba(77, 163, 255, 0.22);
+        background: rgba(77, 163, 255, 0.09);
+        color: var(--text);
+      }
+
+      code {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.92em;
+        color: var(--text);
+      }
+
+      .status-good {
+        color: var(--green);
+      }
+
+      .status-caution {
+        color: var(--accent);
+      }
+
+      .status-risk {
+        color: var(--red);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <article class="hero">
+        <div class="eyebrow">Standup Summary</div>
+        <h1>Git Activity for Friday, 2026-05-16</h1>
+        <p>
+          Yesterday's git history shows three product-facing workstreams: live tape behavior fixes,
+          durable options history support, and faster Docker deploy builds. The day also included
+          merge commit <code>f4108b9</code> for PR <code>#39</code> and two small <code>AGENTS.md</code>
+          housekeeping updates.
+        </p>
+        <div class="meta">
+          <div class="meta-card">
+            <strong>Commits</strong>
+            8 commits recorded on 2026-05-16
+          </div>
+          <div class="meta-card">
+            <strong>Author</strong>
+            dirtydishes
+          </div>
+          <div class="meta-card">
+            <strong>Primary Areas</strong>
+            <code>apps/web</code>, <code>services/api</code>, <code>deployment/docker</code>, <code>scripts</code>
+          </div>
+          <div class="meta-card">
+            <strong>Docs Added</strong>
+            4 turn docs and 1 runbook file
+          </div>
+        </div>
+      </article>
+
+      <section>
+        <h2>Summary</h2>
+        <ul>
+          <li>
+            Live tape behavior was updated in commit <code>39fb5ce</code>, touching
+            <code>apps/web/app/terminal.tsx</code> and <code>services/api/src/live.ts</code>, with
+            companion test updates in <code>apps/web/app/terminal.test.ts</code> and
+            <code>services/api/tests/live.test.ts</code>.
+          </li>
+          <li>
+            Durable options history work landed across commits <code>bd60d0d</code>,
+            <code>2abdd24</code>, and <code>1424a27</code>, spanning web terminal behavior, API
+            live routing, storage tests, and a new route checker in
+            <code>scripts/check-public-api-routes.ts</code>.
+          </li>
+          <li>
+            Deploy build performance was adjusted in commit <code>23ed380</code> through Dockerfile
+            and deployment script changes under <code>deployment/docker</code> and
+            <code>scripts/deploy.ts</code>.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <div class="timeline">
+          <article class="event">
+            <header>
+              <h3>Fix live tape scroll hold and lazy history</h3>
+              <span class="commit-id">39fb5ce</span>
+              <time datetime="2026-05-16T14:23:51-04:00">2026-05-16 14:23 EDT</time>
+            </header>
+            <p>
+              Updated live tape behavior in the terminal and API layers, with matching test edits
+              and a turn document added in <code>docs/turns/2026-05-16-live-tape-scroll-hold-history.html</code>.
+            </p>
+            <div class="file-list">
+              <span class="file-pill">apps/web/app/terminal.tsx</span>
+              <span class="file-pill">apps/web/app/terminal.test.ts</span>
+              <span class="file-pill">services/api/src/live.ts</span>
+              <span class="file-pill">services/api/tests/live.test.ts</span>
+            </div>
+          </article>
+
+          <article class="event">
+            <header>
+              <h3>Durable options tape history implementation</h3>
+              <span class="commit-id">bd60d0d</span>
+              <time datetime="2026-05-16T17:27:02-04:00">2026-05-16 17:27 EDT</time>
+            </header>
+            <p>
+              Added another round of durable options history work across the terminal UI, API live
+              stream logic, storage tests, and a ClickHouse reset runbook.
+            </p>
+            <div class="file-list">
+              <span class="file-pill">apps/web/app/terminal.tsx</span>
+              <span class="file-pill">packages/storage/tests/option-prints.test.ts</span>
+              <span class="file-pill">services/api/src/live.ts</span>
+              <span class="file-pill">docs/clickhouse-reset-runbook.md</span>
+            </div>
+          </article>
+
+          <article class="event">
+            <header>
+              <h3>Durable options tape history follow-up and merge</h3>
+              <span class="commit-id">2abdd24 / f4108b9</span>
+              <time datetime="2026-05-16T17:44:51-04:00">2026-05-16 17:44-17:45 EDT</time>
+            </header>
+            <p>
+              A follow-up implementation commit added <code>.codex/hooks.json</code> and another
+              turn document, followed immediately by merge commit <code>f4108b9</code> for PR
+              <code>#39</code> from <code>dirtydishes/options-cache</code>.
+            </p>
+            <div class="file-list">
+              <span class="file-pill">.codex/hooks.json</span>
+              <span class="file-pill">docs/turns/2026-05-16-1711-durable-options-tape-history.html</span>
+            </div>
+          </article>
+
+          <article class="event">
+            <header>
+              <h3>Speed up Docker deploy builds</h3>
+              <span class="commit-id">23ed380</span>
+              <time datetime="2026-05-16T17:54:00-04:00">2026-05-16 17:54 EDT</time>
+            </header>
+            <p>
+              Adjusted Docker build inputs and deployment scripting, plus updated the Docker README
+              and added a matching turn document.
+            </p>
+            <div class="file-list">
+              <span class="file-pill">deployment/docker/Dockerfile.ingest-options</span>
+              <span class="file-pill">deployment/docker/Dockerfile.service</span>
+              <span class="file-pill">deployment/docker/Dockerfile.web</span>
+              <span class="file-pill">scripts/deploy.ts</span>
+            </div>
+          </article>
+
+          <article class="event">
+            <header>
+              <h3>Fix durable options history routing</h3>
+              <span class="commit-id">1424a27</span>
+              <time datetime="2026-05-16T22:00:21-04:00">2026-05-16 22:00 EDT</time>
+            </header>
+            <p>
+              Closed the day with routing fixes for durable options history, including terminal
+              styling updates, deployment script changes, and a new public API route checker.
+            </p>
+            <div class="file-list">
+              <span class="file-pill">apps/web/app/globals.css</span>
+              <span class="file-pill">apps/web/app/terminal.tsx</span>
+              <span class="file-pill">scripts/check-public-api-routes.ts</span>
+              <span class="file-pill">scripts/deploy.ts</span>
+            </div>
+          </article>
+
+          <article class="event">
+            <header>
+              <h3>Repository instruction updates</h3>
+              <span class="commit-id">eaddf4b / e3940eb</span>
+              <time datetime="2026-05-16T14:14:56-04:00">2026-05-16 14:14 and 14:57 EDT</time>
+            </header>
+            <p>
+              Two small commits updated <code>AGENTS.md</code>. One also modified
+              <code>.beads/issues.jsonl</code>.
+            </p>
+            <div class="file-list">
+              <span class="file-pill">AGENTS.md</span>
+              <span class="file-pill">.beads/issues.jsonl</span>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          This report is derived from <code>git log</code> for the local repository over the full
+          America/New_York day window from <code>2026-05-16 00:00:00 -0400</code> through
+          <code>2026-05-16 23:59:59 -0400</code>. The goal is standup-ready reporting, so the
+          narrative groups related commits together while keeping every statement anchored to a
+          commit, merge, or changed file.
+        </p>
+        <div class="note">
+          The strongest product-facing cluster is the options history work. It appears in three
+          separate commits plus merge commit <code>f4108b9</code>, and those commits repeatedly touch
+          <code>apps/web/app/terminal.tsx</code>, <code>services/api/src/live.ts</code>, and related tests.
+        </div>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <ul>
+          <li>
+            Commit <code>39fb5ce</code> paired UI and API changes with test edits in both the web
+            and API packages, which is a useful signal that the live tape behavior change was not
+            isolated to a single layer.
+          </li>
+          <li>
+            Commit <code>bd60d0d</code> added <code>docs/clickhouse-reset-runbook.md</code>, so the
+            durable options history work included operational documentation alongside code changes.
+          </li>
+          <li>
+            Commit <code>23ed380</code> changed all three Dockerfiles used in deployment plus
+            <code>scripts/deploy.ts</code>, so the build-speed update touched both image definition
+            and deployment orchestration.
+          </li>
+          <li>
+            Commit <code>1424a27</code> introduced <code>scripts/check-public-api-routes.ts</code>,
+            which is the only brand-new script added in yesterday's activity.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <ul>
+          <li>
+            Users of the live terminal should see changes connected to tape scroll behavior and
+            history handling because commits <code>39fb5ce</code>, <code>bd60d0d</code>, and
+            <code>1424a27</code> all modified <code>apps/web/app/terminal.tsx</code>.
+          </li>
+          <li>
+            API consumers and live/replay flows were also part of the day because
+            <code>services/api/src/live.ts</code> changed in two separate commits.
+          </li>
+          <li>
+            Deployment operators should expect updated Docker build behavior after commit
+            <code>23ed380</code> and the later deployment-script follow-up in <code>1424a27</code>.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li>
+            <span class="status-good">Completed:</span> Git history was queried directly with
+            <code>git log --since='2026-05-16 00:00:00 -0400' --until='2026-05-16 23:59:59 -0400'</code>.
+          </li>
+          <li>
+            <span class="status-caution">Not run in this reporting task:</span> no fresh
+            <code>bun test</code>, build, or lint commands were executed.
+          </li>
+          <li>
+            <span class="status-caution">Evidence available in history:</span> yesterday's commits
+            modified test files <code>apps/web/app/terminal.test.ts</code>,
+            <code>services/api/tests/live.test.ts</code>, and
+            <code>packages/storage/tests/option-prints.test.ts</code>.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>
+            This summary is limited to local git history for one calendar day, so it does not infer
+            intent beyond what commit subjects, merge text, and changed files support.
+          </li>
+          <li>
+            PR metadata is only explicitly available for merge commit <code>f4108b9</code>, which
+            names PR <code>#39</code>. Other commits are reported without attaching unverified PR context.
+          </li>
+          <li>
+            The repo currently has local beads file modifications unrelated to this documenting task,
+            so this report avoids treating current workspace state as part of yesterday's activity.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>
+            No additional follow-up beads issues were created from the git history itself because
+            the reporting task did not uncover a concrete defect or missing deliverable.
+          </li>
+          <li>
+            Reporting task tracked in beads issue <code>islandflow-lyt</code>.
+          </li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
