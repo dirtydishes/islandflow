@@ -1039,11 +1039,27 @@ h3 {
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  background-color: oklch(0.12 0.01 250);
 }
 
 .data-table-body {
   position: relative;
   min-width: 100%;
+  --tape-row-height: 36px;
+  --tape-row-double-height: 72px;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      oklch(0.98 0.008 250 / 0.01) 0,
+      oklch(0.98 0.008 250 / 0.01) calc(var(--tape-row-height) - 1px),
+      oklch(0.72 0.012 250 / 0.08) calc(var(--tape-row-height) - 1px),
+      oklch(0.72 0.012 250 / 0.08) var(--tape-row-height),
+      oklch(0.98 0.008 250 / 0.018) var(--tape-row-height),
+      oklch(0.98 0.008 250 / 0.018) calc(var(--tape-row-double-height) - 1px),
+      oklch(0.72 0.012 250 / 0.08) calc(var(--tape-row-double-height) - 1px),
+      oklch(0.72 0.012 250 / 0.08) var(--tape-row-double-height)
+    ),
+    oklch(0.12 0.01 250);
 }
 
 .data-table-options {
@@ -1135,6 +1151,14 @@ h3 {
 .data-table-row-classifier,
 .data-table-row-dark {
   height: 44px;
+}
+
+.data-table-flow .data-table-body,
+.data-table-alerts .data-table-body,
+.data-table-classifier .data-table-body,
+.data-table-dark .data-table-body {
+  --tape-row-height: 44px;
+  --tape-row-double-height: 88px;
 }
 
 .data-table-row-classified {
