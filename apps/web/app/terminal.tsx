@@ -142,12 +142,12 @@ type TapeVirtualListConfig = {
 };
 
 const TAPE_VIRTUAL_CONFIG: Record<TapeVirtualPane, TapeVirtualListConfig> = {
-  options: { rowHeight: 36, overscan: 24, debugLabel: "options" },
-  equities: { rowHeight: 36, overscan: 20, debugLabel: "equities" },
-  flow: { rowHeight: 44, overscan: 16, debugLabel: "flow" },
-  alerts: { rowHeight: 44, overscan: 16, debugLabel: "alerts" },
-  classifier: { rowHeight: 44, overscan: 16, debugLabel: "classifier" },
-  dark: { rowHeight: 44, overscan: 16, debugLabel: "dark" }
+  options: { rowHeight: 36, overscan: 44, debugLabel: "options" },
+  equities: { rowHeight: 36, overscan: 36, debugLabel: "equities" },
+  flow: { rowHeight: 44, overscan: 24, debugLabel: "flow" },
+  alerts: { rowHeight: 44, overscan: 24, debugLabel: "alerts" },
+  classifier: { rowHeight: 44, overscan: 24, debugLabel: "classifier" },
+  dark: { rowHeight: 44, overscan: 24, debugLabel: "dark" }
 };
 
 export const getTapeVirtualConfig = (pane: TapeVirtualPane): TapeVirtualListConfig =>
@@ -842,6 +842,30 @@ export const appendHistoryTail = <T extends SortableItem>(
   });
 
   return cap > 0 ? combined.slice(0, cap) : combined;
+};
+
+export const mergeHeldTapeHistory = <T extends SortableItem>(
+  displayedHistory: T[],
+  incomingHistory: T[],
+  frozenLiveHead: T[]
+): T[] => {
+  if (displayedHistory.length === 0) {
+    return appendHistoryTail([], incomingHistory, frozenLiveHead, 0);
+  }
+
+  const sortedDisplayed = appendHistoryTail([], displayedHistory, frozenLiveHead, 0);
+  const tail = sortedDisplayed.at(-1);
+  const tailTs = tail ? extractSortTs(tail) : Number.POSITIVE_INFINITY;
+  const tailSeq = tail ? extractSortSeq(tail) : Number.POSITIVE_INFINITY;
+  const olderIncoming = incomingHistory.filter((item) => {
+    const itemTs = extractSortTs(item);
+    if (itemTs < tailTs) {
+      return true;
+    }
+    return itemTs === tailTs && extractSortSeq(item) < tailSeq;
+  });
+
+  return appendHistoryTail(sortedDisplayed, olderIncoming, frozenLiveHead, 0);
 };
 
 export const getLiveHistoryRetentionCap = (subscription: LiveSubscription): number => {
@@ -2491,6 +2515,7 @@ const usePausableTapeView = <T extends SortableItem & { seq: number }>(
   config: PausableTapeViewConfig<T>
 ): TapeState<T> => {
   const [data, setData] = useState<PausableTapeData<T>>(EMPTY_PAUSABLE_TAPE);
+  const displayedHistoryRef = useRef<T[]>([]);
   const holdForScroll = config.enabled ? (config.shouldHold ? config.shouldHold() : false) : false;
 
   useEffect(() => {
@@ -2557,13 +2582,31 @@ const usePausableTapeView = <T extends SortableItem & { seq: number }>(
   const status = config.enabled ? config.sourceStatus : "disconnected";
   const projected = projectPausableTapeState(data.visible, status, config.lastUpdate);
   const historyItems = config.historyTail ?? [];
-  const items = useMemo(() => composeTapeItems([], projected.items, historyItems), [projected.items, historyItems]);
+  const displayedHistoryItems = useMemo(() => {
+    if (!config.enabled) {
+      displayedHistoryRef.current = [];
+      return [];
+    }
+
+    if (!holdForScroll) {
+      displayedHistoryRef.current = historyItems;
+      return historyItems;
+    }
+
+    const next = mergeHeldTapeHistory(displayedHistoryRef.current, historyItems, projected.items);
+    displayedHistoryRef.current = next;
+    return next;
+  }, [config.enabled, historyItems, holdForScroll, projected.items]);
+  const items = useMemo(
+    () => composeTapeItems([], projected.items, displayedHistoryItems),
+    [projected.items, displayedHistoryItems]
+  );
 
   return {
     status,
     items,
     liveItems: projected.items,
-    historyItems,
+    historyItems: displayedHistoryItems,
     lastUpdate: projected.lastUpdate,
     replayTime: null,
     replayComplete: false,
@@ -7109,6 +7152,13 @@ type OptionsPaneProps = {
 const OptionsPane = memo(({ state, limit }: OptionsPaneProps) => {
   const items = limit ? state.filteredOptions.slice(0, limit) : state.filteredOptions;
   const virtual = useTapeVirtualList(items, state.optionsScroll.listRef, getTapeVirtualConfig("options"));
+  const optionHistorySubscription = state.liveSession.manifest.find(
+    (subscription) => subscription.channel === "options"
+  );
+  const optionHistoryKey = optionHistorySubscription ? getLiveSubscriptionKey(optionHistorySubscription) : null;
+  const optionHistoryError = optionHistoryKey
+    ? state.liveSession.historyErrors[optionHistoryKey]
+    : null;
   useVirtualHistoryGate(state.mode === "live" && !limit, items.length, virtual.virtualItems.at(-1)?.index ?? -1, () =>
     void state.liveSession.loadOlder("options")
   );
@@ -7139,6 +7189,11 @@ const OptionsPane = memo(({ state, limit }: OptionsPaneProps) => {
       }
     >
       <div className="data-table-shell">
+        {state.mode === "live" && optionHistoryError ? (
+          <div className="history-load-warning" role="status">
+            Older option history failed to load: {optionHistoryError}
+          </div>
+        ) : null}
         {items.length === 0 ? (
           <div className="empty">
             {state.mode === "live"

@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Speed Up Docker Deploys</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #111820;
+        --panel-2: #0d141b;
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --line: #ffffff14;
+        --accent: #f5a623;
+        --accent-soft: #f5a6231f;
+        --ok: #25c17a;
+        --warn: #ffb130;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.55 "IBM Plex Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      main {
+        max-width: 920px;
+        margin: 0 auto;
+        padding: 48px 24px 64px;
+      }
+
+      header {
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 28px;
+        padding-bottom: 24px;
+      }
+
+      h1 {
+        margin: 0 0 10px;
+        font-size: 2rem;
+        line-height: 1.1;
+      }
+
+      h2 {
+        margin: 30px 0 10px;
+        font-size: 1rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      p {
+        max-width: 74ch;
+        margin: 0 0 12px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li {
+        margin: 7px 0;
+      }
+
+      code {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--panel-2);
+        color: var(--text);
+        padding: 1px 5px;
+        font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.92em;
+      }
+
+      pre {
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-2);
+        padding: 14px 16px;
+      }
+
+      pre code {
+        border: 0;
+        padding: 0;
+        background: transparent;
+      }
+
+      .summary {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 16px 18px;
+      }
+
+      .meta {
+        color: var(--muted);
+        font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.78rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .badge {
+        display: inline-block;
+        margin-right: 8px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        padding: 2px 8px;
+        font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .ok {
+        color: var(--ok);
+      }
+
+      .warn {
+        color: var(--warn);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="meta">2026-05-16 17:52 America/New_York</div>
+        <h1>Speed Up Docker Deploys</h1>
+        <p class="summary">
+          <span class="badge">Summary</span>
+          Docker app images now cache dependency installation separately from source changes, and Docker rollouts now build only the images required by the selected deploy scope before restarting containers.
+        </p>
+      </header>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          Implemented the Docker deployment speed-up plan from <code>/Users/kell/Desktop/speed-up-docker.md</code>. The first build after this change may still be slow, but source-only changes should no longer invalidate the expensive Bun and Python dependency layers.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Refactored <code>deployment/docker/Dockerfile.service</code> to copy workspace manifests, run cached <code>bun install --frozen-lockfile</code>, then copy source.</li>
+          <li>Applied the same dependency-first build model to <code>deployment/docker/Dockerfile.web</code>, keeping the Next.js build after source copy.</li>
+          <li>Updated <code>deployment/docker/Dockerfile.ingest-options</code> with separate cached pip and Bun install layers before copying source.</li>
+          <li>Changed <code>scripts/deploy.ts</code> so Docker rollouts run explicit <code>docker compose build &lt;services&gt;</code> followed by <code>docker compose up -d &lt;services&gt;</code>.</li>
+          <li>Documented the faster-build model, scoped rollouts, and appropriate <code>--no-build</code> usage in <code>deployment/docker/README.md</code>.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          The previous Dockerfiles copied all app, service, and package source before dependency installation. That made nearly every code change invalidate <code>bun install</code>, increasing VPS deploy time. The deployment helper also used broad <code>up -d --build</code> behavior rather than a clean build phase scoped to the selected service set.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <p>
+          Each app image now copies root deployment manifests plus every workspace <code>package.json</code> before installing dependencies. The source tree is copied only after the install layer is complete.
+        </p>
+        <pre><code>RUN --mount=type=cache,target=/root/.bun/install/cache \
+  bun install --frozen-lockfile</code></pre>
+        <p>
+          The <code>ingest-options</code> image also copies <code>services/ingest-options/py/requirements.txt</code> before source and uses a pip cache mount:
+        </p>
+        <pre><code>RUN --mount=type=cache,target=/root/.cache/pip \
+  "${VIRTUAL_ENV}/bin/pip" install -r services/ingest-options/py/requirements.txt</code></pre>
+        <p>
+          For full Docker deploys, the helper builds the six core app services explicitly. For scoped deploys, it builds and restarts only the requested services.
+        </p>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <p>
+          Users should see faster deployment turnaround after ordinary source edits because dependency installation is reused when manifests and locks have not changed. Scoped deploys should also disturb fewer containers, reducing restart surface for web-only, API-only, and backend-only updates.
+        </p>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li><span class="ok">Passed:</span> <code>bun run check:docker-workspace</code></li>
+          <li><span class="ok">Passed:</span> <code>./deploy --help</code></li>
+          <li><span class="ok">Passed:</span> <code>docker compose -f deployment/docker/docker-compose.yml config --quiet</code> with a temporary copy of <code>.env.example</code></li>
+          <li><span class="ok">Passed:</span> <code>bun --cwd=apps/web run build</code></li>
+          <li><span class="ok">Passed:</span> <code>bun test</code> with 222 passing tests</li>
+          <li><span class="warn">Not run:</span> targeted Docker image builds because this session could not connect to the Docker daemon at <code>unix:///Users/kell/.orbstack/run/docker.sock</code>.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <p>
+          Docker daemon access was unavailable locally, so image builds still need to be exercised on a machine with a running Docker daemon or during the next VPS rollout. Static Compose validation and repo test coverage passed, and the Dockerfiles use standard BuildKit cache mounts supported by modern Docker Compose v2.
+        </p>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <p>
+          No separate follow-up issue was created. The remaining verification is operational: run the targeted image builds once Docker or OrbStack is available.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

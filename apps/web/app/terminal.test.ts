@@ -24,6 +24,7 @@ import {
   getLiveManifest,
   getRouteFeatures,
   getTapeVirtualConfig,
+  mergeHeldTapeHistory,
   mergeNewestWithOverflow,
   normalizeAlertSeverity,
   normalizeTickerFilterInput,
@@ -394,12 +395,12 @@ describe("route feature map", () => {
 
 describe("fixed tape virtualization config", () => {
   it("uses expected fixed row heights and overscan by table", () => {
-    expect(getTapeVirtualConfig("options")).toEqual({ rowHeight: 36, overscan: 24, debugLabel: "options" });
-    expect(getTapeVirtualConfig("equities")).toEqual({ rowHeight: 36, overscan: 20, debugLabel: "equities" });
-    expect(getTapeVirtualConfig("flow")).toEqual({ rowHeight: 44, overscan: 16, debugLabel: "flow" });
-    expect(getTapeVirtualConfig("alerts")).toEqual({ rowHeight: 44, overscan: 16, debugLabel: "alerts" });
-    expect(getTapeVirtualConfig("classifier")).toEqual({ rowHeight: 44, overscan: 16, debugLabel: "classifier" });
-    expect(getTapeVirtualConfig("dark")).toEqual({ rowHeight: 44, overscan: 16, debugLabel: "dark" });
+    expect(getTapeVirtualConfig("options")).toEqual({ rowHeight: 36, overscan: 44, debugLabel: "options" });
+    expect(getTapeVirtualConfig("equities")).toEqual({ rowHeight: 36, overscan: 36, debugLabel: "equities" });
+    expect(getTapeVirtualConfig("flow")).toEqual({ rowHeight: 44, overscan: 24, debugLabel: "flow" });
+    expect(getTapeVirtualConfig("alerts")).toEqual({ rowHeight: 44, overscan: 24, debugLabel: "alerts" });
+    expect(getTapeVirtualConfig("classifier")).toEqual({ rowHeight: 44, overscan: 24, debugLabel: "classifier" });
+    expect(getTapeVirtualConfig("dark")).toEqual({ rowHeight: 44, overscan: 24, debugLabel: "dark" });
   });
 });
 
@@ -682,6 +683,53 @@ describe("live tape history helpers", () => {
   it("keeps the same anchor when history is appended at the bottom", () => {
     const nextKeys = ["anchor", "after-1", "after-2", "older-1", "older-2"];
     expect(findAnchorRestoreIndex(nextKeys, "anchor", ["anchor", "after-1", "after-2"])).toBe(0);
+  });
+
+  it("keeps held ClickHouse history stable when newer live overflow arrives", () => {
+    const frozenLive = [makeItem("hot-5", 5, 500), makeItem("hot-4", 4, 400)];
+    const displayed = [makeItem("hist-3", 3, 300), makeItem("hist-2", 2, 200)];
+    const incoming = [
+      makeItem("overflow-newer", 6, 600),
+      makeItem("hot-4", 4, 400),
+      makeItem("hist-3", 3, 300),
+      makeItem("hist-2", 2, 200)
+    ];
+
+    expect(mergeHeldTapeHistory(displayed, incoming, frozenLive).map((item) => item.trace_id)).toEqual([
+      "hist-3",
+      "hist-2"
+    ]);
+  });
+
+  it("appends truly older lazy-loaded rows to the held history tail", () => {
+    const frozenLive = [makeItem("hot-5", 5, 500), makeItem("hot-4", 4, 400)];
+    const displayed = [makeItem("hist-3", 3, 300), makeItem("hist-2", 2, 200)];
+    const incoming = [
+      makeItem("hist-3", 3, 300),
+      makeItem("hist-2", 2, 200),
+      makeItem("older-1", 1, 100),
+      makeItem("older-0", 0, 50)
+    ];
+
+    expect(mergeHeldTapeHistory(displayed, incoming, frozenLive).map((item) => item.trace_id)).toEqual([
+      "hist-3",
+      "hist-2",
+      "older-1",
+      "older-0"
+    ]);
+  });
+
+  it("resyncs buffered live history by replacing the held segment after resume", () => {
+    const frozenLive = [makeItem("hot-5", 5, 500), makeItem("hot-4", 4, 400)];
+    const held = mergeHeldTapeHistory(
+      [makeItem("hist-3", 3, 300), makeItem("hist-2", 2, 200)],
+      [makeItem("overflow-newer", 6, 600), makeItem("hist-3", 3, 300), makeItem("older-1", 1, 100)],
+      frozenLive
+    );
+    const resynced = appendHistoryTail([], [makeItem("overflow-newer", 6, 600), ...held], [], 0);
+
+    expect(held.map((item) => item.trace_id)).toEqual(["hist-3", "hist-2", "older-1"]);
+    expect(resynced.map((item) => item.trace_id)).toEqual(["overflow-newer", "hist-3", "hist-2", "older-1"]);
   });
 });
 
