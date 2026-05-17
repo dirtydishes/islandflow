@@ -7109,6 +7109,13 @@ type OptionsPaneProps = {
 const OptionsPane = memo(({ state, limit }: OptionsPaneProps) => {
   const items = limit ? state.filteredOptions.slice(0, limit) : state.filteredOptions;
   const virtual = useTapeVirtualList(items, state.optionsScroll.listRef, getTapeVirtualConfig("options"));
+  const optionHistorySubscription = state.liveSession.manifest.find(
+    (subscription) => subscription.channel === "options"
+  );
+  const optionHistoryKey = optionHistorySubscription ? getLiveSubscriptionKey(optionHistorySubscription) : null;
+  const optionHistoryError = optionHistoryKey
+    ? state.liveSession.historyErrors[optionHistoryKey]
+    : null;
   useVirtualHistoryGate(state.mode === "live" && !limit, items.length, virtual.virtualItems.at(-1)?.index ?? -1, () =>
     void state.liveSession.loadOlder("options")
   );
@@ -7139,6 +7146,11 @@ const OptionsPane = memo(({ state, limit }: OptionsPaneProps) => {
       }
     >
       <div className="data-table-shell">
+        {state.mode === "live" && optionHistoryError ? (
+          <div className="history-load-warning" role="status">
+            Older option history failed to load: {optionHistoryError}
+          </div>
+        ) : null}
         {items.length === 0 ? (
           <div className="empty">
             {state.mode === "live"

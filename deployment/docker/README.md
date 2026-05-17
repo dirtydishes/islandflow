@@ -119,9 +119,15 @@ Supported routing modes:
    - Build web with `NEXT_PUBLIC_API_URL=` (empty).
    - Point `app.<domain>` at the web host port.
    - Proxy these API routes from the app origin to the API host port:
-     - `/ws/*`, `/replay/*`, `/prints/*`, `/joins/*`, `/nbbo/*`, `/dark/*`, `/flow/*`, `/candles/*`
+     - `/ws/*`, `/replay/*`, `/prints/*`, `/joins/*`, `/nbbo/*`, `/dark/*`, `/flow/*`, `/candles/*`, `/history/*`
 
 Enable websocket support on whichever host serves `/ws/*`.
+
+For the current live Nginx Proxy Manager setup behind `flow.deltaisland.io`, keep the API location regex durable in the proxy host advanced config or API, not by hand-editing generated files under `/data/nginx/proxy_host/`. The route matcher should include history:
+
+```nginx
+^/(ws|replay|prints|joins|nbbo|dark|flow|candles|history)/
+```
 
 ## Replay service
 
@@ -441,3 +447,4 @@ After the stack is up:
 - `curl -I http://127.0.0.1:3000/` should return a successful HTTP status on the server.
 - In two-origin mode, browser requests should target `https://api.<domain>/...` and live feeds should use `wss://api.<domain>/ws/...`.
 - In same-origin mode, browser requests should target `https://app.<domain>/...` for API paths and live feeds should use `wss://app.<domain>/ws/...`.
+- In same-origin mode, `bun run check:public-api-routes` should pass for `/prints/options`, `/history/options`, `/replay/options`, `/nbbo/options`, and `/ws/live`.

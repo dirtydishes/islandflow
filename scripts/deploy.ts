@@ -732,9 +732,7 @@ function publicVerification(scope: DeployScope): void {
   }
 
   if (scopeIncludesApi(scope)) {
-    console.log(
-      "Skipping separate public API health check; same-origin mode relies on the public app check plus runtime-local API verification."
-    );
+    runChecked("bun", ["run", "scripts/check-public-api-routes.ts", PUBLIC_APP_URL]);
   }
 }
 
