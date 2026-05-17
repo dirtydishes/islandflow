@@ -114,12 +114,13 @@
         <h2>Validation</h2>
         <ul>
           <li>
-            <code>bun test</code> was attempted and failed due missing local dependencies/modules
-            (for example <code>zod</code>, <code>nats</code>, and workspace package resolution).
+            <code>bun test</code> was run for the repository and reported 2 failing tests plus 1 module-loading error:
+            <code>services/api/tests/live.test.ts</code> (hot-head cap expectation mismatch) and
+            <code>apps/web/app/terminal.test.ts</code> (Next navigation export mismatch).
           </li>
           <li>
-            <code>bun install</code> was started to remediate environment dependencies but was interrupted; full
-            test re-run was skipped per user instruction.
+            The user requested skipping dependency-install remediation before completion, so no additional test-fix work
+            was performed in this turn.
           </li>
           <li><code>git diff</code> review to confirm only intended allowlist and documentation updates were included.</li>
         </ul>
