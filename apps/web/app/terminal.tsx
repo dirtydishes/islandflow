@@ -4604,6 +4604,49 @@ type EvidenceItem =
   | { kind: "print"; id: string; print: OptionPrint }
   | { kind: "unknown"; id: string };
 
+type AlertContextBundle = {
+  alert: AlertEvent | null;
+  flow_packets: FlowPacket[];
+  option_prints: OptionPrint[];
+  missing_refs: string[];
+};
+
+type AlertContextStatus = {
+  traceId: string | null;
+  loading: boolean;
+  missingRefs: string[];
+  error: string | null;
+};
+
+export const buildAlertContextPath = (traceId: string): string =>
+  `/flow/alerts/${encodeURIComponent(traceId)}/context`;
+
+export const collectAlertContextEvidence = (
+  bundle: AlertContextBundle
+): {
+  packets: Map<string, FlowPacket>;
+  prints: Map<string, OptionPrint>;
+} => {
+  const packets = new Map<string, FlowPacket>();
+  const prints = new Map<string, OptionPrint>();
+
+  for (const packet of bundle.flow_packets) {
+    if (packet.id) {
+      packets.set(packet.id, packet);
+    }
+    if (packet.trace_id) {
+      packets.set(packet.trace_id, packet);
+    }
+  }
+  for (const print of bundle.option_prints) {
+    if (print.trace_id) {
+      prints.set(print.trace_id, print);
+    }
+  }
+
+  return { packets, prints };
+};
+
 type DarkEvidenceItem =
   | { kind: "join"; id: string; join: EquityPrintJoin }
   | { kind: "unknown"; id: string };
@@ -4612,15 +4655,28 @@ type AlertDrawerProps = {
   alert: AlertEvent;
   flowPacket: FlowPacket | null;
   evidence: EvidenceItem[];
+  contextStatus: AlertContextStatus;
   onClose: () => void;
 };
 
-const AlertDrawer = ({ alert, flowPacket, evidence, onClose }: AlertDrawerProps) => {
+const formatOptionalMoney = (value: unknown): string | null => {
+  const parsed = parseNumber(value, Number.NaN);
+  return Number.isFinite(parsed) ? `$${formatPrice(parsed)}` : null;
+};
+
+const formatOptionalMs = (value: unknown): string | null => {
+  const parsed = parseNumber(value, Number.NaN);
+  return Number.isFinite(parsed) ? `${Math.round(parsed)}ms` : null;
+};
+
+const AlertDrawer = ({ alert, flowPacket, evidence, contextStatus, onClose }: AlertDrawerProps) => {
   const primary = alert.hits[0];
   const direction = deriveAlertDirection(alert);
   const severity = normalizeAlertSeverity(alert);
   const evidencePrints = evidence.filter((item) => item.kind === "print");
   const unknownCount = evidence.filter((item) => item.kind === "unknown").length;
+  const isContextLoading = contextStatus.traceId === alert.trace_id && contextStatus.loading;
+  const missingRefs = contextStatus.traceId === alert.trace_id ? contextStatus.missingRefs : [];
 
   return (
     <aside className="drawer">
@@ -4639,7 +4695,17 @@ const AlertDrawer = ({ alert, flowPacket, evidence, onClose }: AlertDrawerProps)
         <span className={`pill severity-${severity}`}>{severity}</span>
         <span className="drawer-chip">Score {Math.round(alert.score)}</span>
         <span className={`pill direction-${direction}`}>{direction}</span>
+        {isContextLoading ? <span className="drawer-chip">Loading context</span> : null}
       </div>
+      {isContextLoading ? (
+        <div className="drawer-section drawer-context-loading" aria-label="Loading persisted evidence">
+          <div className="drawer-skeleton drawer-skeleton-wide" />
+          <div className="drawer-skeleton" />
+        </div>
+      ) : null}
+      {contextStatus.traceId === alert.trace_id && contextStatus.error ? (
+        <p className="drawer-empty">Persisted context could not be loaded: {contextStatus.error}</p>
+      ) : null}
 
       <div className="drawer-section">
         <h4>Classifier hits</h4>
@@ -4692,14 +4758,14 @@ const AlertDrawer = ({ alert, flowPacket, evidence, onClose }: AlertDrawerProps)
             </p>
           </div>
         ) : (
-          <p className="drawer-empty">Flow packet not in the current live cache.</p>
+          <p className="drawer-empty">Persisted flow packet is not available for this alert.</p>
         )}
       </div>
 
       <div className="drawer-section">
         <h4>Evidence prints</h4>
         {evidencePrints.length === 0 ? (
-          <p className="drawer-empty">No evidence prints in the live cache yet.</p>
+          <p className="drawer-empty">Persisted evidence prints are not available for this alert.</p>
         ) : (
           <div className="drawer-list">
             {evidencePrints.slice(0, 6).map((item) => (
@@ -4709,6 +4775,36 @@ const AlertDrawer = ({ alert, flowPacket, evidence, onClose }: AlertDrawerProps)
                   <span>${formatPrice(item.print.price)}</span>
                   <span>{formatSize(item.print.size)}x</span>
                   <span>{item.print.exchange}</span>
+                  {item.print.execution_nbbo_side ? <span>Side {item.print.execution_nbbo_side}</span> : null}
+                  {formatOptionalMs(item.print.execution_nbbo_age_ms) ? (
+                    <span>Quote {formatOptionalMs(item.print.execution_nbbo_age_ms)}</span>
+                  ) : null}
+                </div>
+                <div className="drawer-row-meta drawer-evidence-context">
+                  {formatOptionalMoney(item.print.execution_nbbo_bid) ? (
+                    <span>Bid {formatOptionalMoney(item.print.execution_nbbo_bid)}</span>
+                  ) : null}
+                  {formatOptionalMoney(item.print.execution_nbbo_ask) ? (
+                    <span>Ask {formatOptionalMoney(item.print.execution_nbbo_ask)}</span>
+                  ) : null}
+                  {formatOptionalMoney(item.print.execution_nbbo_mid) ? (
+                    <span>Mid {formatOptionalMoney(item.print.execution_nbbo_mid)}</span>
+                  ) : null}
+                  {formatOptionalMoney(item.print.execution_nbbo_spread) ? (
+                    <span>Spr {formatOptionalMoney(item.print.execution_nbbo_spread)}</span>
+                  ) : null}
+                  {formatOptionalMoney(item.print.execution_underlying_spot) ? (
+                    <span>Spot {formatOptionalMoney(item.print.execution_underlying_spot)}</span>
+                  ) : null}
+                  {formatOptionalMoney(item.print.execution_underlying_bid) ? (
+                    <span>U Bid {formatOptionalMoney(item.print.execution_underlying_bid)}</span>
+                  ) : null}
+                  {formatOptionalMoney(item.print.execution_underlying_ask) ? (
+                    <span>U Ask {formatOptionalMoney(item.print.execution_underlying_ask)}</span>
+                  ) : null}
+                  {formatOptionalMoney(item.print.execution_underlying_mid) ? (
+                    <span>U Mid {formatOptionalMoney(item.print.execution_underlying_mid)}</span>
+                  ) : null}
                 </div>
                 <p className="drawer-note">{formatTime(item.print.ts)}</p>
               </div>
@@ -4716,7 +4812,10 @@ const AlertDrawer = ({ alert, flowPacket, evidence, onClose }: AlertDrawerProps)
           </div>
         )}
         {unknownCount > 0 ? (
-          <p className="drawer-empty">+{unknownCount} evidence prints not in cache.</p>
+          <p className="drawer-empty">+{unknownCount} evidence refs unresolved in persisted context.</p>
+        ) : null}
+        {missingRefs.length > 0 ? (
+          <p className="drawer-empty">Missing refs: {missingRefs.slice(0, 4).join(", ")}</p>
         ) : null}
       </div>
     </aside>
@@ -5548,6 +5647,12 @@ const useTerminalState = () => {
   const [pinnedEquityJoinMap, setPinnedEquityJoinMap] = useState<
     Map<string, PinnedEntry<EquityPrintJoin>>
   >(() => new Map());
+  const [selectedAlertContextStatus, setSelectedAlertContextStatus] = useState<AlertContextStatus>({
+    traceId: null,
+    loading: false,
+    missingRefs: [],
+    error: null
+  });
   const [optionSupportSmartMoney, setOptionSupportSmartMoney] = useState<SmartMoneyEvent[]>([]);
   const [optionSupportClassifierHits, setOptionSupportClassifierHits] = useState<ClassifierHitEvent[]>([]);
   const [historicalNbboByTraceId, setHistoricalNbboByTraceId] = useState<Map<string, OptionNBBO | null>>(
@@ -5593,69 +5698,67 @@ const useTerminalState = () => {
   }, [pinnedOptionPrintMap.size, pinnedFlowPacketMap.size, pinnedEquityJoinMap.size]);
 
   useEffect(() => {
-    if (!selectedAlert || mode !== "live") {
+    if (!selectedAlert) {
+      setSelectedAlertContextStatus({
+        traceId: null,
+        loading: false,
+        missingRefs: [],
+        error: null
+      });
       return;
     }
 
-    const packetId = selectedAlert.evidence_refs[0];
-    if (packetId && !resolvedFlowPacketMap.has(packetId)) {
-      incrementRetentionMetric("pinnedFetchMisses", 1);
-      void fetch(buildApiUrl(`/flow/packets/${encodeURIComponent(packetId)}`))
-        .then(async (response) => {
-          if (!response.ok) {
-            throw new Error(await readErrorDetail(response));
-          }
-          return response.json();
-        })
-        .then((payload: { data?: FlowPacket | null }) => {
-          if (!payload.data) {
-            return;
-          }
-          const now = Date.now();
-          const next = new Map<string, FlowPacket>([[payload.data.id, payload.data]]);
-          setPinnedFlowPacketMap((prev) => upsertPinnedEntries(prev, next, now));
-        })
-        .catch((error) => {
-          incrementRetentionMetric("pinnedFetchFailures", 1);
-          console.warn("Failed to fetch flow packet evidence", error);
-        });
-    }
+    const abort = new AbortController();
+    setSelectedAlertContextStatus({
+      traceId: selectedAlert.trace_id,
+      loading: true,
+      missingRefs: [],
+      error: null
+    });
+    incrementRetentionMetric("pinnedFetchMisses", selectedAlert.evidence_refs.length);
 
-    const missingPrintIds = selectedAlert.evidence_refs.filter(
-      (id) => !resolvedFlowPacketMap.has(id) && !resolvedOptionPrintMap.has(id)
-    );
-    if (missingPrintIds.length > 0) {
-      incrementRetentionMetric("pinnedFetchMisses", missingPrintIds.length);
-      const url = new URL(buildApiUrl("/option-prints/by-trace"));
-      for (const traceId of missingPrintIds) {
-        url.searchParams.append("trace_id", traceId);
-      }
-      void fetch(url.toString())
-        .then(async (response) => {
-          if (!response.ok) {
-            throw new Error(await readErrorDetail(response));
-          }
-          return response.json();
-        })
-        .then((payload: { data?: OptionPrint[] }) => {
-          const next = new Map<string, OptionPrint>();
-          for (const item of payload.data ?? []) {
-            if (!item || !item.trace_id) {
-              continue;
-            }
-            next.set(item.trace_id, item);
-          }
-          if (next.size > 0) {
-            const now = Date.now();
-            setPinnedOptionPrintMap((prev) => upsertPinnedEntries(prev, next, now));
-          }
-        })
-        .catch((error) => {
-          incrementRetentionMetric("pinnedFetchFailures", 1);
-          console.warn("Failed to fetch option print evidence", error);
+    void fetch(buildApiUrl(buildAlertContextPath(selectedAlert.trace_id)), { signal: abort.signal })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(await readErrorDetail(response));
+        }
+        return response.json();
+      })
+      .then((payload: AlertContextBundle) => {
+        if (abort.signal.aborted) {
+          return;
+        }
+        const { packets, prints } = collectAlertContextEvidence(payload);
+        const now = Date.now();
+        if (packets.size > 0) {
+          setPinnedFlowPacketMap((prev) => upsertPinnedEntries(prev, packets, now));
+        }
+        if (prints.size > 0) {
+          setPinnedOptionPrintMap((prev) => upsertPinnedEntries(prev, prints, now));
+        }
+        setSelectedAlertContextStatus({
+          traceId: selectedAlert.trace_id,
+          loading: false,
+          missingRefs: payload.missing_refs ?? [],
+          error: null
         });
-    }
-  }, [selectedAlert, mode, resolvedFlowPacketMap, resolvedOptionPrintMap]);
+      })
+      .catch((error) => {
+        if (abort.signal.aborted) {
+          return;
+        }
+        incrementRetentionMetric("pinnedFetchFailures", 1);
+        console.warn("Failed to fetch persisted alert context", error);
+        setSelectedAlertContextStatus({
+          traceId: selectedAlert.trace_id,
+          loading: false,
+          missingRefs: [],
+          error: error instanceof Error ? error.message : String(error)
+        });
+      });
+
+    return () => abort.abort();
+  }, [selectedAlert]);
 
   useEffect(() => {
     if (!selectedDarkEvent || mode !== "live") {
@@ -6802,6 +6905,7 @@ const useTerminalState = () => {
     packetIdByOptionTraceId,
     classifierDecorByOptionTraceId,
     selectedEvidence,
+    selectedAlertContextStatus,
     selectedFlowPacket,
     selectedDarkEvidence,
     selectedDarkUnderlying,
@@ -8515,6 +8619,7 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
             alert={state.selectedAlert}
             flowPacket={state.selectedFlowPacket}
             evidence={state.selectedEvidence}
+            contextStatus={state.selectedAlertContextStatus}
             onClose={() => state.setSelectedAlert(null)}
           />
         ) : null}
