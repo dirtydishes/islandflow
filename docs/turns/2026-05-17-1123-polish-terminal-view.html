@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>2026-05-17 11:23, Polish Terminal View</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: oklch(0.13 0.012 250);
+        --panel: oklch(0.18 0.014 250);
+        --panel-soft: oklch(0.22 0.014 250);
+        --border: oklch(0.72 0.012 250 / 0.18);
+        --text: oklch(0.93 0.014 250);
+        --muted: oklch(0.73 0.018 250);
+        --faint: oklch(0.58 0.016 250);
+        --accent: oklch(0.78 0.12 74);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at 12% 0%, oklch(0.78 0.12 74 / 0.09), transparent 30rem),
+          linear-gradient(180deg, oklch(0.15 0.012 250), var(--bg));
+        color: var(--text);
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.55;
+      }
+
+      main {
+        width: min(920px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 48px 0 64px;
+      }
+
+      header {
+        margin-bottom: 28px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .kicker,
+      h2 {
+        color: var(--accent);
+        font-size: 0.74rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        max-width: 760px;
+        margin: 8px 0 12px;
+        font-size: 2rem;
+        line-height: 1.1;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        margin: 0 0 10px;
+      }
+
+      p {
+        max-width: 74ch;
+        margin: 0 0 12px;
+        color: var(--muted);
+      }
+
+      section {
+        margin-top: 18px;
+        padding: 18px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: linear-gradient(180deg, var(--panel-soft), var(--panel));
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 1.1rem;
+        color: var(--muted);
+      }
+
+      li + li {
+        margin-top: 8px;
+      }
+
+      code {
+        color: var(--text);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.92em;
+      }
+
+      .summary {
+        color: var(--text);
+        font-size: 1.04rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="kicker">Turn Document, 2026-05-17 11:23 ET</div>
+        <h1>Polish Terminal View</h1>
+        <p class="summary">
+          Refined the Islandflow web terminal shell so the Tape view feels more deliberate, more keyboard-readable, and more stable across desktop and mobile.
+        </p>
+      </header>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          This was a focused product polish pass on <code>apps/web/app/globals.css</code>. The work stayed inside the established Islandflow terminal design language: dark operational surfaces, scarce amber emphasis, compact controls, and clear evidence-console states.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Added a shared terminal easing token for consistent, restrained interaction transitions.</li>
+          <li>Styled scrollbars to match the terminal surface instead of falling back to browser defaults.</li>
+          <li>Improved nav, button, and active-control hover and pressed states using the existing OKLCH palette.</li>
+          <li>Refined shell metrics, pane headers, table shells, row focus states, and empty states for clearer hierarchy.</li>
+          <li>Adjusted mobile metric cards and Tape action controls so they align cleanly without horizontal page overflow.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          Islandflow is a serious market-data terminal for traders and researchers. The polish target was product UI, not brand theater, so the changes prioritize trust, legibility, predictable controls, and stable responsive structure.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <ul>
+          <li>All new color work uses existing OKLCH roles and keeps amber as a scarce signal rather than a decorative wash.</li>
+          <li>Keyboard focus on table rows and instrument buttons is now visible without introducing layout shift.</li>
+          <li>Mobile shell metrics now use a two-column grid, and page actions stretch to the viewport width.</li>
+          <li>The polish is CSS-only, so no data contracts, route behavior, or live-stream logic changed.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <p>
+          Users should experience a terminal that reads as more finished under pressure: clearer controls, cleaner empty states, better keyboard affordances, and less visual friction on narrow screens.
+        </p>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li><code>bun install</code> completed to restore missing workspace dependencies.</li>
+          <li><code>bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code> passed with 69 tests.</li>
+          <li><code>bun --cwd=apps/web run build</code> passed.</li>
+          <li>Playwright visual QA checked <code>http://localhost:3000/tape</code> at 1440x1000 and 390x900.</li>
+          <li>Visual QA confirmed no document-level horizontal overflow after the responsive polish.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>The local backend WebSocket at <code>localhost:4000</code> was offline during visual QA, so the screen showed disconnected empty states. This was useful for validating the empty-state polish but did not exercise live data density.</li>
+          <li>Playwright needed a locally cached Chromium executable. The visual check used an existing browser cache path after the default runtime binary was unavailable.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <p>
+          No new Beads follow-up issue was filed. Live-data density should be rechecked naturally when the full local stack is running, but this polish did not reveal a separate actionable defect.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>
