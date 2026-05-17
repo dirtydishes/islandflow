@@ -47,6 +47,7 @@ import {
   ensureOptionPrintsTable,
   fetchAlertsAfter,
   fetchAlertsBefore,
+  fetchAlertContextByTraceId,
   fetchClassifierHitsAfter,
   fetchClassifierHitsBefore,
   fetchSmartMoneyEventsAfter,
@@ -118,6 +119,7 @@ import {
   resolveLiveStateConfig,
   shouldFanoutLiveEvent
 } from "./live";
+import { isAlertContextPath, parseAlertContextTraceIdPath } from "./alert-context";
 import { parseOptionPrintQuery } from "./option-queries";
 import {
   buildSyntheticDerivedStatus,
@@ -1485,6 +1487,25 @@ const run = async () => {
         const limit = parseLimit(url.searchParams.get("limit"));
         const data = await fetchRecentAlerts(clickhouse, limit);
         return jsonResponse({ data });
+      }
+
+      if (req.method === "GET" && isAlertContextPath(url.pathname)) {
+        try {
+          const traceId = parseAlertContextTraceIdPath(url.pathname);
+          if (traceId === null) {
+            return jsonResponse({ error: "not found" }, 404);
+          }
+          const data = await fetchAlertContextByTraceId(clickhouse, traceId);
+          return jsonResponse(data);
+        } catch (error) {
+          return jsonResponse(
+            {
+              error: "invalid alert context query",
+              detail: error instanceof Error ? error.message : String(error)
+            },
+            400
+          );
+        }
       }
 
       if (req.method === "GET" && url.pathname === "/history/options") {
