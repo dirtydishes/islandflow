@@ -75,6 +75,7 @@ Examples:
 ./deploy main --runtime native --web-only
 ./deploy main --runtime native --api-only
 ./deploy current-branch --runtime native --services-only
+./deploy main --runtime native --fast
 ./deploy main --runtime native --web-only --no-build
 ```
 
@@ -84,6 +85,7 @@ Scope behavior:
 - `--web-only`: rebuild/restart only the web unit
 - `--api-only`: restart only the API unit
 - `--services-only`: restart API + backend units without touching the web unit
+- `--fast`: when no explicit scope flag is provided, uses the same `--services-only` scope and trims verbose verification output for quicker completion
 - `--no-build`: skip `bun install --frozen-lockfile` and skip the web build step
 
 ## Current status

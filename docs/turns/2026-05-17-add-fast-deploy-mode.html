@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Turn Report: Add --fast Deploy Mode</title>
+    <style>
+      :root {
+        --bg: #f6f7f8;
+        --panel: #ffffff;
+        --text: #1f2933;
+        --muted: #52606d;
+        --accent: #0b6e99;
+        --border: #d9e2ec;
+        --code-bg: #f0f4f8;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: linear-gradient(180deg, #f6f7f8 0%, #eef3f7 100%);
+        color: var(--text);
+        font: 16px/1.6 "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, serif;
+      }
+      main {
+        max-width: 900px;
+        margin: 40px auto;
+        padding: 0 20px 40px;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 24px;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+      }
+      h1, h2 { line-height: 1.25; margin: 0 0 12px; }
+      h1 { font-size: 1.9rem; }
+      h2 {
+        margin-top: 24px;
+        font-size: 1.2rem;
+        color: var(--accent);
+      }
+      p { margin: 0 0 12px; }
+      ul { margin: 0 0 12px 20px; }
+      code, pre {
+        font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        font-size: 0.93em;
+      }
+      code {
+        background: var(--code-bg);
+        padding: 2px 6px;
+        border-radius: 6px;
+      }
+      pre {
+        background: var(--code-bg);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px;
+        overflow: auto;
+        margin: 0 0 12px;
+      }
+      .meta {
+        color: var(--muted);
+        font-size: 0.95rem;
+        margin-bottom: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <article class="card">
+        <h1>Added <code>--fast</code> mode to deploy helper</h1>
+        <p class="meta">Date: 2026-05-17 · Repo: islandflow · Task: make <code>./deploy main</code> faster for routine rollouts</p>
+
+        <h2>Summary</h2>
+        <p>
+          Added a new <code>--fast</code> flag to <code>./deploy</code> so operators can run a quicker deploy profile without manually combining multiple flags. In fast mode, default full-scope deploys switch to backend-services scope and skip expensive public route-suite checks.
+        </p>
+
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Updated <code>scripts/deploy.ts</code> to parse and advertise <code>--fast</code>.</li>
+          <li>Added effective-scope logic so <code>--fast</code> + default scope behaves like <code>--services-only</code>.</li>
+          <li>Adjusted verification behavior in fast mode:</li>
+          <li>Skipped Docker log tail dump during remote verification.</li>
+          <li>Skipped verbose native <code>systemctl status</code> / <code>journalctl</code> output.</li>
+          <li>Skipped public API route suite (<code>scripts/check-public-api-routes.ts</code>) in fast mode.</li>
+          <li>Documented fast mode in <code>deployment/docker/README.md</code> and <code>deployment/native/README.md</code>.</li>
+        </ul>
+
+        <h2>Context</h2>
+        <p>
+          The default <code>./deploy main</code> path is intentionally thorough and safe, but it can be slow because it rebuilds multiple service images and runs full verification. Fast mode provides an explicit, opt-in speed profile for routine operations.
+        </p>
+
+        <h2>Important Implementation Details</h2>
+        <p>
+          Fast mode does not silently alter explicitly requested scopes. It only remaps scope when the caller leaves scope at default full-stack.
+        </p>
+        <pre><code>function effectiveScope(scope: DeployScope, fast: boolean): DeployScope {
+  if (fast &amp;&amp; scope === "full") {
+    return "services";
+  }
+  return scope;
+}</code></pre>
+        <p>
+          Public verification now keeps behavior explicit. In fast mode, it logs why API route checks were skipped and points operators to <code>DEPLOY_PUBLIC_API_HEALTH_URL</code> if they want a public API probe.
+        </p>
+
+        <h2>Expected Impact for End-Users</h2>
+        <p>
+          Internal operators should see noticeably faster deploy completion in common backend-first rollouts. End-user-facing impact is indirect: faster operational iteration and quicker server refreshes when web changes are not required.
+        </p>
+
+        <h2>Validation</h2>
+        <ul>
+          <li>Ran <code>bun run scripts/deploy.ts --help</code> to validate CLI parsing/help output for the new flag.</li>
+          <li>Ran full test suite with <code>bun test</code> (pass, 232 passing tests).</li>
+        </ul>
+
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li><code>--fast</code> intentionally reduces verification depth; it is not equivalent to the full rollout safety envelope.</li>
+          <li>Fast mode defaults away from web rollout on full scope, so web changes should use explicit web/full scope deploys.</li>
+          <li>Mitigation: behavior is opt-in, surfaced in help text, and documented in deployment READMEs.</li>
+        </ul>
+
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>No immediate follow-up required for this change.</li>
+          <li>Optional future work: add an automatic changed-path-to-scope mapper to choose the smallest safe build set without operator guesswork.</li>
+          <li>Beads issue: <code>islandflow-xod</code> (this task).</li>
+        </ul>
+      </article>
+    </main>
+  </body>
+</html>

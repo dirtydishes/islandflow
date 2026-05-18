@@ -13,6 +13,7 @@ type DeployOptions = {
   mode: DeployMode;
   runtime: DeployRuntime;
   scope: DeployScope;
+  fast: boolean;
   forceRecreate: boolean;
   noBuild: boolean;
 };
@@ -69,9 +70,9 @@ const repoRoot = path.resolve(path.dirname(scriptPath), "..");
 
 function usage(exitCode = 1): never {
   console.error(`Usage:
-  ./deploy main [--runtime docker|native] [--web-only|--api-only|--services-only] [--no-build] [--force-recreate]
-  ./deploy current-branch [--runtime docker|native] [--web-only|--api-only|--services-only] [--no-build] [--force-recreate]
-  ./deploy current branch [--runtime docker|native] [--web-only|--api-only|--services-only] [--no-build] [--force-recreate]
+  ./deploy main [--runtime docker|native] [--web-only|--api-only|--services-only] [--fast] [--no-build] [--force-recreate]
+  ./deploy current-branch [--runtime docker|native] [--web-only|--api-only|--services-only] [--fast] [--no-build] [--force-recreate]
+  ./deploy current branch [--runtime docker|native] [--web-only|--api-only|--services-only] [--fast] [--no-build] [--force-recreate]
 
 Modes:
   main            Deploy origin/main to the live server checkout.
@@ -89,6 +90,7 @@ Scopes:
 
 Options:
   --runtime <name>     Explicit runtime selector (docker or native).
+  --fast               Prefer a quicker rollout profile (defaults full scope to --services-only and skips public API route suite).
   --no-build           Skip docker image builds or native bun install/web build steps.
   --force-recreate     Docker-only escalation path for docker compose when a normal refresh is not enough.
   --help               Show this help text.
@@ -218,11 +220,13 @@ function parseArgs(rawArgs: string[]): DeployOptions {
 
   const runtime = parseRuntime(rawArgs);
   const scope = parseScope(rawArgs);
+  const fast = rawArgs.includes("--fast");
   const forceRecreate = rawArgs.includes("--force-recreate");
   const noBuild = rawArgs.includes("--no-build");
   const positional = rawArgs.filter(
     (arg, index) =>
       arg !== "--force-recreate" &&
+      arg !== "--fast" &&
       arg !== "--no-build" &&
       arg !== "--web-only" &&
       arg !== "--api-only" &&
@@ -238,7 +242,7 @@ function parseArgs(rawArgs: string[]): DeployOptions {
   }
 
   if (positional.length === 1 && positional[0] === "main") {
-    return { mode: "main", runtime, scope, forceRecreate, noBuild };
+    return { mode: "main", runtime, scope, fast, forceRecreate, noBuild };
   }
 
   if (
@@ -249,6 +253,7 @@ function parseArgs(rawArgs: string[]): DeployOptions {
       mode: "current-branch",
       runtime,
       scope,
+      fast,
       forceRecreate,
       noBuild
     };
@@ -300,6 +305,13 @@ function describeScope(scope: DeployScope): string {
     default:
       return "full stack";
   }
+}
+
+function effectiveScope(scope: DeployScope, fast: boolean): DeployScope {
+  if (fast && scope === "full") {
+    return "services";
+  }
+  return scope;
 }
 
 function scopeIncludesWeb(scope: DeployScope): boolean {
@@ -649,14 +661,16 @@ function remoteRollout(
   remoteNativeRollout(mode, branch, scope, noBuild);
 }
 
-function remoteDockerVerification(scope: DeployScope): void {
+function remoteDockerVerification(scope: DeployScope, fast: boolean): void {
   const psServices = dockerServicesForScope(scope);
   const logServices = dockerLogServicesForScope(scope);
   const psCommand =
     psServices.length > 0
       ? `docker compose ps ${psServices.join(" ")}`
       : "docker compose ps";
-  const logCommand = `docker compose logs --tail=100 ${logServices.join(" ")}`;
+  const logCommand = fast
+    ? `echo '[deploy] Fast mode: skipping docker compose logs tail for quicker feedback.'`
+    : `docker compose logs --tail=100 ${logServices.join(" ")}`;
   const checks: string[] = [];
 
   if (scopeIncludesApi(scope)) {
@@ -684,7 +698,7 @@ ${checks.join("\n")}
   );
 }
 
-function remoteNativeVerification(scope: DeployScope): void {
+function remoteNativeVerification(scope: DeployScope, fast: boolean): void {
   const units = nativeUnitsForScope(scope).map((value) => shellEscape(value)).join(" ");
   const checks: string[] = [];
 
@@ -704,26 +718,29 @@ set -euo pipefail
 declare -a units=(${units})
 for unit in "\${units[@]}"; do
   ${NATIVE_SYSTEMCTL_PREFIX} is-active --quiet "$unit"
-  ${NATIVE_SYSTEMCTL_PREFIX} status --no-pager "$unit" || true
-  journalctl -u "$unit" -n 50 --no-pager || true
+  ${fast ? "echo \"[deploy] Fast mode: skipping unit status and recent journal dump for $unit.\"": `${NATIVE_SYSTEMCTL_PREFIX} status --no-pager "$unit" || true\n  journalctl -u "$unit" -n 50 --no-pager || true`}
 done
 ${checks.join("\n")}
 `
   );
 }
 
-function remoteVerification(runtime: DeployRuntime, scope: DeployScope): void {
+function remoteVerification(runtime: DeployRuntime, scope: DeployScope, fast: boolean): void {
   if (runtime === "docker") {
-    remoteDockerVerification(scope);
+    remoteDockerVerification(scope, fast);
     return;
   }
 
-  remoteNativeVerification(scope);
+  remoteNativeVerification(scope, fast);
 }
 
-function publicVerification(scope: DeployScope): void {
+function publicVerification(scope: DeployScope, fast: boolean): void {
   section("Public Verification");
-  runChecked("curl", ["-I", "-fksS", PUBLIC_APP_URL]);
+  if (!fast || scopeIncludesWeb(scope)) {
+    runChecked("curl", ["-I", "-fksS", PUBLIC_APP_URL]);
+  } else {
+    console.log("[deploy] Fast mode: skipping public app HEAD check because web scope is not included.");
+  }
 
   if (scopeIncludesApi(scope) && PUBLIC_API_HEALTH_URL) {
     runChecked("curl", ["-fksS", PUBLIC_API_HEALTH_URL]);
@@ -731,29 +748,39 @@ function publicVerification(scope: DeployScope): void {
   }
 
   if (scopeIncludesApi(scope)) {
+    if (fast) {
+      console.log(
+        "[deploy] Fast mode: skipping scripts/check-public-api-routes.ts route suite. Set DEPLOY_PUBLIC_API_HEALTH_URL to keep a public API health probe in fast mode."
+      );
+      return;
+    }
     runChecked("bun", ["run", "scripts/check-public-api-routes.ts", PUBLIC_APP_URL]);
   }
 }
 
 function main(): void {
   const options = parseArgs(process.argv.slice(2));
+  const scope = effectiveScope(options.scope, options.fast);
   assertSshKeyExists();
   printRuntimeAdvisory(options.runtime);
 
   console.log(
     `Deploying ${options.mode === "main" ? "origin/main" : "the current local branch"} ` +
-      `via ${describeRuntime(options.runtime)} (${describeScope(options.scope)}).`
+      `via ${describeRuntime(options.runtime)} (${describeScope(scope)}${options.fast ? ", fast mode" : ""}).`
   );
+  if (options.fast && options.scope === "full") {
+    console.log("[deploy] Fast mode changed default full scope to --services-only.");
+  }
 
   if (options.mode === "main") {
     localMainPrecheck(options.runtime, options.noBuild);
     remoteGitPrecheck();
-    remoteRuntimePrecheck(options.runtime, options.scope);
+    remoteRuntimePrecheck(options.runtime, scope);
     remoteRollout(
       options.mode,
       options.runtime,
       null,
-      options.scope,
+      scope,
       options.forceRecreate,
       options.noBuild
     );
@@ -762,19 +789,19 @@ function main(): void {
     localBranchPrecheck(branch, options.runtime, options.noBuild);
     publishCurrentBranch(branch);
     remoteGitPrecheck();
-    remoteRuntimePrecheck(options.runtime, options.scope);
+    remoteRuntimePrecheck(options.runtime, scope);
     remoteRollout(
       options.mode,
       options.runtime,
       branch,
-      options.scope,
+      scope,
       options.forceRecreate,
       options.noBuild
     );
   }
 
-  remoteVerification(options.runtime, options.scope);
-  publicVerification(options.scope);
+  remoteVerification(options.runtime, scope, options.fast);
+  publicVerification(scope, options.fast);
 }
 
 main();

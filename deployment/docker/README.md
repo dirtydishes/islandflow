@@ -271,6 +271,7 @@ Examples:
 ./deploy main --runtime docker --web-only
 ./deploy main --runtime docker --api-only
 ./deploy current-branch --runtime docker --services-only
+./deploy main --runtime docker --fast
 ./deploy main --runtime docker --web-only --no-build
 ```
 
@@ -279,6 +280,7 @@ Scoped Docker deploys now build only the selected image set and then restart onl
 - `--web-only`: `docker compose build web`, then `docker compose up -d web`
 - `--api-only`: `docker compose build api`, then `docker compose up -d api`
 - `--services-only`: builds and restarts `api`, `compute`, `candles`, `ingest-options`, and `ingest-equities`
+- `--fast`: when no explicit scope flag is given, treats the deploy as `--services-only` and skips the public API route suite for quicker completion. It still runs remote service health checks.
 
 Use `--no-build` only when the image is already correct and you need Compose to recreate or restart containers, such as after changing server-side environment values that do not affect a Next.js build-time variable. Do not use `--no-build` for dependency changes, application source changes, or `NEXT_PUBLIC_*` changes.
 
