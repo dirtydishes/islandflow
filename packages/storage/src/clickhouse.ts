@@ -1711,6 +1711,25 @@ export const fetchFlowPacketById = async (
   return record ? FlowPacketSchema.parse(fromFlowPacketRecord(record)) : null;
 };
 
+export const fetchFlowPacketsByIds = async (
+  client: ClickHouseClient,
+  ids: string[]
+): Promise<FlowPacket[]> => {
+  const uniqueIds = Array.from(new Set(ids.map((id) => id.trim()).filter(Boolean)));
+  if (uniqueIds.length === 0) {
+    return [];
+  }
+  const result = await client.query({
+    query: `SELECT * FROM ${FLOW_PACKETS_TABLE} WHERE id IN (${buildStringList(uniqueIds)}) ORDER BY source_ts DESC, seq DESC LIMIT ${clampLookupLimit(uniqueIds.length)}`,
+    format: "JSONEachRow"
+  });
+  const rows = await result.json<unknown[]>();
+  const records = rows
+    .map(normalizeFlowPacketRow)
+    .filter((record): record is FlowPacketRecord => record !== null);
+  return FlowPacketSchema.array().parse(records.map(fromFlowPacketRecord));
+};
+
 export const fetchFlowPacketsByMemberTraceIds = async (
   client: ClickHouseClient,
   traceIds: string[]
@@ -1825,6 +1844,55 @@ export const fetchOptionPrintsByTraceIds = async (
 
   const rows = await result.json<unknown[]>();
   return OptionPrintSchema.array().parse(rows.map(normalizeOptionRow));
+};
+
+export type AlertContextBundle = {
+  alert: AlertEvent | null;
+  flow_packets: FlowPacket[];
+  option_prints: OptionPrint[];
+  missing_refs: string[];
+};
+
+export const fetchAlertContextByTraceId = async (
+  client: ClickHouseClient,
+  traceId: string
+): Promise<AlertContextBundle> => {
+  const normalizedTraceId = traceId.trim();
+  if (!normalizedTraceId) {
+    return { alert: null, flow_packets: [], option_prints: [], missing_refs: [] };
+  }
+
+  const alertResult = await client.query({
+    query: `SELECT * FROM ${ALERTS_TABLE} WHERE trace_id = ${quoteString(normalizedTraceId)} ORDER BY source_ts DESC, seq DESC LIMIT 1`,
+    format: "JSONEachRow"
+  });
+  const alertRows = await alertResult.json<unknown[]>();
+  const alertRecord = alertRows
+    .map(normalizeAlertRow)
+    .find((row): row is AlertRecord => row !== null);
+  const alert = alertRecord ? AlertEventSchema.parse(fromAlertRecord(alertRecord)) : null;
+  if (!alert) {
+    return { alert: null, flow_packets: [], option_prints: [], missing_refs: [] };
+  }
+
+  const refs = Array.from(new Set(alert.evidence_refs.map((id) => id.trim()).filter(Boolean)));
+  const packetIds = refs.filter((id) => id.startsWith("flowpacket:"));
+  const printIds = refs.filter((id) => !id.startsWith("flowpacket:"));
+  const [flow_packets, option_prints] = await Promise.all([
+    packetIds.length > 0
+      ? fetchFlowPacketsByIds(client, packetIds)
+      : Promise.resolve([] as FlowPacket[]),
+    printIds.length > 0
+      ? fetchOptionPrintsByTraceIds(client, printIds)
+      : Promise.resolve([] as OptionPrint[])
+  ]);
+
+  const resolvedRefs = new Set<string>([
+    ...flow_packets.map((packet) => packet.id),
+    ...option_prints.map((print) => print.trace_id)
+  ]);
+  const missing_refs = refs.filter((id) => !resolvedRefs.has(id));
+  return { alert, flow_packets, option_prints, missing_refs };
 };
 
 export const fetchEquityPrintJoinsByIds = async (

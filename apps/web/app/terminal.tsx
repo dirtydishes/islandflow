@@ -4692,14 +4692,14 @@ const AlertDrawer = ({ alert, flowPacket, evidence, onClose }: AlertDrawerProps)
             </p>
           </div>
         ) : (
-          <p className="drawer-empty">Flow packet not in the current live cache.</p>
+          <p className="drawer-empty">Flow packet not found in persisted alert context.</p>
         )}
       </div>
 
       <div className="drawer-section">
         <h4>Evidence prints</h4>
         {evidencePrints.length === 0 ? (
-          <p className="drawer-empty">No evidence prints in the live cache yet.</p>
+          <p className="drawer-empty">No persisted evidence prints available yet.</p>
         ) : (
           <div className="drawer-list">
             {evidencePrints.slice(0, 6).map((item) => (
@@ -4716,7 +4716,7 @@ const AlertDrawer = ({ alert, flowPacket, evidence, onClose }: AlertDrawerProps)
           </div>
         )}
         {unknownCount > 0 ? (
-          <p className="drawer-empty">+{unknownCount} evidence prints not in cache.</p>
+          <p className="drawer-empty">+{unknownCount} evidence prints unresolved from persisted context.</p>
         ) : null}
       </div>
     </aside>
@@ -4800,7 +4800,7 @@ const ClassifierHitDrawer = ({ hit, flowPacket, evidence, onClose }: ClassifierH
             </p>
           </div>
         ) : (
-          <p className="drawer-empty">Flow packet not in the current live cache.</p>
+          <p className="drawer-empty">Flow packet not found in persisted alert context.</p>
         )}
       </div>
 
@@ -4824,7 +4824,7 @@ const ClassifierHitDrawer = ({ hit, flowPacket, evidence, onClose }: ClassifierH
           </div>
         )}
         {unknownCount > 0 ? (
-          <p className="drawer-empty">+{unknownCount} evidence prints not in cache.</p>
+          <p className="drawer-empty">+{unknownCount} evidence prints unresolved from persisted context.</p>
         ) : null}
       </div>
     </aside>
@@ -4927,7 +4927,7 @@ const SmartMoneyDrawer = ({ event, flowPacket, evidence, onClose }: SmartMoneyDr
           </div>
         )}
         {unknownCount > 0 ? (
-          <p className="drawer-empty">+{unknownCount} evidence prints not in cache.</p>
+          <p className="drawer-empty">+{unknownCount} evidence prints unresolved from persisted context.</p>
         ) : null}
       </div>
     </aside>
@@ -5039,7 +5039,7 @@ const DarkDrawer = ({ event, evidence, underlying, onClose }: DarkDrawerProps) =
           </div>
         )}
         {unknownCount > 0 ? (
-          <p className="drawer-empty">+{unknownCount} evidence refs not in cache.</p>
+          <p className="drawer-empty">+{unknownCount} evidence refs unresolved from persisted context.</p>
         ) : null}
       </div>
     </aside>
@@ -5553,6 +5553,7 @@ const useTerminalState = () => {
   const [historicalNbboByTraceId, setHistoricalNbboByTraceId] = useState<Map<string, OptionNBBO | null>>(
     () => new Map()
   );
+  const [selectedAlertContextLoading, setSelectedAlertContextLoading] = useState(false);
 
   const resolvedOptionPrintMap = useMemo(() => {
     const merged = new Map<string, OptionPrint>();
@@ -5593,9 +5594,54 @@ const useTerminalState = () => {
   }, [pinnedOptionPrintMap.size, pinnedFlowPacketMap.size, pinnedEquityJoinMap.size]);
 
   useEffect(() => {
-    if (!selectedAlert || mode !== "live") {
+    if (!selectedAlert) {
       return;
     }
+    let cancelled = false;
+    setSelectedAlertContextLoading(true);
+    void fetch(
+      buildApiUrl(`/flow/alerts/${encodeURIComponent(selectedAlert.trace_id)}/context`)
+    )
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(await readErrorDetail(response));
+        }
+        return response.json() as Promise<{
+          flow_packets?: FlowPacket[];
+          option_prints?: OptionPrint[];
+        }>;
+      })
+      .then((payload) => {
+        if (cancelled) {
+          return;
+        }
+        const now = Date.now();
+        const nextPackets = new Map<string, FlowPacket>();
+        for (const packet of payload.flow_packets ?? []) {
+          nextPackets.set(packet.id, packet);
+        }
+        const nextPrints = new Map<string, OptionPrint>();
+        for (const print of payload.option_prints ?? []) {
+          if (print.trace_id) {
+            nextPrints.set(print.trace_id, print);
+          }
+        }
+        if (nextPackets.size > 0) {
+          setPinnedFlowPacketMap((prev) => upsertPinnedEntries(prev, nextPackets, now));
+        }
+        if (nextPrints.size > 0) {
+          setPinnedOptionPrintMap((prev) => upsertPinnedEntries(prev, nextPrints, now));
+        }
+      })
+      .catch((error) => {
+        incrementRetentionMetric("pinnedFetchFailures", 1);
+        console.warn("Failed to fetch alert context", error);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setSelectedAlertContextLoading(false);
+        }
+      });
 
     const packetId = selectedAlert.evidence_refs[0];
     if (packetId && !resolvedFlowPacketMap.has(packetId)) {
@@ -5655,7 +5701,10 @@ const useTerminalState = () => {
           console.warn("Failed to fetch option print evidence", error);
         });
     }
-  }, [selectedAlert, mode, resolvedFlowPacketMap, resolvedOptionPrintMap]);
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedAlert, resolvedFlowPacketMap, resolvedOptionPrintMap]);
 
   useEffect(() => {
     if (!selectedDarkEvent || mode !== "live") {

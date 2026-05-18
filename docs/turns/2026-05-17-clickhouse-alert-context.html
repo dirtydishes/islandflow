@@ -1,0 +1,12 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>2026-05-17 clickhouse alert context</title></head><body>
+<h1>ClickHouse Alert Context Hydration</h1>
+<h2>Summary</h2><p>Implemented persisted alert-context hydration so alert drawers resolve evidence from ClickHouse context instead of only live cache state.</p>
+<h2>Changes Made</h2><ul><li>Added storage lookup bundle for alert context by alert trace ID with flow packets, option prints, and missing refs.</li><li>Added API endpoint <code>GET /flow/alerts/:trace_id/context</code>.</li><li>Updated terminal alert evidence hydration to call the new context endpoint and merge returned evidence into pinned maps.</li><li>Updated drawer cache-miss language to persisted-context language.</li></ul>
+<h2>Context</h2><p>Alert rows remain delivered by existing list feeds and websocket channels; this change only affects detail-time hydration for investigative context.</p>
+<h2>Important Implementation Details</h2><p>The storage bundle resolves evidence refs by type: <code>flowpacket:*</code> refs map to flow packet IDs, remaining refs map to option print trace IDs, and unresolved refs are returned as <code>missing_refs</code>.</p>
+<h2>Expected Impact for End-Users</h2><p>Selecting alerts now resolves more complete persisted evidence context, reducing empty evidence states caused by live-cache eviction windows.</p>
+<h2>Validation</h2><ul><li><code>bun test packages/storage/tests</code> passed.</li><li><code>bun test services/api/tests</code> passed.</li><li><code>bun test apps/web/app/terminal.test.ts</code> passed.</li><li><code>bun --cwd=apps/web run build</code> passed.</li></ul>
+<h2>Issues, Limitations, and Mitigations</h2><p>Front-end loading indicator and explicit missing-ref surfacing in drawer UI are partially addressed; the endpoint and hydration path are in place for further UX polish.</p>
+<h2>Follow-up Work</h2><p>None required for baseline endpoint + hydration path. If needed, create a follow-up Beads item for richer drawer loading skeleton and explicit missing-ref diagnostics display.</p>
+</body></html>
