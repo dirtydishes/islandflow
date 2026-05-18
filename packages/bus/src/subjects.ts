@@ -22,3 +22,5 @@ export const STREAM_CLASSIFIER_HITS = "CLASSIFIER_HITS";
 export const SUBJECT_CLASSIFIER_HITS = "flow.classifier_hits";
 export const STREAM_ALERTS = "ALERTS";
 export const SUBJECT_ALERTS = "flow.alerts";
+export const STREAM_NEWS = "NEWS";
+export const SUBJECT_NEWS = "flow.news";

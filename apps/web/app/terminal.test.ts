@@ -247,6 +247,15 @@ describe("live manifest", () => {
     ]);
   });
 
+  it("includes news subscriptions on home and /news", () => {
+    expect(getLiveManifest("/", "SPY", 60000, buildDefaultFlowFilters()).map((subscription) => subscription.channel)).toContain(
+      "news"
+    );
+    expect(getLiveManifest("/news", "SPY", 60000, buildDefaultFlowFilters()).map((subscription) => subscription.channel)).toEqual([
+      "news"
+    ]);
+  });
+
   it("scopes /charts subscriptions to chart channels only", () => {
     const channels = getLiveManifest("/charts", "SPY", 60000, buildDefaultFlowFilters()).map(
       (subscription) => subscription.channel
@@ -431,6 +440,13 @@ describe("route feature map", () => {
     expect(features.equityOverlay).toBe(true);
     expect(features.alerts).toBe(false);
   });
+
+  it("maps /news to the dedicated news pane", () => {
+    const features = getRouteFeatures("/news");
+    expect(features.news).toBe(true);
+    expect(features.showNewsPane).toBe(true);
+    expect(features.showAlertsPane).toBe(false);
+  });
 });
 
 describe("fixed tape virtualization config", () => {
@@ -461,10 +477,11 @@ describe("dark underlying route dependency helper", () => {
 });
 
 describe("terminal navigation", () => {
-  it("exposes only Home and Tape as top-level destinations", () => {
+  it("exposes Home, Tape, and News as top-level destinations", () => {
     expect(NAV_ITEMS).toEqual([
       { href: "/", label: "Home" },
-      { href: "/tape", label: "Tape" }
+      { href: "/tape", label: "Tape" },
+      { href: "/news", label: "News" }
     ]);
   });
 });

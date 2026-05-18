@@ -7,6 +7,7 @@ import {
   EquityPrintJoinSchema,
   InferredDarkEventSchema,
   FlowPacketSchema,
+  NewsStorySchema,
   OptionNBBOSchema,
   OptionPrintSchema,
   SmartMoneyEventSchema
@@ -20,6 +21,7 @@ import type {
   EquityPrintJoin,
   InferredDarkEvent,
   FlowPacket,
+  NewsStory,
   SmartMoneyEvent,
   OptionNBBO,
   OptionPrint,
@@ -91,6 +93,13 @@ import {
   toSmartMoneyEventRecord,
   type SmartMoneyEventRecord
 } from "./smart-money-events";
+import {
+  NEWS_TABLE,
+  newsTableDDL,
+  fromNewsRecord,
+  toNewsRecord,
+  type NewsRecord
+} from "./news";
 
 export type ClickHouseOptions = {
   url: string;
@@ -320,6 +329,12 @@ export const ensureAlertsTable = async (client: ClickHouseClient): Promise<void>
   }
 };
 
+export const ensureNewsTable = async (client: ClickHouseClient): Promise<void> => {
+  await client.exec({
+    query: newsTableDDL()
+  });
+};
+
 export const insertOptionPrint = async (
   client: ClickHouseClient,
   print: OptionPrint
@@ -444,6 +459,15 @@ export const insertAlert = async (client: ClickHouseClient, alert: AlertEvent): 
   const record = toAlertRecord(alert);
   await client.insert({
     table: ALERTS_TABLE,
+    values: [record],
+    format: "JSONEachRow"
+  });
+};
+
+export const insertNewsStory = async (client: ClickHouseClient, story: NewsStory): Promise<void> => {
+  const record = toNewsRecord(story);
+  await client.insert({
+    table: NEWS_TABLE,
     values: [record],
     format: "JSONEachRow"
   });
@@ -598,6 +622,13 @@ export const enqueueAlertInsert = (
   alert: AlertEvent
 ): void => {
   writer.enqueue(ALERTS_TABLE, toAlertRecord(alert));
+};
+
+export const enqueueNewsStoryInsert = (
+  writer: ClickHouseBatchWriter,
+  story: NewsStory
+): void => {
+  writer.enqueue(NEWS_TABLE, toNewsRecord(story));
 };
 
 const clampLimit = (limit: number): number => {
@@ -1016,6 +1047,32 @@ const normalizeAlertRow = (row: unknown): AlertRecord | null => {
   };
 };
 
+const normalizeNewsRow = (row: unknown): NewsRecord | null => {
+  if (!row || typeof row !== "object") {
+    return null;
+  }
+
+  const record = row as Record<string, unknown>;
+  return {
+    source_ts: coerceNumber(record.source_ts) as number,
+    ingest_ts: coerceNumber(record.ingest_ts) as number,
+    seq: coerceNumber(record.seq) as number,
+    trace_id: String(record.trace_id ?? ""),
+    story_id: coerceNumber(record.story_id) as number,
+    provider: String(record.provider ?? ""),
+    source: String(record.source ?? ""),
+    headline: String(record.headline ?? ""),
+    summary: String(record.summary ?? ""),
+    content_html: String(record.content_html ?? ""),
+    url: String(record.url ?? ""),
+    published_ts: coerceNumber(record.published_ts) as number,
+    updated_ts: coerceNumber(record.updated_ts) as number,
+    provider_symbols_json: String(record.provider_symbols_json ?? "[]"),
+    resolved_symbols_json: String(record.resolved_symbols_json ?? "[]"),
+    symbol_resolution: String(record.symbol_resolution ?? "none") as NewsRecord["symbol_resolution"]
+  };
+};
+
 export const fetchRecentOptionPrints = async (
   client: ClickHouseClient,
   limit: number,
@@ -1205,6 +1262,50 @@ export const fetchRecentAlerts = async (
     .filter((record): record is AlertRecord => record !== null);
   const alerts = records.map(fromAlertRecord);
   return AlertEventSchema.array().parse(alerts);
+};
+
+const latestNewsSelect = `
+SELECT
+  source_ts,
+  ingest_ts,
+  seq,
+  trace_id,
+  story_id,
+  provider,
+  source,
+  headline,
+  summary,
+  content_html,
+  url,
+  published_ts,
+  updated_ts,
+  provider_symbols_json,
+  resolved_symbols_json,
+  symbol_resolution
+FROM (
+  SELECT
+    *,
+    row_number() OVER (PARTITION BY provider, story_id ORDER BY updated_ts DESC, ingest_ts DESC, seq DESC) AS revision_rank
+  FROM ${NEWS_TABLE}
+)
+WHERE revision_rank = 1
+`;
+
+export const fetchRecentNews = async (
+  client: ClickHouseClient,
+  limit: number
+): Promise<NewsStory[]> => {
+  const safeLimit = clampLimit(limit);
+  const result = await client.query({
+    query: `${latestNewsSelect} ORDER BY published_ts DESC, story_id DESC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  const records = rows
+    .map(normalizeNewsRow)
+    .filter((record): record is NewsRecord => record !== null);
+  return NewsStorySchema.array().parse(records.map(fromNewsRecord));
 };
 
 const normalizeAlertEvidenceRefs = (refs: string[]): string[] => {
@@ -1600,6 +1701,27 @@ export const fetchAlertsAfter = async (
   return AlertEventSchema.array().parse(alerts);
 };
 
+export const fetchNewsAfter = async (
+  client: ClickHouseClient,
+  afterTs: number,
+  afterSeq: number,
+  limit: number
+): Promise<NewsStory[]> => {
+  const safeLimit = clampLimit(limit);
+  const safeAfterTs = clampCursor(afterTs);
+  const safeAfterSeq = clampCursor(afterSeq);
+  const result = await client.query({
+    query: `${latestNewsSelect} AND (published_ts, seq) > (${safeAfterTs}, ${safeAfterSeq}) ORDER BY published_ts ASC, seq ASC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  const records = rows
+    .map(normalizeNewsRow)
+    .filter((record): record is NewsRecord => record !== null);
+  return NewsStorySchema.array().parse(records.map(fromNewsRecord));
+};
+
 export const fetchOptionPrintsBefore = async (
   client: ClickHouseClient,
   beforeTs: number,
@@ -1776,6 +1898,25 @@ export const fetchAlertsBefore = async (
     .map(normalizeAlertRow)
     .filter((record): record is AlertRecord => record !== null);
   return AlertEventSchema.array().parse(records.map(fromAlertRecord));
+};
+
+export const fetchNewsBefore = async (
+  client: ClickHouseClient,
+  beforeTs: number,
+  beforeSeq: number,
+  limit: number
+): Promise<NewsStory[]> => {
+  const safeLimit = clampLimit(limit);
+  const result = await client.query({
+    query: `${latestNewsSelect} AND ${buildBeforeTupleCondition("published_ts", "seq", beforeTs, beforeSeq)} ORDER BY published_ts DESC, seq DESC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  const records = rows
+    .map(normalizeNewsRow)
+    .filter((record): record is NewsRecord => record !== null);
+  return NewsStorySchema.array().parse(records.map(fromNewsRecord));
 };
 
 export const fetchInferredDarkBefore = async (

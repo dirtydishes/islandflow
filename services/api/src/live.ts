@@ -8,6 +8,7 @@ import {
   fetchRecentEquityQuotes,
   fetchRecentFlowPackets,
   fetchRecentInferredDark,
+  fetchRecentNews,
   fetchRecentOptionNBBO,
   fetchRecentSmartMoneyEvents,
   type ClickHouseClient
@@ -25,6 +26,7 @@ import {
   FeedSnapshot,
   FlowPacketSchema,
   InferredDarkEventSchema,
+  NewsStorySchema,
   LiveChannelHealth,
   LiveGenericChannel,
   LiveHotChannel,
@@ -40,6 +42,7 @@ import {
   type EquityCandle,
   type EquityPrint,
   type LiveChannel,
+  type NewsStory,
   type OptionPrint
 } from "@islandflow/types";
 import { createMetrics } from "@islandflow/observability";
@@ -63,7 +66,8 @@ const GENERIC_LIMIT_ENV_KEYS: Record<LiveGenericChannel, string> = {
   "smart-money": "LIVE_LIMIT_SMART_MONEY",
   "classifier-hits": "LIVE_LIMIT_CLASSIFIER_HITS",
   alerts: "LIVE_LIMIT_ALERTS",
-  "inferred-dark": "LIVE_LIMIT_INFERRED_DARK"
+  "inferred-dark": "LIVE_LIMIT_INFERRED_DARK",
+  news: "LIVE_LIMIT_NEWS"
 };
 
 const CHART_LIMITS = {
@@ -81,7 +85,8 @@ const DEFAULT_LIVE_LIMITS: GenericLiveLimits = {
   "smart-money": 300,
   "classifier-hits": 300,
   alerts: 300,
-  "inferred-dark": 300
+  "inferred-dark": 300,
+  news: 100
 };
 
 const DEFAULT_SCOPED_CACHE_MAX_KEYS = 32;
@@ -196,16 +201,28 @@ export const resolveGenericLiveLimits = (env: NodeJS.ProcessEnv = process.env): 
       env,
       "inferred-dark",
       env.LIVE_LIMIT_DEFAULT ? liveLimitDefault : DEFAULT_LIVE_LIMITS["inferred-dark"]
-    )
+    ),
+    news: parseGenericLimit(env, "news", env.LIVE_LIMIT_DEFAULT ? liveLimitDefault : DEFAULT_LIVE_LIMITS.news)
   };
 };
 
-const parsePositiveInt = (value: string | undefined, fallback: number): number => {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) {
-    return fallback;
+const extractFreshnessTs = (channel: LiveGenericChannel, item: any): number | null => {
+  switch (channel) {
+    case "options":
+    case "nbbo":
+    case "equities":
+    case "equity-quotes":
+      return typeof item.ts === "number" ? item.ts : null;
+    case "flow":
+    case "classifier-hits":
+    case "alerts":
+    case "inferred-dark":
+      return typeof item.source_ts === "number" ? item.source_ts : null;
+    case "news":
+      return typeof item.published_ts === "number" ? item.published_ts : null;
+    default:
+      return null;
   }
-  return Math.max(1, Math.floor(parsed));
 };
 
 export const resolveLiveStateConfig = (env: NodeJS.ProcessEnv = process.env): LiveStateConfig => ({
@@ -217,6 +234,13 @@ export const resolveLiveStateConfig = (env: NodeJS.ProcessEnv = process.env): Li
   ),
   redisFlushMaxItems: parsePositiveInt(env.LIVE_REDIS_FLUSH_MAX_ITEMS, DEFAULT_REDIS_FLUSH_MAX_ITEMS)
 });
+const parsePositiveInt = (value: string | undefined, fallback: number): number => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return Math.max(1, Math.floor(parsed));
+};
 
 type RedisLike = Pick<
   RedisClientType,
@@ -318,6 +342,14 @@ const getGenericConfig = (limits: GenericLiveLimits): {
     parse: (value) => InferredDarkEventSchema.parse(value),
     cursor: (item) => ({ ts: item.source_ts, seq: item.seq }),
     fetchRecent: fetchRecentInferredDark
+  },
+  news: {
+    redisKey: "live:news",
+    cursorField: "news",
+    limit: limits.news,
+    parse: (value) => NewsStorySchema.parse(value),
+    cursor: (item) => ({ ts: item.published_ts, seq: item.seq }),
+    fetchRecent: fetchRecentNews
   }
 });
 
@@ -369,23 +401,6 @@ const normalizeGenericItems = <T>(
   }
 
   return sortGenericItems(items, config.cursor).slice(0, config.limit);
-};
-
-const extractFreshnessTs = (channel: LiveGenericChannel, item: any): number | null => {
-  switch (channel) {
-    case "options":
-    case "nbbo":
-    case "equities":
-    case "equity-quotes":
-      return typeof item.ts === "number" ? item.ts : null;
-    case "flow":
-    case "classifier-hits":
-    case "alerts":
-    case "inferred-dark":
-      return typeof item.source_ts === "number" ? item.source_ts : null;
-    default:
-      return null;
-  }
 };
 
 const isWithinLiveFeedLookback = (

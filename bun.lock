@@ -121,6 +121,17 @@
         "zod": "^3.23.8",
       },
     },
+    "services/ingest-news": {
+      "name": "@islandflow/ingest-news",
+      "dependencies": {
+        "@islandflow/bus": "workspace:*",
+        "@islandflow/config": "workspace:*",
+        "@islandflow/observability": "workspace:*",
+        "@islandflow/types": "workspace:*",
+        "ws": "^8.18.3",
+        "zod": "^3.23.8",
+      },
+    },
     "services/ingest-options": {
       "name": "@islandflow/ingest-options",
       "dependencies": {
@@ -249,6 +260,8 @@
     "@islandflow/eod-enricher": ["@islandflow/eod-enricher@workspace:services/eod-enricher"],
 
     "@islandflow/ingest-equities": ["@islandflow/ingest-equities@workspace:services/ingest-equities"],
+
+    "@islandflow/ingest-news": ["@islandflow/ingest-news@workspace:services/ingest-news"],
 
     "@islandflow/ingest-options": ["@islandflow/ingest-options@workspace:services/ingest-options"],
 

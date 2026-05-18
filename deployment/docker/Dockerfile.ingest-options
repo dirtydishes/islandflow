@@ -31,6 +31,7 @@ COPY --from=services candles/package.json ./services/candles/package.json
 COPY --from=services compute/package.json ./services/compute/package.json
 COPY --from=services eod-enricher/package.json ./services/eod-enricher/package.json
 COPY --from=services ingest-equities/package.json ./services/ingest-equities/package.json
+COPY --from=services ingest-news/package.json ./services/ingest-news/package.json
 COPY --from=services ingest-options/package.json ./services/ingest-options/package.json
 COPY --from=services ingest-options/py/requirements.txt ./services/ingest-options/py/requirements.txt
 COPY --from=services refdata/package.json ./services/refdata/package.json
