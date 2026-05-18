@@ -37,6 +37,7 @@ const PUBLIC_APP_URL =
   process.env.DEPLOY_PUBLIC_APP_URL?.trim() || "https://flow.deltaisland.io";
 const PUBLIC_API_HEALTH_URL =
   process.env.DEPLOY_PUBLIC_API_HEALTH_URL?.trim() || null;
+const DEPLOY_GIT_REMOTE_OVERRIDE = process.env.DEPLOY_GIT_REMOTE?.trim() || null;
 const NATIVE_SYSTEMCTL_PREFIX =
   process.env.DEPLOY_NATIVE_SYSTEMCTL_PREFIX?.trim() || "sudo -n systemctl";
 const NATIVE_UNITS = {
@@ -75,7 +76,7 @@ function usage(exitCode = 1): never {
   ./deploy current branch [--runtime docker|native] [--web-only|--api-only|--services-only] [--fast] [--no-build] [--force-recreate]
 
 Modes:
-  main            Deploy origin/main to the live server checkout.
+  main            Deploy <remote>/main to the live server checkout.
   current-branch  Push the current local branch, switch the server to it, and deploy it.
 
 Runtimes:
@@ -96,6 +97,7 @@ Options:
   --help               Show this help text.
 
 Environment:
+  DEPLOY_GIT_REMOTE                Override git remote used for deploy fetch/pull/push (auto-detected by default).
   DEPLOY_PUBLIC_APP_URL             Override the public app URL (default: https://flow.deltaisland.io).
   DEPLOY_PUBLIC_API_HEALTH_URL      Optional separate public API health URL for two-origin deployments.
   DEPLOY_NATIVE_SYSTEMCTL_PREFIX    Override systemctl invocation for native rollouts (default: sudo -n systemctl).
@@ -152,6 +154,23 @@ function captureChecked(
     process.exit(result.status ?? 1);
   }
 
+  return result.stdout ?? "";
+}
+
+function tryCapture(
+  command: string,
+  args: string[],
+  options: SpawnSyncOptions = {}
+): string | null {
+  const result = spawnSync(command, args, {
+    cwd: repoRoot,
+    encoding: "utf8",
+    stdio: ["inherit", "pipe", "pipe"],
+    ...options
+  });
+  if (result.status !== 0) {
+    return null;
+  }
   return result.stdout ?? "";
 }
 
@@ -280,6 +299,83 @@ function shellPattern(value: string): string {
   return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
 
+function parseUpstreamRemote(upstreamRef: string | null): string | null {
+  if (!upstreamRef) {
+    return null;
+  }
+  const trimmed = upstreamRef.trim();
+  if (!trimmed || !trimmed.includes("/")) {
+    return null;
+  }
+  return trimmed.split("/", 1)[0] ?? null;
+}
+
+function localGitRemotes(): string[] {
+  const raw = tryCapture("git", ["remote"]);
+  if (!raw) {
+    return [];
+  }
+  return raw
+    .split("\n")
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+}
+
+function localHasRemote(name: string): boolean {
+  return spawnSync("git", ["remote", "get-url", name], {
+    cwd: repoRoot,
+    stdio: "ignore"
+  }).status === 0;
+}
+
+function resolveDeployRemote(mode: DeployMode, branch: string | null): string {
+  const candidates: string[] = [];
+
+  if (DEPLOY_GIT_REMOTE_OVERRIDE) {
+    candidates.push(DEPLOY_GIT_REMOTE_OVERRIDE);
+  }
+
+  if (mode === "current-branch" && branch) {
+    const branchRemote = tryCapture("git", ["config", "--get", `branch.${branch}.remote`])?.trim();
+    if (branchRemote) {
+      candidates.push(branchRemote);
+    }
+
+    const upstreamRef = tryCapture("git", [
+      "rev-parse",
+      "--abbrev-ref",
+      "--symbolic-full-name",
+      "@{u}"
+    ]);
+    const upstreamRemote = parseUpstreamRemote(upstreamRef);
+    if (upstreamRemote) {
+      candidates.push(upstreamRemote);
+    }
+  }
+
+  const mainRemote = tryCapture("git", ["config", "--get", "branch.main.remote"])?.trim();
+  if (mainRemote) {
+    candidates.push(mainRemote);
+  }
+
+  candidates.push("forgejo", "origin", "github", ...localGitRemotes());
+
+  const deduped = Array.from(new Set(candidates.filter((value) => value.length > 0)));
+  const selected = deduped.find((name) => localHasRemote(name));
+
+  if (selected) {
+    return selected;
+  }
+
+  console.error(
+    `Unable to resolve a deploy git remote. Checked candidates: ${deduped.join(", ")}`
+  );
+  console.error(
+    "Set DEPLOY_GIT_REMOTE to a valid remote name or configure branch.<name>.remote."
+  );
+  process.exit(1);
+}
+
 function describeRuntime(runtime: DeployRuntime): string {
   return runtime === "docker" ? "Docker Compose" : "experimental native systemd/Bun";
 }
@@ -404,12 +500,12 @@ function localRuntimePrecheck(runtime: DeployRuntime, noBuild: boolean): void {
   }
 }
 
-function localMainPrecheck(runtime: DeployRuntime, noBuild: boolean): void {
+function localMainPrecheck(remote: string, runtime: DeployRuntime, noBuild: boolean): void {
   section("Local Precheck");
-  runChecked("git", ["fetch", "origin"]);
+  runChecked("git", ["fetch", remote]);
   runChecked("git", ["status", "--short", "--branch"]);
   runChecked("git", ["rev-parse", "--verify", "HEAD"]);
-  runChecked("git", ["rev-parse", "origin/main"]);
+  runChecked("git", ["rev-parse", `${remote}/main`]);
   localRuntimePrecheck(runtime, noBuild);
 }
 
@@ -423,6 +519,7 @@ function currentBranchName(): string {
 }
 
 function localBranchPrecheck(
+  remote: string,
   branch: string,
   runtime: DeployRuntime,
   noBuild: boolean
@@ -430,7 +527,7 @@ function localBranchPrecheck(
   section("Local Precheck");
   runChecked("git", ["branch", "--show-current"]);
   runChecked("git", ["status", "--short", "--branch"]);
-  runChecked("git", ["fetch", "origin"]);
+  runChecked("git", ["fetch", remote]);
 
   const porcelain = captureChecked("git", ["status", "--porcelain=v1"]).trim();
   if (porcelain) {
@@ -443,7 +540,7 @@ function localBranchPrecheck(
   localRuntimePrecheck(runtime, noBuild);
 }
 
-function publishCurrentBranch(branch: string): void {
+function publishCurrentBranch(remote: string, branch: string): void {
   section("Local Publish");
   const upstreamResult = spawnSync(
     "git",
@@ -456,11 +553,11 @@ function publishCurrentBranch(branch: string): void {
   );
 
   if (upstreamResult.status === 0) {
-    runChecked("git", ["push", "origin", branch]);
+    runChecked("git", ["push", remote, branch]);
     return;
   }
 
-  runChecked("git", ["push", "-u", "origin", branch]);
+  runChecked("git", ["push", "-u", remote, branch]);
 }
 
 function remoteGitPrecheck(): void {
@@ -568,18 +665,20 @@ done
   );
 }
 
-function remoteGitUpdateScript(mode: DeployMode, branch: string | null): string {
+function remoteGitUpdateScript(mode: DeployMode, remote: string, branch: string | null): string {
   const escapedBranch = branch ? shellEscape(branch) : null;
+  const escapedRemote = shellEscape(remote);
   const switchCommand =
     mode === "main"
-      ? `git switch main\ngit pull --ff-only origin main`
-      : `git switch ${escapedBranch} || git switch -c ${escapedBranch} --track origin/${escapedBranch}\ngit pull --ff-only origin ${escapedBranch}`;
+      ? `git switch main\ngit pull --ff-only ${escapedRemote} main`
+      : `git switch ${escapedBranch} || git switch -c ${escapedBranch} --track ${escapedRemote}/${escapedBranch}\ngit pull --ff-only ${escapedRemote} ${escapedBranch}`;
 
-  return `cd ${shellEscape(REMOTE_REPO)}\ngit fetch origin\n${switchCommand}`;
+  return `cd ${shellEscape(REMOTE_REPO)}\ngit remote get-url ${escapedRemote} >/dev/null\ngit fetch ${escapedRemote}\n${switchCommand}`;
 }
 
 function remoteDockerRollout(
   mode: DeployMode,
+  remote: string,
   branch: string | null,
   scope: DeployScope,
   forceRecreate: boolean,
@@ -601,7 +700,7 @@ function remoteDockerRollout(
     `#!/usr/bin/env bash
 set -euo pipefail
 
-${remoteGitUpdateScript(mode, branch)}
+${remoteGitUpdateScript(mode, remote, branch)}
 
 cd ${shellEscape(REMOTE_DOCKER_DEPLOYMENT)}
 ${buildCommand ? `${buildCommand}\n` : ""}${upCommand}
@@ -611,6 +710,7 @@ ${buildCommand ? `${buildCommand}\n` : ""}${upCommand}
 
 function remoteNativeRollout(
   mode: DeployMode,
+  remote: string,
   branch: string | null,
   scope: DeployScope,
   noBuild: boolean
@@ -632,7 +732,7 @@ function remoteNativeRollout(
     `#!/usr/bin/env bash
 set -euo pipefail
 
-${remoteGitUpdateScript(mode, branch)}
+${remoteGitUpdateScript(mode, remote, branch)}
 
 cd ${shellEscape(REMOTE_REPO)}
 ${buildSteps.join("\n")}
@@ -647,6 +747,7 @@ done
 
 function remoteRollout(
   mode: DeployMode,
+  remote: string,
   runtime: DeployRuntime,
   branch: string | null,
   scope: DeployScope,
@@ -654,11 +755,11 @@ function remoteRollout(
   noBuild: boolean
 ): void {
   if (runtime === "docker") {
-    remoteDockerRollout(mode, branch, scope, forceRecreate, noBuild);
+    remoteDockerRollout(mode, remote, branch, scope, forceRecreate, noBuild);
     return;
   }
 
-  remoteNativeRollout(mode, branch, scope, noBuild);
+  remoteNativeRollout(mode, remote, branch, scope, noBuild);
 }
 
 function remoteDockerVerification(scope: DeployScope, fast: boolean): void {
@@ -761,23 +862,27 @@ function publicVerification(scope: DeployScope, fast: boolean): void {
 function main(): void {
   const options = parseArgs(process.argv.slice(2));
   const scope = effectiveScope(options.scope, options.fast);
+  const currentBranch = options.mode === "current-branch" ? currentBranchName() : null;
+  const deployRemote = resolveDeployRemote(options.mode, currentBranch);
   assertSshKeyExists();
   printRuntimeAdvisory(options.runtime);
 
   console.log(
-    `Deploying ${options.mode === "main" ? "origin/main" : "the current local branch"} ` +
+    `Deploying ${options.mode === "main" ? `${deployRemote}/main` : "the current local branch"} ` +
       `via ${describeRuntime(options.runtime)} (${describeScope(scope)}${options.fast ? ", fast mode" : ""}).`
   );
+  console.log(`[deploy] Using git remote: ${deployRemote}`);
   if (options.fast && options.scope === "full") {
     console.log("[deploy] Fast mode changed default full scope to --services-only.");
   }
 
   if (options.mode === "main") {
-    localMainPrecheck(options.runtime, options.noBuild);
+    localMainPrecheck(deployRemote, options.runtime, options.noBuild);
     remoteGitPrecheck();
     remoteRuntimePrecheck(options.runtime, scope);
     remoteRollout(
       options.mode,
+      deployRemote,
       options.runtime,
       null,
       scope,
@@ -785,13 +890,18 @@ function main(): void {
       options.noBuild
     );
   } else {
-    const branch = currentBranchName();
-    localBranchPrecheck(branch, options.runtime, options.noBuild);
-    publishCurrentBranch(branch);
+    const branch = currentBranch;
+    if (!branch) {
+      console.error("Unable to resolve current branch for current-branch deploy mode.");
+      process.exit(1);
+    }
+    localBranchPrecheck(deployRemote, branch, options.runtime, options.noBuild);
+    publishCurrentBranch(deployRemote, branch);
     remoteGitPrecheck();
     remoteRuntimePrecheck(options.runtime, scope);
     remoteRollout(
       options.mode,
+      deployRemote,
       options.runtime,
       branch,
       scope,
