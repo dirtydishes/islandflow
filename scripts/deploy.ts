@@ -30,8 +30,7 @@ const SSH_OPTIONS = [
   "BatchMode=yes"
 ];
 const ALLOWED_REMOTE_UNTRACKED = new Set([
-  "deployment/docker/signal-cli-0.14.3-Linux-native.tar.gz",
-  "deployment/npm/"
+  "deployment/docker/signal-cli-0.14.3-Linux-native.tar.gz"
 ]);
 const PUBLIC_APP_URL =
   process.env.DEPLOY_PUBLIC_APP_URL?.trim() || "https://flow.deltaisland.io";

@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ClickHouse Alert Context Hydration</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #111820;
+        --panel-soft: #0d141b;
+        --border: rgba(255, 255, 255, 0.12);
+        --text: #e6edf4;
+        --dim: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --accent-soft: rgba(245, 166, 35, 0.14);
+        --ok: #25c17a;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      main {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 42px 22px 64px;
+      }
+
+      header {
+        padding-bottom: 22px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      h1,
+      h2 {
+        margin: 0;
+        line-height: 1.15;
+      }
+
+      h1 {
+        font-size: 1.8rem;
+        letter-spacing: 0.01em;
+      }
+
+      h2 {
+        margin-top: 30px;
+        font-size: 0.9rem;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+      }
+
+      p {
+        max-width: 74ch;
+        color: var(--dim);
+      }
+
+      ul {
+        display: grid;
+        gap: 8px;
+        padding-left: 20px;
+        color: var(--dim);
+      }
+
+      code {
+        padding: 2px 5px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--panel-soft);
+        color: var(--text);
+        font-family: "SFMono-Regular", Consolas, monospace;
+        font-size: 0.9em;
+      }
+
+      pre {
+        overflow: auto;
+        padding: 14px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--panel);
+      }
+
+      .summary {
+        margin-top: 16px;
+        padding: 16px 18px;
+        border: 1px solid rgba(245, 166, 35, 0.28);
+        border-radius: 12px;
+        background: var(--accent-soft);
+      }
+
+      .status {
+        display: inline-flex;
+        margin-top: 12px;
+        padding: 4px 9px;
+        border: 1px solid rgba(37, 193, 122, 0.34);
+        border-radius: 999px;
+        color: var(--ok);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>ClickHouse Alert Context Hydration</h1>
+        <p class="summary">
+          Alert detail drawers now fetch persisted investigative context from ClickHouse by alert trace id, then merge linked flow packets and option prints into the existing pinned evidence maps.
+        </p>
+        <span class="status">Validated</span>
+      </header>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          This change makes alert details durable. Selecting an alert no longer depends only on the live cache to resolve evidence; the terminal asks the API for a ClickHouse-backed alert context bundle and uses that bundle to populate the existing drawer, classifier support, smart-money support, and prefetch evidence stores.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Added <code>fetchAlertContextByTraceId</code> in storage to load an alert, linked flow packets, linked option prints, and unresolved evidence refs.</li>
+          <li>Added <code>GET /flow/alerts/:trace_id/context</code> to the API without changing existing alert list, history, replay, or websocket feeds.</li>
+          <li>Updated the terminal alert selection effect to fetch persisted context in live, replay, and history modes.</li>
+          <li>Merged hydrated packets and prints into pinned maps so existing evidence consumers share the resolved context.</li>
+          <li>Adjusted alert drawer copy and loading state to reference persisted context rather than live cache misses.</li>
+          <li>Expanded alert evidence print rows with execution NBBO side, bid, ask, mid, spread, quote age, underlying spot, bid, ask, and mid where available.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          Alert rows intentionally remain lightweight for live bursts. The detail drawer is the right place to hydrate heavier investigative context because it runs only when a user asks for a specific alert. The authoritative linkage remains <code>AlertEvent.evidence_refs</code>.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <p>The new API response shape is:</p>
+        <pre><code>{
+  alert: AlertEvent | null,
+  flow_packets: FlowPacket[],
+  option_prints: OptionPrint[],
+  missing_refs: string[]
+}</code></pre>
+        <p>
+          Flow packet refs are resolved with both prefixed and unprefixed candidates. Option print refs are resolved by <code>trace_id</code>. Missing refs are returned explicitly instead of failing the whole response.
+        </p>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <p>
+          Alert details should feel more trustworthy after cache churn or replay navigation. Users can select an older or non-hot alert and still see the preserved evidence context needed to evaluate the signal.
+        </p>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li><code>bun test packages/storage/tests</code></li>
+          <li><code>bun test services/api/tests</code></li>
+          <li><code>bun test apps/web/app/terminal.test.ts</code></li>
+          <li><code>bun --cwd=apps/web run build</code></li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>The endpoint is detail-time only, which avoids making alert list payloads heavier during bursts.</li>
+          <li>Malformed trace ids are rejected by route-level validation.</li>
+          <li>Missing evidence refs remain visible to the drawer as diagnostics rather than hiding partial context.</li>
+          <li>No schema migration was needed because option prints already persist execution context fields.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <p>No follow-up beads issue was filed. The requested storage, API, frontend, tests, build, and documentation work is complete.</p>
+      </section>
+    </main>
+  </body>
+</html>

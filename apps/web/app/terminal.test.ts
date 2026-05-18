@@ -3,9 +3,11 @@ import { getSubscriptionKey as getLiveSubscriptionKey } from "@islandflow/types"
 import {
   NAV_ITEMS,
   appendHistoryTail,
+  buildAlertContextPath,
   buildDefaultFlowFilters,
   buildOptionTapeQueryParams,
   classifierToneForFamily,
+  collectAlertContextEvidence,
   composeTapeItems,
   deriveAlertDirection,
   countActiveFlowFilterGroups,
@@ -92,6 +94,44 @@ describe("pinned evidence pruning", () => {
     const next = prunePinnedEntries(current, new Set(), now);
 
     expect(next).toBe(current);
+  });
+});
+
+describe("alert context hydration helpers", () => {
+  it("builds the persisted ClickHouse context endpoint path", () => {
+    expect(buildAlertContextPath("alert:large_call/one")).toBe(
+      "/flow/alerts/alert%3Alarge_call%2Fone/context"
+    );
+  });
+
+  it("merges hydrated packets and prints into pinned evidence maps", () => {
+    const packet = {
+      trace_id: "flowpacket:1",
+      id: "flowpacket:1",
+      members: ["print:1"],
+      source_ts: 1,
+      ingest_ts: 2,
+      seq: 1,
+      features: {},
+      join_quality: {}
+    } as any;
+    const print = makeOptionPrint({
+      trace_id: "print:1",
+      execution_nbbo_bid: 1.2,
+      execution_nbbo_ask: 1.3,
+      execution_underlying_spot: 450.05
+    });
+
+    const evidence = collectAlertContextEvidence({
+      alert: makeAlert({ evidence_refs: ["flowpacket:1", "print:1"] }),
+      flow_packets: [packet],
+      option_prints: [print],
+      missing_refs: []
+    });
+
+    expect(evidence.packets.get("flowpacket:1")).toBe(packet);
+    expect(evidence.prints.get("print:1")?.execution_nbbo_bid).toBe(1.2);
+    expect(evidence.prints.get("print:1")?.execution_underlying_spot).toBe(450.05);
   });
 });
 

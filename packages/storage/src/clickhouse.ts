@@ -746,6 +746,13 @@ export type EquityPrintQueryFilters = {
   sinceTs?: number;
 };
 
+export type AlertContextBundle = {
+  alert: AlertEvent | null;
+  flow_packets: FlowPacket[];
+  option_prints: OptionPrint[];
+  missing_refs: string[];
+};
+
 const buildOptionPrintFilterConditions = (
   filters: OptionPrintQueryFilters | undefined,
   tracePrefix: string | undefined
@@ -1198,6 +1205,101 @@ export const fetchRecentAlerts = async (
     .filter((record): record is AlertRecord => record !== null);
   const alerts = records.map(fromAlertRecord);
   return AlertEventSchema.array().parse(alerts);
+};
+
+const normalizeAlertEvidenceRefs = (refs: string[]): string[] => {
+  return Array.from(new Set(refs.map((ref) => ref.trim()).filter(Boolean)));
+};
+
+const flowPacketCandidatesFromRef = (ref: string): string[] => {
+  if (!ref) {
+    return [];
+  }
+  if (ref.startsWith("flowpacket:")) {
+    const raw = ref.slice("flowpacket:".length);
+    return raw ? [ref, raw] : [ref];
+  }
+  return [ref, `flowpacket:${ref}`];
+};
+
+const optionPrintCandidatesFromRef = (ref: string): string[] => {
+  if (!ref || ref.startsWith("flowpacket:")) {
+    return [];
+  }
+  return [ref];
+};
+
+export const fetchAlertContextByTraceId = async (
+  client: ClickHouseClient,
+  traceId: string
+): Promise<AlertContextBundle> => {
+  const normalizedTraceId = traceId.trim();
+  if (!normalizedTraceId) {
+    return {
+      alert: null,
+      flow_packets: [],
+      option_prints: [],
+      missing_refs: []
+    };
+  }
+
+  const alertResult = await client.query({
+    query: `SELECT * FROM ${ALERTS_TABLE} WHERE trace_id = ${quoteString(normalizedTraceId)} ORDER BY source_ts DESC, seq DESC LIMIT 1`,
+    format: "JSONEachRow"
+  });
+  const alertRows = await alertResult.json<unknown[]>();
+  const alertRecord = alertRows
+    .map(normalizeAlertRow)
+    .find((record): record is AlertRecord => record !== null);
+  const alert = alertRecord ? AlertEventSchema.parse(fromAlertRecord(alertRecord)) : null;
+
+  if (!alert) {
+    return {
+      alert: null,
+      flow_packets: [],
+      option_prints: [],
+      missing_refs: []
+    };
+  }
+
+  const refs = normalizeAlertEvidenceRefs(alert.evidence_refs);
+  const packetLookupIds = Array.from(new Set(refs.flatMap(flowPacketCandidatesFromRef)));
+  const printLookupIds = Array.from(new Set(refs.flatMap(optionPrintCandidatesFromRef)));
+
+  const [flowPackets, optionPrints] = await Promise.all([
+    packetLookupIds.length > 0
+      ? client
+          .query({
+            query: `SELECT * FROM ${FLOW_PACKETS_TABLE} WHERE id IN (${buildStringList(packetLookupIds)}) ORDER BY source_ts DESC, seq DESC LIMIT ${clampLookupLimit(packetLookupIds.length)}`,
+            format: "JSONEachRow"
+          })
+          .then(async (result) => {
+            const rows = await result.json<unknown[]>();
+            const records = rows
+              .map(normalizeFlowPacketRow)
+              .filter((record): record is FlowPacketRecord => record !== null);
+            return FlowPacketSchema.array().parse(records.map(fromFlowPacketRecord));
+          })
+      : Promise.resolve([]),
+    printLookupIds.length > 0
+      ? fetchOptionPrintsByTraceIds(client, printLookupIds)
+      : Promise.resolve([])
+  ]);
+
+  const packetIds = new Set(flowPackets.flatMap((packet) => [packet.id, packet.trace_id]));
+  const printIds = new Set(optionPrints.map((print) => print.trace_id));
+  const missingRefs = refs.filter((ref) => {
+    const packetResolved = flowPacketCandidatesFromRef(ref).some((candidate) => packetIds.has(candidate));
+    const printResolved = optionPrintCandidatesFromRef(ref).some((candidate) => printIds.has(candidate));
+    return !packetResolved && !printResolved;
+  });
+
+  return {
+    alert,
+    flow_packets: flowPackets,
+    option_prints: optionPrints,
+    missing_refs: missingRefs
+  };
 };
 
 export const fetchOptionPrintsAfter = async (
@@ -1844,55 +1946,6 @@ export const fetchOptionPrintsByTraceIds = async (
 
   const rows = await result.json<unknown[]>();
   return OptionPrintSchema.array().parse(rows.map(normalizeOptionRow));
-};
-
-export type AlertContextBundle = {
-  alert: AlertEvent | null;
-  flow_packets: FlowPacket[];
-  option_prints: OptionPrint[];
-  missing_refs: string[];
-};
-
-export const fetchAlertContextByTraceId = async (
-  client: ClickHouseClient,
-  traceId: string
-): Promise<AlertContextBundle> => {
-  const normalizedTraceId = traceId.trim();
-  if (!normalizedTraceId) {
-    return { alert: null, flow_packets: [], option_prints: [], missing_refs: [] };
-  }
-
-  const alertResult = await client.query({
-    query: `SELECT * FROM ${ALERTS_TABLE} WHERE trace_id = ${quoteString(normalizedTraceId)} ORDER BY source_ts DESC, seq DESC LIMIT 1`,
-    format: "JSONEachRow"
-  });
-  const alertRows = await alertResult.json<unknown[]>();
-  const alertRecord = alertRows
-    .map(normalizeAlertRow)
-    .find((row): row is AlertRecord => row !== null);
-  const alert = alertRecord ? AlertEventSchema.parse(fromAlertRecord(alertRecord)) : null;
-  if (!alert) {
-    return { alert: null, flow_packets: [], option_prints: [], missing_refs: [] };
-  }
-
-  const refs = Array.from(new Set(alert.evidence_refs.map((id) => id.trim()).filter(Boolean)));
-  const packetIds = refs.filter((id) => id.startsWith("flowpacket:"));
-  const printIds = refs.filter((id) => !id.startsWith("flowpacket:"));
-  const [flow_packets, option_prints] = await Promise.all([
-    packetIds.length > 0
-      ? fetchFlowPacketsByIds(client, packetIds)
-      : Promise.resolve([] as FlowPacket[]),
-    printIds.length > 0
-      ? fetchOptionPrintsByTraceIds(client, printIds)
-      : Promise.resolve([] as OptionPrint[])
-  ]);
-
-  const resolvedRefs = new Set<string>([
-    ...flow_packets.map((packet) => packet.id),
-    ...option_prints.map((print) => print.trace_id)
-  ]);
-  const missing_refs = refs.filter((id) => !resolvedRefs.has(id));
-  return { alert, flow_packets, option_prints, missing_refs };
 };
 
 export const fetchEquityPrintJoinsByIds = async (
