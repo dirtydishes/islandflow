@@ -1813,6 +1813,25 @@ export const fetchFlowPacketById = async (
   return record ? FlowPacketSchema.parse(fromFlowPacketRecord(record)) : null;
 };
 
+export const fetchFlowPacketsByIds = async (
+  client: ClickHouseClient,
+  ids: string[]
+): Promise<FlowPacket[]> => {
+  const uniqueIds = Array.from(new Set(ids.map((id) => id.trim()).filter(Boolean)));
+  if (uniqueIds.length === 0) {
+    return [];
+  }
+  const result = await client.query({
+    query: `SELECT * FROM ${FLOW_PACKETS_TABLE} WHERE id IN (${buildStringList(uniqueIds)}) ORDER BY source_ts DESC, seq DESC LIMIT ${clampLookupLimit(uniqueIds.length)}`,
+    format: "JSONEachRow"
+  });
+  const rows = await result.json<unknown[]>();
+  const records = rows
+    .map(normalizeFlowPacketRow)
+    .filter((record): record is FlowPacketRecord => record !== null);
+  return FlowPacketSchema.array().parse(records.map(fromFlowPacketRecord));
+};
+
 export const fetchFlowPacketsByMemberTraceIds = async (
   client: ClickHouseClient,
   traceIds: string[]

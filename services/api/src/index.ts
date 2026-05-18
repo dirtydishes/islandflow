@@ -54,6 +54,7 @@ import {
   fetchSmartMoneyEventsBefore,
   fetchFlowPacketsAfter,
   fetchFlowPacketById,
+  fetchAlertContextByTraceId,
   fetchFlowPacketsByMemberTraceIds,
   fetchFlowPacketsBefore,
   fetchRecentAlerts,
@@ -1610,6 +1611,17 @@ const run = async () => {
         const id = decodeURIComponent(url.pathname.slice("/flow/packets/".length));
         const data = await fetchFlowPacketById(clickhouse, id);
         return jsonResponse({ data });
+      }
+
+      if (req.method === "GET" && /^\/flow\/alerts\/[^/]+\/context$/.test(url.pathname)) {
+        const traceId = decodeURIComponent(
+          url.pathname.slice("/flow/alerts/".length, -"/context".length)
+        ).trim();
+        if (!traceId || traceId.length > 512) {
+          return jsonResponse({ error: "invalid alert trace id" }, 400);
+        }
+        const data = await fetchAlertContextByTraceId(clickhouse, traceId);
+        return jsonResponse(data);
       }
 
       if (req.method === "GET" && url.pathname === "/option-prints/by-trace") {
