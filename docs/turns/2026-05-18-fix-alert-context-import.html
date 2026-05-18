@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>2026-05-18 09:02 EDT - Fix alert context import regression</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f5f2eb;
+        --panel: #fffaf2;
+        --ink: #1f1b17;
+        --muted: #6b6258;
+        --line: #d8cfc2;
+        --accent: #8b5e34;
+        --accent-soft: #efe2d2;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Iowan Old Style", "Palatino Linotype", serif;
+        background: linear-gradient(180deg, var(--bg), #efe7da);
+        color: var(--ink);
+        line-height: 1.6;
+      }
+
+      main {
+        width: min(920px, calc(100vw - 32px));
+        margin: 32px auto 56px;
+        padding: 28px;
+        background: color-mix(in srgb, var(--panel) 94%, white 6%);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        box-shadow: 0 20px 60px rgba(60, 40, 20, 0.08);
+      }
+
+      h1,
+      h2 {
+        line-height: 1.15;
+        margin: 0 0 12px;
+      }
+
+      h1 {
+        font-size: clamp(2rem, 4vw, 2.8rem);
+      }
+
+      h2 {
+        margin-top: 28px;
+        padding-top: 18px;
+        font-size: 1.1rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--accent);
+        border-top: 1px solid var(--line);
+      }
+
+      p,
+      li {
+        font-size: 1rem;
+        margin: 0 0 12px;
+        max-width: 72ch;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      .summary {
+        padding: 16px 18px;
+        border-radius: 14px;
+        background: var(--accent-soft);
+        border: 1px solid #dfccb7;
+      }
+
+      .meta {
+        margin: 10px 0 22px;
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+
+      code,
+      pre {
+        font-family: "SFMono-Regular", "SF Mono", Consolas, monospace;
+        font-size: 0.92rem;
+      }
+
+      pre {
+        margin: 0 0 12px;
+        padding: 14px 16px;
+        overflow: auto;
+        border-radius: 14px;
+        background: #201a16;
+        color: #f7efe6;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Fix alert context import regression</h1>
+      <p class="meta">Completed 2026-05-18 09:02:28 EDT</p>
+
+      <section>
+        <h2>Summary</h2>
+        <div class="summary">
+          <p>
+            A recent alert-context merge left <code>services/api/src/index.ts</code> importing
+            <code>fetchAlertContextByTraceId</code> twice from <code>@islandflow/storage</code>.
+            This change removes the duplicate import so the API entrypoint no longer carries that
+            merge regression.
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Removed the second duplicate <code>fetchAlertContextByTraceId</code> import from <code>services/api/src/index.ts</code>.</li>
+          <li>Left the alert-context implementation and route behavior unchanged.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          This bug scan reviewed commits since the previous automation run on 2026-05-17. The
+          regression appears in the alert-context work that landed shortly after
+          <code>c0b5b6d</code> and remains present on the current tip.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <p>
+          The fix is intentionally minimal because the failure mode came from import duplication,
+          not from the runtime logic itself.
+        </p>
+        <pre><code>import {
+  fetchAlertsAfter,
+  fetchAlertsBefore,
+  fetchAlertContextByTraceId,
+  fetchClassifierHitsAfter,
+  ...
+  fetchFlowPacketsAfter,
+  fetchFlowPacketById,
+  fetchFlowPacketsByMemberTraceIds,
+  ...
+} from "@islandflow/storage";</code></pre>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <p>
+          End-users should see no behavior change in the alert drawer itself. The benefit is
+          operational: the API source no longer contains this compile-time regression, which lowers
+          the chance of broken startup or validation around the new alert-context feature.
+        </p>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li>Ran <code>bun test apps/web/app/terminal.test.ts packages/storage/tests/alerts.test.ts services/api/tests/alert-context.test.ts</code> and all 75 tests passed.</li>
+          <li>Ran <code>bunx tsc --noEmit -p services/api/tsconfig.json</code>. The duplicate import no longer appears as an error, but the repo still has unrelated pre-existing TypeScript failures in other packages and modules.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <p>
+          The broader API TypeScript check is not clean yet. Remaining failures include unrelated
+          issues in <code>packages/bus</code>, <code>packages/config</code>,
+          <code>packages/storage</code>, <code>services/api/src/live.ts</code>, and other API type
+          call sites. They are outside the scope of this minimal regression fix, so they were not
+          changed here.
+        </p>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <p>
+          No new follow-up issue was created for this patch beyond the Beads bug used to track this
+          fix. If the team wants a clean API typecheck gate, the remaining TypeScript failures
+          should be triaged separately.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>
