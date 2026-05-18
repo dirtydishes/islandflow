@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Plan: Native Fast Iterative Deployment</title>
+    <style>
+      body { font-family: Inter, system-ui, sans-serif; margin: 40px auto; max-width: 860px; line-height: 1.55; padding: 0 16px; }
+      h1, h2 { line-height: 1.2; }
+      .meta { color: #555; margin-bottom: 20px; }
+      section { margin: 22px 0; }
+      ul { padding-left: 20px; }
+      code { background: #f3f4f6; padding: 2px 6px; border-radius: 6px; }
+    </style>
+  </head>
+  <body>
+    <h1>Plan: Native, Fast, Iterative Deployment (Docker Optional)</h1>
+    <p class="meta">Date: 2026-05-18</p>
+
+    <section>
+      <h2>Plan Summary</h2>
+      <p>Define and execute a fast iteration deployment path centered on host-native services, while preserving Docker as a fallback/runtime option.</p>
+    </section>
+
+    <section>
+      <h2>Goals</h2>
+      <ul>
+        <li>Reduce deploy turnaround time immediately.</li>
+        <li>Identify concrete bottlenecks with timing evidence.</li>
+        <li>Stabilize proxy/runtime topology for reliable production rollouts.</li>
+        <li>Support both native and Docker strategies with explicit guardrails.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Proposed Changes</h2>
+      <ul>
+        <li>Use scoped fast deploys short-term.</li>
+        <li>Audit and remediate server-state blockers (duplicate compose/project drift).</li>
+        <li>Prepare native runtime prerequisites and checked-in operational assets.</li>
+        <li>Add deployment strategy prechecks, validation matrix, and staged cutover.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Relevant Context</h2>
+      <ul>
+        <li>Open issue <code>islandflow-2db</code>: stale duplicate compose stack cleanup.</li>
+        <li>Open issue <code>islandflow-sz8</code>: public <code>/replay/options</code> proxy regression.</li>
+        <li>Open issue <code>islandflow-38p</code>: native unit templates and rollback helpers.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Implementation Steps</h2>
+      <ol>
+        <li>Stop the bleeding immediately (current deploy loop).</li>
+        <li>Get hard timing data per deploy phase.</li>
+        <li>Live server state audit (when plan mode is off).</li>
+        <li>Resolve duplicate compose stack first (<code>islandflow-2db</code>).</li>
+        <li>Fix NPM proxy route regression (<code>islandflow-sz8</code>).</li>
+        <li>Define target iterative deployment model.</li>
+        <li>Prepare native runtime prerequisites on VPS.</li>
+        <li>Checked-in native ops assets (<code>islandflow-38p</code>).</li>
+        <li>Switch proxy topology for native mode carefully.</li>
+        <li>Deploy strategy guardrails.</li>
+        <li>Validation matrix.</li>
+        <li>Staged cutover plan.</li>
+        <li>Decision: final default runtime.</li>
+        <li>Decision: optimization priority.</li>
+        <li>Decision: immediate live audit kickoff.</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>Risks, Limitations, and Mitigations</h2>
+      <ul>
+        <li>Risk: native runtime not yet production-hardened. Mitigation: keep Docker fallback and explicit gating.</li>
+        <li>Risk: proxy misrouting breaks API routes. Mitigation: route checks and post-change smoke validation.</li>
+        <li>Risk: operational drift on VPS. Mitigation: preflight audits and documented rollback steps.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Open Questions</h2>
+      <ul>
+        <li>Should native become the default runtime now, or after hardening milestones?</li>
+        <li>Should backend iteration speed be prioritized ahead of web deploy speed?</li>
+        <li>Do we start immediate live server audit as soon as plan mode is disabled?</li>
+      </ul>
+    </section>
+  </body>
+</html>

@@ -217,12 +217,14 @@ The current live VPS uses Nginx Proxy Manager on the shared Docker network and r
 
 The deploy helper also warns if it detects a second compose project named `islandflow` on the server, because that usually means the repo-root local-infra stack was started on the VPS by mistake.
 
-The checked-in deploy helper is meant to run from your local repo checkout, not from the VPS shell. It always targets:
+The checked-in deploy helper normally runs from your local repo checkout and targets:
 
 - SSH host: `delta@152.53.80.229`
-- SSH key: `~/.ssh/delta_ed25519`
+- SSH key: `~/.ssh/delta_ed25519` by default
 - Live repo checkout: `/home/delta/islandflow`
 - Live compose directory: `/home/delta/islandflow/deployment/docker`
+
+If you run `./deploy` from `/home/delta/islandflow` on the VPS itself, it now executes the remote steps locally instead of SSHing back into the same machine. You can still force SSH with `DEPLOY_FORCE_SSH=1`, or override the key path with `DEPLOY_SSH_KEY_PATH=/path/to/key`.
 
 It preserves the current Docker Compose project and avoids destructive cleanup on the server.
 
@@ -271,6 +273,7 @@ Examples:
 ./deploy main --runtime docker --web-only
 ./deploy main --runtime docker --api-only
 ./deploy current-branch --runtime docker --services-only
+./deploy main --runtime docker --workers-only
 ./deploy main --runtime docker --fast
 ./deploy main --runtime docker --web-only --no-build
 ```
@@ -280,6 +283,7 @@ Scoped Docker deploys now build only the selected image set and then restart onl
 - `--web-only`: `docker compose build web`, then `docker compose up -d web`
 - `--api-only`: `docker compose build api`, then `docker compose up -d api`
 - `--services-only`: builds and restarts `api`, `compute`, `candles`, `ingest-options`, and `ingest-equities`
+- `--workers-only`: builds and restarts `compute`, `candles`, `ingest-options`, and `ingest-equities` without touching `web` or `api`
 - `--fast`: when no explicit scope flag is given, treats the deploy as `--services-only` and skips the public API route suite for quicker completion. It still runs remote service health checks.
 
 Use `--no-build` only when the image is already correct and you need Compose to recreate or restart containers, such as after changing server-side environment values that do not affect a Next.js build-time variable. Do not use `--no-build` for dependency changes, application source changes, or `NEXT_PUBLIC_*` changes.

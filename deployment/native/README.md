@@ -1,29 +1,114 @@
 # Native Deployment
 
-This directory documents the experimental host-native Islandflow rollout path used by:
+This directory documents the host-native Islandflow rollout path used by:
 
 ```bash
 ./deploy main --runtime native
 ./deploy current-branch --runtime native
 ```
 
-This runtime is intended for faster server iteration during the transition away from Docker-only app rollouts. It is not the recommended path for the current production VPS, which still uses Nginx Proxy Manager to reach the Docker `web` and `api` containers by container name on the shared Docker network. Local development should still prefer:
+## Current operating model
 
-- Docker for infra (`bun run dev:infra`)
-- native Bun services (`bun run dev:services`)
-- native Next.js web (`bun run dev:web`)
+Native runtime is now intended for **fast iterative backend deploys first**, while Docker remains the supported public production edge until a deliberate cutover is completed.
+
+Today, the recommended split is:
+
+- **Docker runtime** for the live public `web` + `api` path
+- **Native runtime** for worker-only iteration (`compute`, `candles`, `ingest-options`, `ingest-equities`)
+- local development stays:
+  - Docker infra: `bun run dev:infra`
+  - native backend services: `bun run dev:services`
+  - native web: `bun run dev:web`
 
 ## What native deploy means here
 
 The checked-in `deploy` helper assumes:
 
-- the live repo checkout is still `/home/delta/islandflow`
+- the live repo checkout is `/home/delta/islandflow`
 - Bun is installed on the VPS
-- app processes are managed by `systemd`
-- infrastructure services such as NATS, ClickHouse, and Redis are already reachable from the host
+- app processes are managed by `systemd --user`
+- infrastructure services such as NATS, ClickHouse, and Redis are reachable from the host
 - the web app runs from `apps/web` and is served with `next start -p 3000`
 
-The deploy script updates the repo checkout, optionally runs `bun install --frozen-lockfile`, optionally rebuilds the web app, restarts the target systemd units, and then verifies the services locally on the VPS plus through the public app URL.
+The deploy script updates the repo checkout, optionally runs `bun install --frozen-lockfile`, optionally rebuilds the web app, restarts the target user units, verifies local health, and then runs public verification when the selected scope includes the public edge.
+
+## Live audit status on 2026-05-18
+
+The plan assumptions were audited on the VPS:
+
+- `bun` is installed and available at `/home/delta/.bun/bin/bun`
+- `systemctl --user` is available and the `delta` user has lingering enabled
+- `/home/delta/islandflow/.env` exists
+- public `https://flow.deltaisland.io/replay/options` routing is healthy again
+- the previously reported duplicate `islandflow` compose project is not currently present in `docker compose ls`
+- native Islandflow user units were not installed at the start of the audit; this change now provides and installs the checked-in user unit files, but they remain disabled until an operator enables a scope intentionally
+
+That means native worker deploy support is now provisioned on the host, but native runtime should still be enabled scope-by-scope rather than started wholesale.
+
+## Checked-in native ops assets
+
+### User unit templates
+
+Checked-in unit files live under:
+
+- `deployment/native/systemd/user/islandflow-web.service`
+- `deployment/native/systemd/user/islandflow-api.service`
+- `deployment/native/systemd/user/islandflow-compute.service`
+- `deployment/native/systemd/user/islandflow-candles.service`
+- `deployment/native/systemd/user/islandflow-ingest-options.service`
+- `deployment/native/systemd/user/islandflow-ingest-equities.service`
+
+These are written for the current VPS layout:
+
+- repo root: `/home/delta/islandflow`
+- Bun binary: `/home/delta/.bun/bin/bun`
+- env file: `/home/delta/islandflow/.env`
+
+### Install the units
+
+```bash
+./deployment/native/install-user-units.sh
+./deployment/native/install-user-units.sh workers
+systemctl --user start islandflow-compute.service
+```
+
+Install script behavior:
+
+- copies the checked-in unit files into `~/.config/systemd/user`
+- reloads the user systemd daemon
+- enables only the scope you explicitly request
+- defaults to installing without enabling anything yet
+
+### Smoke test helper
+
+```bash
+./deployment/native/check-native-health.sh workers
+./deployment/native/check-native-health.sh services
+./deployment/native/check-native-health.sh full
+```
+
+This validates:
+
+- `systemctl --user is-active` for the selected units
+- local API health at `http://127.0.0.1:4000/health` when API scope is included
+- local web health at `http://127.0.0.1:3000/` when web scope is included
+
+### Rollback helper
+
+```bash
+./deployment/native/rollback.sh <git-ref> workers
+./deployment/native/rollback.sh <git-ref> services
+```
+
+Rollback helper behavior:
+
+- requires a clean repo state
+- fetches refs
+- switches the checkout to a detached target ref
+- reruns `bun install --frozen-lockfile`
+- rebuilds the web app only when web scope is included
+- restarts the selected user units
+- runs the native smoke checks
 
 ## Expected unit names
 
@@ -54,87 +139,104 @@ Available overrides:
 
 ## systemctl invocation
 
-By default the deploy helper uses:
-
-```bash
-sudo -n systemctl
-```
-
-If the server uses user units or another wrapper, override it locally before invoking `./deploy`:
+For the checked-in user units, use:
 
 ```bash
 export DEPLOY_NATIVE_SYSTEMCTL_PREFIX="systemctl --user"
-./deploy main --runtime native
 ```
+
+The deploy helper defaults to `sudo -n systemctl`, but that is only appropriate if you intentionally install matching system units.
 
 ## Partial native rollouts
 
 Examples:
 
 ```bash
-./deploy main --runtime native --web-only
-./deploy main --runtime native --api-only
-./deploy current-branch --runtime native --services-only
+./deploy main --runtime native --workers-only
 ./deploy main --runtime native --fast
-./deploy main --runtime native --web-only --no-build
+./deploy main --runtime native --services-only
+./deploy main --runtime native --web-only
+./deploy current-branch --runtime native --workers-only --no-build
 ```
 
 Scope behavior:
 
-- default: restart web + API + backend services
+- default: restart web + API + worker services
 - `--web-only`: rebuild/restart only the web unit
 - `--api-only`: restart only the API unit
-- `--services-only`: restart API + backend units without touching the web unit
-- `--fast`: when no explicit scope flag is provided, uses the same `--services-only` scope and trims verbose verification output for quicker completion
+- `--services-only`: restart API + worker units without touching the web unit
+- `--workers-only`: restart only `compute`, `candles`, `ingest-options`, and `ingest-equities`
+- `--fast`: when no explicit scope flag is provided, native deploys now default to `--workers-only`
 - `--no-build`: skip `bun install --frozen-lockfile` and skip the web build step
 
-## Current status
+## Edge-cutover guardrail
 
-On the current live VPS, native deploys should be treated as opt-in infrastructure work, not the default rollout path. Before a native deploy can succeed there, all of the following must be true at the same time:
-
-- Bun is installed on the host.
-- The selected `systemctl` command works non-interactively.
-- Islandflow systemd units exist for the requested scope.
-- Host-native services can reach the intended NATS, ClickHouse, and Redis endpoints.
-- If `web` or `api` move native, the reverse proxy topology is updated deliberately.
-
-Until that is prepared intentionally, prefer:
+Native deploys that touch the public web or API edge are intentionally blocked unless you acknowledge cutover readiness:
 
 ```bash
-./deploy main --runtime docker
-./deploy current-branch --runtime docker
+export DEPLOY_NATIVE_EDGE_READY=1
 ```
 
-## Server preparation checklist
+Without that variable, these commands are refused:
 
-Before the first native rollout, ensure the VPS has:
+- `./deploy main --runtime native`
+- `./deploy main --runtime native --web-only`
+- `./deploy main --runtime native --api-only`
+- `./deploy main --runtime native --services-only`
 
-1. Bun installed and on `PATH`
-2. a working `/home/delta/islandflow/.env` (or unit-managed equivalent env source)
-3. systemd units for each target service
-4. the web unit configured to serve the built app on port `3000`
-5. the API unit configured to serve health checks on port `4000`
-6. infrastructure endpoints configured so the native services can reach NATS, ClickHouse, and Redis
+This keeps the native path focused on safe worker iteration until proxy routing and public unit ownership are switched deliberately.
 
-## Verification
+## Running deploy from the VPS itself
 
-Native deploys verify:
+If you run `./deploy` from `/home/delta/islandflow` on the live server, the deploy helper now executes the remote steps locally instead of SSHing back into the same machine.
 
-- target units are active via `systemctl`
-- recent unit status and journal output can be collected
-- local `http://127.0.0.1:4000/health` when API scope is included
-- local `http://127.0.0.1:3000/` when web scope is included
-- the public app URL from the local machine after the rollout finishes
+That means:
 
-## Rollback
+- no SSH key is required for on-server deploy execution
+- timing and verification behavior stay the same
+- you can still force SSH with `DEPLOY_FORCE_SSH=1`
+- you can override the SSH key path with `DEPLOY_SSH_KEY_PATH=/path/to/key`
 
-Rollback remains manual for now:
+## Validation matrix
 
-1. switch the server checkout back to the last known-good branch or commit
-2. rerun the appropriate native deploy command
-3. if needed, restart only the affected units with `systemctl`
+| Area | Native workers-only | Native edge cutover |
+| --- | --- | --- |
+| Bun installed | required | required |
+| `systemctl --user` works | required | required |
+| Islandflow user units installed | worker units only | all units |
+| Host access to NATS/ClickHouse/Redis | required | required |
+| Proxy routes updated for `/prints`, `/history`, `/replay`, `/nbbo`, `/ws`, `/flow`, `/candles` | not required | required |
+| Public app check | not required | required |
+| Public API route suite | not required | required |
 
-Docker remains the fallback and currently recommended runtime during the transition:
+## Staged cutover plan
+
+1. **Stage 1: native workers only**
+   - install user units
+   - validate `./deployment/native/check-native-health.sh workers`
+   - use `./deploy main --runtime native --fast`
+2. **Stage 2: native API behind local-only verification**
+   - start `islandflow-api.service`
+   - confirm `curl http://127.0.0.1:4000/health`
+   - do not switch public routing yet
+3. **Stage 3: deliberate public edge cutover**
+   - update proxy routing to native `web`/`api`
+   - export `DEPLOY_NATIVE_EDGE_READY=1`
+   - run full native deploy
+   - validate `bun run scripts/check-public-api-routes.ts https://flow.deltaisland.io`
+4. **Stage 4: decide final default runtime**
+   - keep Docker as fallback until native edge has proven stable
+
+## Recommended current commands
+
+Fast backend iteration before edge cutover:
+
+```bash
+export DEPLOY_NATIVE_SYSTEMCTL_PREFIX="systemctl --user"
+./deploy main --runtime native --fast
+```
+
+Supported production path today:
 
 ```bash
 ./deploy main --runtime docker
