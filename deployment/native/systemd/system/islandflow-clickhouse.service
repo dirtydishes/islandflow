@@ -1,0 +1,17 @@
+[Unit]
+Description=Islandflow ClickHouse
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/env clickhouse-server --config-file=/etc/clickhouse-server/config.xml
+Restart=always
+RestartSec=5
+User=clickhouse
+Group=clickhouse
+StateDirectory=clickhouse
+LimitNOFILE=262144
+
+[Install]
+WantedBy=multi-user.target

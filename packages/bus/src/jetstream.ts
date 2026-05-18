@@ -9,7 +9,9 @@ import {
   type StreamUpdateConfig,
   JSONCodec,
   type JsMsg,
-  createInbox
+  createInbox,
+  nanos,
+  millis
 } from "nats";
 import { getKnownStreamDefinitions, getStreamDefinition, type StreamRetentionClass } from "./streams";
 
@@ -164,13 +166,13 @@ export const resolveStreamRetention = (
 ): Pick<StreamConfig, "max_bytes" | "max_age"> => {
   if (streamClass === "raw") {
     return {
-      max_age: parseBoundedNumber(env.STREAM_RAW_MAX_AGE_MS, 3_600_000),
+      max_age: nanos(parseBoundedNumber(env.STREAM_RAW_MAX_AGE_MS, 3_600_000)),
       max_bytes: parseBoundedNumber(env.STREAM_RAW_MAX_BYTES, 536_870_912)
     };
   }
 
   return {
-    max_age: parseBoundedNumber(env.STREAM_DERIVED_MAX_AGE_MS, 43_200_000),
+    max_age: nanos(parseBoundedNumber(env.STREAM_DERIVED_MAX_AGE_MS, 43_200_000)),
     max_bytes: parseBoundedNumber(env.STREAM_DERIVED_MAX_BYTES, 268_435_456)
   };
 };
@@ -417,7 +419,7 @@ const formatBytes = (value: number): string => {
 };
 
 const formatRetentionSummary = (config: StreamConfig): string => {
-  return `age=${formatDurationMs(Number(config.max_age))} bytes=${formatBytes(config.max_bytes)} replicas=${config.num_replicas} retention=${config.retention} discard=${config.discard}`;
+  return `age=${formatDurationMs(millis(Number(config.max_age)))} bytes=${formatBytes(config.max_bytes)} replicas=${config.num_replicas} retention=${config.retention} discard=${config.discard}`;
 };
 
 const formatReportLine = (
@@ -442,12 +444,12 @@ const formatReportLine = (
       const details = report.retentionDrift
         .map((delta) => {
           const desiredValue = delta.field === "max_age"
-            ? formatDurationMs(Number(delta.desired))
+            ? formatDurationMs(millis(Number(delta.desired)))
             : delta.field === "max_bytes"
               ? formatBytes(Number(delta.desired))
               : formatStructuredValue(delta.desired);
           const currentValue = delta.field === "max_age"
-            ? formatDurationMs(Number(delta.current))
+            ? formatDurationMs(millis(Number(delta.current)))
             : delta.field === "max_bytes"
               ? formatBytes(Number(delta.current))
               : formatStructuredValue(delta.current);

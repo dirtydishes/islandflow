@@ -138,6 +138,7 @@ const DeliverPolicySchema = z.enum(["new", "all", "last", "last_per_subject"]);
 
 const envSchema = z.object({
   API_PORT: z.coerce.number().int().positive().default(4000),
+  API_HOST: z.string().min(1).default("127.0.0.1"),
   NATS_URL: z.string().default("nats://127.0.0.1:4222"),
   CLICKHOUSE_URL: z.string().default("http://127.0.0.1:8123"),
   CLICKHOUSE_DATABASE: z.string().default("default"),
@@ -1313,6 +1314,7 @@ const run = async () => {
   };
 
   const server = Bun.serve<WsData | LiveWsData>({
+    hostname: env.API_HOST,
     port: env.API_PORT,
     fetch: async (req: Request, serverRef: any) => {
       const url = new URL(req.url);
@@ -1995,7 +1997,7 @@ const run = async () => {
     }
   });
 
-  logger.info("api listening", { port: server.port });
+  logger.info("api listening", { host: env.API_HOST, port: server.port });
 
   const shutdown = async (signal: string) => {
     if (state.shutdownPromise) {

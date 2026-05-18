@@ -9,12 +9,14 @@ This directory documents the host-native Islandflow rollout path used by:
 
 ## Current operating model
 
-Native runtime is now intended for **fast iterative backend deploys first**, while Docker remains the supported public production edge until a deliberate cutover is completed.
+Native runtime is now intended for a phased VPS cutover. Docker remains the supported rollback runtime, but Docker and native app services must not own the same Islandflow scope at the same time because the workers and API use durable JetStream consumers.
 
 Today, the recommended split is:
 
-- **Docker runtime** for the live public `web` + `api` path
-- **Native runtime** for worker-only iteration (`compute`, `candles`, `ingest-options`, `ingest-equities`)
+- **Nginx Proxy Manager** remains the public `:80/:443` edge
+- **Native system services** own NATS, Redis, and ClickHouse after infra cutover
+- **Native user services** own `web`, `api`, and workers after app cutover
+- **Docker Compose** remains available as the rollback runtime
 - local development stays:
   - Docker infra: `bun run dev:infra`
   - native backend services: `bun run dev:services`
@@ -46,6 +48,38 @@ The plan assumptions were audited on the VPS:
 That means native worker deploy support is now provisioned on the host, but native runtime should still be enabled scope-by-scope rather than started wholesale.
 
 ## Checked-in native ops assets
+
+### Infra system units
+
+Checked-in system service units and config live under:
+
+- `deployment/native/systemd/system/islandflow-nats.service`
+- `deployment/native/systemd/system/islandflow-redis.service`
+- `deployment/native/systemd/system/islandflow-clickhouse.service`
+- `deployment/native/config/redis.conf`
+- `deployment/native/config/clickhouse-listen.xml`
+
+Install and start them on the VPS with:
+
+```bash
+./deployment/native/bootstrap-infra.sh
+```
+
+Or install and start manually:
+
+```bash
+sudo ./deployment/native/install-infra-units.sh
+sudo ./deployment/native/start-infra.sh
+./deployment/native/check-native-infra.sh
+```
+
+The native infra services bind to loopback and use stable host data paths:
+
+- NATS JetStream: `/var/lib/islandflow/nats`
+- Redis: `/var/lib/islandflow/redis`
+- ClickHouse: `/var/lib/islandflow/clickhouse`
+
+The Docker fallback compose file uses the same `ISLANDFLOW_DATA_ROOT` default of `/var/lib/islandflow`, so rollback can preserve durable state when only one runtime is active.
 
 ### User unit templates
 
@@ -89,9 +123,28 @@ Install script behavior:
 
 This validates:
 
+- native infra health for `full`, `api`, `services`, and `workers`
 - `systemctl --user is-active` for the selected units
 - local API health at `http://127.0.0.1:4000/health` when API scope is included
 - local web health at `http://127.0.0.1:3000/` when web scope is included
+
+### App cutover and edge switch helpers
+
+```bash
+./deployment/native/cutover.sh full
+./deployment/native/switch-npm-edge.sh native
+./deployment/native/full-rollback.sh
+```
+
+The edge switch helper updates the Nginx Proxy Manager database entries for `flow.deltaisland.io` and `api.flow.deltaisland.io`, preserving the same-origin Islandflow API location matcher:
+
+```nginx
+^/(ws|replay|prints|joins|nbbo|dark|flow|candles|history)/
+```
+
+For native cutover, the helper targets the NPM bridge gateway IP by default, not `host.docker.internal`. NPM generates `proxy_pass` with a runtime-resolved `$server` variable, so Docker's `/etc/hosts` alias is not sufficient for these proxy hosts. On the current VPS that native target resolves to `172.18.0.1`, which reaches the host-native `3000` and `4000` listeners from the NPM container.
+
+Switching back to Docker restores upstreams to the Compose service names `web:3000` and `api:4000`.
 
 ### Rollback helper
 
@@ -184,7 +237,7 @@ Without that variable, these commands are refused:
 - `./deploy main --runtime native --api-only`
 - `./deploy main --runtime native --services-only`
 
-This keeps the native path focused on safe worker iteration until proxy routing and public unit ownership are switched deliberately.
+This keeps native app ownership explicit until infra, app health, and proxy routing are switched deliberately.
 
 ## Running deploy from the VPS itself
 

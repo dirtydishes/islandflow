@@ -6,8 +6,10 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=/home/delta/islandflow
+Environment=WEB_HOST=0.0.0.0
+Environment=WEB_PORT=3000
 EnvironmentFile=/home/delta/islandflow/.env
-ExecStart=/home/delta/.bun/bin/bun --cwd apps/web run start
+ExecStart=/bin/sh -lc 'cd /home/delta/islandflow/apps/web && exec /home/delta/.bun/bin/bun x next start -H "$WEB_HOST" -p "$WEB_PORT"'
 Restart=always
 RestartSec=2
 KillSignal=SIGINT

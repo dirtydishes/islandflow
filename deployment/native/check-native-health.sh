@@ -2,6 +2,7 @@
 set -euo pipefail
 
 scope="${1:-full}"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 units=()
 
 case "$scope" in
@@ -24,6 +25,12 @@ case "$scope" in
     echo "Unknown scope: $scope" >&2
     echo "Expected one of: full, web, api, services, workers" >&2
     exit 1
+    ;;
+esac
+
+case "$scope" in
+  full|api|services|workers)
+    "$repo_root/deployment/native/check-native-infra.sh"
     ;;
 esac
 

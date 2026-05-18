@@ -59,4 +59,4 @@ COPY --from=build /app/packages ./packages
 
 EXPOSE 3000
 
-CMD ["bun", "run", "--cwd", "apps/web", "start"]
+CMD ["bun", "run", "--cwd", "apps/web", "start", "--", "-H", "0.0.0.0", "-p", "3000"]
