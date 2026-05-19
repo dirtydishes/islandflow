@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 type DeployMode = "main" | "current-branch";
 type DeployRuntime = "docker" | "native";
-type DeployScope = "full" | "web" | "api" | "services";
+type DeployScope = "full" | "web" | "api" | "services" | "workers";
 
 type DeployOptions = {
   mode: DeployMode;
@@ -18,10 +18,18 @@ type DeployOptions = {
   noBuild: boolean;
 };
 
+type PhaseTiming = {
+  name: string;
+  durationMs: number;
+};
+
 const REMOTE_HOST = "delta@152.53.80.229";
 const REMOTE_REPO = "/home/delta/islandflow";
 const REMOTE_DOCKER_DEPLOYMENT = "/home/delta/islandflow/deployment/docker";
-const SSH_KEY = path.join(process.env.HOME ?? "", ".ssh", "delta_ed25519");
+const SSH_KEY =
+  process.env.DEPLOY_SSH_KEY_PATH?.trim() ||
+  path.join(process.env.HOME ?? "", ".ssh", "delta_ed25519");
+const DEPLOY_FORCE_SSH = process.env.DEPLOY_FORCE_SSH?.trim() === "1";
 const SSH_OPTIONS = [
   "-i",
   SSH_KEY,
@@ -38,6 +46,7 @@ const PUBLIC_APP_URL =
 const PUBLIC_API_HEALTH_URL =
   process.env.DEPLOY_PUBLIC_API_HEALTH_URL?.trim() || null;
 const DEPLOY_GIT_REMOTE_OVERRIDE = process.env.DEPLOY_GIT_REMOTE?.trim() || null;
+const DEPLOY_NATIVE_EDGE_READY = process.env.DEPLOY_NATIVE_EDGE_READY?.trim() === "1";
 const NATIVE_SYSTEMCTL_PREFIX =
   process.env.DEPLOY_NATIVE_SYSTEMCTL_PREFIX?.trim() || "sudo -n systemctl";
 const NATIVE_UNITS = {
@@ -68,15 +77,22 @@ const DOCKER_BACKEND_SERVICES = [
   "ingest-equities",
   "ingest-news"
 ] as const;
+const DOCKER_WORKER_SERVICES = [
+  "compute",
+  "candles",
+  "ingest-options",
+  "ingest-equities"
+] as const;
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(scriptPath), "..");
+const isLocalServerExecution = !DEPLOY_FORCE_SSH && repoRoot === REMOTE_REPO;
 
 function usage(exitCode = 1): never {
   console.error(`Usage:
-  ./deploy main [--runtime docker|native] [--web-only|--api-only|--services-only] [--fast] [--no-build] [--force-recreate]
-  ./deploy current-branch [--runtime docker|native] [--web-only|--api-only|--services-only] [--fast] [--no-build] [--force-recreate]
-  ./deploy current branch [--runtime docker|native] [--web-only|--api-only|--services-only] [--fast] [--no-build] [--force-recreate]
+  ./deploy main [--runtime docker|native] [--web-only|--api-only|--services-only|--workers-only] [--fast] [--no-build] [--force-recreate]
+  ./deploy current-branch [--runtime docker|native] [--web-only|--api-only|--services-only|--workers-only] [--fast] [--no-build] [--force-recreate]
+  ./deploy current branch [--runtime docker|native] [--web-only|--api-only|--services-only|--workers-only] [--fast] [--no-build] [--force-recreate]
 
 Modes:
   main            Deploy <remote>/main to the live server checkout.
@@ -91,18 +107,22 @@ Scopes:
   --web-only      Deploy only the Next.js web surface.
   --api-only      Deploy only the API service.
   --services-only Deploy API + backend services without the web service.
+  --workers-only  Deploy compute/candles/ingest workers without touching web or API.
 
 Options:
   --runtime <name>     Explicit runtime selector (docker or native).
-  --fast               Prefer a quicker rollout profile (defaults full scope to --services-only and skips public API route suite).
+  --fast               Prefer a quicker rollout profile (defaults full scope to --services-only for docker and --workers-only for native, and skips the public API route suite when API scope is included).
   --no-build           Skip docker image builds or native bun install/web build steps.
   --force-recreate     Docker-only escalation path for docker compose when a normal refresh is not enough.
   --help               Show this help text.
 
 Environment:
   DEPLOY_GIT_REMOTE                Override git remote used for deploy fetch/pull/push (auto-detected by default).
+  DEPLOY_SSH_KEY_PATH              Override the SSH key used for remote execution.
+  DEPLOY_FORCE_SSH                 Set to 1 to force SSH even when running from the live server checkout.
   DEPLOY_PUBLIC_APP_URL             Override the public app URL (default: https://flow.deltaisland.io).
   DEPLOY_PUBLIC_API_HEALTH_URL      Optional separate public API health URL for two-origin deployments.
+  DEPLOY_NATIVE_EDGE_READY          Set to 1 to allow native rollouts that include the public web or API edge.
   DEPLOY_NATIVE_SYSTEMCTL_PREFIX    Override systemctl invocation for native rollouts (default: sudo -n systemctl).
   DEPLOY_NATIVE_WEB_UNIT            Override native web systemd unit name.
   DEPLOY_NATIVE_API_UNIT            Override native api systemd unit name.
@@ -116,6 +136,32 @@ Environment:
 
 function section(title: string): void {
   console.log(`\n== ${title} ==`);
+}
+
+function formatDuration(durationMs: number): string {
+  if (durationMs < 1000) {
+    return `${durationMs}ms`;
+  }
+
+  return `${(durationMs / 1000).toFixed(2)}s`;
+}
+
+function timedPhase<T>(timings: PhaseTiming[], name: string, fn: () => T): T {
+  const startedAt = Date.now();
+  try {
+    return fn();
+  } finally {
+    timings.push({ name, durationMs: Date.now() - startedAt });
+  }
+}
+
+function printTimingSummary(timings: PhaseTiming[]): void {
+  section("Deploy Timings");
+  const totalMs = timings.reduce((sum, timing) => sum + timing.durationMs, 0);
+  for (const timing of timings) {
+    console.log(`[deploy] ${timing.name}: ${formatDuration(timing.durationMs)}`);
+  }
+  console.log(`[deploy] total: ${formatDuration(totalMs)}`);
 }
 
 function formatCommand(command: string, args: string[]): string {
@@ -184,6 +230,23 @@ function runRemoteScript(
   args: string[] = []
 ): void {
   section(title);
+
+  if (isLocalServerExecution) {
+    const localArgs = ["-s", "--", ...args];
+    console.log(`$ ${formatCommand("bash", localArgs)}    # local server execution`);
+    const result = spawnSync("bash", localArgs, {
+      cwd: repoRoot,
+      input: script,
+      encoding: "utf8",
+      stdio: ["pipe", "inherit", "inherit"]
+    });
+
+    if (result.status !== 0) {
+      process.exit(result.status ?? 1);
+    }
+    return;
+  }
+
   const sshArgs = [...SSH_OPTIONS, REMOTE_HOST, "bash", "-s", "--", ...args];
   console.log(`$ ${formatCommand("ssh", sshArgs)}`);
   const result = spawnSync("ssh", sshArgs, {
@@ -225,11 +288,14 @@ function parseScope(rawArgs: string[]): DeployScope {
   const scopes = [
     rawArgs.includes("--web-only") ? "web" : null,
     rawArgs.includes("--api-only") ? "api" : null,
-    rawArgs.includes("--services-only") ? "services" : null
+    rawArgs.includes("--services-only") ? "services" : null,
+    rawArgs.includes("--workers-only") ? "workers" : null
   ].filter((value): value is Exclude<DeployScope, "full"> => value !== null);
 
   if (scopes.length > 1) {
-    console.error("Choose only one deploy scope flag: --web-only, --api-only, or --services-only.");
+    console.error(
+      "Choose only one deploy scope flag: --web-only, --api-only, --services-only, or --workers-only."
+    );
     process.exit(1);
   }
 
@@ -254,6 +320,7 @@ function parseArgs(rawArgs: string[]): DeployOptions {
       arg !== "--web-only" &&
       arg !== "--api-only" &&
       arg !== "--services-only" &&
+      arg !== "--workers-only" &&
       arg !== "--runtime" &&
       rawArgs[index - 1] !== "--runtime" &&
       !arg.startsWith("--runtime=")
@@ -286,8 +353,13 @@ function parseArgs(rawArgs: string[]): DeployOptions {
 }
 
 function assertSshKeyExists(): void {
+  if (isLocalServerExecution) {
+    return;
+  }
+
   if (!existsSync(SSH_KEY)) {
     console.error(`Missing SSH key: ${SSH_KEY}`);
+    console.error("Set DEPLOY_SSH_KEY_PATH or run from the live server checkout without DEPLOY_FORCE_SSH.");
     process.exit(1);
   }
 }
@@ -402,14 +474,16 @@ function describeScope(scope: DeployScope): string {
       return "api only";
     case "services":
       return "api + backend services";
+    case "workers":
+      return "worker services only";
     default:
       return "full stack";
   }
 }
 
-function effectiveScope(scope: DeployScope, fast: boolean): DeployScope {
+function effectiveScope(scope: DeployScope, runtime: DeployRuntime, fast: boolean): DeployScope {
   if (fast && scope === "full") {
-    return "services";
+    return runtime === "native" ? "workers" : "services";
   }
   return scope;
 }
@@ -422,6 +496,10 @@ function scopeIncludesApi(scope: DeployScope): boolean {
   return scope === "full" || scope === "api" || scope === "services";
 }
 
+function scopeTouchesPublicEdge(scope: DeployScope): boolean {
+  return scopeIncludesWeb(scope) || scopeIncludesApi(scope);
+}
+
 function dockerServicesForScope(scope: DeployScope): string[] {
   switch (scope) {
     case "web":
@@ -430,6 +508,8 @@ function dockerServicesForScope(scope: DeployScope): string[] {
       return ["api"];
     case "services":
       return [...DOCKER_BACKEND_SERVICES];
+    case "workers":
+      return [...DOCKER_WORKER_SERVICES];
     default:
       return [];
   }
@@ -452,6 +532,8 @@ function dockerLogServicesForScope(scope: DeployScope): string[] {
       return ["api"];
     case "services":
       return [...DOCKER_BACKEND_SERVICES];
+    case "workers":
+      return [...DOCKER_WORKER_SERVICES];
     default:
       return [...DOCKER_CORE_SERVICES];
   }
@@ -471,6 +553,13 @@ function nativeUnitsForScope(scope: DeployScope): string[] {
         NATIVE_UNITS.ingestOptions,
         NATIVE_UNITS.ingestEquities,
         NATIVE_UNITS.ingestNews
+      ];
+    case "workers":
+      return [
+        NATIVE_UNITS.compute,
+        NATIVE_UNITS.candles,
+        NATIVE_UNITS.ingestOptions,
+        NATIVE_UNITS.ingestEquities
       ];
     default:
       return [
@@ -500,19 +589,46 @@ function localDockerWorkspaceSnapshotPrecheck(): void {
   }
 }
 
-function localRuntimePrecheck(runtime: DeployRuntime, noBuild: boolean): void {
+function assertNativeEdgeReady(scope: DeployScope): void {
+  if (!scopeTouchesPublicEdge(scope) || DEPLOY_NATIVE_EDGE_READY) {
+    return;
+  }
+
+  console.error(
+    "Refusing native deploy that touches public web/API scope before edge cutover is acknowledged."
+  );
+  console.error(
+    "Set DEPLOY_NATIVE_EDGE_READY=1 only after proxy routing and native units for the public edge are intentionally prepared."
+  );
+  console.error(
+    "For fast iterative backend deploys before cutover, use --runtime native --workers-only or --runtime native --fast."
+  );
+  process.exit(1);
+}
+
+function localRuntimePrecheck(runtime: DeployRuntime, scope: DeployScope, noBuild: boolean): void {
   if (runtime === "docker" && !noBuild) {
     localDockerWorkspaceSnapshotPrecheck();
+    return;
+  }
+
+  if (runtime === "native") {
+    assertNativeEdgeReady(scope);
   }
 }
 
-function localMainPrecheck(remote: string, runtime: DeployRuntime, noBuild: boolean): void {
+function localMainPrecheck(
+  remote: string,
+  runtime: DeployRuntime,
+  scope: DeployScope,
+  noBuild: boolean
+): void {
   section("Local Precheck");
   runChecked("git", ["fetch", remote]);
   runChecked("git", ["status", "--short", "--branch"]);
   runChecked("git", ["rev-parse", "--verify", "HEAD"]);
   runChecked("git", ["rev-parse", `${remote}/main`]);
-  localRuntimePrecheck(runtime, noBuild);
+  localRuntimePrecheck(runtime, scope, noBuild);
 }
 
 function currentBranchName(): string {
@@ -528,6 +644,7 @@ function localBranchPrecheck(
   remote: string,
   branch: string,
   runtime: DeployRuntime,
+  scope: DeployScope,
   noBuild: boolean
 ): void {
   section("Local Precheck");
@@ -543,7 +660,7 @@ function localBranchPrecheck(
     process.exit(1);
   }
 
-  localRuntimePrecheck(runtime, noBuild);
+  localRuntimePrecheck(runtime, scope, noBuild);
 }
 
 function publishCurrentBranch(remote: string, branch: string): void {
@@ -809,6 +926,10 @@ function remoteNativeVerification(scope: DeployScope, fast: boolean): void {
   const units = nativeUnitsForScope(scope).map((value) => shellEscape(value)).join(" ");
   const checks: string[] = [];
 
+  if (scope === "full" || scope === "api" || scope === "services" || scope === "workers") {
+    checks.push("./deployment/native/check-native-infra.sh");
+  }
+
   if (scopeIncludesApi(scope)) {
     checks.push('curl -fksS http://127.0.0.1:4000/health');
   }
@@ -843,10 +964,10 @@ function remoteVerification(runtime: DeployRuntime, scope: DeployScope, fast: bo
 
 function publicVerification(scope: DeployScope, fast: boolean): void {
   section("Public Verification");
-  if (!fast || scopeIncludesWeb(scope)) {
+  if (scopeIncludesWeb(scope)) {
     runChecked("curl", ["-I", "-fksS", PUBLIC_APP_URL]);
   } else {
-    console.log("[deploy] Fast mode: skipping public app HEAD check because web scope is not included.");
+    console.log("[deploy] Skipping public app HEAD check because web scope is not included.");
   }
 
   if (scopeIncludesApi(scope) && PUBLIC_API_HEALTH_URL) {
@@ -867,7 +988,8 @@ function publicVerification(scope: DeployScope, fast: boolean): void {
 
 function main(): void {
   const options = parseArgs(process.argv.slice(2));
-  const scope = effectiveScope(options.scope, options.fast);
+  const scope = effectiveScope(options.scope, options.runtime, options.fast);
+  const timings: PhaseTiming[] = [];
   const currentBranch = options.mode === "current-branch" ? currentBranchName() : null;
   const deployRemote = resolveDeployRemote(options.mode, currentBranch);
   assertSshKeyExists();
@@ -878,22 +1000,33 @@ function main(): void {
       `via ${describeRuntime(options.runtime)} (${describeScope(scope)}${options.fast ? ", fast mode" : ""}).`
   );
   console.log(`[deploy] Using git remote: ${deployRemote}`);
+  console.log(
+    `[deploy] Execution mode: ${isLocalServerExecution ? "local server checkout" : `ssh to ${REMOTE_HOST}`}`
+  );
   if (options.fast && options.scope === "full") {
-    console.log("[deploy] Fast mode changed default full scope to --services-only.");
+    console.log(
+      `[deploy] Fast mode changed default full scope to ${options.runtime === "native" ? "--workers-only" : "--services-only"}.`
+    );
   }
 
   if (options.mode === "main") {
-    localMainPrecheck(deployRemote, options.runtime, options.noBuild);
-    remoteGitPrecheck();
-    remoteRuntimePrecheck(options.runtime, scope);
-    remoteRollout(
-      options.mode,
-      deployRemote,
-      options.runtime,
-      null,
-      scope,
-      options.forceRecreate,
-      options.noBuild
+    timedPhase(timings, "local precheck", () =>
+      localMainPrecheck(deployRemote, options.runtime, scope, options.noBuild)
+    );
+    timedPhase(timings, "remote git precheck", () => remoteGitPrecheck());
+    timedPhase(timings, "remote runtime precheck", () =>
+      remoteRuntimePrecheck(options.runtime, scope)
+    );
+    timedPhase(timings, "remote rollout", () =>
+      remoteRollout(
+        options.mode,
+        deployRemote,
+        options.runtime,
+        null,
+        scope,
+        options.forceRecreate,
+        options.noBuild
+      )
     );
   } else {
     const branch = currentBranch;
@@ -901,23 +1034,34 @@ function main(): void {
       console.error("Unable to resolve current branch for current-branch deploy mode.");
       process.exit(1);
     }
-    localBranchPrecheck(deployRemote, branch, options.runtime, options.noBuild);
-    publishCurrentBranch(deployRemote, branch);
-    remoteGitPrecheck();
-    remoteRuntimePrecheck(options.runtime, scope);
-    remoteRollout(
-      options.mode,
-      deployRemote,
-      options.runtime,
-      branch,
-      scope,
-      options.forceRecreate,
-      options.noBuild
+    timedPhase(timings, "local precheck", () =>
+      localBranchPrecheck(deployRemote, branch, options.runtime, scope, options.noBuild)
+    );
+    timedPhase(timings, "local publish", () => publishCurrentBranch(deployRemote, branch));
+    timedPhase(timings, "remote git precheck", () => remoteGitPrecheck());
+    timedPhase(timings, "remote runtime precheck", () =>
+      remoteRuntimePrecheck(options.runtime, scope)
+    );
+    timedPhase(timings, "remote rollout", () =>
+      remoteRollout(
+        options.mode,
+        deployRemote,
+        options.runtime,
+        branch,
+        scope,
+        options.forceRecreate,
+        options.noBuild
+      )
     );
   }
 
-  remoteVerification(options.runtime, scope, options.fast);
-  publicVerification(scope, options.fast);
+  timedPhase(timings, "remote verification", () =>
+    remoteVerification(options.runtime, scope, options.fast)
+  );
+  timedPhase(timings, "public verification", () =>
+    publicVerification(scope, options.fast)
+  );
+  printTimingSummary(timings);
 }
 
 main();

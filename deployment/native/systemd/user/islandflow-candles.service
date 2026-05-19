@@ -1,0 +1,17 @@
+[Unit]
+Description=Islandflow candles
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/delta/islandflow
+EnvironmentFile=/home/delta/islandflow/.env
+ExecStart=/home/delta/.bun/bin/bun services/candles/src/index.ts
+Restart=always
+RestartSec=2
+KillSignal=SIGINT
+TimeoutStopSec=20
+
+[Install]
+WantedBy=default.target

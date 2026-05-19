@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Reconcile PR Conflicts</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: oklch(13% 0.018 252);
+        --panel: oklch(18% 0.022 248);
+        --panel-2: oklch(22% 0.026 248);
+        --line: oklch(72% 0.03 248 / 0.18);
+        --text: oklch(93% 0.012 248);
+        --muted: oklch(72% 0.025 248);
+        --faint: oklch(58% 0.025 248);
+        --amber: oklch(78% 0.16 72);
+        --green: oklch(73% 0.16 154);
+        --blue: oklch(70% 0.14 245);
+        --red: oklch(68% 0.18 32);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+        line-height: 1.55;
+      }
+
+      main {
+        width: min(1120px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 48px 0 72px;
+      }
+
+      header {
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 28px;
+        margin-bottom: 28px;
+      }
+
+      .eyebrow,
+      h1,
+      h2,
+      code,
+      pre {
+        font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .eyebrow {
+        color: var(--amber);
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 10px 0 12px;
+        font-size: clamp(2rem, 4vw, 3.2rem);
+        line-height: 1.06;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        margin: 0 0 12px;
+        font-size: 1rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      p {
+        max-width: 76ch;
+        margin: 0 0 12px;
+      }
+
+      a {
+        color: var(--blue);
+      }
+
+      section {
+        padding: 24px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 8px;
+      }
+
+      .summary {
+        color: var(--muted);
+        font-size: 1.05rem;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 12px;
+        margin-top: 14px;
+      }
+
+      .tile {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px;
+      }
+
+      .tile strong {
+        display: block;
+        margin-bottom: 6px;
+      }
+
+      code {
+        color: var(--text);
+        background: oklch(100% 0 0 / 0.06);
+        border: 1px solid oklch(100% 0 0 / 0.08);
+        border-radius: 6px;
+        padding: 0.08rem 0.28rem;
+      }
+
+      pre {
+        overflow: auto;
+        background: var(--panel-2);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px;
+        font-size: 0.86rem;
+      }
+
+      pre code {
+        background: transparent;
+        border: 0;
+        padding: 0;
+      }
+
+      .diff-add {
+        color: var(--green);
+      }
+
+      .diff-del {
+        color: var(--red);
+      }
+
+      .diff-meta {
+        color: var(--faint);
+      }
+
+      .callout {
+        border: 1px solid oklch(78% 0.16 72 / 0.35);
+        background: oklch(78% 0.16 72 / 0.08);
+        border-radius: 8px;
+        padding: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="eyebrow">Turn document • 2026-05-19 18:56 ET</div>
+        <h1>Reconcile PR Conflicts</h1>
+        <p class="summary">
+          Merged <code>forgejo/main</code> into <code>nextjs-upgrade</code>, resolved the checked-in Beads and README conflicts, kept the native deployment work from main, and updated the JetStream tests for the merged nanosecond retention behavior.
+        </p>
+      </header>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          The PR branch now incorporates the current mainline deployment changes while preserving the Next.js upgrade branch. The only hand-edited conflict resolution was in <code>.beads/issues.jsonl</code> and <code>README.md</code>; the rest of the mainline merge applied cleanly.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Resolved <code>.beads/issues.jsonl</code> by keeping issue records from both sides of the merge.</li>
+          <li>Resolved the README deployment workflow section by combining the branch’s command-oriented guidance with main’s newer worker-only, local-server, and native edge cutover notes.</li>
+          <li>Accepted mainline native deployment assets, Docker deployment refinements, API host binding support, deploy timing output, and worker-only deployment scope.</li>
+          <li>Adjusted <code>packages/bus/tests/jetstream.test.ts</code> so retention assertions expect NATS nanoseconds after the merged runtime change.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          The branch was clean before the merge, but Forgejo reported PR conflicts against <code>main</code>. Reproducing the merge locally showed conflicts in the Beads export file and the README deployment section. The automatic merge also brought in mainline native deployment work that touched deploy scripts, Docker deployment files, native systemd templates, public edge documentation, the API host setting, and JetStream retention units.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <div class="grid">
+          <div class="tile">
+            <strong>README resolution</strong>
+            <p>Kept Docker as the recommended VPS path, preserved explicit deploy commands, and added <code>--workers-only</code>, local server execution, and native worker iteration guidance.</p>
+          </div>
+          <div class="tile">
+            <strong>Beads resolution</strong>
+            <p>Removed conflict markers without dropping either branch’s issue records, so Beads history remains complete.</p>
+          </div>
+          <div class="tile">
+            <strong>Test repair</strong>
+            <p>Main now stores JetStream <code>max_age</code> in nanoseconds via NATS helpers. Tests now assert against <code>nanos(...)</code> instead of raw millisecond values.</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p>
+          Diff snippets are presented in the style of <a href="https://diffs.com/docs">diffs.com</a>, using structured additions and deletions for quick review.
+        </p>
+        <pre><code><span class="diff-meta">diff --git a/README.md b/README.md</span>
+<span class="diff-del">- Partial deploys are supported with `--web-only`, `--api-only`, `--services-only`, `--fast`, `--no-build`, and `--force-recreate`.</span>
+<span class="diff-add">+ Partial deploys are supported with `--web-only`, `--api-only`, `--services-only`, `--workers-only`, `--fast`, `--no-build`, and `--force-recreate`.</span>
+<span class="diff-add">+ When run from `/home/delta/islandflow` on the VPS itself, `./deploy` can execute locally instead of SSHing back into the same server.</span>
+<span class="diff-del">- Native deployment expects Bun, systemd units, host-reachable infra, and deliberate reverse-proxy changes. The open follow-up is to add native unit templates and rollback helpers.</span>
+<span class="diff-add">+ Native deployment expects Bun, systemd units, host-reachable infra, and deliberate reverse-proxy changes. Native deploys are intended primarily for worker-only fast iteration until the public edge is cut over deliberately.</span></code></pre>
+
+        <pre><code><span class="diff-meta">diff --git a/packages/bus/tests/jetstream.test.ts b/packages/bus/tests/jetstream.test.ts</span>
+<span class="diff-del">- import type { JetStreamManager, StreamConfig } from "nats";</span>
+<span class="diff-add">+ import { nanos, type JetStreamManager, type StreamConfig } from "nats";</span>
+<span class="diff-del">-       max_age: 3_600_000,</span>
+<span class="diff-add">+       max_age: nanos(3_600_000),</span>
+<span class="diff-del">-       max_age: 43_200_000,</span>
+<span class="diff-add">+       max_age: nanos(43_200_000),</span></code></pre>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <p>
+          The PR should no longer show merge conflicts against main. Users and operators get the Next.js upgrade branch plus the newer deployment safety work from main, including worker-only native deploy guidance and current Docker deployment notes.
+        </p>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li><code>git diff --check</code> passed.</li>
+          <li><code>bun run scripts/deploy.ts --help</code> passed.</li>
+          <li><code>bun run check:docker-workspace</code> passed.</li>
+          <li><code>bun test services/api/tests packages/bus/tests</code> passed with 45 tests.</li>
+          <li><code>bun --cwd=apps/web run build</code> passed on Next.js 16.2.6.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <div class="callout">
+          <p>
+            The first focused test run failed because the merged JetStream implementation correctly returned nanosecond retention values while the existing tests still expected milliseconds. The tests were updated to use the same NATS <code>nanos</code> helper as the runtime behavior, then the suite passed.
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>No new follow-up was created from this reconciliation.</li>
+          <li>Existing deployment follow-ups remain in Beads, including native public edge posture and cutover decisions.</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

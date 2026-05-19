@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>2026-05-18: Native fast iterative deploy</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b1020;
+        --panel: #131a2b;
+        --panel-2: #182237;
+        --text: #eef3ff;
+        --muted: #a7b4d4;
+        --line: #2a3651;
+        --accent: #7dd3fc;
+        --good: #86efac;
+        --warn: #fbbf24;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: linear-gradient(180deg, #060914, var(--bg));
+        color: var(--text);
+        font: 16px/1.6 Inter, system-ui, sans-serif;
+      }
+      main {
+        max-width: 920px;
+        margin: 0 auto;
+        padding: 40px 20px 64px;
+      }
+      section {
+        margin-top: 22px;
+        padding: 22px 24px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      }
+      h1, h2 { line-height: 1.15; }
+      h1 { margin: 0 0 12px; font-size: 2rem; }
+      h2 { margin: 0 0 12px; font-size: 1.15rem; }
+      p, li { color: var(--text); }
+      .meta { color: var(--muted); margin-bottom: 18px; }
+      .lede { color: var(--muted); max-width: 72ch; }
+      code, pre { font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+      code {
+        padding: 0.15rem 0.35rem;
+        border-radius: 8px;
+        background: rgba(125, 211, 252, 0.12);
+        color: var(--accent);
+      }
+      pre {
+        margin: 12px 0 0;
+        padding: 14px 16px;
+        overflow: auto;
+        border-radius: 14px;
+        border: 1px solid var(--line);
+        background: #0a0f1d;
+      }
+      ul { margin: 0; padding-left: 1.2rem; }
+      .good { color: var(--good); }
+      .warn { color: var(--warn); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="meta">Turn document · 2026-05-18 03:29 EDT · Issues: islandflow-9rc, islandflow-38p, islandflow-bsg, islandflow-2db</div>
+      <h1>Native fast iterative deploy</h1>
+      <p class="lede">Implemented the native-first iterative deploy plan by adding deploy timing output, a safe worker-only native fast path, checked-in systemd user units and rollback helpers, server-local deploy execution, and updated live-operational documentation based on a fresh VPS audit.</p>
+
+      <section>
+        <h2>Summary</h2>
+        <p>The deploy flow now supports a safer native worker iteration model without requiring public edge cutover first. It can run directly from the VPS checkout without SSH, emits phase timings, includes checked-in native unit files plus install/rollback/smoke-test helpers, and documents the staged cutover path. During live audit, the previously reported <code>/replay/options</code> proxy issue and duplicate <code>islandflow</code> compose stack were both confirmed resolved on the host.</p>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Extended <code>scripts/deploy.ts</code> with deploy timing summaries for precheck, rollout, and verification phases.</li>
+          <li>Added <code>--workers-only</code> deploy scope for Docker and native runtimes.</li>
+          <li>Changed native <code>--fast</code> behavior so default full-scope fast deploys become worker-only instead of touching web/API.</li>
+          <li>Added native edge guardrails via <code>DEPLOY_NATIVE_EDGE_READY=1</code> before web/API native deploys are allowed.</li>
+          <li>Added local-server execution mode so <code>./deploy</code> can run from <code>/home/delta/islandflow</code> without SSHing back into the same host.</li>
+          <li>Added <code>DEPLOY_SSH_KEY_PATH</code> and <code>DEPLOY_FORCE_SSH</code> overrides for operators with non-default SSH setups.</li>
+          <li>Checked in native ops assets under <code>deployment/native/</code>:</li>
+          <li><code>install-user-units.sh</code>, <code>check-native-health.sh</code>, <code>rollback.sh</code></li>
+          <li>six user unit files in <code>deployment/native/systemd/user/</code></li>
+          <li>Updated <code>README.md</code>, <code>deployment/docker/README.md</code>, and <code>deployment/native/README.md</code> to document the worker-first model, local execution mode, validation matrix, and staged cutover guidance.</li>
+          <li>Synced <code>deployment/docker/workspace-root/package.json</code> so Docker workspace validation passes again.</li>
+          <li>Installed the checked-in user unit files onto the live VPS in disabled form under <code>~/.config/systemd/user</code>.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>The plan targeted faster deployment iteration while avoiding a premature move of the public edge away from the current Docker + Nginx Proxy Manager topology. The practical target was to make native runtime useful immediately for backend-worker iteration, while leaving web/API cutover deliberate and reversible.</p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <ul>
+          <li>Native fast mode now defaults to <code>--workers-only</code>; Docker fast mode still defaults to <code>--services-only</code>.</li>
+          <li>Native deploys that include public web/API scope now fail fast unless <code>DEPLOY_NATIVE_EDGE_READY=1</code> is set.</li>
+          <li>Running from the live VPS checkout automatically switches deploy execution from SSH mode to local mode.</li>
+          <li>The checked-in native unit files are user units aimed at the current VPS layout: <code>/home/delta/islandflow</code> and <code>/home/delta/.bun/bin/bun</code>.</li>
+          <li><code>install-user-units.sh</code> now installs units safely without enabling anything by default; enabling is explicit and scope-based.</li>
+          <li><code>rollback.sh</code> intentionally uses a detached git ref to make one-off native rollback practical without rewriting branch history.</li>
+        </ul>
+        <pre>export DEPLOY_NATIVE_SYSTEMCTL_PREFIX="systemctl --user"
+./deploy main --runtime native --fast
+# resolves to worker-only native deploy before public edge cutover</pre>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <p>End-users should see indirect benefits first: faster backend iteration, safer operational changes, and clearer rollback paths. Public traffic behavior should remain unchanged until a deliberate native edge cutover is performed.</p>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li class="good">Passed: <code>bun run scripts/check-public-api-routes.ts https://flow.deltaisland.io</code></li>
+          <li class="good">Passed: direct public <code>/replay/options</code> curl returned JSON</li>
+          <li class="good">Passed: live Nginx Proxy Manager config contains <code>/replay</code> in the API route matcher</li>
+          <li class="good">Passed: <code>docker compose ls</code> shows no duplicate <code>islandflow</code> project</li>
+          <li class="good">Passed: <code>bash -n deployment/native/install-user-units.sh deployment/native/check-native-health.sh deployment/native/rollback.sh</code></li>
+          <li class="good">Passed: <code>systemd-analyze verify deployment/native/systemd/user/*.service</code></li>
+          <li class="good">Passed: <code>bun run check:docker-workspace</code> after syncing workspace snapshot</li>
+          <li class="good">Passed: native edge guard refusal for <code>bun run scripts/deploy.ts main --runtime native --web-only --no-build</code></li>
+          <li class="good">Passed: <code>./deployment/native/install-user-units.sh</code> followed by <code>systemctl --user list-unit-files 'islandflow*'</code></li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li><span class="warn">Native units were installed but not enabled or started.</span> This is intentional to avoid conflicting with the current Docker production edge.</li>
+          <li><span class="warn">Public web/API native deploys are still gated.</span> Mitigation: explicit <code>DEPLOY_NATIVE_EDGE_READY=1</code> acknowledgment and staged cutover documentation.</li>
+          <li><span class="warn">Native worker runtime has not yet been exercised live against the existing Docker worker stack.</span> Mitigation: follow-up issue to soak worker-only native units before any default-runtime decision.</li>
+          <li><span class="warn">The known untracked Signal CLI tarball remains in the repo checkout.</span> This is already tolerated by the deploy helper allowlist and was not changed here.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>Open follow-up: <code>islandflow-vvw</code> — stage native public-edge cutover after worker soak.</li>
+          <li>Decide whether native should ever replace Docker as the default runtime only after worker soak data and deliberate edge cutover validation.</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

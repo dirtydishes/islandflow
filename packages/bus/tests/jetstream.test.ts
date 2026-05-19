@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { JetStreamManager, StreamConfig } from "nats";
+import { nanos, type JetStreamManager, type StreamConfig } from "nats";
 import {
   auditStreamConfig,
   buildKnownStreamConfig,
@@ -52,14 +52,14 @@ const buildAllKnownConfigs = (env: Record<string, string | undefined> = {}) => {
 describe("jetstream retention defaults", () => {
   it("resolves raw defaults to 60m and 512 MiB", () => {
     expect(resolveStreamRetention("raw")).toEqual({
-      max_age: 3_600_000,
+      max_age: nanos(3_600_000),
       max_bytes: 536_870_912
     });
   });
 
   it("resolves derived defaults to 12h and 256 MiB", () => {
     expect(resolveStreamRetention("derived")).toEqual({
-      max_age: 43_200_000,
+      max_age: nanos(43_200_000),
       max_bytes: 268_435_456
     });
   });
@@ -71,7 +71,7 @@ describe("jetstream retention defaults", () => {
         STREAM_RAW_MAX_BYTES: "5678"
       })
     ).toEqual({
-      max_age: 1234,
+      max_age: nanos(1234),
       max_bytes: 5678
     });
   });

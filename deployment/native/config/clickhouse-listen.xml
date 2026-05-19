@@ -1,0 +1,6 @@
+<clickhouse>
+  <listen_host>127.0.0.1</listen_host>
+  <path>/var/lib/islandflow/clickhouse/</path>
+  <tmp_path>/var/lib/islandflow/clickhouse/tmp/</tmp_path>
+  <user_files_path>/var/lib/islandflow/clickhouse/user_files/</user_files_path>
+</clickhouse>

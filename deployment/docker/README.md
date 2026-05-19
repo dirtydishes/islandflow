@@ -2,12 +2,12 @@
 
 This directory contains the Docker runtime for Islandflow VPS deployments.
 
-Docker remains the default and recommended server rollout path, but the repo-root `deploy` helper can now target either:
+Docker remains the default rollout path before native cutover and the rollback path after cutover. The repo-root `deploy` helper can target either:
 
 - `--runtime docker` for this Docker Compose stack
-- `--runtime native` for an experimental host-native Bun + systemd rollout described in `deployment/native/README.md`
+- `--runtime native` for the host-native Bun + systemd rollout described in `deployment/native/README.md`
 
-The repo no longer ships or supports a separate `deployment/npm` stack. If you want a reverse proxy, point it at the host ports published by this stack.
+The public VPS edge remains Nginx Proxy Manager. Docker fallback can be reached either through the shared Docker network service names or the host ports published by this stack.
 
 It is separate from the repo-root `docker-compose.yml`, which remains the lightweight local infra stack for development.
 
@@ -17,7 +17,7 @@ Do not run the repo-root `docker-compose.yml` on the VPS. On the live server tha
 
 - Builds and runs the full Islandflow stack with Docker Compose.
 - Publishes `web` and `api` to host ports, bound to loopback by default.
-- Runs ClickHouse, Redis, and NATS JetStream with persistent Docker volumes.
+- Runs ClickHouse, Redis, and NATS JetStream with persistent host data under `ISLANDFLOW_DATA_ROOT`.
 - Runs the core runtime services: `ingest-options`, `ingest-equities`, `compute`, `candles`, `api`, and `web`.
 - Keeps `replay` opt-in through a Compose profile, because the current replay service starts immediately when the container is enabled.
 
@@ -56,6 +56,7 @@ cp .env.example .env
 Important defaults:
 
 - `NATS_URL`, `CLICKHOUSE_URL`, and `REDIS_URL` should stay on the internal container hostnames unless you intentionally split infra out.
+- `ISLANDFLOW_DATA_ROOT=/var/lib/islandflow` matches the native infra data root used by the VPS cutover helpers.
 - `OPTIONS_INGEST_ADAPTER=synthetic` and `EQUITIES_INGEST_ADAPTER=synthetic` are the safest first-boot settings.
 - `WEB_BIND_IP=127.0.0.1` and `API_BIND_IP=127.0.0.1` keep the published ports local to the host by default.
 - `WEB_HOST_PORT=3000` and `API_HOST_PORT=4000` control the host-side published ports.
@@ -213,16 +214,18 @@ BuildKit cache mounts require a modern Docker Engine with Dockerfile frontend su
 
 ## Safe rollouts on `152.53.80.229`
 
-The current live VPS uses Nginx Proxy Manager on the shared Docker network and routes public traffic to the Docker `web` and `api` containers by container name. Because of that, this Docker path remains the operationally correct default for the live server today.
+The current live VPS uses Nginx Proxy Manager as the outer edge. Before native cutover, NPM routes Islandflow traffic to Docker service names. During cutover, `deployment/native/switch-npm-edge.sh native` retargets only the Islandflow proxy hosts to the NPM bridge gateway IP so NPM can reach native host ports. If needed, override the detected target with `ISLANDFLOW_NATIVE_HOST=<host-ip>`.
 
 The deploy helper also warns if it detects a second compose project named `islandflow` on the server, because that usually means the repo-root local-infra stack was started on the VPS by mistake.
 
-The checked-in deploy helper is meant to run from your local repo checkout, not from the VPS shell. It always targets:
+The checked-in deploy helper normally runs from your local repo checkout and targets:
 
 - SSH host: `delta@152.53.80.229`
-- SSH key: `~/.ssh/delta_ed25519`
+- SSH key: `~/.ssh/delta_ed25519` by default
 - Live repo checkout: `/home/delta/islandflow`
 - Live compose directory: `/home/delta/islandflow/deployment/docker`
+
+If you run `./deploy` from `/home/delta/islandflow` on the VPS itself, it now executes the remote steps locally instead of SSHing back into the same machine. You can still force SSH with `DEPLOY_FORCE_SSH=1`, or override the key path with `DEPLOY_SSH_KEY_PATH=/path/to/key`.
 
 It preserves the current Docker Compose project and avoids destructive cleanup on the server.
 
@@ -271,6 +274,7 @@ Examples:
 ./deploy main --runtime docker --web-only
 ./deploy main --runtime docker --api-only
 ./deploy current-branch --runtime docker --services-only
+./deploy main --runtime docker --workers-only
 ./deploy main --runtime docker --fast
 ./deploy main --runtime docker --web-only --no-build
 ```
@@ -280,6 +284,7 @@ Scoped Docker deploys now build only the selected image set and then restart onl
 - `--web-only`: `docker compose build web`, then `docker compose up -d web`
 - `--api-only`: `docker compose build api`, then `docker compose up -d api`
 - `--services-only`: builds and restarts `api`, `compute`, `candles`, `ingest-options`, and `ingest-equities`
+- `--workers-only`: builds and restarts `compute`, `candles`, `ingest-options`, and `ingest-equities` without touching `web` or `api`
 - `--fast`: when no explicit scope flag is given, treats the deploy as `--services-only` and skips the public API route suite for quicker completion. It still runs remote service health checks.
 
 Use `--no-build` only when the image is already correct and you need Compose to recreate or restart containers, such as after changing server-side environment values that do not affect a Next.js build-time variable. Do not use `--no-build` for dependency changes, application source changes, or `NEXT_PUBLIC_*` changes.

@@ -168,10 +168,11 @@ Important deployment notes:
 - Run the deploy helper from the local repo checkout, not from the VPS shell.
 - Do not run the repo-root `docker-compose.yml` on the VPS. It is local infra only and can create duplicate exposed NATS, ClickHouse, and Redis containers on the server.
 - The Docker stack lives in `deployment/docker` and is separate from local development infra.
-- Partial deploys are supported with `--web-only`, `--api-only`, `--services-only`, `--fast`, `--no-build`, and `--force-recreate`.
+- Partial deploys are supported with `--web-only`, `--api-only`, `--services-only`, `--workers-only`, `--fast`, `--no-build`, and `--force-recreate`.
 - `--fast` defaults to a services-only Docker rollout when no explicit scope is provided and trims public API route-suite verification while preserving remote service health checks.
 - `./deploy current-branch` requires a clean local working tree and pushes the branch before moving the server checkout.
 - The helper has Forgejo-aware remote resolution for deployments and branch pushes.
+- When run from `/home/delta/islandflow` on the VPS itself, `./deploy` can execute locally instead of SSHing back into the same server.
 - Native deployment is opt-in and experimental:
 
 ```bash
@@ -179,7 +180,7 @@ Important deployment notes:
 ./deploy current-branch --runtime native
 ```
 
-Native deployment expects Bun, systemd units, host-reachable infra, and deliberate reverse-proxy changes. The open follow-up is to add native unit templates and rollback helpers.
+Native deployment expects Bun, systemd units, host-reachable infra, and deliberate reverse-proxy changes. Native deploys are intended primarily for worker-only fast iteration until the public edge is cut over deliberately.
 
 Read more:
 

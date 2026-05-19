@@ -42,6 +42,8 @@ services:
     init: true
     expose:
       - "3000"
+    ports:
+      - "${WEB_BIND_IP:-127.0.0.1}:${WEB_HOST_PORT:-3000}:3000"
     networks:
       - default
       - shared
@@ -64,8 +66,13 @@ services:
   api:
     <<: *service-common
     command: ["services/api/src/index.ts"]
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-warn}
+      API_HOST: 0.0.0.0
     expose:
       - "4000"
+    ports:
+      - "${API_BIND_IP:-127.0.0.1}:${API_HOST_PORT:-4000}:4000"
     networks:
       - default
       - shared
@@ -132,7 +139,7 @@ services:
         soft: 262144
         hard: 262144
     volumes:
-      - clickhouse-data:/var/lib/clickhouse
+      - ${ISLANDFLOW_DATA_ROOT:-/var/lib/islandflow}/clickhouse:/var/lib/clickhouse
       - ./clickhouse/listen.xml:/etc/clickhouse-server/config.d/listen.xml:ro
     healthcheck:
       test:
@@ -150,7 +157,7 @@ services:
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
-      - redis-data:/data
+      - ${ISLANDFLOW_DATA_ROOT:-/var/lib/islandflow}/redis:/data
     healthcheck:
       test:
         [
@@ -168,14 +175,9 @@ services:
     restart: unless-stopped
     command: ["-js", "-sd", "/data"]
     volumes:
-      - nats-data:/data
+      - ${ISLANDFLOW_DATA_ROOT:-/var/lib/islandflow}/nats:/data
 
 networks:
   shared:
     external: true
     name: ${NPM_SHARED_NETWORK:-npm-shared}
-
-volumes:
-  clickhouse-data:
-  redis-data:
-  nats-data:

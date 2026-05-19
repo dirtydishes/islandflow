@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Turn Document - Native Public Edge Cutover</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg-core: #06080b;
+        --bg-elevated: #0b1016;
+        --bg-pane: #111820;
+        --bg-pane-2: #0d141b;
+        --bg-soft: rgba(255, 255, 255, 0.03);
+        --border-subtle: rgba(255, 255, 255, 0.12);
+        --border-strong: rgba(245, 166, 35, 0.32);
+        --text-primary: #e6edf4;
+        --text-dim: #90a0b2;
+        --text-faint: #6e7b8c;
+        --signal-amber: #f5a623;
+        --signal-amber-soft: rgba(245, 166, 35, 0.12);
+        --confirm-green: #25c17a;
+        --confirm-green-soft: rgba(37, 193, 122, 0.14);
+        --risk-red: #ff6b5f;
+        --risk-red-soft: rgba(255, 107, 95, 0.12);
+        --info-blue: #4da3ff;
+        --info-blue-soft: rgba(77, 163, 255, 0.12);
+        --shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at top right, rgba(245, 166, 35, 0.12), transparent 28%),
+          linear-gradient(180deg, #06080b 0%, #0a1117 100%);
+        color: var(--text-primary);
+      }
+
+      main {
+        width: min(1080px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 28px 0 48px;
+      }
+
+      .hero {
+        background:
+          linear-gradient(140deg, rgba(245, 166, 35, 0.1), transparent 42%),
+          linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 100%),
+          var(--bg-pane);
+        border: 1px solid var(--border-strong);
+        border-radius: 16px;
+        box-shadow: var(--shadow);
+        padding: 26px 28px;
+        margin-bottom: 18px;
+      }
+
+      .eyebrow,
+      h2,
+      .meta-label,
+      th {
+        font-family: "IBM Plex Mono", monospace;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--signal-amber);
+        font-size: 0.72rem;
+        margin-bottom: 14px;
+      }
+
+      h1 {
+        margin: 0 0 10px;
+        font-family: "Quantico", "IBM Plex Sans", sans-serif;
+        font-size: clamp(2rem, 4vw, 3rem);
+        line-height: 1.05;
+        letter-spacing: 0.06em;
+      }
+
+      .lead {
+        margin: 0;
+        max-width: 72ch;
+        color: var(--text-dim);
+        line-height: 1.65;
+      }
+
+      .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 10px;
+        margin-top: 18px;
+      }
+
+      .meta-card {
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: var(--bg-soft);
+        border: 1px solid var(--border-subtle);
+      }
+
+      .meta-label {
+        color: var(--text-faint);
+        font-size: 0.68rem;
+        margin-bottom: 6px;
+      }
+
+      .meta-value {
+        color: var(--text-primary);
+        font-size: 0.95rem;
+      }
+
+      section {
+        background: var(--bg-pane);
+        border: 1px solid var(--border-subtle);
+        border-radius: 16px;
+        padding: 22px 24px;
+        margin-bottom: 16px;
+      }
+
+      h2 {
+        margin: 0 0 14px;
+        font-size: 0.76rem;
+        color: var(--signal-amber);
+      }
+
+      p,
+      li {
+        line-height: 1.65;
+        color: var(--text-dim);
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 8px;
+      }
+
+      strong {
+        color: var(--text-primary);
+      }
+
+      code {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.92em;
+        color: var(--signal-amber);
+      }
+
+      pre {
+        margin: 12px 0 0;
+        padding: 14px 16px;
+        border-radius: 12px;
+        background: var(--bg-pane-2);
+        border: 1px solid var(--border-subtle);
+        overflow-x: auto;
+      }
+
+      pre code {
+        color: var(--text-primary);
+      }
+
+      .status-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+      }
+
+      .status-card {
+        border-radius: 12px;
+        border: 1px solid var(--border-subtle);
+        padding: 14px;
+        background: var(--bg-pane-2);
+      }
+
+      .status-card.good {
+        border-color: rgba(37, 193, 122, 0.32);
+        background: linear-gradient(180deg, var(--confirm-green-soft), transparent), var(--bg-pane-2);
+      }
+
+      .status-card.warn {
+        border-color: rgba(77, 163, 255, 0.28);
+        background: linear-gradient(180deg, var(--info-blue-soft), transparent), var(--bg-pane-2);
+      }
+
+      .status-title {
+        margin: 0 0 6px;
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+
+      .status-copy {
+        margin: 0;
+        color: var(--text-dim);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 8px;
+      }
+
+      th,
+      td {
+        text-align: left;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border-subtle);
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--text-faint);
+        font-size: 0.68rem;
+      }
+
+      td {
+        color: var(--text-dim);
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: 999px;
+        padding: 4px 9px;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.7rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .pill.good {
+        color: var(--confirm-green);
+        background: var(--confirm-green-soft);
+      }
+
+      .pill.warn {
+        color: var(--info-blue);
+        background: var(--info-blue-soft);
+      }
+
+      .pill.risk {
+        color: var(--risk-red);
+        background: var(--risk-red-soft);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="hero">
+        <div class="eyebrow">Islandflow Turn Document</div>
+        <h1>Native Public Edge Cutover</h1>
+        <p class="lead">
+          Completed the VPS native-first cutover for Islandflow infrastructure and app services while keeping Nginx
+          Proxy Manager as the outer edge and Docker as the rollback path. The final state now serves
+          <code>flow.deltaisland.io</code> and <code>api.flow.deltaisland.io</code> from the native web and API
+          processes, with verified public routing and a documented follow-up for the long-term API Cloudflare posture.
+        </p>
+        <div class="meta-grid">
+          <div class="meta-card">
+            <div class="meta-label">Generated</div>
+            <div class="meta-value">2026-05-18 19:52 EDT</div>
+          </div>
+          <div class="meta-card">
+            <div class="meta-label">Primary Issue</div>
+            <div class="meta-value"><code>islandflow-vvw</code></div>
+          </div>
+          <div class="meta-card">
+            <div class="meta-label">Follow-up</div>
+            <div class="meta-value"><code>islandflow-fl5</code></div>
+          </div>
+          <div class="meta-card">
+            <div class="meta-label">Runtime State</div>
+            <div class="meta-value">Native active, Docker retained for rollback</div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          The repository now contains the native infra units, native cutover scripts, Docker fallback adjustments, and
+          public-edge retargeting logic required to run Islandflow natively on the VPS. During validation, the live NPM
+          edge was switched from Docker container-name upstreams to native host ports, the host firewall was adjusted so
+          the NPM bridge could reach the native API, and the separate public API TLS problem was resolved by correcting
+          the Cloudflare DNS state for <code>api.flow.deltaisland.io</code>.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>
+            Added checked-in native infra operations under <code>deployment/native/</code>, including
+            <code>bootstrap-infra.sh</code>, <code>check-native-infra.sh</code>, <code>cutover.sh</code>,
+            <code>full-rollback.sh</code>, <code>start-infra.sh</code>, and the native system units for NATS, Redis,
+            and ClickHouse.
+          </li>
+          <li>
+            Extended native app runtime units so the web and API bind on host-reachable interfaces, and forced the
+            native options ingest service to use the synthetic adapter during the cutover.
+          </li>
+          <li>
+            Updated <code>services/api</code> to support explicit host binding through <code>API_HOST</code>, and fixed
+            JetStream retention conversion in <code>packages/bus</code> so native services can start cleanly with the
+            configured max-age values.
+          </li>
+          <li>
+            Updated the Docker fallback assets to publish loopback web/API ports, share durable host data under
+            <code>/var/lib/islandflow</code>, and document the native-to-Docker rollback path.
+          </li>
+          <li>
+            Reworked <code>deployment/native/switch-npm-edge.sh</code> so it targets the NPM bridge gateway IP instead
+            of <code>host.docker.internal</code>, handles the root-owned NPM SQLite database, synchronizes generated
+            <code>proxy_host</code> configs, and reloads NPM deterministically after the edge switch.
+          </li>
+          <li>
+            Created Beads follow-up issue <code>islandflow-fl5</code> for the remaining decision about whether
+            <code>api.flow.deltaisland.io</code> should remain DNS-only or be re-proxied through Cloudflare.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          The migration started from a Docker-owned production baseline where NATS, Redis, ClickHouse, API, workers, and
+          web all ran in Compose, while NPM routed Islandflow traffic to Docker service names. That setup blocked a safe
+          native cutover for two reasons: the native services could not reach Docker-only infra reliably, and NPM could
+          not send public traffic to host-native processes without a deliberate upstream retarget.
+        </p>
+        <p>
+          The runtime model for this work is exclusive ownership. Native and Docker are not allowed to run the same API
+          or worker scopes in parallel because JetStream durable consumers would conflict. The objective was therefore a
+          phased handoff, not a mixed soak for the same queues.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <div class="status-grid">
+          <article class="status-card good">
+            <p class="status-title">NPM edge targeting</p>
+            <p class="status-copy">
+              NPM generates <code>proxy_pass</code> from a runtime-resolved <code>$server</code> variable, so the
+              Docker <code>/etc/hosts</code> alias for <code>host.docker.internal</code> was not sufficient. The switch
+              helper now detects the NPM bridge gateway and uses that IP for native upstreams.
+            </p>
+          </article>
+          <article class="status-card good">
+            <p class="status-title">Firewall path</p>
+            <p class="status-copy">
+              The host UFW policy already allowed port <code>3000</code> but not <code>4000</code>. The live fix was a
+              source-scoped allow for the NPM bridge subnet so the containerized edge could reach the native API.
+            </p>
+          </article>
+          <article class="status-card warn">
+            <p class="status-title">Cloudflare API hostname</p>
+            <p class="status-copy">
+              The API hostname failure was separate from the native cutover. The hostname is now a DNS-only
+              <code>A</code> record pointing at the VPS, which restored public TLS and health responses.
+            </p>
+          </article>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Area</th>
+              <th>Implementation detail</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Native API</strong></td>
+              <td>
+                <code>services/api/src/index.ts</code> now accepts <code>API_HOST</code> and passes it to
+                <code>Bun.serve</code>. The native unit sets <code>API_HOST=0.0.0.0</code> and
+                <code>API_PORT=4000</code>.
+              </td>
+            </tr>
+            <tr>
+              <td><strong>Native web</strong></td>
+              <td>
+                The native web unit now starts from <code>apps/web</code> with
+                <code>bun x next start -H "$WEB_HOST" -p "$WEB_PORT"</code>, avoiding the earlier repo-root startup
+                failure and binding the service on <code>0.0.0.0:3000</code>.
+              </td>
+            </tr>
+            <tr>
+              <td><strong>JetStream retention</strong></td>
+              <td>
+                Native startup exposed a retention-unit bug. The shared bus layer now converts stream max-age values with
+                <code>nanos(...)</code> and formats them back with <code>millis(...)</code>.
+              </td>
+            </tr>
+            <tr>
+              <td><strong>Docker fallback</strong></td>
+              <td>
+                Docker Compose now uses <code>ISLANDFLOW_DATA_ROOT=/var/lib/islandflow</code>, publishes loopback
+                ports, and keeps the fallback runtime compatible with the same durable data directories as the native
+                services.
+              </td>
+            </tr>
+            <tr>
+              <td><strong>NPM switch helper</strong></td>
+              <td>
+                The helper now updates both the NPM database and the generated
+                <code>/data/nginx/proxy_host/*.conf</code> files, because a DB-only restart did not reliably rewrite the
+                live configs for Islandflow.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <pre><code>sudo ufw allow proto tcp from 172.18.0.0/16 to any port 4000 comment 'npm bridge to native api'</code></pre>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <ul>
+          <li>
+            Public web and API traffic now reaches the native Islandflow services, which removes Docker from the primary
+            live request path while keeping the outer edge unchanged.
+          </li>
+          <li>
+            Same-origin public API routes such as <code>/prints</code>, <code>/history</code>, <code>/replay</code>,
+            <code>/nbbo</code>, and <code>/ws/live</code> continue to resolve correctly through the main app hostname.
+          </li>
+          <li>
+            Rollback remains fast and explicit: NPM can be pointed back at Docker service names and the Docker runtime
+            can reclaim the same durable data directories if native operation needs to be abandoned.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <div class="status-grid">
+          <article class="status-card good">
+            <div class="pill good">Static checks</div>
+            <ul>
+              <li><code>bun run check:docker-workspace</code></li>
+              <li><code>docker compose -f deployment/docker/docker-compose.yml config --quiet</code></li>
+              <li><code>docker compose -f /home/delta/nginx-proxy-manager/docker-compose.yml config --quiet</code></li>
+              <li><code>bash -n deployment/native/*.sh</code></li>
+              <li><code>systemd-analyze verify deployment/native/systemd/user/*.service deployment/native/systemd/system/*.service</code></li>
+              <li><code>bun build services/api/src/index.ts --target=bun</code></li>
+              <li><code>bun build scripts/deploy.ts --target=bun</code></li>
+            </ul>
+          </article>
+          <article class="status-card good">
+            <div class="pill good">Native runtime</div>
+            <ul>
+              <li><code>./deployment/native/check-native-health.sh full</code></li>
+              <li><code>curl http://127.0.0.1:4000/health</code></li>
+              <li><code>curl -I http://127.0.0.1:3000/</code></li>
+            </ul>
+          </article>
+          <article class="status-card good">
+            <div class="pill good">Public edge</div>
+            <ul>
+              <li><code>curl -I -fksS https://flow.deltaisland.io</code></li>
+              <li><code>curl -fksS https://api.flow.deltaisland.io/health</code></li>
+              <li><code>bun run scripts/check-public-api-routes.ts https://flow.deltaisland.io</code></li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>
+            The native ingest-options service required an explicit synthetic-adapter override because the environment file
+            still pointed at an Alpaca adapter that was returning <code>401</code> responses. The service now starts
+            cleanly for native cutover, but production adapter selection remains an operational decision.
+          </li>
+          <li>
+            The NPM helper still relies on direct config synchronization because NPM did not reliably regenerate the
+            Islandflow proxy files from SQLite changes alone. This is mitigated by keeping the synchronization logic
+            checked in and by reloading NPM as part of the helper itself.
+          </li>
+          <li>
+            The final public API recovery currently leaves <code>api.flow.deltaisland.io</code> as a DNS-only hostname.
+            That restored service, but it changes the edge posture relative to the web hostname and should be reviewed
+            deliberately.
+          </li>
+          <li>
+            A temporary Cloudflare API token was used to inspect and correct zone state during validation. That token
+            should be rotated outside this repository workflow.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>
+            <code>islandflow-fl5</code>: decide whether <code>api.flow.deltaisland.io</code> should remain DNS-only or
+            be re-proxied through Cloudflare, then re-validate TLS, websocket, and operational behavior for the chosen
+            posture.
+          </li>
+          <li>
+            After operational soak, decide whether native should become the default production runtime or remain a
+            supported alternative with Docker as the preferred steady-state runtime.
+          </li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
