@@ -6,6 +6,8 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=/home/delta/islandflow
+Environment=API_HOST=0.0.0.0
+Environment=API_PORT=4000
 EnvironmentFile=/home/delta/islandflow/.env
 ExecStart=/home/delta/.bun/bin/bun services/api/src/index.ts
 Restart=always

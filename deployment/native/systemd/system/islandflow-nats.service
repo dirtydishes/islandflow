@@ -1,0 +1,18 @@
+[Unit]
+Description=Islandflow NATS JetStream
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/nats-server -js -sd /var/lib/islandflow/nats -a 127.0.0.1 -p 4222 -m 8222
+Restart=always
+RestartSec=2
+User=nats
+Group=nats
+RuntimeDirectory=islandflow-nats
+StateDirectory=islandflow/nats
+LimitNOFILE=1048576
+
+[Install]
+WantedBy=multi-user.target

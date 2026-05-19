@@ -1,0 +1,18 @@
+[Unit]
+Description=Islandflow Redis
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+ExecStart=/usr/bin/env redis-server /etc/islandflow/redis.conf --supervised systemd --daemonize no
+Restart=always
+RestartSec=2
+User=redis
+Group=redis
+RuntimeDirectory=islandflow-redis
+StateDirectory=islandflow/redis
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

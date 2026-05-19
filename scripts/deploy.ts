@@ -920,6 +920,10 @@ function remoteNativeVerification(scope: DeployScope, fast: boolean): void {
   const units = nativeUnitsForScope(scope).map((value) => shellEscape(value)).join(" ");
   const checks: string[] = [];
 
+  if (scope === "full" || scope === "api" || scope === "services" || scope === "workers") {
+    checks.push("./deployment/native/check-native-infra.sh");
+  }
+
   if (scopeIncludesApi(scope)) {
     checks.push('curl -fksS http://127.0.0.1:4000/health');
   }
@@ -954,10 +958,10 @@ function remoteVerification(runtime: DeployRuntime, scope: DeployScope, fast: bo
 
 function publicVerification(scope: DeployScope, fast: boolean): void {
   section("Public Verification");
-  if (!fast || scopeIncludesWeb(scope)) {
+  if (scopeIncludesWeb(scope)) {
     runChecked("curl", ["-I", "-fksS", PUBLIC_APP_URL]);
   } else {
-    console.log("[deploy] Fast mode: skipping public app HEAD check because web scope is not included.");
+    console.log("[deploy] Skipping public app HEAD check because web scope is not included.");
   }
 
   if (scopeIncludesApi(scope) && PUBLIC_API_HEALTH_URL) {
