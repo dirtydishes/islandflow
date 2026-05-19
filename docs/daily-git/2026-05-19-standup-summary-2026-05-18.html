@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Daily Git Summary for 2026-05-18</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --bg-top: #091018;
+        --panel: rgba(17, 24, 32, 0.94);
+        --panel-strong: rgba(13, 20, 27, 0.98);
+        --border: rgba(255, 255, 255, 0.08);
+        --border-strong: rgba(245, 166, 35, 0.28);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --accent-soft: rgba(245, 166, 35, 0.12);
+        --blue: #4da3ff;
+        --blue-soft: rgba(77, 163, 255, 0.12);
+        --green: #25c17a;
+        --green-soft: rgba(37, 193, 122, 0.12);
+        --red: #ff6b5f;
+        --red-soft: rgba(255, 107, 95, 0.12);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at top right, rgba(245, 166, 35, 0.1), transparent 24%),
+          linear-gradient(180deg, var(--bg-top) 0%, var(--bg) 28%, #05070a 100%);
+        color: var(--text);
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+        line-height: 1.6;
+      }
+
+      main {
+        width: min(1120px, calc(100% - 40px));
+        margin: 32px auto 56px;
+      }
+
+      .hero,
+      section {
+        background: linear-gradient(180deg, var(--panel), var(--panel-strong));
+        border: 1px solid var(--border);
+        border-radius: 18px;
+      }
+
+      .hero {
+        padding: 32px;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.32);
+      }
+
+      .eyebrow,
+      .pill,
+      .file-pill,
+      .commit-id,
+      .timestamp {
+        font-family: "IBM Plex Mono", monospace;
+      }
+
+      .eyebrow,
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .eyebrow {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      .pill {
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text);
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        font-family: "Quantico", "Segoe UI", sans-serif;
+        letter-spacing: 0.04em;
+      }
+
+      h1 {
+        margin-top: 18px;
+        font-size: clamp(2rem, 3.5vw, 2.9rem);
+        line-height: 1.05;
+      }
+
+      h2 {
+        font-size: 1.22rem;
+        margin-bottom: 16px;
+      }
+
+      h3 {
+        font-size: 1rem;
+      }
+
+      p {
+        margin: 0;
+        max-width: 82ch;
+        color: var(--muted);
+      }
+
+      .hero p {
+        margin-top: 14px;
+        font-size: 1rem;
+      }
+
+      .meta-grid,
+      .summary-grid,
+      .impact-grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .meta-grid {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        margin-top: 24px;
+      }
+
+      .summary-grid,
+      .impact-grid {
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      }
+
+      .meta-card,
+      .summary-card,
+      .impact-card,
+      .commit-card,
+      .snippet-card,
+      .callout {
+        padding: 16px 18px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.025);
+      }
+
+      .label {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--text);
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.76rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .metric {
+        font-size: 1.6rem;
+        color: var(--text);
+        font-weight: 700;
+      }
+
+      section {
+        padding: 24px;
+        margin-top: 16px;
+      }
+
+      .timeline {
+        display: grid;
+        gap: 14px;
+      }
+
+      .timeline-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 14px;
+        align-items: baseline;
+        margin-bottom: 8px;
+      }
+
+      .commit-id,
+      .timestamp {
+        font-size: 0.76rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .commit-id {
+        color: var(--blue);
+      }
+
+      .timestamp {
+        color: var(--faint);
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+        color: var(--muted);
+      }
+
+      li + li {
+        margin-top: 10px;
+      }
+
+      .file-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .file-pill {
+        padding: 5px 8px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.045);
+        color: var(--text);
+        font-size: 0.73rem;
+      }
+
+      .snippets {
+        display: grid;
+        gap: 14px;
+      }
+
+      pre {
+        margin: 12px 0 0;
+        padding: 14px;
+        overflow-x: auto;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        background: rgba(6, 8, 11, 0.9);
+        color: #d8e4ef;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.8rem;
+        line-height: 1.55;
+      }
+
+      code {
+        font-family: "IBM Plex Mono", monospace;
+      }
+
+      .tone-feature {
+        border-color: rgba(37, 193, 122, 0.24);
+        background: linear-gradient(180deg, rgba(37, 193, 122, 0.09), rgba(255, 255, 255, 0.02));
+      }
+
+      .tone-docs {
+        border-color: rgba(77, 163, 255, 0.22);
+      }
+
+      .tone-risk {
+        border-color: rgba(255, 107, 95, 0.24);
+        background: linear-gradient(180deg, rgba(255, 107, 95, 0.08), rgba(255, 255, 255, 0.02));
+      }
+
+      a {
+        color: #8bc0ff;
+      }
+
+      @media (max-width: 720px) {
+        main {
+          width: min(100%, calc(100% - 24px));
+          margin: 20px auto 32px;
+        }
+
+        .hero,
+        section {
+          padding: 20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="hero">
+        <span class="eyebrow">Daily Git Summary</span>
+        <h1>Standup summary for Monday, May 18, 2026</h1>
+        <p>
+          Git history for May 18 shows four commits. One feature commit introduced an Alpaca-backed news wire across ingest,
+          storage, API, and web surfaces; the other three commits updated workflow docs, beads state, and the previous
+          standup summary.
+        </p>
+        <div class="meta-grid">
+          <div class="meta-card">
+            <span class="label">Commits</span>
+            <div class="metric">4</div>
+          </div>
+          <div class="meta-card">
+            <span class="label">Files Touched</span>
+            <div class="metric">35</div>
+          </div>
+          <div class="meta-card">
+            <span class="label">Insertions</span>
+            <div class="metric">1963</div>
+          </div>
+          <div class="meta-card">
+            <span class="label">Deletions</span>
+            <div class="metric">52</div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Summary</h2>
+        <div class="summary-grid">
+          <div class="summary-card tone-feature">
+            <span class="label">Primary Delivery</span>
+            <p>
+              Commit <code>906fe411</code> added a new <code>services/ingest-news</code> service, news persistence in
+              <code>packages/storage</code>, API endpoints in <code>services/api</code>, and a live news view in
+              <code>apps/web/app/terminal.tsx</code> plus <code>apps/web/app/news/page.tsx</code>.
+            </p>
+          </div>
+          <div class="summary-card tone-docs">
+            <span class="label">Docs And Workflow</span>
+            <p>
+              Commits <code>62aae708</code>, <code>687a2170</code>, and <code>04baeceb</code> updated the previous standup
+              report, beads state, <code>deployment/docker/workspace-root/package.json</code>, and the repo-level
+              <code>AGENTS.md</code> instructions.
+            </p>
+          </div>
+          <div class="summary-card">
+            <span class="label">Standup Framing</span>
+            <p>
+              Yesterday’s visible product work centered on making live Alpaca news available end to end. The remaining
+              activity was project hygiene and documentation.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <div class="timeline">
+          <article class="commit-card tone-docs">
+            <div class="timeline-meta">
+              <strong>update beads</strong>
+              <span class="commit-id">687a2170</span>
+              <span class="timestamp">2026-05-18 03:15 -0400</span>
+              <span class="pill">1 file</span>
+            </div>
+            <p>
+              Added one line to <code>deployment/docker/workspace-root/package.json</code>. The local git history does not
+              show more context beyond the file touch and commit subject.
+            </p>
+          </article>
+
+          <article class="commit-card tone-docs">
+            <div class="timeline-meta">
+              <strong>docs(general): add 2026-05-17 standup summary</strong>
+              <span class="commit-id">62aae708</span>
+              <span class="timestamp">2026-05-18 09:05 -0400</span>
+              <span class="pill">2 files</span>
+            </div>
+            <p>
+              Added the prior day’s report at <code>docs/general/2026-05-18-standup-summary-2026-05-17.html</code> and
+              updated <code>.beads/issues.jsonl</code>.
+            </p>
+            <div class="file-list">
+              <span class="file-pill">docs/general/2026-05-18-standup-summary-2026-05-17.html</span>
+              <span class="file-pill">.beads/issues.jsonl</span>
+            </div>
+          </article>
+
+          <article class="commit-card tone-feature">
+            <div class="timeline-meta">
+              <strong>add alpaca news wire across ingest api and web</strong>
+              <span class="commit-id">906fe411</span>
+              <span class="timestamp">2026-05-18 16:55 -0400</span>
+              <span class="pill">31 files</span>
+              <span class="pill">+1407 / -50</span>
+            </div>
+            <ul>
+              <li>
+                Added a new ingest service in <code>services/ingest-news/src/index.ts</code> that backfills Alpaca news,
+                subscribes to the Alpaca news websocket, resolves symbols, and publishes <code>NewsStory</code> payloads to
+                NATS.
+              </li>
+              <li>
+                Extended shared contracts in <code>packages/types/src/events.ts</code> and
+                <code>packages/types/src/live.ts</code>, plus new storage support in
+                <code>packages/storage/src/news.ts</code> and <code>packages/storage/src/clickhouse.ts</code>.
+              </li>
+              <li>
+                Wired the API to store, fan out, and expose news via <code>/news</code> and <code>/history/news</code> in
+                <code>services/api/src/index.ts</code> and live-session updates in <code>services/api/src/live.ts</code>.
+              </li>
+              <li>
+                Added a web route in <code>apps/web/app/news/page.tsx</code>, a news pane and drawer in
+                <code>apps/web/app/terminal.tsx</code>, and related styling in <code>apps/web/app/globals.css</code>.
+              </li>
+              <li>
+                Updated runtime packaging and local/dev deployment surfaces, including
+                <code>deployment/docker/docker-compose.yml</code>, Dockerfiles, <code>scripts/dev.ts</code>, and
+                <code>scripts/deploy.ts</code>.
+              </li>
+              <li>
+                Added tests in <code>packages/storage/tests/news.test.ts</code>,
+                <code>services/ingest-news/tests/symbols.test.ts</code>, and adjusted
+                <code>apps/web/app/terminal.test.ts</code> plus <code>packages/types/tests/live.test.ts</code>.
+              </li>
+            </ul>
+            <div class="file-list">
+              <span class="file-pill">services/ingest-news/src/index.ts</span>
+              <span class="file-pill">packages/storage/src/news.ts</span>
+              <span class="file-pill">services/api/src/index.ts</span>
+              <span class="file-pill">apps/web/app/terminal.tsx</span>
+              <span class="file-pill">apps/web/app/news/page.tsx</span>
+              <span class="file-pill">apps/web/app/globals.css</span>
+            </div>
+          </article>
+
+          <article class="commit-card tone-docs">
+            <div class="timeline-meta">
+              <strong>update turn docs and beads workflow</strong>
+              <span class="commit-id">04baeceb</span>
+              <span class="timestamp">2026-05-18 21:32 -0400</span>
+              <span class="pill">1 file</span>
+            </div>
+            <p>
+              Edited <code>AGENTS.md</code> to update turn-document and beads workflow guidance.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          This summary is based on local git history between <code>2026-05-18 00:00 -0400</code> and
+          <code>2026-05-19 00:00 -0400</code>. The repository uses Bun, TypeScript, NATS/JetStream, ClickHouse, and a Next.js
+          web app, so the main feature commit spans service ingestion, shared types, persistence, API delivery, and the UI.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <div class="snippets">
+          <article class="snippet-card">
+            <h3>News ingestion was introduced as a first-class service</h3>
+            <p>
+              <code>services/ingest-news/src/index.ts</code> authenticates against Alpaca, backfills recent news, subscribes
+              to live updates, resolves symbols, validates payloads with <code>NewsStorySchema</code>, and publishes them onto
+              the repo’s bus layer.
+            </p>
+            <pre><code>const backfill = await fetchBackfill();
+for (const item of backfill.reverse()) {
+  await publishStory(item);
+}
+
+if (msg === "authenticated") {
+  ws.send(JSON.stringify({ action: "subscribe", news: ["*"] }));
+}</code></pre>
+          </article>
+
+          <article class="snippet-card">
+            <h3>API and live session support were expanded for news</h3>
+            <p>
+              <code>services/api/src/index.ts</code> now ensures the news table exists, subscribes to a news consumer, fans
+              out live updates, and exposes both recent and paginated history endpoints.
+            </p>
+            <pre><code>if (req.method === "GET" && url.pathname === "/news") {
+  const limit = parseLimit(url.searchParams.get("limit") ?? "100");
+  const data = await fetchRecentNews(clickhouse, limit);
+  return jsonResponse({ data });
+}</code></pre>
+          </article>
+
+          <article class="snippet-card">
+            <h3>The web terminal gained a dedicated news surface</h3>
+            <p>
+              <code>apps/web/app/terminal.tsx</code> added a live-only news pane, a per-story drawer, history loading, and a
+              new <code>/news</code> route entry point via <code>apps/web/app/news/page.tsx</code>.
+            </p>
+            <pre><code>if (features.news) {
+  subscriptions.push({ channel: "news", snapshot_limit: LIVE_OPTIONS_HEAD_LIMIT });
+}
+
+export function NewsRoute() {
+  const state = useTerminal();
+  return (
+    &lt;PageFrame title="News"&gt;
+      &lt;div className="page-grid page-grid-news"&gt;
+        &lt;NewsPane state={state} className="news-pane-full" /&gt;
+      &lt;/div&gt;
+    &lt;/PageFrame&gt;
+  );
+}</code></pre>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <div class="impact-grid">
+          <div class="impact-card">
+            <span class="label">Live Terminal</span>
+            <p>
+              Users now have a dedicated news wire surface in the web terminal, including summary rows, story details, and
+              a direct link to the source article.
+            </p>
+          </div>
+          <div class="impact-card">
+            <span class="label">Coverage</span>
+            <p>
+              News is now available alongside the repo’s existing live feeds, with shared symbol resolution and storage that
+              make the data retrievable through API history endpoints.
+            </p>
+          </div>
+          <div class="impact-card tone-risk">
+            <span class="label">Current Boundary</span>
+            <p>
+              The UI copy in the news pane explicitly marks news as live-only in v1, so replay users should not expect the
+              same behavior there yet.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li>Reviewed local git history with <code>git log --since='2026-05-18 00:00' --until='2026-05-19 00:00'</code>.</li>
+          <li>Used <code>git log --stat</code>, <code>git show</code>, and file-level history to anchor each summary item to specific commits and files.</li>
+          <li>No builds or tests were run for this reporting task because the work product is a git summary document, not a behavior change.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>
+            This report is grounded in local commit metadata only. No pull request identifiers were present in the inspected
+            git history, so the summary references commits and files instead of PR numbers.
+          </li>
+          <li>
+            The <code>update beads</code> commit touched only <code>deployment/docker/workspace-root/package.json</code> in
+            visible git output, so this report does not infer intent beyond that recorded file change.
+          </li>
+          <li>
+            Counts here describe May 18 commits only and exclude any uncommitted work present after that date.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>
+            No new product follow-up items were derived from this reporting pass. The only beads item created for this task
+            is <code>islandflow-2df</code>, which tracks publication of this summary document.
+          </li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
