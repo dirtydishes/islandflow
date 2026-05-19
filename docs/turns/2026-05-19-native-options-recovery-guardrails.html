@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>2026-05-19 Native Options Recovery Guardrails</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f4f8;
+        --surface: #ffffff;
+        --ink: #1f1726;
+        --muted: #5f536d;
+        --line: #ddd4e6;
+        --accent: #7c4dff;
+        --accent-soft: #efe7ff;
+        --code-bg: #17131d;
+        --code-ink: #f7f2ff;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+        line-height: 1.55;
+      }
+      main {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 40px 24px 72px;
+      }
+      header, section {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 24px;
+        margin-bottom: 18px;
+      }
+      h1, h2 {
+        margin: 0 0 12px;
+        line-height: 1.15;
+      }
+      h1 { font-size: 2rem; }
+      h2 { font-size: 1.15rem; }
+      p, li { color: var(--ink); }
+      .lede {
+        font-size: 1.05rem;
+        color: var(--muted);
+      }
+      .meta {
+        display: inline-block;
+        margin-top: 10px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-size: 0.9rem;
+        font-weight: 600;
+      }
+      ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+      pre {
+        margin: 0;
+        padding: 16px;
+        overflow: auto;
+        border-radius: 10px;
+        background: var(--code-bg);
+        color: var(--code-ink);
+      }
+      code {
+        font-family: "SFMono-Regular", ui-monospace, monospace;
+        font-size: 0.94rem;
+      }
+      .note {
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+      a { color: var(--accent); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Native Options Recovery Guardrails</h1>
+        <p class="lede">
+          The production outage turned out to be a native deployment config mismatch, not a data-pipeline code failure. I restored the VPS to the last known-good synthetic options adapter, then tightened the checked-in native deployment assets so they no longer imply a systemd override will beat the repo <code>.env</code>.
+        </p>
+        <div class="meta">Generated 2026-05-19 19:24 EDT</div>
+      </header>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          The repo-side change is small and targeted: remove the misleading <code>Environment=OPTIONS_INGEST_ADAPTER=synthetic</code> line from the checked-in native <code>ingest-options</code> unit, and document that Bun-launched services effectively take adapter selection from <code>/home/delta/islandflow/.env</code>.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Removed the checked-in systemd override from <code>deployment/native/systemd/user/islandflow-ingest-options.service</code>.</li>
+          <li>Added an explicit env-precedence warning to <code>deployment/native/README.md</code>.</li>
+          <li>Captured the live diagnosis that the native server had drifted to <code>OPTIONS_INGEST_ADAPTER=alpaca</code> while the prior Docker deployment was running synthetic options.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          On the VPS, <code>islandflow-ingest-options.service</code> was crash-looping with repeated <code>401 Unauthorized</code> responses from Alpaca while the rest of the native stack stayed healthy. The previous Docker-owned <code>islandflow-vps-ingest-options-1</code> container showed <code>OPTIONS_INGEST_ADAPTER=synthetic</code>, which explains why the UI had been healthy before the runtime transition.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <ul>
+          <li>The checked-in unit already referenced <code>/home/delta/islandflow/.env</code>, and Bun's runtime env loading meant a conflicting adapter value there still won in practice.</li>
+          <li>The static key currently stored as <code>ALPACA_API_KEY</code> does not authenticate the failing market-data snapshot request as a Bearer token.</li>
+          <li>Because the real outage fix required a server-side <code>.env</code> correction, this repo patch focuses on preventing operator confusion during the next native cutover.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p class="note">Unified diff blocks below are formatted for diffs-compatible rendering.</p>
+        <pre><code class="language-diff">diff --git a/deployment/native/README.md b/deployment/native/README.md
+@@ -98,6 +98,8 @@ These are written for the current VPS layout:
+ - Bun binary: `/home/delta/.bun/bin/bun`
+ - env file: `/home/delta/islandflow/.env`
+ 
++Important: treat `/home/delta/islandflow/.env` as the effective source of truth for adapter selection. The Bun-launched services read that file directly at runtime, so a conflicting `OPTIONS_INGEST_ADAPTER` value in `.env` can still win over a systemd-only override and push `ingest-options` onto the wrong provider path.
++
+ ### Install the units
+
+diff --git a/deployment/native/systemd/user/islandflow-ingest-options.service b/deployment/native/systemd/user/islandflow-ingest-options.service
+@@ -7,7 +7,6 @@ Wants=network-online.target
+ Type=simple
+ WorkingDirectory=/home/delta/islandflow
+ EnvironmentFile=/home/delta/islandflow/.env
+-Environment=OPTIONS_INGEST_ADAPTER=synthetic
+ ExecStart=/home/delta/.bun/bin/bun services/ingest-options/src/index.ts</code></pre>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <p>
+          End users should not see the options tape stall the next time native units are installed or audited by following the checked-in assets. Operators now have a clearer paper trail that the actual runtime adapter comes from the deployment env file.
+        </p>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li>Verified the native outage mode on the VPS: <code>islandflow-ingest-options.service</code> crash-looped on Alpaca <code>401</code> responses.</li>
+          <li>Confirmed the previous Docker container had been running <code>OPTIONS_INGEST_ADAPTER=synthetic</code>.</li>
+          <li>After the server-side env fix, confirmed fresh rows in <code>default.option_prints</code> and new compute emissions in the native logs.</li>
+          <li>Ran <code>git diff</code> to verify the repo change stayed scoped to the deployment README and the checked-in user unit.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>The repo patch does not add new credential support for Alpaca. It only documents the current env-precedence behavior and removes a misleading override.</li>
+          <li>The live server is restored with synthetic options, which matches the last known-good Docker behavior, but it is not a true live Alpaca ingest path.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li><code>islandflow-wf5</code>: Decide whether production options should remain synthetic or move to a fully supported live provider configuration.</li>
+          <li><code>islandflow-wf5</code>: If Alpaca live data is still desired, add a validated auth flow and a deploy-time smoke test that catches provider auth failures before cutover.</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

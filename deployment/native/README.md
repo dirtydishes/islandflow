@@ -98,6 +98,8 @@ These are written for the current VPS layout:
 - Bun binary: `/home/delta/.bun/bin/bun`
 - env file: `/home/delta/islandflow/.env`
 
+Important: treat `/home/delta/islandflow/.env` as the effective source of truth for adapter selection. The Bun-launched services read that file directly at runtime, so a conflicting `OPTIONS_INGEST_ADAPTER` value in `.env` can still win over a systemd-only override and push `ingest-options` onto the wrong provider path.
+
 ### Install the units
 
 ```bash

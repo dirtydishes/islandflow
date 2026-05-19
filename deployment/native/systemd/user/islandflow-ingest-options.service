@@ -7,7 +7,6 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=/home/delta/islandflow
 EnvironmentFile=/home/delta/islandflow/.env
-Environment=OPTIONS_INGEST_ADAPTER=synthetic
 ExecStart=/home/delta/.bun/bin/bun services/ingest-options/src/index.ts
 Restart=always
 RestartSec=2
