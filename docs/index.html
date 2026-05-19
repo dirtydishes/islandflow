@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Islandflow Docs</title>
+    <style>
+      :root {
+        --bg: #f4f6f8;
+        --surface: #ffffff;
+        --surface-muted: #e8edf2;
+        --text: #1a2433;
+        --muted: #5b6a80;
+        --border: #ccd5df;
+        --accent: #0f766e;
+        --accent-soft: #d1fae5;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Avenir Next", "Segoe UI", sans-serif;
+        background: radial-gradient(circle at top right, #e2f8f2, var(--bg) 35%);
+        color: var(--text);
+      }
+
+      main {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 32px 16px 48px;
+      }
+
+      .header {
+        display: grid;
+        gap: 12px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(1.8rem, 2.3vw, 2.4rem);
+        font-weight: 760;
+      }
+
+      .subtitle {
+        margin: 0;
+        color: var(--muted);
+        max-width: 60ch;
+      }
+
+      .toolbar {
+        margin-top: 10px;
+        padding: 14px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+        display: grid;
+        gap: 12px;
+      }
+
+      .stats {
+        font-size: 0.95rem;
+        color: var(--muted);
+      }
+
+      .search {
+        width: 100%;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font: inherit;
+        font-size: 1rem;
+        padding: 10px 12px;
+        background: #fff;
+      }
+
+      .search:focus {
+        outline: 2px solid color-mix(in srgb, var(--accent) 30%, white);
+        outline-offset: 0;
+        border-color: var(--accent);
+      }
+
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chip {
+        text-decoration: none;
+        color: var(--text);
+        background: var(--surface-muted);
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: 0.85rem;
+        border: 1px solid transparent;
+      }
+
+      .chip span {
+        color: var(--muted);
+      }
+
+      .chip:hover {
+        border-color: var(--accent);
+      }
+
+      .groups {
+        margin-top: 20px;
+        display: grid;
+        gap: 16px;
+      }
+
+      .group {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+        padding: 14px;
+      }
+
+      .group.hidden {
+        display: none;
+      }
+
+      .group h2 {
+        margin: 0 0 10px;
+        font-size: 1.1rem;
+      }
+
+      .group h2 span {
+        color: var(--muted);
+        font-weight: 520;
+      }
+
+      .doc-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 6px;
+      }
+
+      .doc-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 8px 10px;
+        border-radius: 6px;
+      }
+
+      .doc-item.hidden {
+        display: none;
+      }
+
+      .doc-item:hover {
+        background: #f5faf8;
+      }
+
+      .doc-link {
+        color: var(--text);
+        text-decoration: none;
+        font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+        font-size: 0.92rem;
+        overflow-wrap: anywhere;
+      }
+
+      .doc-link:hover {
+        color: var(--accent);
+        text-decoration: underline;
+      }
+
+      .meta {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--muted);
+        font-size: 0.82rem;
+        white-space: nowrap;
+      }
+
+      .tag {
+        background: var(--accent-soft);
+        color: #065f46;
+        border-radius: 999px;
+        padding: 3px 8px;
+        font-size: 0.78rem;
+      }
+
+      .empty {
+        margin-top: 20px;
+        border: 1px dashed var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+        color: var(--muted);
+        padding: 20px;
+        text-align: center;
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="header">
+        <h1>Islandflow docs index</h1>
+        <p class="subtitle">A browsable index of files under <code>docs/</code> with filtering and grouped navigation.</p>
+      </header>
+
+      <section class="toolbar">
+        <div class="stats"><strong id="visible-count">35</strong> of <strong>35</strong> files shown</div>
+        <input id="doc-search" class="search" type="search" placeholder="Filter by filename or folder..." autocomplete="off" />
+        <nav class="chips"><a class="chip" href="#category-turns">turns <span>28</span></a>
+<a class="chip" href="#category-daily-git">daily-git <span>1</span></a>
+<a class="chip" href="#category-general">general <span>2</span></a>
+<a class="chip" href="#category-plans">plans <span>2</span></a>
+<a class="chip" href="#category-root">root <span>2</span></a></nav>
+      </section>
+
+      <section class="groups" id="groups">
+        <section class="group" id="category-turns">
+          <h2>turns <span>28</span></h2>
+          <ul class="doc-list">
+            
+            <li class="doc-item" data-search="turns/2026-05-19-publish-docs-pages-index.html turns">
+              <a class="doc-link" href="./turns/2026-05-19-publish-docs-pages-index.html">turns/2026-05-19-publish-docs-pages-index.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>6.7 KB</span>
+                <span>May 19, 2026, 2:59 PM</span>
+              </div>
+            </li>
+          
+
+            <li class="doc-item" data-search="turns/2026-05-18-native-public-edge-cutover.html turns">
+              <a class="doc-link" href="./turns/2026-05-18-native-public-edge-cutover.html">turns/2026-05-18-native-public-edge-cutover.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>19 KB</span>
+                <span>May 19, 2026, 2:48 PM</span>
+              </div>
+            </li>
+          
+
+            <li class="doc-item" data-search="turns/2026-05-19-reconcile-pr-conflicts.html turns">
+              <a class="doc-link" href="./turns/2026-05-19-reconcile-pr-conflicts.html">turns/2026-05-19-reconcile-pr-conflicts.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>9.8 KB</span>
+                <span>May 19, 2026, 2:48 PM</span>
+              </div>
+            </li>
+          
+
+            <li class="doc-item" data-search="turns/2026-05-18-native-fast-iterative-deploy.html turns">
+              <a class="doc-link" href="./turns/2026-05-18-native-fast-iterative-deploy.html">turns/2026-05-18-native-fast-iterative-deploy.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>9.0 KB</span>
+                <span>May 19, 2026, 2:48 PM</span>
+              </div>
+            </li>
+          
+
+            <li class="doc-item" data-search="turns/2026-05-19-0805-clarify-repo-turn-doc-rules.html turns">
+              <a class="doc-link" href="./turns/2026-05-19-0805-clarify-repo-turn-doc-rules.html">turns/2026-05-19-0805-clarify-repo-turn-doc-rules.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>6.4 KB</span>
+                <span>May 19, 2026, 8:05 AM</span>
+              </div>
+            </li>
+          
+
+            <li class="doc-item" data-search="turns/2026-05-19-0739-update-readme-current-state.html turns">
+              <a class="doc-link" href="./turns/2026-05-19-0739-update-readme-current-state.html">turns/2026-05-19-0739-update-readme-current-state.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>9.8 KB</span>
+                <span>May 19, 2026, 7:39 AM</span>
+              </div>
+            </li>
+          
+
+            <li class="doc-item" data-search="turns/2026-05-19-upgrade-nextjs-16.html turns">
+              <a class="doc-link" href="./turns/2026-05-19-upgrade-nextjs-16.html">turns/2026-05-19-upgrade-nextjs-16.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>9.0 KB</span>
+                <span>May 19, 2026, 7:31 AM</span>
+              </div>
+            </li>
+          
+
+            <li class="doc-item" data-search="turns/2026-05-18-news-wire-view.html turns">
+              <a class="doc-link" href="./turns/2026-05-18-news-wire-view.html">turns/2026-05-18-news-wire-view.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>7.0 KB</span>
+                <span>May 18, 2026, 4:54 PM</span>
+              </div>
+            </li>
+          
+
+            <li class="doc-item" data-search="turns/2026-05-17-forgejo-deploy-remote-resolution.html turns">
+              <a class="doc-link" href="./turns/2026-05-17-forgejo-deploy-remote-resolution.html">turns/2026-05-17-forgejo-deploy-remote-resolution.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>5.3 KB</span>
+                <span>May 17, 2026, 11:22 PM</span>
+              </div>
+            </li>
+          
+
+            <li class="doc-item" data-search="turns/2026-05-17-add-fast-deploy-mode.html turns">
+              <a class="doc-link" href="./turns/2026-05-17-add-fast-deploy-mode.html">turns/2026-05-17-add-fast-deploy-mode.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>5.5 KB</span>
+                <span>May 17, 2026, 10:53 PM</span>
+              </div>
+            </li>
+          
+
+            <li class="doc-item" data-search="turns/2026-05-17-1101-clickhouse-alert-context.html turns">
+              <a class="doc-link" href="./turns/2026-05-17-1101-clickhouse-alert-context.html">turns/2026-05-17-1101-clickhouse-alert-context.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>6.4 KB</span>
+                <span>May 17, 2026, 10:21 PM</span>
+              </div>
+            </li>
+          
+
+            <li class="doc-item" data-search="turns/2026-05-17-clickhouse-alert-context.html turns">
+              <a class="doc-link" href="./turns/2026-05-17-clickhouse-alert-context.html">turns/2026-05-17-clickhouse-alert-context.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>11 KB</span>
+                <span>May 17, 2026, 10:21 PM</span>
+              </div>
+            </li>
+          
+
+            <li class="doc-item" data-search="turns/2026-05-17-deploy-allowlist-pr-packaging.html turns">
+              <a class="doc-link" href="./turns/2026-05-17-deploy-allowlist-pr-packaging.html">turns/2026-05-17-deploy-allowlist-pr-packaging.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>5.2 KB</span>
+                <span>May 17, 2026, 10:21 PM</span>
+              </div>
+            </li>
+          
+
+            <li class="doc-item" data-search="turns/2026-05-17-configure-beads-dolt-remote.html turns">
+              <a class="doc-link" href="./turns/2026-05-17-configure-beads-dolt-remote.html">turns/2026-05-17-configure-beads-dolt-remote.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>7.7 KB</span>
+                <span>May 17, 2026, 10:07 AM</span>
+              </div>
+            </li>
+          
+
+            <li class="doc-item" data-search="turns/2026-05-16-live-tape-scroll-hold-history.html turns">
+              <a class="doc-link" href="./turns/2026-05-16-live-tape-scroll-hold-history.html">turns/2026-05-16-live-tape-scroll-hold-history.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>6.3 KB</span>
+                <span>May 17, 2026, 5:06 AM</span>
+              </div>
+            </li>
+          
+
+            <li class="doc-item" data-search="turns/2026-05-17-0331-fix-live-tape-scroll-stability.html turns">
+              <a class="doc-link" href="./turns/2026-05-17-0331-fix-live-tape-scroll-stability.html">turns/2026-05-17-0331-fix-live-tape-scroll-stability.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>5.6 KB</span>
+                <span>May 17, 2026, 5:06 AM</span>
+              </div>
+            </li>
+          
+
+            <li class="doc-item" data-search="turns/2026-05-16-1725-durable-options-tape-history.html turns">
+              <a class="doc-link" href="./turns/2026-05-16-1725-durable-options-tape-history.html">turns/2026-05-16-1725-durable-options-tape-history.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>7.5 KB</span>
+                <span>May 17, 2026, 5:06 AM</span>
+              </div>
+            </li>
+          
+
+            <li class="doc-item" data-search="turns/2026-05-16-1752-speed-up-docker-deploys.html turns">
+              <a class="doc-link" href="./turns/2026-05-16-1752-speed-up-docker-deploys.html">turns/2026-05-16-1752-speed-up-docker-deploys.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>7.9 KB</span>
+                <span>May 17, 2026, 5:06 AM</span>
+              </div>
+            </li>
+          
+
+            <li class="doc-item" data-search="turns/2026-05-16-2159-fix-durable-options-history-routing.html turns">
+              <a class="doc-link" href="./turns/2026-05-16-2159-fix-durable-options-history-routing.html">turns/2026-05-16-2159-fix-durable-options-history-routing.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>6.4 KB</span>
+                <span>May 17, 2026, 5:06 AM</span>
+              </div>
+            </li>
+          
+
+            <li class="doc-item" data-search="turns/2026-05-15-add-duplicate-vps-compose-warning.html turns">
+              <a class="doc-link" href="./turns/2026-05-15-add-duplicate-vps-compose-warning.html">turns/2026-05-15-add-duplicate-vps-compose-warning.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>7.2 KB</span>
+                <span>May 15, 2026, 9:28 PM</span>
+              </div>
+            </li>
+          
+
+            <li class="doc-item" data-search="turns/2026-05-15-clarify-docker-first-deploy-workflow.html turns">
+              <a class="doc-link" href="./turns/2026-05-15-clarify-docker-first-deploy-workflow.html">turns/2026-05-15-clarify-docker-first-deploy-workflow.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>6.5 KB</span>
+                <span>May 15, 2026, 9:12 PM</span>
+              </div>
+            </li>
+          
+
+            <li class="doc-item" data-search="turns/2026-05-15-dual-runtime-deploy-workflow.html turns">
+              <a class="doc-link" href="./turns/2026-05-15-dual-runtime-deploy-workflow.html">turns/2026-05-15-dual-runtime-deploy-workflow.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>7.9 KB</span>
+                <span>May 15, 2026, 8:52 PM</span>
+              </div>
+            </li>
+          
+
+            <li class="doc-item" data-search="turns/2026-05-15-deploy-preflight-docker-workspace-check.html turns">
+              <a class="doc-link" href="./turns/2026-05-15-deploy-preflight-docker-workspace-check.html">turns/2026-05-15-deploy-preflight-docker-workspace-check.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>3.6 KB</span>
+                <span>May 15, 2026, 7:03 PM</span>
+              </div>
+            </li>
+          
+
+            <li class="doc-item" data-search="turns/2026-05-15-fix-docker-workspace-lockfile-sync.html turns">
+              <a class="doc-link" href="./turns/2026-05-15-fix-docker-workspace-lockfile-sync.html">turns/2026-05-15-fix-docker-workspace-lockfile-sync.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>3.6 KB</span>
+                <span>May 15, 2026, 6:56 PM</span>
+              </div>
+            </li>
+          
+
+            <li class="doc-item" data-search="turns/2026-05-15-quiet-terminal-view.html turns">
+              <a class="doc-link" href="./turns/2026-05-15-quiet-terminal-view.html">turns/2026-05-15-quiet-terminal-view.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>5.3 KB</span>
+                <span>May 15, 2026, 6:55 PM</span>
+              </div>
+            </li>
+          
+
+            <li class="doc-item" data-search="turns/2026-05-14-1824-adapt-terminal-view.html turns">
+              <a class="doc-link" href="./turns/2026-05-14-1824-adapt-terminal-view.html">turns/2026-05-14-1824-adapt-terminal-view.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>6.6 KB</span>
+                <span>May 15, 2026, 6:55 PM</span>
+              </div>
+            </li>
+          
+
+            <li class="doc-item" data-search="turns/2026-05-14-1833-reconcile-pr-conflicts.html turns">
+              <a class="doc-link" href="./turns/2026-05-14-1833-reconcile-pr-conflicts.html">turns/2026-05-14-1833-reconcile-pr-conflicts.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>5.6 KB</span>
+                <span>May 15, 2026, 6:55 PM</span>
+              </div>
+            </li>
+          
+
+            <li class="doc-item" data-search="turns/2026-05-14-harden-terminal-view.html turns">
+              <a class="doc-link" href="./turns/2026-05-14-harden-terminal-view.html">turns/2026-05-14-harden-terminal-view.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>9.2 KB</span>
+                <span>May 15, 2026, 6:55 PM</span>
+              </div>
+            </li>
+          
+          </ul>
+        </section>
+      
+
+        <section class="group" id="category-daily-git">
+          <h2>daily-git <span>1</span></h2>
+          <ul class="doc-list">
+            
+            <li class="doc-item" data-search="daily-git/2026-05-19-standup-summary-2026-05-18.html daily-git">
+              <a class="doc-link" href="./daily-git/2026-05-19-standup-summary-2026-05-18.html">daily-git/2026-05-19-standup-summary-2026-05-18.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>16 KB</span>
+                <span>May 19, 2026, 2:55 PM</span>
+              </div>
+            </li>
+          
+          </ul>
+        </section>
+      
+
+        <section class="group" id="category-general">
+          <h2>general <span>2</span></h2>
+          <ul class="doc-list">
+            
+            <li class="doc-item" data-search="general/2026-05-18-standup-summary-2026-05-17.html general">
+              <a class="doc-link" href="./general/2026-05-18-standup-summary-2026-05-17.html">general/2026-05-18-standup-summary-2026-05-17.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>19 KB</span>
+                <span>May 18, 2026, 9:05 AM</span>
+              </div>
+            </li>
+          
+
+            <li class="doc-item" data-search="general/2026-05-17-standup-summary-2026-05-16.html general">
+              <a class="doc-link" href="./general/2026-05-17-standup-summary-2026-05-16.html">general/2026-05-17-standup-summary-2026-05-16.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>17 KB</span>
+                <span>May 17, 2026, 10:07 AM</span>
+              </div>
+            </li>
+          
+          </ul>
+        </section>
+      
+
+        <section class="group" id="category-plans">
+          <h2>plans <span>2</span></h2>
+          <ul class="doc-list">
+            
+            <li class="doc-item" data-search="plans/2026-05-18-native-fast-iterative-deploy-plan.html plans">
+              <a class="doc-link" href="./plans/2026-05-18-native-fast-iterative-deploy-plan.html">plans/2026-05-18-native-fast-iterative-deploy-plan.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>3.8 KB</span>
+                <span>May 19, 2026, 2:48 PM</span>
+              </div>
+            </li>
+          
+
+            <li class="doc-item" data-search="plans/2026-05-16-1711-durable-options-tape-history.html plans">
+              <a class="doc-link" href="./plans/2026-05-16-1711-durable-options-tape-history.html">plans/2026-05-16-1711-durable-options-tape-history.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>12 KB</span>
+                <span>May 17, 2026, 5:06 AM</span>
+              </div>
+            </li>
+          
+          </ul>
+        </section>
+      
+
+        <section class="group" id="category-root">
+          <h2>root <span>2</span></h2>
+          <ul class="doc-list">
+            
+            <li class="doc-item" data-search="clickhouse-reset-runbook.md root">
+              <a class="doc-link" href="./clickhouse-reset-runbook.md">clickhouse-reset-runbook.md</a>
+              <div class="meta">
+                <span class="tag">md</span>
+                <span>3.0 KB</span>
+                <span>May 17, 2026, 5:06 AM</span>
+              </div>
+            </li>
+          
+
+            <li class="doc-item" data-search="terminal-audit-2026-05-14-0432.html root">
+              <a class="doc-link" href="./terminal-audit-2026-05-14-0432.html">terminal-audit-2026-05-14-0432.html</a>
+              <div class="meta">
+                <span class="tag">html</span>
+                <span>22 KB</span>
+                <span>May 15, 2026, 6:55 PM</span>
+              </div>
+            </li>
+          
+          </ul>
+        </section>
+      </section>
+      <p class="empty" id="empty-state">No files match that filter.</p>
+    </main>
+
+    <script>
+      const searchInput = document.getElementById("doc-search");
+      const items = Array.from(document.querySelectorAll(".doc-item"));
+      const groups = Array.from(document.querySelectorAll(".group"));
+      const visibleCount = document.getElementById("visible-count");
+      const emptyState = document.getElementById("empty-state");
+
+      function applyFilter(query) {
+        const normalized = query.trim().toLowerCase();
+        let shown = 0;
+
+        for (const item of items) {
+          const searchable = item.dataset.search || "";
+          const isVisible = normalized.length === 0 || searchable.includes(normalized);
+          item.classList.toggle("hidden", !isVisible);
+          if (isVisible) shown += 1;
+        }
+
+        for (const group of groups) {
+          const hasVisibleItems = group.querySelector(".doc-item:not(.hidden)") !== null;
+          group.classList.toggle("hidden", !hasVisibleItems);
+        }
+
+        visibleCount.textContent = String(shown);
+        emptyState.style.display = shown === 0 ? "block" : "none";
+      }
+
+      searchInput.addEventListener("input", () => applyFilter(searchInput.value));
+      applyFilter("");
+    </script>
+  </body>
+</html>
