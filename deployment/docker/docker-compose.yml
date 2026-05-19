@@ -122,6 +122,10 @@ services:
     <<: *service-common
     command: ["services/ingest-equities/src/index.ts"]
 
+  ingest-news:
+    <<: *service-common
+    command: ["services/ingest-news/src/index.ts"]
+
   replay:
     <<: *service-common
     profiles: ["replay"]

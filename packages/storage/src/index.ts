@@ -10,3 +10,4 @@ export * from "./equity-print-joins";
 export * from "./inferred-dark";
 export * from "./option-prints";
 export * from "./option-nbbo";
+export * from "./news";

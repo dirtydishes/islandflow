@@ -33,6 +33,7 @@ import type {
   LiveServerMessage,
   LiveHotChannelHealthMap,
   LiveSubscription,
+  NewsStory,
   OptionFlowFilters,
   OptionFlowView,
   OptionNbboSide,
@@ -158,6 +159,7 @@ type RouteFeatures = {
   nbbo: boolean;
   equities: boolean;
   flow: boolean;
+  news: boolean;
   alerts: boolean;
   smartMoney: boolean;
   classifierHits: boolean;
@@ -168,6 +170,7 @@ type RouteFeatures = {
   showOptionsPane: boolean;
   showEquitiesPane: boolean;
   showFlowPane: boolean;
+  showNewsPane: boolean;
   showAlertsPane: boolean;
   showClassifierPane: boolean;
   showDarkPane: boolean;
@@ -187,6 +190,7 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
   const includeEquitiesFallback = shouldIncludeEquitiesForDarkUnderlyingFallback();
   const normalizedPath =
     pathname === "/tape" ||
+    pathname === "/news" ||
     pathname === "/signals" ||
     pathname === "/charts" ||
     pathname === "/replay"
@@ -200,6 +204,7 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         nbbo: true,
         equities: true,
         flow: true,
+        news: false,
         alerts: false,
         smartMoney: false,
         classifierHits: false,
@@ -210,6 +215,7 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         showOptionsPane: true,
         showEquitiesPane: true,
         showFlowPane: true,
+        showNewsPane: false,
         showAlertsPane: false,
         showClassifierPane: false,
         showDarkPane: false,
@@ -220,12 +226,41 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         needsAlertEvidencePrefetch: false,
         needsDarkUnderlying: false
       };
+    case "/news":
+      return {
+        options: false,
+        nbbo: false,
+        equities: false,
+        flow: false,
+        news: true,
+        alerts: false,
+        smartMoney: false,
+        classifierHits: false,
+        inferredDark: false,
+        equityJoins: false,
+        equityCandles: false,
+        equityOverlay: false,
+        showOptionsPane: false,
+        showEquitiesPane: false,
+        showFlowPane: false,
+        showNewsPane: true,
+        showAlertsPane: false,
+        showClassifierPane: false,
+        showDarkPane: false,
+        showChartPane: false,
+        showFocusPane: false,
+        showReplayConsole: false,
+        needsClassifierDecor: false,
+        needsAlertEvidencePrefetch: false,
+        needsDarkUnderlying: false
+      };
     case "/signals":
       return {
         options: false,
         nbbo: false,
         equities: includeEquitiesFallback,
         flow: false,
+        news: false,
         alerts: true,
         smartMoney: true,
         classifierHits: true,
@@ -236,6 +271,7 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         showOptionsPane: false,
         showEquitiesPane: false,
         showFlowPane: false,
+        showNewsPane: false,
         showAlertsPane: true,
         showClassifierPane: true,
         showDarkPane: true,
@@ -252,6 +288,7 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         nbbo: false,
         equities: includeEquitiesFallback,
         flow: false,
+        news: false,
         alerts: false,
         smartMoney: true,
         classifierHits: false,
@@ -262,6 +299,7 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         showOptionsPane: false,
         showEquitiesPane: false,
         showFlowPane: false,
+        showNewsPane: false,
         showAlertsPane: false,
         showClassifierPane: false,
         showDarkPane: false,
@@ -278,6 +316,7 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         nbbo: false,
         equities: false,
         flow: false,
+        news: false,
         alerts: false,
         smartMoney: false,
         classifierHits: false,
@@ -288,6 +327,7 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         showOptionsPane: true,
         showEquitiesPane: false,
         showFlowPane: true,
+        showNewsPane: false,
         showAlertsPane: true,
         showClassifierPane: false,
         showDarkPane: false,
@@ -305,6 +345,7 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         nbbo: false,
         equities: true,
         flow: false,
+        news: true,
         alerts: true,
         smartMoney: true,
         classifierHits: false,
@@ -315,6 +356,7 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         showOptionsPane: false,
         showEquitiesPane: true,
         showFlowPane: false,
+        showNewsPane: true,
         showAlertsPane: true,
         showClassifierPane: false,
         showDarkPane: false,
@@ -332,6 +374,7 @@ const EMPTY_ALERT_EVENTS: AlertEvent[] = [];
 const EMPTY_CLASSIFIER_HIT_EVENTS: ClassifierHitEvent[] = [];
 const EMPTY_SMART_MONEY_EVENTS: SmartMoneyEvent[] = [];
 const EMPTY_INFERRED_DARK_EVENTS: InferredDarkEvent[] = [];
+const EMPTY_NEWS_STORIES: NewsStory[] = [];
 
 type CandlestickSeries = ReturnType<IChartApi["addCandlestickSeries"]>;
 
@@ -1194,6 +1237,44 @@ const formatDateTime = (ts: number): string => {
   return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
 };
 
+const isSameLocalDay = (left: number, right: number): boolean => {
+  const a = new Date(left);
+  const b = new Date(right);
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+};
+
+export const formatNewsTimestamp = (ts: number, now = Date.now()): string => {
+  const date = new Date(ts);
+  return isSameLocalDay(ts, now)
+    ? date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+    : date.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+};
+
+const sanitizeNewsHtml = (value: string): { html: string; fallbackText: string; sanitized: boolean } => {
+  const fallbackText = value
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  try {
+    const sanitized = value
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[\s\S]*?<\/style>/gi, "")
+      .replace(/\son\w+=(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+      .replace(/\shref=(["'])javascript:[\s\S]*?\1/gi, ' href="#"')
+      .replace(/<(?!\/?(p|div|section|article|span|strong|em|b|i|ul|ol|li|br|a|h1|h2|h3|h4|blockquote)\b)[^>]*>/gi, "");
+    return { html: sanitized, fallbackText, sanitized: true };
+  } catch {
+    return { html: "", fallbackText, sanitized: false };
+  }
+};
+
 const humanizeClassifierId = (value: string): string => {
   if (!value) {
     return "Classifier";
@@ -1668,7 +1749,7 @@ export const getOptionTableSnapshot = (
 };
 
 type ListScrollState = {
-  listRef: React.RefObject<HTMLDivElement>;
+  listRef: React.RefObject<HTMLDivElement | null>;
   listNode: HTMLDivElement | null;
   setListRef: (node: HTMLDivElement | null) => void;
   isAtTop: boolean;
@@ -1773,7 +1854,7 @@ const useListScroll = (): ListScrollState => {
 };
 
 const useScrollAnchor = (
-  listRef: React.RefObject<HTMLDivElement>,
+  listRef: React.RefObject<HTMLDivElement | null>,
   isAtTopRef: React.MutableRefObject<boolean>
 ) => {
   const pendingRef = useRef<{
@@ -1915,7 +1996,7 @@ type TapeVirtualRow<T> = {
 
 const useTapeVirtualList = <T extends SortableItem>(
   items: T[],
-  listRef: React.RefObject<HTMLDivElement>,
+  listRef: React.RefObject<HTMLDivElement | null>,
   config: TapeVirtualListConfig
 ): TapeVirtualListResult<T> => {
   const virtualizer = useVirtualizer<HTMLDivElement, HTMLElement>({
@@ -2870,6 +2951,7 @@ type LiveSessionState = {
   smartMoneyHistory: SmartMoneyEvent[];
   classifierHitsHistory: ClassifierHitEvent[];
   alertsHistory: AlertEvent[];
+  newsHistory: NewsStory[];
   inferredDarkHistory: InferredDarkEvent[];
   options: OptionPrint[];
   nbbo: OptionNBBO[];
@@ -2880,6 +2962,7 @@ type LiveSessionState = {
   smartMoney: SmartMoneyEvent[];
   classifierHits: ClassifierHitEvent[];
   alerts: AlertEvent[];
+  news: NewsStory[];
   inferredDark: InferredDarkEvent[];
   chartCandles: EquityCandle[];
   chartOverlay: EquityPrint[];
@@ -2900,6 +2983,7 @@ const LIVE_HISTORY_ENDPOINTS: Partial<Record<LiveSubscription["channel"], string
   "smart-money": "/history/smart-money",
   "classifier-hits": "/history/classifier-hits",
   alerts: "/history/alerts",
+  news: "/history/news",
   "inferred-dark": "/history/inferred-dark"
 };
 
@@ -3072,6 +3156,9 @@ export const getLiveManifest = (
   if (features.flow) {
     subscriptions.push({ channel: "flow", filters: flowFilters, snapshot_limit: LIVE_HOT_WINDOW });
   }
+  if (features.news) {
+    subscriptions.push({ channel: "news", snapshot_limit: LIVE_OPTIONS_HEAD_LIMIT });
+  }
   if (features.alerts) {
     subscriptions.push({ channel: "alerts", snapshot_limit: LIVE_HOT_WINDOW });
   }
@@ -3133,6 +3220,7 @@ const useLiveSession = (
   const [smartMoney, setSmartMoney] = useState<SmartMoneyEvent[]>([]);
   const [classifierHits, setClassifierHits] = useState<ClassifierHitEvent[]>([]);
   const [alerts, setAlerts] = useState<AlertEvent[]>([]);
+  const [news, setNews] = useState<NewsStory[]>([]);
   const [inferredDark, setInferredDark] = useState<InferredDarkEvent[]>([]);
   const [optionsHistory, setOptionsHistory] = useState<OptionPrint[]>([]);
   const [nbboHistory, setNbboHistory] = useState<OptionNBBO[]>([]);
@@ -3142,6 +3230,7 @@ const useLiveSession = (
   const [smartMoneyHistory, setSmartMoneyHistory] = useState<SmartMoneyEvent[]>([]);
   const [classifierHitsHistory, setClassifierHitsHistory] = useState<ClassifierHitEvent[]>([]);
   const [alertsHistory, setAlertsHistory] = useState<AlertEvent[]>([]);
+  const [newsHistory, setNewsHistory] = useState<NewsStory[]>([]);
   const [inferredDarkHistory, setInferredDarkHistory] = useState<InferredDarkEvent[]>([]);
   const [chartCandles, setChartCandles] = useState<EquityCandle[]>([]);
   const [chartOverlay, setChartOverlay] = useState<EquityPrint[]>([]);
@@ -3154,6 +3243,7 @@ const useLiveSession = (
   const smartMoneyRef = useRef<SmartMoneyEvent[]>([]);
   const classifierHitsRef = useRef<ClassifierHitEvent[]>([]);
   const alertsRef = useRef<AlertEvent[]>([]);
+  const newsRef = useRef<NewsStory[]>([]);
   const inferredDarkRef = useRef<InferredDarkEvent[]>([]);
   const chartCandlesRef = useRef<EquityCandle[]>([]);
   const chartOverlayRef = useRef<EquityPrint[]>([]);
@@ -3165,6 +3255,7 @@ const useLiveSession = (
   const smartMoneyHistoryRef = useRef<SmartMoneyEvent[]>([]);
   const classifierHitsHistoryRef = useRef<ClassifierHitEvent[]>([]);
   const alertsHistoryRef = useRef<AlertEvent[]>([]);
+  const newsHistoryRef = useRef<NewsStory[]>([]);
   const inferredDarkHistoryRef = useRef<InferredDarkEvent[]>([]);
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<number | null>(null);
@@ -3218,6 +3309,7 @@ const useLiveSession = (
       setSmartMoney([]);
       setClassifierHits([]);
       setAlerts([]);
+      setNews([]);
       setInferredDark([]);
       setOptionsHistory([]);
       setNbboHistory([]);
@@ -3227,6 +3319,7 @@ const useLiveSession = (
       setSmartMoneyHistory([]);
       setClassifierHitsHistory([]);
       setAlertsHistory([]);
+      setNewsHistory([]);
       setInferredDarkHistory([]);
       setChartCandles([]);
       setChartOverlay([]);
@@ -3239,6 +3332,7 @@ const useLiveSession = (
       smartMoneyRef.current = [];
       classifierHitsRef.current = [];
       alertsRef.current = [];
+      newsRef.current = [];
       inferredDarkRef.current = [];
       chartCandlesRef.current = [];
       chartOverlayRef.current = [];
@@ -3250,6 +3344,7 @@ const useLiveSession = (
       smartMoneyHistoryRef.current = [];
       classifierHitsHistoryRef.current = [];
       alertsHistoryRef.current = [];
+      newsHistoryRef.current = [];
       inferredDarkHistoryRef.current = [];
       subscribedKeysRef.current = new Set();
       subscribedMapRef.current = new Map();
@@ -3401,6 +3496,12 @@ const useLiveSession = (
           mergeItems(setAlerts, alertsRef, items as AlertEvent[], LIVE_HOT_WINDOW, {
             setter: setAlertsHistory,
             ref: alertsHistoryRef
+          });
+          break;
+        case "news":
+          mergeItems(setNews, newsRef, items as NewsStory[], LIVE_OPTIONS_HEAD_LIMIT, {
+            setter: setNewsHistory,
+            ref: newsHistoryRef
           });
           break;
         case "inferred-dark":
@@ -3694,6 +3795,9 @@ const useLiveSession = (
           case "alerts":
             mergeOlder(setAlertsHistory, alertsHistoryRef, alertsRef.current);
             break;
+          case "news":
+            mergeOlder(setNewsHistory, newsHistoryRef, newsRef.current);
+            break;
           case "inferred-dark":
             mergeOlder(setInferredDarkHistory, inferredDarkHistoryRef, inferredDarkRef.current);
             break;
@@ -3735,6 +3839,7 @@ const useLiveSession = (
     smartMoneyHistory,
     classifierHitsHistory,
     alertsHistory,
+    newsHistory,
     inferredDarkHistory,
     options,
     nbbo,
@@ -3745,6 +3850,7 @@ const useLiveSession = (
     smartMoney,
     classifierHits,
     alerts,
+    news,
     inferredDark,
     chartCandles,
     chartOverlay
@@ -4822,6 +4928,69 @@ const AlertDrawer = ({ alert, flowPacket, evidence, contextStatus, onClose }: Al
   );
 };
 
+type NewsDrawerProps = {
+  story: NewsStory;
+  onClose: () => void;
+};
+
+const NewsDrawer = ({ story, onClose }: NewsDrawerProps) => {
+  const body = sanitizeNewsHtml(story.content_html);
+
+  return (
+    <aside className="drawer">
+      <div className="drawer-header">
+        <div>
+          <p className="drawer-eyebrow">News wire</p>
+          <h3>{story.headline}</h3>
+          <p className="drawer-subtitle">
+            {story.source} · Published {formatDateTime(story.published_ts)}
+            {story.updated_ts !== story.published_ts ? ` · Updated ${formatDateTime(story.updated_ts)}` : ""}
+          </p>
+        </div>
+        <button className="drawer-close" type="button" onClick={onClose}>
+          Close
+        </button>
+      </div>
+
+      <div className="drawer-meta">
+        {story.resolved_symbols.map((symbol) => (
+          <span className="drawer-chip" key={`${story.trace_id}-${symbol}`}>
+            {symbol}
+          </span>
+        ))}
+        <span className="drawer-chip">{story.symbol_resolution}</span>
+      </div>
+
+      {story.summary ? (
+        <div className="drawer-section">
+          <h4>Summary</h4>
+          <p className="drawer-note">{story.summary}</p>
+        </div>
+      ) : null}
+
+      <div className="drawer-section">
+        <h4>Story</h4>
+        {body.sanitized && body.html ? (
+          <div className="drawer-note news-drawer-body" dangerouslySetInnerHTML={{ __html: body.html }} />
+        ) : body.fallbackText ? (
+          <p className="drawer-note">{body.fallbackText}</p>
+        ) : (
+          <p className="drawer-empty">Story body unavailable.</p>
+        )}
+      </div>
+
+      {story.url ? (
+        <div className="drawer-section">
+          <h4>Source link</h4>
+          <a className="terminal-button terminal-link-button" href={story.url} rel="noreferrer" target="_blank">
+            Open original article
+          </a>
+        </div>
+      ) : null}
+    </aside>
+  );
+};
+
 type ClassifierHitDrawerProps = {
   hit: ClassifierHitEvent;
   flowPacket: FlowPacket | null;
@@ -5178,6 +5347,7 @@ const useTerminalState = () => {
   const [mode, setMode] = useState<TapeMode>("live");
   const [replaySource, setReplaySource] = useState<string | null>(null);
   const [selectedAlert, setSelectedAlert] = useState<AlertEvent | null>(null);
+  const [selectedNewsStory, setSelectedNewsStory] = useState<NewsStory | null>(null);
   const [selectedDarkEvent, setSelectedDarkEvent] = useState<InferredDarkEvent | null>(null);
   const [selectedClassifierHit, setSelectedClassifierHit] = useState<ClassifierHitEvent | null>(null);
   const [selectedSmartMoneyEvent, setSelectedSmartMoneyEvent] = useState<SmartMoneyEvent | null>(null);
@@ -5274,12 +5444,13 @@ const useTerminalState = () => {
   }, [mode]);
 
   useEffect(() => {
-    if (!selectedAlert && !selectedClassifierHit && !selectedDarkEvent && !selectedSmartMoneyEvent) {
+    if (!selectedAlert && !selectedNewsStory && !selectedClassifierHit && !selectedDarkEvent && !selectedSmartMoneyEvent) {
       return;
     }
 
     const dismissDrawers = () => {
       setSelectedAlert(null);
+      setSelectedNewsStory(null);
       setSelectedClassifierHit(null);
       setSelectedSmartMoneyEvent(null);
       setSelectedDarkEvent(null);
@@ -5305,7 +5476,7 @@ const useTerminalState = () => {
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [selectedAlert, selectedClassifierHit, selectedDarkEvent, selectedSmartMoneyEvent]);
+  }, [selectedAlert, selectedNewsStory, selectedClassifierHit, selectedDarkEvent, selectedSmartMoneyEvent]);
 
   const optionsScroll = useListScroll();
   const equitiesScroll = useListScroll();
@@ -5540,6 +5711,14 @@ const useTerminalState = () => {
         )
       : equityJoins;
   const flowFeed = mode === "live" ? liveFlow : flow;
+  const newsFeed =
+    mode === "live"
+      ? toStaticTapeState(
+          liveSession.status,
+          composeTapeItems([], liveSession.news, liveSession.newsHistory),
+          liveSession.lastUpdate
+        )
+      : toStaticTapeState("disconnected", [], null);
   const alertsFeed =
     mode === "live"
       ? toStaticTapeState(
@@ -6490,6 +6669,16 @@ const useTerminalState = () => {
     routeFeatures.needsAlertEvidencePrefetch
   ]);
 
+  const filteredNews = useMemo(() => {
+    if (!routeFeatures.news && !routeFeatures.showNewsPane) {
+      return EMPTY_NEWS_STORIES;
+    }
+    if (tickerSet.size === 0) {
+      return newsFeed.items;
+    }
+    return newsFeed.items.filter((story) => story.resolved_symbols.some((symbol) => matchesTicker(symbol)));
+  }, [matchesTicker, newsFeed.items, routeFeatures.news, routeFeatures.showNewsPane, tickerSet]);
+
   const visibleAlerts = useMemo(() => {
     if (routeFeatures.needsAlertEvidencePrefetch) {
       return filteredAlerts.slice(0, 12);
@@ -6767,6 +6956,7 @@ const useTerminalState = () => {
     (hit: ClassifierHitEvent) => {
       const alert = findAlertForClassifierHit(hit);
       if (alert) {
+        setSelectedNewsStory(null);
         setSelectedClassifierHit(null);
         setSelectedDarkEvent(null);
         setSelectedSmartMoneyEvent(null);
@@ -6774,6 +6964,7 @@ const useTerminalState = () => {
         return;
       }
 
+      setSelectedNewsStory(null);
       setSelectedAlert(null);
       setSelectedDarkEvent(null);
       setSelectedSmartMoneyEvent(null);
@@ -6783,6 +6974,7 @@ const useTerminalState = () => {
   );
 
   const openFromSmartMoneyEvent = useCallback((event: SmartMoneyEvent) => {
+    setSelectedNewsStory(null);
     setSelectedAlert(null);
     setSelectedClassifierHit(null);
     setSelectedDarkEvent(null);
@@ -6797,6 +6989,7 @@ const useTerminalState = () => {
   );
 
   const handleDarkMarkerClick = useCallback((event: InferredDarkEvent) => {
+    setSelectedNewsStory(null);
     setSelectedAlert(null);
     setSelectedClassifierHit(null);
     setSelectedSmartMoneyEvent(null);
@@ -6816,6 +7009,9 @@ const useTerminalState = () => {
     }
     if (routeFeatures.flow || routeFeatures.showFlowPane) {
       updates.push(flowFeed.lastUpdate);
+    }
+    if (routeFeatures.news || routeFeatures.showNewsPane) {
+      updates.push(newsFeed.lastUpdate);
     }
     if (routeFeatures.alerts || routeFeatures.showAlertsPane) {
       updates.push(alertsFeed.lastUpdate);
@@ -6839,6 +7035,8 @@ const useTerminalState = () => {
     routeFeatures.showFocusPane,
     routeFeatures.flow,
     routeFeatures.showFlowPane,
+    routeFeatures.news,
+    routeFeatures.showNewsPane,
     routeFeatures.alerts,
     routeFeatures.showAlertsPane,
     routeFeatures.smartMoney,
@@ -6849,6 +7047,7 @@ const useTerminalState = () => {
     equitiesFeed.lastUpdate,
     inferredDarkFeed.lastUpdate,
     flowFeed.lastUpdate,
+    newsFeed.lastUpdate,
     alertsFeed.lastUpdate,
     smartMoneyFeed.lastUpdate,
     classifierHitsFeed.lastUpdate
@@ -6861,6 +7060,8 @@ const useTerminalState = () => {
     setReplaySource,
     selectedAlert,
     setSelectedAlert,
+    selectedNewsStory,
+    setSelectedNewsStory,
     selectedDarkEvent,
     setSelectedDarkEvent,
     selectedClassifierHit,
@@ -6887,6 +7088,7 @@ const useTerminalState = () => {
     equityJoins: equityJoinsFeed,
     nbbo: nbboFeed,
     inferredDark: inferredDarkFeed,
+    news: newsFeed,
     flow: flowFeed,
     alerts: alertsFeed,
     smartMoney: smartMoneyFeed,
@@ -6920,6 +7122,7 @@ const useTerminalState = () => {
     equitiesScopedQuiet,
     equitiesSilentWarning,
     filteredInferredDark,
+    filteredNews,
     filteredFlow,
     filteredAlerts,
     filteredSmartMoneyEvents,
@@ -6953,7 +7156,8 @@ const useTerminal = (): TerminalState => {
 
 export const NAV_ITEMS = [
   { href: "/", label: "Home" },
-  { href: "/tape", label: "Tape" }
+  { href: "/tape", label: "Tape" },
+  { href: "/news", label: "News" }
 ] as const;
 
 type PageFrameProps = {
@@ -7780,6 +7984,7 @@ const AlertsPane = memo(({ state, limit, withStrip = false, className }: AlertsP
                         data-tape-key={key}
                         style={{ transform: `translateY(${start}px)` }}
                         onClick={() => {
+                          state.setSelectedNewsStory(null);
                           state.setSelectedDarkEvent(null);
                           state.setSelectedClassifierHit(null);
                           state.setSelectedSmartMoneyEvent(null);
@@ -7802,6 +8007,83 @@ const AlertsPane = memo(({ state, limit, withStrip = false, className }: AlertsP
           </div>
         )}
       </div>
+    </Pane>
+  );
+});
+
+type NewsPaneProps = {
+  state: TerminalState;
+  limit?: number;
+  className?: string;
+};
+
+const NewsPane = memo(({ state, limit, className }: NewsPaneProps) => {
+  const items = limit ? state.filteredNews.slice(0, limit) : state.filteredNews;
+  const canLoadOlder = state.mode === "live" && !limit && items.length > 0;
+
+  return (
+    <Pane
+      className={className}
+      title="News Wire"
+      status={
+        limit ? (
+          <Link className="terminal-button terminal-link-button" href="/news">
+            View all
+          </Link>
+        ) : (
+          <div className="status-inline status-connected">
+            <span className="status-dot" />
+            <span>{state.mode === "live" ? "Live wire" : "Live-only in v1"}</span>
+          </div>
+        )
+      }
+      actions={
+        canLoadOlder ? (
+          <button className="terminal-button" type="button" onClick={() => void state.liveSession.loadOlder("news")}>
+            Older
+          </button>
+        ) : null
+      }
+    >
+      {state.mode === "replay" ? (
+        <div className="empty">News is live-only in v1.</div>
+      ) : items.length === 0 ? (
+        <div className="empty">
+          {state.tickerSet.size > 0 ? "No news stories match the current filter." : "Waiting for live news stories."}
+        </div>
+      ) : (
+        <div className="news-list" role="list" aria-label="News stories">
+          {items.map((story) => (
+            <button
+              className="news-row"
+              key={`${story.trace_id}:${story.updated_ts}:${story.seq}`}
+              type="button"
+              onClick={() => {
+                state.setSelectedNewsStory(null);
+                state.setSelectedAlert(null);
+                state.setSelectedClassifierHit(null);
+                state.setSelectedSmartMoneyEvent(null);
+                state.setSelectedDarkEvent(null);
+                state.setSelectedNewsStory(story);
+              }}
+            >
+              <div className="news-row-head">
+                <h3>{story.headline}</h3>
+                <span className="news-row-time">{formatNewsTimestamp(story.published_ts)}</span>
+              </div>
+              <div className="news-row-meta">
+                <span>{story.source}</span>
+                {story.resolved_symbols.map((symbol) => (
+                  <span className="drawer-chip" key={`${story.trace_id}-${symbol}`}>
+                    {symbol}
+                  </span>
+                ))}
+              </div>
+              {!limit && story.summary ? <p className="drawer-note">{story.summary}</p> : null}
+            </button>
+          ))}
+        </div>
+      )}
     </Pane>
   );
 });
@@ -8016,6 +8298,7 @@ const DarkPane = memo(({ state, limit, className }: DarkPaneProps) => {
                         data-tape-key={key}
                         style={{ transform: `translateY(${start}px)` }}
                         onClick={() => {
+                          state.setSelectedNewsStory(null);
                           state.setSelectedAlert(null);
                           state.setSelectedClassifierHit(null);
                           state.setSelectedSmartMoneyEvent(null);
@@ -8624,6 +8907,10 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
           />
         ) : null}
 
+        {state.selectedNewsStory ? (
+          <NewsDrawer story={state.selectedNewsStory} onClose={() => state.setSelectedNewsStory(null)} />
+        ) : null}
+
         {state.selectedClassifierHit ? (
           <ClassifierHitDrawer
             hit={state.selectedClassifierHit}
@@ -8662,7 +8949,19 @@ export function OverviewRoute() {
       <div className="page-grid page-grid-home">
         <ChartPane state={state} />
         <EquitiesPane state={state} />
+        <NewsPane state={state} limit={6} />
         <AlertsPane state={state} withStrip />
+      </div>
+    </PageFrame>
+  );
+}
+
+export function NewsRoute() {
+  const state = useTerminal();
+  return (
+    <PageFrame title="News">
+      <div className="page-grid page-grid-news">
+        <NewsPane state={state} className="news-pane-full" />
       </div>
     </PageFrame>
   );

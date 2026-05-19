@@ -9,6 +9,7 @@ import {
   SUBJECT_EQUITY_QUOTES,
   SUBJECT_INFERRED_DARK,
   SUBJECT_FLOW_PACKETS,
+  SUBJECT_NEWS,
   SUBJECT_SMART_MONEY_EVENTS,
   SUBJECT_OPTION_NBBO,
   SUBJECT_OPTION_SIGNAL_PRINTS,
@@ -20,6 +21,7 @@ import {
   STREAM_EQUITY_QUOTES,
   STREAM_INFERRED_DARK,
   STREAM_FLOW_PACKETS,
+  STREAM_NEWS,
   STREAM_SMART_MONEY_EVENTS,
   STREAM_OPTION_NBBO,
   STREAM_OPTION_SIGNAL_PRINTS,
@@ -35,6 +37,7 @@ import {
 import {
   createClickHouseClient,
   ensureAlertsTable,
+  ensureNewsTable,
   ensureClassifierHitsTable,
   ensureEquityCandlesTable,
   ensureEquityPrintJoinsTable,
@@ -48,6 +51,8 @@ import {
   fetchAlertsAfter,
   fetchAlertsBefore,
   fetchAlertContextByTraceId,
+  fetchNewsAfter,
+  fetchNewsBefore,
   fetchClassifierHitsAfter,
   fetchClassifierHitsBefore,
   fetchSmartMoneyEventsAfter,
@@ -58,6 +63,7 @@ import {
   fetchFlowPacketsByMemberTraceIds,
   fetchFlowPacketsBefore,
   fetchRecentAlerts,
+  fetchRecentNews,
   fetchRecentClassifierHits,
   fetchRecentSmartMoneyEvents,
   fetchRecentEquityPrintJoins,
@@ -99,6 +105,7 @@ import {
   EquityQuoteSchema,
   FeedSnapshot,
   InferredDarkEventSchema,
+  NewsStorySchema,
   LiveClientMessageSchema,
   LiveServerMessage,
   LiveSubscription,
@@ -677,7 +684,8 @@ const run = async () => {
       STREAM_FLOW_PACKETS,
       STREAM_SMART_MONEY_EVENTS,
       STREAM_CLASSIFIER_HITS,
-      STREAM_ALERTS
+      STREAM_ALERTS,
+      STREAM_NEWS
     ],
     { logger }
   );
@@ -720,6 +728,7 @@ const run = async () => {
     await ensureSmartMoneyEventsTable(clickhouse);
     await ensureClassifierHitsTable(clickhouse);
     await ensureAlertsTable(clickhouse);
+    await ensureNewsTable(clickhouse);
   });
 
   let redis: ReturnType<typeof createClient> | null = null;
@@ -844,6 +853,11 @@ const run = async () => {
       subject: SUBJECT_ALERTS,
       stream: STREAM_ALERTS,
       durableName: "api-alerts"
+    },
+    {
+      subject: SUBJECT_NEWS,
+      stream: STREAM_NEWS,
+      durableName: "api-news"
     }
   ] as const;
 
@@ -992,10 +1006,16 @@ const run = async () => {
     consumerBindings[10].durableName
   );
 
+  const newsSubscription = await subscribeWithReset(
+    consumerBindings[11].subject,
+    consumerBindings[11].stream,
+    consumerBindings[11].durableName
+  );
+
   const fanoutLive = async (
     subscription: LiveSubscription,
     item: unknown,
-    ingestChannel: "options" | "nbbo" | "equities" | "equity-quotes" | "equity-candles" | "equity-overlay" | "equity-joins" | "flow" | "classifier-hits" | "alerts" | "inferred-dark"
+    ingestChannel: "options" | "nbbo" | "equities" | "equity-quotes" | "equity-candles" | "equity-overlay" | "equity-joins" | "flow" | "classifier-hits" | "alerts" | "inferred-dark" | "news"
   ) => {
     const watermark = await liveState.ingest(ingestChannel, item);
 
@@ -1253,6 +1273,21 @@ const run = async () => {
     }
   };
 
+  const pumpNews = async () => {
+    for await (const msg of newsSubscription.messages) {
+      try {
+        const payload = NewsStorySchema.parse(newsSubscription.decode(msg));
+        await fanoutLive({ channel: "news" }, payload, "news");
+        msg.ack();
+      } catch (error) {
+        logger.error("failed to process news story", {
+          error: error instanceof Error ? error.message : String(error)
+        });
+        msg.term();
+      }
+    }
+  };
+
   void pumpOptions();
   void pumpOptionNbbo();
   void pumpEquities();
@@ -1264,6 +1299,7 @@ const run = async () => {
   void pumpSmartMoney();
   void pumpClassifierHits();
   void pumpAlerts();
+  void pumpNews();
 
   const buildSyntheticStatusBody = () => {
     const derived =
@@ -1492,6 +1528,12 @@ const run = async () => {
         return jsonResponse({ data });
       }
 
+      if (req.method === "GET" && url.pathname === "/news") {
+        const limit = parseLimit(url.searchParams.get("limit") ?? "100");
+        const data = await fetchRecentNews(clickhouse, limit);
+        return jsonResponse({ data });
+      }
+
       if (req.method === "GET" && isAlertContextPath(url.pathname)) {
         try {
           const traceId = parseAlertContextTraceIdPath(url.pathname);
@@ -1606,6 +1648,14 @@ const run = async () => {
         const data = await fetchInferredDarkBefore(clickhouse, beforeTs, beforeSeq, limit);
         return jsonResponse(
           buildHistoryResponse(data, (item) => ({ ts: item.source_ts, seq: item.seq }))
+        );
+      }
+
+      if (req.method === "GET" && url.pathname === "/history/news") {
+        const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
+        const data = await fetchNewsBefore(clickhouse, beforeTs, beforeSeq, limit);
+        return jsonResponse(
+          buildHistoryResponse(data, (item) => ({ ts: item.published_ts, seq: item.seq }))
         );
       }
 

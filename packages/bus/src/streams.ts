@@ -7,6 +7,7 @@ import {
   STREAM_EQUITY_QUOTES,
   STREAM_FLOW_PACKETS,
   STREAM_INFERRED_DARK,
+  STREAM_NEWS,
   STREAM_OPTION_NBBO,
   STREAM_OPTION_PRINTS,
   STREAM_OPTION_SIGNAL_PRINTS,
@@ -19,6 +20,7 @@ import {
   SUBJECT_EQUITY_QUOTES,
   SUBJECT_FLOW_PACKETS,
   SUBJECT_INFERRED_DARK,
+  SUBJECT_NEWS,
   SUBJECT_OPTION_NBBO,
   SUBJECT_OPTION_PRINTS,
   SUBJECT_OPTION_SIGNAL_PRINTS,
@@ -53,7 +55,8 @@ export const STREAM_CATALOG: readonly KnownStreamDefinition[] = [
     retentionClass: "derived"
   },
   { name: STREAM_CLASSIFIER_HITS, subject: SUBJECT_CLASSIFIER_HITS, retentionClass: "derived" },
-  { name: STREAM_ALERTS, subject: SUBJECT_ALERTS, retentionClass: "derived" }
+  { name: STREAM_ALERTS, subject: SUBJECT_ALERTS, retentionClass: "derived" },
+  { name: STREAM_NEWS, subject: SUBJECT_NEWS, retentionClass: "derived" }
 ];
 
 const STREAM_CATALOG_BY_NAME = new Map(STREAM_CATALOG.map((definition) => [definition.name, definition]));

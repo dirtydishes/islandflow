@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>README Current-State Update</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #17131f;
+        --panel: #231b31;
+        --panel-2: #2c223d;
+        --text: #f3edf8;
+        --muted: #cbbdda;
+        --line: #514160;
+        --lavender: #c9a7ff;
+        --pink: #f0a7d7;
+        --code: #120e18;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: "IBM Plex Sans", Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.62;
+      }
+
+      main {
+        width: min(980px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 48px 0 64px;
+      }
+
+      header {
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 32px;
+        padding-bottom: 24px;
+      }
+
+      .eyebrow,
+      h1,
+      h2,
+      code,
+      pre {
+        font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      .eyebrow {
+        color: var(--pink);
+        font-size: 0.82rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 8px 0 12px;
+        font-size: clamp(2rem, 4vw, 3.4rem);
+        line-height: 1.08;
+      }
+
+      h2 {
+        color: var(--lavender);
+        font-size: 1.05rem;
+        margin: 0 0 12px;
+      }
+
+      section {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        margin: 18px 0;
+        padding: 22px;
+      }
+
+      p {
+        margin: 0 0 12px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 22px;
+      }
+
+      li + li {
+        margin-top: 6px;
+      }
+
+      code {
+        background: var(--code);
+        border: 1px solid #3a2d49;
+        border-radius: 5px;
+        color: #f4c4e2;
+        padding: 0.12rem 0.32rem;
+      }
+
+      pre {
+        overflow-x: auto;
+        background: var(--code);
+        border: 1px solid #3a2d49;
+        border-radius: 8px;
+        color: #eadff2;
+        padding: 16px;
+      }
+
+      pre code {
+        background: transparent;
+        border: 0;
+        color: inherit;
+        padding: 0;
+      }
+
+      .summary {
+        color: var(--muted);
+        max-width: 72ch;
+      }
+
+      .pillrow {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 16px;
+      }
+
+      .pill {
+        background: var(--panel-2);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--muted);
+        padding: 5px 10px;
+      }
+
+      a {
+        color: var(--pink);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="eyebrow">Turn document · 2026-05-19 07:39 America/New_York</div>
+        <h1>README Current-State Update</h1>
+        <p class="summary">
+          Resolved the README merge conflict and rewrote the project overview so it matches the current Islandflow codebase, including the smart-money taxonomy, Next.js 16 update, news ingest, desktop shell, and current deployment posture.
+        </p>
+        <div class="pillrow">
+          <span class="pill">README.md</span>
+          <span class="pill">smart-money taxonomy</span>
+          <span class="pill">Next.js 16.2.6</span>
+          <span class="pill">deployment docs</span>
+        </div>
+      </header>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          The README no longer contains conflict markers. It now gives a concise but current description of the platform, its runtime services, public smart-money categories, environment knobs, and supported deployment workflow.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Resolved the conflicted README by preserving the useful project-state content and removing stale simplified sections.</li>
+          <li>Added a first-class smart-money taxonomy section for the six public profiles: <code>institutional_directional</code>, <code>retail_whale</code>, <code>event_driven</code>, <code>vol_seller</code>, <code>arbitrage</code>, and <code>hedge_reactive</code>.</li>
+          <li>Documented that smart-money events are now the semantic object, while legacy classifier hits and alerts remain compatibility surfaces.</li>
+          <li>Updated the current implementation state to include Alpaca news ingest, profile-aware UI behavior, alert-context hydration, and the Electron shell.</li>
+          <li>Recorded the Next.js update to <code>16.2.6</code> with React and React DOM <code>19.2.0</code>.</li>
+          <li>Clarified deployment: Docker is still the supported VPS path, native Bun/systemd rollout is experimental, and scoped deploy flags are available.</li>
+          <li>Aligned live-cache and web hot-window defaults with the current env examples and API defaults.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          Recent commits showed the README branch was carrying a Next.js upgrade, Alpaca news support, smart-money event work, and deployment helper changes. The prior README mixed both sides of a merge conflict and did not explain the newer taxonomy-driven classifier model.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <p>
+          The README intentionally treats <code>FlowPacket</code> as an intermediate clustering bridge and <code>SmartMoneyEvent</code> as the current semantic surface. It also documents abstention and suppression behavior so readers do not mistake every large print for a forced smart-money label.
+        </p>
+        <p>
+          Deployment language now matches the current operations docs: <code>./deploy main</code> defaults to the Docker path, <code>--runtime native</code> is available but experimental, and native rollout still depends on systemd units and reverse-proxy preparation.
+        </p>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p>
+          Diff snippets are formatted for readability in the same spirit as <a href="https://diffs.com/docs">diffs.com</a>, with only the most relevant README changes shown here.
+        </p>
+        <pre><code>+## Smart-Money Classification Taxonomy
++
++Islandflow now emits first-class `SmartMoneyEvent` records instead of treating old classifier hits as the final semantic object.
++
++| Profile ID | Meaning | Common evidence |
++| --- | --- | --- |
++| `institutional_directional` | Large directional parent flow with stronger institutional-style conviction. | premium, size, sweep/burst behavior, aggressor imbalance, quote quality |
++| `retail_whale` | Large retail-style speculative bursts, often short-dated or attention-driven. | short-dated OTM concentration, burst prints, IV shock |
++| `event_driven` | Flow aligned to known upcoming events. | event-calendar proximity, expiry after event, pre-event concentration |
++| `vol_seller` | Premium-selling or short-volatility structure evidence. | sell-side premium, straddles/strangles |
++| `arbitrage` | Multi-leg or symmetric structures with low directional exposure. | matched leg symmetry, near-flat directional bias |
++| `hedge_reactive` | Hedge or dealer-reaction style flow around short-dated ATM/gamma context. | 0-2 DTE, near-ATM contracts, underlying move linkage |</code></pre>
+        <pre><code>+## Deployment Workflow
++
++Docker remains the supported and recommended path for the current VPS.
++
++./deploy main
++./deploy main --runtime docker
++./deploy current-branch
++./deploy current-branch --runtime docker
++
++Native deployment is opt-in and experimental:
++
++./deploy main --runtime native
++./deploy current-branch --runtime native</code></pre>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <p>
+          New contributors or future sessions should be able to read the README and understand what Islandflow currently does, which service owns each capability, how the smart-money labels should be interpreted, and which deployment command is appropriate for the VPS.
+        </p>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li>Confirmed no merge conflict markers remain with <code>rg -n "&lt;&lt;&lt;&lt;&lt;&lt;&lt;|=======|&gt;&gt;&gt;&gt;&gt;&gt;&gt;" README.md</code>.</li>
+          <li>Ran <code>git diff --check</code>; no whitespace or patch-format issues were reported.</li>
+          <li>Ran focused tests: <code>bun test packages/types/tests/options-flow.test.ts packages/types/tests/live.test.ts packages/storage/tests/smart-money-events.test.ts services/compute/tests/parent-events.test.ts</code>.</li>
+          <li>Focused test result: 12 pass, 0 fail.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>This was documentation-only, so no full production web build was run. The focused tests cover the smart-money/type/storage claims most relevant to the README update.</li>
+          <li>The README summarizes environment variables instead of listing every low-level classifier and dark-inference threshold. Detailed knobs remain available in <code>.env.example</code> and service code.</li>
+          <li>Native deployment remains experimental; the README calls that out directly and points to the dedicated native deployment document.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li><code>islandflow-38p</code>: add native deployment unit templates and rollback helpers.</li>
+          <li><code>islandflow-932</code>: continue desktop follow-up native features.</li>
+          <li><code>islandflow-2db</code>: manually remove stale local-infra containers from the VPS when doing server hygiene.</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Turn Report: News Wire View via Alpaca Feed</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b1016;
+        --panel: #111820;
+        --panel-2: #0d141b;
+        --border: rgba(255, 255, 255, 0.08);
+        --text: #e6edf4;
+        --dim: #90a0b2;
+        --accent: #f5a623;
+      }
+      body {
+        margin: 0;
+        padding: 32px;
+        background: linear-gradient(180deg, #06080b 0%, #0b1016 100%);
+        color: var(--text);
+        font: 15px/1.6 "IBM Plex Sans", sans-serif;
+      }
+      main {
+        max-width: 980px;
+        margin: 0 auto;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 28px;
+      }
+      h1, h2 {
+        margin: 0 0 12px;
+        font-family: "Quantico", sans-serif;
+        letter-spacing: 0.06em;
+      }
+      h1 { font-size: 1.8rem; }
+      h2 { font-size: 1rem; margin-top: 28px; }
+      p, li { color: var(--text); }
+      .summary {
+        padding: 16px 18px;
+        border: 1px solid rgba(245, 166, 35, 0.28);
+        border-radius: 12px;
+        background: rgba(245, 166, 35, 0.08);
+      }
+      .meta, code, pre { font-family: "IBM Plex Mono", monospace; }
+      .meta { color: var(--dim); font-size: 0.85rem; }
+      section {
+        padding-top: 4px;
+        border-top: 1px solid var(--border);
+      }
+      section:first-of-type { border-top: 0; }
+      ul { padding-left: 18px; }
+      pre {
+        overflow: auto;
+        padding: 14px;
+        border-radius: 12px;
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+      }
+      a { color: var(--accent); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="meta">Created 2026-05-18 · Task: News Wire View via Alpaca Feed</p>
+      <h1>News Wire View via Alpaca Feed</h1>
+      <div class="summary">
+        <strong>Summary</strong>
+        <p>
+          Added an Alpaca-backed live news pipeline end to end: normalized <code>NewsStory</code> types,
+          a dedicated JetStream subject/stream, ClickHouse storage helpers with latest-revision semantics,
+          a new <code>services/ingest-news</code> service, API endpoints and live fanout, and a web
+          <code>/news</code> route plus Home preview with a right-side story drawer.
+        </p>
+      </div>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Added <code>NewsStorySchema</code>, the <code>news</code> live channel, and subscription parsing support in <code>packages/types</code>.</li>
+          <li>Added bus constants for the <code>flow.news</code> subject and <code>NEWS</code> stream.</li>
+          <li>Added ClickHouse news storage helpers, including recent, before-cursor, and after-cursor queries that collapse provider revisions to the latest row per <code>provider + story_id</code>.</li>
+          <li>Created <code>services/ingest-news</code> with Alpaca REST backfill, Alpaca websocket streaming, normalization, and deterministic ticker resolution.</li>
+          <li>Extended the API service to persist live news in the shared cache, expose <code>GET /news</code> and <code>GET /history/news</code>, and fan out <code>news</code> events on <code>/ws/live</code>.</li>
+          <li>Added a top-level <code>/news</code> route, primary nav entry, Home preview pane, replay-mode live-only empty states, and a sanitized full-story drawer.</li>
+          <li>Updated dev and deployment wiring so the new service is included in local runners and the Docker workspace snapshot.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          The plan called for a free-provider v1 news surface that behaves like the rest of Islandflow:
+          compact, evidence-first, and live-native. The implementation keeps replay intentionally out of scope
+          for news while still integrating news into the same live manifest, history pagination, rail navigation,
+          and drawer language used elsewhere in the terminal.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <ul>
+          <li>Ticker resolution prefers provider symbols first, then falls back only to structured patterns in provider HTML: ticker anchors, <code>EXCHANGE:SYM</code>, and <code>$SYM</code>.</li>
+          <li>News history uses <code>published_ts</code> as the visible cursor while revisions are collapsed with a window function over <code>provider, story_id</code> ordered by <code>updated_ts</code>, <code>ingest_ts</code>, and <code>seq</code>.</li>
+          <li>The web drawer sanitizes provider HTML by removing scripts, inline event handlers, and unsupported tags; if sanitization yields nothing useful, the drawer falls back to stripped plain text.</li>
+          <li>Replay mode intentionally renders a clear empty state for news on both Home and <code>/news</code> instead of pretending news is replay-synced.</li>
+        </ul>
+        <pre><code>resolved_symbols = provider_symbols
+  or ticker anchors in content_html
+  or EXCHANGE:SYM matches
+  or $SYM matches</code></pre>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <p>
+          Traders can now monitor a dedicated live news wire inside Islandflow, spot symbol-linked headlines from
+          the Home view, and open full stories in-context without leaving the app. The displayed ticker chips are
+          grounded in stored provider and derived symbol metadata, which makes the feed safer to filter and trust.
+        </p>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li>Ran targeted Bun tests covering types, storage, API live-state behavior, ingest-news symbol resolution, route wiring, and terminal helpers.</li>
+          <li>Built the Next.js web app with <code>bun --cwd=apps/web run build</code>.</li>
+          <li>Ran <code>bun run check:docker-workspace</code> after syncing the deployment workspace snapshot.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>Replay support remains intentionally absent in v1; the UI now states that explicitly instead of showing misleading empty historical behavior.</li>
+          <li>The sanitizer is intentionally conservative and custom, which keeps dependencies light but may strip some harmless provider formatting.</li>
+          <li>The ingest service assumes Alpaca’s current REST and websocket news contracts; if Alpaca changes those payload shapes, the normalization layer will need adjustment.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>No additional follow-up issue was required during this turn.</li>
+          <li>Future extensions are still available behind the same contract: multi-provider aggregation, server-side symbol filtering, and replay-aware news history.</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+  </html>

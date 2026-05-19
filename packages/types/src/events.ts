@@ -262,3 +262,26 @@ export const InferredDarkEventSchema = EventMetaSchema.merge(
 );
 
 export type InferredDarkEvent = z.infer<typeof InferredDarkEventSchema>;
+
+export const NewsSymbolResolutionSchema = z.enum(["provider", "derived", "mixed", "none"]);
+
+export type NewsSymbolResolution = z.infer<typeof NewsSymbolResolutionSchema>;
+
+export const NewsStorySchema = EventMetaSchema.merge(
+  z.object({
+    story_id: z.number().int().nonnegative(),
+    provider: z.string().min(1),
+    source: z.string().min(1),
+    headline: z.string().min(1),
+    summary: z.string(),
+    content_html: z.string(),
+    url: z.string().url().or(z.literal("")),
+    published_ts: z.number().int().nonnegative(),
+    updated_ts: z.number().int().nonnegative(),
+    provider_symbols: z.array(z.string().min(1)),
+    resolved_symbols: z.array(z.string().min(1)),
+    symbol_resolution: NewsSymbolResolutionSchema
+  })
+);
+
+export type NewsStory = z.infer<typeof NewsStorySchema>;

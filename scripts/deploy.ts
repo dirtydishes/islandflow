@@ -57,7 +57,8 @@ const NATIVE_UNITS = {
   ingestOptions:
     process.env.DEPLOY_NATIVE_INGEST_OPTIONS_UNIT?.trim() || "islandflow-ingest-options",
   ingestEquities:
-    process.env.DEPLOY_NATIVE_INGEST_EQUITIES_UNIT?.trim() || "islandflow-ingest-equities"
+    process.env.DEPLOY_NATIVE_INGEST_EQUITIES_UNIT?.trim() || "islandflow-ingest-equities",
+  ingestNews: process.env.DEPLOY_NATIVE_INGEST_NEWS_UNIT?.trim() || "islandflow-ingest-news"
 } as const;
 const DOCKER_CORE_SERVICES = [
   "api",
@@ -65,14 +66,16 @@ const DOCKER_CORE_SERVICES = [
   "compute",
   "candles",
   "ingest-options",
-  "ingest-equities"
+  "ingest-equities",
+  "ingest-news"
 ] as const;
 const DOCKER_BACKEND_SERVICES = [
   "api",
   "compute",
   "candles",
   "ingest-options",
-  "ingest-equities"
+  "ingest-equities",
+  "ingest-news"
 ] as const;
 const DOCKER_WORKER_SERVICES = [
   "compute",
@@ -126,7 +129,8 @@ Environment:
   DEPLOY_NATIVE_COMPUTE_UNIT        Override native compute systemd unit name.
   DEPLOY_NATIVE_CANDLES_UNIT        Override native candles systemd unit name.
   DEPLOY_NATIVE_INGEST_OPTIONS_UNIT Override native ingest-options systemd unit name.
-  DEPLOY_NATIVE_INGEST_EQUITIES_UNIT Override native ingest-equities systemd unit name.`);
+  DEPLOY_NATIVE_INGEST_EQUITIES_UNIT Override native ingest-equities systemd unit name.
+  DEPLOY_NATIVE_INGEST_NEWS_UNIT Override native ingest-news systemd unit name.`);
   process.exit(exitCode);
 }
 
@@ -547,7 +551,8 @@ function nativeUnitsForScope(scope: DeployScope): string[] {
         NATIVE_UNITS.compute,
         NATIVE_UNITS.candles,
         NATIVE_UNITS.ingestOptions,
-        NATIVE_UNITS.ingestEquities
+        NATIVE_UNITS.ingestEquities,
+        NATIVE_UNITS.ingestNews
       ];
     case "workers":
       return [
@@ -563,7 +568,8 @@ function nativeUnitsForScope(scope: DeployScope): string[] {
         NATIVE_UNITS.compute,
         NATIVE_UNITS.candles,
         NATIVE_UNITS.ingestOptions,
-        NATIVE_UNITS.ingestEquities
+        NATIVE_UNITS.ingestEquities,
+        NATIVE_UNITS.ingestNews
       ];
   }
 }

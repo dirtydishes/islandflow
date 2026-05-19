@@ -325,6 +325,7 @@ const serviceTasks: ChildSpec[] = [
   { name: "web", cmd: ["bun", "run", "dev"], cwd: "apps/web" },
   { name: "ingest-options", cmd: ["bun", "run", "dev"], cwd: "services/ingest-options" },
   { name: "ingest-equities", cmd: ["bun", "run", "dev"], cwd: "services/ingest-equities" },
+  { name: "ingest-news", cmd: ["bun", "run", "dev"], cwd: "services/ingest-news" },
   { name: "compute", cmd: ["bun", "run", "dev"], cwd: "services/compute" },
   { name: "candles", cmd: ["bun", "run", "dev"], cwd: "services/candles" },
   { name: "refdata", cmd: ["bun", "run", "dev"], cwd: "services/refdata" },

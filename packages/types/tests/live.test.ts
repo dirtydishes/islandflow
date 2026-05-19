@@ -9,6 +9,7 @@ import {
 describe("live protocol types", () => {
   it("builds stable keys for generic and parameterized subscriptions", () => {
     expect(getSubscriptionKey({ channel: "flow" })).toBe("flow|{}");
+    expect(getSubscriptionKey({ channel: "news" })).toBe("news");
     expect(
       getSubscriptionKey({
         channel: "options",
@@ -53,12 +54,13 @@ describe("live protocol types", () => {
       op: "subscribe",
       subscriptions: [
         { channel: "flow", filters: { nbboSides: ["AA", "A"], minNotional: 50000 } },
+        { channel: "news", snapshot_limit: 100 },
         { channel: "equity-candles", underlying_id: "SPY", interval_ms: 60000 }
       ]
     });
 
     expect(parsed.op).toBe("subscribe");
-    expect(parsed.subscriptions).toHaveLength(2);
+    expect(parsed.subscriptions).toHaveLength(3);
   });
 
   it("validates snapshot and event server messages", () => {
@@ -74,18 +76,24 @@ describe("live protocol types", () => {
     });
     const event = LiveServerMessageSchema.parse({
       op: "event",
-      subscription: { channel: "equity-overlay", underlying_id: "SPY" },
+      subscription: { channel: "news" },
       item: {
         source_ts: 100,
         ingest_ts: 101,
         seq: 1,
-        trace_id: "eq-1",
-        ts: 100,
-        underlying_id: "SPY",
-        price: 500,
-        size: 10,
-        exchange: "X",
-        offExchangeFlag: true
+        trace_id: "alpaca:1",
+        story_id: 1,
+        provider: "alpaca",
+        source: "Benzinga",
+        headline: "TSLA rises",
+        summary: "",
+        content_html: "<p>TSLA rises</p>",
+        url: "https://example.com/story",
+        published_ts: 100,
+        updated_ts: 100,
+        provider_symbols: ["TSLA"],
+        resolved_symbols: ["TSLA"],
+        symbol_resolution: "provider"
       },
       watermark: cursor
     });

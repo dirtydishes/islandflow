@@ -82,6 +82,7 @@ Save the document in:
 ```text
 docs/turns/
 ```
+## Important: If you are not working inside a git repository, save the document to `~/dev/docs/turns/`
 
 Use a clear timestamped filename:
 
@@ -97,11 +98,9 @@ docs/turns/2026-05-14-add-market-replay-controls.html
 
 ### Format
 
-Use the `impeccable` skill to structure and style the document as clean, readable HTML.
+Use the impeccable skill to structure the document as clean, readable HTML.
 
-For this repository, `impeccable` is the styling and layout authority for turn documents when available. Do not apply global non-repo computer-task house styling to repository turn documents.
-
-If the `impeccable` skill is unavailable or blocked by an actual tool/file error, still create a well-structured standalone HTML file with:
+If the impeccable skill is unavailable, still create a well-structured standalone HTML file with:
 
 - A concise summary at the top
 - A detailed explanation of what changed

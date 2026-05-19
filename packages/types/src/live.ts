@@ -8,6 +8,7 @@ import {
   EquityQuoteSchema,
   FlowPacketSchema,
   InferredDarkEventSchema,
+  NewsStorySchema,
   OptionNBBOSchema,
   OptionPrintSchema,
   SmartMoneyEventSchema
@@ -34,7 +35,8 @@ export const LiveGenericChannelSchema = z.enum([
   "smart-money",
   "classifier-hits",
   "alerts",
-  "inferred-dark"
+  "inferred-dark",
+  "news"
 ]);
 
 export const LiveChannelSchema = z.enum([
@@ -48,6 +50,7 @@ export const LiveChannelSchema = z.enum([
   "classifier-hits",
   "alerts",
   "inferred-dark",
+  "news",
   "equity-candles",
   "equity-overlay"
 ]);
@@ -91,7 +94,7 @@ export const LiveSubscriptionSchema = z.discriminatedUnion("channel", [
     snapshot_limit: z.number().int().positive().optional()
   }),
   z.object({
-    channel: z.enum(["nbbo", "equity-quotes", "equity-joins", "classifier-hits", "alerts", "inferred-dark"]),
+    channel: z.enum(["nbbo", "equity-quotes", "equity-joins", "classifier-hits", "alerts", "inferred-dark", "news"]),
     snapshot_limit: z.number().int().positive().optional()
   }),
   z.object({
@@ -123,6 +126,7 @@ const livePayloadSchemas = {
   "classifier-hits": ClassifierHitEventSchema,
   alerts: AlertEventSchema,
   "inferred-dark": InferredDarkEventSchema,
+  news: NewsStorySchema,
   "equity-candles": EquityCandleSchema,
   "equity-overlay": EquityPrintSchema
 } as const;

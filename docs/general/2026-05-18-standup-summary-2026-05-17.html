@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Standup Summary for 2026-05-17</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #111820;
+        --panel-2: #0d141b;
+        --border: rgba(255, 255, 255, 0.08);
+        --border-strong: rgba(245, 166, 35, 0.35);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --accent-soft: rgba(245, 166, 35, 0.12);
+        --green: #25c17a;
+        --green-soft: rgba(37, 193, 122, 0.12);
+        --blue: #4da3ff;
+        --blue-soft: rgba(77, 163, 255, 0.12);
+        --red: #ff6b5f;
+        --red-soft: rgba(255, 107, 95, 0.12);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at top right, rgba(245, 166, 35, 0.12), transparent 28%),
+          linear-gradient(180deg, #091018 0%, var(--bg) 28%, #05070a 100%);
+        color: var(--text);
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+        line-height: 1.6;
+      }
+
+      main {
+        width: min(1120px, calc(100% - 40px));
+        margin: 32px auto 56px;
+      }
+
+      .hero,
+      section {
+        background: linear-gradient(180deg, rgba(17, 24, 32, 0.94), rgba(13, 20, 27, 0.98));
+        border: 1px solid var(--border);
+        border-radius: 18px;
+      }
+
+      .hero {
+        padding: 32px;
+        margin-bottom: 18px;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.32);
+      }
+
+      .eyebrow,
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 12px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .eyebrow {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      .pill {
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text);
+        border: 1px solid var(--border);
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        font-family: "Quantico", "Segoe UI", sans-serif;
+        letter-spacing: 0.04em;
+      }
+
+      h1 {
+        margin-top: 18px;
+        font-size: clamp(2rem, 4vw, 3rem);
+        line-height: 1.04;
+      }
+
+      h2 {
+        font-size: 1.25rem;
+        margin-bottom: 16px;
+      }
+
+      h3 {
+        font-size: 1rem;
+      }
+
+      p {
+        margin: 0;
+        max-width: 80ch;
+        color: var(--muted);
+      }
+
+      .hero p {
+        margin-top: 14px;
+        font-size: 1rem;
+      }
+
+      .meta {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px;
+        margin-top: 24px;
+      }
+
+      .meta-card {
+        padding: 14px 16px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .meta-card strong,
+      .label {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--text);
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.76rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      section {
+        padding: 24px;
+        margin-top: 16px;
+      }
+
+      .summary-list,
+      .detail-list {
+        display: grid;
+        gap: 12px;
+      }
+
+      .summary-item,
+      .timeline-item,
+      .callout {
+        padding: 16px 18px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.025);
+      }
+
+      .summary-item strong,
+      .timeline-item strong {
+        color: var(--text);
+      }
+
+      .timeline {
+        display: grid;
+        gap: 14px;
+      }
+
+      .timeline-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 14px;
+        align-items: baseline;
+        margin-bottom: 8px;
+      }
+
+      .commit-id,
+      .timestamp {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.76rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .commit-id {
+        color: var(--blue);
+      }
+
+      .timestamp {
+        color: var(--faint);
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+        color: var(--muted);
+      }
+
+      li + li {
+        margin-top: 10px;
+      }
+
+      .file-list {
+        margin-top: 12px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .file-pill {
+        padding: 5px 8px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.045);
+        border: 1px solid var(--border);
+        color: var(--text);
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.72rem;
+      }
+
+      .good {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .info {
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .risk {
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      code {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.92em;
+        color: var(--text);
+      }
+
+      .grid-two {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 14px;
+      }
+
+      a {
+        color: var(--blue);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <article class="hero">
+        <span class="eyebrow">Git Standup Summary</span>
+        <h1>Repository activity recorded for 2026-05-17</h1>
+        <p>
+          Yesterday's git history shows three main themes: frontend and API work to hydrate alert evidence from
+          ClickHouse, deploy workflow changes in <code>scripts/deploy.ts</code>, and Beads/Dolt remote setup plus
+          documentation updates. This summary is grounded in the commits, merged PRs, and touched files visible in the
+          repository history for 2026-05-17.
+        </p>
+        <div class="meta">
+          <div class="meta-card">
+            <strong>Commit Count</strong>
+            <span>20 commits on 2026-05-17</span>
+          </div>
+          <div class="meta-card">
+            <strong>Merges</strong>
+            <span>5 pull request merges</span>
+          </div>
+          <div class="meta-card">
+            <strong>File Footprint</strong>
+            <span>22 distinct paths touched</span>
+          </div>
+          <div class="meta-card">
+            <strong>Most Revisited</strong>
+            <span><code>.beads/issues.jsonl</code>, <code>scripts/deploy.ts</code>, <code>apps/web/app/terminal.tsx</code></span>
+          </div>
+        </div>
+      </article>
+
+      <section>
+        <h2>Summary</h2>
+        <div class="summary-list">
+          <div class="summary-item">
+            <strong>Alert context from ClickHouse landed and was merged twice through follow-up PRs.</strong>
+            The core implementation appeared in commit <code>c0b5b6d</code> and merge PR <code>#41</code>
+            (<code>3e08955</code>), then was extended in <code>58e57fa</code> and merged through <code>#43</code>
+            (<code>a27d499</code>) and a documentation polish PR <code>#44</code> (<code>49efc24</code>).
+          </div>
+          <div class="summary-item">
+            <strong>Deploy tooling changed in three steps.</strong>
+            The day included an allowlist tightening in <code>5ddfbfa</code>, a new fast deploy mode in
+            <code>75ed6f3</code>, and Forgejo-aware remote resolution in <code>6e6788b</code>, all centered on
+            <code>scripts/deploy.ts</code>.
+          </div>
+          <div class="summary-item">
+            <strong>Process and reporting work was visible alongside feature work.</strong>
+            Beads Dolt remote configuration was added in <code>37bd393</code>, revised in <code>d0d8bd4</code> and
+            <code>cd0a1dd</code>, and yesterday's prior standup report was added in <code>0416194</code>.
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <div class="timeline">
+          <article class="timeline-item">
+            <div class="timeline-meta">
+              <span class="pill info">Frontend + API</span>
+              <span class="commit-id">c0b5b6d</span>
+              <span class="timestamp">11:02 EDT</span>
+            </div>
+            <h3>Hydrate alert evidence from ClickHouse</h3>
+            <p>
+              Commit <code>c0b5b6d</code> added ClickHouse-backed alert context across storage, API, tests, and the
+              terminal UI. The same change set was merged as PR <code>#41</code> in <code>3e08955</code>.
+            </p>
+            <div class="file-list">
+              <span class="file-pill">packages/storage/src/clickhouse.ts</span>
+              <span class="file-pill">services/api/src/alert-context.ts</span>
+              <span class="file-pill">services/api/src/index.ts</span>
+              <span class="file-pill">apps/web/app/terminal.tsx</span>
+              <span class="file-pill">apps/web/app/terminal.test.ts</span>
+              <span class="file-pill">packages/storage/tests/alerts.test.ts</span>
+            </div>
+          </article>
+
+          <article class="timeline-item">
+            <div class="timeline-meta">
+              <span class="pill">Deploy workflow</span>
+              <span class="commit-id">5ddfbfa</span>
+              <span class="timestamp">11:45 EDT</span>
+            </div>
+            <h3>Tighten deploy remote untracked allowlist</h3>
+            <p>
+              Commit <code>5ddfbfa</code>, later merged as PR <code>#42</code> in <code>8b166a5</code>, narrowed the
+              remote untracked allowlist in <code>scripts/deploy.ts</code>. Two follow-up documentation commits,
+              <code>8631a53</code> and <code>219d3fd</code>, recorded and corrected the validation notes for that
+              change.
+            </p>
+            <div class="file-list">
+              <span class="file-pill">scripts/deploy.ts</span>
+              <span class="file-pill">docs/turns/2026-05-17-deploy-allowlist-pr-packaging.html</span>
+            </div>
+          </article>
+
+          <article class="timeline-item">
+            <div class="timeline-meta">
+              <span class="pill info">Integration</span>
+              <span class="commit-id">58e57fa</span>
+              <span class="timestamp">20:18 EDT</span>
+            </div>
+            <h3>Add ClickHouse alert context hydration for alert drawers</h3>
+            <p>
+              Commit <code>58e57fa</code> extended the earlier alert-context work, adding drawer-specific hydration in
+              the web app and API. A merge-conflict resolution commit <code>dc932cf</code> combined this with the
+              deploy allowlist branch before PR <code>#43</code> merged in <code>a27d499</code>.
+            </p>
+            <div class="file-list">
+              <span class="file-pill">apps/web/app/terminal.tsx</span>
+              <span class="file-pill">packages/storage/src/clickhouse.ts</span>
+              <span class="file-pill">services/api/src/index.ts</span>
+              <span class="file-pill">docs/turns/2026-05-17-clickhouse-alert-context.html</span>
+            </div>
+          </article>
+
+          <article class="timeline-item">
+            <div class="timeline-meta">
+              <span class="pill">Deploy workflow</span>
+              <span class="commit-id">75ed6f3</span>
+              <span class="timestamp">22:53 EDT</span>
+            </div>
+            <h3>Add fast deploy mode for routine rollouts</h3>
+            <p>
+              Commit <code>75ed6f3</code> added a faster deploy path and updated both deployment readmes. Minutes
+              later, commit <code>6e6788b</code> made deploy remote resolution Forgejo-aware, again in
+              <code>scripts/deploy.ts</code>.
+            </p>
+            <div class="file-list">
+              <span class="file-pill">scripts/deploy.ts</span>
+              <span class="file-pill">deployment/docker/README.md</span>
+              <span class="file-pill">deployment/native/README.md</span>
+              <span class="file-pill">docs/turns/2026-05-17-add-fast-deploy-mode.html</span>
+              <span class="file-pill">docs/turns/2026-05-17-forgejo-deploy-remote-resolution.html</span>
+            </div>
+          </article>
+
+          <article class="timeline-item">
+            <div class="timeline-meta">
+              <span class="pill">Repo operations</span>
+              <span class="commit-id">37bd393</span>
+              <span class="timestamp">06:41 EDT</span>
+            </div>
+            <h3>Beads remote setup and daily reporting</h3>
+            <p>
+              Commit <code>37bd393</code> configured the Beads Dolt remote in <code>.beads/config.yaml</code>, then
+              commits <code>d0d8bd4</code> and <code>cd0a1dd</code> revised the same sync settings. Commit
+              <code>0416194</code> added the standup summary document for 2026-05-16 activity in
+              <code>docs/general</code>.
+            </p>
+            <div class="file-list">
+              <span class="file-pill">.beads/config.yaml</span>
+              <span class="file-pill">.beads/issues.jsonl</span>
+              <span class="file-pill">docs/general/2026-05-17-standup-summary-2026-05-16.html</span>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <div class="grid-two">
+          <div class="callout">
+            <span class="label">Merged PRs</span>
+            <ul>
+              <li><code>#40</code> merged in <code>88b2c33</code>: live tape scroll stability and related deploy/image work.</li>
+              <li><code>#41</code> merged in <code>3e08955</code>: initial ClickHouse alert evidence hydration.</li>
+              <li><code>#42</code> merged in <code>8b166a5</code>: deploy allowlist packaging follow-through.</li>
+              <li><code>#43</code> merged in <code>a27d499</code>: alert drawer hydration follow-up.</li>
+              <li><code>#44</code> merged in <code>49efc24</code>: turn-document polish for alert context.</li>
+            </ul>
+          </div>
+          <div class="callout">
+            <span class="label">Most Touched Areas</span>
+            <ul>
+              <li><code>.beads/issues.jsonl</code> changed in 9 commits, reflecting issue tracking churn throughout the day.</li>
+              <li><code>scripts/deploy.ts</code> changed in 3 direct commits tied to deploy safety and speed.</li>
+              <li><code>apps/web/app/terminal.tsx</code> changed in 3 direct commits tied to live tape behavior and alert context.</li>
+              <li>Documentation output expanded across <code>docs/turns</code> and <code>docs/general</code> alongside implementation work.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <ul>
+          <li>
+            The ClickHouse alert-context work was not isolated to one layer. Commits <code>c0b5b6d</code> and
+            <code>58e57fa</code> touched storage access, API wiring, UI presentation, and dedicated tests, which
+            makes this the clearest full-stack change in yesterday's history.
+          </li>
+          <li>
+            The deploy changes were incremental rather than a single rewrite. The history shows a narrowing change in
+            <code>5ddfbfa</code>, an operator-speed path in <code>75ed6f3</code>, and remote detection logic in
+            <code>6e6788b</code>.
+          </li>
+          <li>
+            Merge commit <code>dc932cf</code> explicitly resolved conflicts between the alert-context and deploy
+            allowlist branches before later PR merges landed, so yesterday's main branch activity included integration
+            work as well as feature work.
+          </li>
+          <li>
+            Commit <code>073c1de</code> created an empty <code>forgejo.test</code> path. The git history shows the file
+            creation, but no test content in that commit.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <ul>
+          <li>
+            User-facing terminal behavior changed in two visible ways: live tape scroll stability from
+            <code>d334e16</code>/<code>#40</code> and richer alert evidence context from <code>c0b5b6d</code>,
+            <code>58e57fa</code>, and the follow-up merges.
+          </li>
+          <li>
+            Deploy workflow commits affected operator tooling rather than customer-facing product screens. Those changes
+            should matter most to maintainers using <code>scripts/deploy.ts</code> and the deployment readmes.
+          </li>
+          <li>
+            Beads remote configuration and standup-report commits affected internal workflow and documentation, not
+            runtime product behavior.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li>
+            The turn document added in <code>d334e16</code> records
+            <code>bun test apps/web/app/terminal.test.ts services/api/tests/live.test.ts</code> passing and
+            <code>bun --cwd=apps/web run build</code> passing.
+          </li>
+          <li>
+            The turn document added in <code>c0b5b6d</code> records
+            <code>bun test packages/storage/tests</code>,
+            <code>bun test services/api/tests</code>,
+            <code>bun test apps/web/app/terminal.test.ts</code>, and
+            <code>bun --cwd=apps/web run build</code>.
+          </li>
+          <li>
+            The polished turn document merged in <code>49efc24</code> records those alert-context validations as
+            passing.
+          </li>
+          <li>
+            The deploy allowlist turn document created in <code>8631a53</code> and corrected in <code>219d3fd</code>
+            explicitly notes that a repository-wide <code>bun test</code> run reported failures at that point.
+          </li>
+          <li>
+            Later deploy-related turn documents added in <code>75ed6f3</code> and <code>6e6788b</code> record full
+            <code>bun test</code> passing, with the Forgejo remote document stating <code>232 passing</code>,
+            <code>0 failing</code>.
+          </li>
+          <li>
+            This automation run only created documentation. No additional code validation command was run for this
+            summary itself.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>
+            This document summarizes repository history only. It does not infer goals beyond what commit subjects, PR
+            titles, merge structure, and touched files show.
+          </li>
+          <li>
+            Some PR context is visible only through merge commits. For example, PR <code>#40</code> bundles scroll
+            stability with deploy and Docker-path changes, so the summary reports the merged file footprint rather than
+            inferring which portion dominated the review.
+          </li>
+          <li>
+            Validation evidence comes from committed turn documents, not from re-running every historical command during
+            this automation.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <p>
+          No new follow-up Beads issue was created from the git summary itself. The Beads task for this automation run
+          is <code>islandflow-x70</code>, which tracks creation of this standup document and will be closed as part of
+          the session sync.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>
