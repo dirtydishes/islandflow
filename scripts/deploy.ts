@@ -754,6 +754,10 @@ set -euo pipefail
 
 cd ${shellEscape(REMOTE_REPO)}
 
+if [[ -x "$HOME/.bun/bin/bun" ]]; then
+  export PATH="$HOME/.bun/bin:$PATH"
+fi
+
 if ! command -v bun >/dev/null 2>&1; then
   echo "Refusing native rollout: bun is not installed on the server." >&2
   echo "The current supported VPS path remains --runtime docker." >&2
@@ -855,6 +859,10 @@ function remoteNativeRollout(
     `#!/usr/bin/env bash
 set -euo pipefail
 
+if [[ -x "$HOME/.bun/bin/bun" ]]; then
+  export PATH="$HOME/.bun/bin:$PATH"
+fi
+
 ${remoteGitUpdateScript(mode, remote, branch)}
 
 cd ${shellEscape(REMOTE_REPO)}
@@ -942,6 +950,12 @@ function remoteNativeVerification(scope: DeployScope, fast: boolean): void {
     "Remote Verification",
     `#!/usr/bin/env bash
 set -euo pipefail
+
+cd ${shellEscape(REMOTE_REPO)}
+
+if [[ -x "$HOME/.bun/bin/bun" ]]; then
+  export PATH="$HOME/.bun/bin:$PATH"
+fi
 
 declare -a units=(${units})
 for unit in "\${units[@]}"; do

@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>2026-05-19 Harden Native SSH Deploy Checks</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f4f8;
+        --surface: #ffffff;
+        --ink: #1f1726;
+        --muted: #5f536d;
+        --line: #ddd4e6;
+        --accent: #7c4dff;
+        --accent-soft: #efe7ff;
+        --code-bg: #17131d;
+        --code-ink: #f7f2ff;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+        line-height: 1.55;
+      }
+      main {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 40px 24px 72px;
+      }
+      header, section {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 24px;
+        margin-bottom: 18px;
+      }
+      h1, h2 {
+        margin: 0 0 12px;
+        line-height: 1.15;
+      }
+      h1 { font-size: 2rem; }
+      h2 { font-size: 1.15rem; }
+      .lede {
+        font-size: 1.05rem;
+        color: var(--muted);
+      }
+      .meta {
+        display: inline-block;
+        margin-top: 10px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-size: 0.9rem;
+        font-weight: 600;
+      }
+      ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+      pre {
+        margin: 0;
+        padding: 16px;
+        overflow: auto;
+        border-radius: 10px;
+        background: var(--code-bg);
+        color: var(--code-ink);
+      }
+      code {
+        font-family: "SFMono-Regular", ui-monospace, monospace;
+        font-size: 0.94rem;
+      }
+      .note {
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Harden Native SSH Deploy Checks</h1>
+        <p class="lede">
+          Native deploys over SSH were failing for avoidable operator reasons: the remote shell did not inherit Bun's install path, and native verification assumed it was already running from the repository root before it called checked-in health scripts. This patch makes the SSH path more forgiving and fixes the verification working directory.
+        </p>
+        <div class="meta">Generated 2026-05-19 19:38 EDT</div>
+      </header>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          Updated <code>scripts/deploy.ts</code> so native SSH deploys prepend <code>$HOME/.bun/bin</code> when it exists, and native verification now explicitly <code>cd</code>s into the remote repo before running the checked-in health helpers.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Prepended <code>$HOME/.bun/bin</code> during native remote precheck when available.</li>
+          <li>Prepended <code>$HOME/.bun/bin</code> during native remote rollout when available.</li>
+          <li>Changed native remote verification to run from <code>/home/delta/islandflow</code> before calling <code>deployment/native/check-native-infra.sh</code>.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          During a live native rollout, the deploy helper failed first because the non-login SSH shell could not find <code>bun</code> even though it was installed under the deploy user's home directory. After that was corrected on the host, worker rollout still reported failure because remote verification executed from the home directory and could not resolve the relative path to the checked-in infra check script.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <ul>
+          <li>The fallback only adjusts <code>PATH</code> when <code>$HOME/.bun/bin/bun</code> exists, so it stays harmless on hosts that already expose Bun globally.</li>
+          <li>The repo-root <code>cd</code> keeps the existing relative helper calls intact instead of hardcoding every individual script path in multiple places.</li>
+          <li>This change improves SSH-based deploys without changing local-server deploy behavior.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p class="note">Unified diff blocks below are formatted for diffs-compatible rendering.</p>
+        <pre><code class="language-diff">diff --git a/scripts/deploy.ts b/scripts/deploy.ts
+@@ -754,6 +754,10 @@ set -euo pipefail
+ 
+ cd ${shellEscape(REMOTE_REPO)}
+ 
++if [[ -x "$HOME/.bun/bin/bun" ]]; then
++  export PATH="$HOME/.bun/bin:$PATH"
++fi
++
+ if ! command -v bun >/dev/null 2>&1; then
+
+@@ -855,6 +859,10 @@ set -euo pipefail
+ 
++if [[ -x "$HOME/.bun/bin/bun" ]]; then
++  export PATH="$HOME/.bun/bin:$PATH"
++fi
++
+ ${remoteGitUpdateScript(mode, remote, branch)}
+
+@@ -943,6 +951,12 @@ set -euo pipefail
+ 
++cd ${shellEscape(REMOTE_REPO)}
++
++if [[ -x "$HOME/.bun/bin/bun" ]]; then
++  export PATH="$HOME/.bun/bin:$PATH"
++fi
++
+ declare -a units=(${units})</code></pre>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <p>
+          End users should see fewer failed native deploy attempts and fewer partial restarts caused by tooling assumptions rather than application health. This lowers the odds of avoidable downtime during native rollouts.
+        </p>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li>Observed the original failures during live rollout: missing <code>bun</code> in SSH PATH and missing <code>deployment/native/check-native-infra.sh</code> during remote verification.</li>
+          <li>Used the patched operational path to complete native worker, API, and web rollouts successfully on the VPS.</li>
+          <li>Verified API health at <code>http://127.0.0.1:4000/health</code> and web health at both <code>http://127.0.0.1:3000/</code> and <code>https://flow.deltaisland.io</code>.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>This patch does not solve the separate <code>ingest-news</code> credential problem. Full native deploys still need that unit and provider path to be made healthy before they are completely clean.</li>
+          <li>The VPS also needed a host-level Bun symlink during this recovery. The repo patch reduces dependence on that fix for future SSH deploys but does not remove it retroactively.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li><code>islandflow-fmg</code>: Keep the deploy helper aligned with the actual VPS runtime assumptions and add regression checks around native verification paths.</li>
+          <li><code>islandflow-wf5</code>: Decide whether <code>ingest-news</code> and live options should stay provider-backed or remain intentionally synthetic until auth is hardened.</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
