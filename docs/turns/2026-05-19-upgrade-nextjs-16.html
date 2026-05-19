@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Upgrade apps/web to Next.js 16.2.6</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #17111d;
+      --panel: #24172d;
+      --panel-strong: #30203b;
+      --text: #f3eaf8;
+      --muted: #c8b7d4;
+      --accent: #d9a6ff;
+      --accent-2: #ff9fc7;
+      --line: #5d3f70;
+      --code: #130d18;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 20% 0%, rgba(217, 166, 255, 0.18), transparent 32rem),
+        linear-gradient(145deg, #17111d 0%, #1d1424 56%, #140f19 100%);
+      color: var(--text);
+      font-family: "IBM Plex Sans", system-ui, sans-serif;
+      line-height: 1.62;
+    }
+
+    main {
+      width: min(980px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 56px 0 72px;
+    }
+
+    header {
+      margin-bottom: 34px;
+      padding-bottom: 26px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      color: var(--accent-2);
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.82rem;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2 {
+      font-family: "IBM Plex Mono", monospace;
+      letter-spacing: 0;
+      line-height: 1.2;
+    }
+
+    h1 {
+      max-width: 780px;
+      margin: 0;
+      font-size: clamp(2rem, 5vw, 4.2rem);
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      color: var(--accent);
+      font-size: 1.18rem;
+    }
+
+    section {
+      margin-top: 22px;
+      padding: 22px;
+      border: 1px solid rgba(217, 166, 255, 0.22);
+      border-radius: 8px;
+      background: rgba(36, 23, 45, 0.72);
+    }
+
+    p,
+    li {
+      max-width: 74ch;
+    }
+
+    ul {
+      padding-left: 1.2rem;
+    }
+
+    code,
+    pre {
+      font-family: "IBM Plex Mono", monospace;
+    }
+
+    code {
+      color: #f6c0dd;
+    }
+
+    pre {
+      overflow-x: auto;
+      margin: 14px 0 0;
+      padding: 16px;
+      border: 1px solid rgba(255, 159, 199, 0.22);
+      border-radius: 8px;
+      background: var(--code);
+      color: #f6eafd;
+      font-size: 0.88rem;
+      line-height: 1.55;
+    }
+
+    .summary {
+      font-size: 1.08rem;
+      color: var(--muted);
+    }
+
+    .checklist li::marker {
+      color: var(--accent-2);
+    }
+
+    a {
+      color: #f0b7ff;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">Turn document · 2026-05-19</p>
+      <h1>Upgrade apps/web to Next.js 16.2.6</h1>
+      <p class="summary">The web app now builds and passes focused validation on Next.js 16.2.6 with React 19. The change keeps route behavior and synthetic admin proxy behavior intact while refreshing the root and Docker workspace Bun lockfiles.</p>
+    </header>
+
+    <section>
+      <h2>Summary</h2>
+      <p>Upgraded <code>apps/web</code> from the Next 14 / React 18 stack to Next 16.2.6 and React 19.2.x. The Bun lockfile was refreshed, the Docker workspace lock snapshot was synced, and a React 19 nullable ref type issue exposed by the Next 16 build was fixed.</p>
+    </section>
+
+    <section>
+      <h2>Changes Made</h2>
+      <ul>
+        <li>Updated <code>apps/web/package.json</code> to request <code>next ^16.2.6</code>, <code>react ^19.2.0</code>, and <code>react-dom ^19.2.0</code>.</li>
+        <li>Updated React type dependencies to <code>@types/react ^19.2.7</code> and added <code>@types/react-dom ^19.2.3</code>.</li>
+        <li>Ran <code>bun install</code>, which resolved Next to <code>16.2.6</code> and React/React DOM to <code>19.2.6</code> in <code>bun.lock</code>.</li>
+        <li>Ran <code>bun run sync:docker-workspace</code> so <code>deployment/docker/workspace-root/bun.lock</code> matches the root lock snapshot.</li>
+        <li>Adjusted the terminal list ref types to accept <code>HTMLDivElement | null</code>, matching React 19's stricter ref object typing.</li>
+        <li>Allowed Next 16 to regenerate <code>apps/web/next-env.d.ts</code> with its updated TypeScript reference comment and generated route type import.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Context</h2>
+      <p>The requested upgrade was intentionally dependency-focused. No routes, backend contracts, environment variable names, or shared package exports were changed. Before editing, the web build and the targeted route tests passed on the previous locked Next 14.2.35 stack.</p>
+    </section>
+
+    <section>
+      <h2>Important Implementation Details</h2>
+      <p>No broad codemod was run. The only source-code change was a targeted type correction in <code>apps/web/app/terminal.tsx</code>. Next 16's build now runs with Turbopack by default in this project and completed successfully after the ref typing was narrowed to the actual nullable runtime value.</p>
+      <p>The Docker workspace sync changed the mirrored lockfile, but did not need to rewrite the mirrored package manifest or TypeScript base config.</p>
+    </section>
+
+    <section>
+      <h2>Relevant Diff Snippets</h2>
+      <pre><code>"next": "^16.2.6",
+"react": "^19.2.0",
+"react-dom": "^19.2.0",
+"@types/react": "^19.2.7",
+"@types/react-dom": "^19.2.3"</code></pre>
+      <pre><code>type ListScrollState = {
+  listRef: React.RefObject&lt;HTMLDivElement | null&gt;;
+  listNode: HTMLDivElement | null;
+  setListRef: (node: HTMLDivElement | null) =&gt; void;
+};</code></pre>
+    </section>
+
+    <section>
+      <h2>Expected Impact for End-Users</h2>
+      <p>There should be no intentional user-facing behavior change. The expected visible behavior remains: <code>/</code>, <code>/tape</code>, and <code>/news</code> render the terminal app; <code>/signals</code>, <code>/charts</code>, and <code>/replay</code> redirect to <code>/</code>; synthetic admin API routes keep their gated proxy behavior.</p>
+    </section>
+
+    <section>
+      <h2>Validation</h2>
+      <ul class="checklist">
+        <li>Baseline before edits: <code>bun --cwd=apps/web run build</code> passed on Next 14.2.35.</li>
+        <li>Baseline before edits: <code>bun test apps/web/app/routes.test.ts</code> passed, 3 tests.</li>
+        <li>Baseline before edits: <code>bun test apps/web/app/terminal.test.ts</code> passed, 70 tests.</li>
+        <li>Baseline before edits: <code>bun test apps/web/app/api/admin/synthetic/routes.test.ts</code> passed, 4 tests.</li>
+        <li>After upgrade: <code>bun --cwd=apps/web run build</code> passed on Next 16.2.6.</li>
+        <li>After upgrade: <code>bun test apps/web/app/routes.test.ts</code> passed, 3 tests.</li>
+        <li>After upgrade: <code>bun test apps/web/app/terminal.test.ts</code> passed, 70 tests.</li>
+        <li>After upgrade: <code>bun test apps/web/app/api/admin/synthetic/routes.test.ts</code> passed, 4 tests.</li>
+        <li>After upgrade: <code>bun run check:docker-workspace</code> passed.</li>
+        <li>Manual smoke: <code>bun run dev:web</code> served Next 16.2.6 on <code>localhost:3000</code>.</li>
+        <li>Manual smoke: browser checks confirmed <code>/</code>, <code>/tape</code>, and <code>/news</code> render with title <code>Islandflow Terminal</code>.</li>
+        <li>Manual smoke: <code>/signals</code>, <code>/charts</code>, and <code>/replay</code> returned <code>307</code> redirects to <code>/</code>.</li>
+        <li>Manual smoke: synthetic admin status and control routes returned gated <code>404</code> responses when the internal UI flag was off.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Issues, Limitations, and Mitigations</h2>
+      <p>During <code>dev:web</code> smoke testing, the browser logged a live socket channel validation warning because only the web app was running, not the full backend service stack. Route rendering, redirect behavior, and gated synthetic admin proxy behavior were still verified. A full-stack live feed verification can be done separately with <code>bun run dev</code> if needed.</p>
+      <p>The upgrade did not include a full monorepo test run because the acceptance bar was intentionally web-focused.</p>
+    </section>
+
+    <section>
+      <h2>Follow-up Work</h2>
+      <ul>
+        <li>No required follow-up Beads issue was opened for this upgrade.</li>
+        <li>Optional: run a full-stack live feed smoke with infra and services running if you want runtime stream confidence beyond the web-focused acceptance checks.</li>
+        <li>Optional: run the full monorepo <code>bun test</code> suite before a larger release branch merge.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Helpful Links</h2>
+      <ul>
+        <li><a href="https://nextjs.org/docs/app/guides/upgrading/version-16">Next.js 16 upgrade guide</a></li>
+        <li><a href="https://react.dev/blog/2024/12/05/react-19">React 19 release notes</a></li>
+        <li><a href="https://bun.sh/docs/cli/install">Bun install documentation</a></li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

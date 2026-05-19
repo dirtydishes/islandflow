@@ -1749,7 +1749,7 @@ export const getOptionTableSnapshot = (
 };
 
 type ListScrollState = {
-  listRef: React.RefObject<HTMLDivElement>;
+  listRef: React.RefObject<HTMLDivElement | null>;
   listNode: HTMLDivElement | null;
   setListRef: (node: HTMLDivElement | null) => void;
   isAtTop: boolean;
@@ -1854,7 +1854,7 @@ const useListScroll = (): ListScrollState => {
 };
 
 const useScrollAnchor = (
-  listRef: React.RefObject<HTMLDivElement>,
+  listRef: React.RefObject<HTMLDivElement | null>,
   isAtTopRef: React.MutableRefObject<boolean>
 ) => {
   const pendingRef = useRef<{
@@ -1996,7 +1996,7 @@ type TapeVirtualRow<T> = {
 
 const useTapeVirtualList = <T extends SortableItem>(
   items: T[],
-  listRef: React.RefObject<HTMLDivElement>,
+  listRef: React.RefObject<HTMLDivElement | null>,
   config: TapeVirtualListConfig
 ): TapeVirtualListResult<T> => {
   const virtualizer = useVirtualizer<HTMLDivElement, HTMLElement>({
