@@ -117,8 +117,9 @@ Each turn document must include these sections:
 2. **Changes Made**
 3. **Context**
 4. **Important Implementation Details**
-5. **Expected Impact for End-Users**
-5. **Validation**
+5. **Relevant Diff Snippets**
+6. **Expected Impact for End-Users**
+7. **Validation**
 6. **Issues, Limitations, and Mitigations**
 7. **Follow-up Work**
 
