@@ -255,7 +255,11 @@ All runtime configuration comes from `.env`.
 
 | Variable | Default | What it controls |
 | --- | --- | --- |
-| `ALPACA_API_KEY` | empty | Single-token Alpaca API auth for options, equities, and news adapters. |
+| `ALPACA_API_KEY` | empty | Legacy single-token fallback kept for older Alpaca setups. Prefer explicit key ID + secret vars for current Alpaca auth. |
+| `ALPACA_API_KEY_ID` | empty | Preferred Alpaca key ID used for market-data REST and websocket auth. |
+| `ALPACA_KEY_ID` | empty | Alternate name accepted for the Alpaca key ID. |
+| `ALPACA_API_SECRET_KEY` | empty | Preferred Alpaca secret key paired with `ALPACA_API_KEY_ID`. |
+| `ALPACA_SECRET_KEY` | empty | Alternate name accepted for the Alpaca secret key. |
 | `ALPACA_REST_URL` | `https://data.alpaca.markets` | Alpaca REST base URL. |
 | `ALPACA_WS_BASE_URL` | `wss://stream.data.alpaca.markets/v1beta1` for options, `wss://stream.data.alpaca.markets` for equities/news | Alpaca websocket base URL. |
 | `ALPACA_FEED` | `indicative` | Options feed tier: `indicative` or `opra`. |

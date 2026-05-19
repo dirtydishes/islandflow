@@ -1,4 +1,10 @@
-import { readEnv } from "@islandflow/config";
+import {
+  buildAlpacaAuthHeaders,
+  buildAlpacaWebSocketAuthMessage,
+  hasAlpacaCredentials,
+  readEnv,
+  resolveAlpacaCredentials
+} from "@islandflow/config";
 import { createLogger } from "@islandflow/observability";
 import {
   SUBJECT_NEWS,
@@ -18,6 +24,10 @@ const logger = createLogger({ service });
 const envSchema = z.object({
   NATS_URL: z.string().default("nats://127.0.0.1:4222"),
   ALPACA_API_KEY: z.string().default(""),
+  ALPACA_API_KEY_ID: z.string().default(""),
+  ALPACA_KEY_ID: z.string().default(""),
+  ALPACA_API_SECRET_KEY: z.string().default(""),
+  ALPACA_SECRET_KEY: z.string().default(""),
   ALPACA_REST_URL: z.string().default("https://data.alpaca.markets"),
   ALPACA_WS_BASE_URL: z.string().default("wss://stream.data.alpaca.markets"),
   ALPACA_NEWS_BACKFILL_LIMIT: z.coerce.number().int().positive().max(200).default(100),
@@ -25,6 +35,7 @@ const envSchema = z.object({
 });
 
 const env = readEnv(envSchema);
+const alpacaCredentials = resolveAlpacaCredentials(env);
 
 type AlpacaNewsItem = {
   id?: number;
@@ -42,10 +53,6 @@ type AlpacaNewsItem = {
 type AlpacaNewsResponse = {
   news?: AlpacaNewsItem[];
 };
-
-const buildHeaders = (): Record<string, string> => ({
-  Authorization: `Bearer ${env.ALPACA_API_KEY}`
-});
 
 const parseTimestamp = (value: string | undefined): number => {
   const parsed = value ? Date.parse(value) : Number.NaN;
@@ -90,7 +97,7 @@ const fetchBackfill = async (): Promise<AlpacaNewsItem[]> => {
   url.searchParams.set("limit", env.ALPACA_NEWS_BACKFILL_LIMIT.toString());
 
   const response = await fetch(url.toString(), {
-    headers: buildHeaders()
+    headers: buildAlpacaAuthHeaders(alpacaCredentials)
   });
 
   if (!response.ok) {
@@ -115,8 +122,10 @@ const decodePayload = (data: WebSocket.RawData): unknown => {
 };
 
 const run = async () => {
-  if (!env.ALPACA_API_KEY) {
-    throw new Error("ALPACA_API_KEY is required for ingest-news.");
+  if (!hasAlpacaCredentials(alpacaCredentials)) {
+    throw new Error(
+      "Alpaca news requires ALPACA_API_KEY_ID and ALPACA_API_SECRET_KEY (or ALPACA_KEY_ID / ALPACA_SECRET_KEY)."
+    );
   }
 
   const { nc, js, jsm } = await connectJetStreamWithRetry(
@@ -146,17 +155,11 @@ const run = async () => {
 
   const wsUrl = new URL(env.ALPACA_NEWS_WEBSOCKET_PATH, env.ALPACA_WS_BASE_URL).toString();
   const ws = new WebSocket(wsUrl, {
-    headers: buildHeaders()
+    headers: buildAlpacaAuthHeaders(alpacaCredentials)
   });
 
   ws.on("open", () => {
-    ws.send(
-      JSON.stringify({
-        action: "auth",
-        key: env.ALPACA_API_KEY,
-        secret: ""
-      })
-    );
+    ws.send(JSON.stringify(buildAlpacaWebSocketAuthMessage(alpacaCredentials)));
   });
 
   ws.on("message", (raw) => {

@@ -81,7 +81,8 @@ const DOCKER_WORKER_SERVICES = [
   "compute",
   "candles",
   "ingest-options",
-  "ingest-equities"
+  "ingest-equities",
+  "ingest-news"
 ] as const;
 
 const scriptPath = fileURLToPath(import.meta.url);
@@ -559,7 +560,8 @@ function nativeUnitsForScope(scope: DeployScope): string[] {
         NATIVE_UNITS.compute,
         NATIVE_UNITS.candles,
         NATIVE_UNITS.ingestOptions,
-        NATIVE_UNITS.ingestEquities
+        NATIVE_UNITS.ingestEquities,
+        NATIVE_UNITS.ingestNews
       ];
     default:
       return [

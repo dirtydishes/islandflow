@@ -1,4 +1,4 @@
-import { readEnv } from "@islandflow/config";
+import { hasAlpacaCredentials, readEnv, resolveAlpacaCredentials } from "@islandflow/config";
 import { createLogger } from "@islandflow/observability";
 import {
   SUBJECT_EQUITY_PRINTS,
@@ -47,6 +47,10 @@ const envSchema = z.object({
 
   // Alpaca (equities)
   ALPACA_API_KEY: z.string().default(""),
+  ALPACA_API_KEY_ID: z.string().default(""),
+  ALPACA_KEY_ID: z.string().default(""),
+  ALPACA_API_SECRET_KEY: z.string().default(""),
+  ALPACA_SECRET_KEY: z.string().default(""),
   ALPACA_REST_URL: z.string().default("https://data.alpaca.markets"),
   ALPACA_WS_BASE_URL: z.string().default("wss://stream.data.alpaca.markets"),
   ALPACA_UNDERLYINGS: z.string().default("SPY,NVDA,AAPL"),
@@ -70,6 +74,7 @@ const envSchema = z.object({
 });
 
 const env = readEnv(envSchema);
+const alpacaCredentials = resolveAlpacaCredentials(env);
 const syntheticModes = resolveSyntheticMarketModes({
   syntheticMarketMode: env.SYNTHETIC_MARKET_MODE,
   syntheticEquitiesMode: env.SYNTHETIC_EQUITIES_MODE
@@ -175,13 +180,15 @@ const selectAdapter = (
   }
 
   if (name === "alpaca") {
-    if (!env.ALPACA_API_KEY) {
-      logger.warn("alpaca credentials missing; set ALPACA_API_KEY");
-      throw new Error("ALPACA_API_KEY is required for the alpaca adapter.");
+    if (!hasAlpacaCredentials(alpacaCredentials)) {
+      logger.warn("alpaca credentials missing; set ALPACA_API_KEY_ID and ALPACA_API_SECRET_KEY");
+      throw new Error(
+        "Alpaca equities adapter requires ALPACA_API_KEY_ID and ALPACA_API_SECRET_KEY (or legacy ALPACA_API_KEY)."
+      );
     }
 
     return createAlpacaEquitiesAdapter({
-      apiKey: env.ALPACA_API_KEY,
+      credentials: alpacaCredentials,
       restUrl: env.ALPACA_REST_URL,
       wsBaseUrl: env.ALPACA_WS_BASE_URL,
       feed: env.ALPACA_EQUITIES_FEED,

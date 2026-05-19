@@ -161,8 +161,10 @@ Set the adapter values and credentials in `.env`:
 
 - `OPTIONS_INGEST_ADAPTER=alpaca`
 - `EQUITIES_INGEST_ADAPTER=alpaca`
-- `ALPACA_KEY_ID=...`
-- `ALPACA_SECRET_KEY=...`
+- `ALPACA_API_KEY_ID=...`
+- `ALPACA_API_SECRET_KEY=...`
+
+The older single-variable `ALPACA_API_KEY` fallback is still accepted for legacy setups, but Alpaca's current market-data auth expects a key ID plus secret key pair.
 
 ### Databento mode
 
@@ -284,7 +286,7 @@ Scoped Docker deploys now build only the selected image set and then restart onl
 - `--web-only`: `docker compose build web`, then `docker compose up -d web`
 - `--api-only`: `docker compose build api`, then `docker compose up -d api`
 - `--services-only`: builds and restarts `api`, `compute`, `candles`, `ingest-options`, and `ingest-equities`
-- `--workers-only`: builds and restarts `compute`, `candles`, `ingest-options`, and `ingest-equities` without touching `web` or `api`
+- `--workers-only`: builds and restarts `compute`, `candles`, `ingest-options`, `ingest-equities`, and `ingest-news` without touching `web` or `api`
 - `--fast`: when no explicit scope flag is given, treats the deploy as `--services-only` and skips the public API route suite for quicker completion. It still runs remote service health checks.
 
 Use `--no-build` only when the image is already correct and you need Compose to recreate or restart containers, such as after changing server-side environment values that do not affect a Next.js build-time variable. Do not use `--no-build` for dependency changes, application source changes, or `NEXT_PUBLIC_*` changes.

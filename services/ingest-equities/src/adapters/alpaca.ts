@@ -1,3 +1,8 @@
+import {
+  buildAlpacaAuthHeaders,
+  buildAlpacaWebSocketAuthMessage,
+  type AlpacaCredentials
+} from "@islandflow/config";
 import { createLogger } from "@islandflow/observability";
 import type { EquityPrint, EquityQuote } from "@islandflow/types";
 import type { EquityIngestAdapter, EquityIngestHandlers } from "./types";
@@ -6,7 +11,7 @@ import WebSocket from "ws";
 export type AlpacaEquitiesFeed = "iex" | "sip";
 
 export type AlpacaEquitiesAdapterConfig = {
-  apiKey: string;
+  credentials: AlpacaCredentials;
   restUrl: string;
   wsBaseUrl: string;
   feed: AlpacaEquitiesFeed;
@@ -60,12 +65,6 @@ const normalizeSymbols = (symbols: string[]): string[] => {
   }
 
   return result;
-};
-
-const buildHeaders = (config: AlpacaEquitiesAdapterConfig): Record<string, string> => {
-  return {
-    Authorization: `Bearer ${config.apiKey}`
-  };
 };
 
 const parseTimestamp = (value: string): number => {
@@ -157,7 +156,7 @@ const fetchExchangeMeta = async (config: AlpacaEquitiesAdapterConfig): Promise<M
 
   try {
     const response = await fetch(url.toString(), {
-      headers: buildHeaders(config)
+      headers: buildAlpacaAuthHeaders(config.credentials)
     });
 
     if (!response.ok) {
@@ -184,8 +183,8 @@ export const createAlpacaEquitiesAdapter = (
   return {
     name: "alpaca",
     start: async (handlers: EquityIngestHandlers) => {
-      if (!config.apiKey) {
-        throw new Error("Alpaca equities adapter requires ALPACA_API_KEY.");
+      if (!config.credentials.keyId) {
+        throw new Error("Alpaca equities adapter requires Alpaca credentials.");
       }
 
       const symbols = normalizeSymbols(config.symbols);
@@ -196,7 +195,7 @@ export const createAlpacaEquitiesAdapter = (
       const exchangeNameMap = await fetchExchangeMeta(config);
       const wsUrl = buildWsUrl(config.wsBaseUrl, config.feed);
       const ws = new WebSocket(wsUrl, {
-        headers: buildHeaders(config)
+        headers: buildAlpacaAuthHeaders(config.credentials)
       });
 
       let seq = 0;
@@ -204,13 +203,7 @@ export const createAlpacaEquitiesAdapter = (
       let authenticated = false;
 
       ws.on("open", () => {
-        ws.send(
-          JSON.stringify({
-            action: "auth",
-            key: config.apiKey,
-            secret: ""
-          })
-        );
+        ws.send(JSON.stringify(buildAlpacaWebSocketAuthMessage(config.credentials)));
       });
 
       const subscribe = () => {
