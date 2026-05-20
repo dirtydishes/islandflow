@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>2026-05-20 · Fix Electron Preload Bridge</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: oklch(0.11 0.01 250);
+        --panel: oklch(0.16 0.013 250 / 0.92);
+        --panel-2: oklch(0.14 0.012 250 / 0.9);
+        --text: oklch(0.93 0.014 250);
+        --muted: oklch(0.74 0.018 250);
+        --faint: oklch(0.6 0.016 250);
+        --line: oklch(0.75 0.014 250 / 0.14);
+        --accent: oklch(0.79 0.12 74);
+        --accent-soft: oklch(0.79 0.12 74 / 0.12);
+        --green-soft: oklch(0.75 0.12 151 / 0.12);
+        --red-soft: oklch(0.72 0.14 28 / 0.12);
+        --shadow: 0 24px 80px oklch(0.02 0.01 250 / 0.45);
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+        background:
+          radial-gradient(circle at top left, oklch(0.8 0.12 74 / 0.09), transparent 28%),
+          linear-gradient(180deg, oklch(0.15 0.012 250) 0%, oklch(0.1 0.01 250) 100%);
+        color: var(--text);
+      }
+      main {
+        width: min(1160px, calc(100vw - 40px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+      h1, h2, h3, .eyebrow, .meta, code, pre {
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+      }
+      h1, h2, h3 { margin: 0; }
+      p, li { color: var(--muted); line-height: 1.7; }
+      a { color: inherit; }
+      main > * + * { margin-top: 22px; }
+      .hero, section {
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        box-shadow: var(--shadow);
+      }
+      .hero {
+        display: grid;
+        gap: 20px;
+        padding: 28px;
+        background:
+          linear-gradient(135deg, oklch(0.2 0.017 250 / 0.96), oklch(0.14 0.012 250 / 0.98)),
+          var(--panel);
+      }
+      .eyebrow {
+        margin: 0 0 10px;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        font-size: 0.76rem;
+      }
+      .hero h1 {
+        font-size: clamp(2rem, 3.4vw, 3.5rem);
+        line-height: 0.96;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+      .hero-copy { max-width: 72ch; margin: 14px 0 0; }
+      .hero-grid, .two-col, .validation-grid {
+        display: grid;
+        gap: 18px;
+      }
+      .hero-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .two-col { grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr); }
+      .validation-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .stat, .validation-card, .callout {
+        padding: 16px 18px;
+        border-radius: 16px;
+        border: 1px solid var(--line);
+        background: oklch(0.12 0.01 250 / 0.5);
+      }
+      .stat span, .validation-card span {
+        display: block;
+        margin-bottom: 8px;
+        color: var(--faint);
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        font-size: 0.68rem;
+      }
+      .validation-card.good { background: var(--green-soft); }
+      .validation-card.warn { background: var(--red-soft); }
+      .callout { background: var(--accent-soft); }
+      section {
+        padding: 24px;
+        background: var(--panel-2);
+      }
+      section h2 {
+        margin-bottom: 14px;
+        font-size: 1rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      ul { margin: 0; padding-left: 20px; }
+      li + li { margin-top: 10px; }
+      .chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        padding: 0 10px;
+        border-radius: 999px;
+        border: 1px solid oklch(0.8 0.12 74 / 0.28);
+        background: var(--accent-soft);
+        font-size: 0.74rem;
+      }
+      .meta { color: var(--faint); font-size: 0.82rem; }
+      pre.diff {
+        margin: 0;
+        padding: 16px 18px;
+        overflow: auto;
+        border-radius: 16px;
+        border: 1px solid var(--line);
+        background: oklch(0.08 0.008 250 / 0.95);
+        color: var(--text);
+        line-height: 1.5;
+        font-size: 0.78rem;
+      }
+      .diff-title {
+        margin-bottom: 10px;
+        color: var(--faint);
+        font-size: 0.76rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      @media (max-width: 860px) {
+        main {
+          width: min(100vw - 24px, 1160px);
+          padding-top: 18px;
+        }
+        .hero-grid, .two-col, .validation-grid {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <article class="hero">
+        <div>
+          <p class="eyebrow">Repository Turn Document</p>
+          <h1>Fix Electron Preload Bridge</h1>
+          <p class="hero-copy">
+            Repaired the desktop ChatGPT login bridge by making the Electron preload
+            script emit a classic runnable script instead of ESM. Local desktop
+            settings now reconnect to the native bridge and show the managed
+            account, transport readiness, and model controls again.
+          </p>
+        </div>
+        <div class="hero-grid">
+          <div class="stat">
+            <span>Area</span>
+            <strong>Electron desktop shell</strong>
+          </div>
+          <div class="stat">
+            <span>Issue</span>
+            <strong>`islandflow-hj3`</strong>
+          </div>
+          <div class="stat">
+            <span>Validated</span>
+            <strong>Build, tests, live desktop restart</strong>
+          </div>
+        </div>
+      </article>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          The desktop Copilot settings page was not failing because login was broken.
+          Electron was failing before the bridge could even load: the preload bundle
+          contained runtime `import` syntax, so the renderer never got
+          `window.islandflowDesktop`. After switching the preload implementation to
+          CommonJS-compatible runtime code, the local Electron shell resumed exposing
+          the bridge and the settings page recovered immediately after restart.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Rewrote the desktop preload runtime imports to use `require("electron")`.</li>
+          <li>Inlined the IPC channel names inside the preload file so no runtime module imports remain.</li>
+          <li>Removed the type-only module usage that caused TypeScript to emit a trailing `export {}`.</li>
+          <li>Verified the generated `apps/desktop/dist/preload.js` is now a plain script.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          The UI state on `localhost:3000/settings` was already designed to distinguish
+          between “not in desktop” and “desktop shell detected but native bridge
+          missing.” In this case the latter message was accurate but incomplete: Electron
+          was present, yet the preload never executed because the emitted file was not
+          valid for the preload runtime. That left the renderer with an Electron user
+          agent but no bridge object.
+        </p>
+      </section>
+
+      <section class="two-col">
+        <div>
+          <h2>Important Implementation Details</h2>
+          <ul>
+            <li>Electron logged `Unable to load preload script` followed by `Cannot use import statement outside a module` during local startup.</li>
+            <li>The desktop main process configuration was already pointing at the correct preload path, so the failure was in emitted file format, not window wiring.</li>
+            <li>Keeping the preload free of runtime imports ensures Electron can execute it even though the desktop workspace is otherwise ESM-oriented.</li>
+            <li>The bridge API shape exposed to the web app did not change, so no renderer updates were required.</li>
+          </ul>
+        </div>
+        <div class="callout">
+          <h2>Relevant Runtime Signal</h2>
+          <p class="meta">Observed in Electron startup logs during reproduction</p>
+          <p>
+            `Unable to load preload script: .../dist/preload.js` and
+            `SyntaxError: Cannot use import statement outside a module`
+            were the decisive clues that isolated the problem to preload emission.
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <div class="diff-title">apps/desktop/src/preload.ts</div>
+        <pre class="diff"><code class="language-diff">--- a/apps/desktop/src/preload.ts
++++ b/apps/desktop/src/preload.ts
+@@
+-import { contextBridge, ipcRenderer } from "electron";
+-import { ... } from "./desktop-ai-ipc.js";
++const { contextBridge, ipcRenderer } = require("electron");
++const DESKTOP_AI_STATE_CHANNEL = "islandflow:desktop-ai:state";
++const DESKTOP_AI_GET_STATE = "islandflow:desktop-ai:get-state";
++const DESKTOP_AI_LOGIN_BROWSER = "islandflow:desktop-ai:login-browser";
++const DESKTOP_AI_LOGIN_DEVICE = "islandflow:desktop-ai:login-device";
++const DESKTOP_AI_CANCEL_LOGIN = "islandflow:desktop-ai:cancel-login";
++const DESKTOP_AI_LOGOUT = "islandflow:desktop-ai:logout";
++const DESKTOP_AI_UPDATE_PREFERENCES = "islandflow:desktop-ai:update-preferences";
++const DESKTOP_AI_RUN_TASK = "islandflow:desktop-ai:run-task";
+@@
+-    updatePreferences: (
+-      next: Partial&lt;{ model: string | null; reasoningEffort: IslandflowAiReasoningEffort | null }&gt;
+-    ): Promise&lt;void&gt; =&gt; ipcRenderer.invoke(DESKTOP_AI_UPDATE_PREFERENCES, next),
++    updatePreferences: (next: DesktopAiPreferenceUpdate): Promise&lt;void&gt; =&gt;
++      ipcRenderer.invoke(DESKTOP_AI_UPDATE_PREFERENCES, next),
+        </code></pre>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <p>
+          Local Islandflow Desktop sessions no longer get stuck in the misleading
+          “Bridge unavailable in this window” state when the actual problem is preload
+          execution. Users should see their managed ChatGPT session reconnect, transport
+          status move to <strong>Ready</strong>, and model controls become interactive
+          after launching or restarting the desktop shell.
+        </p>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <div class="validation-grid">
+          <div class="validation-card good">
+            <span>Desktop Build</span>
+            <strong>`bun --cwd=apps/desktop run build` succeeded and emitted a plain preload script.</strong>
+          </div>
+          <div class="validation-card good">
+            <span>Desktop Tests</span>
+            <strong>`bun --cwd=apps/desktop test` passed.</strong>
+          </div>
+          <div class="validation-card good">
+            <span>Web Tests</span>
+            <strong>`bun test apps/web/app/desktop-ai.test.ts` passed.</strong>
+          </div>
+          <div class="validation-card good">
+            <span>Manual Verification</span>
+            <strong>Restarted `bun run dev:desktop` and confirmed settings showed the connected account, ready transport, and populated model controls.</strong>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>The preload now duplicates the IPC channel strings instead of importing them. That is intentional to keep the emitted file import-free.</li>
+          <li>The desktop startup logs still show unrelated remote plugin 403 warnings from the managed app-server environment. They did not block bridge recovery in this turn.</li>
+          <li>The preload uses loose local types to avoid turning the file back into a runtime module. If preload complexity grows, a dedicated CommonJS-safe shared typing strategy may be worth adding later.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <div class="chip-row">
+          <span class="chip">No immediate follow-up required</span>
+          <span class="chip">Possible hardening: build-time preload output guard</span>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

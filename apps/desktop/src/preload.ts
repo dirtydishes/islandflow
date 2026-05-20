@@ -1,34 +1,34 @@
-import { contextBridge, ipcRenderer } from "electron";
-import type {
-  IslandflowAiReasoningEffort,
-  IslandflowAiState,
-  IslandflowAiTaskRequest
-} from "@islandflow/types";
-import {
-  DESKTOP_AI_CANCEL_LOGIN,
-  DESKTOP_AI_GET_STATE,
-  DESKTOP_AI_LOGIN_BROWSER,
-  DESKTOP_AI_LOGIN_DEVICE,
-  DESKTOP_AI_LOGOUT,
-  DESKTOP_AI_RUN_TASK,
-  DESKTOP_AI_STATE_CHANNEL,
-  DESKTOP_AI_UPDATE_PREFERENCES
-} from "./desktop-ai-ipc.js";
+const { contextBridge, ipcRenderer } = require("electron");
+
+const DESKTOP_AI_STATE_CHANNEL = "islandflow:desktop-ai:state";
+const DESKTOP_AI_GET_STATE = "islandflow:desktop-ai:get-state";
+const DESKTOP_AI_LOGIN_BROWSER = "islandflow:desktop-ai:login-browser";
+const DESKTOP_AI_LOGIN_DEVICE = "islandflow:desktop-ai:login-device";
+const DESKTOP_AI_CANCEL_LOGIN = "islandflow:desktop-ai:cancel-login";
+const DESKTOP_AI_LOGOUT = "islandflow:desktop-ai:logout";
+const DESKTOP_AI_UPDATE_PREFERENCES = "islandflow:desktop-ai:update-preferences";
+const DESKTOP_AI_RUN_TASK = "islandflow:desktop-ai:run-task";
+
+type DesktopAiState = any;
+type DesktopAiTaskRequest = any;
+type DesktopAiPreferenceUpdate = Partial<{
+  model: string | null;
+  reasoningEffort: string | null;
+}>;
 
 const bridge = {
   ai: {
-    getState: (): Promise<IslandflowAiState> => ipcRenderer.invoke(DESKTOP_AI_GET_STATE),
+    getState: (): Promise<DesktopAiState> => ipcRenderer.invoke(DESKTOP_AI_GET_STATE),
     loginWithBrowser: (): Promise<void> => ipcRenderer.invoke(DESKTOP_AI_LOGIN_BROWSER),
     loginWithDeviceCode: (): Promise<void> => ipcRenderer.invoke(DESKTOP_AI_LOGIN_DEVICE),
     cancelLogin: (): Promise<void> => ipcRenderer.invoke(DESKTOP_AI_CANCEL_LOGIN),
     logout: (): Promise<void> => ipcRenderer.invoke(DESKTOP_AI_LOGOUT),
-    updatePreferences: (
-      next: Partial<{ model: string | null; reasoningEffort: IslandflowAiReasoningEffort | null }>
-    ): Promise<void> => ipcRenderer.invoke(DESKTOP_AI_UPDATE_PREFERENCES, next),
-    runTask: (request: IslandflowAiTaskRequest): Promise<{ taskId: string }> =>
+    updatePreferences: (next: DesktopAiPreferenceUpdate): Promise<void> =>
+      ipcRenderer.invoke(DESKTOP_AI_UPDATE_PREFERENCES, next),
+    runTask: (request: DesktopAiTaskRequest): Promise<{ taskId: string }> =>
       ipcRenderer.invoke(DESKTOP_AI_RUN_TASK, request),
-    subscribe: (listener: (state: IslandflowAiState) => void): (() => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, state: IslandflowAiState) => {
+    subscribe: (listener: (state: DesktopAiState) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, state: DesktopAiState) => {
         listener(state);
       };
 
