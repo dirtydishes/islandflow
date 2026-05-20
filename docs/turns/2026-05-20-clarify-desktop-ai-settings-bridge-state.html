@@ -1,0 +1,612 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>
+      2026-05-20 18:59 EDT · Clarify Desktop AI Settings Bridge State
+    </title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: oklch(0.11 0.01 250);
+        --panel: oklch(0.16 0.013 250 / 0.92);
+        --panel-2: oklch(0.14 0.012 250 / 0.9);
+        --text: oklch(0.93 0.014 250);
+        --muted: oklch(0.74 0.018 250);
+        --faint: oklch(0.6 0.016 250);
+        --line: oklch(0.75 0.014 250 / 0.14);
+        --accent: oklch(0.79 0.12 74);
+        --accent-soft: oklch(0.79 0.12 74 / 0.12);
+        --warn: oklch(0.74 0.08 68);
+        --warn-soft: oklch(0.2 0.03 68 / 0.28);
+        --green-soft: oklch(0.75 0.12 151 / 0.12);
+        --red-soft: oklch(0.72 0.14 28 / 0.12);
+        --blue-soft: oklch(0.7 0.1 247 / 0.12);
+        --shadow: 0 24px 80px oklch(0.02 0.01 250 / 0.45);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+        background:
+          radial-gradient(
+            circle at top left,
+            oklch(0.8 0.12 74 / 0.09),
+            transparent 28%
+          ),
+          linear-gradient(
+            180deg,
+            oklch(0.15 0.012 250) 0%,
+            oklch(0.1 0.01 250) 100%
+          );
+        color: var(--text);
+      }
+
+      main {
+        width: min(1160px, calc(100vw - 40px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+
+      h1,
+      h2,
+      h3,
+      .eyebrow,
+      .meta,
+      code,
+      pre {
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+      }
+
+      h1,
+      h2,
+      h3,
+      p,
+      ul {
+        margin: 0;
+      }
+
+      p,
+      li {
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .hero {
+        display: grid;
+        gap: 20px;
+        padding: 28px;
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        background:
+          linear-gradient(
+            135deg,
+            oklch(0.2 0.017 250 / 0.96),
+            oklch(0.14 0.012 250 / 0.98)
+          ),
+          var(--panel);
+        box-shadow: var(--shadow);
+      }
+
+      .eyebrow {
+        margin-bottom: 10px;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        font-size: 0.76rem;
+      }
+
+      .hero h1 {
+        font-size: clamp(2rem, 3.2vw, 3.3rem);
+        line-height: 0.96;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+
+      .hero-copy {
+        max-width: 72ch;
+        margin-top: 14px;
+      }
+
+      .hero-grid,
+      .validation-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .stat,
+      .validation-card {
+        padding: 16px 18px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: oklch(0.12 0.01 250 / 0.5);
+      }
+
+      .stat span,
+      .meta-label {
+        display: block;
+        margin-bottom: 8px;
+        color: var(--faint);
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        font-size: 0.68rem;
+      }
+
+      .stat strong {
+        display: block;
+        color: var(--text);
+        font-size: 1rem;
+      }
+
+      .section-grid {
+        display: grid;
+        gap: 18px;
+        margin-top: 22px;
+      }
+
+      section {
+        padding: 24px;
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        background: var(--panel-2);
+        box-shadow: var(--shadow);
+      }
+
+      section h2 {
+        margin-bottom: 14px;
+        font-size: 1rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      ul {
+        padding-left: 20px;
+      }
+
+      li + li,
+      p + p,
+      p + ul,
+      ul + p,
+      .callout + .callout,
+      .diff-title + pre,
+      pre + .diff-title {
+        margin-top: 10px;
+      }
+
+      .two-col {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+        gap: 18px;
+      }
+
+      .callout {
+        padding: 16px 18px;
+        border-radius: 16px;
+        border: 1px solid var(--line);
+        background: var(--blue-soft);
+      }
+
+      .callout.warn {
+        border-color: oklch(0.74 0.08 68 / 0.42);
+        background: var(--warn-soft);
+      }
+
+      .callout strong {
+        color: var(--text);
+      }
+
+      .meta {
+        color: var(--faint);
+        font-size: 0.82rem;
+      }
+
+      .validation-card.good {
+        background: var(--green-soft);
+      }
+
+      .validation-card.warn {
+        background: var(--red-soft);
+      }
+
+      pre.diff {
+        padding: 16px 18px;
+        overflow: auto;
+        border-radius: 16px;
+        border: 1px solid var(--line);
+        background: oklch(0.08 0.008 250 / 0.95);
+        color: var(--text);
+        line-height: 1.5;
+        font-size: 0.78rem;
+      }
+
+      .diff-title {
+        color: var(--faint);
+        font-size: 0.76rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        padding: 0 10px;
+        border-radius: 999px;
+        border: 1px solid oklch(0.8 0.12 74 / 0.28);
+        background: var(--accent-soft);
+        color: var(--text);
+        font-size: 0.74rem;
+      }
+
+      @media (max-width: 860px) {
+        .hero-grid,
+        .two-col,
+        .validation-grid {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        main {
+          width: min(100vw - 24px, 1160px);
+          padding-top: 18px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <article class="hero">
+        <div>
+          <div class="eyebrow">Turn Document · 2026-05-20 18:59 EDT</div>
+          <h1>Clarify Desktop AI Settings Bridge State</h1>
+          <p class="hero-copy">
+            The <code>/settings</code> desktop AI surface now explains why
+            ChatGPT login and model controls are unavailable when a desktop
+            window loses its native bridge, instead of looking like broken
+            controls.
+          </p>
+        </div>
+        <div class="hero-grid">
+          <div class="stat">
+            <span>Issue</span>
+            <strong>islandflow-dy2</strong>
+          </div>
+          <div class="stat">
+            <span>Primary Surface</span>
+            <strong><code>apps/web/app/desktop-ai-panels.tsx</code></strong>
+          </div>
+          <div class="stat">
+            <span>User Outcome</span>
+            <strong>Actionable bridge recovery state</strong>
+          </div>
+        </div>
+      </article>
+
+      <div class="section-grid">
+        <section>
+          <h2>Summary</h2>
+          <p>
+            The settings page previously showed disabled ChatGPT login buttons
+            and sparse model controls whenever the Electron shell was open but
+            its native AI bridge was missing. That looked indistinguishable from
+            broken UI. The fix makes the unavailable state explicit, swaps the
+            dead login affordance for a recovery action, and gives the model
+            area state-aware empty copy.
+          </p>
+        </section>
+
+        <section class="two-col">
+          <div>
+            <h2>Changes Made</h2>
+            <ul>
+              <li>
+                Added pure helper functions that centralize settings copy for
+                desktop-only, bridge-missing, and logged-out model states.
+              </li>
+              <li>
+                Changed the account panel so a missing bridge shows a prominent
+                warning callout and a <code>Reload window</code> action instead
+                of inert login buttons.
+              </li>
+              <li>
+                Changed the profile slot badge so a selected managed login
+                profile reports <code>Bridge unavailable</code> when the current
+                desktop window cannot use it.
+              </li>
+              <li>
+                Added state-specific labels and empty-state copy for the model
+                selector and model list so they explain whether the app is
+                waiting on desktop, bridge recovery, or account login.
+              </li>
+              <li>
+                Added a warning callout style and unit coverage for the new
+                copy-selection helpers.
+              </li>
+            </ul>
+          </div>
+          <div>
+            <h2>Context</h2>
+            <p>
+              This work came directly from a user report against
+              <code>/settings</code>: in a desktop session missing its native
+              bridge, the login controls did not function and the model dropdown
+              area appeared blank or broken.
+            </p>
+            <div class="callout warn">
+              <strong>Why this mattered</strong>
+              <p>
+                The underlying bridge failure was already being detected. The
+                real problem was that the UI expressed that failure as disabled
+                controls without enough explanation, which created the
+                impression that auth itself was broken.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section class="two-col">
+          <div>
+            <h2>Important Implementation Details</h2>
+            <ul>
+              <li>
+                The fix stays in the web renderer layer and does not alter
+                Electron auth or preference persistence behavior.
+              </li>
+              <li>
+                <code>updatePreferences</code> still remains bridge-backed and
+                login-independent, so the change focuses on clearer messaging
+                rather than adding new backend gating.
+              </li>
+              <li>
+                The account panel now derives a bridge notice from
+                <code>shellAvailable</code> and <code>bridgeAvailable</code>,
+                which keeps the browser-only and missing-bridge states distinct.
+              </li>
+              <li>
+                The model area uses the same availability helper family, so the
+                disabled select label and the list empty-state copy stay
+                aligned.
+              </li>
+              <li>
+                The UI now prefers truthful status language over optimistic
+                language. A selected profile is no longer presented as fully
+                usable when the active window cannot reach the native bridge.
+              </li>
+            </ul>
+          </div>
+          <div>
+            <h2>Expected Impact for End-Users</h2>
+            <ul>
+              <li>
+                Users on a broken bridge session immediately see that the
+                problem is window connectivity, not a silent ChatGPT login
+                failure.
+              </li>
+              <li>
+                Users get a local recovery path from the settings page through
+                the new <code>Reload window</code> action.
+              </li>
+              <li>
+                Model controls no longer appear mysteriously empty. They explain
+                whether the app is waiting for bridge recovery or for account
+                login.
+              </li>
+              <li>
+                The managed profile card now reflects actual usability in the
+                current window, which reduces false confidence.
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <section>
+          <h2>Relevant Diff Snippets</h2>
+          <p class="meta">
+            These snippets are formatted as unified patches so they can be
+            consumed by Diffs’
+            <code>parsePatchFiles</code> or <code>PatchDiff</code> flows from
+            <a href="https://diffs.com/docs">diffs.com/docs</a>.
+          </p>
+
+          <div class="diff-title">
+            Settings state helpers and bridge recovery action
+          </div>
+          <pre
+            class="diff"
+          ><code>diff --git a/apps/web/app/desktop-ai-panels.tsx b/apps/web/app/desktop-ai-panels.tsx
+@@
++export const getDesktopAiSettingsBridgeNotice = (shellAvailable, bridgeAvailable) =&gt; {
++  if (!shellAvailable) {
++    return {
++      title: "Desktop app required",
++      body: "Open Islandflow Desktop to connect ChatGPT, load managed models, and use native Copilot controls."
++    };
++  }
++  if (!bridgeAvailable) {
++    return {
++      title: "Bridge unavailable in this window",
++      body: "This Islandflow Desktop window is missing its native AI bridge, so login actions and model controls stay disabled until the bridge reconnects. Reload the window or restart Islandflow if this keeps happening."
++    };
++  }
++  return null;
++};
+@@
+-              &lt;button className="terminal-button terminal-button-primary"&gt;Browser login&lt;/button&gt;
+-              &lt;button className="terminal-button"&gt;Device code&lt;/button&gt;
++              &lt;button
++                className="terminal-button terminal-button-primary"
++                type="button"
++                onClick={() =&gt; window.location.reload()}
++              &gt;
++                Reload window
++              &lt;/button&gt;
+@@
++      {bridgeNotice ? (
++        &lt;div className="copilot-callout copilot-callout-warning"&gt;
++          &lt;strong&gt;{bridgeNotice.title}&lt;/strong&gt;
++          &lt;p className="copilot-note"&gt;{bridgeNotice.body}&lt;/p&gt;
++        &lt;/div&gt;
++      ) : null}</code></pre>
+
+          <div class="diff-title">Model controls copy and empty states</div>
+          <pre
+            class="diff"
+          ><code>diff --git a/apps/web/app/desktop-ai-panels.tsx b/apps/web/app/desktop-ai-panels.tsx
+@@
++const modelSelectLabel = getDesktopAiModelSelectLabel(
++  shellAvailable,
++  bridgeAvailable,
++  state.account.loggedIn,
++  state.models.length
++);
++const modelListEmptyCopy = getDesktopAiModelListEmptyCopy(
++  shellAvailable,
++  bridgeAvailable,
++  state.account.loggedIn
++);
+@@
+-                &lt;option value=""&gt;Use server default&lt;/option&gt;
++                &lt;option value=""&gt;{modelSelectLabel}&lt;/option&gt;
+@@
+-            {state.models.map((model) =&gt; (
+-              &lt;div className="copilot-model-row" key={model.id}&gt;...&lt;/div&gt;
+-            ))}
++            {state.models.length === 0 ? (
++              &lt;p className="copilot-empty"&gt;{modelListEmptyCopy}&lt;/p&gt;
++            ) : (
++              state.models.map((model) =&gt; (
++                &lt;div className="copilot-model-row" key={model.id}&gt;...&lt;/div&gt;
++              ))
++            )}</code></pre>
+
+          <div class="diff-title">Unit coverage and warning presentation</div>
+          <pre
+            class="diff"
+          ><code>diff --git a/apps/web/app/desktop-ai.test.ts b/apps/web/app/desktop-ai.test.ts
+@@
++describe("desktop ai settings copy", () =&gt; {
++  it("explains when the native bridge is missing from the desktop window", () =&gt; {
++    expect(getDesktopAiSettingsBridgeNotice(true, false)?.title).toBe(
++      "Bridge unavailable in this window"
++    );
++  });
++
++  it("keeps the model selector explicit while the bridge is disconnected", () =&gt; {
++    expect(getDesktopAiModelSelectLabel(true, false, false, 0)).toBe("Bridge unavailable");
++    expect(getDesktopAiModelListEmptyCopy(true, false, false)).toContain(
++      "native AI bridge reconnects"
++    );
++  });
++});
+diff --git a/apps/web/app/globals.css b/apps/web/app/globals.css
+@@
++.copilot-callout-warning {
++  border-color: oklch(0.74 0.08 68 / 0.42);
++  background: oklch(0.2 0.03 68 / 0.28);
++}</code></pre>
+        </section>
+
+        <section>
+          <h2>Validation</h2>
+          <div class="validation-grid">
+            <div class="validation-card good">
+              <span class="meta-label">Automated</span>
+              <strong
+                ><code>bun test apps/web/app/desktop-ai.test.ts</code></strong
+              >
+              <p>
+                Passed with 14 assertions groups green, including new coverage
+                for bridge-state copy helpers.
+              </p>
+            </div>
+            <div class="validation-card good">
+              <span class="meta-label">Manual</span>
+              <strong>Electron app state inspection</strong>
+              <p>
+                Verified the live <code>127.0.0.1:3000/settings</code> window
+                now shows <code>Reload window</code>,
+                <code>Bridge unavailable</code>, and the new model-controls
+                explanatory copy.
+              </p>
+            </div>
+            <div class="validation-card warn">
+              <span class="meta-label">Build</span>
+              <strong><code>bun --cwd=apps/web run build</code></strong>
+              <p>
+                Still fails on an existing repo-wide TypeScript import-extension
+                problem in <code>packages/types/src/desktop-ai.ts</code>,
+                unrelated to this change.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section class="two-col">
+          <div>
+            <h2>Issues, Limitations, and Mitigations</h2>
+            <ul>
+              <li>
+                The fix does not repair the missing native bridge itself. It
+                makes that failure mode explicit and recoverable from the page.
+              </li>
+              <li>
+                <code>Reload window</code> is a best-effort recovery action. If
+                the bridge is absent because of a deeper shell startup issue,
+                the user may still need to restart Islandflow.
+              </li>
+              <li>
+                The production web build could not serve as a final validation
+                gate because of the pre-existing <code>.ts</code>-extension
+                import issue already tracked elsewhere in Beads.
+              </li>
+            </ul>
+          </div>
+          <div>
+            <h2>Follow-up Work</h2>
+            <ul>
+              <li>
+                No new follow-up issue was required for this UX patch. The
+                reported confusion is addressed in <code>islandflow-dy2</code>.
+              </li>
+              <li>
+                The repo-wide Next.js build blocker remains separate work,
+                already represented by <code>islandflow-c8f</code>.
+              </li>
+              <li>
+                If bridge loss keeps happening in practice, the next useful step
+                would be adding an in-app bridge diagnostics surface instead of
+                relying on copy and window reload alone.
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <section>
+          <h2>Changes at a Glance</h2>
+          <div class="chip-row">
+            <span class="chip">settings UX hardening</span>
+            <span class="chip">desktop bridge state</span>
+            <span class="chip">managed auth recovery</span>
+            <span class="chip">explicit model empty states</span>
+            <span class="chip">unit test coverage</span>
+          </div>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>

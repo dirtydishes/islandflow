@@ -13,7 +13,7 @@ import type {
   IslandflowAiTaskKind,
   OptionFlowFilters,
   OptionPrint,
-  SmartMoneyEvent
+  SmartMoneyEvent,
 } from "@islandflow/types";
 import { useDesktopAi } from "./desktop-ai";
 
@@ -22,7 +22,7 @@ const usdFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
   minimumFractionDigits: 2,
-  maximumFractionDigits: 4
+  maximumFractionDigits: 4,
 });
 
 const humanizeValue = (value: string | null | undefined): string => {
@@ -36,7 +36,8 @@ const humanizeValue = (value: string | null | undefined): string => {
 
 const formatTokens = (value: number): string => numberFormatter.format(value);
 
-const formatUsd = (value: number | null): string => (value === null ? "Unavailable" : usdFormatter.format(value));
+const formatUsd = (value: number | null): string =>
+  value === null ? "Unavailable" : usdFormatter.format(value);
 
 const formatTimestamp = (value: number | null): string => {
   if (!value) {
@@ -44,7 +45,7 @@ const formatTimestamp = (value: number | null): string => {
   }
   return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
-    timeStyle: "short"
+    timeStyle: "short",
   }).format(value);
 };
 
@@ -52,14 +53,94 @@ const formatPercent = (value: number): string => `${Math.round(value)}%`;
 
 const getTaskStatusLabel = (value: string): string => humanizeValue(value);
 
-const findTask = <T extends { taskId: string }>(tasks: T[], taskId: string | null): T | null => {
+type DesktopAiSettingsNotice = {
+  title: string;
+  body: string;
+};
+
+export const getDesktopAiSettingsBridgeNotice = (
+  shellAvailable: boolean,
+  bridgeAvailable: boolean,
+): DesktopAiSettingsNotice | null => {
+  if (!shellAvailable) {
+    return {
+      title: "Desktop app required",
+      body: "Open Islandflow Desktop to connect ChatGPT, load managed models, and use native Copilot controls.",
+    };
+  }
+
+  if (!bridgeAvailable) {
+    return {
+      title: "Bridge unavailable in this window",
+      body: "This Islandflow Desktop window is missing its native AI bridge, so login actions and model controls stay disabled until the bridge reconnects. Reload the window or restart Islandflow if this keeps happening.",
+    };
+  }
+
+  return null;
+};
+
+export const getDesktopAiModelSelectLabel = (
+  shellAvailable: boolean,
+  bridgeAvailable: boolean,
+  loggedIn: boolean,
+  modelCount: number,
+): string => {
+  if (!shellAvailable) {
+    return "Desktop app required";
+  }
+  if (!bridgeAvailable) {
+    return "Bridge unavailable";
+  }
+  if (!loggedIn) {
+    return "Connect ChatGPT to load models";
+  }
+  if (modelCount === 0) {
+    return "Waiting for managed models";
+  }
+  return "Use server default";
+};
+
+export const getDesktopAiModelListEmptyCopy = (
+  shellAvailable: boolean,
+  bridgeAvailable: boolean,
+  loggedIn: boolean,
+): string => {
+  if (!shellAvailable) {
+    return "Open Islandflow Desktop to load managed model options.";
+  }
+  if (!bridgeAvailable) {
+    return "Managed model options will appear here after the native AI bridge reconnects.";
+  }
+  if (!loggedIn) {
+    return "Connect a ChatGPT or Codex account to load the managed model catalog.";
+  }
+  return "No model catalog has been reported yet.";
+};
+
+export const getDesktopAiProfileBadgeLabel = (
+  selected: boolean,
+  statusLabel: string,
+  bridgeAvailable: boolean,
+): string => {
+  if (!bridgeAvailable) {
+    return statusLabel;
+  }
+  return selected ? "Selected" : statusLabel;
+};
+
+const findTask = <T extends { taskId: string }>(
+  tasks: T[],
+  taskId: string | null,
+): T | null => {
   if (!taskId) {
     return null;
   }
   return tasks.find((task) => task.taskId === taskId) ?? null;
 };
 
-const getCompiledScreenSummary = (compiled: IslandflowAiCompiledScreen): string[] => {
+const getCompiledScreenSummary = (
+  compiled: IslandflowAiCompiledScreen,
+): string[] => {
   const filters = compiled.compiledFilters;
   if (!filters) {
     return [];
@@ -90,7 +171,7 @@ const CopilotPane = ({
   eyebrow,
   actions,
   wide = false,
-  children
+  children,
 }: {
   title: string;
   eyebrow?: string;
@@ -99,7 +180,9 @@ const CopilotPane = ({
   children: ReactNode;
 }) => {
   return (
-    <section className={`terminal-pane copilot-pane${wide ? " copilot-pane-wide" : ""}`}>
+    <section
+      className={`terminal-pane copilot-pane${wide ? " copilot-pane-wide" : ""}`}
+    >
       <div className="terminal-pane-head">
         <div className="terminal-pane-title-row">
           <div>
@@ -107,7 +190,9 @@ const CopilotPane = ({
             <h2 className="terminal-pane-title">{title}</h2>
           </div>
         </div>
-        {actions ? <div className="terminal-pane-actions">{actions}</div> : null}
+        {actions ? (
+          <div className="terminal-pane-actions">{actions}</div>
+        ) : null}
       </div>
       <div className="terminal-pane-body copilot-pane-body">{children}</div>
     </section>
@@ -119,7 +204,7 @@ const UsageBreakdown = ({
   breakdown,
   normalizedCostUsd,
   turnCount,
-  activeDays
+  activeDays,
 }: {
   title: string;
   breakdown: {
@@ -137,7 +222,9 @@ const UsageBreakdown = ({
     <div className="copilot-usage-block">
       <div className="copilot-usage-title-row">
         <h3>{title}</h3>
-        <span className="copilot-usage-cost">{formatUsd(normalizedCostUsd)}</span>
+        <span className="copilot-usage-cost">
+          {formatUsd(normalizedCostUsd)}
+        </span>
       </div>
       <div className="copilot-token-grid">
         <div className="copilot-token-row">
@@ -173,31 +260,48 @@ const UsageBreakdown = ({
   );
 };
 
-const RateLimitBoard = ({ limit }: { limit: IslandflowAiRateLimitSnapshot }) => {
+const RateLimitBoard = ({
+  limit,
+}: {
+  limit: IslandflowAiRateLimitSnapshot;
+}) => {
   return (
-    <div className="copilot-limit-card" key={limit.limitId ?? limit.limitName ?? "default"}>
+    <div
+      className="copilot-limit-card"
+      key={limit.limitId ?? limit.limitName ?? "default"}
+    >
       <div className="copilot-limit-head">
         <div>
           <strong>{limit.limitName ?? "Default rate window"}</strong>
           <p className="copilot-note">
-            {limit.planType ? `Plan ${humanizeValue(limit.planType)}` : "Plan not reported"}
+            {limit.planType
+              ? `Plan ${humanizeValue(limit.planType)}`
+              : "Plan not reported"}
           </p>
         </div>
-        {limit.reachedType ? <span className="copilot-badge warning">{humanizeValue(limit.reachedType)}</span> : null}
+        {limit.reachedType ? (
+          <span className="copilot-badge warning">
+            {humanizeValue(limit.reachedType)}
+          </span>
+        ) : null}
       </div>
       <div className="copilot-limit-grid">
         {limit.primary ? (
           <div className="copilot-limit-window">
             <span>Primary</span>
             <strong>{formatPercent(limit.primary.usedPercent)}</strong>
-            <p className="copilot-note">Resets {formatTimestamp(limit.primary.resetsAt)}</p>
+            <p className="copilot-note">
+              Resets {formatTimestamp(limit.primary.resetsAt)}
+            </p>
           </div>
         ) : null}
         {limit.secondary ? (
           <div className="copilot-limit-window">
             <span>Secondary</span>
             <strong>{formatPercent(limit.secondary.usedPercent)}</strong>
-            <p className="copilot-note">Resets {formatTimestamp(limit.secondary.resetsAt)}</p>
+            <p className="copilot-note">
+              Resets {formatTimestamp(limit.secondary.resetsAt)}
+            </p>
           </div>
         ) : null}
       </div>
@@ -207,10 +311,10 @@ const RateLimitBoard = ({ limit }: { limit: IslandflowAiRateLimitSnapshot }) => 
           {limit.unlimitedCredits
             ? "unlimited"
             : limit.creditsBalance
-            ? limit.creditsBalance
-            : limit.hasCredits === false
-            ? "none"
-            : "not reported"}
+              ? limit.creditsBalance
+              : limit.hasCredits === false
+                ? "none"
+                : "not reported"}
         </p>
       ) : null}
     </div>
@@ -219,7 +323,7 @@ const RateLimitBoard = ({ limit }: { limit: IslandflowAiRateLimitSnapshot }) => 
 
 const TaskOutput = ({
   taskId,
-  emptyMessage
+  emptyMessage,
 }: {
   taskId: string | null;
   emptyMessage: string;
@@ -240,16 +344,24 @@ const TaskOutput = ({
             {task.subtitle} · {getTaskStatusLabel(task.status)}
           </p>
         </div>
-        <span className={`copilot-badge status-${task.status}`}>{getTaskStatusLabel(task.status)}</span>
+        <span className={`copilot-badge status-${task.status}`}>
+          {getTaskStatusLabel(task.status)}
+        </span>
       </div>
       {task.error ? <p className="copilot-error">{task.error}</p> : null}
       {task.text ? <pre className="copilot-task-text">{task.text}</pre> : null}
-      {task.compiledScreen ? <CompiledScreenResult compiled={task.compiledScreen} /> : null}
+      {task.compiledScreen ? (
+        <CompiledScreenResult compiled={task.compiledScreen} />
+      ) : null}
     </div>
   );
 };
 
-const CompiledScreenResult = ({ compiled }: { compiled: IslandflowAiCompiledScreen }) => {
+const CompiledScreenResult = ({
+  compiled,
+}: {
+  compiled: IslandflowAiCompiledScreen;
+}) => {
   const summary = getCompiledScreenSummary(compiled);
 
   return (
@@ -263,7 +375,9 @@ const CompiledScreenResult = ({ compiled }: { compiled: IslandflowAiCompiledScre
           ))}
         </div>
       ) : (
-        <p className="copilot-note">No filter fields were compiled from this prompt.</p>
+        <p className="copilot-note">
+          No filter fields were compiled from this prompt.
+        </p>
       )}
       {compiled.unhandledClauses.length > 0 ? (
         <div className="copilot-unhandled-list">
@@ -282,7 +396,7 @@ const CompiledScreenResult = ({ compiled }: { compiled: IslandflowAiCompiledScre
 const AccountSummary = ({
   loggedIn,
   email,
-  planType
+  planType,
 }: {
   loggedIn: boolean;
   email: string | null;
@@ -294,18 +408,21 @@ const AccountSummary = ({
         <p className="copilot-kicker">Desktop-only official Codex bridge</p>
         <h1 className="page-title">Analyst Copilot</h1>
         <p className="copilot-hero-copy">
-          Managed ChatGPT login stays user-scoped, deterministic smart-money classification stays in charge, and every
-          AI turn is tracked with exact token telemetry from the app-server.
+          Managed ChatGPT login stays user-scoped, deterministic smart-money
+          classification stays in charge, and every AI turn is tracked with
+          exact token telemetry from the app-server.
         </p>
       </div>
       <div className="copilot-hero-meta">
         <div className="copilot-stat">
           <span>Account</span>
-          <strong>{loggedIn ? email ?? "Connected" : "Disconnected"}</strong>
+          <strong>{loggedIn ? (email ?? "Connected") : "Disconnected"}</strong>
         </div>
         <div className="copilot-stat">
           <span>Plan</span>
-          <strong>{loggedIn ? humanizeValue(planType) : "Not connected"}</strong>
+          <strong>
+            {loggedIn ? humanizeValue(planType) : "Not connected"}
+          </strong>
         </div>
       </div>
     </div>
@@ -313,11 +430,23 @@ const AccountSummary = ({
 };
 
 const LoginStatePanel = () => {
-  const { bridgeAvailable, state, loginWithBrowser, loginWithDeviceCode, cancelLogin, logout } = useDesktopAi();
+  const {
+    bridgeAvailable,
+    shellAvailable,
+    state,
+    loginWithBrowser,
+    loginWithDeviceCode,
+    cancelLogin,
+    logout,
+  } = useDesktopAi();
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const loginState = state.account.login;
   const actionsDisabled = busyAction !== null || !bridgeAvailable;
+  const bridgeNotice = getDesktopAiSettingsBridgeNotice(
+    shellAvailable,
+    bridgeAvailable,
+  );
 
   const runAction = async (label: string, action: () => Promise<void>) => {
     setBusyAction(label);
@@ -339,14 +468,24 @@ const LoginStatePanel = () => {
       actions={
         <>
           {state.account.loggedIn ? (
+            <button
+              className="terminal-button"
+              type="button"
+              onClick={() => void runAction("logout", logout)}
+              disabled={actionsDisabled}
+            >
+              {busyAction === "logout" ? "Logging out" : "Logout"}
+            </button>
+          ) : bridgeNotice ? (
+            shellAvailable ? (
               <button
-                className="terminal-button"
+                className="terminal-button terminal-button-primary"
                 type="button"
-                onClick={() => void runAction("logout", logout)}
-                disabled={actionsDisabled}
+                onClick={() => window.location.reload()}
               >
-                {busyAction === "logout" ? "Logging out" : "Logout"}
+                Reload window
               </button>
+            ) : null
           ) : (
             <>
               <button
@@ -367,15 +506,17 @@ const LoginStatePanel = () => {
               </button>
             </>
           )}
-          {(loginState.status === "browser_pending" || loginState.status === "device_code_pending") && !state.account.loggedIn ? (
-              <button
-                className="terminal-button"
-                type="button"
-                onClick={() => void runAction("cancel", cancelLogin)}
-                disabled={actionsDisabled}
-              >
-                Cancel
-              </button>
+          {(loginState.status === "browser_pending" ||
+            loginState.status === "device_code_pending") &&
+          !state.account.loggedIn ? (
+            <button
+              className="terminal-button"
+              type="button"
+              onClick={() => void runAction("cancel", cancelLogin)}
+              disabled={actionsDisabled}
+            >
+              Cancel
+            </button>
           ) : null}
         </>
       }
@@ -385,6 +526,12 @@ const LoginStatePanel = () => {
         email={state.account.email}
         planType={state.account.planType}
       />
+      {bridgeNotice ? (
+        <div className="copilot-callout copilot-callout-warning">
+          <strong>{bridgeNotice.title}</strong>
+          <p className="copilot-note">{bridgeNotice.body}</p>
+        </div>
+      ) : null}
       <div className="copilot-account-grid">
         <div className="copilot-account-card">
           <div className="copilot-list-title">Profile slots</div>
@@ -394,8 +541,14 @@ const LoginStatePanel = () => {
                 <strong>{profile.label}</strong>
                 <p className="copilot-note">{profile.description}</p>
               </div>
-              <span className={`copilot-badge${profile.enabled ? "" : " muted"}`}>
-                {profile.selected ? "Selected" : profile.statusLabel}
+              <span
+                className={`copilot-badge${profile.enabled ? "" : " muted"}`}
+              >
+                {getDesktopAiProfileBadgeLabel(
+                  profile.selected,
+                  profile.statusLabel,
+                  bridgeAvailable,
+                )}
               </span>
             </div>
           ))}
@@ -414,19 +567,29 @@ const LoginStatePanel = () => {
             <span>OpenAI auth required</span>
             <strong>{state.account.requiresOpenaiAuth ? "Yes" : "No"}</strong>
           </div>
-          {state.transportError ? <p className="copilot-error">{state.transportError}</p> : null}
-          {loginState.message ? <p className="copilot-note">{loginState.message}</p> : null}
+          {state.transportError ? (
+            <p className="copilot-error">{state.transportError}</p>
+          ) : null}
+          {loginState.message ? (
+            <p className="copilot-note">{loginState.message}</p>
+          ) : null}
           {loginState.status === "browser_pending" ? (
             <div className="copilot-callout">
               <strong>Browser login in progress</strong>
-              <p className="copilot-note">Finish the ChatGPT sign-in flow in your browser. Islandflow will update automatically.</p>
+              <p className="copilot-note">
+                Finish the ChatGPT sign-in flow in your browser. Islandflow will
+                update automatically.
+              </p>
             </div>
           ) : null}
           {loginState.status === "device_code_pending" ? (
             <div className="copilot-callout">
               <strong>Device code</strong>
               <pre className="copilot-device-code">{loginState.userCode}</pre>
-              <p className="copilot-note">Visit {loginState.verificationUrl} in any browser and enter the code above.</p>
+              <p className="copilot-note">
+                Visit {loginState.verificationUrl} in any browser and enter the
+                code above.
+              </p>
             </div>
           ) : null}
           {actionError ? <p className="copilot-error">{actionError}</p> : null}
@@ -437,23 +600,46 @@ const LoginStatePanel = () => {
 };
 
 export function DesktopAiSettingsRoute() {
-  const { bridgeAvailable, shellAvailable, state, updatePreferences } = useDesktopAi();
-  const [busyPreference, setBusyPreference] = useState<"model" | "reasoning" | null>(null);
+  const { bridgeAvailable, shellAvailable, state, updatePreferences } =
+    useDesktopAi();
+  const [busyPreference, setBusyPreference] = useState<
+    "model" | "reasoning" | null
+  >(null);
   const [preferenceError, setPreferenceError] = useState<string | null>(null);
   const rateLimits = Object.values(state.rateLimitsByLimitId);
   const selectedModel = state.preferences.model ?? "";
   const selectedReasoning = state.preferences.reasoningEffort ?? "";
+  const modelControlsNotice = getDesktopAiSettingsBridgeNotice(
+    shellAvailable,
+    bridgeAvailable,
+  );
+  const modelSelectLabel = getDesktopAiModelSelectLabel(
+    shellAvailable,
+    bridgeAvailable,
+    state.account.loggedIn,
+    state.models.length,
+  );
+  const modelListEmptyCopy = getDesktopAiModelListEmptyCopy(
+    shellAvailable,
+    bridgeAvailable,
+    state.account.loggedIn,
+  );
 
   const savePreference = async (
     key: "model" | "reasoning",
-    next: Partial<{ model: string | null; reasoningEffort: IslandflowAiReasoningEffort | null }>
+    next: Partial<{
+      model: string | null;
+      reasoningEffort: IslandflowAiReasoningEffort | null;
+    }>,
   ) => {
     setBusyPreference(key);
     setPreferenceError(null);
     try {
       await updatePreferences(next);
     } catch (error) {
-      setPreferenceError(error instanceof Error ? error.message : String(error));
+      setPreferenceError(
+        error instanceof Error ? error.message : String(error),
+      );
     } finally {
       setBusyPreference(null);
     }
@@ -462,11 +648,16 @@ export function DesktopAiSettingsRoute() {
   return (
     <div className="page-shell">
       {!shellAvailable ? (
-        <CopilotPane title="Desktop required" eyebrow="Browser-only fallback" wide>
+        <CopilotPane
+          title="Desktop required"
+          eyebrow="Browser-only fallback"
+          wide
+        >
           <div className="copilot-unavailable">
             <p>
-              AI controls are intentionally read-only in the browser build. Open Islandflow Desktop to use managed ChatGPT
-              login, structured Copilot turns, and app-server token telemetry.
+              AI controls are intentionally read-only in the browser build. Open
+              Islandflow Desktop to use managed ChatGPT login, structured
+              Copilot turns, and app-server token telemetry.
             </p>
           </div>
         </CopilotPane>
@@ -476,6 +667,17 @@ export function DesktopAiSettingsRoute() {
 
       <div className="page-grid page-grid-settings">
         <CopilotPane title="Model controls" eyebrow="Execution">
+          {modelControlsNotice ? (
+            <div className="copilot-callout copilot-callout-warning">
+              <strong>{modelControlsNotice.title}</strong>
+              <p className="copilot-note">{modelControlsNotice.body}</p>
+            </div>
+          ) : state.models.length === 0 ? (
+            <div className="copilot-callout">
+              <strong>Managed models are not loaded yet</strong>
+              <p className="copilot-note">{modelListEmptyCopy}</p>
+            </div>
+          ) : null}
           <div className="copilot-field-grid">
             <label className="copilot-field">
               <span className="copilot-field-label">Model</span>
@@ -483,11 +685,19 @@ export function DesktopAiSettingsRoute() {
                 className="copilot-select"
                 value={selectedModel}
                 onChange={(event) =>
-                  void savePreference("model", { model: event.target.value.trim() ? event.target.value : null })
+                  void savePreference("model", {
+                    model: event.target.value.trim()
+                      ? event.target.value
+                      : null,
+                  })
                 }
-                disabled={busyPreference !== null || state.models.length === 0 || !bridgeAvailable}
+                disabled={
+                  busyPreference !== null ||
+                  state.models.length === 0 ||
+                  !bridgeAvailable
+                }
               >
-                <option value="">Use server default</option>
+                <option value="">{modelSelectLabel}</option>
                 {state.models.map((model) => (
                   <option key={model.id} value={model.model}>
                     {model.displayName}
@@ -504,7 +714,7 @@ export function DesktopAiSettingsRoute() {
                   void savePreference("reasoning", {
                     reasoningEffort: event.target.value.trim()
                       ? (event.target.value as IslandflowAiReasoningEffort)
-                      : null
+                      : null,
                   })
                 }
                 disabled={busyPreference !== null || !bridgeAvailable}
@@ -520,40 +730,62 @@ export function DesktopAiSettingsRoute() {
             </label>
           </div>
           <div className="copilot-model-list">
-            {state.models.map((model) => (
-              <div className="copilot-model-row" key={model.id}>
-                <div>
-                  <strong>{model.displayName}</strong>
-                  <p className="copilot-note">{model.description}</p>
+            {state.models.length === 0 ? (
+              <p className="copilot-empty">{modelListEmptyCopy}</p>
+            ) : (
+              state.models.map((model) => (
+                <div className="copilot-model-row" key={model.id}>
+                  <div>
+                    <strong>{model.displayName}</strong>
+                    <p className="copilot-note">{model.description}</p>
+                  </div>
+                  <div className="copilot-model-meta">
+                    <span>{model.model}</span>
+                    {model.pricing ? (
+                      <span>
+                        {formatUsd(model.pricing.inputUsdPer1MTokens)} / 1M
+                        input
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
-                <div className="copilot-model-meta">
-                  <span>{model.model}</span>
-                  {model.pricing ? <span>{formatUsd(model.pricing.inputUsdPer1MTokens)} / 1M input</span> : null}
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
-          {state.models.find((model) => model.model === state.preferences.model)?.pricing ? (
+          {state.models.find((model) => model.model === state.preferences.model)
+            ?.pricing ? (
             <p className="copilot-note">
-              Normalized estimates use current API pricing for the selected model, not your literal ChatGPT subscription bill.
+              Normalized estimates use current API pricing for the selected
+              model, not your literal ChatGPT subscription bill.
             </p>
           ) : null}
-          {preferenceError ? <p className="copilot-error">{preferenceError}</p> : null}
+          {preferenceError ? (
+            <p className="copilot-error">{preferenceError}</p>
+          ) : null}
         </CopilotPane>
 
         <CopilotPane title="Rate limits" eyebrow="Live windows">
           {rateLimits.length === 0 ? (
-            <p className="copilot-empty">No rate-limit snapshots have been reported yet.</p>
+            <p className="copilot-empty">
+              No rate-limit snapshots have been reported yet.
+            </p>
           ) : (
             <div className="copilot-limit-list">
               {rateLimits.map((limit) => (
-                <RateLimitBoard key={limit.limitId ?? limit.limitName ?? "default"} limit={limit} />
+                <RateLimitBoard
+                  key={limit.limitId ?? limit.limitName ?? "default"}
+                  limit={limit}
+                />
               ))}
             </div>
           )}
         </CopilotPane>
 
-        <CopilotPane title="Usage dashboard" eyebrow="Exact app-server telemetry" wide>
+        <CopilotPane
+          title="Usage dashboard"
+          eyebrow="Exact app-server telemetry"
+          wide
+        >
           <div className="copilot-usage-grid">
             <UsageBreakdown
               title="Today"
@@ -578,11 +810,15 @@ export function DesktopAiSettingsRoute() {
           ) : (
             <div className="copilot-turn-list">
               {state.usage.recentTurns.map((turn) => (
-                <div className="copilot-turn-row" key={`${turn.threadId}:${turn.turnId}`}>
+                <div
+                  className="copilot-turn-row"
+                  key={`${turn.threadId}:${turn.turnId}`}
+                >
                   <div>
                     <strong>{turn.taskTitle ?? "Ad hoc turn"}</strong>
                     <p className="copilot-note">
-                      {turn.model ?? "default"} · {formatTimestamp(turn.updatedAt)}
+                      {turn.model ?? "default"} ·{" "}
+                      {formatTimestamp(turn.updatedAt)}
                     </p>
                   </div>
                   <div className="copilot-turn-metrics">
@@ -608,7 +844,9 @@ export function DesktopAiSettingsRoute() {
                       {task.subtitle} · {humanizeValue(task.model)}
                     </p>
                   </div>
-                  <span className={`copilot-badge status-${task.status}`}>{getTaskStatusLabel(task.status)}</span>
+                  <span className={`copilot-badge status-${task.status}`}>
+                    {getTaskStatusLabel(task.status)}
+                  </span>
                 </div>
               ))}
             </div>
@@ -622,7 +860,7 @@ export function DesktopAiSettingsRoute() {
 export const requireDesktopActionCopy = (
   shellAvailable: boolean,
   bridgeAvailable: boolean,
-  loggedIn: boolean
+  loggedIn: boolean,
 ): string => {
   if (!shellAvailable) {
     return "This control is desktop-only. Open Islandflow Desktop to run Copilot tasks.";
@@ -642,7 +880,7 @@ const SmartMoneyTaskButton = ({
   symbol,
   disabled,
   busyKind,
-  onRun
+  onRun,
 }: {
   label: string;
   kind: IslandflowAiTaskKind;
@@ -668,7 +906,7 @@ export function SmartMoneyCopilotPanel({
   event,
   flowPacket,
   evidencePrints,
-  relatedPackets
+  relatedPackets,
 }: {
   event: SmartMoneyEvent;
   flowPacket: FlowPacket | null;
@@ -679,7 +917,11 @@ export function SmartMoneyCopilotPanel({
   const [busyKind, setBusyKind] = useState<IslandflowAiTaskKind | null>(null);
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [taskError, setTaskError] = useState<string | null>(null);
-  const disabledCopy = requireDesktopActionCopy(shellAvailable, bridgeAvailable, state.account.loggedIn);
+  const disabledCopy = requireDesktopActionCopy(
+    shellAvailable,
+    bridgeAvailable,
+    state.account.loggedIn,
+  );
   const actionsDisabled = !bridgeAvailable || !state.account.loggedIn;
 
   const handleRun = async (kind: IslandflowAiTaskKind) => {
@@ -696,8 +938,8 @@ export function SmartMoneyCopilotPanel({
           event,
           flowPacket,
           evidencePrints,
-          relatedPackets
-        }
+          relatedPackets,
+        },
       });
       setActiveTaskId(result.taskId);
     } catch (error) {
@@ -712,7 +954,10 @@ export function SmartMoneyCopilotPanel({
       <div className="copilot-inline-head">
         <div>
           <div className="copilot-list-title">Analyst Copilot</div>
-          <p className="copilot-note">Structured interpretation only, the deterministic classifier remains the source of truth.</p>
+          <p className="copilot-note">
+            Structured interpretation only, the deterministic classifier remains
+            the source of truth.
+          </p>
         </div>
         <Link className="terminal-button" href="/settings">
           AI settings
@@ -754,7 +999,10 @@ export function SmartMoneyCopilotPanel({
       </div>
       {disabledCopy ? <p className="copilot-note">{disabledCopy}</p> : null}
       {taskError ? <p className="copilot-error">{taskError}</p> : null}
-      <TaskOutput taskId={activeTaskId} emptyMessage="Run an explanation, skepticism pass, burst summary, or watchlist synthesis to see the result here." />
+      <TaskOutput
+        taskId={activeTaskId}
+        emptyMessage="Run an explanation, skepticism pass, burst summary, or watchlist synthesis to see the result here."
+      />
     </div>
   );
 }
@@ -766,7 +1014,7 @@ export function ReplayCopilotPanel({
   smartMoneyEvents,
   classifierHits,
   flowPackets,
-  optionPrints
+  optionPrints,
 }: {
   ticker: string | null;
   flowFilters: OptionFlowFilters;
@@ -780,7 +1028,11 @@ export function ReplayCopilotPanel({
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [taskError, setTaskError] = useState<string | null>(null);
-  const disabledCopy = requireDesktopActionCopy(shellAvailable, bridgeAvailable, state.account.loggedIn);
+  const disabledCopy = requireDesktopActionCopy(
+    shellAvailable,
+    bridgeAvailable,
+    state.account.loggedIn,
+  );
   const actionsDisabled = busy || !bridgeAvailable || !state.account.loggedIn;
 
   const handleRun = async () => {
@@ -796,8 +1048,8 @@ export function ReplayCopilotPanel({
           smartMoneyEvents,
           classifierHits,
           flowPackets,
-          optionPrints
-        }
+          optionPrints,
+        },
       });
       setActiveTaskId(result.taskId);
     } catch (error) {
@@ -828,18 +1080,22 @@ export function ReplayCopilotPanel({
       }
     >
       <p className="copilot-note">
-        Copilot uses the current replay slice only: ticker scope, flow filters, visible alerts, classifier hits, packets, and option prints.
+        Copilot uses the current replay slice only: ticker scope, flow filters,
+        visible alerts, classifier hits, packets, and option prints.
       </p>
       {disabledCopy ? <p className="copilot-note">{disabledCopy}</p> : null}
       {taskError ? <p className="copilot-error">{taskError}</p> : null}
-      <TaskOutput taskId={activeTaskId} emptyMessage="Generate a replay postmortem to capture the cleanest read from the current session slice." />
+      <TaskOutput
+        taskId={activeTaskId}
+        emptyMessage="Generate a replay postmortem to capture the cleanest read from the current session slice."
+      />
     </CopilotPane>
   );
 }
 
 export function ScreenCompilerPanel({
   currentFilters,
-  onApplyFilters
+  onApplyFilters,
 }: {
   currentFilters: OptionFlowFilters;
   onApplyFilters: (next: OptionFlowFilters) => void;
@@ -849,8 +1105,15 @@ export function ScreenCompilerPanel({
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [taskError, setTaskError] = useState<string | null>(null);
-  const activeTask = useMemo(() => findTask(state.tasks, activeTaskId), [state.tasks, activeTaskId]);
-  const disabledCopy = requireDesktopActionCopy(shellAvailable, bridgeAvailable, state.account.loggedIn);
+  const activeTask = useMemo(
+    () => findTask(state.tasks, activeTaskId),
+    [state.tasks, activeTaskId],
+  );
+  const disabledCopy = requireDesktopActionCopy(
+    shellAvailable,
+    bridgeAvailable,
+    state.account.loggedIn,
+  );
   const actionsDisabled = busy || !bridgeAvailable || !state.account.loggedIn;
 
   const handleCompile = async () => {
@@ -867,8 +1130,8 @@ export function ScreenCompilerPanel({
         kind: "screen-compile",
         context: {
           prompt: trimmedPrompt,
-          currentFilters
-        }
+          currentFilters,
+        },
       });
       setActiveTaskId(result.taskId);
     } catch (error) {
@@ -913,19 +1176,28 @@ export function ScreenCompilerPanel({
         </label>
         <div className="copilot-current-filters">
           <div className="copilot-list-title">Current filter baseline</div>
-          <pre className="copilot-json-block">{JSON.stringify(currentFilters, null, 2)}</pre>
+          <pre className="copilot-json-block">
+            {JSON.stringify(currentFilters, null, 2)}
+          </pre>
         </div>
       </div>
       {disabledCopy ? <p className="copilot-note">{disabledCopy}</p> : null}
       {taskError ? <p className="copilot-error">{taskError}</p> : null}
       {compiledFilters ? (
         <div className="copilot-apply-row">
-          <button className="terminal-button" type="button" onClick={() => onApplyFilters(compiledFilters)}>
+          <button
+            className="terminal-button"
+            type="button"
+            onClick={() => onApplyFilters(compiledFilters)}
+          >
             Apply compiled filters
           </button>
         </div>
       ) : null}
-      <TaskOutput taskId={activeTaskId} emptyMessage="Compile a natural-language screen to preview the translated filter set and rationale." />
+      <TaskOutput
+        taskId={activeTaskId}
+        emptyMessage="Compile a natural-language screen to preview the translated filter set and rationale."
+      />
     </CopilotPane>
   );
 }
