@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Standup Summary for 2026-05-19</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #071018;
+        --panel: rgba(12, 18, 28, 0.92);
+        --panel-strong: rgba(16, 24, 37, 0.98);
+        --border: rgba(255, 255, 255, 0.09);
+        --text: #ebf1f7;
+        --muted: #99a8ba;
+        --faint: #6f7f92;
+        --accent: #7dd3fc;
+        --accent-soft: rgba(125, 211, 252, 0.14);
+        --good: #7ce3a1;
+        --good-soft: rgba(124, 227, 161, 0.12);
+        --warn: #f6c177;
+        --warn-soft: rgba(246, 193, 119, 0.14);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top right, rgba(125, 211, 252, 0.14), transparent 26%),
+          linear-gradient(180deg, #0a111a 0%, var(--bg) 34%, #05080d 100%);
+        line-height: 1.6;
+      }
+
+      main {
+        width: min(1080px, calc(100% - 40px));
+        margin: 32px auto 56px;
+      }
+
+      .hero,
+      section {
+        background: linear-gradient(180deg, var(--panel), var(--panel-strong));
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.28);
+      }
+
+      .hero {
+        padding: 32px;
+        margin-bottom: 18px;
+      }
+
+      section {
+        padding: 24px;
+        margin-top: 16px;
+      }
+
+      .eyebrow,
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 12px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .eyebrow {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      .tag {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--border);
+        color: var(--muted);
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        font-family: "IBM Plex Mono", monospace;
+      }
+
+      h1 {
+        margin-top: 16px;
+        font-size: clamp(2rem, 4vw, 3rem);
+        line-height: 1.05;
+      }
+
+      h2 {
+        font-size: 1.2rem;
+        margin-bottom: 14px;
+      }
+
+      h3 {
+        font-size: 1rem;
+      }
+
+      p {
+        margin: 0;
+        max-width: 78ch;
+        color: var(--muted);
+      }
+
+      .hero p {
+        margin-top: 14px;
+        font-size: 1rem;
+      }
+
+      .meta {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 12px;
+        margin-top: 24px;
+      }
+
+      .meta-card,
+      .item,
+      .callout {
+        background: rgba(255, 255, 255, 0.025);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 16px 18px;
+      }
+
+      .meta-card strong,
+      .label {
+        display: block;
+        margin-bottom: 6px;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.76rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--text);
+      }
+
+      .grid,
+      .timeline {
+        display: grid;
+        gap: 14px;
+      }
+
+      .timeline-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 14px;
+        align-items: baseline;
+        margin-bottom: 8px;
+      }
+
+      .commit,
+      .time {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.76rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .commit {
+        color: var(--accent);
+      }
+
+      .time {
+        color: var(--faint);
+      }
+
+      ul {
+        margin: 10px 0 0;
+        padding-left: 20px;
+        color: var(--muted);
+      }
+
+      li + li {
+        margin-top: 8px;
+      }
+
+      .files {
+        margin-top: 12px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .file {
+        padding: 5px 9px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.035);
+        color: var(--text);
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.79rem;
+      }
+
+      code,
+      pre {
+        font-family: "IBM Plex Mono", monospace;
+      }
+
+      pre {
+        margin: 12px 0 0;
+        padding: 14px 16px;
+        border-radius: 14px;
+        overflow-x: auto;
+        background: rgba(0, 0, 0, 0.24);
+        border: 1px solid var(--border);
+        color: #d9f2ff;
+      }
+
+      .split {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 14px;
+      }
+
+      .good {
+        border-color: rgba(124, 227, 161, 0.28);
+        background: var(--good-soft);
+      }
+
+      .warn {
+        border-color: rgba(246, 193, 119, 0.24);
+        background: var(--warn-soft);
+      }
+
+      a {
+        color: var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <article class="hero">
+        <span class="eyebrow">Daily Git Summary</span>
+        <h1>Standup Summary for 2026-05-19</h1>
+        <p>
+          Yesterday's git activity centered on four concrete areas: the web workspace moved onto
+          Next.js 16, the repository gained a generated docs index plus a Pages workflow, native
+          deploy and recovery scripts were tightened, and Alpaca news ingestion was wired through
+          native deployment with persisted article handling.
+        </p>
+        <div class="meta">
+          <div class="meta-card">
+            <strong>Date Covered</strong>
+            <span>2026-05-19</span>
+          </div>
+          <div class="meta-card">
+            <strong>Commits Reviewed</strong>
+            <span>18</span>
+          </div>
+          <div class="meta-card">
+            <strong>Main Surfaces</strong>
+            <span>Web, docs, deploy, ingest-news</span>
+          </div>
+          <div class="meta-card">
+            <strong>Validation Basis</strong>
+            <span><code>git log --stat</code> and commit spot checks</span>
+          </div>
+        </div>
+      </article>
+
+      <section>
+        <h2>Summary</h2>
+        <div class="grid">
+          <div class="item">
+            <strong class="label">Platform and Docs</strong>
+            <p>
+              The day started with repo documentation cleanup and a real framework bump in
+              <code>apps/web</code>, then shifted into publishing infrastructure for generated docs.
+            </p>
+          </div>
+          <div class="item">
+            <strong class="label">Deploy and Ingest</strong>
+            <p>
+              The later commits focused on native deployment safety and on getting Alpaca news
+              ingestion authenticated, service-managed, and persisted through the API.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <div class="timeline">
+          <div class="item">
+            <div class="timeline-meta">
+              <span class="commit">b6fa2f0</span>
+              <span class="time">07:31 ET</span>
+              <span class="tag">Web upgrade</span>
+            </div>
+            <h3>Moved the web workspace to Next.js 16</h3>
+            <ul>
+              <li><code>apps/web/package.json</code> and both lockfiles were updated in commit <code>b6fa2f0</code>.</li>
+              <li><code>apps/web/next-env.d.ts</code> and <code>apps/web/app/terminal.tsx</code> were adjusted as part of the same upgrade commit.</li>
+              <li>The earlier commit <code>8173b05</code> used the upgrade title but only changed <code>AGENTS.md</code> and <code>AGENTS server.md</code>, so the code-facing upgrade evidence comes from <code>b6fa2f0</code>.</li>
+            </ul>
+            <div class="files">
+              <span class="file">apps/web/package.json</span>
+              <span class="file">apps/web/app/terminal.tsx</span>
+              <span class="file">bun.lock</span>
+            </div>
+          </div>
+
+          <div class="item">
+            <div class="timeline-meta">
+              <span class="commit">82fd29f</span>
+              <span class="time">07:40 ET</span>
+              <span class="tag">Repo docs</span>
+            </div>
+            <h3>Refreshed repo documentation and turn-doc rules</h3>
+            <ul>
+              <li><code>README.md</code> was substantially rewritten in <code>82fd29f</code> to reflect the current project state.</li>
+              <li><code>AGENTS.md</code> and the turn-doc guidance were clarified in <code>a790a28</code> and documented in <code>cb2de93</code>.</li>
+            </ul>
+            <div class="files">
+              <span class="file">README.md</span>
+              <span class="file">AGENTS.md</span>
+              <span class="file">docs/turns/2026-05-19-0805-clarify-repo-turn-doc-rules.html</span>
+            </div>
+          </div>
+
+          <div class="item">
+            <div class="timeline-meta">
+              <span class="commit">4bacf2c</span>
+              <span class="time">14:59 ET</span>
+              <span class="tag">Publishing</span>
+            </div>
+            <h3>Added a generated docs index and GitHub Pages workflow</h3>
+            <ul>
+              <li><code>.github/workflows/docs-pages.yml</code> was added to publish docs content.</li>
+              <li><code>scripts/generate-docs-index.mjs</code> and the generated <code>docs/index.html</code> landed in the same commit.</li>
+              <li>Two daily-summary commits, <code>75ff4f4</code> and <code>276d489</code>, added then regenerated the prior standup HTML after a merge.</li>
+            </ul>
+            <div class="files">
+              <span class="file">.github/workflows/docs-pages.yml</span>
+              <span class="file">scripts/generate-docs-index.mjs</span>
+              <span class="file">docs/index.html</span>
+            </div>
+          </div>
+
+          <div class="item">
+            <div class="timeline-meta">
+              <span class="commit">4b8eaae</span>
+              <span class="time">19:28 ET</span>
+              <span class="tag">Native deploy</span>
+            </div>
+            <h3>Tightened native deploy and recovery documentation</h3>
+            <ul>
+              <li><code>deployment/native/systemd/user/islandflow-ingest-options.service</code> was simplified in <code>4b8eaae</code>.</li>
+              <li><code>scripts/deploy.ts</code> picked up SSH-assumption fixes in <code>e70835e</code>.</li>
+              <li>Supporting deployment docs were added in <code>docs/turns/2026-05-19-native-options-recovery-guardrails.html</code> and <code>docs/turns/2026-05-19-harden-native-ssh-deploy-checks.html</code>.</li>
+            </ul>
+            <div class="files">
+              <span class="file">scripts/deploy.ts</span>
+              <span class="file">deployment/native/README.md</span>
+              <span class="file">deployment/native/systemd/user/islandflow-ingest-options.service</span>
+            </div>
+          </div>
+
+          <div class="item">
+            <div class="timeline-meta">
+              <span class="commit">7d25608</span>
+              <span class="time">19:57 ET</span>
+              <span class="tag">News ingest</span>
+            </div>
+            <h3>Wired Alpaca news into config, native services, and API persistence</h3>
+            <ul>
+              <li><code>packages/config/src/alpaca.ts</code>, <code>packages/config/src/index.ts</code>, and <code>packages/config/tests/alpaca.test.ts</code> were added in <code>7d25608</code>.</li>
+              <li><code>deployment/native/systemd/user/islandflow-ingest-news.service</code> was introduced so the native install path includes the news worker.</li>
+              <li><code>services/ingest-news/src/index.ts</code> was updated in both <code>7d25608</code> and <code>93b9152</code>, and <code>services/api/src/index.ts</code> was updated in <code>93b9152</code> to persist stories and request article content.</li>
+            </ul>
+            <div class="files">
+              <span class="file">packages/config/src/alpaca.ts</span>
+              <span class="file">services/ingest-news/src/index.ts</span>
+              <span class="file">services/api/src/index.ts</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          The commit stream moved from repo hygiene and framework maintenance in the morning to
+          deploy and ingestion hardening in the evening. The highest-repeat files were
+          <code>.beads/issues.jsonl</code>, <code>README.md</code>, <code>services/ingest-news/src/index.ts</code>,
+          <code>scripts/deploy.ts</code>, and <code>deployment/native/README.md</code>, which matches that
+          split between workflow tracking, documentation, deploy tooling, and news ingest work.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <div class="split">
+          <div class="callout good">
+            <strong class="label">Concrete additions</strong>
+            <ul>
+              <li>A new docs publishing path now exists through <code>.github/workflows/docs-pages.yml</code> and <code>docs/index.html</code>.</li>
+              <li>Native deployment now includes a dedicated ingest-news user unit in <code>deployment/native/systemd/user/islandflow-ingest-news.service</code>.</li>
+              <li>Alpaca configuration gained dedicated source code and tests in <code>packages/config/src/alpaca.ts</code> and <code>packages/config/tests/alpaca.test.ts</code>.</li>
+            </ul>
+          </div>
+          <div class="callout warn">
+            <strong class="label">Notable caveat in the log</strong>
+            <ul>
+              <li>The commit message in <code>8173b05</code> references a Next.js upgrade, but its recorded file changes are documentation-only, so the actual package and lockfile upgrade is attributed here to <code>b6fa2f0</code>.</li>
+              <li>One commit, <code>171cf52</code>, is a merge commit without file-level stat output in the daily summary, so it is treated as integration context rather than a standalone delivered change.</li>
+            </ul>
+          </div>
+        </div>
+        <pre><code>git log --since='2026-05-19 00:00' --until='2026-05-20 00:00' --stat --decorate=short</code></pre>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <div class="grid">
+          <div class="item">
+            <p>
+              Web contributors now have the repo recorded on Next.js 16 with matching lockfile
+              updates in both the main workspace and Docker workspace mirror.
+            </p>
+          </div>
+          <div class="item">
+            <p>
+              Documentation consumers now have a generated index plus a Pages publishing workflow,
+              making turn docs easier to browse outside the repo tree.
+            </p>
+          </div>
+          <div class="item">
+            <p>
+              Native deployment operators now have stricter SSH and rollback guidance, along with
+              an ingest-news user unit that lines up with the later Alpaca news changes.
+            </p>
+          </div>
+          <div class="item">
+            <p>
+              News pipeline users should see Alpaca news handled through explicit config wiring and
+              story persistence paths recorded in the API and ingest service commits.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li>Reviewed all commits between <code>2026-05-19 00:00</code> and <code>2026-05-20 00:00</code> local time with <code>git log --stat</code>.</li>
+          <li>Spot-checked the highest-signal commits: <code>b6fa2f0</code>, <code>4bacf2c</code>, <code>7d25608</code>, and <code>93b9152</code>.</li>
+          <li>Cross-checked repeated files with a unique file-frequency pass to keep the summary anchored to the actual touch points.</li>
+          <li>No build, test, or runtime validation was run for this reporting task because the task was to summarize git activity rather than verify code behavior.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>This summary is limited to committed git activity on 2026-05-19. Uncommitted work and discussion outside git are intentionally excluded.</li>
+          <li>Several commits only updated <code>.beads/issues.jsonl</code>; those were treated as workflow state changes, not product changes.</li>
+          <li>The merge commit <code>171cf52</code> is listed for context but not expanded into file-level claims because the daily stat output did not include its touched files.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>No new follow-up work was inferred here. Any follow-up should come from a separate review of the recorded commits or their linked Beads issues.</li>
+          <li>The beads issue for this reporting task is <code>islandflow-8vr</code>.</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
