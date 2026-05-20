@@ -92,7 +92,8 @@ import {
   fetchNearestOptionNBBOForPrints,
   fetchSmartMoneyEventsByPacketIds,
   fetchClassifierHitsByPacketIds,
-  fetchRecentOptionPrints
+  fetchRecentOptionPrints,
+  insertNewsStory
 } from "@islandflow/storage";
 import type { EquityPrintQueryFilters } from "@islandflow/storage";
 import {
@@ -1277,6 +1278,7 @@ const run = async () => {
     for await (const msg of newsSubscription.messages) {
       try {
         const payload = NewsStorySchema.parse(newsSubscription.decode(msg));
+        await insertNewsStory(clickhouse, payload);
         await fanoutLive({ channel: "news" }, payload, "news");
         msg.ack();
       } catch (error) {

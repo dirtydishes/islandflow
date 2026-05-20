@@ -30,12 +30,20 @@ const envSchema = z.object({
   ALPACA_SECRET_KEY: z.string().default(""),
   ALPACA_REST_URL: z.string().default("https://data.alpaca.markets"),
   ALPACA_WS_BASE_URL: z.string().default("wss://stream.data.alpaca.markets"),
-  ALPACA_NEWS_BACKFILL_LIMIT: z.coerce.number().int().positive().max(200).default(100),
+  ALPACA_NEWS_BACKFILL_LIMIT: z.coerce.number().int().positive().max(50).default(50),
   ALPACA_NEWS_WEBSOCKET_PATH: z.string().default("/v1beta1/news")
 });
 
 const env = readEnv(envSchema);
 const alpacaCredentials = resolveAlpacaCredentials(env);
+
+const escapeHtml = (value: string): string =>
+  value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 
 type AlpacaNewsItem = {
   id?: number;
@@ -66,7 +74,8 @@ const toStory = (item: AlpacaNewsItem, seq: number): NewsStory | null => {
   }
 
   const provider = "alpaca";
-  const contentHtml = item.content ?? "";
+  const summary = item.summary?.trim() ?? "";
+  const contentHtml = item.content?.trim() || (summary ? `<p>${escapeHtml(summary)}</p>` : "");
   const symbols = resolveNewsSymbols(item.symbols ?? [], contentHtml);
   const publishedTs = parseTimestamp(item.created_at);
   const updatedTs = parseTimestamp(item.updated_at ?? item.created_at);
@@ -80,7 +89,7 @@ const toStory = (item: AlpacaNewsItem, seq: number): NewsStory | null => {
     provider,
     source: item.source?.trim() || item.author?.trim() || "Alpaca News",
     headline: item.headline?.trim() || `Story ${storyId}`,
-    summary: item.summary?.trim() || "",
+    summary,
     content_html: contentHtml,
     url: item.url?.trim() || "",
     published_ts: publishedTs,
@@ -95,6 +104,7 @@ const fetchBackfill = async (): Promise<AlpacaNewsItem[]> => {
   const url = new URL("/v1beta1/news", env.ALPACA_REST_URL);
   url.searchParams.set("sort", "desc");
   url.searchParams.set("limit", env.ALPACA_NEWS_BACKFILL_LIMIT.toString());
+  url.searchParams.set("include_content", "true");
 
   const response = await fetch(url.toString(), {
     headers: buildAlpacaAuthHeaders(alpacaCredentials)

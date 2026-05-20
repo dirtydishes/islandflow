@@ -270,7 +270,7 @@ All runtime configuration comes from `.env`.
 | `ALPACA_MONEYNESS_FALLBACK_PCT` | `0.1` | Wider fallback moneyness filter if candidate set is too sparse. |
 | `ALPACA_MAX_QUOTES` | `200` | Upper bound on selected Alpaca options contracts/quotes per cycle. |
 | `ALPACA_EQUITIES_FEED` | `iex` | Alpaca equities feed: `iex` or `sip`. |
-| `ALPACA_NEWS_BACKFILL_LIMIT` | `100` | Alpaca news stories fetched on startup, capped at 200. |
+| `ALPACA_NEWS_BACKFILL_LIMIT` | `50` | Alpaca news stories fetched on startup, capped at 50 by the Alpaca News API. |
 | `ALPACA_NEWS_WEBSOCKET_PATH` | `/v1beta1/news` | Alpaca news websocket path. |
 
 ### Databento replay adapter configuration
