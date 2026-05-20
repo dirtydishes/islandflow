@@ -5,8 +5,8 @@ import {
   FlowPacketSchema,
   OptionPrintSchema,
   SmartMoneyEventSchema
-} from "./events";
-import { OptionFlowFiltersSchema } from "./options-flow";
+} from "./events.ts";
+import { OptionFlowFiltersSchema } from "./options-flow.ts";
 
 export const IslandflowAiReasoningEffortSchema = z.enum([
   "none",

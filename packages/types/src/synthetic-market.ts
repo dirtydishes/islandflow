@@ -1,7 +1,7 @@
 import { z } from "zod";
-import type { SmartMoneyProfileId } from "./events";
-import type { SyntheticMarketMode } from "./options-flow";
-import { SP500_SYMBOLS } from "./sp500";
+import type { SmartMoneyProfileId } from "./events.ts";
+import type { SyntheticMarketMode } from "./options-flow.ts";
+import { SP500_SYMBOLS } from "./sp500.ts";
 
 const SYNTHETIC_PROFILE_WEIGHT_VALUES = [0.6, 1.0, 1.6] as const;
 const SYNTHETIC_COVERAGE_WINDOW_VALUES = [10, 20, 30] as const;

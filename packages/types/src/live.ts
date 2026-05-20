@@ -12,11 +12,11 @@ import {
   OptionNBBOSchema,
   OptionPrintSchema,
   SmartMoneyEventSchema
-} from "./events";
+} from "./events.ts";
 import {
   OptionFlowFiltersSchema,
   optionFlowFilterKey
-} from "./options-flow";
+} from "./options-flow.ts";
 
 export const CursorSchema = z.object({
   ts: z.number().int().nonnegative(),

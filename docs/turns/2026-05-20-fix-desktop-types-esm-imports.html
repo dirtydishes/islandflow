@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Turn Doc - Fix desktop types ESM imports</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f8fc;
+      --panel: #ffffff;
+      --ink: #1c2333;
+      --muted: #5b6781;
+      --accent: #2556d8;
+      --line: #dbe2f1;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, #eef2ff 0%, var(--bg) 45%);
+      color: var(--ink);
+      line-height: 1.55;
+    }
+    main {
+      max-width: 920px;
+      margin: 32px auto;
+      padding: 0 20px 48px;
+    }
+    article {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 28px;
+      box-shadow: 0 14px 36px rgba(28, 35, 51, 0.08);
+    }
+    h1 { margin: 0 0 8px; font-size: 1.6rem; }
+    .meta { color: var(--muted); margin-bottom: 18px; }
+    h2 {
+      margin-top: 26px;
+      margin-bottom: 10px;
+      font-size: 1.15rem;
+      color: #172952;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 6px;
+    }
+    p, li { margin: 0 0 10px; }
+    ul { margin: 0; padding-left: 20px; }
+    code {
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      background: #edf2ff;
+      padding: 1px 5px;
+      border-radius: 6px;
+      font-size: 0.92em;
+    }
+    pre {
+      margin: 10px 0 14px;
+      padding: 14px;
+      border-radius: 10px;
+      border: 1px solid #d6def3;
+      background: #0f1525;
+      color: #d9e2ff;
+      overflow-x: auto;
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.85rem;
+      line-height: 1.45;
+    }
+    .callout {
+      border-left: 4px solid var(--accent);
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: #eef3ff;
+      color: #22335f;
+      margin: 10px 0;
+    }
+    a { color: #1747be; }
+  </style>
+</head>
+<body>
+  <main>
+    <article>
+      <h1>Desktop ESM Import Resolution Fix</h1>
+      <p class="meta">Created: 2026-05-20 18:30 EDT · Branch: <code>lavender/codex-login-management-electron</code></p>
+
+      <h2>Summary</h2>
+      <p>Fixed a desktop startup crash where Electron failed to load <code>@islandflow/types</code> with <code>ERR_MODULE_NOT_FOUND</code> for <code>packages/types/src/events</code>. The types package now uses explicit <code>.ts</code> relative imports, and desktop TypeScript build settings were updated to permit and rewrite those imports during emit.</p>
+
+      <h2>Changes Made</h2>
+      <ul>
+        <li>Updated all internal re-exports/imports in <code>packages/types/src</code> that pointed to sibling modules without file extensions to use explicit <code>.ts</code> extensions.</li>
+        <li>Updated desktop TS compiler options in <code>apps/desktop/tsconfig.json</code>:
+          <code>allowImportingTsExtensions: true</code> and <code>rewriteRelativeImportExtensions: true</code>.</li>
+        <li>Created and tracked the bug in Beads as <code>islandflow-64s</code>.</li>
+      </ul>
+
+      <h2>Context</h2>
+      <p>The desktop app launches via Electron (Node ESM behavior), while much of this monorepo is typically run through Bun. Bun accepts extensionless TypeScript relative imports that Node ESM does not. Since <code>@islandflow/types</code> exports source TS (<code>./src/index.ts</code>), Electron loaded those sources directly and failed on extensionless sibling imports.</p>
+
+      <h2>Important Implementation Details</h2>
+      <ul>
+        <li>The fix stays within current package structure; no new build pipeline was introduced for <code>@islandflow/types</code>.</li>
+        <li>By enabling <code>rewriteRelativeImportExtensions</code>, desktop emit remains compatible even while accepting <code>.ts</code> specifiers during type-checking.</li>
+        <li>This avoids adding runtime Node flags and keeps behavior explicit in source and compiler config.</li>
+      </ul>
+
+      <h2>Relevant Diff Snippets</h2>
+      <p>Unified patch snippets below are diffs.com-compatible patch text format.</p>
+      <pre><code>diff --git a/packages/types/src/index.ts b/packages/types/src/index.ts
+-export * from "./events";
++export * from "./events.ts";
+-export * from "./live";
++export * from "./live.ts";
+
+...
+
+diff --git a/apps/desktop/tsconfig.json b/apps/desktop/tsconfig.json
+ "noEmit": false,
++"allowImportingTsExtensions": true,
++"rewriteRelativeImportExtensions": true,
+ "sourceMap": true,</code></pre>
+
+      <h2>Expected Impact for End-Users</h2>
+      <p>Desktop developers can run <code>bun run dev:desktop</code> without the startup crash. This unblocks local desktop testing and feature work without requiring manual runtime flags or ad hoc environment tweaks.</p>
+
+      <h2>Validation</h2>
+      <ul>
+        <li>Ran <code>bun --cwd=apps/desktop run build</code> successfully.</li>
+        <li>Ran <code>node -e "import('./packages/types/src/index.ts')"</code> to confirm direct source import resolution works after the import updates.</li>
+        <li>Ran <code>bun run dev:desktop</code> and confirmed Electron launched successfully past the previous module-resolution failure (manually interrupted afterward).</li>
+      </ul>
+
+      <h2>Issues, Limitations, and Mitigations</h2>
+      <ul>
+        <li>This fix assumes Node/Electron TypeScript type-stripping support remains available for direct TS source loading.</li>
+        <li>The plugin catalog 403 warnings observed during launch are unrelated to this module-resolution fix and remain unchanged.</li>
+      </ul>
+
+      <h2>Follow-up Work</h2>
+      <ul>
+        <li>Evaluate whether <code>@islandflow/types</code> should eventually ship a dedicated built JS output for stricter runtime portability beyond Bun/Electron workflows.</li>
+        <li>Add a lightweight desktop smoke check in CI for startup-path regressions around workspace package resolution.</li>
+      </ul>
+
+      <p class="callout">Beads issue: <code>islandflow-64s</code>.</p>
+    </article>
+  </main>
+</body>
+</html>

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { OptionNbboSideSchema, OptionTypeSchema, OptionsSignalModeSchema } from "./options-flow";
+import { OptionNbboSideSchema, OptionTypeSchema, OptionsSignalModeSchema } from "./options-flow.ts";
 
 export const EventMetaSchema = z.object({
   source_ts: z.number().int().nonnegative(),
