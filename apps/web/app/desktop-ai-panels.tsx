@@ -313,11 +313,11 @@ const AccountSummary = ({
 };
 
 const LoginStatePanel = () => {
-  const { state, loginWithBrowser, loginWithDeviceCode, cancelLogin, logout } = useDesktopAi();
+  const { bridgeAvailable, state, loginWithBrowser, loginWithDeviceCode, cancelLogin, logout } = useDesktopAi();
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const loginState = state.account.login;
-  const actionsDisabled = busyAction !== null || !state.desktopAvailable;
+  const actionsDisabled = busyAction !== null || !bridgeAvailable;
 
   const runAction = async (label: string, action: () => Promise<void>) => {
     setBusyAction(label);
@@ -437,7 +437,7 @@ const LoginStatePanel = () => {
 };
 
 export function DesktopAiSettingsRoute() {
-  const { state, updatePreferences } = useDesktopAi();
+  const { bridgeAvailable, shellAvailable, state, updatePreferences } = useDesktopAi();
   const [busyPreference, setBusyPreference] = useState<"model" | "reasoning" | null>(null);
   const [preferenceError, setPreferenceError] = useState<string | null>(null);
   const rateLimits = Object.values(state.rateLimitsByLimitId);
@@ -461,7 +461,7 @@ export function DesktopAiSettingsRoute() {
 
   return (
     <div className="page-shell">
-      {!state.desktopAvailable ? (
+      {!shellAvailable ? (
         <CopilotPane title="Desktop required" eyebrow="Browser-only fallback" wide>
           <div className="copilot-unavailable">
             <p>
@@ -485,7 +485,7 @@ export function DesktopAiSettingsRoute() {
                 onChange={(event) =>
                   void savePreference("model", { model: event.target.value.trim() ? event.target.value : null })
                 }
-                disabled={busyPreference !== null || state.models.length === 0 || !state.desktopAvailable}
+                disabled={busyPreference !== null || state.models.length === 0 || !bridgeAvailable}
               >
                 <option value="">Use server default</option>
                 {state.models.map((model) => (
@@ -507,7 +507,7 @@ export function DesktopAiSettingsRoute() {
                       : null
                   })
                 }
-                disabled={busyPreference !== null || !state.desktopAvailable}
+                disabled={busyPreference !== null || !bridgeAvailable}
               >
                 <option value="">Use model default</option>
                 <option value="none">None</option>
@@ -619,9 +619,16 @@ export function DesktopAiSettingsRoute() {
   );
 }
 
-const requireDesktopActionCopy = (desktopAvailable: boolean, loggedIn: boolean): string => {
-  if (!desktopAvailable) {
+export const requireDesktopActionCopy = (
+  shellAvailable: boolean,
+  bridgeAvailable: boolean,
+  loggedIn: boolean
+): string => {
+  if (!shellAvailable) {
     return "This control is desktop-only. Open Islandflow Desktop to run Copilot tasks.";
+  }
+  if (!bridgeAvailable) {
+    return "Islandflow Desktop is open, but this window is missing the native AI bridge. Reload the window or restart the app.";
   }
   if (!loggedIn) {
     return "Connect a ChatGPT or Codex account in Settings before running Copilot analysis.";
@@ -668,11 +675,11 @@ export function SmartMoneyCopilotPanel({
   evidencePrints: OptionPrint[];
   relatedPackets: FlowPacket[];
 }) {
-  const { bridgeAvailable, state, runTask } = useDesktopAi();
+  const { bridgeAvailable, shellAvailable, state, runTask } = useDesktopAi();
   const [busyKind, setBusyKind] = useState<IslandflowAiTaskKind | null>(null);
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [taskError, setTaskError] = useState<string | null>(null);
-  const disabledCopy = requireDesktopActionCopy(bridgeAvailable, state.account.loggedIn);
+  const disabledCopy = requireDesktopActionCopy(shellAvailable, bridgeAvailable, state.account.loggedIn);
   const actionsDisabled = !bridgeAvailable || !state.account.loggedIn;
 
   const handleRun = async (kind: IslandflowAiTaskKind) => {
@@ -769,11 +776,11 @@ export function ReplayCopilotPanel({
   flowPackets: FlowPacket[];
   optionPrints: OptionPrint[];
 }) {
-  const { bridgeAvailable, state, runTask } = useDesktopAi();
+  const { bridgeAvailable, shellAvailable, state, runTask } = useDesktopAi();
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [taskError, setTaskError] = useState<string | null>(null);
-  const disabledCopy = requireDesktopActionCopy(bridgeAvailable, state.account.loggedIn);
+  const disabledCopy = requireDesktopActionCopy(shellAvailable, bridgeAvailable, state.account.loggedIn);
   const actionsDisabled = busy || !bridgeAvailable || !state.account.loggedIn;
 
   const handleRun = async () => {
@@ -837,13 +844,13 @@ export function ScreenCompilerPanel({
   currentFilters: OptionFlowFilters;
   onApplyFilters: (next: OptionFlowFilters) => void;
 }) {
-  const { bridgeAvailable, state, runTask } = useDesktopAi();
+  const { bridgeAvailable, shellAvailable, state, runTask } = useDesktopAi();
   const [prompt, setPrompt] = useState("");
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [taskError, setTaskError] = useState<string | null>(null);
   const activeTask = useMemo(() => findTask(state.tasks, activeTaskId), [state.tasks, activeTaskId]);
-  const disabledCopy = requireDesktopActionCopy(bridgeAvailable, state.account.loggedIn);
+  const disabledCopy = requireDesktopActionCopy(shellAvailable, bridgeAvailable, state.account.loggedIn);
   const actionsDisabled = busy || !bridgeAvailable || !state.account.loggedIn;
 
   const handleCompile = async () => {

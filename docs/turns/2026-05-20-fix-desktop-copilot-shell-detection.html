@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>2026-05-20 · Fix Desktop Copilot Shell Detection</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: oklch(0.11 0.01 250);
+        --panel: oklch(0.16 0.013 250 / 0.92);
+        --panel-2: oklch(0.14 0.012 250 / 0.9);
+        --text: oklch(0.93 0.014 250);
+        --muted: oklch(0.74 0.018 250);
+        --faint: oklch(0.6 0.016 250);
+        --line: oklch(0.75 0.014 250 / 0.14);
+        --accent: oklch(0.79 0.12 74);
+        --accent-soft: oklch(0.79 0.12 74 / 0.12);
+        --green-soft: oklch(0.75 0.12 151 / 0.12);
+        --red-soft: oklch(0.72 0.14 28 / 0.12);
+        --blue-soft: oklch(0.7 0.1 247 / 0.12);
+        --shadow: 0 24px 80px oklch(0.02 0.01 250 / 0.45);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+        background:
+          radial-gradient(circle at top left, oklch(0.8 0.12 74 / 0.09), transparent 28%),
+          linear-gradient(180deg, oklch(0.15 0.012 250) 0%, oklch(0.1 0.01 250) 100%);
+        color: var(--text);
+      }
+
+      main {
+        width: min(1160px, calc(100vw - 40px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+
+      h1,
+      h2,
+      h3,
+      .eyebrow,
+      .meta,
+      code,
+      pre {
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+      }
+
+      p,
+      li {
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      main > * + * {
+        margin-top: 22px;
+      }
+
+      .hero {
+        display: grid;
+        gap: 20px;
+        padding: 28px;
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        background:
+          linear-gradient(135deg, oklch(0.2 0.017 250 / 0.96), oklch(0.14 0.012 250 / 0.98)),
+          var(--panel);
+        box-shadow: var(--shadow);
+      }
+
+      .eyebrow {
+        margin: 0 0 10px;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        font-size: 0.76rem;
+      }
+
+      .hero h1 {
+        font-size: clamp(2rem, 3.4vw, 3.6rem);
+        line-height: 0.95;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+
+      .hero-copy {
+        max-width: 72ch;
+        margin: 14px 0 0;
+      }
+
+      .hero-grid,
+      .section-grid,
+      .validation-grid,
+      .two-col {
+        display: grid;
+        gap: 18px;
+      }
+
+      .hero-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .two-col {
+        grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+      }
+
+      .stat,
+      .validation-card,
+      .callout {
+        padding: 16px 18px;
+        border-radius: 16px;
+        border: 1px solid var(--line);
+        background: oklch(0.12 0.01 250 / 0.5);
+      }
+
+      .stat span,
+      .validation-card span {
+        display: block;
+        margin-bottom: 8px;
+        color: var(--faint);
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        font-size: 0.68rem;
+      }
+
+      .stat strong,
+      .validation-card strong {
+        color: var(--text);
+      }
+
+      .validation-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .validation-card.good {
+        background: var(--green-soft);
+      }
+
+      .validation-card.warn {
+        background: var(--red-soft);
+      }
+
+      .callout {
+        background: var(--blue-soft);
+      }
+
+      section {
+        padding: 24px;
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        background: var(--panel-2);
+        box-shadow: var(--shadow);
+      }
+
+      section h2 {
+        margin-bottom: 14px;
+        font-size: 1rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 10px;
+      }
+
+      .chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        padding: 0 10px;
+        border-radius: 999px;
+        border: 1px solid oklch(0.8 0.12 74 / 0.28);
+        background: var(--accent-soft);
+        color: var(--text);
+        font-size: 0.74rem;
+      }
+
+      .meta {
+        color: var(--faint);
+        font-size: 0.82rem;
+      }
+
+      pre.diff {
+        margin: 0;
+        padding: 16px 18px;
+        overflow: auto;
+        border-radius: 16px;
+        border: 1px solid var(--line);
+        background: oklch(0.08 0.008 250 / 0.95);
+        color: var(--text);
+        line-height: 1.5;
+        font-size: 0.78rem;
+      }
+
+      .diff-title {
+        margin-bottom: 10px;
+        color: var(--faint);
+        font-size: 0.76rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      @media (max-width: 860px) {
+        main {
+          width: min(100vw - 24px, 1160px);
+          padding-top: 18px;
+        }
+
+        .hero-grid,
+        .two-col,
+        .validation-grid {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="hero">
+        <div>
+          <p class="eyebrow">Turn Record · 2026-05-20 18:34 EDT</p>
+          <h1>Fix Desktop Copilot Shell Detection</h1>
+          <p class="hero-copy">
+            This turn fixed the case where Islandflow could be running inside the Electron desktop shell but still show
+            the browser-only Copilot fallback. The renderer now distinguishes between “not in desktop”, “desktop shell
+            detected but native bridge missing”, and “desktop bridge present but initial state failed”.
+          </p>
+        </div>
+        <div class="hero-grid">
+          <div class="stat">
+            <span>Main Issue</span>
+            <strong><code>islandflow-199</code></strong>
+          </div>
+          <div class="stat">
+            <span>Files Changed</span>
+            <strong>3</strong>
+          </div>
+          <div class="stat">
+            <span>Validation</span>
+            <strong>Targeted tests passed, web build blocked by existing repo issue</strong>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          The Copilot settings surface no longer assumes that any failure to load desktop AI state means the app is
+          running in a browser. Instead, it recovers late bridge injection for a short window, exposes better shell-vs-
+          bridge state to the UI, and gives the user actionable recovery copy when the native bridge is missing.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Added desktop runtime helpers in <code>apps/web/app/desktop-ai.tsx</code> to detect Electron shell presence separately from bridge presence.</li>
+          <li>Changed the desktop AI provider to poll briefly for late bridge availability instead of giving up after the first missing-read.</li>
+          <li>Reworked the provider’s unavailable/error state so desktop sessions show bridge-focused recovery guidance instead of browser-only copy.</li>
+          <li>Updated settings and Copilot action panels in <code>apps/web/app/desktop-ai-panels.tsx</code> to gate actions on bridge availability while only showing the browser fallback when the shell is genuinely absent.</li>
+          <li>Added regression coverage in <code>apps/web/app/desktop-ai.test.ts</code> for Electron detection, bridge-missing fallback state, and action helper copy.</li>
+          <li>Filed follow-up issue <code>islandflow-c8f</code> for the unrelated shared-types import-path problem currently blocking <code>bun --cwd=apps/web run build</code>.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <div class="two-col">
+          <div>
+            <p>
+              The reported symptom was a Settings screen that still rendered “Browser-only fallback” even though the
+              user was visibly inside the Islandflow desktop app. The pre-fix renderer had a single blunt interpretation:
+              if the preload bridge was not immediately readable, the state fell back to the same model used for a real
+              browser session.
+            </p>
+            <p>
+              That collapsed three different states into one misleading message:
+            </p>
+            <ul>
+              <li>Regular browser session, where desktop AI truly is unavailable.</li>
+              <li>Electron shell present, but the bridge appeared slightly later than the first effect pass.</li>
+              <li>Electron shell and bridge both present, but the initial <code>getState()</code> call failed.</li>
+            </ul>
+          </div>
+          <aside class="callout">
+            <strong>Why this matters</strong>
+            <p>
+              A desktop shell claiming “open the desktop app” is not just awkward copy. It also disables the login
+              actions that might still be recoverable, which turns a bridge problem into a dead-end user experience.
+            </p>
+          </aside>
+        </div>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <ul>
+          <li><strong>Shell detection:</strong> the renderer now treats an Electron user-agent or a working preload bridge as evidence that the desktop shell is present.</li>
+          <li><strong>Bridge recovery:</strong> the provider polls for up to 20 attempts at 250ms intervals so late preload exposure does not immediately collapse to browser fallback.</li>
+          <li><strong>Better state semantics:</strong> unavailable-state generation now accepts runtime context and can mark <code>desktopAvailable</code> true while still reporting a bridge error.</li>
+          <li><strong>UI gating:</strong> Settings and Copilot actions key off <code>bridgeAvailable</code> for actionable controls, while the “Desktop required” banner keys off <code>shellAvailable</code>.</li>
+          <li><strong>Recovery copy:</strong> action helper text now distinguishes between “open the desktop app”, “reload or restart because the native bridge is missing”, and “connect a ChatGPT or Codex account”.</li>
+        </ul>
+        <div class="chip-row" style="margin-top: 14px;">
+          <span class="chip">Electron shell detection</span>
+          <span class="chip">Late bridge retry</span>
+          <span class="chip">Accurate fallback messaging</span>
+          <span class="chip">Regression tests</span>
+        </div>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p class="meta">
+          Diff snippets are rendered as plain patch strings compatible with the format documented by
+          <a href="https://diffs.com/docs">diffs.com</a>.
+        </p>
+        <div class="section-grid">
+          <div>
+            <div class="diff-title">Renderer runtime detection and bridge polling</div>
+            <pre class="diff"><code>diff --git a/apps/web/app/desktop-ai.tsx b/apps/web/app/desktop-ai.tsx
+@@
++const BRIDGE_POLL_INTERVAL_MS = 250;
++const BRIDGE_POLL_MAX_ATTEMPTS = 20;
++const ELECTRON_USER_AGENT_PATTERN = /\bElectron\/\S+/i;
++
++export const detectDesktopShell = (userAgent: string | null | undefined): boolean =&gt;
++  Boolean(userAgent &amp;&amp; ELECTRON_USER_AGENT_PATTERN.test(userAgent));
++
++export const resolveDesktopAiRuntime = (...) =&gt; {
++  const bridge = value?.islandflowDesktop?.ai ? value.islandflowDesktop : null;
++  const bridgeAvailable = Boolean(bridge?.ai);
++  const shellAvailable = bridgeAvailable || detectDesktopShell(value?.navigator?.userAgent);
++  return { shellAvailable, bridgeAvailable, bridge };
++};
+@@
++    if (!syncRuntime()) {
++      const pollForBridge = () =&gt; {
++        attempts += 1;
++        if (syncRuntime() || attempts &gt;= BRIDGE_POLL_MAX_ATTEMPTS) {
++          return;
++        }
++        pollTimer = window.setTimeout(pollForBridge, BRIDGE_POLL_INTERVAL_MS);
++      };
++      pollTimer = window.setTimeout(pollForBridge, BRIDGE_POLL_INTERVAL_MS);
++    }</code></pre>
+          </div>
+          <div>
+            <div class="diff-title">Settings and task panels stop calling the desktop shell a browser</div>
+            <pre class="diff"><code>diff --git a/apps/web/app/desktop-ai-panels.tsx b/apps/web/app/desktop-ai-panels.tsx
+@@
+-  const actionsDisabled = busyAction !== null || !state.desktopAvailable;
++  const actionsDisabled = busyAction !== null || !bridgeAvailable;
+@@
+-      {!state.desktopAvailable ? (
++      {!shellAvailable ? (
+         &lt;CopilotPane title="Desktop required" eyebrow="Browser-only fallback" wide&gt;
+@@
+-const requireDesktopActionCopy = (desktopAvailable: boolean, loggedIn: boolean): string =&gt; {
+-  if (!desktopAvailable) {
++export const requireDesktopActionCopy = (shellAvailable: boolean, bridgeAvailable: boolean, loggedIn: boolean): string =&gt; {
++  if (!shellAvailable) {
+     return "This control is desktop-only. Open Islandflow Desktop to run Copilot tasks.";
+   }
++  if (!bridgeAvailable) {
++    return "Islandflow Desktop is open, but this window is missing the native AI bridge. Reload the window or restart the app.";
++  }</code></pre>
+          </div>
+          <div>
+            <div class="diff-title">Regression coverage for shell-vs-bridge behavior</div>
+            <pre class="diff"><code>diff --git a/apps/web/app/desktop-ai.test.ts b/apps/web/app/desktop-ai.test.ts
+new file mode 100644
+@@
++it("recognizes Electron user agents before the bridge is available", () =&gt; {
++  const runtime = resolveDesktopAiRuntime({ navigator: { userAgent: "... Electron/39.0.0 ..." } });
++  expect(runtime.shellAvailable).toBe(true);
++  expect(runtime.bridgeAvailable).toBe(false);
++});
++
++it("reports desktop-shell bridge failures without pretending the app is a browser", () =&gt; {
++  const state = createUnavailableState({ shellAvailable: true });
++  expect(state.desktopAvailable).toBe(true);
++  expect(state.transportError).toContain("native AI bridge");
++});</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <ul>
+          <li>Desktop users no longer get told to “open Islandflow Desktop” when they are already in it.</li>
+          <li>If the preload bridge is delayed, the renderer now has a short recovery window before giving up.</li>
+          <li>If the bridge is missing or broken, the UI explains that exact condition and suggests a sensible recovery path.</li>
+          <li>Copilot action text now distinguishes between missing desktop shell, missing bridge, and missing account login.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <div class="validation-grid">
+          <div class="validation-card good">
+            <span>Passed</span>
+            <strong><code>bun test apps/web/app/desktop-ai.test.ts apps/web/app/routes.test.ts apps/web/app/terminal.test.ts</code></strong>
+            <p>All targeted renderer tests passed, including the new desktop shell and bridge regression coverage.</p>
+          </div>
+          <div class="validation-card warn">
+            <span>Blocked By Existing Repo Issue</span>
+            <strong><code>bun --cwd=apps/web run build</code></strong>
+            <p>
+              The build still fails during shared package type-checking because <code>packages/types/src/desktop-ai.ts</code>
+              imports sibling files with explicit <code>.ts</code> extensions. Follow-up issue: <code>islandflow-c8f</code>.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>The provider’s retry window is intentionally short. It helps with delayed bridge injection, but it does not try to hide a truly broken preload indefinitely.</li>
+          <li>The first client paint can still momentarily start from the generic unavailable state before the effect resolves runtime details. The mitigation is that the resolved UI now lands on an accurate desktop-shell state instead of a misleading browser fallback.</li>
+          <li>The production web build remains red for an unrelated shared-types import-path issue. That blocker is explicitly tracked in <code>islandflow-c8f</code> so it does not disappear into session history.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li><code>islandflow-c8f</code>: remove or normalize explicit <code>.ts</code> import specifiers in <code>packages/types</code> so the Next.js production build can complete.</li>
+          <li>Optionally add desktop-shell telemetry to the topbar summary so bridge-missing sessions are visible outside Settings too.</li>
+          <li>If bridge timing remains flaky in practice, consider emitting a preload-ready event instead of relying only on a short polling window.</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
