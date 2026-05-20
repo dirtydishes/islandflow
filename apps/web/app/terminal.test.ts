@@ -476,6 +476,24 @@ describe("route feature map", () => {
     expect(features.showNewsPane).toBe(true);
     expect(features.showAlertsPane).toBe(false);
   });
+
+  it("maps /replay to replay panes and dependencies", () => {
+    const features = getRouteFeatures("/replay");
+    expect(features.showReplayConsole).toBe(true);
+    expect(features.showOptionsPane).toBe(true);
+    expect(features.showFlowPane).toBe(true);
+    expect(features.showAlertsPane).toBe(true);
+    expect(features.needsClassifierDecor).toBe(true);
+  });
+
+  it("maps /settings to a no-feed desktop settings surface", () => {
+    const features = getRouteFeatures("/settings");
+    expect(features.showReplayConsole).toBe(false);
+    expect(features.showOptionsPane).toBe(false);
+    expect(features.showAlertsPane).toBe(false);
+    expect(features.options).toBe(false);
+    expect(features.equities).toBe(false);
+  });
 });
 
 describe("fixed tape virtualization config", () => {
@@ -506,11 +524,15 @@ describe("dark underlying route dependency helper", () => {
 });
 
 describe("terminal navigation", () => {
-  it("exposes Home, Tape, and News as top-level destinations", () => {
+  it("exposes the terminal routes including Copilot settings", () => {
     expect(NAV_ITEMS).toEqual([
       { href: "/", label: "Home" },
       { href: "/tape", label: "Tape" },
-      { href: "/news", label: "News" }
+      { href: "/news", label: "News" },
+      { href: "/signals", label: "Signals" },
+      { href: "/charts", label: "Charts" },
+      { href: "/replay", label: "Replay" },
+      { href: "/settings", label: "Settings" }
     ]);
   });
 });

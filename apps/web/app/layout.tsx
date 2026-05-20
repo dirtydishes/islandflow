@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { ReactNode } from "react";
 import { IBM_Plex_Mono, IBM_Plex_Sans, Quantico } from "next/font/google";
+import { DesktopAiProvider } from "./desktop-ai";
 import { TerminalAppShell } from "./terminal";
 
 const display = Quantico({
@@ -34,7 +35,9 @@ export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en">
       <body className={`${display.variable} ${sans.variable} ${mono.variable}`}>
-        <TerminalAppShell>{children}</TerminalAppShell>
+        <DesktopAiProvider>
+          <TerminalAppShell>{children}</TerminalAppShell>
+        </DesktopAiProvider>
       </body>
     </html>
   );

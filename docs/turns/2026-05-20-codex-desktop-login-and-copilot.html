@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>2026-05-20 · Codex Desktop Login And Copilot</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: oklch(0.11 0.01 250);
+        --panel: oklch(0.16 0.013 250 / 0.92);
+        --panel-2: oklch(0.14 0.012 250 / 0.9);
+        --text: oklch(0.93 0.014 250);
+        --muted: oklch(0.74 0.018 250);
+        --faint: oklch(0.6 0.016 250);
+        --line: oklch(0.75 0.014 250 / 0.14);
+        --accent: oklch(0.79 0.12 74);
+        --accent-soft: oklch(0.79 0.12 74 / 0.12);
+        --green: oklch(0.75 0.12 151);
+        --green-soft: oklch(0.75 0.12 151 / 0.12);
+        --red: oklch(0.72 0.14 28);
+        --red-soft: oklch(0.72 0.14 28 / 0.12);
+        --blue-soft: oklch(0.7 0.1 247 / 0.12);
+        --shadow: 0 24px 80px oklch(0.02 0.01 250 / 0.45);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+        background:
+          radial-gradient(circle at top left, oklch(0.8 0.12 74 / 0.09), transparent 28%),
+          linear-gradient(180deg, oklch(0.15 0.012 250) 0%, oklch(0.1 0.01 250) 100%);
+        color: var(--text);
+      }
+
+      main {
+        width: min(1160px, calc(100vw - 40px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+
+      h1,
+      h2,
+      h3,
+      .eyebrow,
+      .meta,
+      code,
+      pre {
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+      }
+
+      p,
+      li {
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .hero {
+        display: grid;
+        gap: 20px;
+        padding: 28px;
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        background:
+          linear-gradient(135deg, oklch(0.2 0.017 250 / 0.96), oklch(0.14 0.012 250 / 0.98)),
+          var(--panel);
+        box-shadow: var(--shadow);
+      }
+
+      .eyebrow {
+        margin: 0 0 10px;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        font-size: 0.76rem;
+      }
+
+      .hero h1 {
+        font-size: clamp(2rem, 3.4vw, 3.6rem);
+        line-height: 0.95;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+
+      .hero-copy {
+        max-width: 72ch;
+        margin: 14px 0 0;
+      }
+
+      .hero-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .stat {
+        padding: 16px 18px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: oklch(0.12 0.01 250 / 0.5);
+      }
+
+      .stat span {
+        display: block;
+        margin-bottom: 8px;
+        color: var(--faint);
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        font-size: 0.68rem;
+      }
+
+      .stat strong {
+        display: block;
+        color: var(--text);
+        font-size: 1rem;
+      }
+
+      .section-grid {
+        display: grid;
+        gap: 18px;
+        margin-top: 22px;
+      }
+
+      section {
+        padding: 24px;
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        background: var(--panel-2);
+        box-shadow: var(--shadow);
+      }
+
+      section h2 {
+        margin-bottom: 14px;
+        font-size: 1rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 10px;
+      }
+
+      .two-col {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+        gap: 18px;
+      }
+
+      .callout {
+        padding: 16px 18px;
+        border-radius: 16px;
+        border: 1px solid var(--line);
+        background: var(--blue-soft);
+      }
+
+      .callout strong {
+        color: var(--text);
+      }
+
+      .meta {
+        color: var(--faint);
+        font-size: 0.82rem;
+      }
+
+      .validation-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .validation-card {
+        padding: 16px 18px;
+        border-radius: 16px;
+        border: 1px solid var(--line);
+        background: oklch(0.11 0.01 250 / 0.62);
+      }
+
+      .validation-card.good {
+        background: var(--green-soft);
+      }
+
+      .validation-card.warn {
+        background: var(--red-soft);
+      }
+
+      pre.diff {
+        margin: 0;
+        padding: 16px 18px;
+        overflow: auto;
+        border-radius: 16px;
+        border: 1px solid var(--line);
+        background: oklch(0.08 0.008 250 / 0.95);
+        color: var(--text);
+        line-height: 1.5;
+        font-size: 0.78rem;
+      }
+
+      .diff-title {
+        margin-bottom: 10px;
+        color: var(--faint);
+        font-size: 0.76rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .diff-note {
+        margin-top: 10px;
+        font-size: 0.82rem;
+      }
+
+      .chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        padding: 0 10px;
+        border-radius: 999px;
+        border: 1px solid oklch(0.8 0.12 74 / 0.28);
+        background: var(--accent-soft);
+        color: var(--text);
+        font-size: 0.74rem;
+      }
+
+      @media (max-width: 860px) {
+        .hero-grid,
+        .two-col,
+        .validation-grid {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        main {
+          width: min(100vw - 24px, 1160px);
+          padding-top: 18px;
+        }
+
+        section,
+        .hero {
+          padding: 18px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <article class="hero">
+        <div>
+          <p class="eyebrow">Turn Document · Repository Implementation</p>
+          <h1>Codex Desktop Login And Analyst Copilot</h1>
+          <p class="hero-copy">
+            Islandflow Desktop now boots an official <code>codex app-server</code> bridge, lets each desktop user log
+            into a ChatGPT-backed Codex account, exposes a narrow Electron IPC surface to the renderer, and adds an AI
+            settings and copilot experience without turning AI into the live first-pass classifier.
+          </p>
+        </div>
+        <div class="hero-grid">
+          <div class="stat">
+            <span>Scope</span>
+            <strong>Electron bridge, auth, usage telemetry, renderer UI, tests</strong>
+          </div>
+          <div class="stat">
+            <span>Beads</span>
+            <strong><code>islandflow-6tn</code></strong>
+          </div>
+          <div class="stat">
+            <span>Validation</span>
+            <strong>Desktop tests, web tests, shared-type check, desktop typecheck, production web build</strong>
+          </div>
+        </div>
+      </article>
+
+      <div class="section-grid">
+        <section>
+          <h2>Summary</h2>
+          <p>
+            This turn added a desktop-only Codex capability that respects the repo plan: managed ChatGPT login comes
+            first, the existing deterministic smart-money classifier remains the source of truth, and AI is used as a
+            structured analyst copilot on top of existing Islandflow artifacts.
+          </p>
+          <div class="chip-row">
+            <span class="chip">Managed ChatGPT browser login</span>
+            <span class="chip">Device-code fallback</span>
+            <span class="chip">Electron preload + IPC bridge</span>
+            <span class="chip">Usage and rate-limit dashboard</span>
+            <span class="chip">Smart-money and replay copilot actions</span>
+            <span class="chip">Browser-safe degradation</span>
+          </div>
+        </section>
+
+        <section>
+          <h2>Changes Made</h2>
+          <ul>
+            <li>Added a native desktop AI service in <code>apps/desktop/src/desktop-ai.ts</code> that starts <code>codex app-server</code>, handles account state, usage notifications, rate limits, task execution, and preference persistence.</li>
+            <li>Added preload and IPC plumbing in <code>apps/desktop/src/preload.ts</code>, <code>apps/desktop/src/desktop-ai-ipc.ts</code>, and <code>apps/desktop/src/main.ts</code> with trusted-origin enforcement.</li>
+            <li>Introduced shared AI contracts in <code>packages/types/src/desktop-ai.ts</code> for auth state, model controls, token usage, rate limits, task payloads, and compiled screen responses.</li>
+            <li>Added a renderer-side desktop AI provider in <code>apps/web/app/desktop-ai.tsx</code> and richer UI surfaces in <code>apps/web/app/desktop-ai-panels.tsx</code>.</li>
+            <li>Enabled previously latent routes for <code>/signals</code>, <code>/charts</code>, and <code>/replay</code>, plus a new <code>/settings</code> route.</li>
+            <li>Extended the terminal shell and styles so users can reach AI Settings, compile natural-language screens on Tape, run replay postmortems, and investigate smart-money events inline.</li>
+            <li>Added desktop tests for env scrubbing, token usage accounting, rate-limit snapshots, and logout state reset, plus updated web route and navigation tests.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Context</h2>
+          <p>
+            The desktop app was previously a secure Electron wrapper around the web terminal. That meant there was no
+            authenticated native bridge, no preload API for AI state, and no desktop-only place to manage account
+            status, model controls, or token telemetry. The goal of this turn was to add those capabilities without
+            weakening the shell security model and without letting AI replace the deterministic classification pipeline.
+          </p>
+          <div class="callout">
+            <strong>Deliberate product boundary:</strong>
+            <p>
+              The Copilot works only from structured Islandflow payloads such as <code>SmartMoneyEvent</code>,
+              <code>ClassifierHitEvent</code>, <code>FlowPacket</code>, and current replay slices. It does not become a
+              freeform live classifier in v1.
+            </p>
+          </div>
+        </section>
+
+        <section class="two-col">
+          <div>
+            <h2>Important Implementation Details</h2>
+            <ul>
+              <li>The child <code>codex app-server</code> environment now explicitly clears <code>OPENAI_API_KEY</code> and <code>CODEX_API_KEY</code> unless the selected profile mode is API-key-based, which prevents accidental auth-mode drift during ChatGPT subscription sessions.</li>
+              <li>All desktop AI access goes through a narrow preload bridge instead of exposing Node or Electron primitives to the renderer.</li>
+              <li>IPC handlers validate the sender URL with the existing trusted-origin policy before serving account or task requests.</li>
+              <li>Usage is persisted by <code>threadId</code> and <code>turnId</code>, then rolled up into today and lifetime dashboards using exact token notifications from the app-server.</li>
+              <li>Normalized cost is clearly labeled as an API-price estimate, not literal ChatGPT subscription billing.</li>
+              <li>The screen compiler returns a structured filter payload plus rationale and unhandled clauses, then lets the user apply the compiled filters instead of silently mutating the terminal state.</li>
+              <li>The browser build stays safe by exposing an unavailable state through the provider and disabling desktop-only actions outside Electron.</li>
+            </ul>
+          </div>
+          <div>
+            <h2>Expected Impact for End-Users</h2>
+            <ul>
+              <li>Desktop users can log into their own ChatGPT-backed Codex account from Islandflow Settings without sharing a subscription across users.</li>
+              <li>Users can see plan type, model defaults, reasoning controls, rate-limit windows, recent AI turns, and token usage from one place.</li>
+              <li>Selected smart-money events now have one-click explain, counter-thesis, burst summary, and watchlist synthesis actions directly inside the investigation drawer.</li>
+              <li>Replay sessions can produce a structured postmortem from the exact slice currently on screen.</li>
+              <li>Tape users can write a natural-language screen and translate it into the app’s existing filter model where possible.</li>
+              <li>Web-only sessions degrade cleanly instead of exposing broken or misleading AI controls.</li>
+            </ul>
+          </div>
+        </section>
+
+        <section>
+          <h2>Relevant Diff Snippets</h2>
+          <p class="meta">
+            These snippets are formatted as unified patch strings so they can be consumed by Diffs’
+            <code>parsePatchFiles</code> or <code>PatchDiff</code> flow from the official docs:
+            <a href="https://diffs.com/docs">https://diffs.com/docs</a>.
+          </p>
+
+          <div class="diff-title">Electron main process: preload, desktop AI service, and guarded IPC</div>
+          <pre class="diff"><code>diff --git a/apps/desktop/src/main.ts b/apps/desktop/src/main.ts
+@@
+-import { app, BrowserWindow, shell } from "electron";
++import { app, BrowserWindow, ipcMain, shell } from "electron";
++import type { Event as ElectronEvent, IpcMainInvokeEvent } from "electron";
++import { fileURLToPath } from "node:url";
++import { IslandflowDesktopAiService } from "./desktop-ai.js";
++import {
++  DESKTOP_AI_CANCEL_LOGIN,
++  DESKTOP_AI_GET_STATE,
++  DESKTOP_AI_LOGIN_BROWSER,
++  DESKTOP_AI_LOGIN_DEVICE,
++  DESKTOP_AI_LOGOUT,
++  DESKTOP_AI_RUN_TASK,
++  DESKTOP_AI_STATE_CHANNEL,
++  DESKTOP_AI_UPDATE_PREFERENCES
++} from "./desktop-ai-ipc.js";
+@@
++const PRELOAD_PATH = fileURLToPath(new URL("./preload.js", import.meta.url));
+@@
++const registerDesktopAiIpc = (service: IslandflowDesktopAiService): void =&gt; {
++  const guard = (event: IpcMainInvokeEvent): void =&gt; {
++    const senderUrl = event.senderFrame?.url || event.sender.getURL();
++    if (!isTrustedAppUrl(senderUrl)) {
++      throw new Error(`Rejected desktop AI IPC from untrusted origin: ${senderUrl || "unknown"}`);
++    }
++  };
++
++  ipcMain.handle(DESKTOP_AI_GET_STATE, async (event) =&gt; {
++    guard(event);
++    await service.start();
++    return service.getState();
++  });
++  // login, logout, preference, and task handlers follow the same guard
++};</code></pre>
+
+          <div class="diff-title" style="margin-top: 18px">Renderer shell: settings route, topbar entrypoint, and in-context copilot surfaces</div>
+          <pre class="diff"><code>diff --git a/apps/web/app/terminal.tsx b/apps/web/app/terminal.tsx
+@@
++import { useDesktopAi } from "./desktop-ai";
++import {
++  DesktopAiSettingsRoute,
++  ReplayCopilotPanel,
++  ScreenCompilerPanel,
++  SmartMoneyCopilotPanel
++} from "./desktop-ai-panels";
+@@
++export const NAV_ITEMS = [
++  { href: "/", label: "Home" },
++  { href: "/tape", label: "Tape" },
++  { href: "/signals", label: "Signals" },
++  { href: "/charts", label: "Charts" },
++  { href: "/replay", label: "Replay" },
++  { href: "/settings", label: "Settings" }
++];
+@@
++<ScreenCompilerPanel currentFilters={state.flowFilters} onApplyFilters={state.setFlowFilters} />
+@@
++<ReplayCopilotPanel
++  ticker={replayContext.ticker}
++  flowFilters={replayContext.flowFilters}
++  alerts={replayContext.alerts}
++  smartMoneyEvents={replayContext.smartMoneyEvents}
++  classifierHits={replayContext.classifierHits}
++  flowPackets={replayContext.flowPackets}
++  optionPrints={replayContext.optionPrints}
++/>
+@@
++<SmartMoneyCopilotPanel
++  event={event}
++  flowPacket={flowPacket}
++  evidencePrints={evidencePrints.map((item) =&gt; item.print)}
++  relatedPackets={relatedPackets}
++/></code></pre>
+
+          <div class="diff-title" style="margin-top: 18px">Shared desktop AI contract: auth state, rate limits, usage, and structured tasks</div>
+          <pre class="diff"><code>diff --git a/packages/types/src/desktop-ai.ts b/packages/types/src/desktop-ai.ts
++export const IslandflowAiTaskRequestSchema = z.discriminatedUnion("kind", [
++  z.object({ kind: z.literal("smart-money-explain"), context: IslandflowAiSmartMoneyContextSchema }),
++  z.object({ kind: z.literal("smart-money-skeptic"), context: IslandflowAiSmartMoneyContextSchema }),
++  z.object({ kind: z.literal("smart-money-burst-summary"), context: IslandflowAiSmartMoneyContextSchema }),
++  z.object({ kind: z.literal("watchlist-synthesis"), context: IslandflowAiSmartMoneyContextSchema }),
++  z.object({ kind: z.literal("replay-postmortem"), context: IslandflowAiReplayContextSchema }),
++  z.object({ kind: z.literal("screen-compile"), context: IslandflowAiScreenCompileContextSchema })
++]);
++
++export type IslandflowAiState = {
++  desktopAvailable: boolean;
++  transportStatus: IslandflowAiTransportStatus;
++  transportError: string | null;
++  profiles: IslandflowAiProfileSlot[];
++  account: IslandflowAiAccountState;
++  preferences: IslandflowAiPreferences;
++  models: IslandflowAiModelSummary[];
++  rateLimitsByLimitId: Record&lt;string, IslandflowAiRateLimitSnapshot&gt;;
++  usage: IslandflowAiUsageDashboard;
++  tasks: IslandflowAiTaskSnapshot[];
++  updatedAt: number;
++};</code></pre>
+
+          <p class="diff-note">
+            The document does not embed the Diffs runtime directly, but the snippets above are already prepared in the
+            patch-string format that Diffs documents for <code>PatchDiff</code>.
+          </p>
+        </section>
+
+        <section>
+          <h2>Validation</h2>
+          <div class="validation-grid">
+            <div class="validation-card good">
+              <h3>Desktop typecheck</h3>
+              <p><code>bun --cwd=apps/desktop run typecheck</code></p>
+            </div>
+            <div class="validation-card good">
+              <h3>Desktop tests</h3>
+              <p><code>bun --cwd=apps/desktop run test</code></p>
+            </div>
+            <div class="validation-card good">
+              <h3>Shared types</h3>
+              <p><code>bun x tsc -p packages/types/tsconfig.json --noEmit</code></p>
+            </div>
+            <div class="validation-card good">
+              <h3>Web tests</h3>
+              <p><code>bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code></p>
+            </div>
+            <div class="validation-card good">
+              <h3>Web production build</h3>
+              <p><code>bun --cwd=apps/web run build</code></p>
+            </div>
+            <div class="validation-card warn">
+              <h3>Manual desktop runtime</h3>
+              <p>No end-to-end interactive Electron sign-in was executed in this turn. The bridge, auth flows, and renderer integration were validated through type checks, unit tests, and the production web build.</p>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2>Issues, Limitations, and Mitigations</h2>
+          <ul>
+            <li>Workspace provider and API-key profile support are intentionally left as reserved slots behind the same abstraction, not shipped as active shared-subscription behavior.</li>
+            <li>The desktop bridge launches an ephemeral Codex thread per analysis task, which is safer for v1 but means there is not yet a long-lived conversational analyst thread.</li>
+            <li>The screen compiler only applies filters that map onto today’s <code>OptionFlowFilters</code> model, and it explicitly returns unhandled clauses rather than pretending to support unsupported logic.</li>
+            <li>The recent task and usage dashboards depend on app-server notifications. When those notifications do not fire, the UI stays safe and honest rather than synthesizing made-up counters.</li>
+            <li>Renderer interactions were validated in build and unit test contexts, but not with a live packaged desktop binary in this turn.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2>Follow-up Work</h2>
+          <ul>
+            <li>Add an automated Electron integration test harness that exercises browser login completion, device-code completion, logout, and recovery after app-server restart.</li>
+            <li>Promote the reserved workspace-provider slot into a real enterprise or API-key-backed profile once the product decision is ready.</li>
+            <li>Persist richer per-task provenance so replay postmortems and smart-money analyses can be reopened with their original structured context, not only their output text.</li>
+            <li>Consider a dedicated Copilot activity log or side rail once users accumulate enough analyses that the compact recent-task list becomes too shallow.</li>
+          </ul>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>

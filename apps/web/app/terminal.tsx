@@ -55,6 +55,13 @@ import {
   matchesOptionPrintFilters
 } from "@islandflow/types";
 import { createChart, type IChartApi, type SeriesMarker, type UTCTimestamp } from "lightweight-charts";
+import { useDesktopAi } from "./desktop-ai";
+import {
+  DesktopAiSettingsRoute,
+  ReplayCopilotPanel,
+  ScreenCompilerPanel,
+  SmartMoneyCopilotPanel
+} from "./desktop-ai-panels";
 
 const parseBoundedInt = (
   value: string | undefined,
@@ -193,7 +200,8 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
     pathname === "/news" ||
     pathname === "/signals" ||
     pathname === "/charts" ||
-    pathname === "/replay"
+    pathname === "/replay" ||
+    pathname === "/settings"
       ? pathname
       : "/";
 
@@ -336,6 +344,34 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         showReplayConsole: true,
         needsClassifierDecor: true,
         needsAlertEvidencePrefetch: true,
+        needsDarkUnderlying: false
+      };
+    case "/settings":
+      return {
+        options: false,
+        nbbo: false,
+        equities: false,
+        flow: false,
+        news: false,
+        alerts: false,
+        smartMoney: false,
+        classifierHits: false,
+        inferredDark: false,
+        equityJoins: false,
+        equityCandles: false,
+        equityOverlay: false,
+        showOptionsPane: false,
+        showEquitiesPane: false,
+        showFlowPane: false,
+        showNewsPane: false,
+        showAlertsPane: false,
+        showClassifierPane: false,
+        showDarkPane: false,
+        showChartPane: false,
+        showFocusPane: false,
+        showReplayConsole: false,
+        needsClassifierDecor: false,
+        needsAlertEvidencePrefetch: false,
         needsDarkUnderlying: false
       };
     case "/":
@@ -5123,10 +5159,11 @@ type SmartMoneyDrawerProps = {
   event: SmartMoneyEvent;
   flowPacket: FlowPacket | null;
   evidence: EvidenceItem[];
+  relatedPackets: FlowPacket[];
   onClose: () => void;
 };
 
-const SmartMoneyDrawer = ({ event, flowPacket, evidence, onClose }: SmartMoneyDrawerProps) => {
+const SmartMoneyDrawer = ({ event, flowPacket, evidence, relatedPackets, onClose }: SmartMoneyDrawerProps) => {
   const primaryScore =
     event.profile_scores.find((score) => score.profile_id === event.primary_profile_id) ??
     event.profile_scores[0];
@@ -5153,6 +5190,15 @@ const SmartMoneyDrawer = ({ event, flowPacket, evidence, onClose }: SmartMoneyDr
           Probability {primaryScore ? formatConfidence(primaryScore.probability) : "--"}
         </span>
         {event.abstained ? <span className="drawer-chip">Abstained</span> : null}
+      </div>
+
+      <div className="drawer-section">
+        <SmartMoneyCopilotPanel
+          event={event}
+          flowPacket={flowPacket}
+          evidencePrints={evidencePrints.map((item) => item.print)}
+          relatedPackets={relatedPackets}
+        />
       </div>
 
       <div className="drawer-section">
@@ -6370,6 +6416,21 @@ const useTerminalState = () => {
     });
   }, [resolvedOptionPrintMap, selectedSmartMoneyEvent]);
 
+  const selectedSmartMoneyRelatedPackets = useMemo((): FlowPacket[] => {
+    if (!selectedSmartMoneyEvent) {
+      return [];
+    }
+
+    const packets: FlowPacket[] = [];
+    for (const packetId of selectedSmartMoneyEvent.packet_ids) {
+      const packet = resolvedFlowPacketMap.get(packetId);
+      if (packet) {
+        packets.push(packet);
+      }
+    }
+    return packets;
+  }, [resolvedFlowPacketMap, selectedSmartMoneyEvent]);
+
   useEffect(() => {
     if (!selectedSmartMoneyEvent || mode !== "live") {
       return;
@@ -7130,6 +7191,7 @@ const useTerminalState = () => {
     selectedClassifierEvidence,
     selectedSmartMoneyFlowPacket,
     selectedSmartMoneyEvidence,
+    selectedSmartMoneyRelatedPackets,
     filteredOptions,
     filteredEquities,
     optionsScopedQuiet,
@@ -7171,7 +7233,11 @@ const useTerminal = (): TerminalState => {
 export const NAV_ITEMS = [
   { href: "/", label: "Home" },
   { href: "/tape", label: "Tape" },
-  { href: "/news", label: "News" }
+  { href: "/news", label: "News" },
+  { href: "/signals", label: "Signals" },
+  { href: "/charts", label: "Charts" },
+  { href: "/replay", label: "Replay" },
+  { href: "/settings", label: "Settings" }
 ] as const;
 
 type PageFrameProps = {
@@ -8811,9 +8877,16 @@ function SyntheticControlDock() {
 
 export function TerminalAppShell({ children }: { children: ReactNode }) {
   const state = useTerminalState();
+  const ai = useDesktopAi();
   const pathname = usePathname();
   const tickerFieldId = useId();
   const tickerHintId = useId();
+  const isSettingsRoute = pathname === "/settings";
+  const aiButtonLabel = ai.state.account.loggedIn
+    ? `AI ${ai.state.account.planType ? ai.state.account.planType.toUpperCase() : "ON"}`
+    : ai.bridgeAvailable
+    ? "AI setup"
+    : "AI desktop";
 
   return (
     <TerminalContext.Provider value={state}>
@@ -8847,59 +8920,84 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
         <div className="terminal-frame">
           <header className="terminal-topbar">
             <div className="terminal-topbar-actions">
-              <div className="terminal-topbar-controls">
-                {state.selectedInstrumentLabel && state.selectedInstrument?.kind !== "option-contract" ? (
-                  <span className="instrument-focus-chip">
-                    <span>{state.selectedInstrumentLabel}</span>
-                    <button type="button" onClick={() => state.setSelectedInstrument(null)}>
-                      Clear
-                    </button>
-                  </span>
-                ) : null}
-                <label className="terminal-filter">
-                  <span className="terminal-filter-label" id={tickerHintId}>
-                    Ticker
-                  </span>
-                  <span className="terminal-filter-field">
-                    <input
-                      id={tickerFieldId}
-                      aria-describedby={tickerHintId}
-                      autoCapitalize="characters"
-                      autoComplete="off"
-                      autoCorrect="off"
-                      className="terminal-input"
-                      value={state.filterInput}
-                      inputMode="text"
-                      maxLength={TICKER_FILTER_INPUT_MAX_LENGTH}
-                      name="ticker-filter"
-                      onChange={(event) => state.setFilterInput(normalizeTickerFilterInput(event.target.value))}
-                      placeholder="SPY, NVDA, AAPL"
-                      spellCheck={false}
-                    />
-                  </span>
-                </label>
-                <button
-                  aria-label="Clear ticker filter"
-                  className="terminal-button"
-                  type="button"
-                  onClick={() => state.setFilterInput("")}
-                  disabled={state.filterInput.trim().length === 0}
-                  title="Clear ticker filter"
+              {isSettingsRoute ? (
+                <div
+                  className={`terminal-topbar-summary${ai.state.account.loggedIn ? " status-connected" : " status-disconnected"}`}
                 >
-                  Clear
-                </button>
-              </div>
+                  <span className="status-dot" />
+                  <div>
+                    <strong>Desktop Analyst Copilot</strong>
+                    <p className="copilot-note">
+                      {ai.state.account.loggedIn
+                        ? `${ai.state.account.email ?? "Connected"} · ${ai.state.account.planType ?? "plan pending"}`
+                        : "Connect your ChatGPT subscription to unlock desktop-only AI tools."}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="terminal-topbar-controls">
+                  {state.selectedInstrumentLabel && state.selectedInstrument?.kind !== "option-contract" ? (
+                    <span className="instrument-focus-chip">
+                      <span>{state.selectedInstrumentLabel}</span>
+                      <button type="button" onClick={() => state.setSelectedInstrument(null)}>
+                        Clear
+                      </button>
+                    </span>
+                  ) : null}
+                  <label className="terminal-filter">
+                    <span className="terminal-filter-label" id={tickerHintId}>
+                      Ticker
+                    </span>
+                    <span className="terminal-filter-field">
+                      <input
+                        id={tickerFieldId}
+                        aria-describedby={tickerHintId}
+                        autoCapitalize="characters"
+                        autoComplete="off"
+                        autoCorrect="off"
+                        className="terminal-input"
+                        value={state.filterInput}
+                        inputMode="text"
+                        maxLength={TICKER_FILTER_INPUT_MAX_LENGTH}
+                        name="ticker-filter"
+                        onChange={(event) => state.setFilterInput(normalizeTickerFilterInput(event.target.value))}
+                        placeholder="SPY, NVDA, AAPL"
+                        spellCheck={false}
+                      />
+                    </span>
+                  </label>
+                  <button
+                    aria-label="Clear ticker filter"
+                    className="terminal-button"
+                    type="button"
+                    onClick={() => state.setFilterInput("")}
+                    disabled={state.filterInput.trim().length === 0}
+                    title="Clear ticker filter"
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
               <div className="terminal-topbar-mode">
-                <button
-                  aria-label={state.mode === "live" ? "Switch to replay mode" : "Switch to live mode"}
-                  aria-pressed={state.mode !== "live"}
-                  className="terminal-button terminal-button-primary"
-                  type="button"
-                  onClick={state.toggleMode}
-                  title={state.mode === "live" ? "Switch to replay mode" : "Switch to live mode"}
+                <Link
+                  aria-current={isSettingsRoute ? "page" : undefined}
+                  className={`terminal-button${isSettingsRoute ? " terminal-button-primary" : ""}`}
+                  href="/settings"
                 >
-                  {state.mode === "live" ? "Replay" : "Live"}
-                </button>
+                  {aiButtonLabel}
+                </Link>
+                {!isSettingsRoute ? (
+                  <button
+                    aria-label={state.mode === "live" ? "Switch to replay mode" : "Switch to live mode"}
+                    aria-pressed={state.mode !== "live"}
+                    className="terminal-button terminal-button-primary"
+                    type="button"
+                    onClick={state.toggleMode}
+                    title={state.mode === "live" ? "Switch to replay mode" : "Switch to live mode"}
+                  >
+                    {state.mode === "live" ? "Replay" : "Live"}
+                  </button>
+                ) : null}
               </div>
             </div>
           </header>
@@ -8939,6 +9037,7 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
             event={state.selectedSmartMoneyEvent}
             flowPacket={state.selectedSmartMoneyFlowPacket}
             evidence={state.selectedSmartMoneyEvidence}
+            relatedPackets={state.selectedSmartMoneyRelatedPackets}
             onClose={() => state.setSelectedSmartMoneyEvent(null)}
           />
         ) : null}
@@ -9009,11 +9108,14 @@ export function TapeRoute() {
         </>
       }
     >
-      <div className="page-grid page-grid-tape">
-        <OptionsPane state={state} />
-        <EquitiesPane state={state} />
-        <FlowPane state={state} title="Packets" />
-      </div>
+      <>
+        <ScreenCompilerPanel currentFilters={state.flowFilters} onApplyFilters={state.setFlowFilters} />
+        <div className="page-grid page-grid-tape">
+          <OptionsPane state={state} />
+          <EquitiesPane state={state} />
+          <FlowPane state={state} title="Packets" />
+        </div>
+      </>
     </PageFrame>
   );
 }
@@ -9045,14 +9147,52 @@ export function ChartsRoute() {
 
 export function ReplayRoute() {
   const state = useTerminal();
+  const replayContext = useMemo(
+    () => ({
+      ticker: state.replaySource ?? state.activeTickers[0] ?? null,
+      flowFilters: state.flowFilters,
+      alerts: state.filteredAlerts.slice(0, 12),
+      smartMoneyEvents: state.filteredSmartMoneyEvents.slice(0, 12),
+      classifierHits: state.filteredClassifierHits.slice(0, 12),
+      flowPackets: state.filteredFlow.slice(0, 18),
+      optionPrints: state.filteredOptions.slice(0, 24)
+    }),
+    [
+      state.replaySource,
+      state.activeTickers,
+      state.flowFilters,
+      state.filteredAlerts,
+      state.filteredSmartMoneyEvents,
+      state.filteredClassifierHits,
+      state.filteredFlow,
+      state.filteredOptions
+    ]
+  );
   return (
     <PageFrame title="Replay">
       <div className="page-grid page-grid-replay">
+        <ReplayCopilotPanel
+          ticker={replayContext.ticker}
+          flowFilters={replayContext.flowFilters}
+          alerts={replayContext.alerts}
+          smartMoneyEvents={replayContext.smartMoneyEvents}
+          classifierHits={replayContext.classifierHits}
+          flowPackets={replayContext.flowPackets}
+          optionPrints={replayContext.optionPrints}
+        />
         <ReplayConsole state={state} />
         <AlertsPane state={state} limit={10} withStrip />
         <FlowPane state={state} limit={12} />
         <OptionsPane state={state} limit={12} />
       </div>
+    </PageFrame>
+  );
+}
+
+export function SettingsRoute() {
+  return (
+    <PageFrame title="Settings">
+      <DesktopAiSettingsRoute />
     </PageFrame>
   );
 }

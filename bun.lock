@@ -11,6 +11,9 @@
     "apps/desktop": {
       "name": "@islandflow/desktop",
       "version": "0.1.0",
+      "dependencies": {
+        "@islandflow/types": "workspace:*",
+      },
       "devDependencies": {
         "@electron-forge/cli": "^7.8.1",
         "@electron-forge/core": "^7.11.1",

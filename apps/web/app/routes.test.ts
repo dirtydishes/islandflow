@@ -1,31 +1,29 @@
-import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { describe, expect, it } from "bun:test";
 
-const redirect = mock((path: string) => {
-  throw new Error(`NEXT_REDIRECT:${path}`);
-});
+import { ChartsRoute, ReplayRoute, SettingsRoute, SignalsRoute } from "./terminal";
 
-mock.module("next/navigation", () => ({ redirect }));
-
-describe("legacy page redirects", () => {
-  beforeEach(() => {
-    redirect.mockClear();
-  });
-
-  it("redirects /signals to home", async () => {
+describe("route entrypoints", () => {
+  it("renders the signals route directly", async () => {
     const mod = await import("./signals/page");
-    expect(() => mod.default()).toThrow("NEXT_REDIRECT:/");
-    expect(redirect).toHaveBeenCalledWith("/");
+    expect(mod.dynamic).toBe("force-dynamic");
+    expect((mod.default() as any).type).toBe(SignalsRoute);
   });
 
-  it("redirects /charts to home", async () => {
+  it("renders the charts route directly", async () => {
     const mod = await import("./charts/page");
-    expect(() => mod.default()).toThrow("NEXT_REDIRECT:/");
-    expect(redirect).toHaveBeenCalledWith("/");
+    expect(mod.dynamic).toBe("force-dynamic");
+    expect((mod.default() as any).type).toBe(ChartsRoute);
   });
 
-  it("redirects /replay to home", async () => {
+  it("renders the replay route directly", async () => {
     const mod = await import("./replay/page");
-    expect(() => mod.default()).toThrow("NEXT_REDIRECT:/");
-    expect(redirect).toHaveBeenCalledWith("/");
+    expect(mod.dynamic).toBe("force-dynamic");
+    expect((mod.default() as any).type).toBe(ReplayRoute);
+  });
+
+  it("renders the settings route directly", async () => {
+    const mod = await import("./settings/page");
+    expect(mod.dynamic).toBe("force-dynamic");
+    expect((mod.default() as any).type).toBe(SettingsRoute);
   });
 });

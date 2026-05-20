@@ -276,6 +276,25 @@ input {
   margin-left: auto;
 }
 
+.terminal-topbar-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  margin-right: auto;
+}
+
+.terminal-topbar-summary strong {
+  display: block;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.terminal-topbar-summary .copilot-note {
+  margin: 4px 0 0;
+}
+
 .terminal-filter {
   display: flex;
   flex-direction: column;
@@ -712,10 +731,19 @@ h3 {
   grid-template-columns: minmax(0, 1fr);
 }
 
+.page-grid-settings {
+  grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.9fr);
+  align-items: start;
+}
+
 .page-grid-home > :nth-child(3),
 .page-grid-home > :nth-child(4),
 .page-grid-tape > :nth-child(1),
 .page-grid-replay > :nth-child(1) {
+  grid-column: 1 / -1;
+}
+
+.page-grid-settings > .copilot-pane-wide {
   grid-column: 1 / -1;
 }
 
@@ -977,6 +1005,325 @@ h3 {
 
 .page-grid-charts > :last-child {
   height: clamp(430px, 58vh, 760px);
+}
+
+.copilot-pane {
+  background:
+    radial-gradient(circle at top right, oklch(0.8 0.12 74 / 0.07), transparent 36%),
+    linear-gradient(180deg, oklch(0.18 0.013 250) 0%, oklch(0.16 0.012 250) 100%);
+}
+
+.copilot-pane-body {
+  gap: 18px;
+}
+
+.copilot-kicker,
+.copilot-field-label,
+.copilot-list-title {
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.68rem;
+}
+
+.copilot-kicker {
+  margin-bottom: 8px;
+}
+
+.copilot-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.7fr);
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, oklch(0.2 0.017 250 / 0.92), oklch(0.16 0.012 250 / 0.96)),
+    var(--bg-pane-2);
+}
+
+.copilot-hero-copy {
+  max-width: 62ch;
+  margin: 10px 0 0;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+
+.copilot-hero-meta,
+.copilot-account-grid,
+.copilot-usage-grid,
+.copilot-field-grid,
+.copilot-limit-grid,
+.copilot-action-grid,
+.copilot-inline-form {
+  display: grid;
+  gap: 14px;
+}
+
+.copilot-hero-meta {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.copilot-stat,
+.copilot-account-card,
+.copilot-usage-block,
+.copilot-limit-card,
+.copilot-current-filters,
+.copilot-callout {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: oklch(0.13 0.01 250 / 0.64);
+}
+
+.copilot-stat span,
+.copilot-token-row span,
+.copilot-limit-window span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-size: 0.65rem;
+}
+
+.copilot-stat strong,
+.copilot-token-row strong,
+.copilot-limit-window strong,
+.copilot-device-code,
+.copilot-model-meta,
+.copilot-turn-metrics {
+  font-family: var(--font-mono), monospace;
+}
+
+.copilot-stat strong {
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.copilot-account-grid,
+.copilot-usage-grid,
+.copilot-field-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.copilot-inline-row,
+.copilot-turn-row,
+.copilot-task-list-row,
+.copilot-model-row,
+.copilot-token-row,
+.copilot-usage-title-row,
+.copilot-limit-head,
+.copilot-task-head,
+.copilot-inline-head,
+.copilot-apply-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.copilot-inline-row,
+.copilot-turn-row,
+.copilot-task-list-row,
+.copilot-model-row {
+  padding: 10px 0;
+  border-top: 1px solid oklch(0.72 0.012 250 / 0.12);
+}
+
+.copilot-account-card > :first-child,
+.copilot-limit-card > :first-child,
+.copilot-turn-list > :first-child,
+.copilot-task-list > :first-child,
+.copilot-model-list > :first-child,
+.copilot-unhandled-list > :first-child {
+  border-top: 0;
+}
+
+.copilot-note {
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+.copilot-note,
+.copilot-error,
+.copilot-empty,
+.copilot-device-code,
+.copilot-task-text,
+.copilot-json-block {
+  margin: 0;
+}
+
+.copilot-error {
+  color: oklch(0.8 0.11 28);
+  line-height: 1.5;
+}
+
+.copilot-badge {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: oklch(0.97 0.008 250 / 0.04);
+  color: var(--text-dim);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.copilot-badge.muted {
+  opacity: 0.7;
+}
+
+.copilot-badge.warning,
+.copilot-badge.status-running {
+  border-color: oklch(0.78 0.12 74 / 0.38);
+  background: oklch(0.78 0.12 74 / 0.09);
+  color: oklch(0.88 0.06 76);
+}
+
+.copilot-badge.status-completed {
+  border-color: oklch(0.74 0.13 151 / 0.34);
+  background: oklch(0.74 0.13 151 / 0.09);
+  color: oklch(0.88 0.05 151);
+}
+
+.copilot-badge.status-failed,
+.copilot-badge.status-cancelled {
+  border-color: oklch(0.68 0.16 28 / 0.36);
+  background: oklch(0.68 0.16 28 / 0.1);
+  color: oklch(0.88 0.05 28);
+}
+
+.copilot-field {
+  display: grid;
+  gap: 8px;
+}
+
+.copilot-select,
+.copilot-textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: oklch(0.11 0.009 250 / 0.82);
+  color: var(--text);
+}
+
+.copilot-select {
+  min-height: 40px;
+  padding: 0 12px;
+}
+
+.copilot-textarea {
+  padding: 12px;
+  resize: vertical;
+  min-height: 112px;
+  line-height: 1.55;
+}
+
+.copilot-model-list,
+.copilot-limit-list,
+.copilot-turn-list,
+.copilot-task-list,
+.copilot-unhandled-list {
+  display: grid;
+  gap: 0;
+}
+
+.copilot-model-meta,
+.copilot-turn-metrics {
+  display: grid;
+  gap: 4px;
+  justify-items: end;
+  color: var(--text-dim);
+  font-size: 0.76rem;
+}
+
+.copilot-token-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+}
+
+.copilot-token-row,
+.copilot-limit-window {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: oklch(0.97 0.008 250 / 0.03);
+}
+
+.copilot-usage-title-row h3,
+.copilot-limit-head strong {
+  margin: 0;
+}
+
+.copilot-usage-cost {
+  font-family: var(--font-mono), monospace;
+  color: var(--accent);
+}
+
+.copilot-inline-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.copilot-action-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.copilot-task-output,
+.copilot-unavailable {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: oklch(0.12 0.01 250 / 0.72);
+}
+
+.copilot-task-text,
+.copilot-json-block,
+.copilot-device-code {
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: oklch(0.1 0.009 250 / 0.92);
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.55;
+}
+
+.copilot-device-code {
+  font-size: clamp(1.3rem, 2vw, 1.7rem);
+  letter-spacing: 0.18em;
+  text-align: center;
+}
+
+.copilot-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.copilot-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  border: 1px solid var(--border-strong);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.72rem;
+}
+
+.copilot-compiled-screen {
+  display: grid;
+  gap: 10px;
 }
 
 .row {
@@ -2030,6 +2377,7 @@ h3 {
   .page-grid-signals,
   .page-grid-charts,
   .page-grid-replay,
+  .page-grid-settings,
   .replay-matrix,
   .shell-metrics {
     grid-template-columns: minmax(0, 1fr);
@@ -2058,6 +2406,13 @@ h3 {
   .page-grid-signals {
     grid-template-rows: auto;
     min-height: 0;
+  }
+
+  .copilot-hero,
+  .copilot-account-grid,
+  .copilot-usage-grid,
+  .copilot-field-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .terminal-topbar {
@@ -2142,7 +2497,15 @@ h3 {
   .terminal-pane-head,
   .chart-controls,
   .card-controls,
-  .terminal-pane-actions {
+  .terminal-pane-actions,
+  .copilot-inline-head,
+  .copilot-usage-title-row,
+  .copilot-task-head,
+  .copilot-turn-row,
+  .copilot-task-list-row,
+  .copilot-model-row,
+  .copilot-inline-row,
+  .copilot-apply-row {
     flex-direction: column;
     align-items: flex-start;
   }
@@ -2181,7 +2544,8 @@ h3 {
   }
 
   .terminal-topbar-actions,
-  .terminal-topbar-controls {
+  .terminal-topbar-controls,
+  .terminal-topbar-summary {
     flex-direction: column;
     align-items: stretch;
   }
@@ -2189,7 +2553,10 @@ h3 {
   .terminal-topbar-mode .terminal-button,
   .terminal-topbar-controls > .terminal-button,
   .page-actions > .terminal-button,
-  .page-actions > .flow-filter-popover {
+  .page-actions > .flow-filter-popover,
+  .copilot-action-grid > .terminal-button,
+  .copilot-inline-head > .terminal-button,
+  .copilot-apply-row > .terminal-button {
     width: 100%;
   }
 
@@ -2272,7 +2639,9 @@ h3 {
 
   .flow-filter-checkbox-grid,
   .flow-filter-checkbox-grid-wide,
-  .flow-filter-chip-grid {
+  .flow-filter-chip-grid,
+  .copilot-action-grid,
+  .copilot-token-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 
