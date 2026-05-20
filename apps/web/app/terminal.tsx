@@ -4753,6 +4753,26 @@ export const collectAlertContextEvidence = (
   return { packets, prints };
 };
 
+export const getAlertFlowPacketRefs = (
+  alert: Pick<AlertEvent, "evidence_refs">
+): string[] => {
+  return alert.evidence_refs.filter((ref) => ref.startsWith("flowpacket:"));
+};
+
+export const resolveAlertFlowPacket = (
+  alert: Pick<AlertEvent, "evidence_refs">,
+  packets: Map<string, FlowPacket>
+): FlowPacket | null => {
+  for (const ref of getAlertFlowPacketRefs(alert)) {
+    const packet = packets.get(ref);
+    if (packet) {
+      return packet;
+    }
+  }
+
+  return null;
+};
+
 type DarkEvidenceItem =
   | { kind: "join"; id: string; join: EquityPrintJoin }
   | { kind: "unknown"; id: string };
@@ -6014,8 +6034,7 @@ const useTerminalState = () => {
     if (!selectedAlert) {
       return null;
     }
-    const packetId = selectedAlert.evidence_refs[0];
-    return packetId ? resolvedFlowPacketMap.get(packetId) ?? null : null;
+    return resolveAlertFlowPacket(selectedAlert, resolvedFlowPacketMap);
   }, [selectedAlert, resolvedFlowPacketMap]);
 
   const selectedDarkEvidence = useMemo((): DarkEvidenceItem[] => {
@@ -6427,12 +6446,9 @@ const useTerminalState = () => {
         return fromTrace;
       }
 
-      const packetId = alert.evidence_refs[0];
-      if (packetId) {
-        const packet = resolvedFlowPacketMap.get(packetId);
-        if (packet) {
-          return extractUnderlying(extractPacketContract(packet));
-        }
+      const packet = resolveAlertFlowPacket(alert, resolvedFlowPacketMap);
+      if (packet) {
+        return extractUnderlying(extractPacketContract(packet));
       }
 
       for (const ref of alert.evidence_refs) {
@@ -6704,9 +6720,7 @@ const useTerminalState = () => {
       return;
     }
 
-    const visiblePacketIds = visibleAlerts
-      .map((alert) => alert.evidence_refs[0] ?? null)
-      .filter((id): id is string => Boolean(id) && id.startsWith("flowpacket:"));
+    const visiblePacketIds = visibleAlerts.flatMap((alert) => getAlertFlowPacketRefs(alert));
     const missingPacketIds = Array.from(new Set(visiblePacketIds)).filter(
       (id) => !resolvedFlowPacketMap.has(id)
     );
@@ -6788,9 +6802,10 @@ const useTerminalState = () => {
 
   const activePinnedFlowKeys = useMemo(() => {
     const keys = new Set<string>();
-    const selectedAlertPacketId = selectedAlert?.evidence_refs[0];
-    if (selectedAlertPacketId) {
-      keys.add(selectedAlertPacketId);
+    if (selectedAlert) {
+      for (const packetId of getAlertFlowPacketRefs(selectedAlert)) {
+        keys.add(packetId);
+      }
     }
     if (selectedClassifierPacketId) {
       keys.add(selectedClassifierPacketId);
@@ -6799,8 +6814,7 @@ const useTerminalState = () => {
       keys.add(packetId);
     }
     for (const alert of visibleAlerts) {
-      const packetId = alert.evidence_refs[0];
-      if (packetId) {
+      for (const packetId of getAlertFlowPacketRefs(alert)) {
         keys.add(packetId);
       }
     }
@@ -6945,7 +6959,7 @@ const useTerminalState = () => {
       const desiredTrace = `alert:${packetId}`;
       return (
         alertsFeed.items.find(
-          (item) => item.trace_id === desiredTrace || item.evidence_refs[0] === packetId
+          (item) => item.trace_id === desiredTrace || getAlertFlowPacketRefs(item).includes(packetId)
         ) ?? null
       );
     },

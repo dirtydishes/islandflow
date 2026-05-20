@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fix historical alert flow packet persistence in the web terminal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Quantico:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #06080b;
+      --bg-2: #0b1016;
+      --panel: rgba(17, 24, 32, 0.9);
+      --panel-2: rgba(13, 20, 27, 0.92);
+      --line: rgba(255, 255, 255, 0.1);
+      --text: #e6edf4;
+      --muted: #90a0b2;
+      --faint: #6e7b8c;
+      --amber: #f5a623;
+      --amber-soft: rgba(245, 166, 35, 0.14);
+      --blue: #4da3ff;
+      --green: #25c17a;
+      --code: #0a0f14;
+      --shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+      --radius: 14px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at top left, rgba(245, 166, 35, 0.14), transparent 32rem),
+        radial-gradient(circle at top right, rgba(77, 163, 255, 0.12), transparent 26rem),
+        linear-gradient(180deg, var(--bg) 0%, #081017 42%, #05080c 100%);
+      color: var(--text);
+      font-family: "IBM Plex Sans", system-ui, sans-serif;
+      line-height: 1.6;
+    }
+
+    main {
+      width: min(1080px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 40px 0 64px;
+    }
+
+    header {
+      padding: 28px;
+      border: 1px solid var(--line);
+      border-radius: calc(var(--radius) + 2px);
+      background:
+        linear-gradient(180deg, rgba(17, 24, 32, 0.96), rgba(11, 16, 22, 0.94));
+      box-shadow: var(--shadow);
+    }
+
+    .eyebrow,
+    h2,
+    .meta-chip,
+    .diff-title {
+      font-family: "IBM Plex Mono", monospace;
+    }
+
+    .eyebrow {
+      margin: 0 0 12px;
+      color: var(--amber);
+      font-size: 0.76rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 14ch;
+      font-family: "Quantico", sans-serif;
+      font-size: clamp(2.2rem, 4vw, 4.4rem);
+      line-height: 1.02;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .summary {
+      max-width: 72ch;
+      margin: 18px 0 0;
+      color: var(--muted);
+      font-size: 1.02rem;
+    }
+
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .meta-chip {
+      padding: 6px 10px;
+      border: 1px solid rgba(77, 163, 255, 0.24);
+      border-radius: 999px;
+      background: rgba(77, 163, 255, 0.09);
+      color: var(--text);
+      font-size: 0.74rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .grid {
+      display: grid;
+      gap: 18px;
+      margin-top: 20px;
+    }
+
+    section {
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, var(--panel), var(--panel-2));
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      color: var(--amber);
+      font-size: 0.84rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    p,
+    li {
+      max-width: 76ch;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 1.15rem;
+    }
+
+    li + li {
+      margin-top: 8px;
+    }
+
+    code,
+    pre {
+      font-family: "IBM Plex Mono", monospace;
+    }
+
+    code {
+      color: #ffd596;
+    }
+
+    .callout {
+      padding: 14px 16px;
+      border: 1px solid rgba(245, 166, 35, 0.18);
+      border-radius: 12px;
+      background: var(--amber-soft);
+      color: var(--text);
+    }
+
+    .diff-grid {
+      display: grid;
+      gap: 18px;
+    }
+
+    .diff-shell {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      background: rgba(8, 12, 17, 0.92);
+    }
+
+    .diff-title {
+      margin: 0;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      color: var(--text);
+      font-size: 0.76rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .diff-view {
+      min-height: 84px;
+    }
+
+    .diff-fallback {
+      margin: 0;
+      padding: 16px;
+      overflow-x: auto;
+      background: var(--code);
+      color: var(--text);
+      font-size: 0.86rem;
+      line-height: 1.5;
+    }
+
+    .diff-shell.rendered .diff-fallback {
+      display: none;
+    }
+
+    .note {
+      margin-top: 12px;
+      color: var(--faint);
+      font-size: 0.9rem;
+    }
+
+    a {
+      color: #8bc1ff;
+    }
+
+    @media (max-width: 720px) {
+      main {
+        width: min(100%, calc(100% - 20px));
+        padding: 18px 0 28px;
+      }
+
+      header,
+      section {
+        padding: 18px;
+      }
+
+      h1 {
+        max-width: none;
+        font-size: 2.1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">Turn Document · 2026-05-20 02:56 EDT</p>
+      <h1>Historical Alert Flow Packets Persist Again</h1>
+      <p class="summary">Alert detail drawers now resolve persisted flow packets from ClickHouse-backed historical context instead of assuming the first evidence reference is the packet. This restores packet visibility for replayed and older alerts after their Redis hot-cache entries have aged out.</p>
+      <div class="meta-row">
+        <span class="meta-chip">Beads: islandflow-yza</span>
+        <span class="meta-chip">Surface: apps/web terminal</span>
+        <span class="meta-chip">Validation: tests + prod build</span>
+      </div>
+    </header>
+
+    <div class="grid">
+      <section>
+        <h2>Summary</h2>
+        <p>The web terminal was assuming <code>alert.evidence_refs[0]</code> always pointed at a flow packet. For compute-generated alerts, the first evidence ref is often the smart-money event id, with the actual packet id later in the list. That made persisted historical packets look missing even when ClickHouse context had already hydrated them successfully.</p>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Added shared alert helpers in <code>apps/web/app/terminal.tsx</code> to extract all flow-packet refs from an alert and resolve the first hydrated packet semantically.</li>
+          <li>Switched the alert drawer's selected packet lookup to use the shared resolver instead of the first evidence ref.</li>
+          <li>Updated alert-underlying inference, visible-alert prefetch, pinned-flow retention keys, and classifier-hit-to-alert matching to use the same alert packet semantics.</li>
+          <li>Added focused regression coverage in <code>apps/web/app/terminal.test.ts</code> for alerts whose packet ref is not the first evidence entry.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>Islandflow alert detail views combine live Redis retention with ClickHouse historical hydration. Once a packet leaves the hot cache, the UI must treat ClickHouse-loaded evidence as first-class persisted context, not as a degraded fallback. The bug was in the web client’s interpretation of alert evidence ordering, not in the persistence of the packet itself.</p>
+        <div class="callout">
+          Historical packet context was already present. The terminal simply was not selecting it unless the packet id happened to be the first evidence ref.
+        </div>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <ul>
+          <li>The fix is backward-compatible with already-persisted alerts because it tolerates existing evidence ordering instead of rewriting stored records.</li>
+          <li>The shared resolver centralizes the packet-selection rule so replay, pinning, and alert navigation do not drift apart again.</li>
+          <li>The classifier-hit alert matching path now finds alerts by any embedded packet ref, which improves consistency when opening related alert context from signal panes.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <div class="diff-grid">
+          <div class="diff-shell" id="diff-shell-1">
+            <p class="diff-title">apps/web/app/terminal.tsx · alert packet resolution</p>
+            <div class="diff-view" id="diff-1"></div>
+            <pre class="diff-fallback"><code>-const packetId = selectedAlert.evidence_refs[0];
+-return packetId ? resolvedFlowPacketMap.get(packetId) ?? null : null;
++return resolveAlertFlowPacket(selectedAlert, resolvedFlowPacketMap);</code></pre>
+          </div>
+
+          <div class="diff-shell" id="diff-shell-2">
+            <p class="diff-title">apps/web/app/terminal.tsx · prefetch and alert matching</p>
+            <div class="diff-view" id="diff-2"></div>
+            <pre class="diff-fallback"><code>-const visiblePacketIds = visibleAlerts
+-  .map((alert) =&gt; alert.evidence_refs[0] ?? null)
+-  .filter((id): id is string =&gt; Boolean(id) &amp;&amp; id.startsWith("flowpacket:"));
++const visiblePacketIds = visibleAlerts.flatMap((alert) =&gt; getAlertFlowPacketRefs(alert));
+
+-alertsFeed.items.find((item) =&gt; item.trace_id === desiredTrace || item.evidence_refs[0] === packetId)
++alertsFeed.items.find(
++  (item) =&gt; item.trace_id === desiredTrace || getAlertFlowPacketRefs(item).includes(packetId)
++)</code></pre>
+          </div>
+        </div>
+        <p class="note">These snippets are rendered client-side with Diffs using the same old/new code blocks shown in the fallback text if the library cannot load.</p>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <p>Older or replayed alerts should now show their persisted flow packet summary in the detail drawer even after the Redis hot cache no longer has that packet. Users investigating signal history should keep the same evidence continuity they get from live data: packet summary, print context, and related alert linkage stay intact.</p>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li><code>bun test apps/web/app/terminal.test.ts</code> passed with 72 tests.</li>
+          <li><code>bun --cwd=apps/web run build</code> passed on Next.js 16.2.6.</li>
+          <li>The new tests specifically cover alerts where a smart-money event id precedes the packet id in <code>evidence_refs</code>.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>This change does not alter how compute persists alert evidence ordering. Instead, it makes the terminal resilient to existing and future mixed evidence lists.</li>
+          <li>The Diffs rendering in this document loads from the published package at view time. A plain-text fallback is included directly in the HTML so the document remains readable offline.</li>
+          <li>No full monorepo test sweep was run because the change was isolated to the web terminal alert-context path.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>No additional Beads issue was required for this fix.</li>
+          <li>Optional: audit whether compute should emit packet ids before higher-level event ids in <code>evidence_refs</code> for simpler downstream consumers.</li>
+          <li>Optional: add a small integration test around alert drawer selection if the web app gains component-level interaction tests later.</li>
+        </ul>
+      </section>
+    </div>
+  </main>
+
+  <script type="module">
+    const snippets = [
+      {
+        shellId: "diff-shell-1",
+        containerId: "diff-1",
+        name: "apps/web/app/terminal.tsx",
+        oldContents: `const selectedFlowPacket = useMemo(() => {
+  if (!selectedAlert) {
+    return null;
+  }
+  const packetId = selectedAlert.evidence_refs[0];
+  return packetId ? resolvedFlowPacketMap.get(packetId) ?? null : null;
+}, [selectedAlert, resolvedFlowPacketMap]);`,
+        newContents: `const selectedFlowPacket = useMemo(() => {
+  if (!selectedAlert) {
+    return null;
+  }
+  return resolveAlertFlowPacket(selectedAlert, resolvedFlowPacketMap);
+}, [selectedAlert, resolvedFlowPacketMap]);`
+      },
+      {
+        shellId: "diff-shell-2",
+        containerId: "diff-2",
+        name: "apps/web/app/terminal.tsx",
+        oldContents: `const visiblePacketIds = visibleAlerts
+  .map((alert) => alert.evidence_refs[0] ?? null)
+  .filter((id): id is string => Boolean(id) && id.startsWith("flowpacket:"));
+
+alertsFeed.items.find(
+  (item) => item.trace_id === desiredTrace || item.evidence_refs[0] === packetId
+) ?? null;`,
+        newContents: `const visiblePacketIds = visibleAlerts.flatMap((alert) => getAlertFlowPacketRefs(alert));
+
+alertsFeed.items.find(
+  (item) => item.trace_id === desiredTrace || getAlertFlowPacketRefs(item).includes(packetId)
+) ?? null;`
+      }
+    ];
+
+    try {
+      const { FileDiff } = await import("https://esm.sh/@pierre/diffs");
+
+      for (const snippet of snippets) {
+        const container = document.getElementById(snippet.containerId);
+        const shell = document.getElementById(snippet.shellId);
+        if (!container || !shell) {
+          continue;
+        }
+
+        const instance = new FileDiff({
+          theme: { dark: "pierre-dark", light: "pierre-light" },
+          diffStyle: "split"
+        });
+
+        instance.render({
+          oldFile: {
+            name: snippet.name,
+            contents: snippet.oldContents
+          },
+          newFile: {
+            name: snippet.name,
+            contents: snippet.newContents
+          },
+          containerWrapper: container
+        });
+
+        shell.classList.add("rendered");
+      }
+    } catch (error) {
+      console.warn("Failed to render diff snippets with Diffs.", error);
+    }
+  </script>
+</body>
+</html>
