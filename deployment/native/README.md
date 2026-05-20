@@ -91,6 +91,7 @@ Checked-in unit files live under:
 - `deployment/native/systemd/user/islandflow-candles.service`
 - `deployment/native/systemd/user/islandflow-ingest-options.service`
 - `deployment/native/systemd/user/islandflow-ingest-equities.service`
+- `deployment/native/systemd/user/islandflow-ingest-news.service`
 
 These are written for the current VPS layout:
 
@@ -175,6 +176,7 @@ Default unit names used by `scripts/deploy.ts`:
 - `islandflow-candles`
 - `islandflow-ingest-options`
 - `islandflow-ingest-equities`
+- `islandflow-ingest-news`
 
 Override them from your local shell before running `./deploy` if the server uses different names:
 
@@ -191,6 +193,7 @@ Available overrides:
 - `DEPLOY_NATIVE_CANDLES_UNIT`
 - `DEPLOY_NATIVE_INGEST_OPTIONS_UNIT`
 - `DEPLOY_NATIVE_INGEST_EQUITIES_UNIT`
+- `DEPLOY_NATIVE_INGEST_NEWS_UNIT`
 
 ## systemctl invocation
 
@@ -220,7 +223,7 @@ Scope behavior:
 - `--web-only`: rebuild/restart only the web unit
 - `--api-only`: restart only the API unit
 - `--services-only`: restart API + worker units without touching the web unit
-- `--workers-only`: restart only `compute`, `candles`, `ingest-options`, and `ingest-equities`
+- `--workers-only`: restart only `compute`, `candles`, `ingest-options`, `ingest-equities`, and `ingest-news`
 - `--fast`: when no explicit scope flag is provided, native deploys now default to `--workers-only`
 - `--no-build`: skip `bun install --frozen-lockfile` and skip the web build step
 

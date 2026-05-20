@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Turn Report: Fix Native Alpaca News</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b0f14;
+        --panel: #121821;
+        --panel-2: #0f141b;
+        --border: rgba(255, 255, 255, 0.08);
+        --text: #e8eef5;
+        --muted: #93a3b5;
+        --accent: #7dd3fc;
+        --accent-2: #a78bfa;
+        --good: #86efac;
+        --warn: #fbbf24;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at top left, rgba(125, 211, 252, 0.12), transparent 28%),
+          radial-gradient(circle at top right, rgba(167, 139, 250, 0.12), transparent 32%),
+          linear-gradient(180deg, #080b10 0%, var(--bg) 100%);
+        color: var(--text);
+        font: 15px/1.65 "IBM Plex Sans", "Segoe UI", sans-serif;
+        padding: 32px;
+      }
+      main {
+        max-width: 1040px;
+        margin: 0 auto;
+        background: rgba(18, 24, 33, 0.92);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 32px;
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+      }
+      h1, h2 {
+        margin: 0 0 12px;
+        font-family: "IBM Plex Mono", monospace;
+        letter-spacing: 0.04em;
+      }
+      h1 { font-size: 1.85rem; }
+      h2 { font-size: 1rem; margin-top: 28px; }
+      p, li { margin: 0 0 12px; }
+      .meta {
+        color: var(--muted);
+        font-size: 0.9rem;
+        margin-bottom: 18px;
+      }
+      .summary {
+        padding: 18px 20px;
+        border-radius: 16px;
+        border: 1px solid rgba(125, 211, 252, 0.24);
+        background: linear-gradient(135deg, rgba(125, 211, 252, 0.10), rgba(167, 139, 250, 0.10));
+      }
+      section {
+        margin-top: 28px;
+        padding-top: 22px;
+        border-top: 1px solid var(--border);
+      }
+      ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+      code, pre {
+        font-family: "IBM Plex Mono", monospace;
+      }
+      pre {
+        margin: 0 0 14px;
+        padding: 16px;
+        overflow: auto;
+        border-radius: 14px;
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+      }
+      .pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 14px 0 0;
+      }
+      .pill {
+        padding: 7px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--muted);
+        font-size: 0.84rem;
+      }
+      .good { color: var(--good); }
+      .warn { color: var(--warn); }
+      a { color: var(--accent); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="meta">Created 2026-05-19 20:05 EDT · Branch: <code>alpaca-news</code> · Issue: <code>islandflow-laq</code></p>
+      <h1>Fix Native Alpaca News</h1>
+      <div class="summary">
+        <p>
+          Restored the native Alpaca news pipeline on the VPS by correcting Alpaca auth to use key ID + secret,
+          adding the missing native <code>islandflow-ingest-news</code> unit and worker-scope wiring, fixing the
+          Alpaca news backfill defaults to match the current API contract, requesting article content explicitly,
+          and repairing API-side news persistence so the feed is both live and queryable.
+        </p>
+        <div class="pill-row">
+          <span class="pill">VPS unit installed and enabled</span>
+          <span class="pill">Alpaca auth aligned to current docs</span>
+          <span class="pill">Live news confirmed</span>
+          <span class="pill">ClickHouse news history confirmed</span>
+        </div>
+      </div>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          The original native news rollout failed for two separate reasons: the repo never fully wired
+          <code>ingest-news</code> into the native worker templates, and the service was still using bearer-style
+          Alpaca auth plus an oversized backfill limit that Alpaca's current News API rejects. After the service
+          started flowing again, one more pipeline gap appeared: the API fanned news out live but never persisted it
+          to ClickHouse, so <code>/news</code> stayed empty even when headlines showed up in the UI.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Added shared Alpaca credential helpers in <code>packages/config</code> with support for official key ID + secret auth and a legacy bearer fallback.</li>
+          <li>Rewired the Alpaca news, options, and equities adapters to use the shared auth model instead of hardcoded bearer headers and empty websocket secrets.</li>
+          <li>Added the checked-in native user unit <code>deployment/native/systemd/user/islandflow-ingest-news.service</code>.</li>
+          <li>Updated native install, health, cutover, rollback, and deploy-scope scripts so worker/native rollouts include <code>ingest-news</code>.</li>
+          <li>Corrected the native and Docker env/docs story to advertise current Alpaca credential names.</li>
+          <li>Lowered the default Alpaca news backfill limit from <code>100</code> to <code>50</code> to match the current endpoint contract.</li>
+          <li>Requested <code>include_content=true</code> for Alpaca news backfill and added a safe summary fallback when article content is missing.</li>
+          <li>Fixed API-side persistence by inserting each consumed news story into ClickHouse before live fanout.</li>
+          <li>On the VPS, created a fresh <code>.env</code> backup, added <code>ALPACA_API_KEY_ID</code> and <code>ALPACA_API_SECRET_KEY</code>, set <code>ALPACA_NEWS_BACKFILL_LIMIT=50</code>, switched the server checkout to <code>alpaca-news</code>, installed the new user unit, and restarted <code>api</code> plus <code>ingest-news</code>.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          Alpaca's current official auth docs require the <code>APCA-API-KEY-ID</code> and
+          <code>APCA-API-SECRET-KEY</code> header pair for market-data requests, and the current News endpoint
+          documents a <code>limit</code> range of <code>1..50</code> plus optional
+          <code>include_content</code>. This turn aligned Islandflow's native news path with those present-day
+          contracts instead of relying on the older single-token assumption that had drifted into the repo.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <ul>
+          <li>The shared helper prefers <code>ALPACA_API_KEY_ID</code> + <code>ALPACA_API_SECRET_KEY</code>, also accepts <code>ALPACA_KEY_ID</code> + <code>ALPACA_SECRET_KEY</code>, and only falls back to legacy bearer auth when no secret is present.</li>
+          <li>The news backfill now requests article bodies explicitly. When Alpaca still omits full content, the service emits an escaped summary paragraph instead of a blank story body.</li>
+          <li>The native worker scope now treats <code>ingest-news</code> as a first-class worker everywhere the repo previously only handled options and equities.</li>
+          <li>The API now persists each consumed news story into ClickHouse before live fanout, which restores <code>/news</code> and history behavior without removing the live websocket path.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <pre><code class="language-diff">diff --git a/packages/config/src/alpaca.ts b/packages/config/src/alpaca.ts
++export const buildAlpacaAuthHeaders = (credentials) =&gt; ({
++  "APCA-API-KEY-ID": credentials.keyId,
++  "APCA-API-SECRET-KEY": credentials.secret
++})
++export const buildAlpacaWebSocketAuthMessage = (credentials) =&gt; ({
++  action: "auth",
++  key: credentials.keyId,
++  secret: credentials.secret
++})</code></pre>
+        <pre><code class="language-diff">diff --git a/services/ingest-news/src/index.ts b/services/ingest-news/src/index.ts
+-  ALPACA_NEWS_BACKFILL_LIMIT: z.coerce.number().int().positive().max(200).default(100),
++  ALPACA_NEWS_BACKFILL_LIMIT: z.coerce.number().int().positive().max(50).default(50),
++  url.searchParams.set("include_content", "true");
++  const contentHtml = item.content?.trim() || (summary ? `&lt;p&gt;${escapeHtml(summary)}&lt;/p&gt;` : "");</code></pre>
+        <pre><code class="language-diff">diff --git a/services/api/src/index.ts b/services/api/src/index.ts
+   const payload = NewsStorySchema.parse(newsSubscription.decode(msg));
++  await insertNewsStory(clickhouse, payload);
+   await fanoutLive({ channel: "news" }, payload, "news");
+   msg.ack();</code></pre>
+        <p class="meta">These snippets are included in a diff-style rendering format for fast review.</p>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <p>
+          Native Islandflow deployments on the VPS now have a real Alpaca-backed news worker instead of a missing unit
+          and a crash loop. News stories populate with actual article body content in the feed more reliably, and the
+          API's <code>/news</code> path can serve persisted recent stories instead of only depending on live websocket
+          state.
+        </p>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li>Ran local targeted tests: <code>bun test packages/config/tests packages/storage/tests/news.test.ts services/ingest-news/tests services/ingest-equities/tests</code> and all passed.</li>
+          <li>Ran <code>bun run check:docker-workspace</code> and confirmed the Docker workspace snapshot stayed in sync.</li>
+          <li>Verified against current Alpaca docs that market-data auth uses key ID + secret and that the news endpoint limit is capped at 50.</li>
+          <li>On the VPS, confirmed the new <code>islandflow-ingest-news.service</code> unit is installed, enabled, and active under <code>systemd --user</code>.</li>
+          <li>Queried Alpaca directly from the VPS with the configured credentials and confirmed <code>GET https://data.alpaca.markets/v1beta1/news?limit=1&amp;sort=desc</code> returned <span class="good">HTTP 200</span>.</li>
+          <li>Restarted the VPS <code>api</code> and <code>ingest-news</code> services after the persistence fix so the API would store newly republished backfill stories.</li>
+          <li>Verified VPS API output: <code>GET http://127.0.0.1:4000/news?limit=3</code> returned 3 recent real Alpaca stories with non-empty <code>content_html</code> payloads.</li>
+          <li>Verified ClickHouse persistence: <code>SELECT count(), max(story_id), max(published_ts) FROM news</code> returned <code>50</code> rows after the republished backfill.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>The server checkout still carries an unrelated untracked file, <code>deployment/docker/signal-cli-0.14.3-Linux-native.tar.gz</code>. It does not block the news fix, but it is repo hygiene debt on the VPS checkout.</li>
+          <li>The shared Alpaca helper keeps a legacy bearer fallback so older setups do not fail immediately, but the repo documentation now treats key ID + secret as the supported path.</li>
+          <li>Some Alpaca/Benzinga stories may still omit full content. The summary fallback prevents a blank drawer in those cases, but it cannot synthesize text Alpaca does not send.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>No new follow-up Beads issue was required to ship this repair.</li>
+          <li>If native Alpaca options or equities are re-enabled later, the shared credential changes in this turn already cover the same key ID + secret auth model.</li>
+          <li>If the team wants historical news beyond the startup backfill, the next logical extension is a scheduled catch-up cursor instead of only restart-time republishing.</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+  </html>

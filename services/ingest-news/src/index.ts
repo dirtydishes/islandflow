@@ -1,4 +1,10 @@
-import { readEnv } from "@islandflow/config";
+import {
+  buildAlpacaAuthHeaders,
+  buildAlpacaWebSocketAuthMessage,
+  hasAlpacaCredentials,
+  readEnv,
+  resolveAlpacaCredentials
+} from "@islandflow/config";
 import { createLogger } from "@islandflow/observability";
 import {
   SUBJECT_NEWS,
@@ -18,13 +24,26 @@ const logger = createLogger({ service });
 const envSchema = z.object({
   NATS_URL: z.string().default("nats://127.0.0.1:4222"),
   ALPACA_API_KEY: z.string().default(""),
+  ALPACA_API_KEY_ID: z.string().default(""),
+  ALPACA_KEY_ID: z.string().default(""),
+  ALPACA_API_SECRET_KEY: z.string().default(""),
+  ALPACA_SECRET_KEY: z.string().default(""),
   ALPACA_REST_URL: z.string().default("https://data.alpaca.markets"),
   ALPACA_WS_BASE_URL: z.string().default("wss://stream.data.alpaca.markets"),
-  ALPACA_NEWS_BACKFILL_LIMIT: z.coerce.number().int().positive().max(200).default(100),
+  ALPACA_NEWS_BACKFILL_LIMIT: z.coerce.number().int().positive().max(50).default(50),
   ALPACA_NEWS_WEBSOCKET_PATH: z.string().default("/v1beta1/news")
 });
 
 const env = readEnv(envSchema);
+const alpacaCredentials = resolveAlpacaCredentials(env);
+
+const escapeHtml = (value: string): string =>
+  value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 
 type AlpacaNewsItem = {
   id?: number;
@@ -43,10 +62,6 @@ type AlpacaNewsResponse = {
   news?: AlpacaNewsItem[];
 };
 
-const buildHeaders = (): Record<string, string> => ({
-  Authorization: `Bearer ${env.ALPACA_API_KEY}`
-});
-
 const parseTimestamp = (value: string | undefined): number => {
   const parsed = value ? Date.parse(value) : Number.NaN;
   return Number.isFinite(parsed) ? parsed : Date.now();
@@ -59,7 +74,8 @@ const toStory = (item: AlpacaNewsItem, seq: number): NewsStory | null => {
   }
 
   const provider = "alpaca";
-  const contentHtml = item.content ?? "";
+  const summary = item.summary?.trim() ?? "";
+  const contentHtml = item.content?.trim() || (summary ? `<p>${escapeHtml(summary)}</p>` : "");
   const symbols = resolveNewsSymbols(item.symbols ?? [], contentHtml);
   const publishedTs = parseTimestamp(item.created_at);
   const updatedTs = parseTimestamp(item.updated_at ?? item.created_at);
@@ -73,7 +89,7 @@ const toStory = (item: AlpacaNewsItem, seq: number): NewsStory | null => {
     provider,
     source: item.source?.trim() || item.author?.trim() || "Alpaca News",
     headline: item.headline?.trim() || `Story ${storyId}`,
-    summary: item.summary?.trim() || "",
+    summary,
     content_html: contentHtml,
     url: item.url?.trim() || "",
     published_ts: publishedTs,
@@ -88,9 +104,10 @@ const fetchBackfill = async (): Promise<AlpacaNewsItem[]> => {
   const url = new URL("/v1beta1/news", env.ALPACA_REST_URL);
   url.searchParams.set("sort", "desc");
   url.searchParams.set("limit", env.ALPACA_NEWS_BACKFILL_LIMIT.toString());
+  url.searchParams.set("include_content", "true");
 
   const response = await fetch(url.toString(), {
-    headers: buildHeaders()
+    headers: buildAlpacaAuthHeaders(alpacaCredentials)
   });
 
   if (!response.ok) {
@@ -115,8 +132,10 @@ const decodePayload = (data: WebSocket.RawData): unknown => {
 };
 
 const run = async () => {
-  if (!env.ALPACA_API_KEY) {
-    throw new Error("ALPACA_API_KEY is required for ingest-news.");
+  if (!hasAlpacaCredentials(alpacaCredentials)) {
+    throw new Error(
+      "Alpaca news requires ALPACA_API_KEY_ID and ALPACA_API_SECRET_KEY (or ALPACA_KEY_ID / ALPACA_SECRET_KEY)."
+    );
   }
 
   const { nc, js, jsm } = await connectJetStreamWithRetry(
@@ -146,17 +165,11 @@ const run = async () => {
 
   const wsUrl = new URL(env.ALPACA_NEWS_WEBSOCKET_PATH, env.ALPACA_WS_BASE_URL).toString();
   const ws = new WebSocket(wsUrl, {
-    headers: buildHeaders()
+    headers: buildAlpacaAuthHeaders(alpacaCredentials)
   });
 
   ws.on("open", () => {
-    ws.send(
-      JSON.stringify({
-        action: "auth",
-        key: env.ALPACA_API_KEY,
-        secret: ""
-      })
-    );
+    ws.send(JSON.stringify(buildAlpacaWebSocketAuthMessage(alpacaCredentials)));
   });
 
   ws.on("message", (raw) => {

@@ -7,7 +7,7 @@ units=()
 
 case "$scope" in
   full)
-    units=(islandflow-web.service islandflow-api.service islandflow-compute.service islandflow-candles.service islandflow-ingest-options.service islandflow-ingest-equities.service)
+    units=(islandflow-web.service islandflow-api.service islandflow-compute.service islandflow-candles.service islandflow-ingest-options.service islandflow-ingest-equities.service islandflow-ingest-news.service)
     ;;
   web)
     units=(islandflow-web.service)
@@ -16,10 +16,10 @@ case "$scope" in
     units=(islandflow-api.service)
     ;;
   services)
-    units=(islandflow-api.service islandflow-compute.service islandflow-candles.service islandflow-ingest-options.service islandflow-ingest-equities.service)
+    units=(islandflow-api.service islandflow-compute.service islandflow-candles.service islandflow-ingest-options.service islandflow-ingest-equities.service islandflow-ingest-news.service)
     ;;
   workers)
-    units=(islandflow-compute.service islandflow-candles.service islandflow-ingest-options.service islandflow-ingest-equities.service)
+    units=(islandflow-compute.service islandflow-candles.service islandflow-ingest-options.service islandflow-ingest-equities.service islandflow-ingest-news.service)
     ;;
   *)
     echo "Unknown scope: $scope" >&2

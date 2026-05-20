@@ -16,7 +16,7 @@ esac
 echo "Stopping Docker-owned Islandflow app services before native ownership starts."
 (
   cd "$repo_root/deployment/docker"
-  docker compose stop web api compute candles ingest-options ingest-equities
+  docker compose stop web api compute candles ingest-options ingest-equities ingest-news
 )
 
 if [[ "$scope" == "full" || "$scope" == "services" || "$scope" == "api" || "$scope" == "web" ]]; then
@@ -24,9 +24,9 @@ if [[ "$scope" == "full" || "$scope" == "services" || "$scope" == "api" || "$sco
 fi
 
 systemctl --user restart $(case "$scope" in
-  full) echo islandflow-web.service islandflow-api.service islandflow-compute.service islandflow-candles.service islandflow-ingest-options.service islandflow-ingest-equities.service ;;
-  services) echo islandflow-api.service islandflow-compute.service islandflow-candles.service islandflow-ingest-options.service islandflow-ingest-equities.service ;;
-  workers) echo islandflow-compute.service islandflow-candles.service islandflow-ingest-options.service islandflow-ingest-equities.service ;;
+  full) echo islandflow-web.service islandflow-api.service islandflow-compute.service islandflow-candles.service islandflow-ingest-options.service islandflow-ingest-equities.service islandflow-ingest-news.service ;;
+  services) echo islandflow-api.service islandflow-compute.service islandflow-candles.service islandflow-ingest-options.service islandflow-ingest-equities.service islandflow-ingest-news.service ;;
+  workers) echo islandflow-compute.service islandflow-candles.service islandflow-ingest-options.service islandflow-ingest-equities.service islandflow-ingest-news.service ;;
   api) echo islandflow-api.service ;;
   web) echo islandflow-web.service ;;
 esac)

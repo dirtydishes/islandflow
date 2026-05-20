@@ -1,4 +1,9 @@
 import { decode, encode } from "@msgpack/msgpack";
+import {
+  buildAlpacaAuthHeaders,
+  buildAlpacaWebSocketAuthMessage,
+  type AlpacaCredentials
+} from "@islandflow/config";
 import { createLogger } from "@islandflow/observability";
 import type { OptionIngestAdapter, OptionIngestHandlers } from "./types";
 import WebSocket from "ws";
@@ -6,7 +11,7 @@ import WebSocket from "ws";
 type AlpacaFeed = "indicative" | "opra";
 
 type AlpacaOptionsAdapterConfig = {
-  apiKey: string;
+  credentials: AlpacaCredentials;
   restUrl: string;
   wsBaseUrl: string;
   feed: AlpacaFeed;
@@ -147,18 +152,12 @@ const normalizeUnderlyings = (value: string[]): string[] => {
   return result;
 };
 
-const buildHeaders = (config: AlpacaOptionsAdapterConfig): Record<string, string> => {
-  return {
-    Authorization: `Bearer ${config.apiKey}`
-  };
-};
-
 const fetchJson = async <T>(
   url: URL,
   config: AlpacaOptionsAdapterConfig
 ): Promise<T> => {
   const response = await fetch(url.toString(), {
-    headers: buildHeaders(config)
+    headers: buildAlpacaAuthHeaders(config.credentials)
   });
 
   if (!response.ok) {
@@ -398,8 +397,8 @@ export const createAlpacaOptionsAdapter = (
   return {
     name: "alpaca",
     start: async (handlers: OptionIngestHandlers) => {
-      if (!config.apiKey) {
-        throw new Error("Alpaca adapter requires ALPACA_API_KEY.");
+      if (!config.credentials.keyId) {
+        throw new Error("Alpaca adapter requires Alpaca credentials.");
       }
 
       const underlyings = normalizeUnderlyings(config.underlyings);
@@ -485,15 +484,22 @@ export const createAlpacaOptionsAdapter = (
       const wsUrl = `${wsBase}/${config.feed}`;
       const ws = new WebSocket(wsUrl, {
         headers: {
-          ...buildHeaders(config),
+          ...buildAlpacaAuthHeaders(config.credentials),
           "Content-Type": "application/msgpack"
         }
       });
 
       let seq = 0;
       let stopped = false;
+      let subscribed = false;
 
-      ws.on("open", () => {
+      const subscribe = () => {
+        if (subscribed) {
+          return;
+        }
+
+        subscribed = true;
+
         const subscribe: Record<string, unknown> = {
           action: "subscribe",
           trades: selectedSymbols
@@ -504,6 +510,10 @@ export const createAlpacaOptionsAdapter = (
         }
 
         ws.send(encode(subscribe));
+      };
+
+      ws.on("open", () => {
+        ws.send(encode(buildAlpacaWebSocketAuthMessage(config.credentials)));
       });
 
       ws.on("message", (data) => {
@@ -583,7 +593,13 @@ export const createAlpacaOptionsAdapter = (
 
           if (type === "error") {
             logger.error("alpaca stream error", { message });
-          } else if (type === "success" || type === "subscription") {
+          } else if (type === "success") {
+            const status = (message as { msg?: string }).msg ?? "";
+            if (status === "authenticated") {
+              subscribe();
+            }
+            logger.info("alpaca stream status", { message });
+          } else if (type === "subscription") {
             logger.info("alpaca stream status", { message });
           }
         }
