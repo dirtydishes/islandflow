@@ -43,6 +43,8 @@ import {
   shouldClearOptionFocusSeed,
   smartMoneyProfileLabel,
   smartMoneyToneForProfile,
+  getAlertFlowPacketRefs,
+  resolveAlertFlowPacket,
   statusLabel,
   toggleFilterValue
 } from "./terminal";
@@ -132,6 +134,33 @@ describe("alert context hydration helpers", () => {
     expect(evidence.packets.get("flowpacket:1")).toBe(packet);
     expect(evidence.prints.get("print:1")?.execution_nbbo_bid).toBe(1.2);
     expect(evidence.prints.get("print:1")?.execution_underlying_spot).toBe(450.05);
+  });
+
+  it("finds flow-packet refs even when they are not first in alert evidence", () => {
+    const alert = makeAlert({
+      evidence_refs: ["smartmoney:single_leg_event:flowpacket:1", "flowpacket:1", "print:1"]
+    });
+
+    expect(getAlertFlowPacketRefs(alert)).toEqual(["flowpacket:1"]);
+  });
+
+  it("resolves the primary alert flow packet from hydrated historical context", () => {
+    const packet = {
+      trace_id: "flowpacket:1",
+      id: "flowpacket:1",
+      members: ["print:1"],
+      source_ts: 1,
+      ingest_ts: 2,
+      seq: 1,
+      features: {},
+      join_quality: {}
+    } as any;
+    const alert = makeAlert({
+      evidence_refs: ["smartmoney:single_leg_event:flowpacket:1", "flowpacket:1", "print:1"]
+    });
+    const packets = new Map<string, typeof packet>([[packet.id, packet]]);
+
+    expect(resolveAlertFlowPacket(alert, packets)).toBe(packet);
   });
 });
 
