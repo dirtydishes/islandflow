@@ -8,12 +8,14 @@
 
 Islandflow is a Bun + TypeScript monorepo for a personal-use, event-sourced market microstructure research platform focused on:
 
-- options prints + NBBO,
-- off-exchange equity prints,
-- market news context,
-- explainable smart-money flow classification,
-- deterministic replay,
-- evidence-linked UI inspection.
+- multi-source options/equities/news ingest (synthetic + live adapters),
+- deterministic parent-event reconstruction over prints, quotes, and NBBO,
+- explainable participant-style flow classification (not a single binary "smart money" flag),
+- evidence-linked alerts, packet drilldowns, and context hydration,
+- real-time + historical + replay delivery over REST and WebSocket,
+- terminal-style inspection UI for tape, signals, charts, and news.
+
+In its current state, Islandflow acts as an event-sourced intelligence layer on top of raw market microstructure events. Services publish and consume through NATS/JetStream, persist both raw and derived events in ClickHouse, and expose low-latency live feeds plus cursor-based history/replay APIs for research and operator workflows.
 
 ## Current Implementation Status
 
@@ -50,6 +52,24 @@ Planned / not yet complete:
 - **Microstructure awareness**: bounded joins, confidence scoring, and explicit uncertainty.
 - **Taxonomy over folklore**: "smart money" is modeled as participant-style hypotheses, not a single binary label.
 - **Bun-first tooling**: runtime, package management, scripts, and tests use Bun.
+
+## How Print Classification Works (Current Approach)
+
+Islandflow follows the same high-level philosophy captured in [`smartmoney.md`](smartmoney.md): the tape is informative but noisy, and a useful classifier should model multiple participant-style hypotheses instead of forcing every print into one "smart money" bucket.
+
+Current flow in the compute pipeline:
+
+1. **Ingest + normalize** options prints, NBBO, equity prints/quotes, and news into shared schemas.
+2. **Reconstruct parent events** from child prints using bounded clustering windows, quote alignment, and structure-aware packet planning.
+3. **Compute evidence features** such as aggressor side vs NBBO, premium/notional concentration, burst timing, quote freshness/coverage, DTE/moneyness context, and cross-signal linkage.
+4. **Score profile hypotheses** including `institutional_directional`, `retail_whale`, `event_driven`, `vol_seller`, `arbitrage`, and `hedge_reactive`, with reason codes and confidence bands.
+5. **Emit explainable artifacts** (`FlowPacket`, `SmartMoneyEvent`, `ClassifierHitEvent`, `AlertEvent`, inferred-dark events) for both live fanout and historical replay.
+
+Important behavior:
+
+- The classifier can **abstain** when evidence is weak.
+- Suppression guards reduce known false positives (stale/missing quote context, special/complex print ambiguity, hedge-reactive or parity-like structure confusion).
+- Compatibility endpoints remain available while newer smart-money semantics are first-class.
 
 ## Smart-Money Classification Taxonomy
 
