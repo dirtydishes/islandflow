@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { FlowPacket, OptionNBBO, OptionPrint } from "./events.ts";
+import type { FlowPacket, OptionNBBO, OptionPrint } from "./events";
 
 export const SyntheticMarketModeSchema = z.enum(["realistic", "active", "firehose"]);
 export type SyntheticMarketMode = z.infer<typeof SyntheticMarketModeSchema>;

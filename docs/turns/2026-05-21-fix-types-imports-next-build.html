@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fix packages/types imports for Next build</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b1020;
+        --panel: #131b34;
+        --panel-2: #1c2748;
+        --text: #eef3ff;
+        --muted: #b8c4e6;
+        --line: #31416e;
+        --accent: #9fb7ff;
+        --accent-2: #7ee0c3;
+        --code: #0a1227;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "IBM Plex Sans", Inter, system-ui, sans-serif;
+        background:
+          radial-gradient(circle at top right, rgba(159, 183, 255, 0.18), transparent 28%),
+          linear-gradient(180deg, #0a0f1e 0%, var(--bg) 100%);
+        color: var(--text);
+        line-height: 1.65;
+      }
+
+      main {
+        width: min(980px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 40px 0 64px;
+      }
+
+      header {
+        margin-bottom: 24px;
+      }
+
+      h1, h2, code, pre {
+        font-family: "IBM Plex Mono", "SFMono-Regular", Menlo, monospace;
+      }
+
+      h1 {
+        margin: 0 0 12px;
+        font-size: clamp(2rem, 4vw, 3rem);
+        line-height: 1.08;
+      }
+
+      .lede {
+        max-width: 70ch;
+        color: var(--muted);
+        font-size: 1.02rem;
+      }
+
+      .meta {
+        display: inline-flex;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 18px;
+        padding: 8px 12px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: rgba(19, 27, 52, 0.75);
+        color: var(--accent-2);
+        font-size: 0.82rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      section {
+        margin-top: 16px;
+        padding: 22px 24px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: linear-gradient(180deg, rgba(19, 27, 52, 0.96), rgba(28, 39, 72, 0.9));
+        box-shadow: 0 14px 40px rgba(0, 0, 0, 0.22);
+      }
+
+      h2 {
+        margin: 0 0 12px;
+        font-size: 0.98rem;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      p {
+        margin: 0 0 10px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 8px;
+      }
+
+      code {
+        padding: 0.1rem 0.32rem;
+        border-radius: 6px;
+        background: rgba(10, 18, 39, 0.95);
+        border: 1px solid rgba(91, 109, 163, 0.7);
+      }
+
+      pre {
+        margin: 12px 0 0;
+        padding: 14px 16px;
+        overflow-x: auto;
+        border-radius: 12px;
+        background: var(--code);
+        border: 1px solid rgba(91, 109, 163, 0.7);
+      }
+
+      a {
+        color: #c6d4ff;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="meta">Turn Document · 2026-05-21 · islandflow-c8f</div>
+        <h1>Fix shared type imports for Next build</h1>
+        <p class="lede">
+          Resolved the web production build failure on the Electron/Codex branch by normalizing
+          sibling imports in <code>packages/types/src</code>. The fix keeps the change surface
+          narrow: only TypeScript module specifiers changed, with no runtime contract updates.
+        </p>
+      </header>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          The shared type package was exporting and importing local files with explicit
+          <code>.ts</code> suffixes. Next 16 type-checking rejected that layout during
+          <code>bun --cwd=apps/web run build</code>. This turn removed those suffixes across the
+          affected files and verified that the web production build now completes successfully.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Updated <code>packages/types/src/index.ts</code> to re-export sibling modules without explicit <code>.ts</code> suffixes.</li>
+          <li>Updated sibling imports in <code>desktop-ai.ts</code>, <code>events.ts</code>, <code>live.ts</code>, <code>options-flow.ts</code>, and <code>synthetic-market.ts</code>.</li>
+          <li>Left all schemas, exported names, and runtime behavior unchanged.</li>
+          <li>Added this turn document under <code>docs/turns/</code>.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          Recent Electron/Codex work introduced a new <code>packages/types/src/desktop-ai.ts</code>
+          surface and switched the package to source-based workspace exports. That was compatible
+          with the desktop runtime path, but the web production build still runs under Next's
+          stricter TypeScript pipeline, which flagged the explicit <code>.ts</code> sibling imports.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <ul>
+          <li>The fix intentionally stops at module specifiers; it does not alter package exports, tsconfig flags, or build tooling.</li>
+          <li>This keeps the desktop branch behavior stable while making the source package consumable by Next's type-checking rules.</li>
+          <li>The check for remaining explicit local <code>.ts</code> imports in <code>packages/types/src</code> now returns no matches.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p>
+          Snippets below use unified diff formatting compatible with tools documented by
+          <a href="https://diffs.com/docs">diffs.com</a>.
+        </p>
+        <pre><code class="language-diff">diff --git a/packages/types/src/index.ts b/packages/types/src/index.ts
+-export * from "./events.ts";
+-export * from "./live.ts";
+-export * from "./options-flow.ts";
++export * from "./events";
++export * from "./live";
++export * from "./options-flow";</code></pre>
+        <pre><code class="language-diff">diff --git a/packages/types/src/desktop-ai.ts b/packages/types/src/desktop-ai.ts
+-} from "./events.ts";
+-import { OptionFlowFiltersSchema } from "./options-flow.ts";
++} from "./events";
++import { OptionFlowFiltersSchema } from "./options-flow";</code></pre>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <p>
+          The Electron/Codex branch can now produce a successful web build again, which unblocks
+          shipping and testing of the desktop AI settings and Copilot surfaces without a separate
+          manual tsconfig workaround.
+        </p>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li><code>rg -n "from &quot;\\./.*\\.ts&quot;|from '\\./.*\\.ts'|export \\* from &quot;\\./.*\\.ts&quot;|export \\* from '\\./.*\\.ts'" packages/types/src</code> returned no matches after the patch.</li>
+          <li><code>bun test packages/types/tests</code> passed: 12 tests, 0 failures.</li>
+          <li><code>bun install</code> completed successfully in this worktree so the web build could run.</li>
+          <li><code>bun --cwd=apps/web run build</code> completed successfully on Next 16.2.6.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>This fix is scoped to the current source import strategy. If the package later moves to compiled output exports, the import policy should be revisited deliberately.</li>
+          <li>The original failure was branch-specific, so validation was performed on <code>lavender/codex-login-management-electron</code> rather than <code>main</code>.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>Consider adding a lightweight lint or script check that rejects new explicit sibling <code>.ts</code> imports in <code>packages/types/src</code>.</li>
+          <li>No additional product follow-up is required for <code>islandflow-c8f</code> once this branch is reviewed and merged.</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
