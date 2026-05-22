@@ -351,6 +351,8 @@ Default `smart-money` policy rejects lower-information prints and keeps higher-c
 | `LIVE_LIMIT_OPTIONS` | `1000` | Live cache depth for options channel unless overridden. |
 | `LIVE_LIMIT_ALERTS` | `300` | Live cache depth for alerts channel unless overridden. |
 | `LIVE_LIMIT_NEWS` | `100` | Live cache depth for news channel unless overridden. |
+| `LIVE_REDIS_FLUSH_INTERVAL_MS` | `1000` | Milliseconds between buffered Redis live-cache flushes in the API. |
+| `LIVE_REDIS_FLUSH_MAX_ITEMS` | `500` | Buffered live-cache update count that forces an early Redis flush. |
 | `NEXT_PUBLIC_API_URL` | auto-detected in browser, `http://127.0.0.1:4000` fallback | Explicit base URL for API/WS calls from the web app. |
 | `NEXT_PUBLIC_LIVE_HOT_WINDOW` | `600` | Max hot-window items retained for non-options live streams in UI state. |
 | `NEXT_PUBLIC_LIVE_HOT_WINDOW_OPTIONS` | `1200` | Dedicated max hot-window items retained for options prints. |

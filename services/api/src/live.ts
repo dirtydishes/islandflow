@@ -90,8 +90,8 @@ const DEFAULT_LIVE_LIMITS: GenericLiveLimits = {
 };
 
 const DEFAULT_SCOPED_CACHE_MAX_KEYS = 32;
-const DEFAULT_REDIS_FLUSH_INTERVAL_MS = 250;
-const DEFAULT_REDIS_FLUSH_MAX_ITEMS = 100;
+const DEFAULT_REDIS_FLUSH_INTERVAL_MS = 1000;
+const DEFAULT_REDIS_FLUSH_MAX_ITEMS = 500;
 
 type GenericFeedConfig = {
   redisKey: string;

@@ -155,7 +155,7 @@ services:
   redis:
     image: redis:7.2
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
+    command: ["redis-server", "--appendonly", "no"]
     volumes:
       - ${ISLANDFLOW_DATA_ROOT:-/var/lib/islandflow}/redis:/data
     healthcheck:
