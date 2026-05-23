@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Turn Record: Add Options Anatomy Explainer</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #070a0d;
+        --surface: #10161d;
+        --surface-2: #131b23;
+        --surface-3: #19232d;
+        --ink: #e7edf4;
+        --muted: #96a5b7;
+        --faint: #6f7f92;
+        --line: rgba(255, 255, 255, 0.1);
+        --accent: #f5a623;
+        --accent-soft: rgba(245, 166, 35, 0.14);
+        --good: #25c17a;
+        --good-soft: rgba(37, 193, 122, 0.14);
+        --shadow: 0 28px 70px rgba(0, 0, 0, 0.38);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at top right, rgba(245, 166, 35, 0.08), transparent 26%),
+          linear-gradient(180deg, #0a0d11 0%, var(--bg) 100%);
+        color: var(--ink);
+        font: 16px/1.62 "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+      }
+
+      main {
+        width: min(1120px, calc(100vw - 40px));
+        margin: 28px auto 60px;
+      }
+
+      .hero,
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.015) 100%),
+          var(--surface);
+        box-shadow: var(--shadow);
+      }
+
+      .hero {
+        padding: 30px;
+      }
+
+      .eyebrow,
+      h1,
+      h2,
+      h3,
+      code,
+      pre,
+      .meta-label {
+        font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-size: 0.78rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        line-height: 1.08;
+      }
+
+      h1 {
+        margin-top: 16px;
+        font-size: clamp(2.3rem, 4.8vw, 4.2rem);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      h2 {
+        font-size: 1.28rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      h3 {
+        font-size: 1rem;
+      }
+
+      .lede {
+        max-width: 72ch;
+        margin-top: 16px;
+        color: var(--muted);
+      }
+
+      .meta {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 14px;
+        margin-top: 24px;
+      }
+
+      .meta-card {
+        padding: 16px 18px;
+        border-radius: 16px;
+        border: 1px solid var(--line);
+        background: var(--surface-2);
+      }
+
+      .meta-label {
+        display: block;
+        color: var(--faint);
+        font-size: 0.72rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .meta-value {
+        display: block;
+        margin-top: 8px;
+        font-weight: 650;
+      }
+
+      .grid {
+        display: grid;
+        gap: 18px;
+        margin-top: 20px;
+      }
+
+      .card {
+        padding: 24px;
+      }
+
+      p {
+        margin: 0;
+      }
+
+      p + p,
+      p + ul,
+      ul + p,
+      ul + ul {
+        margin-top: 12px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 8px;
+      }
+
+      .callout {
+        margin-top: 16px;
+        padding: 16px 18px;
+        border-radius: 16px;
+        border: 1px solid rgba(37, 193, 122, 0.2);
+        background: var(--good-soft);
+      }
+
+      .callout strong {
+        color: var(--good);
+      }
+
+      code {
+        padding: 0.08rem 0.35rem;
+        border-radius: 0.42rem;
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      pre {
+        margin: 12px 0 0;
+        padding: 16px;
+        border-radius: 16px;
+        overflow-x: auto;
+        background: #0a0f15;
+        border: 1px solid var(--line);
+        color: var(--ink);
+        font-size: 0.88rem;
+        line-height: 1.5;
+      }
+
+      .two-up {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 18px;
+      }
+
+      .small {
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 12px;
+        margin-top: 16px;
+      }
+
+      .metric {
+        padding: 14px 16px;
+        border-radius: 16px;
+        border: 1px solid var(--line);
+        background: var(--surface-3);
+      }
+
+      .metric strong {
+        display: block;
+        font: 700 1.18rem/1.15 "IBM Plex Sans", "Avenir Next", sans-serif;
+      }
+
+      .metric span {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .diff-grid {
+        display: grid;
+        gap: 18px;
+        margin-top: 18px;
+      }
+
+      .diff-shell {
+        padding: 16px;
+        border-radius: 18px;
+        border: 1px solid var(--line);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.025) 0%, rgba(255, 255, 255, 0.01) 100%);
+      }
+
+      .diff-shell h3 {
+        margin-bottom: 10px;
+      }
+
+      .diff-render {
+        min-height: 120px;
+      }
+
+      details {
+        margin-top: 12px;
+      }
+
+      summary {
+        cursor: pointer;
+        color: var(--accent);
+        font-weight: 600;
+      }
+
+      a {
+        color: var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="hero">
+        <span class="eyebrow">Turn Record · May 22, 2026</span>
+        <h1>Add Options Anatomy Explainer</h1>
+        <p class="lede">
+          Added a standalone <code>docs/anatomy.html</code> reference page that explains the
+          full lifecycle of an options print, from ingest and signal gating through flow packet
+          construction, smart-money scoring, classifier hits, alerts, and API/live consumption.
+          The page is styled to match Islandflow’s product register and layered so exec, mixed
+          technical, and operator-level readers can all use the same artifact.
+        </p>
+        <div class="meta">
+          <div class="meta-card">
+            <span class="meta-label">Beads</span>
+            <span class="meta-value"><code>islandflow-hpf</code></span>
+          </div>
+          <div class="meta-card">
+            <span class="meta-label">Artifact</span>
+            <span class="meta-value"><code>docs/anatomy.html</code></span>
+          </div>
+          <div class="meta-card">
+            <span class="meta-label">Register</span>
+            <span class="meta-value">Product, evidence-console styling</span>
+          </div>
+          <div class="meta-card">
+            <span class="meta-label">Secondary Change</span>
+            <span class="meta-value">Regenerated <code>docs/index.html</code></span>
+          </div>
+        </div>
+      </section>
+
+      <div class="grid">
+        <section class="card">
+          <h2>Summary</h2>
+          <p>
+            The repo now includes a reusable explainer page for one of the most important pieces of
+            Islandflow’s mental model: how a raw or synthetic options print turns into visible tape,
+            a flow packet, and sometimes a smart-money or alert event. Instead of scattering that
+            explanation across chat answers and source code, the new page centralizes the pipeline in
+            a designed HTML document that can be browsed directly under <code>docs/</code>.
+          </p>
+          <div class="callout">
+            <strong>Primary outcome:</strong> the new page makes the option-print pipeline legible at
+            three reading depths without forcing someone to reconstruct the architecture from service
+            code.
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Changes Made</h2>
+          <ul>
+            <li>
+              Added <code>docs/anatomy.html</code> as a standalone explainer page titled
+              <em>The Anatomy of an Options Print and Smart Money</em>.
+            </li>
+            <li>
+              Built a large flow-chart section that distinguishes the common tape path from the
+              signal-to-packet-to-smart-money branch.
+            </li>
+            <li>
+              Layered the page into executive, mixed technical, and operator-level explanations so
+              one artifact works for multiple audiences.
+            </li>
+            <li>
+              Included subject/table mapping, annotated sequence detail, synthetic-mode notes, and
+              code anchors back into the real repo.
+            </li>
+            <li>
+              Regenerated <code>docs/index.html</code> so the new explainer is discoverable from the
+              existing docs index.
+            </li>
+          </ul>
+        </section>
+
+        <section class="card">
+          <h2>Context</h2>
+          <p>
+            The user asked for a true flow-chart explanation of what happens when options tape comes
+            in under normal market scenarios and when smart-money behavior is detected, with the
+            important caveat that the current environment is using synthetic prints. The repo already
+            had the implementation details, but not a clear product artifact that unified ingest,
+            compute, storage, bus subjects, and API/live consumption into one readable document.
+          </p>
+          <p>
+            Because Islandflow’s UI language is already defined as an “evidence console,” the new
+            page needed to feel operational and precise rather than like a generic landing page or a
+            decorative infographic.
+          </p>
+        </section>
+
+        <section class="card">
+          <h2>Important Implementation Details</h2>
+          <div class="two-up">
+            <div>
+              <h3>Information architecture</h3>
+              <ul>
+                <li>
+                  The page starts with a semantic legend and a visual flow board so readers can build
+                  the correct mental model before diving into prose.
+                </li>
+                <li>
+                  The explanation then deepens in three layers: executive read, mixed technical
+                  walkthrough, and operator/code-level detail.
+                </li>
+                <li>
+                  The normal tape path and the smart-money path are split explicitly so readers do not
+                  confuse raw tape visibility with compute-derived inference.
+                </li>
+              </ul>
+            </div>
+            <div>
+              <h3>Design choices</h3>
+              <ul>
+                <li>
+                  The visual treatment follows the repo’s product register: dark, stable, evidence-first,
+                  amber used as a sparse signal, monospace labels for pipeline semantics.
+                </li>
+                <li>
+                  The flow chart is pure HTML and CSS, not a JavaScript diagram dependency, so the
+                  page remains portable and straightforward to keep in sync with the repo.
+                </li>
+                <li>
+                  <code>docs/index.html</code> was regenerated with the existing script so the page
+                  participates in the current docs navigation surface instead of becoming a hidden one-off.
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Relevant Diff Snippets</h2>
+          <p class="small">
+            These snippets are rendered with the Diffs library from
+            <a href="https://diffs.com/docs">diffs.com</a>, with a plain-text fallback kept inline.
+          </p>
+          <div class="diff-grid">
+            <article class="diff-shell">
+              <h3><code>docs/anatomy.html</code>: new explainer page and flow-board structure</h3>
+              <div class="diff-render" id="diff-anatomy"></div>
+              <details>
+                <summary>Plain-text fallback</summary>
+                <pre>+ Added docs/anatomy.html
++ Product-register dark evidence-console styling
++ Main flow chart with common path, tape-only branch, and smart-money branch
++ Layered explanation sections for executive, mixed technical, and operator audiences
++ Subject map, annotated sequence, synthetic mode notes, and code anchors</pre>
+              </details>
+            </article>
+
+            <article class="diff-shell">
+              <h3><code>docs/index.html</code>: regenerated docs surface with new entry count</h3>
+              <div class="diff-render" id="diff-index"></div>
+              <details>
+                <summary>Plain-text fallback</summary>
+                <pre>- 35 files shown
++ 47 files shown
+- root/general counts from prior docs set
++ updated counts after regenerating the index, including the new anatomy explainer entry</pre>
+              </details>
+            </article>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Expected Impact for End-Users</h2>
+          <ul>
+            <li>
+              Teammates and operators now have a single place to understand why a print can appear on
+              tape without ever becoming a smart-money event.
+            </li>
+            <li>
+              The synthetic-print caveat is captured directly in the artifact, which should reduce
+              confusion when debugging or demoing the current environment.
+            </li>
+            <li>
+              The docs surface becomes more useful as a living product reference, not just a collection
+              of turn records and plans.
+            </li>
+          </ul>
+        </section>
+
+        <section class="card">
+          <h2>Validation</h2>
+          <ul>
+            <li>
+              Generated the new page at <code>docs/anatomy.html</code> and verified the title and
+              major sections are present.
+            </li>
+            <li>
+              Regenerated the docs index with
+              <code>node scripts/generate-docs-index.mjs</code>, which completed successfully and
+              reported <code>47 entries</code>.
+            </li>
+            <li>
+              Confirmed the new explainer page is included in the docs surface by regenerating
+              <code>docs/index.html</code>.
+            </li>
+          </ul>
+          <div class="metrics">
+            <div class="metric">
+              <strong>1</strong>
+              <span>new reusable explainer page</span>
+            </div>
+            <div class="metric">
+              <strong>47</strong>
+              <span>docs index entries after regeneration</span>
+            </div>
+            <div class="metric">
+              <strong>3</strong>
+              <span>reader depth layers on the page</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Issues, Limitations, and Mitigations</h2>
+          <ul>
+            <li>
+              The page is intentionally hand-authored HTML rather than a generated diagram artifact.
+              That keeps it portable, but it also means future pipeline changes should update this page
+              manually.
+            </li>
+            <li>
+              The docs index regeneration reflects the full current <code>docs/</code> tree, so the
+              visible counts changed by more than one file compared with the previously committed
+              index.
+            </li>
+            <li>
+              This validation pass verified structure and generation success, but did not include a
+              browser-rendered visual QA step against multiple viewport sizes.
+            </li>
+          </ul>
+        </section>
+
+        <section class="card">
+          <h2>Follow-up Work</h2>
+          <ul>
+            <li>
+              Add reciprocal links from more domain-specific docs such as <code>smartmoney.md</code>
+              back to <code>docs/anatomy.html</code>.
+            </li>
+            <li>
+              Consider a second reference page focused specifically on one concrete synthetic example,
+              from a burst of prints to the final alert payload.
+            </li>
+            <li>
+              If the flow-packet feature set evolves, keep the anatomy page in lockstep with those
+              changes so it remains a trustworthy operator reference.
+            </li>
+          </ul>
+        </section>
+      </div>
+
+      <script type="module">
+        const snippets = {
+          anatomy: `diff --git a/docs/anatomy.html b/docs/anatomy.html
+new file mode 100644
+--- /dev/null
++++ b/docs/anatomy.html
+@@
++<title>The Anatomy of an Options Print and Smart Money</title>
++<section class="hero">...</section>
++<section id="flow-chart">main flow board with common path and branch rows</section>
++<section id="executive">executive read</section>
++<section id="technical">mixed technical walkthrough</section>
++<section id="operator">operator and code-level detail</section>
++<section>subject map, annotated event sequence, synthetic mode notes, code anchors</section>`,
+          index: `diff --git a/docs/index.html b/docs/index.html
+--- a/docs/index.html
++++ b/docs/index.html
+@@
+-<div class="stats"><strong id="visible-count">35</strong> of <strong>35</strong> files shown</div>
++<div class="stats"><strong id="visible-count">47</strong> of <strong>47</strong> files shown</div>
+@@
+-<a class="chip" href="#category-general">general <span>2</span></a>
++<a class="chip" href="#category-general">general <span>4</span></a>
+@@
++<a class="doc-link" href="./anatomy.html">anatomy.html</a>`
+        };
+
+        const fallbackRender = (id, text) => {
+          const target = document.getElementById(id);
+          if (!target) {
+            return;
+          }
+          const pre = document.createElement("pre");
+          pre.textContent = text;
+          target.replaceChildren(pre);
+        };
+
+        try {
+          const { FileDiff } = await import("https://esm.sh/@pierre/diffs");
+          const targets = [
+            ["diff-anatomy", snippets.anatomy],
+            ["diff-index", snippets.index]
+          ];
+
+          for (const [id, text] of targets) {
+            const mount = document.getElementById(id);
+            if (!mount) {
+              continue;
+            }
+            const diff = new FileDiff(text, { language: "diff" });
+            mount.appendChild(diff.element);
+          }
+        } catch (error) {
+          console.warn("Failed to load diffs.com renderer", error);
+          fallbackRender("diff-anatomy", snippets.anatomy);
+          fallbackRender("diff-index", snippets.index);
+        }
+      </script>
+    </main>
+  </body>
+</html>

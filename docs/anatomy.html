@@ -1,0 +1,954 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>The Anatomy of an Options Print and Smart Money</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg-core: oklch(0.14 0.015 240);
+        --bg-shell: oklch(0.17 0.018 240);
+        --bg-pane: oklch(0.2 0.02 240);
+        --bg-pane-2: oklch(0.23 0.02 240);
+        --bg-soft: oklch(0.28 0.022 240 / 0.48);
+        --line: oklch(0.48 0.03 240 / 0.34);
+        --line-strong: oklch(0.67 0.06 75 / 0.48);
+        --text: oklch(0.93 0.01 240);
+        --text-dim: oklch(0.74 0.02 240);
+        --text-faint: oklch(0.62 0.016 240);
+        --amber: oklch(0.79 0.16 76);
+        --amber-soft: oklch(0.33 0.07 76 / 0.32);
+        --green: oklch(0.74 0.15 154);
+        --green-soft: oklch(0.31 0.06 154 / 0.3);
+        --blue: oklch(0.72 0.12 244);
+        --blue-soft: oklch(0.31 0.05 244 / 0.28);
+        --red: oklch(0.69 0.17 28);
+        --red-soft: oklch(0.31 0.06 28 / 0.32);
+        --shadow: 0 30px 80px rgba(0, 0, 0, 0.38);
+        --radius-xl: 20px;
+        --radius-lg: 16px;
+        --radius-md: 12px;
+        --radius-sm: 10px;
+        --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        --sans: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+        --display: "Quantico", "IBM Plex Sans", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        font-family: var(--sans);
+        color: var(--text);
+        background:
+          radial-gradient(circle at 0% 0%, rgba(245, 166, 35, 0.09), transparent 24%),
+          radial-gradient(circle at 100% 0%, rgba(77, 163, 255, 0.12), transparent 26%),
+          linear-gradient(180deg, var(--bg-shell) 0%, var(--bg-core) 100%);
+      }
+
+      a {
+        color: var(--amber);
+      }
+
+      code,
+      pre,
+      .eyebrow,
+      .chip,
+      .mini-label,
+      th,
+      .lane-label {
+        font-family: var(--mono);
+      }
+
+      main {
+        width: min(1440px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 28px 0 64px;
+      }
+
+      .hero {
+        display: grid;
+        gap: 22px;
+        padding: 28px;
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0.015) 100%),
+          linear-gradient(135deg, rgba(17, 24, 32, 0.96) 0%, rgba(8, 11, 16, 0.98) 100%);
+        box-shadow: var(--shadow);
+      }
+
+      .hero-top {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--text-dim);
+        font-size: 0.72rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        line-height: 1.08;
+      }
+
+      h1 {
+        font-family: var(--display);
+        font-size: clamp(2.35rem, 5vw, 4.8rem);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      h2 {
+        font-family: var(--display);
+        font-size: 1.5rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      h3 {
+        font-size: 1.04rem;
+        font-weight: 650;
+      }
+
+      .hero-copy {
+        display: grid;
+        grid-template-columns: minmax(0, 1.7fr) minmax(280px, 0.85fr);
+        gap: 26px;
+        align-items: start;
+      }
+
+      .lede {
+        margin: 0;
+        max-width: 68ch;
+        color: var(--text-dim);
+        font-size: 1rem;
+        line-height: 1.62;
+      }
+
+      .hero-note {
+        padding: 18px;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .hero-note p {
+        margin: 0;
+        color: var(--text-dim);
+        line-height: 1.55;
+      }
+
+      .hero-note p + p {
+        margin-top: 12px;
+      }
+
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 12px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        text-decoration: none;
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.03);
+        font-size: 0.75rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .chip:hover {
+        border-color: var(--line-strong);
+      }
+
+      .chip .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        flex: 0 0 auto;
+      }
+
+      .chip.raw .dot {
+        background: var(--blue);
+      }
+
+      .chip.derived .dot {
+        background: var(--amber);
+      }
+
+      .chip.store .dot {
+        background: var(--green);
+      }
+
+      .chip.live .dot {
+        background: var(--red);
+      }
+
+      .stack {
+        display: grid;
+        gap: 22px;
+        margin-top: 22px;
+      }
+
+      .section {
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        padding: 24px;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0.016) 100%),
+          var(--bg-pane);
+        box-shadow: var(--shadow);
+      }
+
+      .section-head {
+        display: grid;
+        gap: 8px;
+        margin-bottom: 18px;
+      }
+
+      .section-head p,
+      .copy p,
+      .copy li,
+      .table-wrap td,
+      .table-wrap th {
+        color: var(--text-dim);
+        line-height: 1.58;
+      }
+
+      .section-head p,
+      .copy p {
+        margin: 0;
+        max-width: 74ch;
+      }
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .summary-card {
+        padding: 18px;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--line);
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.025) 0%, rgba(255, 255, 255, 0.01) 100%);
+      }
+
+      .summary-card p {
+        margin: 10px 0 0;
+      }
+
+      .mini-label {
+        display: inline-block;
+        margin-bottom: 8px;
+        color: var(--text-faint);
+        font-size: 0.72rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .flow-scroll {
+        overflow-x: auto;
+        padding-bottom: 6px;
+      }
+
+      .flow-board {
+        min-width: 1320px;
+        display: grid;
+        gap: 18px;
+      }
+
+      .lanes {
+        display: grid;
+        grid-template-columns: 160px repeat(6, minmax(180px, 1fr));
+        gap: 14px;
+        align-items: stretch;
+      }
+
+      .lane-label {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.025);
+        color: var(--text-faint);
+        font-size: 0.74rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        text-align: center;
+      }
+
+      .node {
+        position: relative;
+        min-height: 138px;
+        padding: 16px;
+        border-radius: 18px;
+        border: 1px solid var(--line);
+        background: var(--bg-pane-2);
+        display: grid;
+        gap: 10px;
+      }
+
+      .node strong {
+        font-size: 1.02rem;
+        line-height: 1.25;
+      }
+
+      .node p {
+        margin: 0;
+        color: var(--text-dim);
+        font-size: 0.92rem;
+        line-height: 1.48;
+      }
+
+      .node ul {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--text-dim);
+      }
+
+      .node li + li {
+        margin-top: 6px;
+      }
+
+      .node.raw {
+        box-shadow: inset 0 0 0 1px rgba(77, 163, 255, 0.18);
+      }
+
+      .node.derived {
+        box-shadow: inset 0 0 0 1px rgba(245, 166, 35, 0.24);
+      }
+
+      .node.store {
+        box-shadow: inset 0 0 0 1px rgba(37, 193, 122, 0.24);
+      }
+
+      .node.live {
+        box-shadow: inset 0 0 0 1px rgba(255, 107, 95, 0.24);
+      }
+
+      .node-arrow::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        right: -12px;
+        width: 24px;
+        height: 2px;
+        background: linear-gradient(90deg, var(--line-strong) 0%, var(--amber) 100%);
+      }
+
+      .node-arrow::before {
+        content: "";
+        position: absolute;
+        top: calc(50% - 5px);
+        right: -12px;
+        border-top: 6px solid transparent;
+        border-bottom: 6px solid transparent;
+        border-left: 8px solid var(--amber);
+      }
+
+      .branch-grid {
+        display: grid;
+        grid-template-columns: 160px repeat(6, minmax(180px, 1fr));
+        gap: 14px;
+        align-items: stretch;
+      }
+
+      .branch-empty {
+        border-radius: var(--radius-lg);
+        border: 1px dashed transparent;
+        min-height: 112px;
+      }
+
+      .branch-box {
+        min-height: 112px;
+      }
+
+      .branch-box p {
+        margin: 0;
+      }
+
+      .copy {
+        display: grid;
+        gap: 16px;
+      }
+
+      .copy ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+
+      .copy li + li {
+        margin-top: 8px;
+      }
+
+      .detail-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+        gap: 18px;
+      }
+
+      .callout {
+        padding: 18px;
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.025);
+      }
+
+      .callout p {
+        margin: 0;
+      }
+
+      .callout p + p {
+        margin-top: 10px;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 720px;
+      }
+
+      th,
+      td {
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.035);
+        font-size: 0.76rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      pre {
+        margin: 0;
+        padding: 18px;
+        border-radius: var(--radius-lg);
+        background: oklch(0.13 0.012 240);
+        border: 1px solid var(--line);
+        color: var(--text);
+        overflow-x: auto;
+        line-height: 1.5;
+        font-size: 0.88rem;
+      }
+
+      .footer-note {
+        color: var(--text-faint);
+        font-size: 0.88rem;
+      }
+
+      @media (max-width: 1080px) {
+        .hero-copy,
+        .detail-grid,
+        .summary-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 720px) {
+        main {
+          width: min(100vw, calc(100vw - 20px));
+          padding-top: 12px;
+        }
+
+        .hero,
+        .section {
+          padding: 18px;
+          border-radius: 18px;
+        }
+
+        h1 {
+          font-size: clamp(1.9rem, 8vw, 2.8rem);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="hero">
+        <div class="hero-top">
+          <span class="eyebrow">Islandflow Reference · Options Flow Pipeline</span>
+          <nav class="toolbar" aria-label="Page navigation">
+            <a class="chip raw" href="#flow-chart"><span class="dot"></span>Flow Chart</a>
+            <a class="chip derived" href="#executive"><span class="dot"></span>Executive</a>
+            <a class="chip store" href="#technical"><span class="dot"></span>Technical</a>
+            <a class="chip live" href="#operator"><span class="dot"></span>Operator Detail</a>
+          </nav>
+        </div>
+
+        <div class="hero-copy">
+          <div>
+            <h1>The Anatomy of an Options Print and Smart Money</h1>
+            <p class="lede">
+              This page explains how a single options print moves through Islandflow under normal market conditions,
+              how the signal gate decides whether compute should care, how a parent flow packet is assembled, and how
+              smart-money, classifier-hit, and alert events emerge from that packet. It is designed as one artifact
+              with three reading depths: executive, mixed technical, and operator-level.
+            </p>
+          </div>
+          <aside class="hero-note">
+            <p>
+              The key distinction is structural: the options tape is print-level, flow is packet-level, and smart
+              money is model output on those packets.
+            </p>
+            <p>
+              Synthetic mode changes the source of prints and NBBO context, not the downstream architecture.
+            </p>
+          </aside>
+        </div>
+      </section>
+
+      <div class="stack">
+        <section class="section">
+          <div class="section-head">
+            <h2>Legend</h2>
+            <p>Color coding is semantic, not decorative, so you can scan the diagram without relearning the vocabulary.</p>
+          </div>
+          <div class="toolbar" aria-label="Legend">
+            <span class="chip raw"><span class="dot"></span>Raw market or synthetic input</span>
+            <span class="chip derived"><span class="dot"></span>Derived compute stage</span>
+            <span class="chip store"><span class="dot"></span>Stored or persisted state</span>
+            <span class="chip live"><span class="dot"></span>API, websocket, or user-facing surface</span>
+          </div>
+        </section>
+
+        <section class="section" id="flow-chart">
+          <div class="section-head">
+            <h2>Main Flow Chart</h2>
+            <p>
+              The first row shows the common path every print touches. The second row shows the branch between prints
+              that remain tape-only and prints that become packet candidates for smart-money evaluation.
+            </p>
+          </div>
+
+          <div class="flow-scroll">
+            <div class="flow-board">
+              <div class="lanes">
+                <div class="lane-label">Input</div>
+                <article class="node raw node-arrow">
+                  <span class="mini-label">Stage 1</span>
+                  <strong>Option print candidate arrives</strong>
+                  <p>
+                    The source can be a native market adapter or the synthetic adapter. Synthetic mode can also emit a
+                    matching NBBO update.
+                  </p>
+                </article>
+                <article class="node raw node-arrow">
+                  <span class="mini-label">Stage 2</span>
+                  <strong>ingest-options enriches the print</strong>
+                  <p>
+                    The service joins recent option NBBO and underlying equity quote context, derives metadata, and
+                    computes <code>signal_pass</code>.
+                  </p>
+                </article>
+                <article class="node store node-arrow">
+                  <span class="mini-label">Stage 3</span>
+                  <strong>Raw print is written and published</strong>
+                  <ul>
+                    <li>ClickHouse: <code>option_prints</code></li>
+                    <li>NATS: <code>options.prints</code></li>
+                  </ul>
+                </article>
+                <article class="node derived node-arrow">
+                  <span class="mini-label">Stage 4</span>
+                  <strong>Signal gate decides if compute should care</strong>
+                  <p>
+                    Only <code>signal_pass=true</code> prints are published to <code>options.prints.signal</code> and
+                    consumed by compute.
+                  </p>
+                </article>
+                <article class="node derived node-arrow">
+                  <span class="mini-label">Stage 5</span>
+                  <strong>compute builds or updates a parent cluster</strong>
+                  <p>
+                    Nearby signal prints for the same contract are grouped inside the cluster window while NBBO and
+                    equity-quote caches supply context.
+                  </p>
+                </article>
+                <article class="node live">
+                  <span class="mini-label">Stage 6</span>
+                  <strong>API and UI consume the resulting streams</strong>
+                  <p>
+                    The API hydrates hot snapshots, history endpoints read ClickHouse, and the terminal surfaces tape,
+                    flow, smart-money, classifier, and alert views.
+                  </p>
+                </article>
+              </div>
+
+              <div class="branch-grid">
+                <div class="lane-label">Tape-only branch</div>
+                <div class="branch-empty"></div>
+                <div class="branch-empty"></div>
+                <article class="node store branch-box">
+                  <span class="mini-label">Branch A</span>
+                  <strong>Raw print remains visible</strong>
+                  <p>
+                    Even if the print does not pass the signal gate, it still exists in ClickHouse and can appear in
+                    raw tape or history views.
+                  </p>
+                </article>
+                <article class="node derived branch-box">
+                  <span class="mini-label">Branch A outcome</span>
+                  <strong>No compute packet path</strong>
+                  <p>
+                    No <code>FlowPacket</code>, no smart-money evaluation, no classifier hits, and no alert emission.
+                  </p>
+                </article>
+                <div class="branch-empty"></div>
+                <div class="branch-empty"></div>
+              </div>
+
+              <div class="branch-grid">
+                <div class="lane-label">Smart-money branch</div>
+                <div class="branch-empty"></div>
+                <div class="branch-empty"></div>
+                <div class="branch-empty"></div>
+                <article class="node derived branch-box">
+                  <span class="mini-label">Branch B</span>
+                  <strong>Signal print enters compute</strong>
+                  <p>
+                    compute subscribes to <code>options.prints.signal</code>, not raw <code>options.prints</code>.
+                  </p>
+                </article>
+                <article class="node derived branch-box">
+                  <span class="mini-label">Branch B outcome</span>
+                  <strong>FlowPacket is emitted</strong>
+                  <ul>
+                    <li>ClickHouse: <code>flow_packets</code></li>
+                    <li>NATS: <code>flow.packets</code></li>
+                  </ul>
+                </article>
+                <article class="node live branch-box">
+                  <span class="mini-label">Branch B continuation</span>
+                  <strong>Smart-money, classifier hits, alerts</strong>
+                  <p>
+                    The packet is scored into a <code>SmartMoneyEvent</code>, which may abstain, produce classifier
+                    hits, and finally emit an alert.
+                  </p>
+                </article>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" id="executive">
+          <div class="section-head">
+            <h2>Executive Read</h2>
+            <p>
+              The shortest truthful version of the system: not every options print is considered meaningful, and smart
+              money is not detected directly from a single print.
+            </p>
+          </div>
+          <div class="summary-grid">
+            <article class="summary-card">
+              <span class="mini-label">1. Tape</span>
+              <h3>Every print is stored</h3>
+              <p>
+                All enriched prints are written to ClickHouse and published to the raw options subject. This preserves
+                evidence even when the print is uninteresting for higher-order inference.
+              </p>
+            </article>
+            <article class="summary-card">
+              <span class="mini-label">2. Compute</span>
+              <h3>Only signal prints reach the parent-event engine</h3>
+              <p>
+                A print must pass the signal gate before compute clusters it with neighboring prints and builds a
+                packet that represents a possible parent order.
+              </p>
+            </article>
+            <article class="summary-card">
+              <span class="mini-label">3. Smart money</span>
+              <h3>Smart money is a scored interpretation</h3>
+              <p>
+                The model evaluates the packet using quote quality, aggressor mix, size, structure, DTE, IV, and event
+                context. It can still abstain if the evidence is weak or suppressed.
+              </p>
+            </article>
+          </div>
+        </section>
+
+        <section class="section" id="technical">
+          <div class="section-head">
+            <h2>Mixed Technical Walkthrough</h2>
+            <p>
+              This layer is for teammates who know the product and want the exact branching logic without reading
+              through service code first.
+            </p>
+          </div>
+          <div class="detail-grid">
+            <div class="copy">
+              <p>
+                <strong>Step 1:</strong> a candidate print enters <code>ingest-options</code>. In synthetic mode this
+                print was manufactured by the synthetic adapter, which may also emit a synthetic NBBO update for the
+                same contract.
+              </p>
+              <p>
+                <strong>Step 2:</strong> the print is enriched with the most recent option NBBO and underlying equity
+                quote at or before the print timestamp. The service derives metadata, execution-side context, and the
+                <code>signal_pass</code> decision.
+              </p>
+              <p>
+                <strong>Step 3:</strong> the enriched print is persisted to ClickHouse and published to
+                <code>options.prints</code>. If <code>signal_pass=true</code>, the same print is also published to
+                <code>options.prints.signal</code>.
+              </p>
+              <p>
+                <strong>Step 4:</strong> compute subscribes to the signal subject plus NBBO and equity-quote subjects.
+                It does not build packet candidates from every raw print. It only clusters signal prints.
+              </p>
+              <p>
+                <strong>Step 5:</strong> compute aggregates nearby signal prints for the same option contract into a
+                cluster, then flushes that cluster into a <code>FlowPacket</code> with features such as total premium,
+                print count, aggressor ratios, NBBO coverage, stale-quote counts, IV context, and structure clues.
+              </p>
+              <p>
+                <strong>Step 6:</strong> the packet is transformed into a <code>SmartMoneyEvent</code>. If suppression
+                rules trip or the top profile probability is too weak, the event abstains. Otherwise, it can emit
+                classifier hits and finally an alert with evidence references back to the packet and member prints.
+              </p>
+            </div>
+            <aside class="callout">
+              <span class="mini-label">Important distinction</span>
+              <p>
+                A <code>FlowPacket</code> is already a derived parent-event candidate. It is not just another name for
+                the options tape.
+              </p>
+              <p>
+                A <code>SmartMoneyEvent</code> is model output on that packet, not a raw tape fact. The system treats
+                it as evidence-backed interpretation with explicit abstention and suppression paths.
+              </p>
+            </aside>
+          </div>
+        </section>
+
+        <section class="section" id="operator">
+          <div class="section-head">
+            <h2>Operator and Code-Level Detail</h2>
+            <p>
+              This section is for someone tracing the live pipeline, debugging a regression, or trying to understand
+              exactly why a given print surfaced on tape but did or did not become a smart-money event.
+            </p>
+          </div>
+          <div class="copy">
+            <p>
+              The first fork is the signal gate in <code>ingest-options</code>. The enriched print is always stored and
+              published raw. The only thing <code>signal_pass</code> controls is whether compute receives that print on
+              <code>options.prints.signal</code>.
+            </p>
+            <p>
+              The compute service maintains separate caches for option NBBO and underlying equity quotes. When signal
+              prints arrive, it flushes aged clusters, extends the active cluster for that contract if the print lands
+              within the configured window, or emits the old cluster and starts a new one.
+            </p>
+            <p>
+              The cluster becomes a <code>FlowPacket</code> only after compute summarizes parent-level features. That
+              packet then passes through smart-money scoring. The scoring layer derives a profile set such as
+              institutional directional, retail whale, event driven, vol seller, arbitrage, or hedge reactive.
+            </p>
+            <p>
+              A packet can still fail to produce actionable downstream artifacts. Suppression rules down-rank special
+              print context, stale or missing quote context, and cross-like execution patterns. The top profile must
+              also clear the probability threshold. If it does not, the smart-money event is emitted in abstained form
+              and classifier hits stop there.
+            </p>
+            <p>
+              If the packet does clear those checks, compute writes and publishes the smart-money event, derives up to
+              a few classifier hits from the top profile set, scores a final alert, and publishes all three derived
+              streams. The API subscribes to those subjects and fans them out into live websocket channels while
+              ClickHouse remains the history source behind <code>/history/*</code>.
+            </p>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Subject or table</th>
+                  <th>Produced by</th>
+                  <th>Carries</th>
+                  <th>Why it exists</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>options.prints</code></td>
+                  <td><code>ingest-options</code></td>
+                  <td>All enriched option prints</td>
+                  <td>Preserves the full tape, even when a print is not interesting enough for compute.</td>
+                </tr>
+                <tr>
+                  <td><code>options.prints.signal</code></td>
+                  <td><code>ingest-options</code></td>
+                  <td>Signal-passing option prints</td>
+                  <td>Acts as the compute admission gate so packet building starts from a filtered tape.</td>
+                </tr>
+                <tr>
+                  <td><code>flow.packets</code></td>
+                  <td><code>compute</code></td>
+                  <td>Parent-event candidates</td>
+                  <td>Turns several child prints into one summarized event with market-structure features.</td>
+                </tr>
+                <tr>
+                  <td><code>flow.smart_money</code></td>
+                  <td><code>compute</code></td>
+                  <td>Smart-money evaluations</td>
+                  <td>Publishes the scored interpretation of a packet, including abstained outcomes.</td>
+                </tr>
+                <tr>
+                  <td><code>flow.classifier_hits</code></td>
+                  <td><code>compute</code></td>
+                  <td>Top classifier consequences</td>
+                  <td>Exposes the strongest profile-level labels that downstream UX and alerting can decorate.</td>
+                </tr>
+                <tr>
+                  <td><code>flow.alerts</code></td>
+                  <td><code>compute</code></td>
+                  <td>Alert events with evidence refs</td>
+                  <td>Packages the final severity and supporting evidence into a user-facing alert stream.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-head">
+            <h2>Normal Path Versus Smart-Money Path</h2>
+            <p>
+              These two sequences are easy to confuse, especially because both begin with the same enriched tape
+              record.
+            </p>
+          </div>
+          <div class="detail-grid">
+            <div class="callout">
+              <span class="mini-label">Normal market path</span>
+              <p>
+                Print arrives, gets enriched, gets stored, appears on the raw tape, and stops there unless it passes
+                the signal gate. This is the dominant path for ordinary or low-signal activity.
+              </p>
+            </div>
+            <div class="callout">
+              <span class="mini-label">Smart-money path</span>
+              <p>
+                Print arrives, passes the signal gate, joins a cluster, becomes a packet, receives a smart-money score,
+                then may emit classifier hits and an alert if the packet is not suppressed or abstained.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-head">
+            <h2>Annotated Event Sequence</h2>
+            <p>
+              The example below is the shortest operator-friendly way to think about the branch that leads to a
+              smart-money result.
+            </p>
+          </div>
+          <pre><code>1. Synthetic or market adapter emits OptionPrint candidate
+2. ingest-options enriches it with latest NBBO and underlying quote context
+3. Enriched print is written to ClickHouse option_prints
+4. Enriched print is published to options.prints
+5. If signal_pass=true, the same print is also published to options.prints.signal
+6. compute consumes options.prints.signal and updates the active contract cluster
+7. Cluster flush builds a FlowPacket with parent-level features
+8. FlowPacket is written to ClickHouse flow_packets and published to flow.packets
+9. compute scores the packet into a SmartMoneyEvent
+10. If suppressed or low-confidence, the SmartMoneyEvent abstains and stops there
+11. Otherwise classifier hits are emitted
+12. Alert scoring emits a final alert with evidence refs to smart-money event, flow packet, and member prints
+13. API subscribes to these streams and exposes them through live websocket channels and ClickHouse-backed history</code></pre>
+        </section>
+
+        <section class="section">
+          <div class="section-head">
+            <h2>What Synthetic Mode Changes</h2>
+            <p>
+              Synthetic mode can make the upstream generator artificial, but the downstream branch logic stays
+              identical.
+            </p>
+          </div>
+          <div class="copy">
+            <p>
+              The synthetic adapter constructs an <code>OptionPrint</code> with fields such as
+              <code>execution_iv_source="synthetic_pressure_model"</code>, and it may emit a synthetic NBBO for the
+              same contract. From that point forward, the pipeline is the same one used for normal ingest.
+            </p>
+            <p>
+              That means synthetic smart-money is not a special smart-money subsystem. It is the standard
+              signal-to-packet-to-smart-money pipeline running on synthetic upstream events.
+            </p>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-head">
+            <h2>Code Anchors</h2>
+            <p>
+              If you want to confirm this page against the code, these are the most useful entry points.
+            </p>
+          </div>
+          <div class="copy">
+            <ul>
+              <li><code>services/ingest-options/src/enrichment.ts</code>: enriches the print and decides <code>signal_pass</code>.</li>
+              <li><code>services/ingest-options/src/index.ts</code>: writes prints and publishes raw versus signal subjects.</li>
+              <li><code>services/compute/src/index.ts</code>: subscribes to signal prints, maintains clusters, emits packets, smart money, hits, and alerts.</li>
+              <li><code>services/compute/src/parent-events.ts</code>: builds <code>SmartMoneyEvent</code>, suppression rules, primary profile, abstention, and classifier derivation.</li>
+              <li><code>packages/bus/src/subjects.ts</code>: canonical subject names for the pipeline.</li>
+            </ul>
+          </div>
+          <p class="footer-note">
+            This document is intended as a living product reference, not a turn artifact. If the packet features,
+            thresholds, or stream names change, update this page alongside the relevant pipeline code.
+          </p>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>
