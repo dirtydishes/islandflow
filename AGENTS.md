@@ -90,6 +90,8 @@ At the end of every completed implementation task, before final handoff, create 
 
 This documentation is mandatory whenever code, configuration, tests, or project files were changed.
 
+For diff content in turn documentation (including "Code diffs" and "Relevant Diff Snippets"), use `@pierre/diffs` output by default. If `@pierre/diffs` is unavailable because of a real tool or blocking error, use a clearly labeled plain diff/code block fallback and note why.
+
 ### Do not produce this for minor or trivial changes, including but not limited to:
 
 - Syntax fixes
@@ -105,7 +107,7 @@ This documentation is mandatory whenever code, configuration, tests, or project 
 **"New Changes as of {time and date at which the change was made}"**
 - **Summary of changes**
 - **Why this change was made**
-- **Code diffs**
+- **Code diffs** (use `@pierre/diffs` output by default; if unavailable, include a clearly labeled plain diff/code block and note why)
 - **Related issues or PRs**
 
 Additionally, add a note to each section explaining why the changes were made.
@@ -154,7 +156,7 @@ Each turn document must include these sections:
 2. **Changes Made**
 3. **Context**
 4. **Important Implementation Details**
-5. **Relevant Diff Snippets**
+5. **Relevant Diff Snippets** (render with `@pierre/diffs` output by default; if unavailable, include a clearly labeled plain diff/code block and note why)
 6. **Expected Impact for End-Users**
 7. **Validation**
 8. **Issues, Limitations, and Mitigations**

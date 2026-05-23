@@ -31,5 +31,8 @@
     "postcss": "^8.5.15",
     "tar": "^7.5.15",
     "tmp": "^0.2.5"
+  },
+  "dependencies": {
+    "@pierre/diffs": "^1.2.2"
   }
 }
