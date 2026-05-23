@@ -90,6 +90,26 @@ At the end of every completed implementation task, before final handoff, create 
 
 This documentation is mandatory whenever code, configuration, tests, or project files were changed.
 
+### Do not produce this for minor or trivial changes, including but not limited to:
+
+- Syntax fixes
+- Code refactoring
+- Documentation updates
+- Reconciling PRs
+- Updating AGENTS.md or other documentation
+
+**Feel free to use your own judgement and always prompt the user if you are unsure if this change requires documentation or not.**
+
+### When making a minor update to a previous change, update the existing documentation instead of creating a new file. Use the following format:
+
+**"New Changes as of {time and date at which the change was made}"**
+- **Summary of changes**
+- **Why this change was made**
+- **Code diffs**
+- **Related issues or PRs**
+
+Additionally, add a note to each section explaining why the changes were made.
+
 ### Location
 
 Save the document in:
