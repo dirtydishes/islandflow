@@ -27,6 +27,7 @@ const makeClickHouse = (
 const makeRedis = () => {
   const lists = new Map<string, string[]>();
   const hashes = new Map<string, Map<string, string>>();
+  let clearTrimCount = 0;
 
   return {
     isOpen: true,
@@ -41,6 +42,9 @@ const makeRedis = () => {
     },
     async lTrim(key: string, start: number, stop: number) {
       const next = lists.get(key) ?? [];
+      if (start > stop) {
+        clearTrimCount += 1;
+      }
       lists.set(key, start > stop ? [] : next.slice(start, stop + 1));
       return "OK";
     },
@@ -52,6 +56,9 @@ const makeRedis = () => {
       hash.set(field, value);
       hashes.set(key, hash);
       return 1;
+    },
+    getClearTrimCount() {
+      return clearTrimCount;
     }
   };
 };
@@ -64,8 +71,8 @@ describe("LiveStateManager", () => {
       LIVE_LIMIT_FLOW: "bad"
     } as NodeJS.ProcessEnv);
 
-    expect(limits.options).toBe(777);
-    expect(limits.nbbo).toBe(100000);
+    expect(limits.options).toBe(100);
+    expect(limits.nbbo).toBe(1000);
     expect(limits.flow).toBe(500);
     expect(limits["equity-quotes"]).toBe(500);
     expect(limits.alerts).toBe(300);
@@ -209,11 +216,13 @@ describe("LiveStateManager", () => {
     const flushed = await redis.lRange("live:flow", 0, 99);
     expect(persisted).toHaveLength(0);
     expect(flushed).toHaveLength(2);
+    expect(redis.getClearTrimCount()).toBe(0);
 
     const stats = manager.getStatsSnapshot();
     expect(stats.trimOperations).toBeGreaterThan(0);
     expect(stats.redisFlushCount).toBeGreaterThan(0);
     expect(stats.cacheDepthByKey["live:flow"]).toBe(2);
+    expect(stats.redisFlushPayloadBytes).toBeGreaterThan(0);
   });
 
   it("reorders out-of-order live events without dropping newest-first semantics", async () => {
@@ -1072,6 +1081,33 @@ describe("LiveStateManager", () => {
     const stats = manager.getStatsSnapshot();
     expect(stats.genericCacheSnapshots).toBe(1);
     expect(stats.scopedClickHouseSnapshots).toBe(1);
+  });
+
+  it("clamps oversized snapshot requests to the server-side channel cap", async () => {
+    const manager = new LiveStateManager(makeClickHouse(), null);
+    const now = Date.now();
+
+    for (let idx = 0; idx < 120; idx += 1) {
+      await manager.ingest("options", {
+        source_ts: now + idx,
+        ingest_ts: now + idx + 1,
+        seq: idx + 1,
+        trace_id: `opt-${idx + 1}`,
+        ts: now + idx,
+        option_contract_id: `SPY-2025-01-17-${500 + idx}-C`,
+        price: 1,
+        size: 10,
+        exchange: "X"
+      });
+    }
+
+    const snapshot = await manager.getSnapshot({
+      channel: "options",
+      snapshot_limit: 10_000
+    });
+
+    expect(snapshot.items).toHaveLength(100);
+    expect(manager.getStatsSnapshot().snapshotItemsByChannel.options).toBe(100);
   });
 
   it("keeps backend channel health healthy when a scoped query is quiet", async () => {

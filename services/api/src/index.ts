@@ -307,6 +307,35 @@ const subscriptionSockets = new Map<string, Set<LiveSocket>>();
 const subscriptionDefinitions = new Map<string, LiveSubscription>();
 const liveHeartbeats = new Map<LiveSocket, ReturnType<typeof setInterval>>();
 
+const buildLiveSubscriptionMetrics = (): {
+  liveSocketCount: number;
+  uniqueSubscriptionsByChannel: Partial<Record<LiveSubscription["channel"], number>>;
+  socketFanoutByChannel: Partial<Record<LiveSubscription["channel"], number>>;
+} => {
+  const uniqueSubscriptionsByChannel: Partial<Record<LiveSubscription["channel"], number>> = {};
+  const socketFanoutByChannel: Partial<Record<LiveSubscription["channel"], number>> = {};
+
+  for (const subscription of subscriptionDefinitions.values()) {
+    uniqueSubscriptionsByChannel[subscription.channel] =
+      (uniqueSubscriptionsByChannel[subscription.channel] ?? 0) + 1;
+  }
+
+  for (const [key, sockets] of subscriptionSockets.entries()) {
+    const subscription = subscriptionDefinitions.get(key);
+    if (!subscription || sockets.size === 0) {
+      continue;
+    }
+    socketFanoutByChannel[subscription.channel] =
+      (socketFanoutByChannel[subscription.channel] ?? 0) + sockets.size;
+  }
+
+  return {
+    liveSocketCount: liveSocketSubscriptions.size,
+    uniqueSubscriptionsByChannel,
+    socketFanoutByChannel
+  };
+};
+
 const jsonResponse = (body: unknown, status = 200): Response => {
   return new Response(JSON.stringify(body), {
     status,
@@ -759,6 +788,8 @@ const run = async () => {
 
   const liveState = new LiveStateManager(clickhouse, redis, resolveLiveStateConfig());
   await liveState.hydrate();
+  let previousLiveStats = liveState.getStatsSnapshot();
+  let previousMemoryUsage = process.memoryUsage();
   const warnLiveLag = (
     channel: keyof typeof HOT_LIVE_REDIS_KEYS,
     ageMs: number | null | undefined
@@ -778,25 +809,52 @@ const run = async () => {
   const liveStateMetricsTimer = setInterval(() => {
     const snapshot = liveState.getStatsSnapshot();
     const hotFeedHealth = liveState.getHotChannelHealth();
+    const subscriptionMetrics = buildLiveSubscriptionMetrics();
+    const memoryUsage = process.memoryUsage();
     const hotFeedLagMs = {
       options: snapshot.freshnessAgeMsByKey[HOT_LIVE_REDIS_KEYS.options] ?? null,
       equities: snapshot.freshnessAgeMsByKey[HOT_LIVE_REDIS_KEYS.equities] ?? null,
       flow: snapshot.freshnessAgeMsByKey[HOT_LIVE_REDIS_KEYS.flow] ?? null,
       nbbo: snapshot.freshnessAgeMsByKey[HOT_LIVE_REDIS_KEYS.nbbo] ?? null
     };
+    const flushDelta = {
+      redisFlushCount: snapshot.redisFlushCount - previousLiveStats.redisFlushCount,
+      redisFlushItems: snapshot.redisFlushItems - previousLiveStats.redisFlushItems,
+      redisFlushPayloadBytes: snapshot.redisFlushPayloadBytes - previousLiveStats.redisFlushPayloadBytes
+    };
+    const memorySnapshot = {
+      rss_bytes: memoryUsage.rss,
+      heap_used_bytes: memoryUsage.heapUsed,
+      heap_total_bytes: memoryUsage.heapTotal,
+      external_bytes: memoryUsage.external,
+      array_buffers_bytes: memoryUsage.arrayBuffers,
+      rss_delta_bytes: memoryUsage.rss - previousMemoryUsage.rss,
+      heap_used_delta_bytes: memoryUsage.heapUsed - previousMemoryUsage.heapUsed
+    };
     logger.info("live cache metrics", {
       ...snapshot,
       hotFeedLagMs,
       hotFeedHealth,
+      flushDelta,
+      memorySnapshot,
+      liveSubscriptions: subscriptionMetrics,
       snapshotSourceCounts: {
         generic_cache_snapshot: snapshot.genericCacheSnapshots,
         scoped_clickhouse_snapshot: snapshot.scopedClickHouseSnapshots
       }
     });
+    metrics.gauge("api.memory.rss_bytes", memoryUsage.rss);
+    metrics.gauge("api.memory.heap_used_bytes", memoryUsage.heapUsed);
+    metrics.gauge("api.live.active_sockets", subscriptionMetrics.liveSocketCount);
+    for (const [channel, count] of Object.entries(subscriptionMetrics.uniqueSubscriptionsByChannel)) {
+      metrics.gauge("api.live.subscription_count", count, { channel });
+    }
     warnLiveLag("options", hotFeedLagMs.options);
     warnLiveLag("equities", hotFeedLagMs.equities);
     warnLiveLag("flow", hotFeedLagMs.flow);
     warnLiveLag("nbbo", hotFeedLagMs.nbbo);
+    previousLiveStats = snapshot;
+    previousMemoryUsage = memoryUsage;
   }, 60000);
 
   const consumerBindings = [
