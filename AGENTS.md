@@ -90,17 +90,31 @@ At the end of every completed implementation task, before final handoff, create 
 
 This documentation is mandatory whenever code, configuration, tests, or project files were changed.
 
+### Precedence and classification
+
+Use this decision order before creating a turn document:
+
+1. Check the minor/trivial exemption checklist below first.
+2. If the task clearly matches an exemption, do not create a turn document.
+3. If the task is a clearly substantive implementation change, create a turn document.
+4. If classification is ambiguous or mixed, ask the user before creating a turn document.
+
+The minor/trivial exemptions override the general mandatory turn-document rule.
+
 For diff content in turn documentation (including "Code diffs" and "Relevant Diff Snippets"), use `@pierre/diffs` output by default. If `@pierre/diffs` is unavailable because of a real tool or blocking error, use a clearly labeled plain diff/code block fallback and note why.
 
-### Do not produce this for minor or trivial changes, including but not limited to:
+### No turn document for minor/trivial checklist matches
 
-- Syntax fixes
-- Code refactoring
-- Documentation updates
-- Reconciling PRs
-- Updating AGENTS.md or other documentation
+Do not create a turn document when the change is minor/trivial and cleanly matches one of these categories:
 
-**Feel free to use your own judgement and always prompt the user if you are unsure if this change requires documentation or not.**
+- `AGENTS.md` changes or other documentation-only changes
+- Syntax-only fixes
+- Refactor-only changes with no behavior change
+- PR/conflict reconciliation work
+- Issue-tracker-only updates such as `beads/issues.json`
+- Support-file changes that only accompany one of the exempt categories above (for example lockfile or manifest updates required for docs-workflow changes)
+
+If a change does not cleanly fit either exempt or substantive buckets, ask the user before creating a turn document.
 
 ### When making a minor update to a previous change, update the existing documentation instead of creating a new file. Use the following format:
 
@@ -164,7 +178,7 @@ Each turn document must include these sections:
 
 ### Completion Rule
 
-A task is not complete until:
+A task that requires a turn document is not complete until:
 
 1. The Beads workflow is updated
 2. The turn document is created in `docs/turns`
@@ -174,7 +188,7 @@ A task is not complete until:
 6. `git push forgejo <branch>` succeeds
 7. `git status` shows the branch is up to date with `forgejo/<branch>`
 
-For trivial changes, the document may be brief, but it must still exist and clearly explain what changed and how it was validated.
+For tasks that do require turn documentation, the document may be brief when scope is small, but it must clearly explain what changed and how it was validated.
 
 ## Plan Mode Documentation
 
