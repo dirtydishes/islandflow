@@ -72,12 +72,12 @@ const parseBoundedInt = (
   return Math.max(min, Math.min(max, Math.floor(parsed)));
 };
 
-const LIVE_HOT_WINDOW = parseBoundedInt(process.env.NEXT_PUBLIC_LIVE_HOT_WINDOW, 600, 1, 100000);
+const LIVE_HOT_WINDOW = parseBoundedInt(process.env.NEXT_PUBLIC_LIVE_HOT_WINDOW, 600, 1, 2000);
 const LIVE_HOT_WINDOW_OPTIONS = parseBoundedInt(
   process.env.NEXT_PUBLIC_LIVE_HOT_WINDOW_OPTIONS,
   1200,
   1,
-  100000
+  2000
 );
 const LIVE_OPTIONS_HEAD_LIMIT = 100;
 const LIVE_HISTORY_SOFT_CAP = parseBoundedInt(
