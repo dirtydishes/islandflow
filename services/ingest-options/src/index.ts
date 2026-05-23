@@ -44,6 +44,7 @@ import { createIbkrOptionsAdapter } from "./adapters/ibkr";
 import { createSyntheticOptionsAdapter } from "./adapters/synthetic";
 import type { OptionIngestAdapter, StopHandler } from "./adapters/types";
 import { enrichOptionPrint, rememberContext, selectAtOrBefore, type ContextHistory } from "./enrichment";
+import { processOptionTrade } from "./trade-pipeline";
 import { z } from "zod";
 
 const service = "ingest-options";
@@ -104,6 +105,20 @@ const envSchema = z.object({
   OPTIONS_SIGNAL_ETF_UNDERLYINGS: z
     .string()
     .default("SPY,QQQ,IWM,DIA,TLT,GLD,SLV,XLF,XLE,XLV,XLI,XLP,XLU,XLY,SMH,ARKK"),
+  OPTIONS_PERSIST_SIGNAL_ONLY: z
+    .preprocess((value) => {
+      if (typeof value === "string") {
+        const normalized = value.trim().toLowerCase();
+        if (["1", "true", "yes", "on"].includes(normalized)) {
+          return true;
+        }
+        if (["0", "false", "no", "off"].includes(normalized)) {
+          return false;
+        }
+      }
+      return value;
+    }, z.boolean())
+    .default(true),
   TESTING_MODE: z
     .preprocess((value) => {
       if (typeof value === "string") {
@@ -400,6 +415,9 @@ const run = async () => {
     () => syntheticControl
   );
   logger.info("ingest adapter selected", { adapter: adapter.name });
+  logger.info("option print clickhouse persistence mode", {
+    signal_only: env.OPTIONS_PERSIST_SIGNAL_ONLY
+  });
   const allowPublish = buildThrottle(env.TESTING_MODE, env.TESTING_THROTTLE_MS);
   const allowNbboPublish = buildThrottle(env.TESTING_MODE, env.TESTING_THROTTLE_MS);
 
@@ -426,11 +444,12 @@ const run = async () => {
       const print = enrichOptionPrint(rawPrint, optionQuote, equityQuote, optionsSignalConfig);
 
       try {
-        await insertOptionPrint(clickhouse, print);
-        await publishJson(js, SUBJECT_OPTION_PRINTS, print);
-        if (print.signal_pass) {
-          await publishJson(js, SUBJECT_OPTION_SIGNAL_PRINTS, print);
-        }
+        await processOptionTrade(print, {
+          persistSignalOnly: env.OPTIONS_PERSIST_SIGNAL_ONLY,
+          persist: async (value) => insertOptionPrint(clickhouse, value),
+          publishRaw: async (value) => publishJson(js, SUBJECT_OPTION_PRINTS, value),
+          publishSignal: async (value) => publishJson(js, SUBJECT_OPTION_SIGNAL_PRINTS, value)
+        });
       } catch (error) {
         if (isExpectedShutdownError(error)) {
           return;

@@ -55,3 +55,30 @@ docker compose exec clickhouse clickhouse-client --query "SELECT count() FROM fl
 ```
 
 Restart ingest/API services through the normal dev or deployment path. The options tape should repopulate its 100-row hot head from new signal prints, and older rows should appear only after the scroll gate asks `/history/options` for ClickHouse-backed history.
+
+## One-Time Cleanup: Remove Non-Signal Option Prints
+
+If `OPTIONS_PERSIST_SIGNAL_ONLY=true` is enabled, historical rows with `signal_pass = 0` can be removed once to align stored history with the new ingestion policy:
+
+```bash
+docker compose exec clickhouse clickhouse-client --query "ALTER TABLE option_prints DELETE WHERE signal_pass = 0"
+```
+
+For `deployment/docker/docker-compose.yml`, run the same command with `docker compose -f deployment/docker/docker-compose.yml exec clickhouse ...`.
+
+Important notes:
+
+- ClickHouse `ALTER ... DELETE` is asynchronous; deleted rows may still appear until the mutation is applied.
+- You can monitor mutation progress:
+
+```bash
+docker compose exec clickhouse clickhouse-client --query "SELECT command, is_done, latest_fail_reason FROM system.mutations WHERE table = 'option_prints' ORDER BY create_time DESC LIMIT 5"
+```
+
+- After mutation completion, verify row counts:
+
+```bash
+docker compose exec clickhouse clickhouse-client --query "SELECT count() AS remaining_non_signal FROM option_prints WHERE signal_pass = 0"
+```
+
+- Optional compaction (larger datasets): run `OPTIMIZE TABLE option_prints FINAL` during a maintenance window.

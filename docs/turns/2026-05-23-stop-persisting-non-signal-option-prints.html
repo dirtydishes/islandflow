@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Turn Doc: Stop Persisting Non-Signal Option Prints</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f7f7fa;
+      --fg: #171a1f;
+      --muted: #4a5160;
+      --card: #ffffff;
+      --line: #d9dce4;
+      --accent: #2f6fed;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1217;
+        --fg: #e8ecf3;
+        --muted: #a8b2c5;
+        --card: #151a22;
+        --line: #2a3342;
+        --accent: #79a3ff;
+      }
+    }
+    body {
+      margin: 0;
+      font-family: "IBM Plex Sans", "Inter", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.55;
+    }
+    main {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 32px 20px 56px;
+    }
+    h1, h2 {
+      line-height: 1.2;
+      margin-top: 0;
+    }
+    h2 {
+      margin-top: 28px;
+      border-top: 1px solid var(--line);
+      padding-top: 20px;
+    }
+    p, li {
+      color: var(--fg);
+    }
+    .meta {
+      color: var(--muted);
+      margin-top: 8px;
+      margin-bottom: 20px;
+    }
+    .summary {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+    code, pre {
+      font-family: "IBM Plex Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+      font-size: 0.92rem;
+    }
+    pre {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 14px;
+      overflow-x: auto;
+    }
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Stop Persisting Non-Signal Option Prints in ClickHouse</h1>
+    <p class="meta"><strong>Date:</strong> 2026-05-23 00:00 EDT<br /><strong>Beads Issue:</strong> islandflow-l9h</p>
+
+    <h2>Summary</h2>
+    <div class="summary">
+      <p>Implemented a signal-gated persistence path for option prints in <code>ingest-options</code>. With the new default configuration, prints that fail the initial signal gate (<code>signal_pass=false</code>) are no longer inserted into ClickHouse, while JetStream publish behavior remains unchanged.</p>
+    </div>
+
+    <h2>Changes Made</h2>
+    <ul>
+      <li>Added <code>OPTIONS_PERSIST_SIGNAL_ONLY</code> env support (default <code>true</code>) in <code>services/ingest-options/src/index.ts</code>.</li>
+      <li>Refactored option-trade side effects into a new helper module: <code>services/ingest-options/src/trade-pipeline.ts</code>.</li>
+      <li>Updated ingest trade handling to gate ClickHouse inserts by <code>signal_pass</code> when signal-only mode is enabled.</li>
+      <li>Kept publish behavior as-is: always publish to <code>options.prints</code>, publish to <code>options.signal_prints</code> only when <code>signal_pass=true</code>.</li>
+      <li>Added targeted tests in <code>services/ingest-options/tests/trade-pipeline.test.ts</code>.</li>
+      <li>Added <code>OPTIONS_PERSIST_SIGNAL_ONLY=true</code> to both env example files.</li>
+      <li>Documented one-time cleanup SQL and mutation verification steps in <code>docs/clickhouse-reset-runbook.md</code>.</li>
+    </ul>
+
+    <h2>Context</h2>
+    <p>The options pipeline enriches and classifies prints before persistence and fanout. Previously, all enriched prints were inserted into ClickHouse regardless of signal eligibility, which retained low-value noise in durable history. The intended direction is to keep durable history aligned with the signal gate while preserving stream fanout compatibility.</p>
+
+    <h2>Important Implementation Details</h2>
+    <ul>
+      <li><code>OPTIONS_PERSIST_SIGNAL_ONLY</code> parses standard boolean env strings (<code>true/false</code>, <code>1/0</code>, <code>yes/no</code>, <code>on/off</code>) and defaults to <code>true</code>.</li>
+      <li>Persistence decision logic is centralized in <code>shouldPersistOptionPrint()</code> for easy testing and future reuse.</li>
+      <li>A startup log line now reports the active persistence mode for quick operator visibility.</li>
+      <li>Cleanup SQL is intentionally documented as a manual one-off operational step, not automatic startup behavior.</li>
+      <li>Expected semantic effect: new “raw” ClickHouse history for options will be signal-only when default mode is used; replay paths sourced from ClickHouse option prints will reflect the same dataset.</li>
+    </ul>
+
+    <h2>Relevant Diff Snippets</h2>
+    <p>Unified diffs below are formatted to be compatible with <a href="https://diffs.com/docs">diffs.com</a> rendering conventions.</p>
+<pre><code class="language-diff">diff --git a/services/ingest-options/src/index.ts b/services/ingest-options/src/index.ts
+@@
++  OPTIONS_PERSIST_SIGNAL_ONLY: z.preprocess(..., z.boolean()).default(true),
+@@
++  logger.info("option print clickhouse persistence mode", { signal_only: env.OPTIONS_PERSIST_SIGNAL_ONLY });
+@@
+-        await insertOptionPrint(clickhouse, print);
+-        await publishJson(js, SUBJECT_OPTION_PRINTS, print);
+-        if (print.signal_pass) {
+-          await publishJson(js, SUBJECT_OPTION_SIGNAL_PRINTS, print);
+-        }
++        await processOptionTrade(print, {
++          persistSignalOnly: env.OPTIONS_PERSIST_SIGNAL_ONLY,
++          persist: async (value) => insertOptionPrint(clickhouse, value),
++          publishRaw: async (value) => publishJson(js, SUBJECT_OPTION_PRINTS, value),
++          publishSignal: async (value) => publishJson(js, SUBJECT_OPTION_SIGNAL_PRINTS, value)
++        });</code></pre>
+
+<pre><code class="language-diff">diff --git a/services/ingest-options/src/trade-pipeline.ts b/services/ingest-options/src/trade-pipeline.ts
+@@
++export const shouldPersistOptionPrint = (print, persistSignalOnly) =&gt; !persistSignalOnly || print.signal_pass === true;
++
++export const processOptionTrade = async (print, deps) =&gt; {
++  if (shouldPersistOptionPrint(print, deps.persistSignalOnly)) {
++    await deps.persist(print);
++  }
++  await deps.publishRaw(print);
++  if (print.signal_pass) {
++    await deps.publishSignal(print);
++  }
++};</code></pre>
+
+<pre><code class="language-diff">diff --git a/docs/clickhouse-reset-runbook.md b/docs/clickhouse-reset-runbook.md
+@@
++## One-Time Cleanup: Remove Non-Signal Option Prints
++docker compose exec clickhouse clickhouse-client --query "ALTER TABLE option_prints DELETE WHERE signal_pass = 0"
++...monitor with system.mutations and verify remaining_non_signal count...</code></pre>
+
+    <h2>Expected Impact for End-Users</h2>
+    <p>Options history and replay streams backed by ClickHouse contain less noise and better reflect actionable signal flow. This improves signal-to-noise in historical tape usage without changing event schemas or API contract shapes.</p>
+
+    <h2>Validation</h2>
+    <ul>
+      <li>Ran focused tests: <code>bun test services/ingest-options/tests/trade-pipeline.test.ts</code> (pass).</li>
+      <li>Attempted broader ingest-options test run: <code>bun test services/ingest-options/tests</code> (failed in this worktree due to missing module resolution for <code>@islandflow/types</code> in existing tests unrelated to this change).</li>
+      <li>Manual review confirmed no API schema/type signature changes were introduced.</li>
+    </ul>
+
+    <h2>Issues, Limitations, and Mitigations</h2>
+    <ul>
+      <li>Cleanup of historical non-signal rows is manual; it is not auto-executed by services to avoid accidental destructive behavior.</li>
+      <li>ClickHouse delete mutations are asynchronous. Mitigation: documented mutation-status query and post-delete verification query.</li>
+      <li>The full local test suite for <code>services/ingest-options/tests</code> was not fully runnable in this worktree due to module-resolution setup, so validation relied on targeted tests plus static review.</li>
+    </ul>
+
+    <h2>Follow-up Work</h2>
+    <ul>
+      <li>Run the one-time cleanup mutation in each environment that should drop historical non-signal rows.</li>
+      <li>After cleanup completion, verify zero remaining rows where <code>signal_pass = 0</code>.</li>
+      <li>Optionally add an operational metric for dropped non-signal persistence decisions if observability of suppression volume is needed.</li>
+    </ul>
+  </main>
+</body>
+</html>
