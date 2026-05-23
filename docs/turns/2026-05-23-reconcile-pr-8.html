@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Turn Doc - Reconcile PR #8</title>
+  <style>
+    :root { color-scheme: light; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 2rem auto; max-width: 920px; line-height: 1.5; color: #111827; }
+    h1,h2 { line-height: 1.2; }
+    code,pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    pre { background:#f3f4f6; padding:0.9rem; border-radius:8px; overflow:auto; }
+    section { margin: 1.2rem 0; }
+  </style>
+</head>
+<body>
+  <h1>Reconcile PR #8 with main</h1>
+  <p><strong>Date:</strong> 2026-05-23</p>
+
+  <section>
+    <h2>Summary</h2>
+    <p>Reconciled PR #8 by merging the latest <code>main</code> into <code>stabilize-live-api-memory</code>, resolving the only merge conflict, and pushing the updated branch to Forgejo.</p>
+  </section>
+
+  <section>
+    <h2>Changes Made</h2>
+    <ul>
+      <li>Checked out <code>stabilize-live-api-memory</code> from <code>forgejo/stabilize-live-api-memory</code>.</li>
+      <li>Merged <code>forgejo/main</code> into the PR branch.</li>
+      <li>Resolved merge conflict in <code>.beads/issues.jsonl</code>.</li>
+      <li>Closed Beads issue <code>islandflow-kgu</code> for this reconciliation work.</li>
+      <li>Pushed Beads data and git branch updates to Forgejo.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Context</h2>
+    <p>The user requested reconciliation for PR #8. PR #8 head branch (<code>stabilize-live-api-memory</code>) was behind current <code>main</code>, so the branch needed an integration merge to clear mergeability drift.</p>
+  </section>
+
+  <section>
+    <h2>Important Implementation Details</h2>
+    <ul>
+      <li>The only merge conflict was in Beads tracker data (<code>.beads/issues.jsonl</code>).</li>
+      <li>Conflict resolution preserved both upstream tracker updates and the in-progress reconciliation issue record.</li>
+      <li>No service/application source files required manual code conflict resolution in this reconciliation pass.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Relevant Diff Snippets</h2>
+    <p>Rendered in diffs.com-compatible unified diff style:</p>
+    <pre><code class="language-diff">commit 6584f7d1545019da663ab3ec9719d06e25c5244e
+Merge: db73700 8464287
+Author: dirtydishes
+
++ merge main into stabilize-live-api-memory to reconcile pr 8
+
+MM .beads/issues.jsonl</code></pre>
+  </section>
+
+  <section>
+    <h2>Expected Impact for End-Users</h2>
+    <p>End-users should not see functional UI/API changes from this reconciliation itself; the impact is operational: PR #8 can now be merged cleanly against current mainline history.</p>
+  </section>
+
+  <section>
+    <h2>Validation</h2>
+    <ul>
+      <li>Verified branch push to Forgejo succeeded.</li>
+      <li>Verified Beads push (<code>bd dolt push</code>) succeeded.</li>
+      <li>Verified final git state reports branch aligned with <code>forgejo/stabilize-live-api-memory</code>.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Issues, Limitations, and Mitigations</h2>
+    <ul>
+      <li><strong>Limitation:</strong> <code>fj</code> auth was initially unauthorized in this session.</li>
+      <li><strong>Mitigation:</strong> Re-auth was completed by user and confirmed with successful <code>fj pr view 8</code>.</li>
+      <li><strong>Scope note:</strong> This turn focused on branch reconciliation, not feature behavior changes.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Follow-up Work</h2>
+    <ul>
+      <li>Proceed with normal review/merge flow for PR #8 in Forgejo.</li>
+      <li>If additional commits land on <code>main</code> before merge, re-run a quick reconciliation pass.</li>
+    </ul>
+  </section>
+</body>
+</html>
