@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Turn Report - Update GitHub Pages Docs Target</title>
+    <style>
+      :root {
+        --bg: #f7f8fc;
+        --card: #ffffff;
+        --text: #1c2434;
+        --muted: #5b667d;
+        --line: #d8dfeb;
+        --accent: #0f766e;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Inter", "Segoe UI", sans-serif;
+        color: var(--text);
+        background: var(--bg);
+        line-height: 1.55;
+      }
+      main {
+        max-width: 920px;
+        margin: 0 auto;
+        padding: 28px 16px 40px;
+      }
+      h1 { margin: 0 0 8px; font-size: clamp(1.5rem, 2.2vw, 2rem); }
+      h2 { margin: 0 0 10px; font-size: 1.15rem; }
+      .meta { margin: 0 0 18px; color: var(--muted); }
+      section {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px 16px;
+        margin: 0 0 12px;
+      }
+      ul { margin: 0; padding-left: 20px; }
+      li + li { margin-top: 6px; }
+      p { margin: 0; }
+      p + p { margin-top: 8px; }
+      code {
+        font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+        font-size: 0.92em;
+      }
+      pre {
+        margin: 8px 0 0;
+        background: #0f172a;
+        color: #e2e8f0;
+        border: 1px solid #1e293b;
+        border-radius: 8px;
+        padding: 12px;
+        overflow-x: auto;
+      }
+      a { color: var(--accent); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Update GitHub Pages docs target URL</h1>
+      <p class="meta">Completed on May 23, 2026.</p>
+
+      <section>
+        <h2>Summary</h2>
+        <p>Updated the GitHub Pages workflow so the generated root landing page now redirects explicitly to <code>https://dirtydishes.github.io/islandflow/docs/</code>.</p>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Edited <code>.github/workflows/docs-pages.yml</code>.</li>
+          <li>Changed the root <code>site/index.html</code> meta-refresh and fallback link from a relative <code>./docs/</code> target to an absolute Pages URL target.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>The existing docs Pages workflow already copied repository docs into <code>site/docs/</code>. The requested update was to ensure the published root route consistently forwards to the canonical project URL <code>dirtydishes.github.io/islandflow/docs</code>.</p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <ul>
+          <li>Deployment artifact structure remains unchanged: docs are still published under <code>site/docs/</code>.</li>
+          <li>Only the redirect target changed, minimizing risk of deployment regressions.</li>
+          <li>Fallback anchor text now points to the same absolute URL as the redirect destination.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p>Snippet style follows <a href="https://diffs.com/docs">diffs.com</a> formatting conventions.</p>
+        <pre><code class="language-diff">--- .github/workflows/docs-pages.yml
++++ .github/workflows/docs-pages.yml
+@@
+-printf '%s\n' '&lt;!doctype html&gt;... url=./docs/...&lt;a href="./docs/"&gt;Continue to docs&lt;/a&gt;' &gt; site/index.html
++printf '%s\n' '&lt;!doctype html&gt;... url=https://dirtydishes.github.io/islandflow/docs/...&lt;a href="https://dirtydishes.github.io/islandflow/docs/"&gt;Continue to docs&lt;/a&gt;' &gt; site/index.html</code></pre>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <ul>
+          <li>Visiting the Pages root now consistently routes users to <code>/islandflow/docs/</code> on the canonical host.</li>
+          <li>Users get a stable docs destination regardless of relative path behavior.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li>Reviewed workflow diff to confirm only redirect target changed.</li>
+          <li>Attempted to run <code>bunx actionlint .github/workflows/docs-pages.yml</code>, but the package executable could not be resolved in this environment.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>Absolute URL redirect is now tied to the current canonical host/path; if Pages host naming changes, this line must be updated.</li>
+          <li>No runtime workflow execution was performed locally; final validation occurs on next GitHub Actions run.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>Add <code>actionlint</code> as a repo-managed dev tool or CI check so workflow linting is repeatable in local and CI environments.</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

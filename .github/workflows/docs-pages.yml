@@ -36,7 +36,7 @@ jobs:
         run: |
           mkdir -p site/docs
           cp -R docs/. site/docs/
-          printf '%s\n' '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=./docs/"><title>Islandflow Docs</title><a href="./docs/">Continue to docs</a>' > site/index.html
+          printf '%s\n' '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=https://dirtydishes.github.io/islandflow/docs/"><title>Islandflow Docs</title><a href="https://dirtydishes.github.io/islandflow/docs/">Continue to docs</a>' > site/index.html
           touch site/.nojekyll
 
       - name: Upload Pages artifact
