@@ -31,8 +31,8 @@ bd close <id>         # Complete work
    ```bash
    git pull --rebase
    bd dolt push
-   git push
-   git status  # MUST show "up to date with origin"
+   git push forgejo <branch>
+   git status  # MUST show "up to date with forgejo/<branch>"
    ```
 5. **Clean up** - Clear stashes, prune remote branches
 6. **Verify** - All changes committed AND pushed
@@ -68,6 +68,21 @@ Working style that avoids common problems here:
 - Prefer editing in the touched workspace (`services/<name>`, `packages/<name>`, `apps/web`) and keep shared contract changes in `packages/types`.
 - Keep `.env` aligned with `.env.example`; adapters default to synthetic modes for local development.
 - Dev runners persist child PID state in `.tmp/`; if a previous run crashed, restart via the standard `bun run dev*` commands so stale processes are cleaned up.
+
+## Forgejo Is Canonical
+
+This repository's primary home is Forgejo:
+
+- URL: `https://git.deltaisland.io/dirtydishes/islandflow`
+- Git remote: `forgejo`
+- Push target: `forgejo` (not GitHub)
+
+Agent expectations:
+
+- Prefer `git push forgejo <branch>` when publishing work.
+- Treat GitHub as a mirror unless explicitly instructed otherwise.
+- Use `fj` for Forgejo pull request workflows (create/view/update PRs).
+- When sharing PR links in handoff, use the Forgejo PR URL.
 
 ## Required Turn Documentation
 
@@ -134,8 +149,8 @@ A task is not complete until:
 3. Relevant quality gates have passed or failures are documented
 4. Changes are committed
 5. `bd dolt push` succeeds
-6. `git push` succeeds
-7. `git status` shows the branch is up to date with origin
+6. `git push forgejo <branch>` succeeds
+7. `git status` shows the branch is up to date with `forgejo/<branch>`
 
 For trivial changes, the document may be brief, but it must still exist and clearly explain what changed and how it was validated.
 
