@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>2026-05-22 - Forgejo Primary Agent Workflow</title>
+    <style>
+      :root {
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --text: #19202a;
+        --muted: #516074;
+        --border: #d7dfeb;
+        --accent: #3559e0;
+        --code-bg: #0f172a;
+        --code-text: #e2e8f0;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background: radial-gradient(circle at top, #eef2ff 0%, var(--bg) 48%);
+        color: var(--text);
+        line-height: 1.6;
+      }
+      main {
+        max-width: 960px;
+        margin: 2rem auto;
+        padding: 0 1rem 2rem;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 8px 26px rgba(22, 34, 60, 0.06);
+      }
+      h1, h2 { line-height: 1.25; margin: 0 0 0.65rem; }
+      h1 { font-size: 1.5rem; }
+      h2 { font-size: 1.1rem; color: var(--accent); }
+      p { margin: 0.35rem 0; }
+      ul { margin: 0.4rem 0 0.4rem 1.1rem; padding: 0; }
+      li { margin: 0.25rem 0; }
+      .meta { color: var(--muted); font-size: 0.92rem; }
+      pre {
+        margin: 0.6rem 0 0;
+        background: var(--code-bg);
+        color: var(--code-text);
+        border-radius: 10px;
+        border: 1px solid #1e293b;
+        padding: 0.9rem;
+        overflow-x: auto;
+      }
+      code { font-family: "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace; }
+      a { color: var(--accent); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="card">
+        <h1>Turn Documentation: Forgejo-First Agent Workflow in AGENTS.md</h1>
+        <p class="meta"><strong>Date:</strong> 2026-05-22 22:53 EDT</p>
+        <p class="meta"><strong>Beads Issue:</strong> islandflow-2cj</p>
+      </section>
+
+      <section class="card">
+        <h2>Summary</h2>
+        <p>
+          Updated <code>AGENTS.md</code> so agents explicitly treat Forgejo as the canonical home for this repository,
+          prioritize the <code>forgejo</code> git remote for pushes, and use the <code>fj</code> CLI for pull request workflows.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Added a new <code>Forgejo Is Canonical</code> section to <code>AGENTS.md</code>.</li>
+          <li>Documented canonical repo URL, preferred remote name, and push target.</li>
+          <li>Added explicit expectations to use <code>fj</code> for PR create/view/update workflows.</li>
+          <li>Updated session completion and completion-rule text to require <code>git push forgejo &lt;branch&gt;</code>.</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>Context</h2>
+        <p>
+          The repository is primarily hosted on Forgejo (<code>git.deltaisland.io</code>) with GitHub also configured.
+          Without explicit guidance, agents may default to GitHub tooling or ambiguous <code>git push</code> behavior.
+          This change removes that ambiguity so automation and handoffs consistently target Forgejo first.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>Important Implementation Details</h2>
+        <ul>
+          <li>The existing Beads integration block was preserved; only Forgejo preference guidance was added/clarified.</li>
+          <li>Push instructions now name the remote directly to prevent accidental mirror-only pushes.</li>
+          <li>PR tooling guidance now references <code>fj</code> to align with the primary Forgejo workflow.</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>Relevant Diff Snippets</h2>
+        <p>
+          Snippets below use standard unified diff formatting compatible with tools like
+          <a href="https://diffs.com/docs">diffs.com</a>.
+        </p>
+        <pre><code class="language-diff">+## Forgejo Is Canonical
++
++This repository's primary home is Forgejo:
++
++- URL: `https://git.deltaisland.io/dirtydishes/islandflow`
++- Git remote: `forgejo`
++- Push target: `forgejo` (not GitHub)
++
++Agent expectations:
++
++- Prefer `git push forgejo &lt;branch&gt;` when publishing work.
++- Treat GitHub as a mirror unless explicitly instructed otherwise.
++- Use `fj` for Forgejo pull request workflows (create/view/update PRs).
++- When sharing PR links in handoff, use the Forgejo PR URL.
+@@
+-   git push
+-   git status  # MUST show "up to date with origin"
++   git push forgejo &lt;branch&gt;
++   git status  # MUST show "up to date with forgejo/&lt;branch&gt;"
+@@
+-6. `git push` succeeds
+-7. `git status` shows the branch is up to date with origin
++6. `git push forgejo &lt;branch&gt;` succeeds
++7. `git status` shows the branch is up to date with `forgejo/&lt;branch&gt;`</code></pre>
+      </section>
+
+      <section class="card">
+        <h2>Expected Impact for End-Users</h2>
+        <p>
+          End-users should see more consistent agent behavior around publish and review workflows: branches and PRs will be
+          created against Forgejo by default, reducing mistakes caused by mixed-remote assumptions.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>Validation</h2>
+        <ul>
+          <li>Manually reviewed <code>AGENTS.md</code> to confirm Forgejo guidance is explicit and internally consistent.</li>
+          <li>Confirmed completion-rule steps now specify <code>git push forgejo &lt;branch&gt;</code>.</li>
+          <li>No runtime/test suite changes were required because this is a documentation/process-only update.</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>This change relies on agents having <code>fj</code> installed and authenticated; if unavailable, users may need to use web UI fallback.</li>
+          <li>Existing user habits around GitHub-first workflows may persist; explicit checklist wording mitigates this over time.</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>Optionally add a short Forgejo contribution section in <code>README.md</code> with <code>fj</code> quickstart commands.</li>
+          <li>Optionally add a pre-push script check that warns when pushing to non-Forgejo remotes from feature branches.</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
