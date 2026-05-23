@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Turn Record: Stabilize Live API Memory</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f3f1eb;
+        --surface: #fffdf8;
+        --surface-strong: #f7f2e9;
+        --ink: #1f1b16;
+        --muted: #62584c;
+        --line: #d6c8b4;
+        --accent: #8d5a2b;
+        --accent-soft: rgba(141, 90, 43, 0.12);
+        --good: #245c3b;
+        --warn: #8a4b15;
+        --shadow: 0 24px 60px rgba(61, 44, 21, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at top left, rgba(141, 90, 43, 0.12), transparent 32%),
+          linear-gradient(180deg, #f7f3ec 0%, var(--bg) 100%);
+        color: var(--ink);
+        font: 16px/1.6 "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, serif;
+      }
+
+      main {
+        width: min(1120px, calc(100vw - 40px));
+        margin: 32px auto 56px;
+      }
+
+      .hero {
+        background: var(--surface);
+        border: 1px solid rgba(214, 200, 180, 0.9);
+        border-radius: 28px;
+        padding: 32px;
+        box-shadow: var(--shadow);
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font: 600 12px/1.2 "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        font-family: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+        line-height: 1.1;
+      }
+
+      h1 {
+        margin-top: 16px;
+        font-size: clamp(2.4rem, 5vw, 4rem);
+        letter-spacing: -0.04em;
+      }
+
+      .lede {
+        max-width: 72ch;
+        margin-top: 18px;
+        color: var(--muted);
+        font-size: 1.08rem;
+      }
+
+      .hero-meta {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 14px;
+        margin-top: 28px;
+      }
+
+      .meta-card {
+        padding: 16px 18px;
+        border-radius: 18px;
+        background: var(--surface-strong);
+        border: 1px solid rgba(214, 200, 180, 0.9);
+      }
+
+      .meta-label {
+        display: block;
+        color: var(--muted);
+        font: 600 0.76rem/1.2 "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .meta-value {
+        display: block;
+        margin-top: 8px;
+        font: 700 1.05rem/1.3 "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+      }
+
+      .grid {
+        display: grid;
+        gap: 20px;
+        margin-top: 20px;
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid rgba(214, 200, 180, 0.9);
+        border-radius: 24px;
+        padding: 24px;
+        box-shadow: var(--shadow);
+      }
+
+      .card h2 {
+        font-size: 1.35rem;
+        margin-bottom: 14px;
+      }
+
+      p {
+        margin: 0;
+      }
+
+      p + p,
+      ul + p,
+      p + ul,
+      ul + ul {
+        margin-top: 12px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 8px;
+      }
+
+      .callout {
+        padding: 16px 18px;
+        border-radius: 18px;
+        background: rgba(36, 92, 59, 0.08);
+        border: 1px solid rgba(36, 92, 59, 0.16);
+      }
+
+      .callout strong {
+        color: var(--good);
+        font-family: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px;
+        margin-top: 16px;
+      }
+
+      .metric {
+        padding: 14px 16px;
+        border-radius: 18px;
+        background: var(--surface-strong);
+        border: 1px solid rgba(214, 200, 180, 0.9);
+      }
+
+      .metric strong {
+        display: block;
+        font: 700 1.2rem/1.2 "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+      }
+
+      .metric span {
+        color: var(--muted);
+        font: 500 0.9rem/1.4 "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+      }
+
+      code,
+      pre {
+        font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      code {
+        padding: 0.08rem 0.35rem;
+        border-radius: 0.45rem;
+        background: rgba(99, 86, 67, 0.08);
+      }
+
+      pre {
+        overflow-x: auto;
+        margin: 12px 0 0;
+        padding: 16px;
+        border-radius: 16px;
+        background: #1f1b16;
+        color: #f7f2e9;
+        font-size: 0.88rem;
+        line-height: 1.5;
+      }
+
+      .diff-grid {
+        display: grid;
+        gap: 18px;
+      }
+
+      .diff-shell {
+        border: 1px solid rgba(214, 200, 180, 0.9);
+        border-radius: 20px;
+        padding: 16px;
+        background: linear-gradient(180deg, #fffdf9 0%, #f7f2ea 100%);
+      }
+
+      .diff-shell h3 {
+        font-size: 1rem;
+        margin-bottom: 10px;
+      }
+
+      .diff-render {
+        min-height: 120px;
+      }
+
+      details {
+        margin-top: 12px;
+      }
+
+      summary {
+        cursor: pointer;
+        color: var(--accent);
+        font: 600 0.88rem/1.3 "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+      }
+
+      .two-up {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 20px;
+      }
+
+      .small {
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      a {
+        color: var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="hero">
+        <span class="eyebrow">Turn Record · May 22, 2026</span>
+        <h1>Stabilize Live API Memory and Internal Traffic</h1>
+        <p class="lede">
+          The Islandflow live API was repeatedly getting OOM-killed on the VPS because the hot live
+          cache could retain oversized channel windows and rewrite whole Redis lists at high
+          frequency. This turn applied an immediate server-side mitigation, hardened the API cache
+          path in code, and rolled the changes onto the native systemd deployment.
+        </p>
+        <div class="hero-meta">
+          <div class="meta-card">
+            <span class="meta-label">Branch</span>
+            <span class="meta-value"><code>stabilize-live-api-memory</code></span>
+          </div>
+          <div class="meta-card">
+            <span class="meta-label">Beads</span>
+            <span class="meta-value"><code>islandflow-thp</code></span>
+          </div>
+          <div class="meta-card">
+            <span class="meta-label">Deployment</span>
+            <span class="meta-value">Native systemd user services on the VPS</span>
+          </div>
+          <div class="meta-card">
+            <span class="meta-label">Primary Outcome</span>
+            <span class="meta-value">API RSS returned to roughly 115-130 MB after rollout</span>
+          </div>
+        </div>
+      </section>
+
+      <div class="grid">
+        <section class="card">
+          <h2>Summary</h2>
+          <p>
+            The live API is now bounded in three layers instead of trusting environment values and
+            reconnect behavior. First, the VPS <code>.env</code> was reset to safer live-window
+            values and the oversized Redis hot-cache keys were cleared. Second, the API now clamps
+            generic live cache limits per channel in code. Third, generic live feed persistence now
+            appends deltas into Redis instead of cloning and rewriting entire lists on every flush.
+          </p>
+          <div class="callout" style="margin-top: 16px">
+            <strong>Observed on the VPS after rollout:</strong>
+            the API stayed healthy through restart, minute metrics showed much smaller cache depths,
+            and the kernel did not log any new Bun OOM kill after the hardened restart.
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Changes Made</h2>
+          <ul>
+            <li>
+              Added channel-specific hard caps in
+              <code>services/api/src/live.ts</code> so oversized
+              <code>LIVE_LIMIT_*</code> values are clamped before use.
+            </li>
+            <li>
+              Changed generic live Redis persistence from full-list rewrite behavior to append-plus-trim,
+              with rewrite fallback only when the in-memory ordering has to be rebuilt.
+            </li>
+            <li>
+              Serialized Redis flushes during shutdown so service restarts do not race with a closing
+              Redis client.
+            </li>
+            <li>
+              Added API minute-log visibility for live subscription counts, Redis flush deltas,
+              payload bytes, snapshot sizes, and process memory usage.
+            </li>
+            <li>
+              Tightened the browser-exposed live window caps in
+              <code>apps/web/app/terminal.tsx</code> and aligned the tracked env examples with the safer
+              production defaults, including <code>LIVE_LIMIT_NEWS</code>.
+            </li>
+            <li>
+              Applied the emergency mitigation directly on the VPS:
+              updated <code>/home/delta/islandflow/.env</code>, created
+              <code>/home/delta/islandflow/.env.backup-2026-05-22-2131</code>, deleted stale
+              <code>live:*</code> Redis keys, rebuilt the web app, and restarted
+              <code>islandflow-api.service</code> and <code>islandflow-web.service</code>.
+            </li>
+          </ul>
+        </section>
+
+        <section class="card">
+          <h2>Context</h2>
+          <p>
+            The VPS was killing <code>islandflow-api.service</code> several times on May 22, 2026.
+            Kernel logs showed Bun reaching roughly 8-9 GiB RSS inside the API service cgroup before
+            the OOM killer stepped in. The API minute logs also showed channel depths pinned at
+            <code>10000</code> for multiple feeds, plus massive cumulative Redis rewrite churn.
+          </p>
+          <p>
+            Most of the “huge bandwidth” in <code>btop</code> was local loopback traffic: Bun talking
+            to Redis, NATS, and ClickHouse on <code>127.0.0.1</code>. That meant the problem was not a
+            public-edge flood, it was the live cache architecture multiplying internal work on the box.
+          </p>
+        </section>
+
+        <section class="card">
+          <h2>Important Implementation Details</h2>
+          <div class="two-up">
+            <div>
+              <h3 style="margin-bottom: 10px">API hardening</h3>
+              <ul>
+                <li>
+                  Hard caps now bound generic channel windows even if env values drift upward.
+                </li>
+                <li>
+                  <code>snapshot_limit</code> is still honored, but only up to the lower of the request,
+                  the configured limit, and the safe channel cap.
+                </li>
+                <li>
+                  Generic feeds use incremental Redis appends; scoped candle and overlay caches still
+                  use full rewrites because they are much smaller and keyed differently.
+                </li>
+              </ul>
+            </div>
+            <div>
+              <h3 style="margin-bottom: 10px">Operational changes</h3>
+              <ul>
+                <li>
+                  The VPS now runs with a much smaller hot live footprint:
+                  options <code>100</code>, flow <code>500</code>, alerts <code>300</code>,
+                  news <code>100</code>.
+                </li>
+                <li>
+                  Old Redis hot-cache keys were deleted so the API did not rehydrate oversized lists on boot.
+                </li>
+                <li>
+                  The web app was rebuilt on the VPS checkout after switching that checkout onto
+                  <code>stabilize-live-api-memory</code>.
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Relevant Diff Snippets</h2>
+          <p class="small">
+            These snippets are rendered with the Diffs library from
+            <a href="https://diffs.com/docs">diffs.com</a>, with a plain-text fallback kept inline in the file.
+          </p>
+          <div class="diff-grid" style="margin-top: 18px">
+            <article class="diff-shell">
+              <h3><code>services/api/src/live.ts</code>: hard caps and append-based generic Redis flushes</h3>
+              <div class="diff-render" id="diff-live"></div>
+              <details>
+                <summary>Plain-text fallback</summary>
+                <pre>Added LIVE_GENERIC_LIMIT_CAPS, clamped env/configured limits, changed generic writes from
+queueRedisWrite(items:[...items]) to queueGenericRedisWrite(item, items, forceRewrite), and split
+Redis persistence into rewrite and append paths with shutdown-safe flush serialization.</pre>
+              </details>
+            </article>
+
+            <article class="diff-shell">
+              <h3><code>services/api/src/index.ts</code>: minute metrics now include memory and live subscription visibility</h3>
+              <div class="diff-render" id="diff-index"></div>
+              <details>
+                <summary>Plain-text fallback</summary>
+                <pre>Added buildLiveSubscriptionMetrics(), previous snapshot tracking, flush delta logging,
+memory snapshots, and gauges for RSS, heap used, active sockets, and per-channel subscriptions.</pre>
+              </details>
+            </article>
+
+            <article class="diff-shell">
+              <h3><code>.env.example</code> and <code>apps/web/app/terminal.tsx</code>: safer default windows</h3>
+              <div class="diff-render" id="diff-config"></div>
+              <details>
+                <summary>Plain-text fallback</summary>
+                <pre>Reduced LIVE_LIMIT_OPTIONS in tracked examples to 100, added LIVE_LIMIT_NEWS=100,
+and lowered the client-exposed maximum live hot windows from 100000 to 2000.</pre>
+              </details>
+            </article>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Expected Impact for End-Users</h2>
+          <ul>
+            <li>
+              The hosted app should stop disappearing behind API restarts caused by the kernel OOM killer.
+            </li>
+            <li>
+              Live feeds should still feel current, but the server will retain a tighter hot window instead of
+              hoarding oversized in-memory histories.
+            </li>
+            <li>
+              The operator experience on the VPS should improve because internal loopback churn is materially lower.
+            </li>
+          </ul>
+        </section>
+
+        <section class="card">
+          <h2>Validation</h2>
+          <ul>
+            <li>
+              Local API test gate passed:
+              <code>bun test services/api/tests/live.test.ts</code>
+            </li>
+            <li>
+              Local web production build passed:
+              <code>bun --cwd=apps/web run build</code>
+            </li>
+            <li>
+              VPS mitigation applied successfully. Redis reported <code>1524</code> live keys removed before restart.
+            </li>
+            <li>
+              After mitigation restart, <code>systemctl --user status islandflow-api.service</code> showed the
+              API at about <code>84 MB</code> RSS instead of multi-GB startup drift.
+            </li>
+            <li>
+              After rolling the hardened branch onto the VPS, the API minute log at
+              <code>2026-05-22 21:44:11 EDT</code> showed:
+            </li>
+          </ul>
+          <div class="metrics">
+            <div class="metric">
+              <strong>119.6 MB</strong>
+              <span>API RSS from the minute memory snapshot</span>
+            </div>
+            <div class="metric">
+              <strong>100</strong>
+              <span><code>live:options</code> depth</span>
+            </div>
+            <div class="metric">
+              <strong>500</strong>
+              <span><code>live:flow</code>, <code>live:alerts</code>, and <code>live:equity-quotes</code> caps held</span>
+            </div>
+            <div class="metric">
+              <strong>34,559</strong>
+              <span>Redis flush items in that minute delta</span>
+            </div>
+            <div class="metric">
+              <strong>9.18 MB</strong>
+              <span>Redis flush payload bytes in that minute delta</span>
+            </div>
+            <div class="metric">
+              <strong>No new OOM</strong>
+              <span>Kernel logs after the hardened restart</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Issues, Limitations, and Mitigations</h2>
+          <ul>
+            <li>
+              The new minute metrics are cumulative plus delta-based. They are much more useful than the old
+              absolute counters, but they still reset on process restart.
+            </li>
+            <li>
+              <code>snapshotItemsByChannel</code> remains empty when no live websocket clients are connected.
+              That is expected because snapshots are only recorded when a snapshot is actually served.
+            </li>
+            <li>
+              Quiet feeds such as news and inferred-dark can still show very old freshness ages in logs.
+              That reflects inactivity, not a broken hot path.
+            </li>
+            <li>
+              The append-based Redis path deliberately falls back to a rewrite when out-of-order live events
+              require the in-memory ordering to be rebuilt. That keeps correctness ahead of theoretical write minimization.
+            </li>
+          </ul>
+        </section>
+
+        <section class="card">
+          <h2>Follow-up Work</h2>
+          <ul>
+            <li>
+              Add explicit alerting for repeated API RSS growth and for minute-level flush deltas that jump far above the new baseline.
+            </li>
+            <li>
+              Decide whether quiet-channel freshness logs should suppress extremely stale values for feeds like news to reduce operator noise.
+            </li>
+            <li>
+              Consider moving the live cache metrics into a dashboard view so operators do not need to parse journal lines manually.
+            </li>
+          </ul>
+        </section>
+      </div>
+    </main>
+
+    <script type="module">
+      const diffs = [
+        {
+          id: "diff-live",
+          name: "services/api/src/live.ts",
+          oldContents: `const DEFAULT_LIVE_LIMITS: GenericLiveLimits = {
+  options: 100,
+  nbbo: 1000,
+  equities: 1000,
+  "equity-quotes": 500,
+  "equity-joins": 500,
+  flow: 500,
+  "smart-money": 300,
+  "classifier-hits": 300,
+  alerts: 300,
+  "inferred-dark": 300,
+  news: 100
+};
+
+const parseGenericLimit = (env, channel, fallback) => {
+  const key = GENERIC_LIMIT_ENV_KEYS[channel];
+  const raw = env[key];
+  if (!raw || raw.trim().length === 0) {
+    return fallback;
+  }
+
+  const parsed = Number(raw);
+  const bounded = Math.max(MIN_GENERIC_LIMIT, Math.min(MAX_GENERIC_LIMIT, Math.floor(parsed)));
+  return bounded;
+};
+
+type BufferedRedisWrite = {
+  listKey: string;
+  cursorField: string;
+  items: unknown[];
+  limit: number;
+  cursor: Cursor | null;
+  updates: number;
+};
+
+private queueRedisWrite(listKey, cursorField, items, limit, cursor) {
+  const existing = this.pendingRedisWrites.get(listKey);
+  const write: BufferedRedisWrite = {
+    listKey,
+    cursorField,
+    items: [...items],
+    limit,
+    cursor,
+    updates: (existing?.updates ?? 0) + 1
+  };
+  this.pendingRedisWrites.set(listKey, write);
+}
+
+private async persistList(listKey, cursorField, items, limit, cursor) {
+  const payloads = items.map((entry) => JSON.stringify(entry));
+  await this.redis.lTrim(listKey, 1, 0);
+  if (payloads.length > 0) {
+    for (let idx = payloads.length - 1; idx >= 0; idx -= 1) {
+      await this.redis.lPush(listKey, payloads[idx]);
+    }
+    await this.redis.lTrim(listKey, 0, limit - 1);
+  }
+  await this.redis.hSet(CURSOR_HASH_KEY, cursorField, JSON.stringify(cursor));
+}`,
+          newContents: `export const LIVE_GENERIC_LIMIT_CAPS: GenericLiveLimits = {
+  options: 100,
+  nbbo: 1000,
+  equities: 1000,
+  "equity-quotes": 500,
+  "equity-joins": 500,
+  flow: 500,
+  "smart-money": 300,
+  "classifier-hits": 300,
+  alerts: 300,
+  "inferred-dark": 300,
+  news: 100
+};
+
+const clampConfiguredLimit = (channel: LiveGenericChannel, value: number): number =>
+  Math.max(MIN_GENERIC_LIMIT, Math.min(LIVE_GENERIC_LIMIT_CAPS[channel], Math.floor(value)));
+
+const parseGenericLimit = (env, channel, fallback) => {
+  const key = GENERIC_LIMIT_ENV_KEYS[channel];
+  const raw = env[key];
+  if (!raw || raw.trim().length === 0) {
+    return clampConfiguredLimit(channel, fallback);
+  }
+
+  const parsed = Number(raw);
+  const bounded = clampConfiguredLimit(channel, Math.min(MAX_GENERIC_LIMIT, parsed));
+  return bounded;
+};
+
+type BufferedRedisRewrite = {
+  mode: "rewrite";
+  listKey: string;
+  cursorField: string;
+  items: unknown[];
+  limit: number;
+  cursor: Cursor | null;
+  updates: number;
+};
+
+type BufferedRedisAppend = {
+  mode: "append";
+  listKey: string;
+  cursorField: string;
+  payloads: string[];
+  limit: number;
+  cursor: Cursor | null;
+  updates: number;
+};
+
+private queueGenericRedisWrite(listKey, cursorField, item, items, limit, cursor, forceRewrite = false) {
+  const existing = this.pendingRedisWrites.get(listKey);
+  const nextUpdateCount = (existing?.updates ?? 0) + 1;
+  if (forceRewrite || existing?.mode === "rewrite") {
+    this.pendingRedisWrites.set(listKey, {
+      mode: "rewrite",
+      listKey,
+      cursorField,
+      items: [...items],
+      limit,
+      cursor,
+      updates: nextUpdateCount
+    });
+  } else {
+    this.pendingRedisWrites.set(listKey, {
+      mode: "append",
+      listKey,
+      cursorField,
+      payloads: [...(existing?.mode === "append" ? existing.payloads : []), JSON.stringify(item)],
+      limit,
+      cursor,
+      updates: nextUpdateCount
+    });
+  }
+}
+
+private async persistListAppend(listKey, cursorField, payloads, limit, cursor) {
+  for (const payload of payloads) {
+    await this.redis.lPush(listKey, payload);
+  }
+  await this.redis.lTrim(listKey, 0, limit - 1);
+  await this.redis.hSet(CURSOR_HASH_KEY, cursorField, JSON.stringify(cursor));
+}`
+        },
+        {
+          id: "diff-index",
+          name: "services/api/src/index.ts",
+          oldContents: `const liveStateMetricsTimer = setInterval(() => {
+  const snapshot = liveState.getStatsSnapshot();
+  const hotFeedHealth = liveState.getHotChannelHealth();
+  const hotFeedLagMs = {
+    options: snapshot.freshnessAgeMsByKey[HOT_LIVE_REDIS_KEYS.options] ?? null,
+    equities: snapshot.freshnessAgeMsByKey[HOT_LIVE_REDIS_KEYS.equities] ?? null,
+    flow: snapshot.freshnessAgeMsByKey[HOT_LIVE_REDIS_KEYS.flow] ?? null,
+    nbbo: snapshot.freshnessAgeMsByKey[HOT_LIVE_REDIS_KEYS.nbbo] ?? null
+  };
+  logger.info("live cache metrics", {
+    ...snapshot,
+    hotFeedLagMs,
+    hotFeedHealth,
+    snapshotSourceCounts: {
+      generic_cache_snapshot: snapshot.genericCacheSnapshots,
+      scoped_clickhouse_snapshot: snapshot.scopedClickHouseSnapshots
+    }
+  });
+}, 60000);`,
+          newContents: `const buildLiveSubscriptionMetrics = () => {
+  const uniqueSubscriptionsByChannel: Partial<Record<LiveSubscription["channel"], number>> = {};
+  const socketFanoutByChannel: Partial<Record<LiveSubscription["channel"], number>> = {};
+
+  for (const subscription of subscriptionDefinitions.values()) {
+    uniqueSubscriptionsByChannel[subscription.channel] =
+      (uniqueSubscriptionsByChannel[subscription.channel] ?? 0) + 1;
+  }
+
+  for (const [key, sockets] of subscriptionSockets.entries()) {
+    const subscription = subscriptionDefinitions.get(key);
+    if (!subscription || sockets.size === 0) {
+      continue;
+    }
+    socketFanoutByChannel[subscription.channel] =
+      (socketFanoutByChannel[subscription.channel] ?? 0) + sockets.size;
+  }
+
+  return {
+    liveSocketCount: liveSocketSubscriptions.size,
+    uniqueSubscriptionsByChannel,
+    socketFanoutByChannel
+  };
+};
+
+let previousLiveStats = liveState.getStatsSnapshot();
+let previousMemoryUsage = process.memoryUsage();
+
+const liveStateMetricsTimer = setInterval(() => {
+  const snapshot = liveState.getStatsSnapshot();
+  const hotFeedHealth = liveState.getHotChannelHealth();
+  const subscriptionMetrics = buildLiveSubscriptionMetrics();
+  const memoryUsage = process.memoryUsage();
+  const flushDelta = {
+    redisFlushCount: snapshot.redisFlushCount - previousLiveStats.redisFlushCount,
+    redisFlushItems: snapshot.redisFlushItems - previousLiveStats.redisFlushItems,
+    redisFlushPayloadBytes: snapshot.redisFlushPayloadBytes - previousLiveStats.redisFlushPayloadBytes
+  };
+  const memorySnapshot = {
+    rss_bytes: memoryUsage.rss,
+    heap_used_bytes: memoryUsage.heapUsed,
+    rss_delta_bytes: memoryUsage.rss - previousMemoryUsage.rss
+  };
+
+  logger.info("live cache metrics", {
+    ...snapshot,
+    flushDelta,
+    memorySnapshot,
+    liveSubscriptions: subscriptionMetrics
+  });
+
+  metrics.gauge("api.memory.rss_bytes", memoryUsage.rss);
+  metrics.gauge("api.live.active_sockets", subscriptionMetrics.liveSocketCount);
+}, 60000);`
+        },
+        {
+          id: "diff-config",
+          name: "config excerpt",
+          oldContents: `// apps/web/app/terminal.tsx
+const LIVE_HOT_WINDOW = parseBoundedInt(process.env.NEXT_PUBLIC_LIVE_HOT_WINDOW, 600, 1, 100000);
+const LIVE_HOT_WINDOW_OPTIONS = parseBoundedInt(
+  process.env.NEXT_PUBLIC_LIVE_HOT_WINDOW_OPTIONS,
+  1200,
+  1,
+  100000
+);
+
+# .env.example
+LIVE_LIMIT_OPTIONS=1000
+LIVE_LIMIT_INFERRED_DARK=300`,
+          newContents: `// apps/web/app/terminal.tsx
+const LIVE_HOT_WINDOW = parseBoundedInt(process.env.NEXT_PUBLIC_LIVE_HOT_WINDOW, 600, 1, 2000);
+const LIVE_HOT_WINDOW_OPTIONS = parseBoundedInt(
+  process.env.NEXT_PUBLIC_LIVE_HOT_WINDOW_OPTIONS,
+  1200,
+  1,
+  2000
+);
+
+# .env.example
+LIVE_LIMIT_OPTIONS=100
+LIVE_LIMIT_INFERRED_DARK=300
+LIVE_LIMIT_NEWS=100`
+        }
+      ];
+
+      try {
+        const { FileDiff } = await import("https://esm.sh/@pierre/diffs");
+        for (const diff of diffs) {
+          const container = document.getElementById(diff.id);
+          if (!container) continue;
+          const fileDiff = new FileDiff({ theme: "github-light" });
+          fileDiff.render({
+            oldFile: { name: diff.name, contents: diff.oldContents },
+            newFile: { name: diff.name, contents: diff.newContents },
+            containerWrapper: container
+          });
+        }
+      } catch (error) {
+        console.warn("Failed to load diffs.com renderer", error);
+      }
+    </script>
+  </body>
+</html>
