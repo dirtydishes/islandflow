@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Turn Report - Default Turn-Doc Diffs to @pierre/diffs</title>
+    <style>
+      :root {
+        --bg: #f7f8fc;
+        --card: #ffffff;
+        --text: #1c2434;
+        --muted: #5b667d;
+        --line: #d8dfeb;
+        --accent: #0f766e;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Inter", "Segoe UI", sans-serif;
+        color: var(--text);
+        background: var(--bg);
+        line-height: 1.55;
+      }
+      main {
+        max-width: 920px;
+        margin: 0 auto;
+        padding: 28px 16px 40px;
+      }
+      h1 { margin: 0 0 8px; font-size: clamp(1.5rem, 2.2vw, 2rem); }
+      h2 { margin: 0 0 10px; font-size: 1.15rem; }
+      .meta { margin: 0 0 18px; color: var(--muted); }
+      section {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px 16px;
+        margin: 0 0 12px;
+      }
+      ul { margin: 0; padding-left: 20px; }
+      li + li { margin-top: 6px; }
+      p { margin: 0; }
+      p + p { margin-top: 8px; }
+      code {
+        font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+        font-size: 0.92em;
+      }
+      pre {
+        margin: 8px 0 0;
+        background: #0f172a;
+        color: #e2e8f0;
+        border: 1px solid #1e293b;
+        border-radius: 8px;
+        padding: 12px;
+        overflow-x: auto;
+      }
+      a { color: var(--accent); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Default turn-doc diffs to <code>@pierre/diffs</code></h1>
+      <p class="meta">Completed on May 23, 2026 at 6:47 PM ET.</p>
+
+      <section>
+        <h2>Summary</h2>
+        <p>Updated repository turn-documentation rules to prefer <code>@pierre/diffs</code> for diff snippets, added a documented fallback path, and included the package/lock updates needed for consistent local usage.</p>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Edited <code>AGENTS.md</code> to add a default diff-format policy for turn docs.</li>
+          <li>Updated the minor-update template bullet for <code>Code diffs</code> with explicit <code>@pierre/diffs</code> default plus fallback wording.</li>
+          <li>Updated required section <code>Relevant Diff Snippets</code> with the same default-and-fallback wording.</li>
+          <li>Added <code>@pierre/diffs</code> to root <code>package.json</code> dependencies and synced <code>bun.lock</code>.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>The existing guidance required a diff section but did not explicitly standardize on a single rendering tool. This change aligns turn-doc expectations around one default tool while preserving an escape hatch when tooling is unavailable.</p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <ul>
+          <li>The policy is intentionally a preferred default, not a hard requirement.</li>
+          <li>Fallback usage is constrained to real tool/blocking errors and must be labeled with a reason.</li>
+          <li>No runtime application behavior was changed; this is workflow/documentation and dependency-surface work.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p><code>@pierre/diffs</code> is now the repository default for this section.</p>
+        <pre><code class="language-diff">--- AGENTS.md
++++ AGENTS.md
+@@
++For diff content in turn documentation (including "Code diffs" and "Relevant Diff Snippets"), use `@pierre/diffs` output by default.
+@@
+-- **Code diffs**
++- **Code diffs** (use `@pierre/diffs` output by default; if unavailable, include a clearly labeled plain diff/code block and note why)
+@@
+-5. **Relevant Diff Snippets**
++5. **Relevant Diff Snippets** (render with `@pierre/diffs` output by default; if unavailable, include a clearly labeled plain diff/code block and note why)
+
+--- package.json
++++ package.json
+@@
++  "dependencies": {
++    "@pierre/diffs": "^1.2.2"
++  }</code></pre>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <ul>
+          <li>Future turn docs should have more consistent and readable diff presentation.</li>
+          <li>Contributors have clearer guidance for fallback behavior when the preferred renderer cannot be used.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li>Verified policy text appears in all required AGENTS locations for diff guidance.</li>
+          <li>Ran <code>bun install --frozen-lockfile</code> and confirmed lockfile consistency with no changes.</li>
+          <li>Confirmed repository is clean and branch is up to date after push.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>This change standardizes policy but does not retroactively update old turn docs.</li>
+          <li>Actual visual rendering still depends on environment/tool availability; fallback instructions mitigate this.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>Optionally add a tiny helper script/example to generate <code>@pierre/diffs</code> HTML snippets directly for turn docs.</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
