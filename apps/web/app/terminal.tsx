@@ -186,23 +186,34 @@ export const shouldIncludeEquitiesForDarkUnderlyingFallback = (): boolean => {
   return false;
 };
 
+const CANONICAL_OPTIONS_PATH = "/options";
+const TAPE_COMPAT_PATH = "/tape";
+const KNOWN_TERMINAL_PATHS = new Set([
+  CANONICAL_OPTIONS_PATH,
+  TAPE_COMPAT_PATH,
+  "/news",
+  "/signals",
+  "/charts",
+  "/replay"
+]);
+
+export const normalizeTerminalPathname = (pathname: string): string => {
+  if (pathname === TAPE_COMPAT_PATH) {
+    return CANONICAL_OPTIONS_PATH;
+  }
+  return KNOWN_TERMINAL_PATHS.has(pathname) ? pathname : "/";
+};
+
 export const getRouteFeatures = (pathname: string): RouteFeatures => {
   const includeEquitiesFallback = shouldIncludeEquitiesForDarkUnderlyingFallback();
-  const normalizedPath =
-    pathname === "/tape" ||
-    pathname === "/news" ||
-    pathname === "/signals" ||
-    pathname === "/charts" ||
-    pathname === "/replay"
-      ? pathname
-      : "/";
+  const normalizedPath = normalizeTerminalPathname(pathname);
 
   switch (normalizedPath) {
-    case "/tape":
+    case "/options":
       return {
         options: true,
         nbbo: true,
-        equities: true,
+        equities: false,
         flow: true,
         news: false,
         alerts: false,
@@ -213,7 +224,7 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         equityCandles: false,
         equityOverlay: false,
         showOptionsPane: true,
-        showEquitiesPane: true,
+        showEquitiesPane: false,
         showFlowPane: true,
         showNewsPane: false,
         showAlertsPane: false,
@@ -368,6 +379,10 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         needsDarkUnderlying: true
       };
   }
+};
+
+export const getTerminalNavCurrentHref = (pathname: string): string => {
+  return normalizeTerminalPathname(pathname);
 };
 
 const EMPTY_ALERT_EVENTS: AlertEvent[] = [];
@@ -7170,7 +7185,7 @@ const useTerminal = (): TerminalState => {
 
 export const NAV_ITEMS = [
   { href: "/", label: "Home" },
-  { href: "/tape", label: "Tape" },
+  { href: "/options", label: "Options" },
   { href: "/news", label: "News" }
 ] as const;
 
@@ -8812,8 +8827,31 @@ function SyntheticControlDock() {
 export function TerminalAppShell({ children }: { children: ReactNode }) {
   const state = useTerminalState();
   const pathname = usePathname();
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const tickerFieldId = useId();
   const tickerHintId = useId();
+  const activeNavHref = getTerminalNavCurrentHref(pathname);
+
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!drawerOpen) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setDrawerOpen(false);
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [drawerOpen]);
 
   return (
     <TerminalContext.Provider value={state}>
@@ -8821,31 +8859,26 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
         <a className="skip-link" href="#terminal-content">
           Skip to terminal content
         </a>
-        <aside className="terminal-rail">
-          <div className="terminal-brand">
-            <span className="terminal-brand-kicker">IF</span>
-            <span className="terminal-brand-name">Islandflow</span>
-          </div>
-          <nav aria-label="Primary" className="terminal-nav">
-            {NAV_ITEMS.map((item) => {
-              const active = pathname === item.href;
-              return (
-                <Link
-                  aria-current={active ? "page" : undefined}
-                  className={`terminal-nav-link${active ? " terminal-nav-link-active" : ""}`}
-                  href={item.href}
-                  key={item.href}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
-          <ShellMetricStrip />
-        </aside>
 
         <div className="terminal-frame">
           <header className="terminal-topbar">
+            <div className="terminal-topbar-leading">
+              <button
+                aria-controls="terminal-nav-drawer"
+                aria-expanded={drawerOpen}
+                aria-label={drawerOpen ? "Close navigation menu" : "Open navigation menu"}
+                className="terminal-button terminal-menu-trigger"
+                type="button"
+                onClick={() => setDrawerOpen((current) => !current)}
+              >
+                <span aria-hidden="true" className="terminal-menu-trigger-icon">
+                  <span />
+                  <span />
+                  <span />
+                </span>
+                <span>Menu</span>
+              </button>
+            </div>
             <div className="terminal-topbar-actions">
               <div className="terminal-topbar-controls">
                 {state.selectedInstrumentLabel && state.selectedInstrument?.kind !== "option-contract" ? (
@@ -8908,6 +8941,53 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
             {children}
           </main>
         </div>
+
+        {drawerOpen ? (
+          <>
+            <button
+              aria-label="Close navigation drawer"
+              className="terminal-drawer-backdrop"
+              type="button"
+              onClick={() => setDrawerOpen(false)}
+            />
+            <aside
+              aria-label="Primary navigation"
+              className="terminal-nav-drawer"
+              id="terminal-nav-drawer"
+            >
+              <div className="terminal-drawer-head">
+                <div className="terminal-brand">
+                  <span className="terminal-brand-kicker">IF</span>
+                  <span className="terminal-brand-name">Islandflow</span>
+                </div>
+                <button
+                  aria-label="Close navigation drawer"
+                  className="terminal-button terminal-drawer-close"
+                  type="button"
+                  onClick={() => setDrawerOpen(false)}
+                >
+                  Close
+                </button>
+              </div>
+              <nav aria-label="Primary" className="terminal-nav">
+                {NAV_ITEMS.map((item) => {
+                  const active = activeNavHref === item.href;
+                  return (
+                    <Link
+                      aria-current={active ? "page" : undefined}
+                      className={`terminal-nav-link${active ? " terminal-nav-link-active" : ""}`}
+                      href={item.href}
+                      key={item.href}
+                    >
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </nav>
+              <ShellMetricStrip />
+            </aside>
+          </>
+        ) : null}
 
         <SyntheticControlDock />
 
@@ -8981,11 +9061,11 @@ export function NewsRoute() {
   );
 }
 
-export function TapeRoute() {
+export function OptionsRoute() {
   const state = useTerminal();
   return (
     <PageFrame
-      title="Tape"
+      title="Options"
       actions={
         <>
           <button
@@ -9009,9 +9089,8 @@ export function TapeRoute() {
         </>
       }
     >
-      <div className="page-grid page-grid-tape">
+      <div className="page-grid page-grid-options">
         <OptionsPane state={state} />
-        <EquitiesPane state={state} />
         <FlowPane state={state} title="Packets" />
       </div>
     </PageFrame>

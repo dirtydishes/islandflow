@@ -1,7 +1,7 @@
-import { redirect } from "next/navigation";
+import { OptionsRoute } from "../terminal";
 
 export const dynamic = "force-dynamic";
 
 export default function Page() {
-  redirect("/options");
+  return <OptionsRoute />;
 }

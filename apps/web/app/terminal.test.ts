@@ -24,6 +24,7 @@ import {
   getOptionScope,
   getLiveFeedStatus,
   getLiveManifest,
+  getTerminalNavCurrentHref,
   getRouteFeatures,
   getTapeVirtualConfig,
   mergeHeldTapeHistory,
@@ -44,6 +45,7 @@ import {
   smartMoneyProfileLabel,
   smartMoneyToneForProfile,
   getAlertFlowPacketRefs,
+  normalizeTerminalPathname,
   resolveAlertFlowPacket,
   statusLabel,
   toggleFilterValue
@@ -165,18 +167,24 @@ describe("alert context hydration helpers", () => {
 });
 
 describe("live manifest", () => {
-  it("includes only tape channels on /tape", () => {
+  it("includes only options channels on /options", () => {
     const filters = buildDefaultFlowFilters();
-    const channels = getLiveManifest("/tape", "SPY", 60000, filters).map(
+    const channels = getLiveManifest("/options", "SPY", 60000, filters).map(
       (subscription) => subscription.channel
     );
 
-    expect(channels).toEqual(["options", "nbbo", "equities", "flow"]);
+    expect(channels).toEqual(["options", "nbbo", "flow"]);
   });
 
-  it("dedupes tape options subscription", () => {
+  it("keeps /tape as a compatibility alias for /options subscriptions", () => {
+    expect(getLiveManifest("/tape", "SPY", 60000, buildDefaultFlowFilters())).toEqual(
+      getLiveManifest("/options", "SPY", 60000, buildDefaultFlowFilters())
+    );
+  });
+
+  it("dedupes options subscriptions on /options", () => {
     const tapeOptionsSubscriptions = getLiveManifest(
-      "/tape",
+      "/options",
       "SPY",
       60000,
       buildDefaultFlowFilters()
@@ -184,35 +192,35 @@ describe("live manifest", () => {
     expect(tapeOptionsSubscriptions).toHaveLength(1);
   });
 
-  it("keeps option filters on /tape options subscriptions", () => {
+  it("keeps option filters on /options subscriptions", () => {
     const filters = {
       ...buildDefaultFlowFilters(),
       minNotional: 125_000
     };
 
-    const tapeOptionsSubscription = getLiveManifest("/tape", "SPY", 60000, filters).find(
+    const tapeOptionsSubscription = getLiveManifest("/options", "SPY", 60000, filters).find(
       (subscription) => subscription.channel === "options"
     );
 
     expect(tapeOptionsSubscription?.filters).toBe(filters);
   });
 
-  it("applies global flow filters to flow subscriptions on /tape", () => {
+  it("applies global flow filters to flow subscriptions on /options", () => {
     const filters = {
       ...buildDefaultFlowFilters(),
       minNotional: 50_000
     };
 
-    const tapeFlowSubscription = getLiveManifest("/tape", "SPY", 60000, filters).find(
+    const tapeFlowSubscription = getLiveManifest("/options", "SPY", 60000, filters).find(
       (subscription) => subscription.channel === "flow"
     );
 
     expect(tapeFlowSubscription?.filters).toBe(filters);
   });
 
-  it("includes scoped option and equity subscriptions", () => {
+  it("includes scoped option subscriptions on /options", () => {
     const manifest = getLiveManifest(
-      "/tape",
+      "/options",
       "AAPL",
       60000,
       buildDefaultFlowFilters(),
@@ -226,15 +234,11 @@ describe("live manifest", () => {
       (subscription): subscription is Extract<(typeof manifest)[number], { channel: "options" }> =>
         subscription.channel === "options"
     );
-    const equitiesSubscription = manifest.find(
-      (subscription): subscription is Extract<(typeof manifest)[number], { channel: "equities" }> =>
-        subscription.channel === "equities"
-    );
 
     expect(optionsSubscription?.underlying_ids).toEqual(["AAPL"]);
     expect(optionsSubscription?.option_contract_id).toBe("AAPL-2025-01-17-200-C");
     expect(optionsSubscription?.snapshot_limit).toBe(100);
-    expect(equitiesSubscription?.underlying_ids).toEqual(["AAPL"]);
+    expect(manifest.some((subscription) => subscription.channel === "equities")).toBe(false);
   });
 
   it("drops option-print filters for contract-focused options subscriptions but keeps flow filters", () => {
@@ -244,7 +248,7 @@ describe("live manifest", () => {
       optionTypes: ["put"] as const
     };
     const manifest = getLiveManifest(
-      "/tape",
+      "/options",
       "AAPL",
       60000,
       filters,
@@ -443,13 +447,19 @@ describe("contract-focused option helpers", () => {
 });
 
 describe("route feature map", () => {
-  it("maps /tape to tape panes and dependencies", () => {
-    const features = getRouteFeatures("/tape");
+  it("maps /options to the options and packets panes", () => {
+    const features = getRouteFeatures("/options");
     expect(features.showOptionsPane).toBe(true);
-    expect(features.showEquitiesPane).toBe(true);
+    expect(features.showEquitiesPane).toBe(false);
     expect(features.showFlowPane).toBe(true);
     expect(features.needsClassifierDecor).toBe(true);
     expect(features.alerts).toBe(false);
+  });
+
+  it("keeps /tape route compatibility while normalizing to /options", () => {
+    expect(normalizeTerminalPathname("/tape")).toBe("/options");
+    expect(getTerminalNavCurrentHref("/tape")).toBe("/options");
+    expect(getRouteFeatures("/tape")).toEqual(getRouteFeatures("/options"));
   });
 
   it("maps /signals to signal panes and dependencies", () => {
@@ -506,10 +516,10 @@ describe("dark underlying route dependency helper", () => {
 });
 
 describe("terminal navigation", () => {
-  it("exposes Home, Tape, and News as top-level destinations", () => {
+  it("exposes Home, Options, and News as top-level destinations", () => {
     expect(NAV_ITEMS).toEqual([
       { href: "/", label: "Home" },
-      { href: "/tape", label: "Tape" },
+      { href: "/options", label: "Options" },
       { href: "/news", label: "News" }
     ]);
   });
