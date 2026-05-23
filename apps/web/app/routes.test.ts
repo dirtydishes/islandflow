@@ -28,4 +28,10 @@ describe("legacy page redirects", () => {
     expect(() => mod.default()).toThrow("NEXT_REDIRECT:/");
     expect(redirect).toHaveBeenCalledWith("/");
   });
+
+  it("redirects /tape to /options", async () => {
+    const mod = await import("./tape/page");
+    expect(() => mod.default()).toThrow("NEXT_REDIRECT:/options");
+    expect(redirect).toHaveBeenCalledWith("/options");
+  });
 });

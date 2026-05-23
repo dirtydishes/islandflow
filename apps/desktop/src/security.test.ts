@@ -8,7 +8,11 @@ import {
 } from "./security.js";
 
 describe("desktop URL policy", () => {
-  it("allows the hosted production origin", () => {
+  it("allows the hosted production origin on /options", () => {
+    expect(isTrustedAppUrl("https://flow.deltaisland.io/options?symbol=SPY")).toBe(true);
+  });
+
+  it("keeps /tape trusted as a compatibility path on the same origin", () => {
     expect(isTrustedAppUrl("https://flow.deltaisland.io/tape?symbol=SPY")).toBe(true);
   });
 
@@ -37,5 +41,8 @@ describe("desktop URL policy", () => {
     expect(resolveDesktopStartUrl(undefined)).toBe(DESKTOP_PRODUCTION_URL);
     expect(resolveDesktopStartUrl("https://example.com")).toBe(DESKTOP_PRODUCTION_URL);
     expect(resolveDesktopStartUrl("http://127.0.0.1:3000")).toBe("http://127.0.0.1:3000");
+    expect(resolveDesktopStartUrl("https://flow.deltaisland.io/options")).toBe(
+      "https://flow.deltaisland.io/options"
+    );
   });
 });
