@@ -103,6 +103,7 @@ const LIVE_EQUITIES_SILENT_WARNING_MS = parseBoundedInt(
   5 * 60 * 1000
 );
 const LIVE_FLOW_STALE_MS = 30_000;
+const NAV_DRAWER_EXIT_MS = 180;
 const PINNED_EVIDENCE_TTL_MS = parseBoundedInt(
   process.env.NEXT_PUBLIC_PINNED_EVIDENCE_TTL_MS,
   20 * 60 * 1000,
@@ -118,6 +119,13 @@ const PINNED_EVIDENCE_MAX_ITEMS = parseBoundedInt(
 const NBBO_MAX_AGE_MS = Number(process.env.NEXT_PUBLIC_NBBO_MAX_AGE_MS);
 const NBBO_MAX_AGE_MS_SAFE =
   Number.isFinite(NBBO_MAX_AGE_MS) && NBBO_MAX_AGE_MS > 0 ? NBBO_MAX_AGE_MS : 1000;
+
+type NavDrawerPhase = "closed" | "opening" | "open" | "closing";
+
+const prefersReducedMotion = () =>
+  typeof window !== "undefined" &&
+  typeof window.matchMedia === "function" &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const FLOW_FILTER_PRESET = process.env.NEXT_PUBLIC_FLOW_FILTER_PRESET ?? "smart-money";
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"]);
 const CANDLE_INTERVALS = [
@@ -8827,23 +8835,101 @@ function SyntheticControlDock() {
 export function TerminalAppShell({ children }: { children: ReactNode }) {
   const state = useTerminalState();
   const pathname = usePathname();
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerPhase, setDrawerPhase] = useState<NavDrawerPhase>("closed");
+  const drawerFrameRef = useRef<number | null>(null);
+  const drawerCloseTimerRef = useRef<number | null>(null);
   const tickerFieldId = useId();
   const tickerHintId = useId();
   const activeNavHref = getTerminalNavCurrentHref(pathname);
+  const drawerExpanded = drawerPhase === "opening" || drawerPhase === "open";
 
   useEffect(() => {
-    setDrawerOpen(false);
+    if (drawerFrameRef.current !== null) {
+      window.cancelAnimationFrame(drawerFrameRef.current);
+      drawerFrameRef.current = null;
+    }
+    if (drawerCloseTimerRef.current !== null) {
+      window.clearTimeout(drawerCloseTimerRef.current);
+      drawerCloseTimerRef.current = null;
+    }
+    setDrawerPhase("closed");
   }, [pathname]);
 
   useEffect(() => {
-    if (!drawerOpen) {
+    return () => {
+      if (drawerFrameRef.current !== null) {
+        window.cancelAnimationFrame(drawerFrameRef.current);
+      }
+      if (drawerCloseTimerRef.current !== null) {
+        window.clearTimeout(drawerCloseTimerRef.current);
+      }
+    };
+  }, []);
+
+  const openNavDrawer = useCallback(() => {
+    if (drawerFrameRef.current !== null) {
+      window.cancelAnimationFrame(drawerFrameRef.current);
+      drawerFrameRef.current = null;
+    }
+    if (drawerCloseTimerRef.current !== null) {
+      window.clearTimeout(drawerCloseTimerRef.current);
+      drawerCloseTimerRef.current = null;
+    }
+
+    if (prefersReducedMotion()) {
+      setDrawerPhase("open");
+      return;
+    }
+
+    setDrawerPhase("opening");
+    drawerFrameRef.current = window.requestAnimationFrame(() => {
+      drawerFrameRef.current = null;
+      setDrawerPhase("open");
+    });
+  }, []);
+
+  const closeNavDrawer = useCallback(() => {
+    if (drawerPhase === "closed" || drawerPhase === "closing") {
+      return;
+    }
+    if (drawerFrameRef.current !== null) {
+      window.cancelAnimationFrame(drawerFrameRef.current);
+      drawerFrameRef.current = null;
+    }
+    if (drawerCloseTimerRef.current !== null) {
+      window.clearTimeout(drawerCloseTimerRef.current);
+      drawerCloseTimerRef.current = null;
+    }
+
+    if (prefersReducedMotion()) {
+      setDrawerPhase("closed");
+      return;
+    }
+
+    // Keep the drawer mounted long enough to animate out cleanly.
+    setDrawerPhase("closing");
+    drawerCloseTimerRef.current = window.setTimeout(() => {
+      drawerCloseTimerRef.current = null;
+      setDrawerPhase("closed");
+    }, NAV_DRAWER_EXIT_MS);
+  }, [drawerPhase]);
+
+  const toggleNavDrawer = useCallback(() => {
+    if (drawerExpanded) {
+      closeNavDrawer();
+      return;
+    }
+    openNavDrawer();
+  }, [closeNavDrawer, drawerExpanded, openNavDrawer]);
+
+  useEffect(() => {
+    if (!drawerExpanded) {
       return;
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setDrawerOpen(false);
+        closeNavDrawer();
       }
     };
 
@@ -8851,7 +8937,7 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [drawerOpen]);
+  }, [closeNavDrawer, drawerExpanded]);
 
   return (
     <TerminalContext.Provider value={state}>
@@ -8865,11 +8951,11 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
             <div className="terminal-topbar-leading">
               <button
                 aria-controls="terminal-nav-drawer"
-                aria-expanded={drawerOpen}
-                aria-label={drawerOpen ? "Close navigation menu" : "Open navigation menu"}
+                aria-expanded={drawerExpanded}
+                aria-label={drawerExpanded ? "Close navigation menu" : "Open navigation menu"}
                 className="terminal-button terminal-menu-trigger"
                 type="button"
-                onClick={() => setDrawerOpen((current) => !current)}
+                onClick={toggleNavDrawer}
               >
                 <span aria-hidden="true" className="terminal-menu-trigger-icon">
                   <span />
@@ -8942,17 +9028,19 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
           </main>
         </div>
 
-        {drawerOpen ? (
+        {drawerPhase !== "closed" ? (
           <>
             <button
               aria-label="Close navigation drawer"
               className="terminal-drawer-backdrop"
+              data-state={drawerPhase}
               type="button"
-              onClick={() => setDrawerOpen(false)}
+              onClick={closeNavDrawer}
             />
             <aside
               aria-label="Primary navigation"
               className="terminal-nav-drawer"
+              data-state={drawerPhase}
               id="terminal-nav-drawer"
             >
               <div className="terminal-drawer-head">
@@ -8964,7 +9052,7 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
                   aria-label="Close navigation drawer"
                   className="terminal-button terminal-drawer-close"
                   type="button"
-                  onClick={() => setDrawerOpen(false)}
+                  onClick={closeNavDrawer}
                 >
                   Close
                 </button>
