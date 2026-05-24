@@ -84,6 +84,9 @@ Agent expectations:
 - Use `fj` for Forgejo pull request workflows (create/view/update PRs).
 - When sharing PR links in handoff, use the Forgejo PR URL.
 
+# This project is running in production at https://flow.deltaisland.io
+  - You may access the server using `ssh di`
+
 ## Required Turn Documentation
 
 At the end of every completed implementation task, before final handoff, create a user-readable HTML document describing the work.
