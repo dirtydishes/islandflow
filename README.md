@@ -172,6 +172,41 @@ bun run dev:web
 
 This keeps Docker in the local workflow where it helps most, for NATS, ClickHouse, and Redis, while keeping the app services in native Bun/Next.js loops.
 
+## CI
+
+Forgejo Actions under `.forgejo/workflows` are the canonical CI path for this repository.
+
+The baseline workflow lives at `.forgejo/workflows/ci.yml` and runs on:
+
+- pull requests,
+- pushes to `main`,
+- manual dispatches from the Forgejo Actions UI.
+
+The fast `validate` job is intentionally limited to checks that already have good local signal:
+
+- `bun install --frozen-lockfile`
+- `bun test`
+- `bun run check:docker-workspace`
+- `bun --cwd=apps/web run build`
+
+Runner expectations:
+
+- Provide an `ubuntu-latest` label backed by Docker, for example `ubuntu-latest:docker://node:20-bookworm`.
+- An optional alias such as `docker:docker://node:20-bookworm` is fine for future explicit targeting, but the baseline workflow only requires `ubuntu-latest`.
+- The backing image must include Node.js because the checkout action is Node-based.
+
+What this CI path does not cover yet:
+
+- Docker image builds under `deployment/docker`
+- NATS, Redis, or ClickHouse service-container integration coverage
+- deployment, release, or coverage-reporting workflows
+
+To rerun or troubleshoot a job in Forgejo:
+
+- Open the repository's `Actions` tab.
+- Select the `CI` workflow.
+- Use `Run workflow` for a manual dispatch, or open an existing run and use the rerun action from that run page.
+
 ## Deployment Workflow
 
 Docker remains the supported and recommended path for the current VPS.
