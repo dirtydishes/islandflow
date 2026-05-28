@@ -8958,7 +8958,7 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
               <div className="terminal-drawer-head">
                 <div className="terminal-brand">
                   <span className="terminal-brand-kicker">IF</span>
-                  <span className="terminal-brand-name">Islandflow</span>
+                  <span className="terminal-brand-name">islandflow</span>
                 </div>
                 <button
                   aria-label="Close navigation drawer"
