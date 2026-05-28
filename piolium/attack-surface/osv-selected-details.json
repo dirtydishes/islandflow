@@ -1,0 +1,1024 @@
+[
+  {
+    "id": "GHSA-f82v-jwr5-mffw",
+    "summary": "Authorization Bypass in Next.js Middleware",
+    "details": "# Impact\nIt is possible to bypass authorization checks within a Next.js application, if the authorization check occurs in middleware.\n\n# Patches\n* For Next.js 15.x, this issue is fixed in `15.2.3`\n* For Next.js 14.x, this issue is fixed in `14.2.25`\n* For Next.js 13.x, this issue is fixed in 13.5.9\n* For Next.js 12.x, this issue is fixed in 12.3.5\n* For Next.js 11.x, consult the below workaround.\n\n_Note: Next.js deployments hosted on Vercel are automatically protected against this vulnerability._\n\n# Workaround\nIf patching to a safe version is infeasible, we recommend that you prevent external user requests which contain the `x-middleware-subrequest` header from reaching your Next.js application.\n\n## Credits\n\n- Allam Rachid (zhero;)\n- Allam Yasser (inzo_)",
+    "aliases": [
+      "CVE-2025-29927"
+    ],
+    "modified": "2026-03-04T15:06:29.993197Z",
+    "published": "2025-03-21T15:20:12Z",
+    "related": [
+      "CGA-fp7v-rgjp-xfjh"
+    ],
+    "database_specific": {
+      "github_reviewed_at": "2025-03-21T15:20:12Z",
+      "severity": "CRITICAL",
+      "nvd_published_at": "2025-03-21T15:15:42Z",
+      "github_reviewed": true,
+      "cwe_ids": [
+        "CWE-285",
+        "CWE-863"
+      ]
+    },
+    "references": [
+      {
+        "type": "WEB",
+        "url": "https://github.com/vercel/next.js/security/advisories/GHSA-f82v-jwr5-mffw"
+      },
+      {
+        "type": "ADVISORY",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-29927"
+      },
+      {
+        "type": "WEB",
+        "url": "https://github.com/vercel/next.js/commit/52a078da3884efe6501613c7834a3d02a91676d2"
+      },
+      {
+        "type": "WEB",
+        "url": "https://github.com/vercel/next.js/commit/5fd3ae8f8542677c6294f32d18022731eab6fe48"
+      },
+      {
+        "type": "PACKAGE",
+        "url": "https://github.com/vercel/next.js"
+      },
+      {
+        "type": "WEB",
+        "url": "https://github.com/vercel/next.js/releases/tag/v12.3.5"
+      },
+      {
+        "type": "WEB",
+        "url": "https://github.com/vercel/next.js/releases/tag/v13.5.9"
+      },
+      {
+        "type": "WEB",
+        "url": "https://security.netapp.com/advisory/ntap-20250328-0002"
+      },
+      {
+        "type": "WEB",
+        "url": "https://vercel.com/changelog/vercel-firewall-proactively-protects-against-vulnerability-with-middleware"
+      },
+      {
+        "type": "WEB",
+        "url": "http://www.openwall.com/lists/oss-security/2025/03/23/3"
+      },
+      {
+        "type": "WEB",
+        "url": "http://www.openwall.com/lists/oss-security/2025/03/23/4"
+      }
+    ],
+    "affected": [
+      {
+        "package": {
+          "name": "next",
+          "ecosystem": "npm",
+          "purl": "pkg:npm/next"
+        },
+        "ranges": [
+          {
+            "type": "SEMVER",
+            "events": [
+              {
+                "introduced": "13.0.0"
+              },
+              {
+                "fixed": "13.5.9"
+              }
+            ]
+          }
+        ],
+        "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2025/03/GHSA-f82v-jwr5-mffw/GHSA-f82v-jwr5-mffw.json"
+        }
+      },
+      {
+        "package": {
+          "name": "next",
+          "ecosystem": "npm",
+          "purl": "pkg:npm/next"
+        },
+        "ranges": [
+          {
+            "type": "SEMVER",
+            "events": [
+              {
+                "introduced": "14.0.0"
+              },
+              {
+                "fixed": "14.2.25"
+              }
+            ]
+          }
+        ],
+        "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2025/03/GHSA-f82v-jwr5-mffw/GHSA-f82v-jwr5-mffw.json"
+        }
+      },
+      {
+        "package": {
+          "name": "next",
+          "ecosystem": "npm",
+          "purl": "pkg:npm/next"
+        },
+        "ranges": [
+          {
+            "type": "SEMVER",
+            "events": [
+              {
+                "introduced": "15.0.0"
+              },
+              {
+                "fixed": "15.2.3"
+              }
+            ]
+          }
+        ],
+        "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2025/03/GHSA-f82v-jwr5-mffw/GHSA-f82v-jwr5-mffw.json"
+        }
+      },
+      {
+        "package": {
+          "name": "next",
+          "ecosystem": "npm",
+          "purl": "pkg:npm/next"
+        },
+        "ranges": [
+          {
+            "type": "SEMVER",
+            "events": [
+              {
+                "introduced": "12.0.0"
+              },
+              {
+                "fixed": "12.3.5"
+              }
+            ]
+          }
+        ],
+        "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2025/03/GHSA-f82v-jwr5-mffw/GHSA-f82v-jwr5-mffw.json"
+        }
+      }
+    ],
+    "schema_version": "1.7.3",
+    "severity": [
+      {
+        "type": "CVSS_V3",
+        "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N"
+      }
+    ]
+  },
+  {
+    "id": "GHSA-gx5p-jg67-6x7h",
+    "summary": "Next.js has cross-site scripting in beforeInteractive scripts with untrusted input",
+    "details": "### Impact\n\nApplications that use `beforeInteractive` scripts together with untrusted content can be vulnerable to cross-site scripting. In affected versions, serialized script content was not escaped safely before being embedded into the document, which could allow attacker-controlled input to break out of the intended script context and execute arbitrary JavaScript in a visitor's browser.\n\n### Fix\n\nWe now HTML-escape serialized `beforeInteractive` script content before embedding it into the page, preventing attacker-controlled content from breaking out of the inline script boundary.\n\n### Workarounds\n\nIf you cannot upgrade immediately, do not pass untrusted data into `beforeInteractive` scripts. If that pattern is unavoidable, sanitize or escape the content before embedding it.",
+    "aliases": [
+      "CVE-2026-44580"
+    ],
+    "modified": "2026-05-14T20:51:25.401511Z",
+    "published": "2026-05-11T15:56:38Z",
+    "related": [
+      "CGA-h76m-2q9m-82h7"
+    ],
+    "database_specific": {
+      "github_reviewed_at": "2026-05-11T15:56:38Z",
+      "severity": "MODERATE",
+      "nvd_published_at": "2026-05-13T18:16:18Z",
+      "github_reviewed": true,
+      "cwe_ids": [
+        "CWE-79"
+      ]
+    },
+    "references": [
+      {
+        "type": "WEB",
+        "url": "https://github.com/vercel/next.js/security/advisories/GHSA-gx5p-jg67-6x7h"
+      },
+      {
+        "type": "ADVISORY",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-44580"
+      },
+      {
+        "type": "PACKAGE",
+        "url": "https://github.com/vercel/next.js"
+      },
+      {
+        "type": "WEB",
+        "url": "https://github.com/vercel/next.js/releases/tag/v15.5.16"
+      },
+      {
+        "type": "WEB",
+        "url": "https://github.com/vercel/next.js/releases/tag/v16.2.5"
+      }
+    ],
+    "affected": [
+      {
+        "package": {
+          "name": "next",
+          "ecosystem": "npm",
+          "purl": "pkg:npm/next"
+        },
+        "ranges": [
+          {
+            "type": "SEMVER",
+            "events": [
+              {
+                "introduced": "13.0.0"
+              },
+              {
+                "fixed": "15.5.16"
+              }
+            ]
+          }
+        ],
+        "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2026/05/GHSA-gx5p-jg67-6x7h/GHSA-gx5p-jg67-6x7h.json"
+        }
+      },
+      {
+        "package": {
+          "name": "next",
+          "ecosystem": "npm",
+          "purl": "pkg:npm/next"
+        },
+        "ranges": [
+          {
+            "type": "SEMVER",
+            "events": [
+              {
+                "introduced": "16.0.0"
+              },
+              {
+                "fixed": "16.2.5"
+              }
+            ]
+          }
+        ],
+        "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2026/05/GHSA-gx5p-jg67-6x7h/GHSA-gx5p-jg67-6x7h.json"
+        }
+      }
+    ],
+    "schema_version": "1.7.5",
+    "severity": [
+      {
+        "type": "CVSS_V3",
+        "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N"
+      }
+    ]
+  },
+  {
+    "id": "GHSA-4342-x723-ch2f",
+    "summary": "Next.js Improper Middleware Redirect Handling Leads to SSRF",
+    "details": "A vulnerability in **Next.js Middleware** has been fixed in **v14.2.32** and **v15.4.7**. The issue occurred when request headers were directly passed into `NextResponse.next()`. In self-hosted applications, this could allow Server-Side Request Forgery (SSRF) if certain sensitive headers from the incoming request were reflected back into the response.\n\nAll users implementing custom middleware logic in self-hosted environments are strongly encouraged to upgrade and verify correct usage of the `next()` function.\n\nMore details at [Vercel Changelog](https://vercel.com/changelog/cve-2025-57822)",
+    "aliases": [
+      "CVE-2025-57822"
+    ],
+    "modified": "2026-02-04T04:20:45.658010Z",
+    "published": "2025-08-29T21:33:09Z",
+    "related": [
+      "CGA-wpvj-5hjh-p49g"
+    ],
+    "database_specific": {
+      "github_reviewed_at": "2025-08-29T21:33:09Z",
+      "severity": "MODERATE",
+      "nvd_published_at": "2025-08-29T22:15:32Z",
+      "github_reviewed": true,
+      "cwe_ids": [
+        "CWE-918"
+      ]
+    },
+    "references": [
+      {
+        "type": "WEB",
+        "url": "https://github.com/vercel/next.js/security/advisories/GHSA-4342-x723-ch2f"
+      },
+      {
+        "type": "ADVISORY",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-57822"
+      },
+      {
+        "type": "WEB",
+        "url": "https://github.com/vercel/next.js/commit/9c9aaed5bb9338ef31b0517ccf0ab4414f2093d8"
+      },
+      {
+        "type": "PACKAGE",
+        "url": "https://github.com/vercel/next.js"
+      },
+      {
+        "type": "WEB",
+        "url": "https://vercel.com/changelog/cve-2025-57822"
+      }
+    ],
+    "affected": [
+      {
+        "package": {
+          "name": "next",
+          "ecosystem": "npm",
+          "purl": "pkg:npm/next"
+        },
+        "ranges": [
+          {
+            "type": "SEMVER",
+            "events": [
+              {
+                "introduced": "0.9.9"
+              },
+              {
+                "fixed": "14.2.32"
+              }
+            ]
+          }
+        ],
+        "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2025/08/GHSA-4342-x723-ch2f/GHSA-4342-x723-ch2f.json"
+        }
+      },
+      {
+        "package": {
+          "name": "next",
+          "ecosystem": "npm",
+          "purl": "pkg:npm/next"
+        },
+        "ranges": [
+          {
+            "type": "SEMVER",
+            "events": [
+              {
+                "introduced": "15.0.0-canary.0"
+              },
+              {
+                "fixed": "15.4.7"
+              }
+            ]
+          }
+        ],
+        "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2025/08/GHSA-4342-x723-ch2f/GHSA-4342-x723-ch2f.json"
+        }
+      }
+    ],
+    "schema_version": "1.7.3",
+    "severity": [
+      {
+        "type": "CVSS_V3",
+        "score": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:L/A:N"
+      }
+    ]
+  },
+  {
+    "id": "GHSA-7gfc-8cq8-jh5f",
+    "summary": "Next.js authorization bypass vulnerability",
+    "details": "### Impact\nIf a Next.js application is performing authorization in middleware based on pathname, it was possible for this authorization to be bypassed.\n\n### Patches\nThis issue was patched in Next.js `14.2.15` and later.\n\nIf your Next.js application is hosted on Vercel, this vulnerability has been automatically mitigated, regardless of Next.js version.\n\n### Workarounds\nThere are no official workarounds for this vulnerability.\n\n#### Credits\nWe'd like to thank [tyage](http://github.com/tyage) (GMO CyberSecurity by IERAE) for responsible disclosure of this issue.",
+    "aliases": [
+      "CVE-2024-51479"
+    ],
+    "modified": "2025-09-10T21:12:24Z",
+    "published": "2024-12-17T15:09:06Z",
+    "database_specific": {
+      "severity": "HIGH",
+      "cwe_ids": [
+        "CWE-285",
+        "CWE-863"
+      ],
+      "github_reviewed": true,
+      "nvd_published_at": "2024-12-17T19:15:06Z",
+      "github_reviewed_at": "2024-12-17T15:09:06Z"
+    },
+    "references": [
+      {
+        "type": "WEB",
+        "url": "https://github.com/vercel/next.js/security/advisories/GHSA-7gfc-8cq8-jh5f"
+      },
+      {
+        "type": "ADVISORY",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2024-51479"
+      },
+      {
+        "type": "WEB",
+        "url": "https://github.com/vercel/next.js/commit/1c8234eb20bc8afd396b89999a00f06b61d72d7b"
+      },
+      {
+        "type": "PACKAGE",
+        "url": "https://github.com/vercel/next.js"
+      },
+      {
+        "type": "WEB",
+        "url": "https://github.com/vercel/next.js/releases/tag/v14.2.15"
+      }
+    ],
+    "affected": [
+      {
+        "package": {
+          "name": "next",
+          "ecosystem": "npm",
+          "purl": "pkg:npm/next"
+        },
+        "ranges": [
+          {
+            "type": "SEMVER",
+            "events": [
+              {
+                "introduced": "9.5.5"
+              },
+              {
+                "fixed": "14.2.15"
+              }
+            ]
+          }
+        ],
+        "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2024/12/GHSA-7gfc-8cq8-jh5f/GHSA-7gfc-8cq8-jh5f.json"
+        }
+      }
+    ],
+    "schema_version": "1.7.3",
+    "severity": [
+      {
+        "type": "CVSS_V3",
+        "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"
+      }
+    ]
+  },
+  {
+    "id": "GHSA-2mhh-w6q8-5hxw",
+    "summary": "Remote Memory Disclosure in ws",
+    "details": "Versions of `ws` prior to 1.0.1 are affected by a remote memory disclosure vulnerability.\n\nIn certain rare circumstances, applications which allow users to control the arguments of a `client.ping()` call will cause `ws` to send the contents of an allocated but non-zero-filled buffer to the server. This may disclose sensitive information that still exists in memory after previous use of the memory for other tasks.\n\n\n\n## Proof of Concept\n```\nvar ws = require('ws')\n\nvar server = new ws.Server({ port: 9000 })\nvar client = new ws('ws://localhost:9000')\n\nclient.on('open', function () {\n  console.log('open')\n  client.ping(50) // this sends a non-zeroed buffer of 50 bytes\n\n  client.on('pong', function (data) {\n    console.log('got pong')\n    console.log(data) // Data from the client. \n  })\n})\n```\n\n\n## Recommendation\n\nUpdate to version 1.0.1 or greater.",
+    "aliases": [
+      "CVE-2016-10518"
+    ],
+    "modified": "2023-11-08T03:58:10.113790Z",
+    "published": "2019-02-18T23:56:42Z",
+    "database_specific": {
+      "github_reviewed": true,
+      "severity": "LOW",
+      "nvd_published_at": null,
+      "cwe_ids": [
+        "CWE-201"
+      ],
+      "github_reviewed_at": "2020-06-16T20:52:34Z"
+    },
+    "references": [
+      {
+        "type": "ADVISORY",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2016-10518"
+      },
+      {
+        "type": "WEB",
+        "url": "https://github.com/websockets/ws/commit/29293ed11b679e0366fa0f6bb9310b330dafd795"
+      },
+      {
+        "type": "WEB",
+        "url": "https://gist.github.com/c0nrad/e92005446c480707a74a"
+      },
+      {
+        "type": "ADVISORY",
+        "url": "https://github.com/advisories/GHSA-2mhh-w6q8-5hxw"
+      },
+      {
+        "type": "WEB",
+        "url": "https://github.com/websockets/ws/releases/tag/1.0.1"
+      },
+      {
+        "type": "WEB",
+        "url": "https://www.npmjs.com/advisories/67"
+      }
+    ],
+    "affected": [
+      {
+        "package": {
+          "name": "ws",
+          "ecosystem": "npm",
+          "purl": "pkg:npm/ws"
+        },
+        "ranges": [
+          {
+            "type": "SEMVER",
+            "events": [
+              {
+                "introduced": "0"
+              },
+              {
+                "fixed": "1.0.1"
+              }
+            ]
+          }
+        ],
+        "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2019/02/GHSA-2mhh-w6q8-5hxw/GHSA-2mhh-w6q8-5hxw.json"
+        }
+      }
+    ],
+    "schema_version": "1.7.3"
+  },
+  {
+    "id": "GHSA-35q2-47q7-3pc3",
+    "summary": "Node-Redis potential exponential regex in monitor mode",
+    "details": "### Impact\nWhen a client is in monitoring mode, the regex begin used to detected monitor messages could cause exponential backtracking on some strings. This issue could lead to a denial of service.\n\n### Patches\nThe problem was fixed in commit [`2d11b6d`](https://github.com/NodeRedis/node-redis/commit/2d11b6dc9b9774464a91fb4b448bad8bf699629e) and was released in version `3.1.1`.\n\n### References\n#1569 (GHSL-2021-026)",
+    "aliases": [
+      "CVE-2021-29469"
+    ],
+    "modified": "2026-03-13T22:14:10.168484Z",
+    "published": "2021-04-27T15:56:03Z",
+    "related": [
+      "CVE-2021-29469"
+    ],
+    "database_specific": {
+      "github_reviewed": true,
+      "cwe_ids": [
+        "CWE-400"
+      ],
+      "nvd_published_at": "2021-04-23T18:15:00Z",
+      "severity": "HIGH",
+      "github_reviewed_at": "2021-04-23T18:11:39Z"
+    },
+    "references": [
+      {
+        "type": "WEB",
+        "url": "https://github.com/NodeRedis/node-redis/security/advisories/GHSA-35q2-47q7-3pc3"
+      },
+      {
+        "type": "ADVISORY",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2021-29469"
+      },
+      {
+        "type": "WEB",
+        "url": "https://github.com/NodeRedis/node-redis/commit/2d11b6dc9b9774464a91fb4b448bad8bf699629e"
+      },
+      {
+        "type": "WEB",
+        "url": "https://github.com/NodeRedis/node-redis/releases/tag/v3.1.1"
+      },
+      {
+        "type": "WEB",
+        "url": "https://security.netapp.com/advisory/ntap-20210611-0010"
+      }
+    ],
+    "affected": [
+      {
+        "package": {
+          "name": "redis",
+          "ecosystem": "npm",
+          "purl": "pkg:npm/redis"
+        },
+        "ranges": [
+          {
+            "type": "SEMVER",
+            "events": [
+              {
+                "introduced": "2.6.0"
+              },
+              {
+                "fixed": "3.1.1"
+              }
+            ]
+          }
+        ],
+        "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2021/04/GHSA-35q2-47q7-3pc3/GHSA-35q2-47q7-3pc3.json"
+        }
+      }
+    ],
+    "schema_version": "1.7.5",
+    "severity": [
+      {
+        "type": "CVSS_V3",
+        "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+      }
+    ]
+  },
+  {
+    "id": "GHSA-m95q-7qp3-xv42",
+    "summary": "Zod denial of service vulnerability",
+    "details": "Zod version 3.22.2 allows an attacker to perform a denial of service while validating emails.",
+    "aliases": [
+      "CVE-2023-4316"
+    ],
+    "modified": "2024-09-06T19:11:37Z",
+    "published": "2023-09-28T21:30:58Z",
+    "database_specific": {
+      "nvd_published_at": "2023-09-28T21:15:10Z",
+      "github_reviewed": true,
+      "github_reviewed_at": "2023-10-02T16:26:26Z",
+      "severity": "MODERATE",
+      "cwe_ids": [
+        "CWE-1333"
+      ]
+    },
+    "references": [
+      {
+        "type": "ADVISORY",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2023-4316"
+      },
+      {
+        "type": "WEB",
+        "url": "https://github.com/colinhacks/zod/issues/2609"
+      },
+      {
+        "type": "WEB",
+        "url": "https://github.com/colinhacks/zod/pull/2824"
+      },
+      {
+        "type": "WEB",
+        "url": "https://github.com/colinhacks/zod/commit/2ba00fe2377f4d53947a84b8cdb314a63bbd6dd4"
+      },
+      {
+        "type": "WEB",
+        "url": "https://fluidattacks.com/advisories/swift"
+      },
+      {
+        "type": "PACKAGE",
+        "url": "https://github.com/colinhacks/zod"
+      },
+      {
+        "type": "WEB",
+        "url": "https://github.com/colinhacks/zod/releases/tag/v3.22.3"
+      },
+      {
+        "type": "WEB",
+        "url": "https://www.npmjs.com/package/zod"
+      }
+    ],
+    "affected": [
+      {
+        "package": {
+          "name": "zod",
+          "ecosystem": "npm",
+          "purl": "pkg:npm/zod"
+        },
+        "ranges": [
+          {
+            "type": "SEMVER",
+            "events": [
+              {
+                "introduced": "0"
+              },
+              {
+                "fixed": "3.22.3"
+              }
+            ]
+          }
+        ],
+        "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2023/09/GHSA-m95q-7qp3-xv42/GHSA-m95q-7qp3-xv42.json",
+          "last_known_affected_version_range": "<= 3.22.2"
+        }
+      }
+    ],
+    "schema_version": "1.7.3",
+    "severity": [
+      {
+        "type": "CVSS_V3",
+        "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"
+      }
+    ]
+  },
+  {
+    "id": "GHSA-prmc-5v5w-c465",
+    "summary": "Client TLS credentials sent raw to server in npm package nats",
+    "details": "Nats is a Node.js client for the NATS messaging system.\n\n## Problem Description\n\n_Preview versions_ of two NPM packages and one Deno package from the NATS project contain an information disclosure flaw, leaking options to the NATS server; for one package, this includes TLS private credentials.\n\nThe _connection_ configuration options in these JavaScript-based implementations were fully serialized and sent to the server in the client's `CONNECT` message, immediately after TLS establishment.\n\nThe nats.js client supports Mutual TLS and the credentials for the TLS client key are included in the connection configuration options; disclosure of the client's TLS private key to the server has been observed.\n\nMost authentication mechanisms are handled after connection, instead of as part of connection, so other authentication mechanisms are unaffected.\nFor clarity: NATS account NKey authentication **is NOT affected**.\n\nNeither the nats.ws nor the nats.deno clients support Mutual TLS: the affected versions listed below are those where the logic flaw is\npresent.  We are including the nats.ws and nats.deno versions out of an abundance of caution, as library maintainers, but rate as minimal the likelihood of applications leaking sensitive data.\n\n\n## Affected versions\n\n### Security impact\n\n* NPM package nats.js:\n  + **mainline is unaffected**\n  + beta branch is vulnerable from 2.0.0-201, fixed in 2.0.0-209\n\n### Logic flaw\n\n* NPM package nats.ws:\n  + status: preview\n  + flawed from 1.0.0-85, fixed in 1.0.0-111\n\n* Deno repository https://github.com/nats-io/nats.deno\n  + status: preview\n  + flawed in all git tags prior to fix\n  + fixed with git tag v1.0.0-9\n\n\n## Impact\n\nFor deployments using TLS client certificates (for mutual TLS), private key material for TLS is leaked from the client application to the\nserver.  If the server is untrusted (run by a third party), or if the client application also disables TLS verification (and so the true identity of the server is unverifiable) then authentication credentials are leaked.\n\n## Workaround\n\n*None*\n\n## Solution\n\nUpgrade your package dependencies to fixed versions, and then reissue any TLS client credentials (with new keys, not just new certificates) and revoke the old ones.",
+    "modified": "2021-03-31T18:09:39Z",
+    "published": "2021-04-06T17:32:38Z",
+    "database_specific": {
+      "nvd_published_at": null,
+      "github_reviewed": true,
+      "github_reviewed_at": "2021-03-31T18:09:39Z",
+      "cwe_ids": [
+        "CWE-522"
+      ],
+      "severity": "CRITICAL"
+    },
+    "references": [
+      {
+        "type": "WEB",
+        "url": "https://github.com/nats-io/nats.js/security/advisories/GHSA-prmc-5v5w-c465"
+      },
+      {
+        "type": "WEB",
+        "url": "https://advisories.nats.io/CVE/CVE-2020-26149.txt"
+      }
+    ],
+    "affected": [
+      {
+        "package": {
+          "name": "nats",
+          "ecosystem": "npm",
+          "purl": "pkg:npm/nats"
+        },
+        "ranges": [
+          {
+            "type": "SEMVER",
+            "events": [
+              {
+                "introduced": "2.0.0-201"
+              },
+              {
+                "fixed": "2.0.0-209"
+              }
+            ]
+          }
+        ],
+        "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2021/04/GHSA-prmc-5v5w-c465/GHSA-prmc-5v5w-c465.json",
+          "last_known_affected_version_range": "<= 2.0.0-208"
+        }
+      }
+    ],
+    "schema_version": "1.7.3"
+  },
+  {
+    "id": "GHSA-2q4g-w47c-4674",
+    "summary": "Unpreventable top-level navigation",
+    "details": "### Impact\nThe `will-navigate` event that apps use to prevent navigations to unexpected destinations [as per our security recommendations](https://www.electronjs.org/docs/tutorial/security) can be bypassed when a sub-frame performs a top-frame navigation across sites.\n\n### Patches\n\n* `11.0.0-beta.1`\n* `10.0.1`\n* `9.3.0`\n* `8.5.1`\n\n### Workarounds\nSandbox all your iframes using the [`sandbox` attribute](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/iframe#attr-sandbox).  This will prevent them creating top-frame navigations and is good practice anyway.\n\n### For more information\nIf you have any questions or comments about this advisory:\n\n* Email us at security@electronjs.org",
+    "aliases": [
+      "CVE-2020-15174"
+    ],
+    "modified": "2026-03-13T22:16:07.714555Z",
+    "published": "2020-10-06T14:24:04Z",
+    "related": [
+      "CVE-2020-15174"
+    ],
+    "database_specific": {
+      "nvd_published_at": "2020-10-06T18:15:00Z",
+      "github_reviewed": true,
+      "github_reviewed_at": "2020-10-06T14:12:16Z",
+      "severity": "HIGH",
+      "cwe_ids": [
+        "CWE-20",
+        "CWE-693"
+      ]
+    },
+    "references": [
+      {
+        "type": "WEB",
+        "url": "https://github.com/electron/electron/security/advisories/GHSA-2q4g-w47c-4674"
+      },
+      {
+        "type": "ADVISORY",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2020-15174"
+      },
+      {
+        "type": "WEB",
+        "url": "https://github.com/electron/electron/commit/18613925610ba319da7f497b6deed85ad712c59b"
+      },
+      {
+        "type": "PACKAGE",
+        "url": "https://github.com/electron/electron"
+      }
+    ],
+    "affected": [
+      {
+        "package": {
+          "name": "electron",
+          "ecosystem": "npm",
+          "purl": "pkg:npm/electron"
+        },
+        "ranges": [
+          {
+            "type": "SEMVER",
+            "events": [
+              {
+                "introduced": "8.0.0-beta.0"
+              },
+              {
+                "fixed": "8.5.1"
+              }
+            ]
+          }
+        ],
+        "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2020/10/GHSA-2q4g-w47c-4674/GHSA-2q4g-w47c-4674.json"
+        }
+      },
+      {
+        "package": {
+          "name": "electron",
+          "ecosystem": "npm",
+          "purl": "pkg:npm/electron"
+        },
+        "ranges": [
+          {
+            "type": "SEMVER",
+            "events": [
+              {
+                "introduced": "9.0.0-beta.0"
+              },
+              {
+                "fixed": "9.3.0"
+              }
+            ]
+          }
+        ],
+        "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2020/10/GHSA-2q4g-w47c-4674/GHSA-2q4g-w47c-4674.json"
+        }
+      },
+      {
+        "package": {
+          "name": "electron",
+          "ecosystem": "npm",
+          "purl": "pkg:npm/electron"
+        },
+        "ranges": [
+          {
+            "type": "SEMVER",
+            "events": [
+              {
+                "introduced": "10.0.0-beta.0"
+              },
+              {
+                "fixed": "10.0.1"
+              }
+            ]
+          }
+        ],
+        "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2020/10/GHSA-2q4g-w47c-4674/GHSA-2q4g-w47c-4674.json"
+        }
+      }
+    ],
+    "schema_version": "1.7.5",
+    "severity": [
+      {
+        "type": "CVSS_V3",
+        "score": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:C/C:N/I:H/A:L"
+      }
+    ]
+  },
+  {
+    "id": "GHSA-mvjj-gqq2-p4hw",
+    "summary": "Cross-Site Scripting in react-dom",
+    "details": "Affected versions of `react-dom` are vulnerable to Cross-Site Scripting (XSS). The package fails to validate attribute names in HTML tags which may lead to Cross-Site Scripting in specific scenarios. This may allow attackers to execute arbitrary JavaScript in the victim's browser. To be affected by this vulnerability, the application needs to:\n- be a server-side React app\n- be rendered to HTML using `ReactDOMServer`\n- include an attribute name from user input in an HTML tag\n\n\n## Recommendation\n\nIf you are using `react-dom` 16.0.x, upgrade to 16.0.1 or later.  \nIf you are using `react-dom` 16.1.x, upgrade to 16.1.2 or later.  \nIf you are using `react-dom` 16.2.x, upgrade to 16.2.1 or later.  \nIf you are using `react-dom` 16.3.x, upgrade to 16.3.3 or later.  \nIf you are using `react-dom` 16.4.x, upgrade to 16.4.2 or later.",
+    "aliases": [
+      "CVE-2018-6341"
+    ],
+    "modified": "2023-11-08T04:00:21.209483Z",
+    "published": "2019-01-04T19:05:35Z",
+    "database_specific": {
+      "github_reviewed_at": "2020-06-16T21:47:15Z",
+      "severity": "MODERATE",
+      "nvd_published_at": null,
+      "github_reviewed": true,
+      "cwe_ids": [
+        "CWE-79"
+      ]
+    },
+    "references": [
+      {
+        "type": "ADVISORY",
+        "url": "https://nvd.nist.gov/vuln/detail/CVE-2018-6341"
+      },
+      {
+        "type": "ADVISORY",
+        "url": "https://github.com/advisories/GHSA-mvjj-gqq2-p4hw"
+      },
+      {
+        "type": "WEB",
+        "url": "https://reactjs.org/blog/2018/08/01/react-v-16-4-2.html"
+      },
+      {
+        "type": "WEB",
+        "url": "https://snyk.io/vuln/npm:react-dom:20180802"
+      },
+      {
+        "type": "WEB",
+        "url": "https://twitter.com/reactjs/status/1024745321987887104"
+      },
+      {
+        "type": "WEB",
+        "url": "https://www.npmjs.com/advisories/1421"
+      }
+    ],
+    "affected": [
+      {
+        "package": {
+          "name": "react-dom",
+          "ecosystem": "npm",
+          "purl": "pkg:npm/react-dom"
+        },
+        "ranges": [
+          {
+            "type": "SEMVER",
+            "events": [
+              {
+                "introduced": "16.0.0"
+              },
+              {
+                "fixed": "16.0.1"
+              }
+            ]
+          }
+        ],
+        "versions": [
+          "16.0.0"
+        ],
+        "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2019/01/GHSA-mvjj-gqq2-p4hw/GHSA-mvjj-gqq2-p4hw.json"
+        }
+      },
+      {
+        "package": {
+          "name": "react-dom",
+          "ecosystem": "npm",
+          "purl": "pkg:npm/react-dom"
+        },
+        "ranges": [
+          {
+            "type": "SEMVER",
+            "events": [
+              {
+                "introduced": "16.1.0"
+              },
+              {
+                "fixed": "16.1.2"
+              }
+            ]
+          }
+        ],
+        "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2019/01/GHSA-mvjj-gqq2-p4hw/GHSA-mvjj-gqq2-p4hw.json"
+        }
+      },
+      {
+        "package": {
+          "name": "react-dom",
+          "ecosystem": "npm",
+          "purl": "pkg:npm/react-dom"
+        },
+        "ranges": [
+          {
+            "type": "SEMVER",
+            "events": [
+              {
+                "introduced": "16.2.0"
+              },
+              {
+                "fixed": "16.2.1"
+              }
+            ]
+          }
+        ],
+        "versions": [
+          "16.2.0"
+        ],
+        "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2019/01/GHSA-mvjj-gqq2-p4hw/GHSA-mvjj-gqq2-p4hw.json"
+        }
+      },
+      {
+        "package": {
+          "name": "react-dom",
+          "ecosystem": "npm",
+          "purl": "pkg:npm/react-dom"
+        },
+        "ranges": [
+          {
+            "type": "SEMVER",
+            "events": [
+              {
+                "introduced": "16.3.0"
+              },
+              {
+                "fixed": "16.3.3"
+              }
+            ]
+          }
+        ],
+        "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2019/01/GHSA-mvjj-gqq2-p4hw/GHSA-mvjj-gqq2-p4hw.json"
+        }
+      },
+      {
+        "package": {
+          "name": "react-dom",
+          "ecosystem": "npm",
+          "purl": "pkg:npm/react-dom"
+        },
+        "ranges": [
+          {
+            "type": "SEMVER",
+            "events": [
+              {
+                "introduced": "16.4.0"
+              },
+              {
+                "fixed": "16.4.2"
+              }
+            ]
+          }
+        ],
+        "database_specific": {
+          "source": "https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2019/01/GHSA-mvjj-gqq2-p4hw/GHSA-mvjj-gqq2-p4hw.json"
+        }
+      }
+    ],
+    "schema_version": "1.7.3",
+    "severity": [
+      {
+        "type": "CVSS_V3",
+        "score": "CVSS:3.0/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N"
+      }
+    ]
+  }
+]
