@@ -22,7 +22,7 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata = {
-  title: "Islandflow Terminal",
+  title: "islandflow terminal",
   description: "Realtime options flow and off-exchange analysis terminal"
 };
 
