@@ -352,10 +352,10 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
     case "/":
     default:
       return {
-        options: false,
+        options: true,
         nbbo: false,
         equities: true,
-        flow: false,
+        flow: true,
         news: true,
         alerts: true,
         smartMoney: true,
@@ -364,17 +364,17 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         equityJoins: true,
         equityCandles: true,
         equityOverlay: true,
-        showOptionsPane: false,
+        showOptionsPane: true,
         showEquitiesPane: true,
-        showFlowPane: false,
+        showFlowPane: true,
         showNewsPane: true,
         showAlertsPane: true,
         showClassifierPane: false,
-        showDarkPane: false,
+        showDarkPane: true,
         showChartPane: true,
         showFocusPane: false,
         showReplayConsole: false,
-        needsClassifierDecor: false,
+        needsClassifierDecor: true,
         needsAlertEvidencePrefetch: true,
         needsDarkUnderlying: true
       };
@@ -4215,24 +4215,24 @@ const CandleChart = ({
       width,
       height,
       layout: {
-        background: { color: "#fffdf7" },
-        textColor: "#4e3e25"
+        background: { color: "#0d141b" },
+        textColor: "#90a0b2"
       },
       grid: {
-        vertLines: { color: "rgba(82, 64, 36, 0.12)" },
-        horzLines: { color: "rgba(82, 64, 36, 0.12)" }
+        vertLines: { color: "rgba(144, 160, 178, 0.12)" },
+        horzLines: { color: "rgba(144, 160, 178, 0.12)" }
       },
       crosshair: {
-        vertLine: { color: "rgba(47, 109, 79, 0.35)" },
-        horzLine: { color: "rgba(47, 109, 79, 0.35)" }
+        vertLine: { color: "rgba(245, 166, 35, 0.32)" },
+        horzLine: { color: "rgba(245, 166, 35, 0.32)" }
       },
       timeScale: {
-        borderColor: "rgba(111, 91, 57, 0.35)",
+        borderColor: "rgba(144, 160, 178, 0.24)",
         timeVisible: true,
         secondsVisible: intervalMs < 60000
       },
       rightPriceScale: {
-        borderColor: "rgba(111, 91, 57, 0.35)"
+        borderColor: "rgba(144, 160, 178, 0.24)"
       }
     });
 
@@ -4250,11 +4250,11 @@ const CandleChart = ({
     overlayCtxRef.current = overlayCanvas.getContext("2d");
 
     const series = chart.addCandlestickSeries({
-      upColor: "#2f6d4f",
-      downColor: "#c46f2a",
+      upColor: "#25c17a",
+      downColor: "#ff6b5f",
       borderVisible: false,
-      wickUpColor: "#2f6d4f",
-      wickDownColor: "#c46f2a"
+      wickUpColor: "#25c17a",
+      wickDownColor: "#ff6b5f"
     });
 
     chartRef.current = chart;
@@ -8397,6 +8397,278 @@ const ChartPane = memo(({ state, title = "Chart" }: ChartPaneProps) => {
   );
 });
 
+type CommandDeckTicker = {
+  symbol: string;
+  price: number | null;
+  move: number | null;
+  options: number;
+  alerts: number;
+};
+
+const buildCommandDeckTickers = (state: TerminalState): CommandDeckTicker[] => {
+  const symbols = new Set<string>();
+  for (const symbol of state.activeTickers) {
+    symbols.add(symbol);
+  }
+  for (const print of state.filteredEquities.slice(0, 80)) {
+    symbols.add(print.underlying_id.toUpperCase());
+  }
+  for (const print of state.filteredOptions.slice(0, 80)) {
+    const parsed = parseOptionContractId(normalizeContractId(print.option_contract_id));
+    const symbol = (print.underlying_id ?? parsed?.root ?? extractUnderlying(print.option_contract_id))?.toUpperCase();
+    if (symbol) {
+      symbols.add(symbol);
+    }
+  }
+  for (const event of state.filteredSmartMoneyEvents.slice(0, 30)) {
+    symbols.add(event.underlying_id.toUpperCase());
+  }
+  for (const story of state.filteredNews.slice(0, 20)) {
+    for (const symbol of story.resolved_symbols) {
+      symbols.add(symbol.toUpperCase());
+    }
+  }
+  if (symbols.size === 0) {
+    symbols.add(state.chartTicker.toUpperCase());
+  }
+
+  return Array.from(symbols).slice(0, 10).map((symbol) => {
+    const equityPrints = state.filteredEquities
+      .filter((print) => print.underlying_id.toUpperCase() === symbol)
+      .slice(0, 2);
+    const price = equityPrints[0]?.price ?? null;
+    const previous = equityPrints[1]?.price ?? null;
+    const move = price !== null && previous !== null && previous !== 0 ? (price - previous) / previous : null;
+    const options = state.filteredOptions
+      .slice(0, 120)
+      .filter((print) => {
+        const parsed = parseOptionContractId(normalizeContractId(print.option_contract_id));
+        const underlying = (print.underlying_id ?? parsed?.root ?? extractUnderlying(print.option_contract_id))?.toUpperCase();
+        return underlying === symbol;
+      }).length;
+    const alerts = state.filteredAlerts
+      .slice(0, 80)
+      .filter((alert) => alert.trace_id.toUpperCase().includes(symbol)).length;
+    return { symbol, price, move, options, alerts };
+  });
+};
+
+const CommandDeckHeader = ({ state }: { state: TerminalState }) => {
+  const focus = state.activeTickers.length > 0 ? state.activeTickers.join(", ") : state.chartTicker;
+  const selected = state.selectedInstrumentLabel ?? "No contract lock";
+  const connectionLabel = state.mode === "live" ? statusLabel(state.liveSession.status, false, state.mode) : "Replay";
+
+  return (
+    <header className="command-deck-header" aria-label="Command deck context">
+      <div className="command-deck-brand">
+        <span className="command-deck-mark" aria-hidden="true" />
+        <div>
+          <span className="command-deck-kicker">islandflow</span>
+          <h2>Command Deck</h2>
+        </div>
+      </div>
+      <div className="command-deck-brief">
+        <span>Evidence console</span>
+        <strong>{focus}</strong>
+        <span>{selected}</span>
+      </div>
+      <div className="command-deck-controls" aria-label="Active command deck controls">
+        <span className={`command-chip command-chip-${state.liveSession.status}`}>
+          {state.mode === "live" ? "Live" : "Replay"}: {connectionLabel}
+        </span>
+        <span className="command-chip">Last {state.lastSeen ? formatTime(state.lastSeen) : "waiting"}</span>
+        <button className="terminal-button" type="button" onClick={state.toggleMode}>
+          {state.mode === "live" ? "Switch to Replay" : "Switch to Live"}
+        </button>
+      </div>
+    </header>
+  );
+};
+
+const TickerRail = ({ state }: { state: TerminalState }) => {
+  const tickers = useMemo(() => buildCommandDeckTickers(state), [state]);
+
+  return (
+    <div className="command-ticker-rail" aria-label="Live ticker focus rail">
+      <div className="command-ticker-track">
+        {tickers.map((ticker) => {
+          const direction = ticker.move === null ? "flat" : ticker.move >= 0 ? "up" : "down";
+          const equity = state.filteredEquities.find((print) => print.underlying_id.toUpperCase() === ticker.symbol);
+          return (
+            <button
+              className={`command-ticker-card is-${direction}`}
+              key={ticker.symbol}
+              type="button"
+              onClick={() => (equity ? state.focusEquityTicker(equity) : state.setFilterInput(ticker.symbol))}
+            >
+              <span className="command-ticker-symbol">{ticker.symbol}</span>
+              <span className="command-ticker-price">{ticker.price === null ? "--" : `$${formatPrice(ticker.price)}`}</span>
+              <span className="command-ticker-move">
+                {ticker.move === null
+                  ? "Move n/a"
+                  : `${direction === "up" ? "Up" : "Down"} ${formatPct(Math.abs(ticker.move))}`}
+              </span>
+              <span className="command-ticker-meta">
+                {ticker.options} opt / {ticker.alerts} alerts
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+const FeedHealthPane = ({ state }: { state: TerminalState }) => {
+  const rows = [
+    { label: "Options", tape: state.options, subscribed: state.routeFeatures.options },
+    { label: "Equities", tape: state.equities, subscribed: state.routeFeatures.equities },
+    { label: "Flow", tape: state.flow, subscribed: state.routeFeatures.flow },
+    { label: "Alerts", tape: state.alerts, subscribed: state.routeFeatures.alerts },
+    { label: "News", tape: state.news, subscribed: state.routeFeatures.news },
+    { label: "Dark", tape: state.inferredDark, subscribed: state.routeFeatures.inferredDark }
+  ];
+
+  return (
+    <Pane
+      className="command-feed-pane"
+      title="Feed Health"
+      status={<span className="command-pane-meta">{state.liveSession.manifest.length} subscriptions</span>}
+    >
+      <div className="command-health-list">
+        {rows.map(({ label, tape, subscribed }) => (
+          <div className="command-health-row" key={label}>
+            <span>{label}</span>
+            <span className={`command-health-status command-health-${tape.status}`}>
+              {subscribed ? statusLabel(tape.status, tape.paused, state.mode) : "Idle"}
+            </span>
+            <span>{tape.lastUpdate ? formatTime(tape.lastUpdate) : "No update"}</span>
+            <span>{tape.dropped > 0 ? `${tape.dropped} dropped` : "Queue clear"}</span>
+          </div>
+        ))}
+      </div>
+    </Pane>
+  );
+};
+
+const EventContextPane = ({ state }: { state: TerminalState }) => {
+  const events = [
+    ...state.filteredAlerts.slice(0, 3).map((alert) => ({
+      key: `alert-${alert.trace_id}-${alert.seq}`,
+      ts: alert.source_ts,
+      label: "Alert",
+      title: alert.hits[0] ? humanizeClassifierId(alert.hits[0].classifier_id) : "Classifier alert",
+      detail: alert.hits[0]?.explanations?.[0] ?? `${alert.hits.length} linked hits`,
+      action: () => state.setSelectedAlert(alert)
+    })),
+    ...state.filteredSmartMoneyEvents.slice(0, 3).map((event) => ({
+      key: `smart-${event.event_id}-${event.seq}`,
+      ts: event.source_ts,
+      label: "Smart",
+      title: smartMoneyProfileLabel(event.primary_profile_id),
+      detail: `${event.underlying_id} ${normalizeDirection(event.primary_direction)} / ${event.packet_ids.length} packets`,
+      action: () => state.openFromSmartMoneyEvent(event)
+    })),
+    ...state.filteredInferredDark.slice(0, 3).map((event) => ({
+      key: `dark-${event.trace_id}-${event.seq}`,
+      ts: event.source_ts,
+      label: "Dark",
+      title: humanizeClassifierId(event.type),
+      detail: `${event.evidence_refs.length} evidence refs / confidence ${formatConfidence(event.confidence)}`,
+      action: () => state.setSelectedDarkEvent(event)
+    })),
+    ...state.filteredNews.slice(0, 2).map((story) => ({
+      key: `news-${story.trace_id}-${story.seq}`,
+      ts: story.published_ts,
+      label: "News",
+      title: story.headline,
+      detail: story.resolved_symbols.length > 0 ? story.resolved_symbols.join(", ") : story.source,
+      action: () => state.setSelectedNewsStory(story)
+    }))
+  ].sort((a, b) => b.ts - a.ts).slice(0, 6);
+
+  return (
+    <Pane
+      className="command-context-pane"
+      title="Event Context"
+      status={<span className="command-pane-meta">Focus evidence</span>}
+    >
+      {events.length === 0 ? (
+        <div className="empty">No linked evidence is available for this scope yet.</div>
+      ) : (
+        <div className="command-context-list" role="list">
+          {events.map((event) => (
+            <button className="command-context-row" key={event.key} type="button" onClick={event.action}>
+              <time>{formatTime(event.ts)}</time>
+              <span className="command-context-kind">{event.label}</span>
+              <strong>{event.title}</strong>
+              <span>{event.detail}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </Pane>
+  );
+};
+
+const HomeReplayRail = ({ state }: { state: TerminalState }) => {
+  const replayTime =
+    state.options.replayTime ??
+    state.equities.replayTime ??
+    state.flow.replayTime ??
+    state.alerts.replayTime ??
+    state.inferredDark.replayTime;
+  const replayComplete =
+    state.options.replayComplete ||
+    state.equities.replayComplete ||
+    state.flow.replayComplete ||
+    state.alerts.replayComplete ||
+    state.inferredDark.replayComplete;
+  const activeSource = state.replaySource ? state.replaySource.toUpperCase() : state.mode === "live" ? "LIVE HEAD" : "AUTO";
+
+  return (
+    <Pane
+      className="command-replay-pane"
+      title="Replay / Mode"
+      status={
+        <TapeStatus
+          status={state.mode === "live" ? state.liveSession.status : state.options.status}
+          lastUpdate={state.lastSeen}
+          replayTime={replayTime}
+          replayComplete={replayComplete}
+          paused={false}
+          dropped={state.options.dropped + state.equities.dropped + state.flow.dropped + state.alerts.dropped}
+          mode={state.mode}
+        />
+      }
+      actions={
+        <button className="terminal-button" type="button" onClick={state.toggleMode}>
+          {state.mode === "live" ? "Replay" : "Live"}
+        </button>
+      }
+    >
+      <div className="command-replay-strip">
+        <div>
+          <span>Source</span>
+          <strong>{activeSource}</strong>
+        </div>
+        <div>
+          <span>Cursor</span>
+          <strong>{replayTime ? formatTime(replayTime) : state.lastSeen ? formatTime(state.lastSeen) : "waiting"}</strong>
+        </div>
+        <div>
+          <span>Chart</span>
+          <strong>{state.chartTicker} / {formatIntervalLabel(state.chartIntervalMs)}</strong>
+        </div>
+        <div>
+          <span>Scope</span>
+          <strong>{state.activeTickers.length > 0 ? state.activeTickers.join(", ") : "All symbols"}</strong>
+        </div>
+      </div>
+    </Pane>
+  );
+};
+
 const FocusPane = memo(({ state }: { state: TerminalState }) => {
   const hits = state.chartSmartMoneyEvents.slice(-10).reverse();
   const dark = state.chartInferredDark.slice(-10).reverse();
@@ -9040,11 +9312,18 @@ export function OverviewRoute() {
   const state = useTerminal();
   return (
     <PageFrame title="Home">
-      <div className="page-grid page-grid-home">
-        <ChartPane state={state} />
-        <EquitiesPane state={state} />
-        <NewsPane state={state} limit={6} />
-        <AlertsPane state={state} withStrip />
+      <div className="command-deck-shell">
+        <CommandDeckHeader state={state} />
+        <TickerRail state={state} />
+        <div className="command-deck-grid">
+          <OptionsPane state={state} limit={14} />
+          <ChartPane state={state} title="Price / Flow" />
+          <AlertsPane state={state} limit={8} withStrip className="command-signals-pane" />
+          <FeedHealthPane state={state} />
+          <DarkPane state={state} limit={8} className="command-dark-pane" />
+          <EventContextPane state={state} />
+          <HomeReplayRail state={state} />
+        </div>
       </div>
     </PageFrame>
   );
