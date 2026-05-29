@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Remove frontend cooker route</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #06080b;
+      --panel: #111820;
+      --panel-2: #0d141b;
+      --border: rgba(255, 255, 255, 0.13);
+      --text: #e6edf4;
+      --muted: #90a0b2;
+      --faint: #6e7b8c;
+      --accent: #f5a623;
+      --accent-soft: rgba(245, 166, 35, 0.12);
+      --red-soft: rgba(255, 107, 95, 0.13);
+      --green-soft: rgba(37, 193, 122, 0.12);
+      font-family: "IBM Plex Sans", Inter, system-ui, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: linear-gradient(180deg, #0b1016 0%, var(--bg) 100%);
+      color: var(--text);
+      line-height: 1.55;
+    }
+
+    main {
+      width: min(1040px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 48px 0 72px;
+    }
+
+    header {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.018));
+      padding: 24px;
+    }
+
+    h1, h2, h3, code, pre {
+      font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: 1.9rem;
+      letter-spacing: 0;
+      line-height: 1.15;
+    }
+
+    h2 {
+      margin: 34px 0 12px;
+      font-size: 1rem;
+      color: var(--accent);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    p { margin: 0 0 14px; color: var(--muted); }
+
+    ul { margin: 0; padding-left: 1.2rem; color: var(--muted); }
+
+    li + li { margin-top: 7px; }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 18px;
+    }
+
+    .chip {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.035);
+      padding: 4px 9px;
+      color: var(--text);
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.78rem;
+    }
+
+    section {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 22px;
+    }
+
+    section:last-child { border-bottom: 0; }
+
+    pre {
+      margin: 12px 0 0;
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #080c11;
+      padding: 14px;
+      color: #d9e6f2;
+      font-size: 0.83rem;
+      line-height: 1.45;
+    }
+
+    code {
+      color: #f5d392;
+      font-size: 0.93em;
+    }
+
+    .note {
+      border: 1px solid rgba(245, 166, 35, 0.24);
+      border-radius: 10px;
+      background: var(--accent-soft);
+      padding: 12px 14px;
+      color: #f6d69c;
+    }
+
+    .ok {
+      border-color: rgba(37, 193, 122, 0.22);
+      background: var(--green-soft);
+      color: #a9e8c9;
+    }
+
+    .risk {
+      border-color: rgba(255, 107, 95, 0.24);
+      background: var(--red-soft);
+      color: #ffc1bb;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Remove frontend cooker route</h1>
+      <p>Removed the experimental <code>/frontend-cooker</code> page from the Next.js app and cleaned up repository references that still listed it as a public route or scanner candidate.</p>
+      <div class="meta">
+        <span class="chip">2026-05-29 09:51 EDT</span>
+        <span class="chip">Beads: islandflow-dk5</span>
+        <span class="chip">Scope: web route removal</span>
+      </div>
+    </header>
+
+    <section>
+      <h2>Summary</h2>
+      <p>The frontend cooker prototype is no longer routable in the web app. Its page component and CSS module were deleted, and the attack-surface documentation now reflects the remaining public pages.</p>
+    </section>
+
+    <section>
+      <h2>Changes Made</h2>
+      <ul>
+        <li>Deleted <code>apps/web/app/frontend-cooker/page.tsx</code>.</li>
+        <li>Deleted <code>apps/web/app/frontend-cooker/frontend-cooker.module.css</code>.</li>
+        <li>Removed <code>/frontend-cooker</code> from the architecture entrypoint inventory.</li>
+        <li>Removed <code>/frontend-cooker</code> from the public routes authorization matrix.</li>
+        <li>Removed stale scanner candidate entries for the deleted page from <code>piolium/attack-surface/candidates-summary.md</code> and <code>piolium/attack-surface/candidates.jsonl</code>.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Context</h2>
+      <p>The removed page was an experimental visual exploration route with several mock terminal variations. It was still exposed by file-system routing and listed in security inventory artifacts even though it was not part of the core Islandflow terminal workflow.</p>
+    </section>
+
+    <section>
+      <h2>Important Implementation Details</h2>
+      <p>Next.js removes the route when the corresponding folder no longer contains a page file. No redirects or replacement route were added, so requests to <code>/frontend-cooker</code> will now fall through to the app's not-found behavior.</p>
+      <p>The existing local modification to <code>apps/web/next-env.d.ts</code> was left untouched because it predated this task.</p>
+    </section>
+
+    <section>
+      <h2>Relevant Diff Snippets</h2>
+      <p class="note">The repo asks for <code>@pierre/diffs</code> output by default. Attempting <code>bunx @pierre/diffs --help</code> failed because the package does not expose a runnable CLI executable, so this document includes a labeled plain unified diff fallback.</p>
+      <pre><code>diff --git a/apps/web/app/frontend-cooker/page.tsx b/apps/web/app/frontend-cooker/page.tsx
+deleted file mode 100644
+--- a/apps/web/app/frontend-cooker/page.tsx
++++ /dev/null
+@@ -1,55 +0,0 @@
+-"use client";
+-
+-import { useMemo, useState } from "react";
+-import styles from "./frontend-cooker.module.css";
+-...
+-export default function FrontendCooker() {
+-  const [active, setActive] = useState(0);
+-  const current = variations[active];
+-  const nav = useMemo(() =&gt; variations.slice(0, 5), []);
+-  return &lt;div className={styles.cookerShell}&gt;...&lt;/div&gt;;
+-}</code></pre>
+      <pre><code>diff --git a/piolium/attack-surface/architecture-entrypoints.md b/piolium/attack-surface/architecture-entrypoints.md
+@@ -12,7 +12,7 @@
+ ### Web app (`apps/web/app`, Next.js on port 3000)
+-- Pages: `/`, `/tape`, `/signals`, `/charts`, `/news`, `/options`, `/replay`, `/frontend-cooker`.
++- Pages: `/`, `/tape`, `/signals`, `/charts`, `/news`, `/options`, `/replay`.</code></pre>
+      <pre><code>diff --git a/piolium/attack-surface/public-routes-authz-matrix.md b/piolium/attack-surface/public-routes-authz-matrix.md
+@@ -29,7 +29,7 @@
+-| 17 | Next public pages `/`, `/tape`, `/signals`, `/charts`, `/news`, `/options`, `/replay`, `/frontend-cooker` | ...
++| 17 | Next public pages `/`, `/tape`, `/signals`, `/charts`, `/news`, `/options`, `/replay` | ...</code></pre>
+    </section>
+
+    <section>
+      <h2>Expected Impact for End-Users</h2>
+      <p>Users will no longer be able to open the experimental frontend cooker page. The production terminal routes remain unchanged: <code>/</code>, <code>/tape</code>, <code>/signals</code>, <code>/charts</code>, <code>/news</code>, <code>/options</code>, and <code>/replay</code>.</p>
+    </section>
+
+    <section>
+      <h2>Validation</h2>
+      <p class="ok">Passed: <code>bun --cwd=apps/web run build</code>. The resulting Next.js route list did not include <code>/frontend-cooker</code>.</p>
+      <p>Also checked the repository with <code>rg -n "frontend-cooker|Frontend Cooker|/frontend-cooker" -S .</code>; no remaining references were found after the cleanup.</p>
+    </section>
+
+    <section>
+      <h2>Issues, Limitations, and Mitigations</h2>
+      <p class="risk">No runtime redirect was added. That is intentional for a removal request, but any external bookmark to <code>/frontend-cooker</code> will now receive the app's not-found response.</p>
+      <p>The <code>@pierre/diffs</code> CLI was not available through <code>bunx</code>, so the diff section uses a plain unified diff fallback.</p>
+    </section>
+
+    <section>
+      <h2>Follow-up Work</h2>
+      <p>No follow-up issue was filed because the requested route and known references were removed, and validation passed.</p>
+    </section>
+  </main>
+</body>
+</html>

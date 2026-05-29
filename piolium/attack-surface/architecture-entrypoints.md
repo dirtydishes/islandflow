@@ -12,7 +12,7 @@
 - WebSockets: `GET /ws/options`, `/ws/options-nbbo`, `/ws/equities`, `/ws/equity-candles`, `/ws/equity-quotes`, `/ws/equity-joins`, `/ws/inferred-dark`, `/ws/flow`, `/ws/classifier-hits`, `/ws/smart-money`, `/ws/alerts`, `/ws/live`.
 
 ### Web app (`apps/web/app`, Next.js on port 3000)
-- Pages: `/`, `/tape`, `/signals`, `/charts`, `/news`, `/options`, `/replay`, `/frontend-cooker`.
+- Pages: `/`, `/tape`, `/signals`, `/charts`, `/news`, `/options`, `/replay`.
 - Next API admin proxy: `GET /api/admin/synthetic/status`, `GET|PUT /api/admin/synthetic/control`.
 
 ### Desktop (`apps/desktop`)
