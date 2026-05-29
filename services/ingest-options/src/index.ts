@@ -157,7 +157,7 @@ const nbboHistoryByContract: ContextHistory<OptionNBBO> = new Map();
 const equityQuoteHistoryByUnderlying: ContextHistory<EquityQuote> = new Map();
 const OPTION_CONTEXT_PRUNE_INTERVAL_MS = 60_000;
 
-const pruneContextHistory = <T extends { ts: number }>(
+const pruneContextHistory = <T extends { ts: number; seq: number }>(
   history: ContextHistory<T>,
   maxKeys: number,
   ttlMs: number,

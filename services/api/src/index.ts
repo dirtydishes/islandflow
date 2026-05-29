@@ -59,7 +59,6 @@ import {
   fetchSmartMoneyEventsBefore,
   fetchFlowPacketsAfter,
   fetchFlowPacketById,
-  fetchAlertContextByTraceId,
   fetchFlowPacketsByMemberTraceIds,
   fetchFlowPacketsBefore,
   fetchRecentAlerts,
@@ -108,6 +107,7 @@ import {
   InferredDarkEventSchema,
   NewsStorySchema,
   LiveClientMessageSchema,
+  type LiveChannel,
   LiveServerMessage,
   LiveSubscription,
   LiveSubscriptionSchema,
@@ -118,6 +118,7 @@ import {
   SmartMoneyEventSchema,
   OptionNBBOSchema,
   OptionPrintSchema,
+  type OptionPrint,
   getSubscriptionKey
 } from "@islandflow/types";
 import { createClient } from "redis";
@@ -598,11 +599,8 @@ const parseLiveEquityPrintFilters = (url: URL): EquityPrintQueryFilters => ({
 
 const matchesScopedOptionSubscription = (
   print: { underlying_id?: string; option_contract_id: string },
-  subscription: LiveSubscription
+  subscription: Extract<LiveSubscription, { channel: "options" }>
 ): boolean => {
-  if (subscription.channel !== "options") {
-    return false;
-  }
   if (subscription.option_contract_id && subscription.option_contract_id !== print.option_contract_id) {
     return false;
   }
@@ -1016,7 +1014,7 @@ const run = async () => {
   const fanoutLive = async (
     subscription: LiveSubscription,
     item: unknown,
-    ingestChannel: "options" | "nbbo" | "equities" | "equity-quotes" | "equity-candles" | "equity-overlay" | "equity-joins" | "flow" | "classifier-hits" | "alerts" | "inferred-dark" | "news"
+    ingestChannel: LiveChannel
   ) => {
     const watermark = await liveState.ingest(ingestChannel, item);
 
@@ -1033,7 +1031,7 @@ const run = async () => {
       return;
     }
 
-    const optionItem = ingestChannel === "options" ? (item as Parameters<typeof matchesOptionPrintFilters>[0]) : null;
+    const optionItem = ingestChannel === "options" ? (item as OptionPrint) : null;
     const equityItem = ingestChannel === "equities" ? (item as Parameters<typeof matchesScopedEquitySubscription>[0]) : null;
     const flowItem = ingestChannel === "flow" ? (item as Parameters<typeof matchesFlowPacketFilters>[0]) : null;
     let matchedSubscriptions = 0;

@@ -245,7 +245,7 @@ describe("live manifest", () => {
     const filters = {
       ...buildDefaultFlowFilters(),
       minNotional: 500_000,
-      optionTypes: ["put"] as const
+      optionTypes: ["put" as const]
     };
     const manifest = getLiveManifest(
       "/options",
@@ -366,7 +366,7 @@ describe("contract-focused option helpers", () => {
     const filters = {
       ...buildDefaultFlowFilters(),
       minNotional: 500_000,
-      optionTypes: ["put"] as const
+      optionTypes: ["put" as const]
     };
 
     expect(

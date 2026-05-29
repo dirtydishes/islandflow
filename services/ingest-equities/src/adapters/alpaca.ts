@@ -88,7 +88,7 @@ const decodePayload = (data: WebSocket.RawData): unknown => {
     return JSON.parse(new TextDecoder().decode(new Uint8Array(data.buffer, data.byteOffset, data.byteLength))) as unknown;
   }
 
-  return JSON.parse(new TextDecoder().decode(new Uint8Array(data as ArrayBuffer))) as unknown;
+  return JSON.parse(new TextDecoder().decode(new Uint8Array(data as unknown as ArrayBuffer))) as unknown;
 };
 
 const extractExchangeMeta = (payload: unknown): AlpacaExchangeMetaEntry[] => {

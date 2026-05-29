@@ -1,10 +1,13 @@
 import {
   connect,
   consumerOpts,
+  DiscardPolicy,
   type ConsumerOptsBuilder,
   type JetStreamClient,
   type JetStreamManager,
   type NatsConnection,
+  RetentionPolicy,
+  StorageType,
   type StreamConfig,
   type StreamUpdateConfig,
   JSONCodec,
@@ -182,17 +185,18 @@ export const buildStreamConfig = (
   subject: string,
   streamClass: StreamRetentionClass,
   env: Record<string, string | undefined> = process.env
-): StreamConfig => ({
-  name,
-  subjects: [subject],
-  retention: "limits",
-  storage: "file",
-  discard: "old",
-  max_msgs_per_subject: -1,
-  max_msgs: -1,
-  ...resolveStreamRetention(streamClass, env),
-  num_replicas: 1
-});
+): StreamConfig =>
+  ({
+    name,
+    subjects: [subject],
+    retention: RetentionPolicy.Limits,
+    storage: StorageType.File,
+    discard: DiscardPolicy.Old,
+    max_msgs_per_subject: -1,
+    max_msgs: -1,
+    ...resolveStreamRetention(streamClass, env),
+    num_replicas: 1
+  }) as StreamConfig;
 
 export const buildKnownStreamConfig = (
   name: string,

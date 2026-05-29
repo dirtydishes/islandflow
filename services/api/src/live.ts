@@ -489,7 +489,7 @@ const matchesScopedOptionSnapshot = (
   }
 
   const allowed = new Set(subscription.underlying_ids.map((value) => value.toUpperCase()));
-  return allowed.has(item.underlying_id.toUpperCase());
+  return item.underlying_id ? allowed.has(item.underlying_id.toUpperCase()) : false;
 };
 
 const matchesScopedEquitySnapshot = (

@@ -14,6 +14,8 @@ export type EquityPrintJoinRecord = {
   join_quality_json: string;
 };
 
+type JsonPrimitiveRecord = Record<string, string | number | boolean>;
+
 export const equityPrintJoinsTableDDL = (): string => {
   return `
 CREATE TABLE IF NOT EXISTS ${EQUITY_PRINT_JOINS_TABLE} (
@@ -46,11 +48,11 @@ export const toEquityPrintJoinRecord = (join: EquityPrintJoin): EquityPrintJoinR
   };
 };
 
-const safeJson = (value: string, fallback: Record<string, unknown>): Record<string, unknown> => {
+const safeJson = (value: string, fallback: JsonPrimitiveRecord): JsonPrimitiveRecord => {
   try {
     const parsed = JSON.parse(value);
     if (parsed && typeof parsed === "object") {
-      return parsed as Record<string, unknown>;
+      return parsed as JsonPrimitiveRecord;
     }
   } catch {
     // ignore

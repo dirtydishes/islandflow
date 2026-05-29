@@ -13,6 +13,8 @@ export type FlowPacketRecord = {
   join_quality_json: string;
 };
 
+type JsonPrimitiveRecord = Record<string, string | number | boolean>;
+
 export const flowPacketsTableDDL = (): string => {
   return `
 CREATE TABLE IF NOT EXISTS ${FLOW_PACKETS_TABLE} (
@@ -43,11 +45,11 @@ export const toFlowPacketRecord = (packet: FlowPacket): FlowPacketRecord => {
   };
 };
 
-const safeJson = (value: string, fallback: Record<string, unknown>): Record<string, unknown> => {
+const safeJson = (value: string, fallback: JsonPrimitiveRecord): JsonPrimitiveRecord => {
   try {
     const parsed = JSON.parse(value);
     if (parsed && typeof parsed === "object") {
-      return parsed as Record<string, unknown>;
+      return parsed as JsonPrimitiveRecord;
     }
   } catch {
     // ignore

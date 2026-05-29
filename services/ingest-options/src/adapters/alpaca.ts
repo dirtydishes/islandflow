@@ -380,7 +380,7 @@ const decodePayload = (data: WebSocket.RawData): unknown => {
     return decode(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
   }
 
-  return decode(new Uint8Array(data as ArrayBuffer));
+  return decode(new Uint8Array(data as unknown as ArrayBuffer));
 };
 
 const parseTimestamp = (value: string): number => {

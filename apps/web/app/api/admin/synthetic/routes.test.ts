@@ -40,7 +40,7 @@ describe("synthetic admin proxy helpers", () => {
         }
       });
     });
-    globalThis.fetch = fetchMock as typeof fetch;
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
     const route = await import("./status/route");
 
     const response = await route.GET();
