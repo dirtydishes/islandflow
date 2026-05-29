@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Harden Web Terminal UI States</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #101720;
+        --panel-2: #0b1118;
+        --line: rgba(230, 237, 244, 0.14);
+        --text: #e6edf4;
+        --muted: #9aabba;
+        --faint: #718093;
+        --accent: #f5a623;
+        --blue: #4da3ff;
+        --green: #25c17a;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        background: linear-gradient(180deg, #0b1016 0%, var(--bg) 100%);
+        color: var(--text);
+        font: 15px/1.55 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      main {
+        width: min(1120px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 48px 0 64px;
+      }
+
+      header {
+        display: grid;
+        gap: 12px;
+        padding-bottom: 28px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      h1, h2 {
+        margin: 0;
+        font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        letter-spacing: 0.02em;
+      }
+
+      h1 {
+        font-size: 2rem;
+        line-height: 1.15;
+      }
+
+      h2 {
+        margin-top: 34px;
+        font-size: 1rem;
+        color: var(--accent);
+        text-transform: uppercase;
+      }
+
+      p { max-width: 74ch; }
+
+      .summary {
+        max-width: 78ch;
+        color: var(--muted);
+        font-size: 1.02rem;
+      }
+
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chip {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 4px 9px;
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--muted);
+        font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.78rem;
+      }
+
+      section {
+        padding-top: 2px;
+      }
+
+      ul {
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 8px;
+      }
+
+      code, pre {
+        font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      pre {
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 14px;
+        background: var(--panel-2);
+        color: #dce7f2;
+      }
+
+      .diff-note {
+        color: var(--faint);
+        font-size: 0.86rem;
+      }
+
+      .callout {
+        border: 1px solid rgba(77, 163, 255, 0.28);
+        border-radius: 12px;
+        padding: 14px 16px;
+        background: rgba(77, 163, 255, 0.08);
+      }
+
+      a { color: var(--blue); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="meta">
+          <span class="chip">2026-05-29 18:04 EDT</span>
+          <span class="chip">Beads: islandflow-ggm</span>
+          <span class="chip">Web terminal hardening</span>
+        </div>
+        <h1>Harden Web Terminal UI States</h1>
+        <p class="summary">
+          The terminal UI now handles live and replay status, empty panes, clipped market data, and table semantics more reliably for real users, assistive technology, and unusual input values.
+        </p>
+      </header>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          I hardened the main web terminal surface by adding accessible feed announcements, reusable empty-state markup, safer data cells for clipped values, and stronger table semantics on the busiest tape panes.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Added <code>buildTapeStatusAnnouncement</code> so live and replay feed states have complete screen-reader labels instead of relying on colored dots or terse visible labels.</li>
+          <li>Added reusable <code>DataCell</code> and <code>EmptyState</code> helpers for terminal panes.</li>
+          <li>Updated Options, Equities, and Flow panes with semantic column headers, rowgroups, cells, and useful <code>title</code> fallbacks for clipped values.</li>
+          <li>Improved empty-state layout so long messages wrap cleanly without collapsing the pane.</li>
+          <li>Added <code>unicode-bidi: plaintext</code> to table cells so mixed-direction symbols, ticker text, and unusual copied values are less likely to reorder confusingly.</li>
+          <li>Added focused tests for the new status-announcement helper.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          Islandflow is an evidence console for live market investigation. The UI has to remain useful when feeds are stale, paused, empty, or carrying long contract identifiers and numeric values. Hardening here focused on making the existing dense terminal more robust without changing its visual identity.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <ul>
+          <li><code>TapeStatus</code> now exposes a polite status region with an <code>aria-label</code> such as <code>Live feed behind</code> or <code>Replay feed paused, time not available, 12 queued rows</code>.</li>
+          <li>The visible status dot is marked <code>aria-hidden</code>, keeping color as a visual cue rather than the only status carrier.</li>
+          <li>Table headers are generated from arrays to keep repeated header markup consistent.</li>
+          <li>Clipped values such as option contracts, exact timestamps, full notional values, NBBO quality strings, and venue labels now expose fuller details through <code>title</code> where useful.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p class="diff-note">
+          Diff snippets are presented in the format expected by diffs.com-style unified diff rendering. <code>@pierre/diffs</code> is installed in this repo, but it does not expose a CLI binary, so the relevant unified snippets are embedded directly.
+        </p>
+        <pre><code>diff --git a/apps/web/app/terminal.tsx b/apps/web/app/terminal.tsx
+@@
++export const buildTapeStatusAnnouncement = ({
++  status,
++  replayTime,
++  replayComplete,
++  paused,
++  dropped,
++  mode
++}: Pick&lt;TapeStatusProps, "status" | "replayTime" | "replayComplete" | "paused" | "dropped" | "mode"&gt;): string =&gt; {
++  const label = replayComplete ? "Replay Complete" : statusLabel(status, paused, mode);
++  const feedLabel = mode === "live" &amp;&amp; label.toLowerCase().startsWith("feed ")
++    ? label.toLowerCase()
++    : `feed ${label.toLowerCase()}`;
++  const parts = [`${mode === "live" ? "Live" : "Replay"} ${feedLabel}`];
++  ...
++};
++
++const EmptyState = ({ children }: { children: ReactNode }) =&gt; (
++  &lt;div className="empty" role="status" aria-live="polite"&gt;
++    {children}
++  &lt;/div&gt;
++);
+
+@@
+-    &lt;div className={`status-inline status-${status} ${mode === "replay" ? "status-replay" : ""}`.trim()}&gt;
+-      &lt;span className="status-dot" /&gt;
++    &lt;div
++      className={`status-inline status-${status} ${mode === "replay" ? "status-replay" : ""}`.trim()}
++      role="status"
++      aria-live="polite"
++      aria-label={announcement}
++    &gt;
++      &lt;span className="status-dot" aria-hidden="true" /&gt;</code></pre>
+
+        <pre><code>diff --git a/apps/web/app/globals.css b/apps/web/app/globals.css
+@@
+ .data-table-cell {
+   min-width: 0;
+   overflow: hidden;
+   text-overflow: ellipsis;
+   white-space: nowrap;
+   font-size: 0.72rem;
++  unicode-bidi: plaintext;
+ }
+
+ .empty {
++  display: flex;
++  align-items: center;
++  min-height: 76px;
+   padding: 18px;
+   border-radius: 12px;
+   border: 1px dashed var(--border);
+   background: var(--bg-soft);
+   color: var(--text-dim);
++  line-height: 1.4;
++  overflow-wrap: anywhere;
+ }</code></pre>
+
+        <pre><code>diff --git a/apps/web/app/terminal.test.ts b/apps/web/app/terminal.test.ts
+@@
++describe("tape status hardening", () =&gt; {
++  it("announces stale live feeds without relying on the colored dot", () =&gt; {
++    expect(
++      buildTapeStatusAnnouncement({
++        status: "stale",
++        replayTime: null,
++        replayComplete: false,
++        paused: false,
++        dropped: 0,
++        mode: "live"
++      })
++    ).toBe("Live feed behind");
++  });
++});</code></pre>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <p>
+          Traders and researchers should get a steadier terminal under imperfect feed conditions. Screen-reader users get explicit live and replay status changes, empty panes announce themselves clearly, and clipped market values are easier to inspect without widening the layout.
+        </p>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li><code>bun test apps/web/app/terminal.test.ts</code>: 76 passing tests.</li>
+          <li><code>bun --cwd=apps/web run build</code>: production build completed successfully.</li>
+          <li>Browser verification at <code>http://localhost:3000/options</code>: confirmed status regions, table semantics, column headers, rowgroup, and cells are present in the rendered page.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>The Options pane can still be wider than a narrow viewport by design; the table remains inside its horizontal scroll container.</li>
+          <li>Alert, classifier, dark-event, and news panes still have some older one-off markup. This task hardened the highest-traffic tape panes first.</li>
+          <li>The browser check observed a history-load warning because backend history was unavailable locally. That state rendered cleanly and was not a build blocker.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <div class="callout">
+          <p>
+            No additional Beads issue was required during this turn. A sensible future pass would extend the same <code>DataCell</code> and <code>EmptyState</code> treatment to Alerts, Smart Money, Dark Events, and the chart evidence lists.
+          </p>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

@@ -4,6 +4,7 @@ import {
   NAV_ITEMS,
   appendHistoryTail,
   buildAlertContextPath,
+  buildTapeStatusAnnouncement,
   buildDefaultFlowFilters,
   buildOptionTapeQueryParams,
   classifierToneForFamily,
@@ -50,6 +51,34 @@ import {
   statusLabel,
   toggleFilterValue
 } from "./terminal";
+
+describe("tape status hardening", () => {
+  it("builds a screen-reader announcement with replay state and queued rows", () => {
+    expect(
+      buildTapeStatusAnnouncement({
+        status: "connected",
+        replayTime: null,
+        replayComplete: false,
+        paused: true,
+        dropped: 12,
+        mode: "replay"
+      })
+    ).toBe("Replay feed paused, time not available, 12 queued rows");
+  });
+
+  it("announces stale live feeds without relying on the colored dot", () => {
+    expect(
+      buildTapeStatusAnnouncement({
+        status: "stale",
+        replayTime: null,
+        replayComplete: false,
+        paused: false,
+        dropped: 0,
+        mode: "live"
+      })
+    ).toBe("Live feed behind");
+  });
+});
 
 const makeItem = (traceId: string, seq: number, ts: number) => ({
   trace_id: traceId,

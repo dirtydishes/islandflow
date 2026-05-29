@@ -2145,6 +2145,59 @@ export const statusLabel = (status: WsStatus, paused: boolean, mode: TapeMode): 
   }
 };
 
+export const buildTapeStatusAnnouncement = ({
+  status,
+  replayTime,
+  replayComplete,
+  paused,
+  dropped,
+  mode
+}: Pick<TapeStatusProps, "status" | "replayTime" | "replayComplete" | "paused" | "dropped" | "mode">): string => {
+  const label = replayComplete ? "Replay Complete" : statusLabel(status, paused, mode);
+  const feedLabel = mode === "live" && label.toLowerCase().startsWith("feed ")
+    ? label.toLowerCase()
+    : `feed ${label.toLowerCase()}`;
+  const parts = [`${mode === "live" ? "Live" : "Replay"} ${feedLabel}`];
+
+  if (mode === "replay") {
+    parts.push(`time ${replayTime ? formatTime(replayTime) : "not available"}`);
+  }
+
+  if (paused && dropped > 0) {
+    parts.push(`${dropped} queued rows`);
+  }
+
+  return parts.join(", ");
+};
+
+const DataCell = ({
+  children,
+  className = "",
+  title,
+  numeric = false
+}: {
+  children: ReactNode;
+  className?: string;
+  title?: string;
+  numeric?: boolean;
+}) => {
+  const classes = ["data-table-cell", numeric ? "data-table-cell-number" : "", className]
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    <span className={classes} role="cell" title={title}>
+      {children}
+    </span>
+  );
+};
+
+const EmptyState = ({ children }: { children: ReactNode }) => (
+  <div className="empty" role="status" aria-live="polite">
+    {children}
+  </div>
+);
+
 type TapeConfig<T> = {
   mode: TapeMode;
   wsPath: string;
@@ -3893,17 +3946,33 @@ const TapeStatus = ({
 }: TapeStatusProps) => {
   const label = replayComplete ? "Replay Complete" : statusLabel(status, paused, mode);
   const pausedLabel = paused && dropped > 0 ? `+${dropped} queued` : "";
+  const announcement = buildTapeStatusAnnouncement({
+    status,
+    replayTime,
+    replayComplete,
+    paused,
+    dropped,
+    mode
+  });
 
   return (
-    <div className={`status-inline status-${status} ${mode === "replay" ? "status-replay" : ""}`.trim()}>
-      <span className="status-dot" />
+    <div
+      className={`status-inline status-${status} ${mode === "replay" ? "status-replay" : ""}`.trim()}
+      role="status"
+      aria-live="polite"
+      aria-label={announcement}
+    >
+      <span className="status-dot" aria-hidden="true" />
       <span className="status-inline-label">{label}</span>
       {mode === "replay" ? (
         <span className="status-inline-meta">
           Replay time {replayTime ? formatTime(replayTime) : "—"}
         </span>
       ) : null}
-      <span className={`status-inline-counter${pausedLabel ? " status-inline-counter-visible" : ""}`}>
+      <span
+        className={`status-inline-counter${pausedLabel ? " status-inline-counter-visible" : ""}`}
+        aria-hidden={!pausedLabel}
+      >
         {pausedLabel || "+000 queued"}
       </span>
     </div>
@@ -7532,7 +7601,7 @@ const OptionsPane = memo(({ state, limit }: OptionsPaneProps) => {
           </div>
         ) : null}
         {items.length === 0 ? (
-          <div className="empty">
+          <EmptyState>
             {state.mode === "live"
               ? state.options.status === "stale"
                 ? "Feed behind. Waiting for fresh option prints."
@@ -7544,29 +7613,23 @@ const OptionsPane = memo(({ state, limit }: OptionsPaneProps) => {
               : state.tickerSet.size > 0
                 ? "No option prints match the current filter."
                 : "Replay queue empty. Ensure ClickHouse has data."}
-          </div>
+          </EmptyState>
         ) : (
           <div className="data-table-wrap">
             <div className="data-table data-table-options" role="table" aria-label="Options tape">
               <div className="data-table-head" role="row">
-                <span className="data-table-cell">TIME</span>
-                <span className="data-table-cell">SYM</span>
-                <span className="data-table-cell">EXP</span>
-                <span className="data-table-cell">STRIKE</span>
-                <span className="data-table-cell">C/P</span>
-                <span className="data-table-cell">SPOT</span>
-                <span className="data-table-cell">DETAILS</span>
-                <span className="data-table-cell">TYPE</span>
-                <span className="data-table-cell">VALUE</span>
-                <span className="data-table-cell">SIDE</span>
-                <span className="data-table-cell">IV</span>
-                <span className="data-table-cell">CLASSIFIER</span>
+                {["TIME", "SYM", "EXP", "STRIKE", "C/P", "SPOT", "DETAILS", "TYPE", "VALUE", "SIDE", "IV", "CLASSIFIER"].map((header) => (
+                  <span className="data-table-cell" role="columnheader" key={header}>
+                    {header}
+                  </span>
+                ))}
               </div>
               <div className="data-table-scroll" ref={state.optionsScroll.setListRef}>
                 <div
                   className="data-table-body"
                   style={{ height: `${virtual.totalSize}px` }}
                   aria-hidden={virtual.virtualItems.length === 0}
+                  role="rowgroup"
                 >
                   {virtual.virtualItems.map(({ item: print, key, index, start, size }) => {
                     const contractId = normalizeContractId(print.option_contract_id);
@@ -7602,42 +7665,42 @@ const OptionsPane = memo(({ state, limit }: OptionsPaneProps) => {
                     };
                     const cells = (
                       <>
-                        <span className="data-table-cell data-table-cell-number">{formatTime(print.ts)}</span>
-                        <span className="data-table-cell">
+                        <DataCell numeric title={formatDateTime(print.ts)}>{formatTime(print.ts)}</DataCell>
+                        <DataCell title={contractId}>
                           <button className="instrument-cell-button" type="button" onClick={focusContract}>
                             {contractDisplay?.ticker ?? parsed?.root ?? formatContractLabel(contractId)}
                           </button>
-                        </span>
-                        <span className="data-table-cell">
+                        </DataCell>
+                        <DataCell title={contractDisplay?.expiration ?? parsed?.expiry ?? undefined}>
                           <button className="instrument-cell-button" type="button" onClick={focusContract}>
                             {contractDisplay?.expiration ?? parsed?.expiry ?? "--"}
                           </button>
-                        </span>
-                        <span className="data-table-cell data-table-cell-number">
+                        </DataCell>
+                        <DataCell numeric title={contractDisplay?.strike ?? undefined}>
                           <button className="instrument-cell-button" type="button" onClick={focusContract}>
                             {contractDisplay?.strike.replace(/[CP]$/, "") ?? "--"}
                           </button>
-                        </span>
-                        <span className="data-table-cell">
+                        </DataCell>
+                        <DataCell>
                           <button className="instrument-cell-button" type="button" onClick={focusContract}>
                             {parsed?.right ?? contractDisplay?.strike.slice(-1) ?? "--"}
                           </button>
-                        </span>
-                        <span className="data-table-cell data-table-cell-number">{typeof spot === "number" ? formatPrice(spot) : "--"}</span>
-                        <span className="data-table-cell data-table-cell-number">
+                        </DataCell>
+                        <DataCell numeric>{typeof spot === "number" ? formatPrice(spot) : "--"}</DataCell>
+                        <DataCell numeric title={`${formatSize(print.size)} at ${formatPrice(print.price)}, ${nbboSide ?? "unknown side"}`}>
                           {formatSize(print.size)}@{formatPrice(print.price)}_{nbboSide ?? "--"}
-                        </span>
-                        <span className="data-table-cell">{print.option_type ?? "--"}</span>
-                        <span className="data-table-cell data-table-cell-number notional-emphasis">${formatCompactUsd(notional)}</span>
-                        <span className="data-table-cell">
+                        </DataCell>
+                        <DataCell title={print.option_type ?? undefined}>{print.option_type ?? "--"}</DataCell>
+                        <DataCell numeric className="notional-emphasis" title={`$${formatUsd(notional)}`}>${formatCompactUsd(notional)}</DataCell>
+                        <DataCell>
                           {nbboSide ? (
                             <span className={`nbbo-tag nbbo-tag-${nbboSide.toLowerCase()}`}>{nbboSide}</span>
                           ) : (
                             "--"
                           )}
-                        </span>
-                        <span className="data-table-cell data-table-cell-number">{typeof iv === "number" ? formatPct(iv) : "--"}</span>
-                        <span className="data-table-cell">{decor ? humanizeClassifierId(decor.family) : "--"}</span>
+                        </DataCell>
+                        <DataCell numeric>{typeof iv === "number" ? formatPct(iv) : "--"}</DataCell>
+                        <DataCell title={decor ? humanizeClassifierId(decor.family) : undefined}>{decor ? humanizeClassifierId(decor.family) : "--"}</DataCell>
                       </>
                     );
 
@@ -7721,7 +7784,7 @@ const EquitiesPane = memo(({ state, limit }: EquitiesPaneProps) => {
     >
       <div className="data-table-shell">
         {items.length === 0 ? (
-          <div className="empty">
+          <EmptyState>
             {state.mode === "live"
               ? state.equities.status === "stale"
                 ? "Feed behind. Waiting for fresh equity prints."
@@ -7735,23 +7798,23 @@ const EquitiesPane = memo(({ state, limit }: EquitiesPaneProps) => {
               : state.tickerSet.size > 0
                 ? "No equity prints match the current filter."
                 : "Replay queue empty. Ensure ClickHouse has data."}
-          </div>
+          </EmptyState>
         ) : (
           <div className="data-table-wrap">
             <div className="data-table data-table-equities" role="table" aria-label="Equity prints">
               <div className="data-table-head" role="row">
-                <span className="data-table-cell">TIME</span>
-                <span className="data-table-cell">SYM</span>
-                <span className="data-table-cell">PRICE</span>
-                <span className="data-table-cell">SIZE</span>
-                <span className="data-table-cell">VENUE</span>
-                <span className="data-table-cell">TAPE</span>
+                {["TIME", "SYM", "PRICE", "SIZE", "VENUE", "TAPE"].map((header) => (
+                  <span className="data-table-cell" role="columnheader" key={header}>
+                    {header}
+                  </span>
+                ))}
               </div>
               <div className="data-table-scroll" ref={state.equitiesScroll.setListRef}>
-                <div className="data-table-body" style={{ height: `${virtual.totalSize}px` }}>
+                <div className="data-table-body" role="rowgroup" style={{ height: `${virtual.totalSize}px` }}>
                   {virtual.virtualItems.map(({ item: print, key, index, start, size }) => (
                     <div
                       className={`data-table-row data-table-row-equities data-table-virtual-row${index % 2 === 1 ? " is-even" : ""}`}
+                      role="row"
                       key={key}
                       data-index={index}
                       data-row-start={String(start)}
@@ -7759,8 +7822,8 @@ const EquitiesPane = memo(({ state, limit }: EquitiesPaneProps) => {
                       data-tape-key={key}
                       style={{ transform: `translateY(${start}px)` }}
                     >
-                      <span className="data-table-cell data-table-cell-number">{formatTime(print.ts)}</span>
-                      <span className="data-table-cell">
+                      <DataCell numeric title={formatDateTime(print.ts)}>{formatTime(print.ts)}</DataCell>
+                      <DataCell title={print.underlying_id}>
                         <button
                           className="instrument-cell-button"
                           type="button"
@@ -7768,11 +7831,11 @@ const EquitiesPane = memo(({ state, limit }: EquitiesPaneProps) => {
                         >
                           {print.underlying_id}
                         </button>
-                      </span>
-                      <span className="data-table-cell data-table-cell-number">${formatPrice(print.price)}</span>
-                      <span className="data-table-cell data-table-cell-number">{formatSize(print.size)}x</span>
-                      <span className="data-table-cell">{print.exchange}</span>
-                      <span className="data-table-cell">{print.offExchangeFlag ? "Off-Ex" : "Lit"}</span>
+                      </DataCell>
+                      <DataCell numeric>${formatPrice(print.price)}</DataCell>
+                      <DataCell numeric>{formatSize(print.size)}x</DataCell>
+                      <DataCell title={print.exchange}>{print.exchange}</DataCell>
+                      <DataCell>{print.offExchangeFlag ? "Off-Ex" : "Lit"}</DataCell>
                     </div>
                   ))}
                 </div>
@@ -7825,7 +7888,7 @@ const FlowPane = memo(({ state, limit, title = "Flow" }: FlowPaneProps) => {
     >
       <div className="data-table-shell">
         {items.length === 0 ? (
-          <div className="empty">
+          <EmptyState>
             {state.tickerSet.size > 0
               ? "No flow packets match the current filter."
               : state.mode === "live"
@@ -7833,23 +7896,19 @@ const FlowPane = memo(({ state, limit, title = "Flow" }: FlowPaneProps) => {
                   ? "Feed behind. Waiting for fresh flow packets."
                   : "No flow packets yet. Start compute."
                 : "Replay queue empty. Ensure ClickHouse has data."}
-          </div>
+          </EmptyState>
         ) : (
           <div className="data-table-wrap">
             <div className="data-table data-table-flow" role="table" aria-label="Flow packets">
               <div className="data-table-head" role="row">
-                <span className="data-table-cell">TIME</span>
-                <span className="data-table-cell">CONTRACT</span>
-                <span className="data-table-cell">PRINTS</span>
-                <span className="data-table-cell">SIZE</span>
-                <span className="data-table-cell">NOTIONAL</span>
-                <span className="data-table-cell">WINDOW</span>
-                <span className="data-table-cell">STRUCTURE</span>
-                <span className="data-table-cell">NBBO</span>
-                <span className="data-table-cell">QUALITY</span>
+                {["TIME", "CONTRACT", "PRINTS", "SIZE", "NOTIONAL", "WINDOW", "STRUCTURE", "NBBO", "QUALITY"].map((header) => (
+                  <span className="data-table-cell" role="columnheader" key={header}>
+                    {header}
+                  </span>
+                ))}
               </div>
               <div className="data-table-scroll" ref={state.flowScroll.setListRef}>
-                <div className="data-table-body" style={{ height: `${virtual.totalSize}px` }}>
+                <div className="data-table-body" role="rowgroup" style={{ height: `${virtual.totalSize}px` }}>
                   {virtual.virtualItems.map(({ item: packet, key, index, start, size }) => {
                     const features = packet.features ?? {};
                     const contract = String(features.option_contract_id ?? packet.id ?? "unknown");
@@ -7904,6 +7963,7 @@ const FlowPane = memo(({ state, limit, title = "Flow" }: FlowPaneProps) => {
                     return (
                       <div
                         className={`data-table-row data-table-row-flow data-table-virtual-row${index % 2 === 1 ? " is-even" : ""}${nbboStale || nbboMissing ? " data-table-row-warn" : ""}`}
+                        role="row"
                         key={key}
                         data-index={index}
                         data-row-start={String(start)}
@@ -7911,15 +7971,15 @@ const FlowPane = memo(({ state, limit, title = "Flow" }: FlowPaneProps) => {
                         data-tape-key={key}
                         style={{ transform: `translateY(${start}px)` }}
                       >
-                        <span className="data-table-cell data-table-cell-number">{formatTime(startTs)} → {formatTime(endTs)}</span>
-                        <span className="data-table-cell">{contract}</span>
-                        <span className="data-table-cell data-table-cell-number">{formatFlowMetric(count)}</span>
-                        <span className="data-table-cell data-table-cell-number">{formatFlowMetric(totalSize)}</span>
-                        <span className="data-table-cell data-table-cell-number">${formatUsd(notional)}</span>
-                        <span className="data-table-cell data-table-cell-number">{windowMs > 0 ? formatFlowMetric(windowMs, "ms") : "--"}</span>
-                        <span className="data-table-cell">{structureLabel}</span>
-                        <span className="data-table-cell data-table-cell-number">{nbboLabel}</span>
-                        <span className="data-table-cell">{qualityLabel || "--"}</span>
+                        <DataCell numeric title={`${formatDateTime(startTs)} to ${formatDateTime(endTs)}`}>{formatTime(startTs)} → {formatTime(endTs)}</DataCell>
+                        <DataCell title={contract}>{contract}</DataCell>
+                        <DataCell numeric>{formatFlowMetric(count)}</DataCell>
+                        <DataCell numeric>{formatFlowMetric(totalSize)}</DataCell>
+                        <DataCell numeric>${formatUsd(notional)}</DataCell>
+                        <DataCell numeric>{windowMs > 0 ? formatFlowMetric(windowMs, "ms") : "--"}</DataCell>
+                        <DataCell title={structureLabel !== "--" ? structureLabel : undefined}>{structureLabel}</DataCell>
+                        <DataCell numeric title={nbboLabel !== "--" ? nbboLabel : undefined}>{nbboLabel}</DataCell>
+                        <DataCell title={qualityLabel || undefined}>{qualityLabel || "--"}</DataCell>
                       </div>
                     );
                   })}

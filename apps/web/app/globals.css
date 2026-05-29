@@ -1675,6 +1675,7 @@ h3 {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 0.72rem;
+  unicode-bidi: plaintext;
 }
 
 .data-table-cell-number {
@@ -2010,11 +2011,16 @@ h3 {
 }
 
 .empty {
+  display: flex;
+  align-items: center;
+  min-height: 76px;
   padding: 18px;
   border-radius: 12px;
   border: 1px dashed var(--border);
   background: var(--bg-soft);
   color: var(--text-dim);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .drawer {
