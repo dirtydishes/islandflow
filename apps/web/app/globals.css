@@ -10,6 +10,7 @@
   --text: oklch(0.93 0.014 250);
   --text-dim: oklch(0.74 0.018 250);
   --text-faint: oklch(0.59 0.016 250);
+  --text-muted: var(--text-dim);
   --accent: oklch(0.78 0.12 74);
   --accent-soft: oklch(0.78 0.12 74 / 0.1);
   --green: oklch(0.74 0.13 151);
@@ -661,6 +662,7 @@ h3 {
   color: var(--text-muted);
   font-size: 0.78rem;
   line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .flow-filter-checkbox-grid,
@@ -1249,6 +1251,12 @@ h3 {
   color: var(--text-dim);
 }
 
+.drawer-note,
+.drawer-empty,
+.note {
+  overflow-wrap: anywhere;
+}
+
 .chart-surface {
   width: 100%;
   height: 460px;
@@ -1457,6 +1465,7 @@ h3 {
   color: oklch(0.91 0.08 72);
   font-size: 0.78rem;
   line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .data-table-wrap {
@@ -2291,6 +2300,7 @@ h3 {
 
 .synthetic-control-error {
   color: var(--red);
+  overflow-wrap: anywhere;
 }
 
 .drawer-header {

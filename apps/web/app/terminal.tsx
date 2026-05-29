@@ -507,6 +507,20 @@ const sampleToLimit = <T,>(items: T[], limit: number): T[] => {
   return sampled;
 };
 
+export const formatUiErrorMessage = (message: unknown, fallback = "Request failed"): string => {
+  const raw =
+    message instanceof Error
+      ? message.message
+      : typeof message === "string"
+        ? message
+        : String(message ?? "");
+  const normalized = raw.replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return fallback;
+  }
+  return normalized.length > 240 ? `${normalized.slice(0, 237)}...` : normalized;
+};
+
 const readErrorDetail = async (response: Response): Promise<string> => {
   const statusLabel = `HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ""}`;
   const text = await response.text();
@@ -530,9 +544,9 @@ const readErrorDetail = async (response: Response): Promise<string> => {
       error?: string;
       message?: string;
     };
-    return payload.detail ?? payload.error ?? payload.message ?? `${statusLabel}: ${truncated}`;
+    return formatUiErrorMessage(payload.detail ?? payload.error ?? payload.message ?? `${statusLabel}: ${truncated}`);
   } catch {
-    return `${statusLabel}: ${truncated}`;
+    return formatUiErrorMessage(`${statusLabel}: ${truncated}`);
   }
 };
 
@@ -4479,7 +4493,7 @@ const CandleChart = ({
         if (!active) {
           return;
         }
-        setError(error instanceof Error ? error.message : String(error));
+        setError(formatUiErrorMessage(error));
         setStatus("disconnected");
         setHasData(false);
       }
@@ -7596,8 +7610,8 @@ const OptionsPane = memo(({ state, limit }: OptionsPaneProps) => {
     >
       <div className="data-table-shell">
         {state.mode === "live" && optionHistoryError ? (
-          <div className="history-load-warning" role="status">
-            Older option history failed to load: {optionHistoryError}
+          <div className="history-load-warning" role="status" aria-live="polite">
+            Older option history failed to load: {formatUiErrorMessage(optionHistoryError)}
           </div>
         ) : null}
         {items.length === 0 ? (
@@ -8869,6 +8883,9 @@ function SyntheticControlDock() {
           setLoading(false);
           return;
         }
+        if (!response.ok) {
+          throw new Error(await readErrorDetail(response));
+        }
         const nextStatus = (await response.json()) as SyntheticAdminStatusResponse;
         setStatus(nextStatus);
         if (!dirtyRef.current) {
@@ -8879,7 +8896,7 @@ function SyntheticControlDock() {
         }
       } catch (loadError) {
         if (!cancelled) {
-          setError(loadError instanceof Error ? loadError.message : String(loadError));
+          setError(formatUiErrorMessage(loadError, "Synthetic status could not be loaded"));
         }
       } finally {
         if (!cancelled) {
@@ -8917,8 +8934,7 @@ function SyntheticControlDock() {
       })
         .then(async (response) => {
           if (!response.ok) {
-            const body = await response.json().catch(() => null);
-            throw new Error(body?.detail ?? body?.error ?? "Synthetic control update failed");
+            throw new Error(await readErrorDetail(response));
           }
           return (await response.json()) as SyntheticAdminControlResponse;
         })
@@ -8939,7 +8955,7 @@ function SyntheticControlDock() {
         })
         .catch((updateError) => {
           dirtyRef.current = false;
-          setError(updateError instanceof Error ? updateError.message : String(updateError));
+          setError(formatUiErrorMessage(updateError, "Synthetic control update failed"));
           setDraft(savedRef.current);
         })
         .finally(() => {
@@ -9147,7 +9163,11 @@ function SyntheticControlDock() {
                 </div>
               </section>
 
-              {error ? <p className="drawer-note synthetic-control-error">{error}</p> : null}
+              {error ? (
+                <p className="drawer-note synthetic-control-error" role="alert">
+                  {error}
+                </p>
+              ) : null}
             </>
           )}
         </aside>

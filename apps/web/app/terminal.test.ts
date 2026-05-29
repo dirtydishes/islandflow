@@ -14,6 +14,7 @@ import {
   countActiveFlowFilterGroups,
   filterOptionTapeItems,
   findAnchorRestoreIndex,
+  formatUiErrorMessage,
   formatCompactUsd,
   formatOptionContractLabel,
   flushPausableTapeData,
@@ -77,6 +78,25 @@ describe("tape status hardening", () => {
         mode: "live"
       })
     ).toBe("Live feed behind");
+  });
+});
+
+describe("terminal error message hardening", () => {
+  it("normalizes whitespace and clamps oversized messages before rendering", () => {
+    const longMessage = `API failed\n\n${"x".repeat(320)}`;
+
+    const formatted = formatUiErrorMessage(longMessage);
+
+    expect(formatted).toHaveLength(240);
+    expect(formatted).toStartWith("API failed x");
+    expect(formatted).toEndWith("...");
+    expect(formatted).not.toContain("\n");
+  });
+
+  it("uses a fallback when an error payload is empty", () => {
+    expect(formatUiErrorMessage("   ", "Synthetic status could not be loaded")).toBe(
+      "Synthetic status could not be loaded"
+    );
   });
 });
 
