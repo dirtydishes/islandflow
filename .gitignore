@@ -17,6 +17,7 @@ apps/desktop/out/
 # Local assistant artifacts
 session-ses_*.md
 token-usage-output.txt
+.impeccable/live/server.json
 
 # Beads / Dolt files (added by bd init)
 .dolt/
