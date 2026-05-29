@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Standup Summary for 2026-05-28</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Quantico:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: rgba(17, 24, 32, 0.94);
+        --panel-2: rgba(13, 20, 27, 0.98);
+        --line: rgba(255, 255, 255, 0.09);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --amber: #f5a623;
+        --amber-soft: rgba(245, 166, 35, 0.14);
+        --blue: #4da3ff;
+        --blue-soft: rgba(77, 163, 255, 0.12);
+        --green: #25c17a;
+        --green-soft: rgba(37, 193, 122, 0.12);
+        --red: #ff6b5f;
+        --red-soft: rgba(255, 107, 95, 0.14);
+        --shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+        --radius: 18px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at top right, rgba(245, 166, 35, 0.14), transparent 28rem),
+          radial-gradient(circle at top left, rgba(77, 163, 255, 0.1), transparent 24rem),
+          linear-gradient(180deg, #081018 0%, var(--bg) 34%, #05070a 100%);
+        color: var(--text);
+        font-family: "IBM Plex Sans", system-ui, sans-serif;
+        line-height: 1.6;
+      }
+
+      main {
+        width: min(1100px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 30px 0 56px;
+      }
+
+      .hero,
+      section {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      }
+
+      .hero {
+        padding: 30px;
+        box-shadow: var(--shadow);
+      }
+
+      section {
+        margin-top: 18px;
+        padding: 22px;
+      }
+
+      .eyebrow,
+      h2,
+      .chip,
+      .commit-id,
+      code,
+      pre {
+        font-family: "IBM Plex Mono", monospace;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: var(--amber-soft);
+        color: var(--amber);
+        font-size: 0.76rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h3 {
+        margin: 0;
+        font-family: "Quantico", sans-serif;
+        letter-spacing: 0.05em;
+      }
+
+      h1 {
+        margin-top: 16px;
+        font-size: clamp(2.2rem, 4vw, 3.5rem);
+        line-height: 1.03;
+        text-transform: uppercase;
+      }
+
+      h2 {
+        margin: 0 0 14px;
+        color: var(--amber);
+        font-size: 0.84rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h3 {
+        font-size: 1rem;
+      }
+
+      p,
+      li {
+        max-width: 78ch;
+        color: var(--muted);
+      }
+
+      .hero p {
+        margin: 16px 0 0;
+        font-size: 1.02rem;
+      }
+
+      .meta,
+      .grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .meta {
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        margin-top: 22px;
+      }
+
+      .card,
+      .timeline-item,
+      .callout {
+        padding: 16px 18px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.025);
+      }
+
+      .label {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--text);
+        font-size: 0.74rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .value-strong {
+        color: var(--text);
+        font-size: 1.2rem;
+        font-weight: 600;
+      }
+
+      .chip-row,
+      .file-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chip,
+      .file-pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--text);
+        font-size: 0.74rem;
+        letter-spacing: 0.04em;
+      }
+
+      .good {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .info {
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .risk {
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      .timeline-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 14px;
+        margin-bottom: 10px;
+      }
+
+      .commit-id {
+        color: var(--blue);
+        font-size: 0.76rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .timestamp {
+        color: var(--faint);
+        font-size: 0.76rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+
+      .timeline {
+        display: grid;
+        gap: 14px;
+      }
+
+      .callout {
+        border-color: rgba(245, 166, 35, 0.22);
+        background: linear-gradient(180deg, rgba(245, 166, 35, 0.08), rgba(255, 255, 255, 0.02));
+      }
+
+      code {
+        padding: 0.12rem 0.32rem;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--text);
+      }
+
+      @media (max-width: 720px) {
+        main {
+          width: min(100%, calc(100% - 20px));
+          padding: 18px 0 40px;
+        }
+
+        .hero,
+        section {
+          padding: 18px;
+        }
+
+        h1 {
+          font-size: 2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <article class="hero">
+        <span class="eyebrow">Standup Summary • 2026-05-28</span>
+        <h1>Frontend Merge, Mock Routes, and Audit Artifact Drop</h1>
+        <p>
+          Yesterday's activity centers on two app-facing commits on the
+          <code>frontend-redesign</code> line, one large security-audit artifact
+          commit under <code>piolium/attack-surface</code>, and the merge of PR
+          <code>#13</code> back into <code>main</code>. The concrete implementation
+          work touched the home command deck, new dashboard mock routes, and a
+          generated attack-surface evidence bundle.
+        </p>
+        <div class="meta">
+          <div class="card">
+            <span class="label">Commits on 2026-05-28</span>
+            <div class="value-strong">4</div>
+          </div>
+          <div class="card">
+            <span class="label">Merge Activity</span>
+            <div class="value-strong">PR #13 merged into main</div>
+          </div>
+          <div class="card">
+            <span class="label">Primary Areas</span>
+            <div class="value-strong">`apps/web` and `piolium`</div>
+          </div>
+        </div>
+      </article>
+
+      <section>
+        <h2>Summary</h2>
+        <div class="callout">
+          <p>
+            The day produced one merged frontend branch, one dashboard-mock
+            addition, one home command deck redesign, and one audit artifact
+            import. The heaviest user-facing files were
+            <code>apps/web/app/globals.css</code>,
+            <code>apps/web/app/terminal.tsx</code>, and
+            <code>apps/web/app/dashboard-mocks.tsx</code>.
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <div class="timeline">
+          <div class="timeline-item">
+            <div class="timeline-meta">
+              <span class="commit-id">b075a099</span>
+              <span class="timestamp">2026-05-28 04:40 EDT</span>
+            </div>
+            <h3>Add dashboard mock routes</h3>
+            <p>
+              Commit <code>b075a0994c5f296707b399cfd38a45d1096407ba</code> added
+              <code>apps/web/app/dashboard-mocks.tsx</code>, four mock route pages
+              at <code>apps/web/app/mock1/page.tsx</code> through
+              <code>mock4/page.tsx</code>, updated
+              <code>apps/web/app/globals.css</code>, and added
+              <code>docs/turns/2026-05-28-dashboard-mock-routes.html</code>.
+            </p>
+            <div class="file-list">
+              <span class="file-pill">dashboard-mocks.tsx</span>
+              <span class="file-pill">mock1/page.tsx</span>
+              <span class="file-pill">mock2/page.tsx</span>
+              <span class="file-pill">mock3/page.tsx</span>
+              <span class="file-pill">mock4/page.tsx</span>
+            </div>
+          </div>
+
+          <div class="timeline-item">
+            <div class="timeline-meta">
+              <span class="commit-id">a35a7576</span>
+              <span class="timestamp">2026-05-28 05:10 EDT</span>
+            </div>
+            <h3>Redesign home command deck</h3>
+            <p>
+              Commit <code>a35a7576220d61e00805d4251266c9f4dc6ceb0b</code> updated
+              <code>apps/web/app/terminal.tsx</code> and
+              <code>apps/web/app/globals.css</code>, plus added the companion turn
+              doc <code>docs/turns/2026-05-28-redesign-home-command-deck.html</code>.
+            </p>
+            <div class="file-list">
+              <span class="file-pill">terminal.tsx</span>
+              <span class="file-pill">globals.css</span>
+              <span class="file-pill">redesign-home-command-deck.html</span>
+            </div>
+          </div>
+
+          <div class="timeline-item">
+            <div class="timeline-meta">
+              <span class="commit-id">47a5adca</span>
+              <span class="timestamp">2026-05-28 05:13 EDT</span>
+            </div>
+            <h3>Add attack surface audit artifacts</h3>
+            <p>
+              Commit <code>47a5adca901190a737816da3b110d0627e7dfd1a</code> added
+              24 files under <code>piolium/attack-surface</code>, including
+              <code>knowledge-base-report.md</code>,
+              <code>osv-selected-details.json</code>,
+              <code>public-routes-authz-matrix.md</code>, and
+              <code>state-concurrency-summary.md</code>.
+            </p>
+            <div class="file-list">
+              <span class="file-pill">knowledge-base-report.md</span>
+              <span class="file-pill">osv-selected-details.json</span>
+              <span class="file-pill">public-routes-authz-matrix.md</span>
+              <span class="file-pill">state-concurrency-summary.md</span>
+            </div>
+          </div>
+
+          <div class="timeline-item">
+            <div class="timeline-meta">
+              <span class="commit-id">85ad7f73</span>
+              <span class="timestamp">2026-05-28 16:21 UTC</span>
+            </div>
+            <h3>Merge PR #13 into main</h3>
+            <p>
+              Merge commit <code>85ad7f73872055039a2f3084f71af0adb3e0086b</code>
+              merged pull request <code>#13</code>, titled
+              <code>Redesign home command deck</code>, from
+              <code>frontend-redesign</code> into <code>main</code>. The merge
+              pulled in the mock-route work, the terminal/globals redesign, the
+              attack-surface artifact set, and
+              <code>docs/general/2026-05-25-standup-summary-2026-05-24.html</code>.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          This summary is based on the repository's 2026-05-28 commit history from
+          <code>git log</code> and supporting <code>git show --stat</code> output.
+          The sequence shows implementation work first on the
+          <code>frontend-redesign</code> branch, then a same-day merge into
+          <code>main</code> through Forgejo PR <code>#13</code>.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <div class="grid">
+          <div class="card">
+            <span class="label">User-Facing Surface Area</span>
+            <p>
+              The app work concentrated in <code>apps/web/app</code>, especially
+              <code>globals.css</code> and <code>terminal.tsx</code>, which means the
+              redesign and mock routes were primarily front-end presentation and
+              routing changes.
+            </p>
+          </div>
+          <div class="card">
+            <span class="label">Documentation Added Alongside Changes</span>
+            <p>
+              Both implementation commits added matching turn docs under
+              <code>docs/turns</code>, which gives direct repo-local context for the
+              dashboard mocks and home command deck redesign.
+            </p>
+          </div>
+          <div class="card">
+            <span class="label">Audit Artifact Scope</span>
+            <p>
+              The <code>piolium/attack-surface</code> commit appears to be an evidence
+              bundle rather than a runtime code change, with markdown, TSV, JSON, and
+              JSONL outputs capturing findings such as dependency intelligence and
+              route/authz matrices.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <ul>
+          <li>
+            The merged frontend work should change the home command deck and expose
+            four mock dashboard routes in the web app.
+          </li>
+          <li>
+            The attack-surface artifact commit should not directly change runtime
+            behavior for end-users, but it adds repository evidence that can support
+            future security review and remediation.
+          </li>
+          <li>
+            PR <code>#13</code> moved the frontend-redesign work onto
+            <code>main</code>, so those UI changes are now part of the primary branch.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <div class="chip-row">
+          <span class="chip good">Validated with git log</span>
+          <span class="chip info">Validated with git show --stat</span>
+          <span class="chip info">PR reference captured from merge commit</span>
+        </div>
+        <p>
+          Validation for this summary consisted of reviewing the dated commit list,
+          merge metadata, and per-commit file stats. No new build, test, or lint run
+          was required to produce the standup report itself.
+        </p>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>
+            This report reflects committed activity on 2026-05-28 only; it does not
+            infer work from uncommitted files or unstaged local changes.
+          </li>
+          <li>
+            Merge commits aggregate prior branch work, so the detailed implementation
+            notes in this report point back to the underlying non-merge commits where
+            possible.
+          </li>
+          <li>
+            The repository currently has an unrelated local modification in
+            <code>apps/web/next-env.d.ts</code>; it was left untouched and excluded
+            from the standup summary because it is not part of yesterday's committed
+            history.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>
+            If the team wants deeper implementation detail during standup, open the
+            paired docs at <code>docs/turns/2026-05-28-dashboard-mock-routes.html</code>
+            and <code>docs/turns/2026-05-28-redesign-home-command-deck.html</code>.
+          </li>
+          <li>
+            No new follow-up Beads issue was identified from the commit history
+            itself beyond this reporting task.
+          </li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
