@@ -1469,6 +1469,7 @@ h3 {
 }
 
 .data-table-wrap {
+  position: relative;
   display: flex;
   flex: 1 1 auto;
   min-height: 0;
@@ -2489,6 +2490,10 @@ h3 {
     min-height: 0;
   }
 
+  .page-grid-options > .terminal-pane {
+    height: clamp(430px, 68svh, 720px);
+  }
+
   .command-deck-grid {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
@@ -2563,7 +2568,7 @@ h3 {
   }
 
   .terminal-content {
-    padding: 16px 10px 22px;
+    padding: 18px 10px calc(22px + env(safe-area-inset-bottom));
   }
 
   .page-shell {
@@ -2615,11 +2620,19 @@ h3 {
     position: sticky;
     top: 0;
     z-index: 30;
-    padding: 12px 10px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    column-gap: 10px;
+    row-gap: 16px;
+    padding: 10px 10px 12px;
   }
 
   .terminal-topbar-leading {
-    width: 100%;
+    width: auto;
+    min-width: 0;
+    grid-column: 1;
+    grid-row: 1;
   }
 
   .terminal-button,
@@ -2638,30 +2651,50 @@ h3 {
   .terminal-topbar-actions,
   .terminal-topbar-controls,
   .terminal-topbar-mode {
-    width: 100%;
+    min-width: 0;
     justify-content: flex-start;
   }
 
-  .terminal-topbar-actions,
+  .terminal-topbar-actions {
+    display: contents;
+  }
+
   .terminal-topbar-controls {
-    flex-direction: column;
-    align-items: stretch;
+    width: 100%;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 10px;
+  }
+
+  .terminal-topbar-mode {
+    grid-column: 2;
+    grid-row: 1;
+    width: auto;
+    justify-content: flex-end;
   }
 
   .terminal-menu-trigger {
-    width: 100%;
+    width: auto;
     justify-content: center;
   }
 
   .terminal-topbar-mode .terminal-button,
-  .terminal-topbar-controls > .terminal-button,
   .terminal-topbar-leading > .terminal-button,
   .page-actions > .terminal-button,
   .page-actions > .flow-filter-popover {
     width: 100%;
   }
 
+  .terminal-topbar-controls > .terminal-button {
+    width: auto;
+    min-width: 76px;
+  }
+
   .instrument-focus-chip {
+    grid-column: 1 / -1;
     max-width: none;
     min-height: 44px;
     justify-content: space-between;
@@ -2683,6 +2716,10 @@ h3 {
 
   .terminal-pane {
     border-radius: 12px;
+  }
+
+  .page-grid-options > .terminal-pane {
+    height: clamp(390px, 62svh, 620px);
   }
 
   .terminal-pane-head,
@@ -2716,6 +2753,7 @@ h3 {
     width: 100%;
     flex-direction: column;
     align-items: stretch;
+    margin-top: 2px;
   }
 
   .flow-filter-popover {
@@ -2753,6 +2791,19 @@ h3 {
     margin-inline: -12px;
     border-radius: 0;
     scroll-snap-type: x proximity;
+    scrollbar-gutter: stable;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .data-table-wrap::after {
+    content: "";
+    position: sticky;
+    right: 0;
+    z-index: 5;
+    flex: 0 0 18px;
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent, oklch(0.12 0.01 250 / 0.92));
   }
 
   .data-table {
@@ -2768,6 +2819,39 @@ h3 {
   .data-table-head,
   .data-table-row {
     padding-inline: 8px;
+  }
+
+  .data-table-head .data-table-cell:first-child,
+  .data-table-row .data-table-cell:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 4;
+    margin-left: -8px;
+    padding-left: 8px;
+    background: oklch(0.13 0.01 250);
+    box-shadow:
+      1px 0 0 oklch(0.72 0.012 250 / 0.14),
+      14px 0 18px oklch(0.06 0.01 250 / 0.42);
+  }
+
+  .data-table-head .data-table-cell:first-child {
+    z-index: 6;
+    background: oklch(0.15 0.012 250);
+  }
+
+  .data-table-row.is-even .data-table-cell:first-child {
+    background: oklch(0.145 0.011 250);
+  }
+
+  .data-table-row:hover .data-table-cell:first-child,
+  .data-table-row:focus-visible .data-table-cell:first-child {
+    background: oklch(0.18 0.025 74);
+  }
+
+  .data-table-row-classified .data-table-cell:first-child {
+    background:
+      linear-gradient(90deg, rgba(var(--classifier-rgb, 192, 200, 210), calc(0.04 + var(--classifier-intensity, 0) * 0.1)), transparent 90%),
+      oklch(0.13 0.01 250);
   }
 
   .data-table-row-options,
@@ -2832,6 +2916,22 @@ h3 {
 }
 
 @media (max-width: 420px) {
+  .terminal-topbar {
+    column-gap: 8px;
+    row-gap: 14px;
+    padding-inline: 8px;
+  }
+
+  .terminal-menu-trigger {
+    min-width: 92px;
+    padding-inline: 8px;
+  }
+
+  .terminal-topbar-mode .terminal-button {
+    min-width: 82px;
+    padding-inline: 8px;
+  }
+
   .terminal-content {
     padding-inline: 8px;
   }
