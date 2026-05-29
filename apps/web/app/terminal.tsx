@@ -16,6 +16,7 @@ import {
   type CSSProperties,
   type Dispatch,
   type MouseEvent as ReactMouseEvent,
+  type RefObject,
   type ReactNode,
   type SetStateAction
 } from "react";
@@ -390,6 +391,115 @@ const EMPTY_CLASSIFIER_HIT_EVENTS: ClassifierHitEvent[] = [];
 const EMPTY_SMART_MONEY_EVENTS: SmartMoneyEvent[] = [];
 const EMPTY_INFERRED_DARK_EVENTS: InferredDarkEvent[] = [];
 const EMPTY_NEWS_STORIES: NewsStory[] = [];
+
+const TABBABLE_SELECTOR = [
+  "a[href]",
+  "button:not([disabled])",
+  "input:not([disabled]):not([type='hidden'])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  "[tabindex]:not([tabindex='-1'])"
+].join(",");
+
+export const isElementTabbable = (element: HTMLElement): boolean => {
+  if (element.hasAttribute("disabled") || element.getAttribute("aria-hidden") === "true") {
+    return false;
+  }
+
+  const tabIndex = element.getAttribute("tabindex");
+  if (tabIndex && Number(tabIndex) < 0) {
+    return false;
+  }
+
+  return Boolean(element.offsetParent || element.getClientRects().length > 0);
+};
+
+export const getTabbableElements = (root: HTMLElement): HTMLElement[] => {
+  return Array.from(root.querySelectorAll<HTMLElement>(TABBABLE_SELECTOR)).filter(isElementTabbable);
+};
+
+const useModalFocusTrap = (
+  active: boolean,
+  rootRef: RefObject<HTMLElement | null>,
+  onClose: () => void,
+  restoreFocusRef?: RefObject<HTMLElement | null>
+) => {
+  const fallbackFocusRef = useRef<HTMLElement | null>(null);
+
+  useLayoutEffect(() => {
+    if (!active) {
+      return;
+    }
+
+    fallbackFocusRef.current =
+      restoreFocusRef?.current ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+    const root = rootRef.current;
+    if (!root) {
+      return;
+    }
+
+    const focusTarget = getTabbableElements(root)[0] ?? root;
+    focusTarget.focus({ preventScroll: true });
+
+    return () => {
+      const restoreTarget = restoreFocusRef?.current ?? fallbackFocusRef.current;
+      if (restoreTarget?.isConnected) {
+        restoreTarget.focus({ preventScroll: true });
+      }
+      fallbackFocusRef.current = null;
+    };
+  }, [active, restoreFocusRef, rootRef]);
+
+  useEffect(() => {
+    if (!active) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const root = rootRef.current;
+      if (!root) {
+        return;
+      }
+
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const tabbable = getTabbableElements(root);
+      if (tabbable.length === 0) {
+        event.preventDefault();
+        root.focus({ preventScroll: true });
+        return;
+      }
+
+      const first = tabbable[0];
+      const last = tabbable[tabbable.length - 1];
+      const activeElement = document.activeElement;
+
+      if (event.shiftKey && activeElement === first) {
+        event.preventDefault();
+        last.focus({ preventScroll: true });
+      } else if (!event.shiftKey && activeElement === last) {
+        event.preventDefault();
+        first.focus({ preventScroll: true });
+      } else if (!root.contains(activeElement)) {
+        event.preventDefault();
+        first.focus({ preventScroll: true });
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown, true);
+    };
+  }, [active, onClose, rootRef]);
+};
 
 type CandlestickSeries = ReturnType<IChartApi["addCandlestickSeries"]>;
 
@@ -4894,6 +5004,8 @@ const formatOptionalMs = (value: unknown): string | null => {
 };
 
 const AlertDrawer = ({ alert, flowPacket, evidence, contextStatus, onClose }: AlertDrawerProps) => {
+  const drawerRef = useRef<HTMLElement | null>(null);
+  const titleId = useId();
   const primary = alert.hits[0];
   const direction = deriveAlertDirection(alert);
   const severity = normalizeAlertSeverity(alert);
@@ -4901,13 +5013,14 @@ const AlertDrawer = ({ alert, flowPacket, evidence, contextStatus, onClose }: Al
   const unknownCount = evidence.filter((item) => item.kind === "unknown").length;
   const isContextLoading = contextStatus.traceId === alert.trace_id && contextStatus.loading;
   const missingRefs = contextStatus.traceId === alert.trace_id ? contextStatus.missingRefs : [];
+  useModalFocusTrap(true, drawerRef, onClose);
 
   return (
-    <aside className="drawer">
+    <aside aria-labelledby={titleId} aria-modal="true" className="drawer" ref={drawerRef} role="dialog" tabIndex={-1}>
       <div className="drawer-header">
         <div>
           <p className="drawer-eyebrow">Alert details</p>
-          <h3>{primary ? humanizeClassifierId(primary.classifier_id) : "Alert"}</h3>
+          <h3 id={titleId}>{primary ? humanizeClassifierId(primary.classifier_id) : "Alert"}</h3>
           <p className="drawer-subtitle">{formatDateTime(alert.source_ts)}</p>
         </div>
         <button className="drawer-close" type="button" onClick={onClose}>
@@ -5052,14 +5165,17 @@ type NewsDrawerProps = {
 };
 
 const NewsDrawer = ({ story, onClose }: NewsDrawerProps) => {
+  const drawerRef = useRef<HTMLElement | null>(null);
+  const titleId = useId();
   const body = sanitizeNewsHtml(story.content_html);
+  useModalFocusTrap(true, drawerRef, onClose);
 
   return (
-    <aside className="drawer">
+    <aside aria-labelledby={titleId} aria-modal="true" className="drawer" ref={drawerRef} role="dialog" tabIndex={-1}>
       <div className="drawer-header">
         <div>
           <p className="drawer-eyebrow">News wire</p>
-          <h3>{story.headline}</h3>
+          <h3 id={titleId}>{story.headline}</h3>
           <p className="drawer-subtitle">
             {story.source} · Published {formatDateTime(story.published_ts)}
             {story.updated_ts !== story.published_ts ? ` · Updated ${formatDateTime(story.updated_ts)}` : ""}
@@ -5117,16 +5233,19 @@ type ClassifierHitDrawerProps = {
 };
 
 const ClassifierHitDrawer = ({ hit, flowPacket, evidence, onClose }: ClassifierHitDrawerProps) => {
+  const drawerRef = useRef<HTMLElement | null>(null);
+  const titleId = useId();
   const direction = normalizeDirection(hit.direction);
   const evidencePrints = evidence.filter((item) => item.kind === "print");
   const unknownCount = evidence.filter((item) => item.kind === "unknown").length;
+  useModalFocusTrap(true, drawerRef, onClose);
 
   return (
-    <aside className="drawer">
+    <aside aria-labelledby={titleId} aria-modal="true" className="drawer" ref={drawerRef} role="dialog" tabIndex={-1}>
       <div className="drawer-header">
         <div>
           <p className="drawer-eyebrow">Classifier hit</p>
-          <h3>{humanizeClassifierId(hit.classifier_id)}</h3>
+          <h3 id={titleId}>{humanizeClassifierId(hit.classifier_id)}</h3>
           <p className="drawer-subtitle">{formatDateTime(hit.source_ts)}</p>
         </div>
         <button className="drawer-close" type="button" onClick={onClose}>
@@ -5225,19 +5344,22 @@ type SmartMoneyDrawerProps = {
 };
 
 const SmartMoneyDrawer = ({ event, flowPacket, evidence, onClose }: SmartMoneyDrawerProps) => {
+  const drawerRef = useRef<HTMLElement | null>(null);
+  const titleId = useId();
   const primaryScore =
     event.profile_scores.find((score) => score.profile_id === event.primary_profile_id) ??
     event.profile_scores[0];
   const direction = normalizeDirection(event.primary_direction);
   const evidencePrints = evidence.filter((item) => item.kind === "print");
   const unknownCount = evidence.filter((item) => item.kind === "unknown").length;
+  useModalFocusTrap(true, drawerRef, onClose);
 
   return (
-    <aside className="drawer">
+    <aside aria-labelledby={titleId} aria-modal="true" className="drawer" ref={drawerRef} role="dialog" tabIndex={-1}>
       <div className="drawer-header">
         <div>
           <p className="drawer-eyebrow">Smart money profile</p>
-          <h3>{smartMoneyProfileLabel(event.primary_profile_id)}</h3>
+          <h3 id={titleId}>{smartMoneyProfileLabel(event.primary_profile_id)}</h3>
           <p className="drawer-subtitle">{formatDateTime(event.source_ts)}</p>
         </div>
         <button className="drawer-close" type="button" onClick={onClose}>
@@ -5328,19 +5450,22 @@ type DarkDrawerProps = {
 };
 
 const DarkDrawer = ({ event, evidence, underlying, onClose }: DarkDrawerProps) => {
+  const drawerRef = useRef<HTMLElement | null>(null);
+  const titleId = useId();
   const joinEvidence = evidence.filter(
     (item): item is { kind: "join"; id: string; join: EquityPrintJoin } => item.kind === "join"
   );
   const unknownCount = evidence.filter((item) => item.kind === "unknown").length;
   const traceRefs = event.evidence_refs.slice(0, 6);
   const extraRefs = Math.max(0, event.evidence_refs.length - traceRefs.length);
+  useModalFocusTrap(true, drawerRef, onClose);
 
   return (
-    <aside className="drawer">
+    <aside aria-labelledby={titleId} aria-modal="true" className="drawer" ref={drawerRef} role="dialog" tabIndex={-1}>
       <div className="drawer-header">
         <div>
           <p className="drawer-eyebrow">Inferred dark</p>
-          <h3>{humanizeClassifierId(event.type)}</h3>
+          <h3 id={titleId}>{humanizeClassifierId(event.type)}</h3>
           <p className="drawer-subtitle">{formatDateTime(event.source_ts)}</p>
         </div>
         <button className="drawer-close" type="button" onClick={onClose}>
@@ -8856,6 +8981,15 @@ function SyntheticControlDock() {
   const [error, setError] = useState<string | null>(null);
   const dirtyRef = useRef(false);
   const savedRef = useRef<SyntheticControlState | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const drawerRef = useRef<HTMLElement | null>(null);
+  const titleId = useId();
+
+  const closeDrawer = useCallback(() => {
+    setOpen(false);
+  }, []);
+
+  useModalFocusTrap(open, drawerRef, closeDrawer, triggerRef);
 
   useEffect(() => {
     if (!visible) {
@@ -9000,22 +9134,31 @@ function SyntheticControlDock() {
     <>
       <button
         aria-expanded={open}
+        aria-haspopup="dialog"
         aria-label="Synthetic control"
         className={`synthetic-control-gear${open ? " is-open" : ""}`}
         onClick={() => setOpen((current) => !current)}
+        ref={triggerRef}
         type="button"
       >
         <span className="synthetic-control-gear-mark">+</span>
       </button>
 
       {open ? (
-        <aside className="synthetic-control-drawer" aria-label="Synthetic control drawer">
+        <aside
+          aria-labelledby={titleId}
+          aria-modal="true"
+          className="synthetic-control-drawer"
+          ref={drawerRef}
+          role="dialog"
+          tabIndex={-1}
+        >
           <div className="synthetic-control-header">
             <div>
               <p className="synthetic-control-kicker">Synthetic Control</p>
-              <h3>Hosted tape operator rail</h3>
+              <h3 id={titleId}>Hosted tape operator rail</h3>
             </div>
-            <button className="drawer-close" onClick={() => setOpen(false)} type="button">
+            <button className="drawer-close" onClick={closeDrawer} type="button">
               Close
             </button>
           </div>
@@ -9182,28 +9325,19 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const tickerFieldId = useId();
   const tickerHintId = useId();
+  const navTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const navDrawerRef = useRef<HTMLElement | null>(null);
+  const navDrawerTitleId = useId();
   const activeNavHref = getTerminalNavCurrentHref(pathname);
+  const closeNavDrawer = useCallback(() => {
+    setDrawerOpen(false);
+  }, []);
+
+  useModalFocusTrap(drawerOpen, navDrawerRef, closeNavDrawer, navTriggerRef);
 
   useEffect(() => {
     setDrawerOpen(false);
   }, [pathname]);
-
-  useEffect(() => {
-    if (!drawerOpen) {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setDrawerOpen(false);
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [drawerOpen]);
 
   return (
     <TerminalContext.Provider value={state}>
@@ -9220,6 +9354,7 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
                 aria-expanded={drawerOpen}
                 aria-label={drawerOpen ? "Close navigation menu" : "Open navigation menu"}
                 className="terminal-button terminal-menu-trigger"
+                ref={navTriggerRef}
                 type="button"
                 onClick={() => setDrawerOpen((current) => !current)}
               >
@@ -9300,15 +9435,19 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
               aria-label="Close navigation drawer"
               className="terminal-drawer-backdrop"
               type="button"
-              onClick={() => setDrawerOpen(false)}
+              onClick={closeNavDrawer}
             />
             <aside
-              aria-label="Primary navigation"
+              aria-labelledby={navDrawerTitleId}
+              aria-modal="true"
               className="terminal-nav-drawer"
               id="terminal-nav-drawer"
+              ref={navDrawerRef}
+              role="dialog"
+              tabIndex={-1}
             >
               <div className="terminal-drawer-head">
-                <div className="terminal-brand">
+                <div className="terminal-brand" id={navDrawerTitleId}>
                   <span className="terminal-brand-kicker">IF</span>
                   <span className="terminal-brand-name">islandflow</span>
                 </div>
@@ -9316,7 +9455,7 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
                   aria-label="Close navigation drawer"
                   className="terminal-button terminal-drawer-close"
                   type="button"
-                  onClick={() => setDrawerOpen(false)}
+                  onClick={closeNavDrawer}
                 >
                   Close
                 </button>
