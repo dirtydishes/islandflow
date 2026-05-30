@@ -1,6 +1,16 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, mock } from "bun:test";
 import { getSubscriptionKey as getLiveSubscriptionKey } from "@islandflow/types";
-import {
+
+const redirect = mock((path: string) => {
+  throw new Error(`NEXT_REDIRECT:${path}`);
+});
+
+mock.module("next/navigation", () => ({
+  redirect,
+  usePathname: () => "/options"
+}));
+
+const {
   NAV_ITEMS,
   appendHistoryTail,
   buildAlertContextPath,
@@ -49,7 +59,7 @@ import {
   resolveAlertFlowPacket,
   statusLabel,
   toggleFilterValue
-} from "./terminal";
+} = await import("./terminal");
 
 const makeItem = (traceId: string, seq: number, ts: number) => ({
   trace_id: traceId,

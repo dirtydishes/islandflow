@@ -4,7 +4,8 @@ const redirect = mock((path: string) => {
   throw new Error(`NEXT_REDIRECT:${path}`);
 });
 
-mock.module("next/navigation", () => ({ redirect }));
+mock.module("next/navigation", () => ({ default: { redirect }, redirect }));
+mock.module("next/navigation.js", () => ({ default: { redirect }, redirect }));
 
 describe("legacy page redirects", () => {
   beforeEach(() => {
