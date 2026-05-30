@@ -101,7 +101,24 @@ Use this decision order before creating a turn document:
 
 The minor/trivial exemptions override the general mandatory turn-document rule.
 
-For diff content in turn documentation (including "Code diffs" and "Relevant Diff Snippets"), use `@pierre/diffs` output by default. If `@pierre/diffs` is unavailable because of a real tool or blocking error, use a clearly labeled plain diff/code block fallback and note why.
+For diff content in turn documentation (including "Code diffs" and "Relevant Diff Snippets"), render the diff as HTML with the `@pierre/diffs/ssr` library by default. Do not try to run `bunx @pierre/diffs`; this package is installed as a library and does not expose a CLI. A plain diff/code block fallback is only acceptable if importing or rendering with `@pierre/diffs/ssr` fails because of a real tool or blocking error, and the document must say why.
+
+Known-good `@pierre/diffs/ssr` pattern:
+
+```js
+import { preloadPatchDiff } from "@pierre/diffs/ssr";
+import { execSync } from "node:child_process";
+
+const patch = execSync("git diff -- path/to/file", { encoding: "utf8" });
+const rendered = (
+  await preloadPatchDiff({
+    patch,
+    options: { maxContextLines: 4 }
+  })
+).prerenderedHTML;
+```
+
+Embed `rendered` directly into the turn document inside a clearly labeled diff container.
 
 ### No turn document for minor/trivial checklist matches
 
@@ -121,7 +138,7 @@ If a change does not cleanly fit either exempt or substantive buckets, ask the u
 **"New Changes as of {time and date at which the change was made}"**
 - **Summary of changes**
 - **Why this change was made**
-- **Code diffs** (use `@pierre/diffs` output by default; if unavailable, include a clearly labeled plain diff/code block and note why)
+- **Code diffs** (render with `@pierre/diffs/ssr` by default; if importing or rendering fails, include a clearly labeled plain diff/code block and note why)
 - **Related issues or PRs**
 
 Additionally, add a note to each section explaining why the changes were made.
@@ -170,7 +187,7 @@ Each turn document must include these sections:
 2. **Changes Made**
 3. **Context**
 4. **Important Implementation Details**
-5. **Relevant Diff Snippets** (render with `@pierre/diffs` output by default; if unavailable, include a clearly labeled plain diff/code block and note why)
+5. **Relevant Diff Snippets** (render with `@pierre/diffs/ssr` by default; if importing or rendering fails, include a clearly labeled plain diff/code block and note why)
 6. **Expected Impact for End-Users**
 7. **Validation**
 8. **Issues, Limitations, and Mitigations**
