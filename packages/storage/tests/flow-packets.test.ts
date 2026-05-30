@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { createClickHouseClient, fetchFlowPacketById, fetchFlowPacketsBefore } from "../src/clickhouse";
+import {
+  createClickHouseClient,
+  fetchFlowPacketById,
+  fetchFlowPacketsBefore
+} from "../src/clickhouse";
 import {
   flowPacketsTableDDL,
   FLOW_PACKETS_TABLE,

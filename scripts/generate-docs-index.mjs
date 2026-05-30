@@ -6,7 +6,7 @@ const outputFile = path.join(docsDir, "index.html");
 
 const dateFormatter = new Intl.DateTimeFormat("en-US", {
   dateStyle: "medium",
-  timeStyle: "short",
+  timeStyle: "short"
 });
 
 function escapeHtml(value) {
@@ -71,7 +71,7 @@ async function collectDocsFiles(rootDir, currentDir = rootDir, acc = []) {
         relativePath,
         category: relativePath.includes("/") ? relativePath.split("/")[0] : "root",
         sizeBytes: stats.size,
-        modifiedAt: stats.mtime,
+        modifiedAt: stats.mtime
       });
     }
   }

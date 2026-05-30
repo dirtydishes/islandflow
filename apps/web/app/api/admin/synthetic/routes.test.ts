@@ -1,8 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
-import {
-  getSyntheticAdminProxyConfig,
-  isSyntheticAdminFeatureEnabled
-} from "./shared";
+import { getSyntheticAdminProxyConfig, isSyntheticAdminFeatureEnabled } from "./shared";
 
 const originalFetch = globalThis.fetch;
 

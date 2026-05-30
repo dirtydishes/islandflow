@@ -59,7 +59,9 @@ export const STREAM_CATALOG: readonly KnownStreamDefinition[] = [
   { name: STREAM_NEWS, subject: SUBJECT_NEWS, retentionClass: "derived" }
 ];
 
-const STREAM_CATALOG_BY_NAME = new Map(STREAM_CATALOG.map((definition) => [definition.name, definition]));
+const STREAM_CATALOG_BY_NAME = new Map(
+  STREAM_CATALOG.map((definition) => [definition.name, definition])
+);
 
 export const getKnownStreamDefinitions = (): readonly KnownStreamDefinition[] => {
   return STREAM_CATALOG;

@@ -465,8 +465,7 @@ const parseCandleParams = (
 
   const endTs = params.end_ts ?? Date.now();
   const limit = params.limit ?? env.REST_DEFAULT_LIMIT;
-  const startTs =
-    params.start_ts ?? Math.max(0, Math.floor(endTs - params.interval_ms * limit));
+  const startTs = params.start_ts ?? Math.max(0, Math.floor(endTs - params.interval_ms * limit));
   const rangeStart = Math.min(startTs, endTs);
   const rangeEnd = Math.max(startTs, endTs);
 
@@ -482,7 +481,13 @@ const parseCandleParams = (
 
 const parseCandleReplayParams = (
   url: URL
-): { underlyingId: string; intervalMs: number; afterTs: number; afterSeq: number; limit: number } => {
+): {
+  underlyingId: string;
+  intervalMs: number;
+  afterTs: number;
+  afterSeq: number;
+  limit: number;
+} => {
   const params = candleReplaySchema.parse({
     underlying_id: url.searchParams.get("underlying_id") ?? undefined,
     interval_ms: url.searchParams.get("interval_ms") ?? undefined,
@@ -601,7 +606,10 @@ const matchesScopedOptionSubscription = (
   print: { underlying_id?: string; option_contract_id: string },
   subscription: Extract<LiveSubscription, { channel: "options" }>
 ): boolean => {
-  if (subscription.option_contract_id && subscription.option_contract_id !== print.option_contract_id) {
+  if (
+    subscription.option_contract_id &&
+    subscription.option_contract_id !== print.option_contract_id
+  ) {
     return false;
   }
   if (subscription.underlying_ids?.length) {
@@ -693,8 +701,7 @@ const run = async () => {
     env.OPTIONS_INGEST_ADAPTER,
     env.EQUITIES_INGEST_ADAPTER
   );
-  const syntheticBackendDisabledReason =
-    getSyntheticBackendDisabledReason(syntheticBackendMode);
+  const syntheticBackendDisabledReason = getSyntheticBackendDisabledReason(syntheticBackendMode);
   const syntheticControlKv = await openSyntheticControlKv(js);
   let syntheticControl = await ensureSyntheticControlState(syntheticControlKv);
   const syntheticProfileHits = createRollingSyntheticProfileHits();
@@ -899,11 +906,7 @@ const run = async () => {
     }
   }
 
-  const subscribeWithReset = async <T>(
-    subject: string,
-    stream: string,
-    durableName: string
-  ) => {
+  const subscribeWithReset = async <T>(subject: string, stream: string, durableName: string) => {
     const opts = buildDurableConsumer(durableName);
     applyDeliverPolicy(opts, env.API_DELIVER_POLICY);
     try {
@@ -924,7 +927,8 @@ const run = async () => {
       try {
         await jsm.consumers.delete(stream, durableName);
       } catch (deleteError) {
-        const deleteMessage = deleteError instanceof Error ? deleteError.message : String(deleteError);
+        const deleteMessage =
+          deleteError instanceof Error ? deleteError.message : String(deleteError);
         if (!deleteMessage.includes("not found")) {
           logger.warn("failed to delete jetstream consumer", {
             durable: durableName,
@@ -1023,8 +1027,12 @@ const run = async () => {
     }
 
     const matchingSubscriptions =
-      subscription.channel === "options" || subscription.channel === "flow" || subscription.channel === "equities"
-        ? [...subscriptionDefinitions.entries()].filter(([, candidate]) => candidate.channel === subscription.channel)
+      subscription.channel === "options" ||
+      subscription.channel === "flow" ||
+      subscription.channel === "equities"
+        ? [...subscriptionDefinitions.entries()].filter(
+            ([, candidate]) => candidate.channel === subscription.channel
+          )
         : [[getSubscriptionKey(subscription), subscription] as const];
 
     if (matchingSubscriptions.length === 0) {
@@ -1032,8 +1040,12 @@ const run = async () => {
     }
 
     const optionItem = ingestChannel === "options" ? (item as OptionPrint) : null;
-    const equityItem = ingestChannel === "equities" ? (item as Parameters<typeof matchesScopedEquitySubscription>[0]) : null;
-    const flowItem = ingestChannel === "flow" ? (item as Parameters<typeof matchesFlowPacketFilters>[0]) : null;
+    const equityItem =
+      ingestChannel === "equities"
+        ? (item as Parameters<typeof matchesScopedEquitySubscription>[0])
+        : null;
+    const flowItem =
+      ingestChannel === "flow" ? (item as Parameters<typeof matchesFlowPacketFilters>[0]) : null;
     let matchedSubscriptions = 0;
 
     for (const [key, candidate] of matchingSubscriptions) {
@@ -1315,9 +1327,7 @@ const run = async () => {
       },
       control: syntheticBackendMode === "synthetic" ? syntheticControl : null,
       derived,
-      ...(syntheticBackendDisabledReason
-        ? { disabled_reason: syntheticBackendDisabledReason }
-        : {})
+      ...(syntheticBackendDisabledReason ? { disabled_reason: syntheticBackendDisabledReason } : {})
     };
   };
 
@@ -1385,11 +1395,7 @@ const run = async () => {
           syntheticControl = await writeSyntheticControlState(syntheticControlKv, payload);
           return jsonResponse({
             control: syntheticControl,
-            derived: buildSyntheticDerivedStatus(
-              Date.now(),
-              syntheticControl,
-              syntheticProfileHits
-            )
+            derived: buildSyntheticDerivedStatus(Date.now(), syntheticControl, syntheticProfileHits)
           });
         } catch (error) {
           return jsonResponse(
@@ -1436,7 +1442,13 @@ const run = async () => {
       if (req.method === "GET" && url.pathname === "/prints/equities/range") {
         try {
           const { underlyingId, startTs, endTs, limit } = parseEquityPrintRangeParams(url);
-          const data = await fetchEquityPrintsRange(clickhouse, underlyingId, startTs, endTs, limit);
+          const data = await fetchEquityPrintsRange(
+            clickhouse,
+            underlyingId,
+            startTs,
+            endTs,
+            limit
+          );
           return jsonResponse({ data });
         } catch (error) {
           return jsonResponse(
@@ -1566,7 +1578,9 @@ const run = async () => {
             source,
             storageFilters
           );
-          return jsonResponse(buildHistoryResponse(data, (item) => ({ ts: item.ts, seq: item.seq })));
+          return jsonResponse(
+            buildHistoryResponse(data, (item) => ({ ts: item.ts, seq: item.seq }))
+          );
         } catch (error) {
           return jsonResponse(
             {
@@ -1986,7 +2000,9 @@ const run = async () => {
           const payload =
             typeof message === "string"
               ? message
-              : new TextDecoder().decode(message instanceof Uint8Array ? message : new Uint8Array(message));
+              : new TextDecoder().decode(
+                  message instanceof Uint8Array ? message : new Uint8Array(message)
+                );
           const parsed = LiveClientMessageSchema.parse(JSON.parse(payload));
           if (parsed.op === "ping") {
             sendLiveMessage(socket, {

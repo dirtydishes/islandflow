@@ -36,11 +36,20 @@ jobs:
       - name: Install dependencies
         run: ~/.bun/bin/bun install --frozen-lockfile
 
+      - name: Check formatting
+        run: ~/.bun/bin/bun run fmt:check
+
+      - name: Run lint
+        run: ~/.bun/bin/bun run lint
+
       - name: Run typecheck
         run: ~/.bun/bin/bun run typecheck
 
       - name: Run tests
         run: ~/.bun/bin/bun test
+
+      - name: Check public API routes
+        run: ~/.bun/bin/bun run check:public-api-routes
 
       - name: Check Docker workspace snapshot
         run: ~/.bun/bin/bun run check:docker-workspace

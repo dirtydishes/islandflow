@@ -3,7 +3,9 @@ import { isAlertContextPath, parseAlertContextTraceIdPath } from "../src/alert-c
 
 describe("alert context route helpers", () => {
   it("extracts a valid alert trace id from the context endpoint path", () => {
-    expect(parseAlertContextTraceIdPath("/flow/alerts/alert%3Actx%2Fone/context")).toBe("alert:ctx/one");
+    expect(parseAlertContextTraceIdPath("/flow/alerts/alert%3Actx%2Fone/context")).toBe(
+      "alert:ctx/one"
+    );
   });
 
   it("returns null for unrelated alert paths", () => {

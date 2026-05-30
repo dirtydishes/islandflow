@@ -78,7 +78,9 @@ const getDteDays = (packet: FlowPacket): number | null => {
 
 const inferDirection = (packet: FlowPacket): SmartMoneyDirection => {
   const structureRights = stringFeature(packet, "structure_rights");
-  const optionType = stringFeature(packet, "option_type") || parseContractId(stringFeature(packet, "option_contract_id"))?.right;
+  const optionType =
+    stringFeature(packet, "option_type") ||
+    parseContractId(stringFeature(packet, "option_contract_id"))?.right;
   const buy = numberFeature(packet, "nbbo_aggressive_buy_ratio");
   const sell = numberFeature(packet, "nbbo_aggressive_sell_ratio");
   const sellDominant = sell >= buy + 0.12;
@@ -102,16 +104,26 @@ export type SmartMoneyParentEventOptions = {
   eventCalendarMatch?: EventCalendarMatch | null;
 };
 
-const buildFeatures = (packet: FlowPacket, options: SmartMoneyParentEventOptions = {}): SmartMoneyFeatures => {
+const buildFeatures = (
+  packet: FlowPacket,
+  options: SmartMoneyParentEventOptions = {}
+): SmartMoneyFeatures => {
   const contractId = stringFeature(packet, "option_contract_id");
   const contract = parseContractId(contractId);
   const underlyingMid = numberFeature(packet, "underlying_mid");
-  const quoteAge = numberFeature(packet, "nbbo_age_ms") || numberFeature(packet, "underlying_quote_age_ms");
-  const printCount = Math.max(0, Math.round(numberFeature(packet, "count") || packet.members.length));
+  const quoteAge =
+    numberFeature(packet, "nbbo_age_ms") || numberFeature(packet, "underlying_quote_age_ms");
+  const printCount = Math.max(
+    0,
+    Math.round(numberFeature(packet, "count") || packet.members.length)
+  );
   const staleCount = numberFeature(packet, "nbbo_stale_count");
   const missingCount = numberFeature(packet, "nbbo_missing_count");
   const structureLegs = Math.max(0, Math.round(numberFeature(packet, "structure_legs")));
-  const strikeCount = Math.max(1, Math.round(numberFeature(packet, "structure_strikes") || (contract ? 1 : 0)));
+  const strikeCount = Math.max(
+    1,
+    Math.round(numberFeature(packet, "structure_strikes") || (contract ? 1 : 0))
+  );
   const specialCount = numberFeature(packet, "special_print_count");
   const calendarEventTs = options.eventCalendarMatch?.event_ts ?? null;
   const eventTs = calendarEventTs ?? numberFeature(packet, "corporate_event_ts");
@@ -119,7 +131,9 @@ const buildFeatures = (packet: FlowPacket, options: SmartMoneyParentEventOptions
   const expiryTs = contract ? Date.parse(`${contract.expiry}T00:00:00Z`) : Number.NaN;
 
   const atmProximity =
-    contract && underlyingMid > 0 ? Math.abs(contract.strike - underlyingMid) / underlyingMid : null;
+    contract && underlyingMid > 0
+      ? Math.abs(contract.strike - underlyingMid) / underlyingMid
+      : null;
 
   return {
     contract_count: Math.max(1, structureLegs || 1),
@@ -143,14 +157,18 @@ const buildFeatures = (packet: FlowPacket, options: SmartMoneyParentEventOptions
     nbbo_stale_ratio: printCount > 0 ? clamp((staleCount + missingCount) / printCount) : 0,
     quote_age_ms: quoteAge > 0 ? quoteAge : null,
     venue_count: Math.max(1, Math.round(numberFeature(packet, "venue_count") || 1)),
-    inter_fill_ms_mean: printCount > 1 ? numberFeature(packet, "window_ms") / Math.max(1, printCount - 1) : null,
+    inter_fill_ms_mean:
+      printCount > 1 ? numberFeature(packet, "window_ms") / Math.max(1, printCount - 1) : null,
     strike_count: strikeCount,
     strike_concentration: strikeCount > 0 ? clamp(1 / strikeCount) : 0,
-    ...(stringFeature(packet, "structure_type") ? { structure_type: stringFeature(packet, "structure_type") } : {}),
+    ...(stringFeature(packet, "structure_type")
+      ? { structure_type: stringFeature(packet, "structure_type") }
+      : {}),
     structure_legs: structureLegs,
     same_size_leg_symmetry: clamp(numberFeature(packet, "same_size_leg_symmetry")),
     net_directional_bias: clamp(
-      numberFeature(packet, "nbbo_aggressive_buy_ratio") - numberFeature(packet, "nbbo_aggressive_sell_ratio"),
+      numberFeature(packet, "nbbo_aggressive_buy_ratio") -
+        numberFeature(packet, "nbbo_aggressive_sell_ratio"),
       -1,
       1
     ),
@@ -159,7 +177,10 @@ const buildFeatures = (packet: FlowPacket, options: SmartMoneyParentEventOptions
     underlying_move_bps: numberFeature(packet, "underlying_move_bps") || null,
     days_to_event: eventTs > 0 ? (eventTs - referenceTs) / MS_PER_DAY : null,
     expiry_after_event: eventTs > 0 && Number.isFinite(expiryTs) ? expiryTs >= eventTs : null,
-    pre_event_concentration: eventTs > 0 && eventTs >= referenceTs ? clamp(1 - (eventTs - referenceTs) / (21 * MS_PER_DAY)) : null,
+    pre_event_concentration:
+      eventTs > 0 && eventTs >= referenceTs
+        ? clamp(1 - (eventTs - referenceTs) / (21 * MS_PER_DAY))
+        : null,
     special_print_ratio: printCount > 0 ? clamp(specialCount / printCount) : 0
   };
 };
@@ -170,7 +191,10 @@ const detectSuppression = (packet: FlowPacket, features: SmartMoneyFeatures): st
     .split(",")
     .map((item) => item.trim().toUpperCase())
     .filter(Boolean);
-  if (conditions.some((condition) => SPECIAL_CONDITIONS.has(condition)) || features.special_print_ratio >= 0.34) {
+  if (
+    conditions.some((condition) => SPECIAL_CONDITIONS.has(condition)) ||
+    features.special_print_ratio >= 0.34
+  ) {
     reasons.push("special_print_or_complex_context");
   }
   if (features.nbbo_coverage_ratio < 0.35 || features.nbbo_stale_ratio >= 0.5) {
@@ -198,7 +222,10 @@ const evaluateProfiles = (
   const burstFactor = clamp(features.print_count / 8);
   const quality = clamp(features.nbbo_coverage_ratio - features.nbbo_stale_ratio);
   const shortDatedOtm =
-    dte <= 7 && features.atm_proximity !== null && features.atm_proximity >= 0.05 && features.option_type === "C";
+    dte <= 7 &&
+    features.atm_proximity !== null &&
+    features.atm_proximity >= 0.05 &&
+    features.option_type === "C";
   const nearAtm = features.atm_proximity !== null && features.atm_proximity <= 0.015;
   const preEvent =
     features.days_to_event !== null &&
@@ -211,7 +238,11 @@ const evaluateProfiles = (
       "institutional_directional",
       suppressed.length > 0 || shortDatedOtm
         ? 0.18
-        : 0.2 + premiumFactor * 0.25 + burstFactor * 0.18 + quality * 0.16 + (buy >= 0.58 || sell >= 0.58 ? 0.12 : 0),
+        : 0.2 +
+            premiumFactor * 0.25 +
+            burstFactor * 0.18 +
+            quality * 0.16 +
+            (buy >= 0.58 || sell >= 0.58 ? 0.12 : 0),
       direction,
       [
         "large_parent_event",
@@ -232,13 +263,19 @@ const evaluateProfiles = (
     ),
     score(
       "event_driven",
-      0.12 + (preEvent ? 0.32 : 0) + premiumFactor * 0.14 + clamp(features.spread_widening ?? 0, 0, 0.16),
+      0.12 +
+        (preEvent ? 0.32 : 0) +
+        premiumFactor * 0.14 +
+        clamp(features.spread_widening ?? 0, 0, 0.16),
       direction === "unknown" ? "neutral" : direction,
       ["event_calendar_alignment", "expiry_after_event", "pre_event_concentration"]
     ),
     score(
       "vol_seller",
-      0.12 + (sell >= 0.58 ? 0.24 : 0) + (structure === "straddle" || structure === "strangle" ? 0.2 : 0) + premiumFactor * 0.14,
+      0.12 +
+        (sell >= 0.58 ? 0.24 : 0) +
+        (structure === "straddle" || structure === "strangle" ? 0.2 : 0) +
+        premiumFactor * 0.14,
       "neutral",
       ["sell_side_premium", "short_vol_structure_evidence"]
     ),
@@ -273,11 +310,16 @@ export const buildSmartMoneyEventFromPacket = (
   const suppressed = detectSuppression(packet, features);
   const profileScores = evaluateProfiles(packet, features, suppressed);
   const primary = profileScores[0] ?? null;
-  const abstained = !primary || primary.probability < 0.42 || suppressed.includes("stale_or_missing_quote_context");
-  const underlying = stringFeature(packet, "underlying_id") || parseContractId(features.option_contract_id ?? "")?.root || "UNKNOWN";
-  const eventKind = features.structure_legs >= 2 || stringFeature(packet, "packet_kind") === "structure"
-    ? "multi_leg_event"
-    : "single_leg_event";
+  const abstained =
+    !primary || primary.probability < 0.42 || suppressed.includes("stale_or_missing_quote_context");
+  const underlying =
+    stringFeature(packet, "underlying_id") ||
+    parseContractId(features.option_contract_id ?? "")?.root ||
+    "UNKNOWN";
+  const eventKind =
+    features.structure_legs >= 2 || stringFeature(packet, "packet_kind") === "structure"
+      ? "multi_leg_event"
+      : "single_leg_event";
 
   return SmartMoneyEventSchema.parse({
     source_ts: packet.source_ts,
@@ -292,8 +334,8 @@ export const buildSmartMoneyEventFromPacket = (
     event_window_ms: features.window_ms,
     features,
     profile_scores: profileScores,
-    primary_profile_id: abstained ? null : primary?.profile_id ?? null,
-    primary_direction: abstained ? "unknown" : primary?.direction ?? "unknown",
+    primary_profile_id: abstained ? null : (primary?.profile_id ?? null),
+    primary_direction: abstained ? "unknown" : (primary?.direction ?? "unknown"),
     abstained,
     suppressed_reasons: suppressed
   });
@@ -308,7 +350,9 @@ const LEGACY_PROFILE_MAP: Record<SmartMoneyProfileId, string> = {
   hedge_reactive: "smart_money_hedge_reactive"
 };
 
-export const deriveClassifierHitsFromSmartMoneyEvent = (event: SmartMoneyEvent): ClassifierHit[] => {
+export const deriveClassifierHitsFromSmartMoneyEvent = (
+  event: SmartMoneyEvent
+): ClassifierHit[] => {
   if (event.abstained || !event.primary_profile_id) {
     return [];
   }

@@ -89,11 +89,7 @@ const priceForPlacement = (
   return formatPrice(Math.max(0.01, price));
 };
 
-const buildQuoteContext = (
-  symbol: string,
-  now: number,
-  control: SyntheticControlState
-) => {
+const buildQuoteContext = (symbol: string, now: number, control: SyntheticControlState) => {
   const session = getSyntheticSessionState(now, control);
   const state = getSyntheticUnderlyingState(symbol, now, control, session);
   return {
@@ -184,7 +180,9 @@ export const createSyntheticEquitiesAdapter = (
           session.regime === "retail_chase";
 
         if (allowDark) {
-          const darkSymbol = focusSymbols[seq % focusSymbols.length] ?? SYNTHETIC_SYMBOLS[symbolCursor % SYNTHETIC_SYMBOLS.length]!;
+          const darkSymbol =
+            focusSymbols[seq % focusSymbols.length] ??
+            SYNTHETIC_SYMBOLS[symbolCursor % SYNTHETIC_SYMBOLS.length]!;
           const darkQuote = buildQuoteContext(darkSymbol, now, control);
           const darkPlacement = pickDarkPlacement(
             darkQuote.state.driftBps,
@@ -203,13 +201,7 @@ export const createSyntheticEquitiesAdapter = (
           if (handlers.onQuote) {
             quoteSeq += 1;
             void handlers.onQuote(
-              buildSyntheticQuote(
-                quoteSeq,
-                now - 2,
-                darkSymbol,
-                darkQuote.bid,
-                darkQuote.ask
-              )
+              buildSyntheticQuote(quoteSeq, now - 2, darkSymbol, darkQuote.bid, darkQuote.ask)
             );
           }
 
@@ -236,11 +228,7 @@ export const createSyntheticEquitiesAdapter = (
           const eventTs = now + i * 4;
           const quote = buildQuoteContext(symbol, eventTs, control);
           const clustered = focusSet.has(symbol);
-          const placement = pickPrimaryPlacement(
-            quote.state.driftBps,
-            session.regime,
-            seq + i
-          );
+          const placement = pickPrimaryPlacement(quote.state.driftBps, session.regime, seq + i);
           const exchange = EXCHANGES[(seq + symbol.charCodeAt(0) + i) % EXCHANGES.length]!;
           const baseSize =
             throughput.litSizeBase +
@@ -255,13 +243,7 @@ export const createSyntheticEquitiesAdapter = (
           if (handlers.onQuote) {
             quoteSeq += 1;
             void handlers.onQuote(
-              buildSyntheticQuote(
-                quoteSeq,
-                eventTs - 2,
-                symbol,
-                quote.bid,
-                quote.ask
-              )
+              buildSyntheticQuote(quoteSeq, eventTs - 2, symbol, quote.bid, quote.ask)
             );
           }
 

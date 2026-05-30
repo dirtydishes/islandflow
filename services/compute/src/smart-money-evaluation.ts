@@ -1,4 +1,9 @@
-import type { FlowPacket, SmartMoneyDirection, SmartMoneyEvent, SmartMoneyProfileId } from "@islandflow/types";
+import type {
+  FlowPacket,
+  SmartMoneyDirection,
+  SmartMoneyEvent,
+  SmartMoneyProfileId
+} from "@islandflow/types";
 import { buildSmartMoneyEventFromPacket, type SmartMoneyParentEventOptions } from "./parent-events";
 
 export type SmartMoneyLabel = {
@@ -115,8 +120,12 @@ export const compareSmartMoneyReplayOutputs = (
   liveEvents: SmartMoneyEvent[],
   batchEvents: SmartMoneyEvent[]
 ): ReplayConsistencyReport => {
-  const liveById = new Map(liveEvents.map((event) => [event.event_id, smartMoneyEventSignature(event)]));
-  const batchById = new Map(batchEvents.map((event) => [event.event_id, smartMoneyEventSignature(event)]));
+  const liveById = new Map(
+    liveEvents.map((event) => [event.event_id, smartMoneyEventSignature(event)])
+  );
+  const batchById = new Map(
+    batchEvents.map((event) => [event.event_id, smartMoneyEventSignature(event)])
+  );
   const ids = [...new Set([...liveById.keys(), ...batchById.keys()])].sort();
   const mismatches: ReplayConsistencyMismatch[] = [];
 
@@ -153,7 +162,9 @@ export const evaluateSmartMoneyEvents = (
   const labelsById = new Map(labels.map((label) => [label.event_id, label]));
   const labeledEvents = events
     .map((event) => ({ event, label: labelsById.get(event.event_id) }))
-    .filter((entry): entry is { event: SmartMoneyEvent; label: SmartMoneyLabel } => Boolean(entry.label));
+    .filter((entry): entry is { event: SmartMoneyEvent; label: SmartMoneyLabel } =>
+      Boolean(entry.label)
+    );
 
   const emitted = events.filter((event) => !event.abstained && event.primary_profile_id);
   const profilePrecision: SmartMoneyEvaluationReport["profile_precision"] = {};
@@ -163,7 +174,8 @@ export const evaluateSmartMoneyEvents = (
     const predicted = labeledEvents.filter((entry) => entry.event.primary_profile_id === profile);
     const actual = labeledEvents.filter((entry) => entry.label.profile_id === profile);
     const truePositive = predicted.filter((entry) => entry.label.profile_id === profile).length;
-    profilePrecision[profile] = predicted.length > 0 ? round(truePositive / predicted.length) : null;
+    profilePrecision[profile] =
+      predicted.length > 0 ? round(truePositive / predicted.length) : null;
     profileRecall[profile] = actual.length > 0 ? round(truePositive / actual.length) : null;
   }
 
@@ -175,7 +187,10 @@ export const evaluateSmartMoneyEvents = (
     labeled_count: labeledEvents.length,
     emitted_count: emitted.length,
     abstained_count: events.filter((event) => event.abstained).length,
-    abstention_rate: events.length > 0 ? round(events.filter((event) => event.abstained).length / events.length) : 0,
+    abstention_rate:
+      events.length > 0
+        ? round(events.filter((event) => event.abstained).length / events.length)
+        : 0,
     profile_precision: profilePrecision,
     profile_recall: profileRecall,
     calibration,
@@ -195,7 +210,9 @@ const buildCalibration = (
   }));
 
   for (const { event, label } of entries) {
-    const probability = event.profile_scores.find((entry) => entry.profile_id === event.primary_profile_id)?.probability ?? 0;
+    const probability =
+      event.profile_scores.find((entry) => entry.profile_id === event.primary_profile_id)
+        ?.probability ?? 0;
     const index = Math.min(bucketCount - 1, Math.floor(probability * bucketCount));
     buckets[index].probabilities.push(probability);
     if (!event.abstained && event.primary_profile_id === label.profile_id) {
@@ -209,9 +226,13 @@ const buildCalibration = (
     count: bucket.probabilities.length,
     average_probability:
       bucket.probabilities.length > 0
-        ? round(bucket.probabilities.reduce((sum, value) => sum + value, 0) / bucket.probabilities.length)
+        ? round(
+            bucket.probabilities.reduce((sum, value) => sum + value, 0) /
+              bucket.probabilities.length
+          )
         : 0,
-    accuracy: bucket.probabilities.length > 0 ? round(bucket.correct / bucket.probabilities.length) : null
+    accuracy:
+      bucket.probabilities.length > 0 ? round(bucket.correct / bucket.probabilities.length) : null
   }));
 };
 
@@ -223,7 +244,10 @@ const buildEconomicSanity = (
       sign: directionalSign(event.primary_direction),
       realized: label.realized_return_bps
     }))
-    .filter((entry): entry is { sign: number; realized: number } => entry.sign !== 0 && Number.isFinite(entry.realized));
+    .filter(
+      (entry): entry is { sign: number; realized: number } =>
+        entry.sign !== 0 && Number.isFinite(entry.realized)
+    );
 
   if (directional.length === 0) {
     return {
@@ -236,7 +260,12 @@ const buildEconomicSanity = (
   const signedReturns = directional.map((entry) => entry.sign * entry.realized);
   return {
     directional_count: directional.length,
-    direction_hit_rate: round(signedReturns.filter((value) => value > 0).length / directional.length),
-    average_signed_return_bps: round(signedReturns.reduce((sum, value) => sum + value, 0) / signedReturns.length, 2)
+    direction_hit_rate: round(
+      signedReturns.filter((value) => value > 0).length / directional.length
+    ),
+    average_signed_return_bps: round(
+      signedReturns.reduce((sum, value) => sum + value, 0) / signedReturns.length,
+      2
+    )
   };
 };

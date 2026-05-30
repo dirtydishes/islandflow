@@ -5,7 +5,11 @@ import {
   fetchOptionPrintsByTraceIds,
   fetchRecentOptionPrints
 } from "../src/clickhouse";
-import { normalizeOptionPrint, optionPrintsTableDDL, OPTION_PRINTS_TABLE } from "../src/option-prints";
+import {
+  normalizeOptionPrint,
+  optionPrintsTableDDL,
+  OPTION_PRINTS_TABLE
+} from "../src/option-prints";
 
 const basePrint = {
   source_ts: 100,

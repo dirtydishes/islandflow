@@ -68,7 +68,9 @@ const listWorkspacePaths = async (workspacePatterns: string[]): Promise<string[]
   const paths = new Set<string>();
 
   for (const pattern of workspacePatterns) {
-    const globPattern = pattern.endsWith("/") ? `${pattern}package.json` : `${pattern}/package.json`;
+    const globPattern = pattern.endsWith("/")
+      ? `${pattern}package.json`
+      : `${pattern}/package.json`;
     const glob = new Bun.Glob(globPattern);
     for await (const match of glob.scan({ cwd: repoRoot })) {
       const normalized = match.replaceAll("\\", "/");
@@ -124,15 +126,21 @@ const formatDependencyDiff = (
 const check = async (): Promise<number> => {
   const issues: string[] = [];
 
-  const [rootPackage, deploymentPackage, rootTsconfig, deploymentTsconfig, rootLock, deploymentLock] =
-    await Promise.all([
-      parseObjectLiteral<RootPackageManifest>(rootPackagePath),
-      parseObjectLiteral(deploymentPackagePath),
-      parseObjectLiteral(rootTsconfigPath),
-      parseObjectLiteral(deploymentTsconfigPath),
-      parseObjectLiteral<BunLock>(rootLockPath),
-      parseObjectLiteral<BunLock>(deploymentLockPath)
-    ]);
+  const [
+    rootPackage,
+    deploymentPackage,
+    rootTsconfig,
+    deploymentTsconfig,
+    rootLock,
+    deploymentLock
+  ] = await Promise.all([
+    parseObjectLiteral<RootPackageManifest>(rootPackagePath),
+    parseObjectLiteral(deploymentPackagePath),
+    parseObjectLiteral(rootTsconfigPath),
+    parseObjectLiteral(deploymentTsconfigPath),
+    parseObjectLiteral<BunLock>(rootLockPath),
+    parseObjectLiteral<BunLock>(deploymentLockPath)
+  ]);
 
   const rootPackageSnapshot = stableStringify(rootPackage);
   const deploymentPackageSnapshot = stableStringify(deploymentPackage);
@@ -172,7 +180,9 @@ const check = async (): Promise<number> => {
       "peerDependencies"
     ];
     for (const section of sections) {
-      const expectedMap = normalizedDependencyMap(workspacePackage[section] as DependencyMap | undefined);
+      const expectedMap = normalizedDependencyMap(
+        workspacePackage[section] as DependencyMap | undefined
+      );
       const actualMap = normalizedDependencyMap(
         deploymentWorkspace[section] as DependencyMap | undefined
       );
@@ -212,7 +222,9 @@ const check = async (): Promise<number> => {
       "peerDependencies"
     ];
     for (const section of sections) {
-      const expectedMap = normalizedDependencyMap(rootWorkspace[section] as DependencyMap | undefined);
+      const expectedMap = normalizedDependencyMap(
+        rootWorkspace[section] as DependencyMap | undefined
+      );
       const actualMap = normalizedDependencyMap(
         deploymentWorkspace[section] as DependencyMap | undefined
       );

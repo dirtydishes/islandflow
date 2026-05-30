@@ -13,10 +13,7 @@ import {
   OptionPrintSchema,
   SmartMoneyEventSchema
 } from "./events";
-import {
-  OptionFlowFiltersSchema,
-  optionFlowFilterKey
-} from "./options-flow";
+import { OptionFlowFiltersSchema, optionFlowFilterKey } from "./options-flow";
 
 export const CursorSchema = z.object({
   ts: z.number().int().nonnegative(),
@@ -94,7 +91,15 @@ export const LiveSubscriptionSchema = z.discriminatedUnion("channel", [
     snapshot_limit: z.number().int().positive().optional()
   }),
   z.object({
-    channel: z.enum(["nbbo", "equity-quotes", "equity-joins", "classifier-hits", "alerts", "inferred-dark", "news"]),
+    channel: z.enum([
+      "nbbo",
+      "equity-quotes",
+      "equity-joins",
+      "classifier-hits",
+      "alerts",
+      "inferred-dark",
+      "news"
+    ]),
     snapshot_limit: z.number().int().positive().optional()
   }),
   z.object({

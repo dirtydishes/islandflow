@@ -16,7 +16,11 @@ import {
   nanos,
   millis
 } from "nats";
-import { getKnownStreamDefinitions, getStreamDefinition, type StreamRetentionClass } from "./streams";
+import {
+  getKnownStreamDefinitions,
+  getStreamDefinition,
+  type StreamRetentionClass
+} from "./streams";
 
 export type NatsConnectionOptions = {
   servers: string | string[];
@@ -251,9 +255,10 @@ const diffConfigFields = (
   for (const field of fields) {
     const currentValue = getFieldValue(current, field);
     const desiredValue = getFieldValue(desired, field);
-    const matches = Array.isArray(currentValue) && Array.isArray(desiredValue)
-      ? arraysEqual(currentValue, desiredValue)
-      : currentValue === desiredValue;
+    const matches =
+      Array.isArray(currentValue) && Array.isArray(desiredValue)
+        ? arraysEqual(currentValue, desiredValue)
+        : currentValue === desiredValue;
 
     if (!matches) {
       deltas.push({
@@ -391,7 +396,10 @@ const formatStructuredValue = (value: unknown): string => {
 
 const formatStructuralMismatchMessage = (audit: StreamAuditReport): string => {
   const details = audit.structuralMismatch
-    .map((delta) => `${delta.field} current=${formatStructuredValue(delta.current)} desired=${formatStructuredValue(delta.desired)}`)
+    .map(
+      (delta) =>
+        `${delta.field} current=${formatStructuredValue(delta.current)} desired=${formatStructuredValue(delta.desired)}`
+    )
     .join("; ");
   return `Refusing to reconcile stream ${audit.name}: structural mismatch (${details})`;
 };
@@ -447,16 +455,18 @@ const formatReportLine = (
     case "retention_drift": {
       const details = report.retentionDrift
         .map((delta) => {
-          const desiredValue = delta.field === "max_age"
-            ? formatDurationMs(millis(Number(delta.desired)))
-            : delta.field === "max_bytes"
-              ? formatBytes(Number(delta.desired))
-              : formatStructuredValue(delta.desired);
-          const currentValue = delta.field === "max_age"
-            ? formatDurationMs(millis(Number(delta.current)))
-            : delta.field === "max_bytes"
-              ? formatBytes(Number(delta.current))
-              : formatStructuredValue(delta.current);
+          const desiredValue =
+            delta.field === "max_age"
+              ? formatDurationMs(millis(Number(delta.desired)))
+              : delta.field === "max_bytes"
+                ? formatBytes(Number(delta.desired))
+                : formatStructuredValue(delta.desired);
+          const currentValue =
+            delta.field === "max_age"
+              ? formatDurationMs(millis(Number(delta.current)))
+              : delta.field === "max_bytes"
+                ? formatBytes(Number(delta.current))
+                : formatStructuredValue(delta.current);
           return `${delta.field}:${currentValue}->${desiredValue}`;
         })
         .join(" ");
@@ -464,7 +474,10 @@ const formatReportLine = (
     }
     case "structural_mismatch": {
       const details = report.structuralMismatch
-        .map((delta) => `${delta.field}:${formatStructuredValue(delta.current)}->${formatStructuredValue(delta.desired)}`)
+        .map(
+          (delta) =>
+            `${delta.field}:${formatStructuredValue(delta.current)}->${formatStructuredValue(delta.desired)}`
+        )
         .join(" ");
       return `● ${report.name} structural-mismatch ${details}`;
     }

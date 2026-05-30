@@ -33,9 +33,7 @@ const envSchema = z.object({
   CANDLE_INTERVALS_MS: z.string().default("60000,300000"),
   CANDLE_MAX_LATE_MS: z.coerce.number().int().nonnegative().default(0),
   CANDLE_CACHE_LIMIT: z.coerce.number().int().nonnegative().default(2000),
-  CANDLE_DELIVER_POLICY: z
-    .enum(["new", "all", "last", "last_per_subject"])
-    .default("new"),
+  CANDLE_DELIVER_POLICY: z.enum(["new", "all", "last", "last_per_subject"]).default("new"),
   CANDLE_CONSUMER_RESET: z
     .preprocess((value) => {
       if (typeof value === "string") {
@@ -290,7 +288,10 @@ const run = async () => {
   } else {
     try {
       const info = await jsm.consumers.info(STREAM_EQUITY_PRINTS, durableName);
-      if (info?.config?.deliver_policy && info.config.deliver_policy !== env.CANDLE_DELIVER_POLICY) {
+      if (
+        info?.config?.deliver_policy &&
+        info.config.deliver_policy !== env.CANDLE_DELIVER_POLICY
+      ) {
         logger.warn("resetting consumer due to deliver policy change", {
           durable: durableName,
           current: info.config.deliver_policy,
@@ -301,7 +302,10 @@ const run = async () => {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (!message.includes("not found")) {
-        logger.warn("failed to inspect jetstream consumer", { durable: durableName, error: message });
+        logger.warn("failed to inspect jetstream consumer", {
+          durable: durableName,
+          error: message
+        });
       }
     }
   }
@@ -327,7 +331,8 @@ const run = async () => {
       try {
         await jsm.consumers.delete(STREAM_EQUITY_PRINTS, durableName);
       } catch (deleteError) {
-        const deleteMessage = deleteError instanceof Error ? deleteError.message : String(deleteError);
+        const deleteMessage =
+          deleteError instanceof Error ? deleteError.message : String(deleteError);
         if (!deleteMessage.includes("not found")) {
           logger.warn("failed to delete jetstream consumer", {
             durable: durableName,

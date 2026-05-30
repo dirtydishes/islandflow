@@ -17,16 +17,18 @@ export const TEST_CLASSIFIER_CONFIG: ClassifierConfig = {
   zeroDteMinSize: 400
 };
 
-export const buildFlowPacket = (opts: {
-  id?: string;
-  source_ts?: number;
-  ingest_ts?: number;
-  seq?: number;
-  trace_id?: string;
-  members?: string[];
-  features?: FlowPacket["features"];
-  join_quality?: FlowPacket["join_quality"];
-} = {}): FlowPacket => {
+export const buildFlowPacket = (
+  opts: {
+    id?: string;
+    source_ts?: number;
+    ingest_ts?: number;
+    seq?: number;
+    trace_id?: string;
+    members?: string[];
+    features?: FlowPacket["features"];
+    join_quality?: FlowPacket["join_quality"];
+  } = {}
+): FlowPacket => {
   const id = opts.id ?? "flowpacket:test";
   const source_ts = opts.source_ts ?? Date.parse("2025-01-01T14:30:00Z");
   const ingest_ts = opts.ingest_ts ?? source_ts;
@@ -66,4 +68,3 @@ export const buildFlowPacket = (opts: {
 export const getHit = (hits: ClassifierHit[], id: string): ClassifierHit | null => {
   return hits.find((hit) => hit.classifier_id === id) ?? null;
 };
-

@@ -24,9 +24,7 @@ type RollingWindowEntry = {
 };
 
 const toNumbers = (values: string[]): number[] => {
-  return values
-    .map((value) => Number(value))
-    .filter((value) => Number.isFinite(value));
+  return values.map((value) => Number(value)).filter((value) => Number.isFinite(value));
 };
 
 export const computeStats = (values: number[]): { mean: number; stddev: number; count: number } => {

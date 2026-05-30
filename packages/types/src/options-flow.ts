@@ -212,9 +212,10 @@ export const deriveOptionPrintMetadata = (
   const parsed = parseOptionContractId(print.option_contract_id);
   const underlying = parsed?.root?.toUpperCase();
   const optionType = parsed?.right === "C" ? "call" : parsed?.right === "P" ? "put" : undefined;
-  const notional = Number.isFinite(print.price) && Number.isFinite(print.size)
-    ? Number((print.price * print.size * 100).toFixed(2))
-    : undefined;
+  const notional =
+    Number.isFinite(print.price) && Number.isFinite(print.size)
+      ? Number((print.price * print.size * 100).toFixed(2))
+      : undefined;
 
   return {
     underlying_id: underlying,
@@ -243,7 +244,14 @@ const balancedThresholds = (config: OptionsSignalConfig): OptionsSignalConfig =>
 export const evaluateOptionSignal = (
   print: Pick<
     OptionPrint,
-    "size" | "conditions" | "signal_profile" | "underlying_id" | "option_type" | "notional" | "nbbo_side" | "is_etf"
+    | "size"
+    | "conditions"
+    | "signal_profile"
+    | "underlying_id"
+    | "option_type"
+    | "notional"
+    | "nbbo_side"
+    | "is_etf"
   >,
   baseConfig: OptionsSignalConfig
 ): OptionSignalDecision => {
@@ -260,7 +268,8 @@ export const evaluateOptionSignal = (
   const reasons: string[] = [];
   const notional = print.notional ?? 0;
   const side = print.nbbo_side ?? "MISSING";
-  const isSweepOrIso = hasCondition(print.conditions, "SWEEP") || hasCondition(print.conditions, "ISO");
+  const isSweepOrIso =
+    hasCondition(print.conditions, "SWEEP") || hasCondition(print.conditions, "ISO");
 
   if (notional < config.minNotional) {
     return {
@@ -413,8 +422,14 @@ export const matchesFlowPacketFilters = (
   }
 
   const features = packet.features ?? {};
-  const totalNotional = typeof features.total_notional === "number" ? features.total_notional : Number(features.total_notional ?? 0);
-  if (typeof filters.minNotional === "number" && (!Number.isFinite(totalNotional) || totalNotional < filters.minNotional)) {
+  const totalNotional =
+    typeof features.total_notional === "number"
+      ? features.total_notional
+      : Number(features.total_notional ?? 0);
+  if (
+    typeof filters.minNotional === "number" &&
+    (!Number.isFinite(totalNotional) || totalNotional < filters.minNotional)
+  ) {
     return false;
   }
 
@@ -433,10 +448,7 @@ export const matchesFlowPacketFilters = (
         : typeof features.structure_rights === "string"
           ? features.structure_rights.toLowerCase()
           : null;
-    if (
-      !optionType ||
-      !filters.optionTypes.some((selected) => optionType.includes(selected))
-    ) {
+    if (!optionType || !filters.optionTypes.some((selected) => optionType.includes(selected))) {
       return false;
     }
   }

@@ -30,21 +30,12 @@ const SSH_KEY =
   process.env.DEPLOY_SSH_KEY_PATH?.trim() ||
   path.join(process.env.HOME ?? "", ".ssh", "delta_ed25519");
 const DEPLOY_FORCE_SSH = process.env.DEPLOY_FORCE_SSH?.trim() === "1";
-const SSH_OPTIONS = [
-  "-i",
-  SSH_KEY,
-  "-o",
-  "IdentitiesOnly=yes",
-  "-o",
-  "BatchMode=yes"
-];
+const SSH_OPTIONS = ["-i", SSH_KEY, "-o", "IdentitiesOnly=yes", "-o", "BatchMode=yes"];
 const ALLOWED_REMOTE_UNTRACKED = new Set([
   "deployment/docker/signal-cli-0.14.3-Linux-native.tar.gz"
 ]);
-const PUBLIC_APP_URL =
-  process.env.DEPLOY_PUBLIC_APP_URL?.trim() || "https://flow.deltaisland.io";
-const PUBLIC_API_HEALTH_URL =
-  process.env.DEPLOY_PUBLIC_API_HEALTH_URL?.trim() || null;
+const PUBLIC_APP_URL = process.env.DEPLOY_PUBLIC_APP_URL?.trim() || "https://flow.deltaisland.io";
+const PUBLIC_API_HEALTH_URL = process.env.DEPLOY_PUBLIC_API_HEALTH_URL?.trim() || null;
 const DEPLOY_GIT_REMOTE_OVERRIDE = process.env.DEPLOY_GIT_REMOTE?.trim() || null;
 const DEPLOY_NATIVE_EDGE_READY = process.env.DEPLOY_NATIVE_EDGE_READY?.trim() === "1";
 const NATIVE_SYSTEMCTL_PREFIX =
@@ -171,11 +162,7 @@ function formatCommand(command: string, args: string[]): string {
     .join(" ");
 }
 
-function runChecked(
-  command: string,
-  args: string[],
-  options: SpawnSyncOptions = {}
-): void {
+function runChecked(command: string, args: string[], options: SpawnSyncOptions = {}): void {
   console.log(`$ ${formatCommand(command, args)}`);
   const result = spawnSync(command, args, {
     cwd: repoRoot,
@@ -188,11 +175,7 @@ function runChecked(
   }
 }
 
-function captureChecked(
-  command: string,
-  args: string[],
-  options: SpawnSyncOptions = {}
-): string {
+function captureChecked(command: string, args: string[], options: SpawnSyncOptions = {}): string {
   const result = spawnSync(command, args, {
     cwd: repoRoot,
     encoding: "utf8",
@@ -225,11 +208,7 @@ function tryCapture(
   return result.stdout ?? "";
 }
 
-function runRemoteScript(
-  title: string,
-  script: string,
-  args: string[] = []
-): void {
+function runRemoteScript(title: string, script: string, args: string[] = []): void {
   section(title);
 
   if (isLocalServerExecution) {
@@ -360,7 +339,9 @@ function assertSshKeyExists(): void {
 
   if (!existsSync(SSH_KEY)) {
     console.error(`Missing SSH key: ${SSH_KEY}`);
-    console.error("Set DEPLOY_SSH_KEY_PATH or run from the live server checkout without DEPLOY_FORCE_SSH.");
+    console.error(
+      "Set DEPLOY_SSH_KEY_PATH or run from the live server checkout without DEPLOY_FORCE_SSH."
+    );
     process.exit(1);
   }
 }
@@ -399,10 +380,12 @@ function localGitRemotes(): string[] {
 }
 
 function localHasRemote(name: string): boolean {
-  return spawnSync("git", ["remote", "get-url", name], {
-    cwd: repoRoot,
-    stdio: "ignore"
-  }).status === 0;
+  return (
+    spawnSync("git", ["remote", "get-url", name], {
+      cwd: repoRoot,
+      stdio: "ignore"
+    }).status === 0
+  );
 }
 
 function resolveDeployRemote(mode: DeployMode, branch: string | null): string {
@@ -444,12 +427,8 @@ function resolveDeployRemote(mode: DeployMode, branch: string | null): string {
     return selected;
   }
 
-  console.error(
-    `Unable to resolve a deploy git remote. Checked candidates: ${deduped.join(", ")}`
-  );
-  console.error(
-    "Set DEPLOY_GIT_REMOTE to a valid remote name or configure branch.<name>.remote."
-  );
+  console.error(`Unable to resolve a deploy git remote. Checked candidates: ${deduped.join(", ")}`);
+  console.error("Set DEPLOY_GIT_REMOTE to a valid remote name or configure branch.<name>.remote.");
   process.exit(1);
 }
 
@@ -748,7 +727,9 @@ fi
     return;
   }
 
-  const units = nativeUnitsForScope(scope).map((value) => shellEscape(value)).join(" ");
+  const units = nativeUnitsForScope(scope)
+    .map((value) => shellEscape(value))
+    .join(" ");
   runRemoteScript(
     "Remote Runtime Precheck",
     `#!/usr/bin/env bash
@@ -819,9 +800,7 @@ function remoteDockerRollout(
     upArgs.push("--force-recreate");
   }
   const buildServices = dockerBuildServicesForScope(scope);
-  const buildCommand = noBuild
-    ? null
-    : `docker compose build ${buildServices.join(" ")}`;
+  const buildCommand = noBuild ? null : `docker compose build ${buildServices.join(" ")}`;
   const upCommand = `docker compose ${[...upArgs, ...rolloutServices].join(" ")}`;
 
   runRemoteScript(
@@ -844,7 +823,9 @@ function remoteNativeRollout(
   scope: DeployScope,
   noBuild: boolean
 ): void {
-  const units = nativeUnitsForScope(scope).map((value) => shellEscape(value)).join(" ");
+  const units = nativeUnitsForScope(scope)
+    .map((value) => shellEscape(value))
+    .join(" ");
   const buildSteps: string[] = [];
 
   if (!noBuild) {
@@ -854,7 +835,11 @@ function remoteNativeRollout(
     }
   }
 
-  buildSteps.push(`${NATIVE_SYSTEMCTL_PREFIX} restart ${nativeUnitsForScope(scope).map((value) => shellEscape(value)).join(" ")}`);
+  buildSteps.push(
+    `${NATIVE_SYSTEMCTL_PREFIX} restart ${nativeUnitsForScope(scope)
+      .map((value) => shellEscape(value))
+      .join(" ")}`
+  );
 
   runRemoteScript(
     "Remote Rollout",
@@ -899,9 +884,7 @@ function remoteDockerVerification(scope: DeployScope, fast: boolean): void {
   const psServices = dockerServicesForScope(scope);
   const logServices = dockerLogServicesForScope(scope);
   const psCommand =
-    psServices.length > 0
-      ? `docker compose ps ${psServices.join(" ")}`
-      : "docker compose ps";
+    psServices.length > 0 ? `docker compose ps ${psServices.join(" ")}` : "docker compose ps";
   const logCommand = fast
     ? `echo '[deploy] Fast mode: skipping docker compose logs tail for quicker feedback.'`
     : `docker compose logs --tail=100 ${logServices.join(" ")}`;
@@ -933,7 +916,9 @@ ${checks.join("\n")}
 }
 
 function remoteNativeVerification(scope: DeployScope, fast: boolean): void {
-  const units = nativeUnitsForScope(scope).map((value) => shellEscape(value)).join(" ");
+  const units = nativeUnitsForScope(scope)
+    .map((value) => shellEscape(value))
+    .join(" ");
   const checks: string[] = [];
 
   if (scope === "full" || scope === "api" || scope === "services" || scope === "workers") {
@@ -941,11 +926,11 @@ function remoteNativeVerification(scope: DeployScope, fast: boolean): void {
   }
 
   if (scopeIncludesApi(scope)) {
-    checks.push('curl -fksS http://127.0.0.1:4000/health');
+    checks.push("curl -fksS http://127.0.0.1:4000/health");
   }
 
   if (scopeIncludesWeb(scope)) {
-    checks.push('curl -I -fksS http://127.0.0.1:3000/');
+    checks.push("curl -I -fksS http://127.0.0.1:3000/");
   }
 
   runRemoteScript(
@@ -962,7 +947,7 @@ fi
 declare -a units=(${units})
 for unit in "\${units[@]}"; do
   ${NATIVE_SYSTEMCTL_PREFIX} is-active --quiet "$unit"
-  ${fast ? "echo \"[deploy] Fast mode: skipping unit status and recent journal dump for $unit.\"": `${NATIVE_SYSTEMCTL_PREFIX} status --no-pager "$unit" || true\n  journalctl -u "$unit" -n 50 --no-pager || true`}
+  ${fast ? 'echo "[deploy] Fast mode: skipping unit status and recent journal dump for $unit."' : `${NATIVE_SYSTEMCTL_PREFIX} status --no-pager "$unit" || true\n  journalctl -u "$unit" -n 50 --no-pager || true`}
 done
 ${checks.join("\n")}
 `
@@ -1074,9 +1059,7 @@ function main(): void {
   timedPhase(timings, "remote verification", () =>
     remoteVerification(options.runtime, scope, options.fast)
   );
-  timedPhase(timings, "public verification", () =>
-    publicVerification(scope, options.fast)
-  );
+  timedPhase(timings, "public verification", () => publicVerification(scope, options.fast));
   printTimingSummary(timings);
 }
 

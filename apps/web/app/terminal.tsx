@@ -54,7 +54,12 @@ import {
   matchesFlowPacketFilters,
   matchesOptionPrintFilters
 } from "@islandflow/types";
-import { createChart, type IChartApi, type SeriesMarker, type UTCTimestamp } from "lightweight-charts";
+import {
+  createChart,
+  type IChartApi,
+  type SeriesMarker,
+  type UTCTimestamp
+} from "lightweight-charts";
 
 const parseBoundedInt = (
   value: string | undefined,
@@ -656,8 +661,9 @@ const frontendTapeDebugMetrics: Record<TapeDebugMetricKey, number> = {
 const bumpTapeDebugMetric = (key: TapeDebugMetricKey, count = 1): void => {
   frontendTapeDebugMetrics[key] += count;
   if (DEV_TAPE_DEBUG && typeof window !== "undefined") {
-    (window as typeof window & { __IF_TAPE_DEBUG__?: Record<TapeDebugMetricKey, number> }).__IF_TAPE_DEBUG__ =
-      frontendTapeDebugMetrics;
+    (
+      window as typeof window & { __IF_TAPE_DEBUG__?: Record<TapeDebugMetricKey, number> }
+    ).__IF_TAPE_DEBUG__ = frontendTapeDebugMetrics;
   }
 };
 
@@ -1047,9 +1053,8 @@ const buildApiUrl = (path: string): string => {
   return `${httpProtocol}://${host}${path}`;
 };
 
-export const isSyntheticAdminVisible = (
-  value = process.env.NEXT_PUBLIC_SYNTHETIC_ADMIN
-): boolean => value === "1";
+export const isSyntheticAdminVisible = (value = process.env.NEXT_PUBLIC_SYNTHETIC_ADMIN): boolean =>
+  value === "1";
 
 type SyntheticAdminStatusResponse = {
   enabled: boolean;
@@ -1082,10 +1087,7 @@ const SYNTHETIC_PROFILE_ORDER: Array<keyof SyntheticControlState["profile_weight
   "hedge_reactive"
 ];
 
-const SYNTHETIC_PROFILE_LABELS: Record<
-  keyof SyntheticControlState["profile_weights"],
-  string
-> = {
+const SYNTHETIC_PROFILE_LABELS: Record<keyof SyntheticControlState["profile_weights"], string> = {
   institutional_directional: "Institutional Directional",
   retail_whale: "Retail Whale",
   event_driven: "Event Driven",
@@ -1266,10 +1268,17 @@ export const formatNewsTimestamp = (ts: number, now = Date.now()): string => {
   const date = new Date(ts);
   return isSameLocalDay(ts, now)
     ? date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
-    : date.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+    : date.toLocaleString([], {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit"
+      });
 };
 
-const sanitizeNewsHtml = (value: string): { html: string; fallbackText: string; sanitized: boolean } => {
+const sanitizeNewsHtml = (
+  value: string
+): { html: string; fallbackText: string; sanitized: boolean } => {
   const fallbackText = value
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
@@ -1283,7 +1292,10 @@ const sanitizeNewsHtml = (value: string): { html: string; fallbackText: string; 
       .replace(/<style[\s\S]*?<\/style>/gi, "")
       .replace(/\son\w+=(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
       .replace(/\shref=(["'])javascript:[\s\S]*?\1/gi, ' href="#"')
-      .replace(/<(?!\/?(p|div|section|article|span|strong|em|b|i|ul|ol|li|br|a|h1|h2|h3|h4|blockquote)\b)[^>]*>/gi, "");
+      .replace(
+        /<(?!\/?(p|div|section|article|span|strong|em|b|i|ul|ol|li|br|a|h1|h2|h3|h4|blockquote)\b)[^>]*>/gi,
+        ""
+      );
     return { html: sanitized, fallbackText, sanitized: true };
   } catch {
     return { html: "", fallbackText, sanitized: false };
@@ -1350,9 +1362,11 @@ export const deriveAlertDirection = (alert: AlertEvent): "bullish" | "bearish" |
     totals[direction].confidence += Number.isFinite(hit.confidence) ? hit.confidence : 0;
   }
 
-  const ranked = (Object.entries(totals) as Array<
-    ["bullish" | "bearish" | "neutral", { count: number; confidence: number }]
-  >).sort((a, b) => {
+  const ranked = (
+    Object.entries(totals) as Array<
+      ["bullish" | "bearish" | "neutral", { count: number; confidence: number }]
+    >
+  ).sort((a, b) => {
     if (b[1].count !== a[1].count) {
       return b[1].count - a[1].count;
     }
@@ -1366,7 +1380,10 @@ export const getAlertWindowAnchorTs = (alerts: AlertEvent[], fallbackNow = Date.
   if (alerts.length === 0) {
     return fallbackNow;
   }
-  return alerts.reduce((max, alert) => Math.max(max, alert.source_ts), alerts[0]?.source_ts ?? fallbackNow);
+  return alerts.reduce(
+    (max, alert) => Math.max(max, alert.source_ts),
+    alerts[0]?.source_ts ?? fallbackNow
+  );
 };
 
 const extractUnderlying = (contractId: string): string => {
@@ -1510,14 +1527,13 @@ export const buildDefaultFlowFilters = (): OptionFlowFilters => ({
   nbboSides: DEFAULT_FLOW_SIDES,
   optionTypes: DEFAULT_FLOW_OPTION_TYPES,
   minNotional:
-    FLOW_FILTER_PRESET === "all"
-      ? undefined
-      : FLOW_FILTER_PRESET === "balanced"
-      ? 5_000
-      : undefined
+    FLOW_FILTER_PRESET === "all" ? undefined : FLOW_FILTER_PRESET === "balanced" ? 5_000 : undefined
 });
 
-const sameFilterValues = <T extends string>(left: T[] | undefined, right: T[] | undefined): boolean => {
+const sameFilterValues = <T extends string>(
+  left: T[] | undefined,
+  right: T[] | undefined
+): boolean => {
   const leftValues = [...(left ?? [])].sort();
   const rightValues = [...(right ?? [])].sort();
   if (leftValues.length !== rightValues.length) {
@@ -1716,7 +1732,7 @@ export const classifierToneForFamily = (classifierId: string): string =>
   CLASSIFIER_FAMILY_TONES[classifierId] ?? "neutral";
 
 export const smartMoneyToneForProfile = (profileId: SmartMoneyProfileId | null): string =>
-  profileId ? SMART_MONEY_PROFILE_TONES[profileId] ?? "neutral" : "neutral";
+  profileId ? (SMART_MONEY_PROFILE_TONES[profileId] ?? "neutral") : "neutral";
 
 export const smartMoneyProfileLabel = (profileId: SmartMoneyProfileId | null): string =>
   profileId ? humanizeClassifierId(profileId) : "Abstained";
@@ -1755,7 +1771,10 @@ export const getOptionTableSnapshot = (
 ): { spot: string; iv: string; side: string; details: string; value: string } => {
   const side = print.execution_nbbo_side ?? print.nbbo_side ?? fallbackSide ?? "--";
   return {
-    spot: typeof print.execution_underlying_spot === "number" ? formatPrice(print.execution_underlying_spot) : "--",
+    spot:
+      typeof print.execution_underlying_spot === "number"
+        ? formatPrice(print.execution_underlying_spot)
+        : "--",
     iv: typeof print.execution_iv === "number" ? formatPct(print.execution_iv) : "--",
     side,
     details: `${formatSize(print.size)}@${formatPrice(print.price)}_${side}`,
@@ -1879,7 +1898,9 @@ const useScrollAnchor = (
   } | null>(null);
 
   const readRenderedRows = useCallback((element: HTMLDivElement) => {
-    return Array.from(element.querySelectorAll<HTMLElement>("[data-tape-key][data-row-start][data-row-size]"))
+    return Array.from(
+      element.querySelectorAll<HTMLElement>("[data-tape-key][data-row-start][data-row-size]")
+    )
       .map((node) => {
         const key = node.dataset.tapeKey;
         const start = Number(node.dataset.rowStart);
@@ -2164,9 +2185,7 @@ type TapeConfig<T> = {
   hotWindowLimit?: number;
 };
 
-const useTape = <T extends SortableItem & { seq: number }>(
-  config: TapeConfig<T>
-): TapeState<T> => {
+const useTape = <T extends SortableItem & { seq: number }>(config: TapeConfig<T>): TapeState<T> => {
   const { mode, wsPath, replayPath, expectedType, latestPath, onNewItems, captureScroll } = config;
   const batchSize = config.batchSize ?? 40;
   const pollMs = config.pollMs ?? 1000;
@@ -2712,20 +2731,16 @@ const usePausableTapeView = <T extends SortableItem & { seq: number }>(
   };
 };
 
-const useLiveStream = <T extends SortableItem>(
-  config: {
-    enabled: boolean;
-    wsPath: string;
-    expectedType: MessageType;
-    onNewItems?: (count: number) => void;
-    captureScroll?: () => void;
-    shouldHold?: () => boolean;
-    resumeSignal?: number;
-  }
-): TapeState<T> => {
-  const [status, setStatus] = useState<WsStatus>(
-    config.enabled ? "connecting" : "disconnected"
-  );
+const useLiveStream = <T extends SortableItem>(config: {
+  enabled: boolean;
+  wsPath: string;
+  expectedType: MessageType;
+  onNewItems?: (count: number) => void;
+  captureScroll?: () => void;
+  shouldHold?: () => boolean;
+  resumeSignal?: number;
+}): TapeState<T> => {
+  const [status, setStatus] = useState<WsStatus>(config.enabled ? "connecting" : "disconnected");
   const [items, setItems] = useState<T[]>([]);
   const [lastUpdate, setLastUpdate] = useState<number | null>(null);
   const [replayTime] = useState<number | null>(null);
@@ -2784,8 +2799,7 @@ const useLiveStream = <T extends SortableItem>(
         return;
       }
 
-      const nextBatch =
-        holdRef.current.length > 0 ? [...holdRef.current, ...buffered] : buffered;
+      const nextBatch = holdRef.current.length > 0 ? [...holdRef.current, ...buffered] : buffered;
       holdRef.current = [];
 
       setItems((prev) =>
@@ -3002,7 +3016,10 @@ const LIVE_HISTORY_ENDPOINTS: Partial<Record<LiveSubscription["channel"], string
   "inferred-dark": "/history/inferred-dark"
 };
 
-const appendOptionFlowFilters = (params: URLSearchParams, filters: OptionFlowFilters | undefined): void => {
+const appendOptionFlowFilters = (
+  params: URLSearchParams,
+  filters: OptionFlowFilters | undefined
+): void => {
   if (!filters) {
     return;
   }
@@ -3119,7 +3136,10 @@ export const shouldClearOptionFocusSeed = (
 };
 
 const appendLiveScopeParams = (params: URLSearchParams, subscription: LiveSubscription): void => {
-  if ((subscription.channel === "options" || subscription.channel === "equities") && subscription.underlying_ids?.length) {
+  if (
+    (subscription.channel === "options" || subscription.channel === "equities") &&
+    subscription.underlying_ids?.length
+  ) {
     params.set("underlying_ids", subscription.underlying_ids.join(","));
   }
   if (subscription.channel === "options" && subscription.option_contract_id) {
@@ -3157,7 +3177,7 @@ export const getLiveManifest = (
       filters:
         optionScope?.option_contract_id && optionPrintFilters === undefined
           ? undefined
-          : optionPrintFilters ?? flowFilters,
+          : (optionPrintFilters ?? flowFilters),
       ...optionScope,
       snapshot_limit: LIVE_OPTIONS_HEAD_LIMIT
     });
@@ -3412,7 +3432,8 @@ const useLiveSession = (
         return;
       }
 
-      const subscription = message.op === "snapshot" ? message.snapshot.subscription : message.subscription;
+      const subscription =
+        message.op === "snapshot" ? message.snapshot.subscription : message.subscription;
       const items = message.op === "snapshot" ? message.snapshot.items : [message.item];
       const subscriptionKey = getLiveSubscriptionKey(subscription);
       const updateAt = Date.now();
@@ -3520,10 +3541,16 @@ const useLiveSession = (
           });
           break;
         case "inferred-dark":
-          mergeItems(setInferredDark, inferredDarkRef, items as InferredDarkEvent[], LIVE_HOT_WINDOW, {
-            setter: setInferredDarkHistory,
-            ref: inferredDarkHistoryRef
-          });
+          mergeItems(
+            setInferredDark,
+            inferredDarkRef,
+            items as InferredDarkEvent[],
+            LIVE_HOT_WINDOW,
+            {
+              setter: setInferredDarkHistory,
+              ref: inferredDarkHistoryRef
+            }
+          );
           break;
         case "equity-candles":
           mergeItems(setChartCandles, chartCandlesRef, items as EquityCandle[]);
@@ -3895,7 +3922,9 @@ const TapeStatus = ({
   const pausedLabel = paused && dropped > 0 ? `+${dropped} queued` : "";
 
   return (
-    <div className={`status-inline status-${status} ${mode === "replay" ? "status-replay" : ""}`.trim()}>
+    <div
+      className={`status-inline status-${status} ${mode === "replay" ? "status-replay" : ""}`.trim()}
+    >
       <span className="status-dot" />
       <span className="status-inline-label">{label}</span>
       {mode === "replay" ? (
@@ -3903,7 +3932,9 @@ const TapeStatus = ({
           Replay time {replayTime ? formatTime(replayTime) : "—"}
         </span>
       ) : null}
-      <span className={`status-inline-counter${pausedLabel ? " status-inline-counter-visible" : ""}`}>
+      <span
+        className={`status-inline-counter${pausedLabel ? " status-inline-counter-visible" : ""}`}
+      >
         {pausedLabel || "+000 queued"}
       </span>
     </div>
@@ -3919,7 +3950,14 @@ type TapeControlsProps = {
   onJump: () => void;
 };
 
-const TapeControls = ({ mode, paused, onTogglePause, isAtTop, missed, onJump }: TapeControlsProps) => {
+const TapeControls = ({
+  mode,
+  paused,
+  onTogglePause,
+  isAtTop,
+  missed,
+  onJump
+}: TapeControlsProps) => {
   const active = !isAtTop && missed > 0;
   return (
     <div className={`tape-controls${active ? " tape-controls-active" : ""}`}>
@@ -3931,7 +3969,10 @@ const TapeControls = ({ mode, paused, onTogglePause, isAtTop, missed, onJump }: 
       <button className="jump-button" type="button" onClick={onJump} disabled={isAtTop}>
         Jump to top
       </button>
-      <span className={`missed-count${active ? " missed-count-visible" : ""}`} aria-hidden={!active}>
+      <span
+        className={`missed-count${active ? " missed-count-visible" : ""}`}
+        aria-hidden={!active}
+      >
         +{missed} new
       </span>
     </div>
@@ -4120,11 +4161,7 @@ const CandleChart = ({
               ? "#c46f2a"
               : "rgba(111, 91, 57, 0.9)",
         shape:
-          direction === "bullish"
-            ? "arrowUp"
-            : direction === "bearish"
-              ? "arrowDown"
-              : "circle",
+          direction === "bullish" ? "arrowUp" : direction === "bearish" ? "arrowDown" : "circle",
         text: event.abstained
           ? "ABS"
           : event.primary_profile_id
@@ -4381,9 +4418,7 @@ const CandleChart = ({
         const response = await fetch(url.toString());
         if (!response.ok) {
           const detail = await readErrorDetail(response);
-          throw new Error(
-            `Candle fetch failed (${response.status})${detail ? `: ${detail}` : ""}`
-          );
+          throw new Error(`Candle fetch failed (${response.status})${detail ? `: ${detail}` : ""}`);
         }
         const payload = (await response.json()) as { data?: EquityCandle[] };
         if (!active || !seriesRef.current) {
@@ -4415,7 +4450,6 @@ const CandleChart = ({
         setHasData(false);
       }
     };
-
 
     const ensureOverlayListener = () => {
       if (!chartRef.current) {
@@ -4563,7 +4597,7 @@ const CandleChart = ({
       return;
     }
 
-    const sortedCandles = [...liveCandles].sort((a, b) => (a.ts - b.ts) || (a.seq - b.seq));
+    const sortedCandles = [...liveCandles].sort((a, b) => a.ts - b.ts || a.seq - b.seq);
     if (sortedCandles.length > 0) {
       seriesRef.current.setData(sortedCandles.map(toChartCandle));
       const last = sortedCandles.at(-1);
@@ -4768,9 +4802,7 @@ export const collectAlertContextEvidence = (
   return { packets, prints };
 };
 
-export const getAlertFlowPacketRefs = (
-  alert: Pick<AlertEvent, "evidence_refs">
-): string[] => {
+export const getAlertFlowPacketRefs = (alert: Pick<AlertEvent, "evidence_refs">): string[] => {
   return alert.evidence_refs.filter((ref) => ref.startsWith("flowpacket:"));
 };
 
@@ -4839,7 +4871,10 @@ const AlertDrawer = ({ alert, flowPacket, evidence, contextStatus, onClose }: Al
         {isContextLoading ? <span className="drawer-chip">Loading context</span> : null}
       </div>
       {isContextLoading ? (
-        <div className="drawer-section drawer-context-loading" aria-label="Loading persisted evidence">
+        <div
+          className="drawer-section drawer-context-loading"
+          aria-label="Loading persisted evidence"
+        >
           <div className="drawer-skeleton drawer-skeleton-wide" />
           <div className="drawer-skeleton" />
         </div>
@@ -4880,7 +4915,12 @@ const AlertDrawer = ({ alert, flowPacket, evidence, contextStatus, onClose }: Al
               {String(flowPacket.features.option_contract_id ?? flowPacket.id ?? "Flow packet")}
             </div>
             <div className="drawer-row-meta">
-              <span>{formatFlowMetric(parseNumber(flowPacket.features.count, flowPacket.members.length))} prints</span>
+              <span>
+                {formatFlowMetric(
+                  parseNumber(flowPacket.features.count, flowPacket.members.length)
+                )}{" "}
+                prints
+              </span>
               <span>{formatFlowMetric(parseNumber(flowPacket.features.total_size, 0))} size</span>
               <span>
                 Notional $
@@ -4906,7 +4946,9 @@ const AlertDrawer = ({ alert, flowPacket, evidence, contextStatus, onClose }: Al
       <div className="drawer-section">
         <h4>Evidence prints</h4>
         {evidencePrints.length === 0 ? (
-          <p className="drawer-empty">Persisted evidence prints are not available for this alert.</p>
+          <p className="drawer-empty">
+            Persisted evidence prints are not available for this alert.
+          </p>
         ) : (
           <div className="drawer-list">
             {evidencePrints.slice(0, 6).map((item) => (
@@ -4916,7 +4958,9 @@ const AlertDrawer = ({ alert, flowPacket, evidence, contextStatus, onClose }: Al
                   <span>${formatPrice(item.print.price)}</span>
                   <span>{formatSize(item.print.size)}x</span>
                   <span>{item.print.exchange}</span>
-                  {item.print.execution_nbbo_side ? <span>Side {item.print.execution_nbbo_side}</span> : null}
+                  {item.print.execution_nbbo_side ? (
+                    <span>Side {item.print.execution_nbbo_side}</span>
+                  ) : null}
                   {formatOptionalMs(item.print.execution_nbbo_age_ms) ? (
                     <span>Quote {formatOptionalMs(item.print.execution_nbbo_age_ms)}</span>
                   ) : null}
@@ -4953,7 +4997,9 @@ const AlertDrawer = ({ alert, flowPacket, evidence, contextStatus, onClose }: Al
           </div>
         )}
         {unknownCount > 0 ? (
-          <p className="drawer-empty">+{unknownCount} evidence refs unresolved in persisted context.</p>
+          <p className="drawer-empty">
+            +{unknownCount} evidence refs unresolved in persisted context.
+          </p>
         ) : null}
         {missingRefs.length > 0 ? (
           <p className="drawer-empty">Missing refs: {missingRefs.slice(0, 4).join(", ")}</p>
@@ -4979,7 +5025,9 @@ const NewsDrawer = ({ story, onClose }: NewsDrawerProps) => {
           <h3>{story.headline}</h3>
           <p className="drawer-subtitle">
             {story.source} · Published {formatDateTime(story.published_ts)}
-            {story.updated_ts !== story.published_ts ? ` · Updated ${formatDateTime(story.updated_ts)}` : ""}
+            {story.updated_ts !== story.published_ts
+              ? ` · Updated ${formatDateTime(story.updated_ts)}`
+              : ""}
           </p>
         </div>
         <button className="drawer-close" type="button" onClick={onClose}>
@@ -5006,7 +5054,10 @@ const NewsDrawer = ({ story, onClose }: NewsDrawerProps) => {
       <div className="drawer-section">
         <h4>Story</h4>
         {body.sanitized && body.html ? (
-          <div className="drawer-note news-drawer-body" dangerouslySetInnerHTML={{ __html: body.html }} />
+          <div
+            className="drawer-note news-drawer-body"
+            dangerouslySetInnerHTML={{ __html: body.html }}
+          />
         ) : body.fallbackText ? (
           <p className="drawer-note">{body.fallbackText}</p>
         ) : (
@@ -5017,7 +5068,12 @@ const NewsDrawer = ({ story, onClose }: NewsDrawerProps) => {
       {story.url ? (
         <div className="drawer-section">
           <h4>Source link</h4>
-          <a className="terminal-button terminal-link-button" href={story.url} rel="noreferrer" target="_blank">
+          <a
+            className="terminal-button terminal-link-button"
+            href={story.url}
+            rel="noreferrer"
+            target="_blank"
+          >
             Open original article
           </a>
         </div>
@@ -5070,7 +5126,9 @@ const ClassifierHitDrawer = ({ hit, flowPacket, evidence, onClose }: ClassifierH
           </div>
         )}
         {hit.explanations.length > 6 ? (
-          <p className="drawer-empty">+{hit.explanations.length - 6} more explanations not shown.</p>
+          <p className="drawer-empty">
+            +{hit.explanations.length - 6} more explanations not shown.
+          </p>
         ) : null}
       </div>
 
@@ -5083,7 +5141,10 @@ const ClassifierHitDrawer = ({ hit, flowPacket, evidence, onClose }: ClassifierH
             </div>
             <div className="drawer-row-meta">
               <span>
-                {formatFlowMetric(parseNumber(flowPacket.features.count, flowPacket.members.length))} prints
+                {formatFlowMetric(
+                  parseNumber(flowPacket.features.count, flowPacket.members.length)
+                )}{" "}
+                prints
               </span>
               <span>{formatFlowMetric(parseNumber(flowPacket.features.total_size, 0))} size</span>
               <span>
@@ -5205,9 +5266,7 @@ const SmartMoneyDrawer = ({ event, flowPacket, evidence, onClose }: SmartMoneyDr
             Window {formatFlowMetric(event.event_window_ms, "ms")} · {event.event_kind}
           </p>
         </div>
-        {flowPacket ? (
-          <p className="drawer-note">Flow packet {flowPacket.id}</p>
-        ) : null}
+        {flowPacket ? <p className="drawer-note">Flow packet {flowPacket.id}</p> : null}
       </div>
 
       <div className="drawer-section">
@@ -5384,13 +5443,19 @@ const useTerminalState = () => {
   const [selectedAlert, setSelectedAlert] = useState<AlertEvent | null>(null);
   const [selectedNewsStory, setSelectedNewsStory] = useState<NewsStory | null>(null);
   const [selectedDarkEvent, setSelectedDarkEvent] = useState<InferredDarkEvent | null>(null);
-  const [selectedClassifierHit, setSelectedClassifierHit] = useState<ClassifierHitEvent | null>(null);
-  const [selectedSmartMoneyEvent, setSelectedSmartMoneyEvent] = useState<SmartMoneyEvent | null>(null);
+  const [selectedClassifierHit, setSelectedClassifierHit] = useState<ClassifierHitEvent | null>(
+    null
+  );
+  const [selectedSmartMoneyEvent, setSelectedSmartMoneyEvent] = useState<SmartMoneyEvent | null>(
+    null
+  );
   const [selectedInstrument, setSelectedInstrument] = useState<SelectedInstrument>(null);
   const [optionFocusSeed, setOptionFocusSeed] = useState<TapeFocusSeed<OptionPrint> | null>(null);
   const [equityFocusSeed, setEquityFocusSeed] = useState<TapeFocusSeed<EquityPrint> | null>(null);
   const [filterInput, setFilterInput] = useState<string>("");
-  const [flowFilters, setFlowFilters] = useState<OptionFlowFilters>(() => buildDefaultFlowFilters());
+  const [flowFilters, setFlowFilters] = useState<OptionFlowFilters>(() =>
+    buildDefaultFlowFilters()
+  );
   const [chartIntervalMs, setChartIntervalMs] = useState<number>(CANDLE_INTERVALS[0].ms);
   const activeTickers = useMemo(() => parseTickerFilterInput(filterInput), [filterInput]);
   const tickerSet = useMemo(() => new Set(activeTickers), [activeTickers]);
@@ -5398,8 +5463,9 @@ const useTerminalState = () => {
   const isOptionContractFocused = selectedInstrument?.kind === "option-contract";
   const focusedOptionContractId =
     selectedInstrument?.kind === "option-contract" ? selectedInstrument.contractId : null;
-  const optionFocusScopeKey =
-    focusedOptionContractId ? `option-contract:${focusedOptionContractId}` : null;
+  const optionFocusScopeKey = focusedOptionContractId
+    ? `option-contract:${focusedOptionContractId}`
+    : null;
   const equityFocusScopeKey =
     selectedInstrument?.kind === "equity"
       ? `equity:${selectedInstrument.underlyingId.toUpperCase()}`
@@ -5414,7 +5480,12 @@ const useTerminalState = () => {
   );
   const equityScope = useMemo(
     () => ({
-      underlying_ids: activeTickers.length > 0 ? activeTickers : instrumentUnderlying ? [instrumentUnderlying] : undefined
+      underlying_ids:
+        activeTickers.length > 0
+          ? activeTickers
+          : instrumentUnderlying
+            ? [instrumentUnderlying]
+            : undefined
     }),
     [activeTickers, instrumentUnderlying]
   );
@@ -5479,7 +5550,13 @@ const useTerminalState = () => {
   }, [mode]);
 
   useEffect(() => {
-    if (!selectedAlert && !selectedNewsStory && !selectedClassifierHit && !selectedDarkEvent && !selectedSmartMoneyEvent) {
+    if (
+      !selectedAlert &&
+      !selectedNewsStory &&
+      !selectedClassifierHit &&
+      !selectedDarkEvent &&
+      !selectedSmartMoneyEvent
+    ) {
       return;
     }
 
@@ -5511,7 +5588,13 @@ const useTerminalState = () => {
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [selectedAlert, selectedNewsStory, selectedClassifierHit, selectedDarkEvent, selectedSmartMoneyEvent]);
+  }, [
+    selectedAlert,
+    selectedNewsStory,
+    selectedClassifierHit,
+    selectedDarkEvent,
+    selectedSmartMoneyEvent
+  ]);
 
   const optionsScroll = useListScroll();
   const equitiesScroll = useListScroll();
@@ -5525,10 +5608,7 @@ const useTerminalState = () => {
   const flowAnchor = useScrollAnchor(flowScroll.listRef, flowScroll.isAtTopRef);
   const darkAnchor = useScrollAnchor(darkScroll.listRef, darkScroll.isAtTopRef);
   const alertsAnchor = useScrollAnchor(alertsScroll.listRef, alertsScroll.isAtTopRef);
-  const classifierAnchor = useScrollAnchor(
-    classifierScroll.listRef,
-    classifierScroll.isAtTopRef
-  );
+  const classifierAnchor = useScrollAnchor(classifierScroll.listRef, classifierScroll.isAtTopRef);
   const disableReplayGrouping = useCallback(() => null, []);
   const optionQueryParams = useMemo<Record<string, string | undefined>>(
     () => buildOptionTapeQueryParams(effectiveOptionPrintFilters, optionScope),
@@ -5664,12 +5744,18 @@ const useTerminalState = () => {
     getReplayKey: disableReplayGrouping
   });
 
-  const optionsChannelStatus = getHotChannelFeedStatus(liveSession.status, liveSession.channelHealth.options);
+  const optionsChannelStatus = getHotChannelFeedStatus(
+    liveSession.status,
+    liveSession.channelHealth.options
+  );
   const equitiesChannelStatus = getHotChannelFeedStatus(
     liveSession.status,
     liveSession.channelHealth.equities
   );
-  const flowChannelStatus = getHotChannelFeedStatus(liveSession.status, liveSession.channelHealth.flow);
+  const flowChannelStatus = getHotChannelFeedStatus(
+    liveSession.status,
+    liveSession.channelHealth.flow
+  );
 
   const liveOptions = usePausableTapeView<OptionPrint>({
     enabled: mode === "live",
@@ -5725,8 +5811,7 @@ const useTerminalState = () => {
     [equityFocusScopeKey, equityFocusSeed, liveEquities.historyItems, liveEquities.liveItems]
   );
 
-  const optionsFeed =
-    mode === "live" ? { ...liveOptions, items: seededLiveOptionsItems } : options;
+  const optionsFeed = mode === "live" ? { ...liveOptions, items: seededLiveOptionsItems } : options;
   const nbboFeed =
     mode === "live"
       ? toStaticTapeState(
@@ -5868,10 +5953,12 @@ const useTerminalState = () => {
     error: null
   });
   const [optionSupportSmartMoney, setOptionSupportSmartMoney] = useState<SmartMoneyEvent[]>([]);
-  const [optionSupportClassifierHits, setOptionSupportClassifierHits] = useState<ClassifierHitEvent[]>([]);
-  const [historicalNbboByTraceId, setHistoricalNbboByTraceId] = useState<Map<string, OptionNBBO | null>>(
-    () => new Map()
-  );
+  const [optionSupportClassifierHits, setOptionSupportClassifierHits] = useState<
+    ClassifierHitEvent[]
+  >([]);
+  const [historicalNbboByTraceId, setHistoricalNbboByTraceId] = useState<
+    Map<string, OptionNBBO | null>
+  >(() => new Map());
 
   const resolvedOptionPrintMap = useMemo(() => {
     const merged = new Map<string, OptionPrint>();
@@ -6365,11 +6452,16 @@ const useTerminalState = () => {
       }
       return { kind: "unknown", id };
     });
-  }, [resolvedFlowPacketMap, resolvedOptionPrintMap, selectedClassifierHit, selectedClassifierPacketId]);
+  }, [
+    resolvedFlowPacketMap,
+    resolvedOptionPrintMap,
+    selectedClassifierHit,
+    selectedClassifierPacketId
+  ]);
 
   const selectedSmartMoneyFlowPacket = useMemo(() => {
     const packetId = selectedSmartMoneyEvent?.packet_ids[0];
-    return packetId ? resolvedFlowPacketMap.get(packetId) ?? null : null;
+    return packetId ? (resolvedFlowPacketMap.get(packetId) ?? null) : null;
   }, [resolvedFlowPacketMap, selectedSmartMoneyEvent]);
 
   const selectedSmartMoneyEvidence = useMemo((): EvidenceItem[] => {
@@ -6390,12 +6482,16 @@ const useTerminalState = () => {
       return;
     }
 
-    const missingPacketIds = selectedSmartMoneyEvent.packet_ids.filter((id) => !resolvedFlowPacketMap.has(id));
+    const missingPacketIds = selectedSmartMoneyEvent.packet_ids.filter(
+      (id) => !resolvedFlowPacketMap.has(id)
+    );
     if (missingPacketIds.length > 0) {
       incrementRetentionMetric("pinnedFetchMisses", missingPacketIds.length);
       void Promise.all(
         missingPacketIds.map(async (packetId) => {
-          const response = await fetch(buildApiUrl(`/flow/packets/${encodeURIComponent(packetId)}`));
+          const response = await fetch(
+            buildApiUrl(`/flow/packets/${encodeURIComponent(packetId)}`)
+          );
           if (!response.ok) {
             throw new Error(await readErrorDetail(response));
           }
@@ -6420,7 +6516,9 @@ const useTerminalState = () => {
         });
     }
 
-    const missingPrintIds = selectedSmartMoneyEvent.member_print_ids.filter((id) => !resolvedOptionPrintMap.has(id));
+    const missingPrintIds = selectedSmartMoneyEvent.member_print_ids.filter(
+      (id) => !resolvedOptionPrintMap.has(id)
+    );
     if (missingPrintIds.length === 0) {
       return;
     }
@@ -6475,7 +6573,12 @@ const useTerminalState = () => {
 
       return null;
     },
-    [extractPacketContract, extractUnderlyingFromTrace, resolvedFlowPacketMap, resolvedOptionPrintMap]
+    [
+      extractPacketContract,
+      extractUnderlyingFromTrace,
+      resolvedFlowPacketMap,
+      resolvedOptionPrintMap
+    ]
   );
 
   const matchesTicker = useCallback(
@@ -6510,7 +6613,9 @@ const useTerminalState = () => {
   const filteredEquities = useMemo(() => {
     if (tickerSet.size === 0) {
       if (instrumentUnderlying) {
-        return equitiesFeed.items.filter((print) => print.underlying_id.toUpperCase() === instrumentUnderlying);
+        return equitiesFeed.items.filter(
+          (print) => print.underlying_id.toUpperCase() === instrumentUnderlying
+        );
       }
       return equitiesFeed.items;
     }
@@ -6548,7 +6653,11 @@ const useTerminalState = () => {
       setEquityFocusSeed(null);
       return;
     }
-    const composedBaseItems = composeTapeItems([], liveEquities.liveItems ?? [], liveEquities.historyItems ?? []);
+    const composedBaseItems = composeTapeItems(
+      [],
+      liveEquities.liveItems ?? [],
+      liveEquities.historyItems ?? []
+    );
     const liveKeys = new Set(composedBaseItems.map((item) => getTapeItemKey(item)));
     if (equityFocusSeed.items.every((item) => liveKeys.has(getTapeItemKey(item)))) {
       setEquityFocusSeed(null);
@@ -6559,7 +6668,11 @@ const useTerminalState = () => {
     (print: OptionPrint) => {
       const contractId = normalizeContractId(print.option_contract_id);
       const parsed = parseOptionContractId(contractId);
-      const underlyingId = (print.underlying_id ?? parsed?.root ?? extractUnderlying(contractId)).toUpperCase();
+      const underlyingId = (
+        print.underlying_id ??
+        parsed?.root ??
+        extractUnderlying(contractId)
+      ).toUpperCase();
       const scopeKey = `option-contract:${contractId}`;
       const subscriptionKey = getLiveSubscriptionKey({
         channel: "options",
@@ -6568,7 +6681,9 @@ const useTerminalState = () => {
       });
       const seedItems = composeTapeItems(
         [print],
-        filteredOptions.filter((candidate) => normalizeContractId(candidate.option_contract_id) === contractId),
+        filteredOptions.filter(
+          (candidate) => normalizeContractId(candidate.option_contract_id) === contractId
+        ),
         []
       );
       setOptionFocusSeed({ scopeKey, subscriptionKey, items: seedItems });
@@ -6593,7 +6708,9 @@ const useTerminalState = () => {
       const scopeKey = `equity:${underlyingId}`;
       const seedItems = composeTapeItems(
         [print],
-        filteredEquities.filter((candidate) => candidate.underlying_id.toUpperCase() === underlyingId),
+        filteredEquities.filter(
+          (candidate) => candidate.underlying_id.toUpperCase() === underlyingId
+        ),
         []
       );
       setEquityFocusSeed({ scopeKey, items: seedItems });
@@ -6707,7 +6824,9 @@ const useTerminalState = () => {
     if (tickerSet.size === 0) {
       return newsFeed.items;
     }
-    return newsFeed.items.filter((story) => story.resolved_symbols.some((symbol) => matchesTicker(symbol)));
+    return newsFeed.items.filter((story) =>
+      story.resolved_symbols.some((symbol) => matchesTicker(symbol))
+    );
   }, [matchesTicker, newsFeed.items, routeFeatures.news, routeFeatures.showNewsPane, tickerSet]);
 
   const visibleAlerts = useMemo(() => {
@@ -6731,7 +6850,11 @@ const useTerminalState = () => {
   }, [visibleAlerts]);
 
   useEffect(() => {
-    if (!routeFeatures.needsAlertEvidencePrefetch || mode !== "live" || visibleAlerts.length === 0) {
+    if (
+      !routeFeatures.needsAlertEvidencePrefetch ||
+      mode !== "live" ||
+      visibleAlerts.length === 0
+    ) {
       return;
     }
 
@@ -6744,7 +6867,9 @@ const useTerminalState = () => {
       incrementRetentionMetric("pinnedFetchMisses", missingPacketIds.length);
       void Promise.all(
         missingPacketIds.map(async (packetId) => {
-          const response = await fetch(buildApiUrl(`/flow/packets/${encodeURIComponent(packetId)}`));
+          const response = await fetch(
+            buildApiUrl(`/flow/packets/${encodeURIComponent(packetId)}`)
+          );
           if (!response.ok) {
             throw new Error(await readErrorDetail(response));
           }
@@ -6855,7 +6980,12 @@ const useTerminalState = () => {
       keys.add(id);
     }
     return keys;
-  }, [selectedAlert, selectedClassifierFlowPacket, selectedSmartMoneyEvent, visibleAlertEvidenceRefs]);
+  }, [
+    selectedAlert,
+    selectedClassifierFlowPacket,
+    selectedSmartMoneyEvent,
+    visibleAlertEvidenceRefs
+  ]);
 
   const activePinnedJoinKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -6974,7 +7104,8 @@ const useTerminalState = () => {
       const desiredTrace = `alert:${packetId}`;
       return (
         alertsFeed.items.find(
-          (item) => item.trace_id === desiredTrace || getAlertFlowPacketRefs(item).includes(packetId)
+          (item) =>
+            item.trace_id === desiredTrace || getAlertFlowPacketRefs(item).includes(packetId)
         ) ?? null
       );
     },
@@ -7045,15 +7176,20 @@ const useTerminalState = () => {
     if (routeFeatures.alerts || routeFeatures.showAlertsPane) {
       updates.push(alertsFeed.lastUpdate);
     }
-    if (routeFeatures.smartMoney || routeFeatures.showClassifierPane || routeFeatures.showChartPane || routeFeatures.showFocusPane) {
+    if (
+      routeFeatures.smartMoney ||
+      routeFeatures.showClassifierPane ||
+      routeFeatures.showChartPane ||
+      routeFeatures.showFocusPane
+    ) {
       updates.push(smartMoneyFeed.lastUpdate);
     }
     if (routeFeatures.classifierHits || routeFeatures.showClassifierPane) {
       updates.push(classifierHitsFeed.lastUpdate);
     }
-    return updates
-      .filter((value): value is number => value !== null)
-      .sort((a, b) => b - a)[0] ?? null;
+    return (
+      updates.filter((value): value is number => value !== null).sort((a, b) => b - a)[0] ?? null
+    );
   }, [
     routeFeatures.options,
     routeFeatures.showOptionsPane,
@@ -7212,13 +7348,7 @@ type FlowFilterPopoverProps = {
   onChange: Dispatch<SetStateAction<OptionFlowFilters>>;
 };
 
-const FlowFilterSection = ({
-  title,
-  children
-}: {
-  title: string;
-  children: ReactNode;
-}) => {
+const FlowFilterSection = ({ title, children }: { title: string; children: ReactNode }) => {
   return (
     <section className="flow-filter-section">
       <div className="flow-filter-section-title">{title}</div>
@@ -7265,7 +7395,8 @@ export const FlowFilterPopover = ({ filters, onChange }: FlowFilterPopoverProps)
     onChange((prev) => ({
       ...prev,
       view,
-      securityTypes: view === "raw" ? undefined : prev.securityTypes ?? DEFAULT_FLOW_SECURITY_TYPES,
+      securityTypes:
+        view === "raw" ? undefined : (prev.securityTypes ?? DEFAULT_FLOW_SECURITY_TYPES),
       nbboSides: view === "raw" ? undefined : prev.nbboSides,
       optionTypes: view === "raw" ? undefined : prev.optionTypes,
       minNotional: view === "raw" ? undefined : prev.minNotional
@@ -7316,11 +7447,7 @@ export const FlowFilterPopover = ({ filters, onChange }: FlowFilterPopoverProps)
       </button>
 
       {open ? (
-        <div
-          aria-label="Flow filters"
-          className="flow-filter-popover-panel"
-          role="dialog"
-        >
+        <div aria-label="Flow filters" className="flow-filter-popover-panel" role="dialog">
           <div className="flow-filter-popover-head">
             <div>
               <div className="flow-filter-popover-title">Flow Filters</div>
@@ -7488,16 +7615,25 @@ type OptionsPaneProps = {
 
 const OptionsPane = memo(({ state, limit }: OptionsPaneProps) => {
   const items = limit ? state.filteredOptions.slice(0, limit) : state.filteredOptions;
-  const virtual = useTapeVirtualList(items, state.optionsScroll.listRef, getTapeVirtualConfig("options"));
+  const virtual = useTapeVirtualList(
+    items,
+    state.optionsScroll.listRef,
+    getTapeVirtualConfig("options")
+  );
   const optionHistorySubscription = state.liveSession.manifest.find(
     (subscription) => subscription.channel === "options"
   );
-  const optionHistoryKey = optionHistorySubscription ? getLiveSubscriptionKey(optionHistorySubscription) : null;
+  const optionHistoryKey = optionHistorySubscription
+    ? getLiveSubscriptionKey(optionHistorySubscription)
+    : null;
   const optionHistoryError = optionHistoryKey
     ? state.liveSession.historyErrors[optionHistoryKey]
     : null;
-  useVirtualHistoryGate(state.mode === "live" && !limit, items.length, virtual.virtualItems.at(-1)?.index ?? -1, () =>
-    void state.liveSession.loadOlder("options")
+  useVirtualHistoryGate(
+    state.mode === "live" && !limit,
+    items.length,
+    virtual.virtualItems.at(-1)?.index ?? -1,
+    () => void state.liveSession.loadOlder("options")
   );
 
   return (
@@ -7572,7 +7708,9 @@ const OptionsPane = memo(({ state, limit }: OptionsPaneProps) => {
                     const contractId = normalizeContractId(print.option_contract_id);
                     const parsed = parseOptionContractId(contractId);
                     const contractDisplay = formatOptionContractLabel(contractId);
-                    const quote = state.historicalNbboByTraceId.get(print.trace_id) ?? state.nbboMap.get(contractId);
+                    const quote =
+                      state.historicalNbboByTraceId.get(print.trace_id) ??
+                      state.nbboMap.get(contractId);
                     const hasPreservedNbbo = typeof print.execution_nbbo_side === "string";
                     const nbboSide =
                       print.execution_nbbo_side ??
@@ -7602,42 +7740,72 @@ const OptionsPane = memo(({ state, limit }: OptionsPaneProps) => {
                     };
                     const cells = (
                       <>
-                        <span className="data-table-cell data-table-cell-number">{formatTime(print.ts)}</span>
+                        <span className="data-table-cell data-table-cell-number">
+                          {formatTime(print.ts)}
+                        </span>
                         <span className="data-table-cell">
-                          <button className="instrument-cell-button" type="button" onClick={focusContract}>
-                            {contractDisplay?.ticker ?? parsed?.root ?? formatContractLabel(contractId)}
+                          <button
+                            className="instrument-cell-button"
+                            type="button"
+                            onClick={focusContract}
+                          >
+                            {contractDisplay?.ticker ??
+                              parsed?.root ??
+                              formatContractLabel(contractId)}
                           </button>
                         </span>
                         <span className="data-table-cell">
-                          <button className="instrument-cell-button" type="button" onClick={focusContract}>
+                          <button
+                            className="instrument-cell-button"
+                            type="button"
+                            onClick={focusContract}
+                          >
                             {contractDisplay?.expiration ?? parsed?.expiry ?? "--"}
                           </button>
                         </span>
                         <span className="data-table-cell data-table-cell-number">
-                          <button className="instrument-cell-button" type="button" onClick={focusContract}>
+                          <button
+                            className="instrument-cell-button"
+                            type="button"
+                            onClick={focusContract}
+                          >
                             {contractDisplay?.strike.replace(/[CP]$/, "") ?? "--"}
                           </button>
                         </span>
                         <span className="data-table-cell">
-                          <button className="instrument-cell-button" type="button" onClick={focusContract}>
+                          <button
+                            className="instrument-cell-button"
+                            type="button"
+                            onClick={focusContract}
+                          >
                             {parsed?.right ?? contractDisplay?.strike.slice(-1) ?? "--"}
                           </button>
                         </span>
-                        <span className="data-table-cell data-table-cell-number">{typeof spot === "number" ? formatPrice(spot) : "--"}</span>
+                        <span className="data-table-cell data-table-cell-number">
+                          {typeof spot === "number" ? formatPrice(spot) : "--"}
+                        </span>
                         <span className="data-table-cell data-table-cell-number">
                           {formatSize(print.size)}@{formatPrice(print.price)}_{nbboSide ?? "--"}
                         </span>
                         <span className="data-table-cell">{print.option_type ?? "--"}</span>
-                        <span className="data-table-cell data-table-cell-number notional-emphasis">${formatCompactUsd(notional)}</span>
+                        <span className="data-table-cell data-table-cell-number notional-emphasis">
+                          ${formatCompactUsd(notional)}
+                        </span>
                         <span className="data-table-cell">
                           {nbboSide ? (
-                            <span className={`nbbo-tag nbbo-tag-${nbboSide.toLowerCase()}`}>{nbboSide}</span>
+                            <span className={`nbbo-tag nbbo-tag-${nbboSide.toLowerCase()}`}>
+                              {nbboSide}
+                            </span>
                           ) : (
                             "--"
                           )}
                         </span>
-                        <span className="data-table-cell data-table-cell-number">{typeof iv === "number" ? formatPct(iv) : "--"}</span>
-                        <span className="data-table-cell">{decor ? humanizeClassifierId(decor.family) : "--"}</span>
+                        <span className="data-table-cell data-table-cell-number">
+                          {typeof iv === "number" ? formatPct(iv) : "--"}
+                        </span>
+                        <span className="data-table-cell">
+                          {decor ? humanizeClassifierId(decor.family) : "--"}
+                        </span>
                       </>
                     );
 
@@ -7689,9 +7857,16 @@ type EquitiesPaneProps = {
 
 const EquitiesPane = memo(({ state, limit }: EquitiesPaneProps) => {
   const items = limit ? state.filteredEquities.slice(0, limit) : state.filteredEquities;
-  const virtual = useTapeVirtualList(items, state.equitiesScroll.listRef, getTapeVirtualConfig("equities"));
-  useVirtualHistoryGate(state.mode === "live" && !limit, items.length, virtual.virtualItems.at(-1)?.index ?? -1, () =>
-    void state.liveSession.loadOlder("equities")
+  const virtual = useTapeVirtualList(
+    items,
+    state.equitiesScroll.listRef,
+    getTapeVirtualConfig("equities")
+  );
+  useVirtualHistoryGate(
+    state.mode === "live" && !limit,
+    items.length,
+    virtual.virtualItems.at(-1)?.index ?? -1,
+    () => void state.liveSession.loadOlder("equities")
   );
 
   return (
@@ -7759,7 +7934,9 @@ const EquitiesPane = memo(({ state, limit }: EquitiesPaneProps) => {
                       data-tape-key={key}
                       style={{ transform: `translateY(${start}px)` }}
                     >
-                      <span className="data-table-cell data-table-cell-number">{formatTime(print.ts)}</span>
+                      <span className="data-table-cell data-table-cell-number">
+                        {formatTime(print.ts)}
+                      </span>
                       <span className="data-table-cell">
                         <button
                           className="instrument-cell-button"
@@ -7769,10 +7946,16 @@ const EquitiesPane = memo(({ state, limit }: EquitiesPaneProps) => {
                           {print.underlying_id}
                         </button>
                       </span>
-                      <span className="data-table-cell data-table-cell-number">${formatPrice(print.price)}</span>
-                      <span className="data-table-cell data-table-cell-number">{formatSize(print.size)}x</span>
+                      <span className="data-table-cell data-table-cell-number">
+                        ${formatPrice(print.price)}
+                      </span>
+                      <span className="data-table-cell data-table-cell-number">
+                        {formatSize(print.size)}x
+                      </span>
                       <span className="data-table-cell">{print.exchange}</span>
-                      <span className="data-table-cell">{print.offExchangeFlag ? "Off-Ex" : "Lit"}</span>
+                      <span className="data-table-cell">
+                        {print.offExchangeFlag ? "Off-Ex" : "Lit"}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -7794,8 +7977,11 @@ type FlowPaneProps = {
 const FlowPane = memo(({ state, limit, title = "Flow" }: FlowPaneProps) => {
   const items = limit ? state.filteredFlow.slice(0, limit) : state.filteredFlow;
   const virtual = useTapeVirtualList(items, state.flowScroll.listRef, getTapeVirtualConfig("flow"));
-  useVirtualHistoryGate(state.mode === "live" && !limit, items.length, virtual.virtualItems.at(-1)?.index ?? -1, () =>
-    void state.liveSession.loadOlder("flow")
+  useVirtualHistoryGate(
+    state.mode === "live" && !limit,
+    items.length,
+    virtual.virtualItems.at(-1)?.index ?? -1,
+    () => void state.liveSession.loadOlder("flow")
   );
 
   return (
@@ -7866,18 +8052,26 @@ const FlowPane = memo(({ state, limit, title = "Flow" }: FlowPaneProps) => {
                       typeof features.structure_type === "string" ? features.structure_type : "";
                     const structureLegs = parseNumber(features.structure_legs, 0);
                     const structureRights =
-                      typeof features.structure_rights === "string" ? features.structure_rights : "";
+                      typeof features.structure_rights === "string"
+                        ? features.structure_rights
+                        : "";
                     const structureStrikes = parseNumber(features.structure_strikes, 0);
                     const nbboBid = parseNumber(features.nbbo_bid, Number.NaN);
                     const nbboAsk = parseNumber(features.nbbo_ask, Number.NaN);
                     const nbboMid = parseNumber(features.nbbo_mid, Number.NaN);
                     const nbboSpread = parseNumber(features.nbbo_spread, Number.NaN);
-                    const aggressiveBuyRatio = parseNumber(features.nbbo_aggressive_buy_ratio, Number.NaN);
+                    const aggressiveBuyRatio = parseNumber(
+                      features.nbbo_aggressive_buy_ratio,
+                      Number.NaN
+                    );
                     const aggressiveSellRatio = parseNumber(
                       features.nbbo_aggressive_sell_ratio,
                       Number.NaN
                     );
-                    const aggressiveCoverage = parseNumber(features.nbbo_coverage_ratio, Number.NaN);
+                    const aggressiveCoverage = parseNumber(
+                      features.nbbo_coverage_ratio,
+                      Number.NaN
+                    );
                     const insideRatio = parseNumber(features.nbbo_inside_ratio, Number.NaN);
                     const nbboAge = parseNumber(packet.join_quality.nbbo_age_ms, Number.NaN);
                     const nbboStale = parseNumber(packet.join_quality.nbbo_stale, 0) > 0;
@@ -7885,21 +8079,26 @@ const FlowPane = memo(({ state, limit, title = "Flow" }: FlowPaneProps) => {
                     const structureLabel = structureType
                       ? `${structureType.replace(/_/g, " ")}${structureRights ? ` ${structureRights}` : ""}${structureLegs > 0 ? ` ${structureLegs}L` : ""}${structureStrikes > 0 ? ` ${structureStrikes}K` : ""}`
                       : "--";
-                    const nbboLabel = Number.isFinite(nbboBid) && Number.isFinite(nbboAsk)
-                      ? `${formatPrice(nbboBid)} x ${formatPrice(nbboAsk)}`
-                      : Number.isFinite(nbboMid)
-                        ? `Mid ${formatPrice(nbboMid)}`
-                        : "--";
+                    const nbboLabel =
+                      Number.isFinite(nbboBid) && Number.isFinite(nbboAsk)
+                        ? `${formatPrice(nbboBid)} x ${formatPrice(nbboAsk)}`
+                        : Number.isFinite(nbboMid)
+                          ? `Mid ${formatPrice(nbboMid)}`
+                          : "--";
                     const qualityLabel = [
                       Number.isFinite(aggressiveCoverage) && aggressiveCoverage > 0
                         ? `Agg ${formatPct(aggressiveBuyRatio)}/${formatPct(aggressiveSellRatio)} ${formatPct(aggressiveCoverage)} cov`
                         : null,
-                      Number.isFinite(insideRatio) && insideRatio > 0 ? `In ${formatPct(insideRatio)}` : null,
+                      Number.isFinite(insideRatio) && insideRatio > 0
+                        ? `In ${formatPct(insideRatio)}`
+                        : null,
                       Number.isFinite(nbboSpread) ? `Spr ${formatPrice(nbboSpread)}` : null,
                       Number.isFinite(nbboAge) ? `${Math.round(nbboAge)}ms` : null,
                       nbboStale ? "Stale" : null,
                       nbboMissing ? "Missing" : null
-                    ].filter(Boolean).join(" | ");
+                    ]
+                      .filter(Boolean)
+                      .join(" | ");
 
                     return (
                       <div
@@ -7911,12 +8110,22 @@ const FlowPane = memo(({ state, limit, title = "Flow" }: FlowPaneProps) => {
                         data-tape-key={key}
                         style={{ transform: `translateY(${start}px)` }}
                       >
-                        <span className="data-table-cell data-table-cell-number">{formatTime(startTs)} → {formatTime(endTs)}</span>
+                        <span className="data-table-cell data-table-cell-number">
+                          {formatTime(startTs)} → {formatTime(endTs)}
+                        </span>
                         <span className="data-table-cell">{contract}</span>
-                        <span className="data-table-cell data-table-cell-number">{formatFlowMetric(count)}</span>
-                        <span className="data-table-cell data-table-cell-number">{formatFlowMetric(totalSize)}</span>
-                        <span className="data-table-cell data-table-cell-number">${formatUsd(notional)}</span>
-                        <span className="data-table-cell data-table-cell-number">{windowMs > 0 ? formatFlowMetric(windowMs, "ms") : "--"}</span>
+                        <span className="data-table-cell data-table-cell-number">
+                          {formatFlowMetric(count)}
+                        </span>
+                        <span className="data-table-cell data-table-cell-number">
+                          {formatFlowMetric(totalSize)}
+                        </span>
+                        <span className="data-table-cell data-table-cell-number">
+                          ${formatUsd(notional)}
+                        </span>
+                        <span className="data-table-cell data-table-cell-number">
+                          {windowMs > 0 ? formatFlowMetric(windowMs, "ms") : "--"}
+                        </span>
                         <span className="data-table-cell">{structureLabel}</span>
                         <span className="data-table-cell data-table-cell-number">{nbboLabel}</span>
                         <span className="data-table-cell">{qualityLabel || "--"}</span>
@@ -7942,9 +8151,16 @@ type AlertsPaneProps = {
 
 const AlertsPane = memo(({ state, limit, withStrip = false, className }: AlertsPaneProps) => {
   const items = limit ? state.filteredAlerts.slice(0, limit) : state.filteredAlerts;
-  const virtual = useTapeVirtualList(items, state.alertsScroll.listRef, getTapeVirtualConfig("alerts"));
-  useVirtualHistoryGate(state.mode === "live" && !limit, items.length, virtual.virtualItems.at(-1)?.index ?? -1, () =>
-    void state.liveSession.loadOlder("alerts")
+  const virtual = useTapeVirtualList(
+    items,
+    state.alertsScroll.listRef,
+    getTapeVirtualConfig("alerts")
+  );
+  useVirtualHistoryGate(
+    state.mode === "live" && !limit,
+    items.length,
+    virtual.virtualItems.at(-1)?.index ?? -1,
+    () => void state.liveSession.loadOlder("alerts")
   );
 
   return (
@@ -8020,13 +8236,23 @@ const AlertsPane = memo(({ state, limit, withStrip = false, className }: AlertsP
                           state.setSelectedAlert(alert);
                         }}
                       >
-                        <span className="data-table-cell data-table-cell-number">{formatTime(alert.source_ts)}</span>
-                        <span className="data-table-cell">{primary ? humanizeClassifierId(primary.classifier_id) : "Alert"}</span>
+                        <span className="data-table-cell data-table-cell-number">
+                          {formatTime(alert.source_ts)}
+                        </span>
+                        <span className="data-table-cell">
+                          {primary ? humanizeClassifierId(primary.classifier_id) : "Alert"}
+                        </span>
                         <span className="data-table-cell">{severity}</span>
-                        <span className="data-table-cell data-table-cell-number">{Math.round(alert.score)}</span>
-                        <span className="data-table-cell data-table-cell-number">{alert.hits.length}</span>
+                        <span className="data-table-cell data-table-cell-number">
+                          {Math.round(alert.score)}
+                        </span>
+                        <span className="data-table-cell data-table-cell-number">
+                          {alert.hits.length}
+                        </span>
                         <span className="data-table-cell">{direction}</span>
-                        <span className="data-table-cell">{primary?.explanations?.[0] ?? "--"}</span>
+                        <span className="data-table-cell">
+                          {primary?.explanations?.[0] ?? "--"}
+                        </span>
                       </button>
                     );
                   })}
@@ -8068,7 +8294,11 @@ const NewsPane = memo(({ state, limit, className }: NewsPaneProps) => {
       }
       actions={
         canLoadOlder ? (
-          <button className="terminal-button" type="button" onClick={() => void state.liveSession.loadOlder("news")}>
+          <button
+            className="terminal-button"
+            type="button"
+            onClick={() => void state.liveSession.loadOlder("news")}
+          >
             Older
           </button>
         ) : null
@@ -8078,7 +8308,9 @@ const NewsPane = memo(({ state, limit, className }: NewsPaneProps) => {
         <div className="empty">News is live-only in v1.</div>
       ) : items.length === 0 ? (
         <div className="empty">
-          {state.tickerSet.size > 0 ? "No news stories match the current filter." : "Waiting for live news stories."}
+          {state.tickerSet.size > 0
+            ? "No news stories match the current filter."
+            : "Waiting for live news stories."}
         </div>
       ) : (
         <div className="news-list" role="list" aria-label="News stories">
@@ -8124,7 +8356,9 @@ type ClassifierPaneProps = {
 };
 
 const ClassifierPane = memo(({ state, limit, className }: ClassifierPaneProps) => {
-  const smartMoneyItems = limit ? state.filteredSmartMoneyEvents.slice(0, limit) : state.filteredSmartMoneyEvents;
+  const smartMoneyItems = limit
+    ? state.filteredSmartMoneyEvents.slice(0, limit)
+    : state.filteredSmartMoneyEvents;
   const legacyItems =
     smartMoneyItems.length === 0
       ? limit
@@ -8133,11 +8367,20 @@ const ClassifierPane = memo(({ state, limit, className }: ClassifierPaneProps) =
       : [];
   const items: Array<SmartMoneyEvent | ClassifierHitEvent> =
     smartMoneyItems.length > 0 ? smartMoneyItems : legacyItems;
-  const virtual = useTapeVirtualList(items, state.classifierScroll.listRef, getTapeVirtualConfig("classifier"));
-  useVirtualHistoryGate(state.mode === "live" && !limit, items.length, virtual.virtualItems.at(-1)?.index ?? -1, () => {
-    void state.liveSession.loadOlder("smart-money");
-    void state.liveSession.loadOlder("classifier-hits");
-  });
+  const virtual = useTapeVirtualList(
+    items,
+    state.classifierScroll.listRef,
+    getTapeVirtualConfig("classifier")
+  );
+  useVirtualHistoryGate(
+    state.mode === "live" && !limit,
+    items.length,
+    virtual.virtualItems.at(-1)?.index ?? -1,
+    () => {
+      void state.liveSession.loadOlder("smart-money");
+      void state.liveSession.loadOlder("classifier-hits");
+    }
+  );
   const showingSmartMoney = smartMoneyItems.length > 0;
 
   return (
@@ -8177,7 +8420,11 @@ const ClassifierPane = memo(({ state, limit, className }: ClassifierPaneProps) =
           </div>
         ) : (
           <div className="data-table-wrap">
-            <div className="data-table data-table-classifier" role="table" aria-label="Smart money profiles">
+            <div
+              className="data-table data-table-classifier"
+              role="table"
+              aria-label="Smart money profiles"
+            >
               <div className="data-table-head" role="row">
                 <span className="data-table-cell">TIME</span>
                 <span className="data-table-cell">PROFILE</span>
@@ -8187,60 +8434,75 @@ const ClassifierPane = memo(({ state, limit, className }: ClassifierPaneProps) =
               </div>
               <div className="data-table-scroll" ref={state.classifierScroll.setListRef}>
                 <div className="data-table-body" style={{ height: `${virtual.totalSize}px` }}>
-                  {showingSmartMoney ? virtual.virtualItems.map(({ item, key, index, start, size }) => {
-                    const event = item as SmartMoneyEvent;
-                    const primaryScore =
-                      event.profile_scores.find((score) => score.profile_id === event.primary_profile_id) ??
-                      event.profile_scores[0];
-                    const direction = normalizeDirection(event.primary_direction);
-                    return (
-                      <button
-                        className={`data-table-row data-table-row-button data-table-row-classifier data-table-virtual-row${index % 2 === 1 ? " is-even" : ""} data-table-row-direction-${direction}`}
-                        key={key}
-                        type="button"
-                        data-index={index}
-                        data-row-start={String(start)}
-                        data-row-size={String(size)}
-                        data-tape-key={key}
-                        style={{ transform: `translateY(${start}px)` }}
-                        onClick={() => state.openFromSmartMoneyEvent(event)}
-                      >
-                        <span className="data-table-cell data-table-cell-number">{formatTime(event.source_ts)}</span>
-                        <span className="data-table-cell">{smartMoneyProfileLabel(event.primary_profile_id)}</span>
-                        <span className="data-table-cell">{direction}</span>
-                        <span className="data-table-cell data-table-cell-number">
-                          {primaryScore ? formatConfidence(primaryScore.probability) : "--"}
-                        </span>
-                        <span className="data-table-cell">
-                          {event.abstained
-                            ? event.suppressed_reasons[0] ?? "abstained"
-                            : primaryScore?.reasons[0] ?? primaryScore?.confidence_band ?? "--"}
-                        </span>
-                      </button>
-                    );
-                  }) : virtual.virtualItems.map(({ item, key, index, start, size }) => {
-                    const hit = item as ClassifierHitEvent;
-                    const direction = normalizeDirection(hit.direction);
-                    return (
-                      <button
-                        className={`data-table-row data-table-row-button data-table-row-classifier data-table-virtual-row${index % 2 === 1 ? " is-even" : ""} data-table-row-direction-${direction}`}
-                        key={key}
-                        type="button"
-                        data-index={index}
-                        data-row-start={String(start)}
-                        data-row-size={String(size)}
-                        data-tape-key={key}
-                        style={{ transform: `translateY(${start}px)` }}
-                        onClick={() => state.openFromClassifierHit(hit)}
-                      >
-                        <span className="data-table-cell data-table-cell-number">{formatTime(hit.source_ts)}</span>
-                        <span className="data-table-cell">{humanizeClassifierId(hit.classifier_id)}</span>
-                        <span className="data-table-cell">{direction}</span>
-                        <span className="data-table-cell data-table-cell-number">{formatConfidence(hit.confidence)}</span>
-                        <span className="data-table-cell">{hit.explanations?.[0] ?? "--"}</span>
-                      </button>
-                    );
-                  })}
+                  {showingSmartMoney
+                    ? virtual.virtualItems.map(({ item, key, index, start, size }) => {
+                        const event = item as SmartMoneyEvent;
+                        const primaryScore =
+                          event.profile_scores.find(
+                            (score) => score.profile_id === event.primary_profile_id
+                          ) ?? event.profile_scores[0];
+                        const direction = normalizeDirection(event.primary_direction);
+                        return (
+                          <button
+                            className={`data-table-row data-table-row-button data-table-row-classifier data-table-virtual-row${index % 2 === 1 ? " is-even" : ""} data-table-row-direction-${direction}`}
+                            key={key}
+                            type="button"
+                            data-index={index}
+                            data-row-start={String(start)}
+                            data-row-size={String(size)}
+                            data-tape-key={key}
+                            style={{ transform: `translateY(${start}px)` }}
+                            onClick={() => state.openFromSmartMoneyEvent(event)}
+                          >
+                            <span className="data-table-cell data-table-cell-number">
+                              {formatTime(event.source_ts)}
+                            </span>
+                            <span className="data-table-cell">
+                              {smartMoneyProfileLabel(event.primary_profile_id)}
+                            </span>
+                            <span className="data-table-cell">{direction}</span>
+                            <span className="data-table-cell data-table-cell-number">
+                              {primaryScore ? formatConfidence(primaryScore.probability) : "--"}
+                            </span>
+                            <span className="data-table-cell">
+                              {event.abstained
+                                ? (event.suppressed_reasons[0] ?? "abstained")
+                                : (primaryScore?.reasons[0] ??
+                                  primaryScore?.confidence_band ??
+                                  "--")}
+                            </span>
+                          </button>
+                        );
+                      })
+                    : virtual.virtualItems.map(({ item, key, index, start, size }) => {
+                        const hit = item as ClassifierHitEvent;
+                        const direction = normalizeDirection(hit.direction);
+                        return (
+                          <button
+                            className={`data-table-row data-table-row-button data-table-row-classifier data-table-virtual-row${index % 2 === 1 ? " is-even" : ""} data-table-row-direction-${direction}`}
+                            key={key}
+                            type="button"
+                            data-index={index}
+                            data-row-start={String(start)}
+                            data-row-size={String(size)}
+                            data-tape-key={key}
+                            style={{ transform: `translateY(${start}px)` }}
+                            onClick={() => state.openFromClassifierHit(hit)}
+                          >
+                            <span className="data-table-cell data-table-cell-number">
+                              {formatTime(hit.source_ts)}
+                            </span>
+                            <span className="data-table-cell">
+                              {humanizeClassifierId(hit.classifier_id)}
+                            </span>
+                            <span className="data-table-cell">{direction}</span>
+                            <span className="data-table-cell data-table-cell-number">
+                              {formatConfidence(hit.confidence)}
+                            </span>
+                            <span className="data-table-cell">{hit.explanations?.[0] ?? "--"}</span>
+                          </button>
+                        );
+                      })}
                 </div>
               </div>
             </div>
@@ -8260,8 +8522,11 @@ type DarkPaneProps = {
 const DarkPane = memo(({ state, limit, className }: DarkPaneProps) => {
   const items = limit ? state.filteredInferredDark.slice(0, limit) : state.filteredInferredDark;
   const virtual = useTapeVirtualList(items, state.darkScroll.listRef, getTapeVirtualConfig("dark"));
-  useVirtualHistoryGate(state.mode === "live" && !limit, items.length, virtual.virtualItems.at(-1)?.index ?? -1, () =>
-    void state.liveSession.loadOlder("inferred-dark")
+  useVirtualHistoryGate(
+    state.mode === "live" && !limit,
+    items.length,
+    virtual.virtualItems.at(-1)?.index ?? -1,
+    () => void state.liveSession.loadOlder("inferred-dark")
   );
 
   return (
@@ -8334,12 +8599,20 @@ const DarkPane = memo(({ state, limit, className }: DarkPaneProps) => {
                           state.setSelectedDarkEvent(event);
                         }}
                       >
-                        <span className="data-table-cell data-table-cell-number">{formatTime(event.source_ts)}</span>
+                        <span className="data-table-cell data-table-cell-number">
+                          {formatTime(event.source_ts)}
+                        </span>
                         <span className="data-table-cell">{humanizeClassifierId(event.type)}</span>
                         <span className="data-table-cell">{underlying ?? "Unknown"}</span>
-                        <span className="data-table-cell data-table-cell-number">{formatConfidence(event.confidence)}</span>
-                        <span className="data-table-cell data-table-cell-number">{evidenceCount}</span>
-                        <span className="data-table-cell">{underlying ? "--" : "Underlying not in current join cache."}</span>
+                        <span className="data-table-cell data-table-cell-number">
+                          {formatConfidence(event.confidence)}
+                        </span>
+                        <span className="data-table-cell data-table-cell-number">
+                          {evidenceCount}
+                        </span>
+                        <span className="data-table-cell">
+                          {underlying ? "--" : "Underlying not in current join cache."}
+                        </span>
                       </button>
                     );
                   })}
@@ -8359,7 +8632,6 @@ type ChartPaneProps = {
 };
 
 const ChartPane = memo(({ state, title = "Chart" }: ChartPaneProps) => {
-
   return (
     <Pane
       title={title}
@@ -8415,7 +8687,11 @@ const buildCommandDeckTickers = (state: TerminalState): CommandDeckTicker[] => {
   }
   for (const print of state.filteredOptions.slice(0, 80)) {
     const parsed = parseOptionContractId(normalizeContractId(print.option_contract_id));
-    const symbol = (print.underlying_id ?? parsed?.root ?? extractUnderlying(print.option_contract_id))?.toUpperCase();
+    const symbol = (
+      print.underlying_id ??
+      parsed?.root ??
+      extractUnderlying(print.option_contract_id)
+    )?.toUpperCase();
     if (symbol) {
       symbols.add(symbol);
     }
@@ -8432,31 +8708,39 @@ const buildCommandDeckTickers = (state: TerminalState): CommandDeckTicker[] => {
     symbols.add(state.chartTicker.toUpperCase());
   }
 
-  return Array.from(symbols).slice(0, 10).map((symbol) => {
-    const equityPrints = state.filteredEquities
-      .filter((print) => print.underlying_id.toUpperCase() === symbol)
-      .slice(0, 2);
-    const price = equityPrints[0]?.price ?? null;
-    const previous = equityPrints[1]?.price ?? null;
-    const move = price !== null && previous !== null && previous !== 0 ? (price - previous) / previous : null;
-    const options = state.filteredOptions
-      .slice(0, 120)
-      .filter((print) => {
+  return Array.from(symbols)
+    .slice(0, 10)
+    .map((symbol) => {
+      const equityPrints = state.filteredEquities
+        .filter((print) => print.underlying_id.toUpperCase() === symbol)
+        .slice(0, 2);
+      const price = equityPrints[0]?.price ?? null;
+      const previous = equityPrints[1]?.price ?? null;
+      const move =
+        price !== null && previous !== null && previous !== 0
+          ? (price - previous) / previous
+          : null;
+      const options = state.filteredOptions.slice(0, 120).filter((print) => {
         const parsed = parseOptionContractId(normalizeContractId(print.option_contract_id));
-        const underlying = (print.underlying_id ?? parsed?.root ?? extractUnderlying(print.option_contract_id))?.toUpperCase();
+        const underlying = (
+          print.underlying_id ??
+          parsed?.root ??
+          extractUnderlying(print.option_contract_id)
+        )?.toUpperCase();
         return underlying === symbol;
       }).length;
-    const alerts = state.filteredAlerts
-      .slice(0, 80)
-      .filter((alert) => alert.trace_id.toUpperCase().includes(symbol)).length;
-    return { symbol, price, move, options, alerts };
-  });
+      const alerts = state.filteredAlerts
+        .slice(0, 80)
+        .filter((alert) => alert.trace_id.toUpperCase().includes(symbol)).length;
+      return { symbol, price, move, options, alerts };
+    });
 };
 
 const CommandDeckHeader = ({ state }: { state: TerminalState }) => {
   const focus = state.activeTickers.length > 0 ? state.activeTickers.join(", ") : state.chartTicker;
   const selected = state.selectedInstrumentLabel ?? "No contract lock";
-  const connectionLabel = state.mode === "live" ? statusLabel(state.liveSession.status, false, state.mode) : "Replay";
+  const connectionLabel =
+    state.mode === "live" ? statusLabel(state.liveSession.status, false, state.mode) : "Replay";
 
   return (
     <header className="command-deck-header" aria-label="Command deck context">
@@ -8476,7 +8760,9 @@ const CommandDeckHeader = ({ state }: { state: TerminalState }) => {
         <span className={`command-chip command-chip-${state.liveSession.status}`}>
           {state.mode === "live" ? "Live" : "Replay"}: {connectionLabel}
         </span>
-        <span className="command-chip">Last {state.lastSeen ? formatTime(state.lastSeen) : "waiting"}</span>
+        <span className="command-chip">
+          Last {state.lastSeen ? formatTime(state.lastSeen) : "waiting"}
+        </span>
         <button className="terminal-button" type="button" onClick={state.toggleMode}>
           {state.mode === "live" ? "Switch to Replay" : "Switch to Live"}
         </button>
@@ -8493,16 +8779,22 @@ const TickerRail = ({ state }: { state: TerminalState }) => {
       <div className="command-ticker-track">
         {tickers.map((ticker) => {
           const direction = ticker.move === null ? "flat" : ticker.move >= 0 ? "up" : "down";
-          const equity = state.filteredEquities.find((print) => print.underlying_id.toUpperCase() === ticker.symbol);
+          const equity = state.filteredEquities.find(
+            (print) => print.underlying_id.toUpperCase() === ticker.symbol
+          );
           return (
             <button
               className={`command-ticker-card is-${direction}`}
               key={ticker.symbol}
               type="button"
-              onClick={() => (equity ? state.focusEquityTicker(equity) : state.setFilterInput(ticker.symbol))}
+              onClick={() =>
+                equity ? state.focusEquityTicker(equity) : state.setFilterInput(ticker.symbol)
+              }
             >
               <span className="command-ticker-symbol">{ticker.symbol}</span>
-              <span className="command-ticker-price">{ticker.price === null ? "--" : `$${formatPrice(ticker.price)}`}</span>
+              <span className="command-ticker-price">
+                {ticker.price === null ? "--" : `$${formatPrice(ticker.price)}`}
+              </span>
               <span className="command-ticker-move">
                 {ticker.move === null
                   ? "Move n/a"
@@ -8533,7 +8825,9 @@ const FeedHealthPane = ({ state }: { state: TerminalState }) => {
     <Pane
       className="command-feed-pane"
       title="Feed Health"
-      status={<span className="command-pane-meta">{state.liveSession.manifest.length} subscriptions</span>}
+      status={
+        <span className="command-pane-meta">{state.liveSession.manifest.length} subscriptions</span>
+      }
     >
       <div className="command-health-list">
         {rows.map(({ label, tape, subscribed }) => (
@@ -8585,7 +8879,9 @@ const EventContextPane = ({ state }: { state: TerminalState }) => {
       detail: story.resolved_symbols.length > 0 ? story.resolved_symbols.join(", ") : story.source,
       action: () => state.setSelectedNewsStory(story)
     }))
-  ].sort((a, b) => b.ts - a.ts).slice(0, 6);
+  ]
+    .sort((a, b) => b.ts - a.ts)
+    .slice(0, 6);
 
   return (
     <Pane
@@ -8598,7 +8894,12 @@ const EventContextPane = ({ state }: { state: TerminalState }) => {
       ) : (
         <div className="command-context-list" role="list">
           {events.map((event) => (
-            <button className="command-context-row" key={event.key} type="button" onClick={event.action}>
+            <button
+              className="command-context-row"
+              key={event.key}
+              type="button"
+              onClick={event.action}
+            >
               <time>{formatTime(event.ts)}</time>
               <span className="command-context-kind">{event.label}</span>
               <strong>{event.title}</strong>
@@ -8624,7 +8925,11 @@ const HomeReplayRail = ({ state }: { state: TerminalState }) => {
     state.flow.replayComplete ||
     state.alerts.replayComplete ||
     state.inferredDark.replayComplete;
-  const activeSource = state.replaySource ? state.replaySource.toUpperCase() : state.mode === "live" ? "LIVE HEAD" : "AUTO";
+  const activeSource = state.replaySource
+    ? state.replaySource.toUpperCase()
+    : state.mode === "live"
+      ? "LIVE HEAD"
+      : "AUTO";
 
   return (
     <Pane
@@ -8637,7 +8942,12 @@ const HomeReplayRail = ({ state }: { state: TerminalState }) => {
           replayTime={replayTime}
           replayComplete={replayComplete}
           paused={false}
-          dropped={state.options.dropped + state.equities.dropped + state.flow.dropped + state.alerts.dropped}
+          dropped={
+            state.options.dropped +
+            state.equities.dropped +
+            state.flow.dropped +
+            state.alerts.dropped
+          }
           mode={state.mode}
         />
       }
@@ -8654,15 +8964,25 @@ const HomeReplayRail = ({ state }: { state: TerminalState }) => {
         </div>
         <div>
           <span>Cursor</span>
-          <strong>{replayTime ? formatTime(replayTime) : state.lastSeen ? formatTime(state.lastSeen) : "waiting"}</strong>
+          <strong>
+            {replayTime
+              ? formatTime(replayTime)
+              : state.lastSeen
+                ? formatTime(state.lastSeen)
+                : "waiting"}
+          </strong>
         </div>
         <div>
           <span>Chart</span>
-          <strong>{state.chartTicker} / {formatIntervalLabel(state.chartIntervalMs)}</strong>
+          <strong>
+            {state.chartTicker} / {formatIntervalLabel(state.chartIntervalMs)}
+          </strong>
         </div>
         <div>
           <span>Scope</span>
-          <strong>{state.activeTickers.length > 0 ? state.activeTickers.join(", ") : "All symbols"}</strong>
+          <strong>
+            {state.activeTickers.length > 0 ? state.activeTickers.join(", ") : "All symbols"}
+          </strong>
         </div>
       </div>
     </Pane>
@@ -8696,7 +9016,9 @@ const FocusPane = memo(({ state }: { state: TerminalState }) => {
                   <div>
                     <div className="contract">{smartMoneyProfileLabel(hit.primary_profile_id)}</div>
                     <div className="meta">
-                      <span className={`pill direction-${normalizeDirection(hit.primary_direction)}`}>
+                      <span
+                        className={`pill direction-${normalizeDirection(hit.primary_direction)}`}
+                      >
                         {normalizeDirection(hit.primary_direction)}
                       </span>
                       <span>{formatTime(hit.source_ts)}</span>
@@ -8744,7 +9066,11 @@ const ReplayConsole = memo(({ state }: { state: TerminalState }) => {
     <Pane
       title="Console"
       actions={
-        <button className="terminal-button terminal-button-primary" type="button" onClick={state.toggleMode}>
+        <button
+          className="terminal-button terminal-button-primary"
+          type="button"
+          onClick={state.toggleMode}
+        >
           {replayActive ? "Switch Live" : "Switch Replay"}
         </button>
       }
@@ -8900,9 +9226,7 @@ function SyntheticControlDock() {
   const disabled = !status?.enabled;
   const derived = status?.derived;
 
-  const updateControl = (
-    patch: SyntheticControlPatch
-  ) => {
+  const updateControl = (patch: SyntheticControlPatch) => {
     dirtyRef.current = true;
     setDraft((current) =>
       createSyntheticControlDraft(current ?? buildDefaultSyntheticControl(), patch)
@@ -8989,9 +9313,7 @@ function SyntheticControlDock() {
                 <label className="synthetic-control-toggle">
                   <input
                     checked={currentControl.coverage_assist}
-                    onChange={(event) =>
-                      updateControl({ coverage_assist: event.target.checked })
-                    }
+                    onChange={(event) => updateControl({ coverage_assist: event.target.checked })}
                     type="checkbox"
                   />
                   <span>Coverage assist</span>
@@ -9003,8 +9325,7 @@ function SyntheticControlDock() {
                       key={minutes}
                       onClick={() =>
                         updateControl({
-                          coverage_window_minutes:
-                            minutes as SyntheticCoverageWindowMinutes
+                          coverage_window_minutes: minutes as SyntheticCoverageWindowMinutes
                         })
                       }
                       type="button"
@@ -9067,9 +9388,7 @@ function SyntheticControlDock() {
                   <div>
                     <span>Focus</span>
                     <strong>
-                      {derived?.focus_symbols?.length
-                        ? derived.focus_symbols.join(", ")
-                        : "—"}
+                      {derived?.focus_symbols?.length ? derived.focus_symbols.join(", ") : "—"}
                     </strong>
                   </div>
                   <div>
@@ -9153,7 +9472,8 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
             </div>
             <div className="terminal-topbar-actions">
               <div className="terminal-topbar-controls">
-                {state.selectedInstrumentLabel && state.selectedInstrument?.kind !== "option-contract" ? (
+                {state.selectedInstrumentLabel &&
+                state.selectedInstrument?.kind !== "option-contract" ? (
                   <span className="instrument-focus-chip">
                     <span>{state.selectedInstrumentLabel}</span>
                     <button type="button" onClick={() => state.setSelectedInstrument(null)}>
@@ -9177,7 +9497,9 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
                       inputMode="text"
                       maxLength={TICKER_FILTER_INPUT_MAX_LENGTH}
                       name="ticker-filter"
-                      onChange={(event) => state.setFilterInput(normalizeTickerFilterInput(event.target.value))}
+                      onChange={(event) =>
+                        state.setFilterInput(normalizeTickerFilterInput(event.target.value))
+                      }
                       placeholder="SPY, NVDA, AAPL"
                       spellCheck={false}
                     />
@@ -9196,7 +9518,9 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
               </div>
               <div className="terminal-topbar-mode">
                 <button
-                  aria-label={state.mode === "live" ? "Switch to replay mode" : "Switch to live mode"}
+                  aria-label={
+                    state.mode === "live" ? "Switch to replay mode" : "Switch to live mode"
+                  }
                   aria-pressed={state.mode !== "live"}
                   className="terminal-button terminal-button-primary"
                   type="button"
@@ -9274,7 +9598,10 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
         ) : null}
 
         {state.selectedNewsStory ? (
-          <NewsDrawer story={state.selectedNewsStory} onClose={() => state.setSelectedNewsStory(null)} />
+          <NewsDrawer
+            story={state.selectedNewsStory}
+            onClose={() => state.setSelectedNewsStory(null)}
+          />
         ) : null}
 
         {state.selectedClassifierHit ? (

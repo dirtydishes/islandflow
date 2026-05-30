@@ -9,9 +9,7 @@ import {
   shouldFanoutLiveEvent
 } from "../src/live";
 
-const makeClickHouse = (
-  queryResolver?: (query: string) => unknown[]
-): ClickHouseClient =>
+const makeClickHouse = (queryResolver?: (query: string) => unknown[]): ClickHouseClient =>
   ({
     exec: async () => {},
     insert: async () => {},
@@ -149,22 +147,18 @@ describe("LiveStateManager", () => {
   it("trims generic windows to configured per-channel limits", async () => {
     const redis = makeRedis();
     const now = Date.now();
-    const manager = new LiveStateManager(
-      makeClickHouse(),
-      redis as never,
-      {
-        options: 10000,
-        nbbo: 10000,
-        equities: 10000,
-        "equity-quotes": 10000,
-        "equity-joins": 10000,
-        flow: 2,
-        "smart-money": 10000,
-        "classifier-hits": 10000,
-        alerts: 10000,
-        "inferred-dark": 10000
-      }
-    );
+    const manager = new LiveStateManager(makeClickHouse(), redis as never, {
+      options: 10000,
+      nbbo: 10000,
+      equities: 10000,
+      "equity-quotes": 10000,
+      "equity-joins": 10000,
+      flow: 2,
+      "smart-money": 10000,
+      "classifier-hits": 10000,
+      alerts: 10000,
+      "inferred-dark": 10000
+    });
 
     await manager.ingest("flow", {
       source_ts: now,
@@ -503,18 +497,15 @@ describe("LiveStateManager", () => {
       manager.getSnapshot({ channel: "flow" })
     ]);
 
-    expect((optionsSnapshot.items as Array<{ trace_id: string }>).map((item) => item.trace_id)).toEqual([
-      "opt-fresh",
-      "opt-stale"
-    ]);
-    expect((nbboSnapshot.items as Array<{ trace_id: string }>).map((item) => item.trace_id)).toEqual([
-      "nbbo-fresh",
-      "nbbo-stale"
-    ]);
-    expect((equitiesSnapshot.items as Array<{ trace_id: string }>).map((item) => item.trace_id)).toEqual([
-      "eq-fresh",
-      "eq-stale"
-    ]);
+    expect(
+      (optionsSnapshot.items as Array<{ trace_id: string }>).map((item) => item.trace_id)
+    ).toEqual(["opt-fresh", "opt-stale"]);
+    expect(
+      (nbboSnapshot.items as Array<{ trace_id: string }>).map((item) => item.trace_id)
+    ).toEqual(["nbbo-fresh", "nbbo-stale"]);
+    expect(
+      (equitiesSnapshot.items as Array<{ trace_id: string }>).map((item) => item.trace_id)
+    ).toEqual(["eq-fresh", "eq-stale"]);
     expect((flowSnapshot.items as Array<{ id: string }>).map((item) => item.id)).toEqual([
       "flow-fresh",
       "flow-stale"
@@ -699,10 +690,9 @@ describe("LiveStateManager", () => {
       option_contract_id: "AAPL-2025-01-17-200-C"
     });
 
-    expect((snapshot.items as Array<{ trace_id: string }>).map((item) => item.trace_id).slice(0, 2)).toEqual([
-      "opt-hot",
-      "opt-backfill"
-    ]);
+    expect(
+      (snapshot.items as Array<{ trace_id: string }>).map((item) => item.trace_id).slice(0, 2)
+    ).toEqual(["opt-hot", "opt-backfill"]);
   });
 
   it("seeds scoped equity snapshots from clickhouse rows older than 24h", async () => {
@@ -806,12 +796,12 @@ describe("LiveStateManager", () => {
       manager.getSnapshot({ channel: "flow" })
     ]);
 
-    expect((optionsSnapshot.items as Array<{ trace_id: string }>).map((item) => item.trace_id)).toEqual([
-      "opt-retained"
-    ]);
-    expect((equitiesSnapshot.items as Array<{ trace_id: string }>).map((item) => item.trace_id)).toEqual([
-      "eq-retained"
-    ]);
+    expect(
+      (optionsSnapshot.items as Array<{ trace_id: string }>).map((item) => item.trace_id)
+    ).toEqual(["opt-retained"]);
+    expect(
+      (equitiesSnapshot.items as Array<{ trace_id: string }>).map((item) => item.trace_id)
+    ).toEqual(["eq-retained"]);
     expect((flowSnapshot.items as Array<{ id: string }>).map((item) => item.id)).toEqual([
       "flow-retained"
     ]);
@@ -1047,7 +1037,10 @@ describe("LiveStateManager", () => {
   });
 
   it("tracks generic cache and scoped clickhouse snapshot sources separately", async () => {
-    const manager = new LiveStateManager(makeClickHouse(() => []), null);
+    const manager = new LiveStateManager(
+      makeClickHouse(() => []),
+      null
+    );
     const now = Date.now();
 
     await manager.ingest("options", {
@@ -1075,7 +1068,10 @@ describe("LiveStateManager", () => {
   });
 
   it("keeps backend channel health healthy when a scoped query is quiet", async () => {
-    const manager = new LiveStateManager(makeClickHouse(() => []), null);
+    const manager = new LiveStateManager(
+      makeClickHouse(() => []),
+      null
+    );
     const now = Date.now();
 
     await manager.ingest("options", {
@@ -1098,7 +1094,9 @@ describe("LiveStateManager", () => {
 
     expect(quietSnapshot.items).toEqual([]);
     expect(manager.getHotChannelHealth().options.healthy).toBe(true);
-    expect(manager.getStatsSnapshot().freshnessAgeMsByKey[HOT_LIVE_REDIS_KEYS.options]).toBeLessThanOrEqual(50);
+    expect(
+      manager.getStatsSnapshot().freshnessAgeMsByKey[HOT_LIVE_REDIS_KEYS.options]
+    ).toBeLessThanOrEqual(50);
   });
 
   it("exposes freshness helper for feed status", () => {

@@ -48,7 +48,11 @@ export const selectAtOrBefore = <T extends { ts: number; seq: number }>(
     if (item.ts > ts) {
       continue;
     }
-    if (!selected || item.ts > selected.ts || (item.ts === selected.ts && item.seq >= selected.seq)) {
+    if (
+      !selected ||
+      item.ts > selected.ts ||
+      (item.ts === selected.ts && item.seq >= selected.seq)
+    ) {
       selected = item;
     }
   }

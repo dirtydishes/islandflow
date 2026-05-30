@@ -15,10 +15,7 @@ const roundTo = (value: number, digits = 4): number => {
   return Number(value.toFixed(digits));
 };
 
-export const classifyQuotePlacement = (
-  price: number,
-  join: EquityQuoteJoin
-): QuotePlacement => {
+export const classifyQuotePlacement = (price: number, join: EquityQuoteJoin): QuotePlacement => {
   if (!Number.isFinite(price)) {
     return "MISSING";
   }

@@ -130,7 +130,10 @@ describe("alerts storage helpers", () => {
   });
 
   it("returns an empty context when the alert is missing", async () => {
-    const bundle = await fetchAlertContextByTraceId(makeClient(() => []), "alert:missing");
+    const bundle = await fetchAlertContextByTraceId(
+      makeClient(() => []),
+      "alert:missing"
+    );
 
     expect(bundle).toEqual({
       alert: null,

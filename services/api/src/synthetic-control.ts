@@ -83,11 +83,7 @@ export const buildSyntheticDerivedStatus = (
     session_phase: session.session_phase,
     regime: session.regime,
     focus_symbols: session.focus_symbols,
-    profile_hit_counts: getSyntheticProfileHitCounts(
-      state,
-      now,
-      control.coverage_window_minutes
-    ),
+    profile_hit_counts: getSyntheticProfileHitCounts(state, now, control.coverage_window_minutes),
     coverage_window_minutes: control.coverage_window_minutes
   });
 };

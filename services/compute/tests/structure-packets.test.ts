@@ -18,7 +18,9 @@ const placements = (overrides?: Partial<LegEvidence["placements"]>): LegEvidence
   ...overrides
 });
 
-const leg = (input: Partial<LegEvidence> & Pick<LegEvidence, "contractId" | "right" | "strike">): LegEvidence => {
+const leg = (
+  input: Partial<LegEvidence> & Pick<LegEvidence, "contractId" | "right" | "strike">
+): LegEvidence => {
   return {
     contractId: input.contractId,
     root: "SPY",

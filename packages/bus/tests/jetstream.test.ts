@@ -43,10 +43,9 @@ const buildMockStreamManager = (configs: Record<string, StreamConfig | null>) =>
 };
 
 const buildAllKnownConfigs = (env: Record<string, string | undefined> = {}) => {
-  return Object.fromEntries(STREAMS.map((name) => [name, buildKnownStreamConfig(name, env)])) as Record<
-    string,
-    StreamConfig
-  >;
+  return Object.fromEntries(
+    STREAMS.map((name) => [name, buildKnownStreamConfig(name, env)])
+  ) as Record<string, StreamConfig>;
 };
 
 describe("jetstream retention defaults", () => {
@@ -194,7 +193,9 @@ describe("runReconcileStreamsCommand", () => {
     });
 
     expect(exitCode).toBe(1);
-    expect(outputs.some((line) => line.includes("OPTIONS_PRINTS") && line.includes("drift"))).toBe(true);
+    expect(outputs.some((line) => line.includes("OPTIONS_PRINTS") && line.includes("drift"))).toBe(
+      true
+    );
   });
 
   it("updates drift in --apply mode and reports actions", async () => {
@@ -240,7 +241,11 @@ describe("runReconcileStreamsCommand", () => {
     });
 
     expect(exitCode).toBe(1);
-    expect(outputs.some((line) => line.includes("OPTIONS_PRINTS") && line.includes("structural-mismatch"))).toBe(true);
+    expect(
+      outputs.some(
+        (line) => line.includes("OPTIONS_PRINTS") && line.includes("structural-mismatch")
+      )
+    ).toBe(true);
     expect(errors.some((line) => line.includes("OPTIONS_PRINTS"))).toBe(true);
   });
 });

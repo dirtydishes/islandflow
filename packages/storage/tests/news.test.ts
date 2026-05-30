@@ -1,16 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import type { ClickHouseClient } from "../src/clickhouse";
-import {
-  NEWS_TABLE,
-  fromNewsRecord,
-  newsTableDDL,
-  toNewsRecord
-} from "../src/news";
-import {
-  fetchNewsAfter,
-  fetchNewsBefore,
-  fetchRecentNews
-} from "../src/clickhouse";
+import { NEWS_TABLE, fromNewsRecord, newsTableDDL, toNewsRecord } from "../src/news";
+import { fetchNewsAfter, fetchNewsBefore, fetchRecentNews } from "../src/clickhouse";
 
 const makeClient = (resolver: (query: string) => unknown[]): ClickHouseClient =>
   ({

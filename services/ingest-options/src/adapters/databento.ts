@@ -235,8 +235,7 @@ export const createDatabentoOptionsAdapter = (
               return;
             }
 
-            const scaledPrice =
-              config.priceScale === 1 ? price : price / config.priceScale;
+            const scaledPrice = config.priceScale === 1 ? price : price / config.priceScale;
 
             const conditions = Array.isArray(payload.conditions)
               ? payload.conditions.map((entry) => String(entry))

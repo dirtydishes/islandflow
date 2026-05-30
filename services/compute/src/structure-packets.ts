@@ -134,7 +134,9 @@ const dayDiff = (from: string | null, to: string | null): number | null => {
 };
 
 const sameSizeLegSymmetry = (legs: LegEvidence[]): number => {
-  const sizes = legs.map((leg) => leg.totalSize).filter((value) => Number.isFinite(value) && value > 0);
+  const sizes = legs
+    .map((leg) => leg.totalSize)
+    .filter((value) => Number.isFinite(value) && value > 0);
   if (sizes.length < 2) {
     return 0;
   }
@@ -146,7 +148,10 @@ const sameSizeLegSymmetry = (legs: LegEvidence[]): number => {
   return min / max;
 };
 
-export const shouldEmitStructurePacket = (legs: LegEvidence[], currentLegContractId: string): boolean => {
+export const shouldEmitStructurePacket = (
+  legs: LegEvidence[],
+  currentLegContractId: string
+): boolean => {
   if (legs.length < 2) {
     return false;
   }
@@ -226,7 +231,8 @@ export const planStructurePacket = (
   const totalSize = legs.reduce((sum, leg) => sum + leg.totalSize, 0);
   const count = legs.reduce((sum, leg) => sum + leg.members.length, 0);
   const placements = mergePlacements(legs);
-  const placementTotal = placements.aa + placements.a + placements.b + placements.bb + placements.mid;
+  const placementTotal =
+    placements.aa + placements.a + placements.b + placements.bb + placements.mid;
   const aggressiveTotal = placements.aa + placements.a + placements.b + placements.bb;
   const aggressiveBuy = placements.aa + placements.a;
   const aggressiveSell = placements.bb + placements.b;
@@ -235,7 +241,10 @@ export const planStructurePacket = (
   const nbboAggressiveSellRatio = aggressiveTotal > 0 ? aggressiveSell / aggressiveTotal : 0;
   const nbboAggressiveRatio = placementTotal > 0 ? aggressiveTotal / placementTotal : 0;
 
-  const source_ts = legs.reduce((min, leg) => Math.min(min, leg.source_ts), Number.POSITIVE_INFINITY);
+  const source_ts = legs.reduce(
+    (min, leg) => Math.min(min, leg.source_ts),
+    Number.POSITIVE_INFINITY
+  );
   const ingest_ts = legs.reduce((max, leg) => Math.max(max, leg.ingest_ts), 0);
   const seq = legs.reduce((max, leg) => Math.max(max, leg.seq), 0);
 

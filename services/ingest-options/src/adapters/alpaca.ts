@@ -152,10 +152,7 @@ const normalizeUnderlyings = (value: string[]): string[] => {
   return result;
 };
 
-const fetchJson = async <T>(
-  url: URL,
-  config: AlpacaOptionsAdapterConfig
-): Promise<T> => {
+const fetchJson = async <T>(url: URL, config: AlpacaOptionsAdapterConfig): Promise<T> => {
   const response = await fetch(url.toString(), {
     headers: buildAlpacaAuthHeaders(config.credentials)
   });
@@ -235,10 +232,7 @@ const fetchOptionSnapshots = async (
   return contracts;
 };
 
-const selectExpiries = (
-  contracts: OptionContract[],
-  maxDteDays: number
-): ExpiryInfo[] => {
+const selectExpiries = (contracts: OptionContract[], maxDteDays: number): ExpiryInfo[] => {
   const today = new Date();
   const expiryMap = new Map<string, ExpiryInfo>();
 
@@ -332,7 +326,9 @@ const selectContractsForUnderlying = (
     const minStrike = price * (1 - config.moneynessPct);
     const maxStrike = price * (1 + config.moneynessPct);
     const strikePairs = Array.from(strikeMap.entries())
-      .filter(([strike, pair]) => pair.call && pair.put && strike >= minStrike && strike <= maxStrike)
+      .filter(
+        ([strike, pair]) => pair.call && pair.put && strike >= minStrike && strike <= maxStrike
+      )
       .map(([strike, pair]) => ({
         strike,
         call: pair.call as string,
@@ -540,7 +536,10 @@ export const createAlpacaOptionsAdapter = (
             continue;
           }
 
-          const message = entry as AlpacaTradeMessage | AlpacaQuoteMessage | { T?: string; msg?: string };
+          const message = entry as
+            | AlpacaTradeMessage
+            | AlpacaQuoteMessage
+            | { T?: string; msg?: string };
           const type = message.T;
 
           if (type === "t") {

@@ -43,7 +43,12 @@ import { createDatabentoOptionsAdapter } from "./adapters/databento";
 import { createIbkrOptionsAdapter } from "./adapters/ibkr";
 import { createSyntheticOptionsAdapter } from "./adapters/synthetic";
 import type { OptionIngestAdapter, StopHandler } from "./adapters/types";
-import { enrichOptionPrint, rememberContext, selectAtOrBefore, type ContextHistory } from "./enrichment";
+import {
+  enrichOptionPrint,
+  rememberContext,
+  selectAtOrBefore,
+  type ContextHistory
+} from "./enrichment";
 import { z } from "zod";
 
 const service = "ingest-options";
@@ -87,7 +92,10 @@ const envSchema = z.object({
   IBKR_EXPIRY: z.string().min(1).default("20250117"),
   IBKR_STRIKE: z.coerce.number().positive().default(450),
   IBKR_RIGHT: z
-    .preprocess((value) => (typeof value === "string" ? value.toUpperCase() : value), z.enum(["C", "P"]))
+    .preprocess(
+      (value) => (typeof value === "string" ? value.toUpperCase() : value),
+      z.enum(["C", "P"])
+    )
     .default("C"),
   IBKR_EXCHANGE: z.string().min(1).default("SMART"),
   IBKR_CURRENCY: z.string().min(1).default("USD"),
@@ -395,10 +403,7 @@ const run = async () => {
     await ensureOptionNBBOTable(clickhouse);
   });
 
-  const adapter = selectAdapter(
-    env.OPTIONS_INGEST_ADAPTER,
-    () => syntheticControl
-  );
+  const adapter = selectAdapter(env.OPTIONS_INGEST_ADAPTER, () => syntheticControl);
   logger.info("ingest adapter selected", { adapter: adapter.name });
   const allowPublish = buildThrottle(env.TESTING_MODE, env.TESTING_THROTTLE_MS);
   const allowNbboPublish = buildThrottle(env.TESTING_MODE, env.TESTING_THROTTLE_MS);
@@ -421,7 +426,10 @@ const run = async () => {
         rawPrint.ts
       );
       const equityQuote = parsedMetadata.underlying_id
-        ? selectAtOrBefore(equityQuoteHistoryByUnderlying.get(parsedMetadata.underlying_id), rawPrint.ts)
+        ? selectAtOrBefore(
+            equityQuoteHistoryByUnderlying.get(parsedMetadata.underlying_id),
+            rawPrint.ts
+          )
         : null;
       const print = enrichOptionPrint(rawPrint, optionQuote, equityQuote, optionsSignalConfig);
 
@@ -500,8 +508,16 @@ const run = async () => {
 
   const pruneTimer = setInterval(() => {
     const removed =
-      pruneContextHistory(nbboHistoryByContract, env.OPTION_CONTEXT_MAX_KEYS, env.OPTION_CONTEXT_TTL_MS) +
-      pruneContextHistory(equityQuoteHistoryByUnderlying, env.OPTION_CONTEXT_MAX_KEYS, env.OPTION_CONTEXT_TTL_MS);
+      pruneContextHistory(
+        nbboHistoryByContract,
+        env.OPTION_CONTEXT_MAX_KEYS,
+        env.OPTION_CONTEXT_TTL_MS
+      ) +
+      pruneContextHistory(
+        equityQuoteHistoryByUnderlying,
+        env.OPTION_CONTEXT_MAX_KEYS,
+        env.OPTION_CONTEXT_TTL_MS
+      );
     logger.info("option context cache summary", {
       nbbo_context_keys: nbboHistoryByContract.size,
       equity_quote_context_keys: equityQuoteHistoryByUnderlying.size,

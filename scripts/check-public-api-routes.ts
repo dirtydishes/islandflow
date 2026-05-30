@@ -7,7 +7,10 @@ type RouteCheck = {
 
 const routeChecks: RouteCheck[] = [
   { path: "/prints/options?view=signal&limit=1", expectJson: true },
-  { path: "/history/options?view=signal&before_ts=4102444800000&before_seq=999999999&limit=1", expectJson: true },
+  {
+    path: "/history/options?view=signal&before_ts=4102444800000&before_seq=999999999&limit=1",
+    expectJson: true
+  },
   { path: "/replay/options?view=signal&after_ts=0&after_seq=0&limit=1", expectJson: true },
   { path: "/nbbo/options?limit=1", expectJson: true },
   { path: "/ws/live", expectJson: true }
@@ -31,7 +34,9 @@ const assertPublicApiRoute = async ({ path, expectJson }: RouteCheck): Promise<v
 
   if (expectJson && !isJsonResponse(response)) {
     const sample = responseText.replace(/\s+/g, " ").slice(0, 120);
-    throw new Error(`${url.pathname} returned non-JSON content (${response.headers.get("content-type") ?? "none"}): ${sample}`);
+    throw new Error(
+      `${url.pathname} returned non-JSON content (${response.headers.get("content-type") ?? "none"}): ${sample}`
+    );
   }
 };
 

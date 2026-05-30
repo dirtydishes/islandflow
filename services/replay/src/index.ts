@@ -52,11 +52,7 @@ type ReplayStreamKind = "options" | "nbbo" | "equities" | "equity-quotes";
 
 type ReplayEvent = OptionPrint | OptionNBBO | EquityPrint | EquityQuote;
 
-type FetchAfter = (
-  afterTs: number,
-  afterSeq: number,
-  limit: number
-) => Promise<ReplayEvent[]>;
+type FetchAfter = (afterTs: number, afterSeq: number, limit: number) => Promise<ReplayEvent[]>;
 
 type ReplayStream = {
   kind: ReplayStreamKind;
@@ -79,7 +75,12 @@ const STREAM_DEFS: Record<
     subject: string;
     streamName: string;
     rank: number;
-    fetchAfter: (client: ReturnType<typeof createClickHouseClient>, afterTs: number, afterSeq: number, limit: number) => Promise<ReplayEvent[]>;
+    fetchAfter: (
+      client: ReturnType<typeof createClickHouseClient>,
+      afterTs: number,
+      afterSeq: number,
+      limit: number
+    ) => Promise<ReplayEvent[]>;
   }
 > = {
   options: {
@@ -196,7 +197,9 @@ const getEventIngestTs = (event: ReplayEvent): number =>
 
 const getEventSeq = (event: ReplayEvent): number => (Number.isFinite(event.seq) ? event.seq : 0);
 
-const pickNextEvent = (streams: ReplayStream[]): { stream: ReplayStream; event: ReplayEvent } | null => {
+const pickNextEvent = (
+  streams: ReplayStream[]
+): { stream: ReplayStream; event: ReplayEvent } | null => {
   let choice: { stream: ReplayStream; event: ReplayEvent } | null = null;
 
   for (const stream of streams) {
@@ -313,7 +316,8 @@ const run = async () => {
       kind,
       subject: def.subject,
       streamName: def.streamName,
-      fetchAfter: (afterTs, afterSeq, limit) => def.fetchAfter(clickhouse, afterTs, afterSeq, limit),
+      fetchAfter: (afterTs, afterSeq, limit) =>
+        def.fetchAfter(clickhouse, afterTs, afterSeq, limit),
       buffer: [],
       cursor: { ...startCursor },
       done: false,

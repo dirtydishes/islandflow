@@ -573,10 +573,7 @@ const buildVerticalSpreadHit = (
   };
 };
 
-const buildLadderHit = (
-  packet: FlowPacket,
-  config: ClassifierConfig
-): ClassifierHit | null => {
+const buildLadderHit = (packet: FlowPacket, config: ClassifierConfig): ClassifierHit | null => {
   const structureType = getStringFeature(packet, "structure_type");
   if (structureType !== "ladder") {
     return null;
@@ -648,7 +645,8 @@ const buildRollHit = (packet: FlowPacket, config: ClassifierConfig): ClassifierH
   }
 
   const activity = getLargeActivity(packet, config);
-  const qualifies = activity.totalPremium >= config.spikeMinPremium || activity.totalSize >= config.spikeMinSize;
+  const qualifies =
+    activity.totalPremium >= config.spikeMinPremium || activity.totalSize >= config.spikeMinSize;
   if (!qualifies) {
     return null;
   }
@@ -708,7 +706,9 @@ const buildRollHit = (packet: FlowPacket, config: ClassifierConfig): ClassifierH
 
   const expiryNote = hasExpiryPair
     ? `Expiries: ${fromExpiry} -> ${toExpiry}${
-        expiryDaysDelta !== null && expiryDaysDelta !== 0 ? ` (${Math.round(expiryDaysDelta)}d)` : ""
+        expiryDaysDelta !== null && expiryDaysDelta !== 0
+          ? ` (${Math.round(expiryDaysDelta)}d)`
+          : ""
       }.`
     : "Expiry pairing unavailable.";
   const strikeNote = hasStrikePair
@@ -850,9 +850,10 @@ export const evaluateClassifiers = (
   const packetKind = getStringFeature(packet, "packet_kind");
   const structureOnly = packetKind === "structure";
 
-  const contractId = typeof packet.features.option_contract_id === "string"
-    ? packet.features.option_contract_id
-    : "";
+  const contractId =
+    typeof packet.features.option_contract_id === "string"
+      ? packet.features.option_contract_id
+      : "";
   const contract = structureOnly ? null : parseContractId(contractId);
   const hits: ClassifierHit[] = [];
 

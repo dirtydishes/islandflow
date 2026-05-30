@@ -46,7 +46,7 @@ import {
   enqueueEquityPrintJoinInsert,
   enqueueFlowPacketInsert,
   enqueueInferredDarkInsert,
-  enqueueSmartMoneyEventInsert,
+  enqueueSmartMoneyEventInsert
 } from "@islandflow/storage";
 import {
   AlertEventSchema,
@@ -324,7 +324,9 @@ const buildPacketId = (cluster: ClusterState): string => {
 
 const isExpectedShutdownNatsError = (error: unknown): boolean => {
   const code = getErrorCode(error);
-  return runtimeState.shuttingDown && (code === "CONNECTION_DRAINING" || code === "CONNECTION_CLOSED");
+  return (
+    runtimeState.shuttingDown && (code === "CONNECTION_DRAINING" || code === "CONNECTION_CLOSED")
+  );
 };
 
 const createPlacementCounts = (): NbboPlacementCounts => ({
@@ -337,7 +339,14 @@ const createPlacementCounts = (): NbboPlacementCounts => ({
   stale: 0
 });
 
-const SPECIAL_PRINT_CONDITIONS = new Set(["AUCTION", "CROSS", "OPENING", "CLOSING", "COMPLEX", "SPREAD"]);
+const SPECIAL_PRINT_CONDITIONS = new Set([
+  "AUCTION",
+  "CROSS",
+  "OPENING",
+  "CLOSING",
+  "COMPLEX",
+  "SPREAD"
+]);
 const SYNTHETIC_EVENT_CONDITION_RE = /^EVENT_(\d+)D$/i;
 
 const normalizeConditions = (conditions: readonly string[] | undefined): string[] =>
@@ -460,11 +469,7 @@ const storeRecentRootLeg = (leg: LegEvidence, anchorTs: number): void => {
   recentLegsByRoot.set(key, next);
 };
 
-const collectActiveLegs = (
-  key: string,
-  anchorTs: number,
-  excludeId: string
-): LegEvidence[] => {
+const collectActiveLegs = (key: string, anchorTs: number, excludeId: string): LegEvidence[] => {
   const legs: LegEvidence[] = [];
   for (const [contractId, cluster] of clusters) {
     if (contractId === excludeId) {
@@ -485,11 +490,7 @@ const collectActiveLegs = (
   return legs;
 };
 
-const collectActiveRootLegs = (
-  key: string,
-  anchorTs: number,
-  excludeId: string
-): LegEvidence[] => {
+const collectActiveRootLegs = (key: string, anchorTs: number, excludeId: string): LegEvidence[] => {
   const legs: LegEvidence[] = [];
   for (const [contractId, cluster] of clusters) {
     if (contractId === excludeId) {
@@ -601,12 +602,19 @@ const applyDeliverPolicy = (
 const buildCluster = (print: OptionPrint): ClusterState => {
   const placements = createPlacementCounts();
   const normalizedConditions = normalizeConditions(print.conditions);
-  const executionIv = typeof print.execution_iv === "number" && Number.isFinite(print.execution_iv) ? print.execution_iv : null;
+  const executionIv =
+    typeof print.execution_iv === "number" && Number.isFinite(print.execution_iv)
+      ? print.execution_iv
+      : null;
   const executionUnderlyingMid =
-    typeof print.execution_underlying_mid === "number" && Number.isFinite(print.execution_underlying_mid)
+    typeof print.execution_underlying_mid === "number" &&
+    Number.isFinite(print.execution_underlying_mid)
       ? print.execution_underlying_mid
       : null;
-  recordPlacement(placements, classifyPlacement(print.price, selectNbbo(print.option_contract_id, print.ts)));
+  recordPlacement(
+    placements,
+    classifyPlacement(print.price, selectNbbo(print.option_contract_id, print.ts))
+  );
   return {
     contractId: print.option_contract_id,
     underlyingId: print.underlying_id ?? null,
@@ -661,11 +669,18 @@ const updateCluster = (cluster: ClusterState, print: OptionPrint): ClusterState 
   if (typeof print.execution_iv === "number" && Number.isFinite(print.execution_iv)) {
     cluster.lastExecutionIv = print.execution_iv;
     cluster.minExecutionIv =
-      cluster.minExecutionIv === null ? print.execution_iv : Math.min(cluster.minExecutionIv, print.execution_iv);
+      cluster.minExecutionIv === null
+        ? print.execution_iv
+        : Math.min(cluster.minExecutionIv, print.execution_iv);
     cluster.maxExecutionIv =
-      cluster.maxExecutionIv === null ? print.execution_iv : Math.max(cluster.maxExecutionIv, print.execution_iv);
+      cluster.maxExecutionIv === null
+        ? print.execution_iv
+        : Math.max(cluster.maxExecutionIv, print.execution_iv);
   }
-  if (typeof print.execution_underlying_mid === "number" && Number.isFinite(print.execution_underlying_mid)) {
+  if (
+    typeof print.execution_underlying_mid === "number" &&
+    Number.isFinite(print.execution_underlying_mid)
+  ) {
     if (cluster.firstUnderlyingMid === null) {
       cluster.firstUnderlyingMid = print.execution_underlying_mid;
     }
@@ -686,11 +701,7 @@ type NbboJoin = {
 
 const updateNbboCache = (nbbo: OptionNBBO): void => {
   const existing = nbboCache.get(nbbo.option_contract_id);
-  if (
-    !existing ||
-    nbbo.ts > existing.ts ||
-    (nbbo.ts === existing.ts && nbbo.seq >= existing.seq)
-  ) {
+  if (!existing || nbbo.ts > existing.ts || (nbbo.ts === existing.ts && nbbo.seq >= existing.seq)) {
     nbboCache.set(nbbo.option_contract_id, nbbo);
     nbboCacheTouchedAt.set(nbbo.option_contract_id, Date.now());
   }
@@ -907,14 +918,18 @@ const flushCluster = async (
     features.special_print_count = cluster.specialPrintCount;
   }
   if (cluster.minExecutionIv !== null && cluster.maxExecutionIv !== null) {
-    features.execution_iv_shock = roundTo(Math.max(0, cluster.maxExecutionIv - cluster.minExecutionIv));
+    features.execution_iv_shock = roundTo(
+      Math.max(0, cluster.maxExecutionIv - cluster.minExecutionIv)
+    );
   }
   if (
     cluster.firstUnderlyingMid !== null &&
     cluster.lastUnderlyingMid !== null &&
     cluster.firstUnderlyingMid > 0
   ) {
-    const moveBps = ((cluster.lastUnderlyingMid - cluster.firstUnderlyingMid) / cluster.firstUnderlyingMid) * 10_000;
+    const moveBps =
+      ((cluster.lastUnderlyingMid - cluster.firstUnderlyingMid) / cluster.firstUnderlyingMid) *
+      10_000;
     features.underlying_move_bps = roundTo(moveBps);
   }
   const syntheticEventOffsetDays = parseSyntheticEventOffsetDays(cluster.conditions);
@@ -1004,7 +1019,13 @@ const flushCluster = async (
     const rollLegs = [currentLeg, ...rootCandidates];
     const rollSummary = summarizeStructure(rollLegs);
     if (rollSummary?.type === "roll") {
-      await emitStructurePacketIfNeeded(js, batchWriter, rollLegs, rollSummary, currentLeg.contractId);
+      await emitStructurePacketIfNeeded(
+        js,
+        batchWriter,
+        rollLegs,
+        rollSummary,
+        currentLeg.contractId
+      );
     }
 
     storeRecentLeg(currentLeg, anchorTs);
@@ -1072,13 +1093,21 @@ const emitClassifiers = async (
     const underlyingId =
       typeof packet.features.underlying_id === "string"
         ? packet.features.underlying_id
-        : parseContractId(typeof packet.features.option_contract_id === "string" ? packet.features.option_contract_id : "")?.root;
+        : parseContractId(
+            typeof packet.features.option_contract_id === "string"
+              ? packet.features.option_contract_id
+              : ""
+          )?.root;
     const referenceTs =
       typeof packet.features.end_ts === "number" && Number.isFinite(packet.features.end_ts)
         ? packet.features.end_ts
         : packet.source_ts;
-    const eventCalendarMatch = underlyingId ? eventCalendarProvider.findNextEvent(underlyingId, referenceTs) : null;
-    smartMoneyEvent = SmartMoneyEventSchema.parse(buildSmartMoneyEventFromPacket(packet, { eventCalendarMatch }));
+    const eventCalendarMatch = underlyingId
+      ? eventCalendarProvider.findNextEvent(underlyingId, referenceTs)
+      : null;
+    smartMoneyEvent = SmartMoneyEventSchema.parse(
+      buildSmartMoneyEventFromPacket(packet, { eventCalendarMatch })
+    );
     enqueueSmartMoneyEventInsert(batchWriter, smartMoneyEvent);
     await publishJson(js, SUBJECT_SMART_MONEY_EVENTS, smartMoneyEvent);
     emitCounters.smartMoneyEvents += 1;
@@ -1282,20 +1311,29 @@ const run = async () => {
 
   if (env.SMART_MONEY_EVENT_CALENDAR_PATH) {
     try {
-      eventCalendarProvider = await loadEventCalendarProviderFromFile(env.SMART_MONEY_EVENT_CALENDAR_PATH);
-      logger.info("smart money event calendar loaded", { path: env.SMART_MONEY_EVENT_CALENDAR_PATH });
+      eventCalendarProvider = await loadEventCalendarProviderFromFile(
+        env.SMART_MONEY_EVENT_CALENDAR_PATH
+      );
+      logger.info("smart money event calendar loaded", {
+        path: env.SMART_MONEY_EVENT_CALENDAR_PATH
+      });
     } catch (error) {
       eventCalendarProvider = createEmptyEventCalendarProvider();
-      logger.warn("smart money event calendar unavailable; scoring will use neutral event features", {
-        path: env.SMART_MONEY_EVENT_CALENDAR_PATH,
-        error: error instanceof Error ? error.message : String(error)
-      });
+      logger.warn(
+        "smart money event calendar unavailable; scoring will use neutral event features",
+        {
+          path: env.SMART_MONEY_EVENT_CALENDAR_PATH,
+          error: error instanceof Error ? error.message : String(error)
+        }
+      );
     }
   }
 
   const redis = createRedisClient(env.REDIS_URL);
   redis.on("error", (error) => {
-    logger.warn("redis client error", { error: error instanceof Error ? error.message : String(error) });
+    logger.warn("redis client error", {
+      error: error instanceof Error ? error.message : String(error)
+    });
   });
 
   await retry("redis connect", 120, 500, async () => {
@@ -1379,7 +1417,10 @@ const run = async () => {
   } else {
     try {
       const info = await jsm.consumers.info(STREAM_OPTION_SIGNAL_PRINTS, durableName);
-      if (info?.config?.deliver_policy && info.config.deliver_policy !== env.COMPUTE_DELIVER_POLICY) {
+      if (
+        info?.config?.deliver_policy &&
+        info.config.deliver_policy !== env.COMPUTE_DELIVER_POLICY
+      ) {
         logger.warn("resetting consumer due to deliver policy change", {
           durable: durableName,
           current: info.config.deliver_policy,
@@ -1390,7 +1431,10 @@ const run = async () => {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (!message.includes("not found")) {
-        logger.warn("failed to inspect jetstream consumer", { durable: durableName, error: message });
+        logger.warn("failed to inspect jetstream consumer", {
+          durable: durableName,
+          error: message
+        });
       }
     }
   }
@@ -1402,13 +1446,19 @@ const run = async () => {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (!message.includes("not found")) {
-        logger.warn("failed to reset jetstream consumer", { durable: nbboDurableName, error: message });
+        logger.warn("failed to reset jetstream consumer", {
+          durable: nbboDurableName,
+          error: message
+        });
       }
     }
   } else {
     try {
       const info = await jsm.consumers.info(STREAM_OPTION_NBBO, nbboDurableName);
-      if (info?.config?.deliver_policy && info.config.deliver_policy !== env.COMPUTE_DELIVER_POLICY) {
+      if (
+        info?.config?.deliver_policy &&
+        info.config.deliver_policy !== env.COMPUTE_DELIVER_POLICY
+      ) {
         logger.warn("resetting consumer due to deliver policy change", {
           durable: nbboDurableName,
           current: info.config.deliver_policy,
@@ -1419,7 +1469,10 @@ const run = async () => {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (!message.includes("not found")) {
-        logger.warn("failed to inspect jetstream consumer", { durable: nbboDurableName, error: message });
+        logger.warn("failed to inspect jetstream consumer", {
+          durable: nbboDurableName,
+          error: message
+        });
       }
     }
   }
@@ -1440,7 +1493,10 @@ const run = async () => {
   } else {
     try {
       const info = await jsm.consumers.info(STREAM_EQUITY_PRINTS, equityPrintDurableName);
-      if (info?.config?.deliver_policy && info.config.deliver_policy !== env.COMPUTE_DELIVER_POLICY) {
+      if (
+        info?.config?.deliver_policy &&
+        info.config.deliver_policy !== env.COMPUTE_DELIVER_POLICY
+      ) {
         logger.warn("resetting consumer due to deliver policy change", {
           durable: equityPrintDurableName,
           current: info.config.deliver_policy,
@@ -1475,7 +1531,10 @@ const run = async () => {
   } else {
     try {
       const info = await jsm.consumers.info(STREAM_EQUITY_QUOTES, equityQuoteDurableName);
-      if (info?.config?.deliver_policy && info.config.deliver_policy !== env.COMPUTE_DELIVER_POLICY) {
+      if (
+        info?.config?.deliver_policy &&
+        info.config.deliver_policy !== env.COMPUTE_DELIVER_POLICY
+      ) {
         logger.warn("resetting consumer due to deliver policy change", {
           durable: equityQuoteDurableName,
           current: info.config.deliver_policy,
@@ -1515,7 +1574,8 @@ const run = async () => {
       try {
         await jsm.consumers.delete(STREAM_OPTION_SIGNAL_PRINTS, durableName);
       } catch (deleteError) {
-        const deleteMessage = deleteError instanceof Error ? deleteError.message : String(deleteError);
+        const deleteMessage =
+          deleteError instanceof Error ? deleteError.message : String(deleteError);
         if (!deleteMessage.includes("not found")) {
           logger.warn("failed to delete jetstream consumer", {
             durable: durableName,
@@ -1551,7 +1611,8 @@ const run = async () => {
       try {
         await jsm.consumers.delete(STREAM_OPTION_NBBO, nbboDurableName);
       } catch (deleteError) {
-        const deleteMessage = deleteError instanceof Error ? deleteError.message : String(deleteError);
+        const deleteMessage =
+          deleteError instanceof Error ? deleteError.message : String(deleteError);
         if (!deleteMessage.includes("not found")) {
           logger.warn("failed to delete jetstream consumer", {
             durable: nbboDurableName,
@@ -1582,12 +1643,16 @@ const run = async () => {
         throw error;
       }
 
-      logger.warn("resetting jetstream consumer", { durable: equityPrintDurableName, error: message });
+      logger.warn("resetting jetstream consumer", {
+        durable: equityPrintDurableName,
+        error: message
+      });
 
       try {
         await jsm.consumers.delete(STREAM_EQUITY_PRINTS, equityPrintDurableName);
       } catch (deleteError) {
-        const deleteMessage = deleteError instanceof Error ? deleteError.message : String(deleteError);
+        const deleteMessage =
+          deleteError instanceof Error ? deleteError.message : String(deleteError);
         if (!deleteMessage.includes("not found")) {
           logger.warn("failed to delete jetstream consumer", {
             durable: equityPrintDurableName,
@@ -1626,7 +1691,8 @@ const run = async () => {
       try {
         await jsm.consumers.delete(STREAM_EQUITY_QUOTES, equityQuoteDurableName);
       } catch (deleteError) {
-        const deleteMessage = deleteError instanceof Error ? deleteError.message : String(deleteError);
+        const deleteMessage =
+          deleteError instanceof Error ? deleteError.message : String(deleteError);
         if (!deleteMessage.includes("not found")) {
           logger.warn("failed to delete jetstream consumer", {
             durable: equityQuoteDurableName,

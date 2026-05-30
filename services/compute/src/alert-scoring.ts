@@ -14,4 +14,3 @@ export const scoreAlert = (
   const severity = score >= 80 ? "high" : score >= 45 ? "medium" : "low";
   return { score, severity };
 };
-

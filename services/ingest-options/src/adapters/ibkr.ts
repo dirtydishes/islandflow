@@ -59,9 +59,7 @@ const readLines = async (
   }
 };
 
-export const createIbkrOptionsAdapter = (
-  config: IbkrOptionsAdapterConfig
-): OptionIngestAdapter => {
+export const createIbkrOptionsAdapter = (config: IbkrOptionsAdapterConfig): OptionIngestAdapter => {
   return {
     name: "ibkr",
     start: (handlers: OptionIngestHandlers) => {

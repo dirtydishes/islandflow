@@ -715,10 +715,7 @@ const SYNTHETIC_PROFILES: Record<SyntheticMarketMode, SyntheticOptionsProfile> =
       ...scenario,
       countRange: [scenario.countRange[0], scenario.countRange[1]],
       sizeRange: [scenario.sizeRange[0], scenario.sizeRange[1]],
-      targetNotionalRange: [
-        scenario.targetNotionalRange[0],
-        scenario.targetNotionalRange[1]
-      ]
+      targetNotionalRange: [scenario.targetNotionalRange[0], scenario.targetNotionalRange[1]]
     })),
     pricePlacements: PLACEMENTS
   },
@@ -743,10 +740,7 @@ const SYNTHETIC_PROFILES: Record<SyntheticMarketMode, SyntheticOptionsProfile> =
     scenarios: SCENARIO_LIBRARY.map((scenario) => ({
       ...scenario,
       countRange: [scenario.countRange[0] + 2, scenario.countRange[1] + 4],
-      sizeRange: [
-        Math.round(scenario.sizeRange[0] * 1.8),
-        Math.round(scenario.sizeRange[1] * 2.1)
-      ],
+      sizeRange: [Math.round(scenario.sizeRange[0] * 1.8), Math.round(scenario.sizeRange[1] * 2.1)],
       targetNotionalRange: [
         Math.round(scenario.targetNotionalRange[0] * 1.7),
         Math.round(scenario.targetNotionalRange[1] * 2.0)
@@ -768,7 +762,7 @@ const SMART_MONEY_TEMPLATE_SCENARIOS: Record<
   hedge_reactive: "reactive_put_wall"
 };
 
-const pick = <T,>(items: readonly T[], seed: number): T => {
+const pick = <T>(items: readonly T[], seed: number): T => {
   return items[Math.abs(seed) % items.length]!;
 };
 
@@ -850,9 +844,7 @@ export const updateSyntheticIvForTest = (
     const sizeImpact = Math.log10(Math.max(10, input.size)) * 0.012;
     const notionalImpact = Math.log10(Math.max(1_000, input.notional)) * 0.01;
     pressure +=
-      input.placement === "AA"
-        ? sizeImpact + notionalImpact
-        : (sizeImpact + notionalImpact) * 0.65;
+      input.placement === "AA" ? sizeImpact + notionalImpact : (sizeImpact + notionalImpact) * 0.65;
   } else if (input.placement === "MID") {
     pressure += 0.001;
   } else {
@@ -879,8 +871,7 @@ const estimateSyntheticOptionMid = (input: {
       : Math.max(0, input.strike - input.underlying);
   const timeYears = Math.max(1, input.dteDays + 1) / 365;
   const baselineIv = initializeSyntheticIv(input.dteDays, input.moneyness);
-  const modeBoost =
-    input.mode === "firehose" ? 1.18 : input.mode === "active" ? 1.08 : 0.96;
+  const modeBoost = input.mode === "firehose" ? 1.18 : input.mode === "active" ? 1.08 : 0.96;
   const distance = Math.abs(input.moneyness - 1);
   const extrinsic =
     input.underlying *
@@ -939,12 +930,7 @@ const chooseScenario = (
 ): Scenario => {
   const session = getSyntheticSessionState(now, control);
   const focusSymbol = session.focus_symbols[0] ?? SYNTHETIC_SYMBOLS[0]!;
-  const familyWeights = getSyntheticScenarioWeights(
-    focusSymbol,
-    now,
-    control,
-    session
-  );
+  const familyWeights = getSyntheticScenarioWeights(focusSymbol, now, control, session);
   const coverageCounts = getCoverageCounts(coverageState, now, control);
   const weightedScenarios = profile.scenarios.map((scenario, index) => {
     const familyWeight = familyWeights[scenario.label];
@@ -964,7 +950,10 @@ const chooseScenario = (
           : 1;
     return {
       ...scenario,
-      weight: Math.max(1, Math.round(scenario.weight * familyWeight * coverageBoost * quietBias * 100))
+      weight: Math.max(
+        1,
+        Math.round(scenario.weight * familyWeight * coverageBoost * quietBias * 100)
+      )
     };
   });
   return pickWeighted(weightedScenarios, now + control.shared_seed * 31);
@@ -977,7 +966,8 @@ const pickScenarioSymbol = (
 ): string => {
   const session = getSyntheticSessionState(now, control);
   const symbolPool =
-    scenario.preferredSymbols?.length && (scenario.label === "event_driven" || Math.abs(now) % 4 === 0)
+    scenario.preferredSymbols?.length &&
+    (scenario.label === "event_driven" || Math.abs(now) % 4 === 0)
       ? [...scenario.preferredSymbols]
       : session.focus_symbols.length > 0
         ? [...session.focus_symbols, ...SYNTHETIC_SYMBOLS]
@@ -1033,11 +1023,12 @@ const buildDynamicFlowFeatures = (
       0,
       0.26
     ),
-    underlying_move_bps: Math.round(
-      (Number(scenario.flowFeatures.underlying_move_bps ?? underlying.driftBps) +
-        underlying.shockBps * 0.35) *
-        100
-    ) / 100,
+    underlying_move_bps:
+      Math.round(
+        (Number(scenario.flowFeatures.underlying_move_bps ?? underlying.driftBps) +
+          underlying.shockBps * 0.35) *
+          100
+      ) / 100,
     venue_count: Math.max(
       1,
       Math.round(
@@ -1059,18 +1050,14 @@ const buildBurst = (
   coverageState: CoverageWindowState,
   scenarioOverride?: Scenario
 ): Burst => {
-  const scenario =
-    scenarioOverride ?? chooseScenario(profile, now, control, coverageState);
+  const scenario = scenarioOverride ?? chooseScenario(profile, now, control, coverageState);
   const symbol = pickScenarioSymbol(scenario, now, control);
   const symbolHash = hashSyntheticSymbol(symbol);
   const seed = symbolHash + burstIndex * 7;
   const session = getSyntheticSessionState(now, control);
   const underlyingState = getSyntheticUnderlyingState(symbol, now, control, session);
   const baseUnderlying = underlyingState.mid;
-  const expiryOffset = pick(
-    scenario.expiryOffsets ?? EXPIRY_OFFSETS,
-    symbolHash + burstIndex
-  );
+  const expiryOffset = pick(scenario.expiryOffsets ?? EXPIRY_OFFSETS, symbolHash + burstIndex);
   const strikeStep = baseUnderlying >= 200 ? 10 : baseUnderlying >= 100 ? 5 : 2.5;
   const right =
     scenario.right === "either"
@@ -1099,16 +1086,15 @@ const buildBurst = (
   const priceStep =
     scenario.priceTrend === "up" ? 0.01 : scenario.priceTrend === "down" ? -0.01 : 0;
   const flowFeatures = buildDynamicFlowFeatures(scenario, symbol, now, control);
-  const legTemplates =
-    scenario.legs?.length
-      ? scenario.legs
-      : [
-          {
-            right,
-            strikeMoneyness: scenario.strikeMoneyness,
-            placementScenarioId: scenario.placementProfile ?? scenario.label
-          }
-        ];
+  const legTemplates = scenario.legs?.length
+    ? scenario.legs
+    : [
+        {
+          right,
+          strikeMoneyness: scenario.strikeMoneyness,
+          placementScenarioId: scenario.placementProfile ?? scenario.label
+        }
+      ];
   const targetNotionalPerLeg = targetNotional / legTemplates.length;
 
   const legs = legTemplates.map((template, legIndex): BurstLeg => {
@@ -1127,8 +1113,7 @@ const buildBurst = (
     const strike = Math.max(
       1,
       templateStrike ??
-        Math.round(baseUnderlying / strikeStep) * strikeStep +
-          strikeOffset * strikeStep
+        Math.round(baseUnderlying / strikeStep) * strikeStep + strikeOffset * strikeStep
     );
     const legSize = Math.max(1, Math.round(baseSize * (template.sizeMultiplier ?? 1)));
     const legMoneyness = strike / baseUnderlying;
@@ -1141,13 +1126,13 @@ const buildBurst = (
       mode
     });
     const targetMid =
-      targetNotionalPerLeg /
-      Math.max(1, legSize * cycles * OPTION_CONTRACT_MULTIPLIER);
+      targetNotionalPerLeg / Math.max(1, legSize * cycles * OPTION_CONTRACT_MULTIPLIER);
     const cappedTheoreticalMid = Math.min(
       theoreticalMid,
       Math.max(0.35, targetMid * (scenario.label === "institutional_directional" ? 2.2 : 2.6))
     );
-    const blendedMid = cappedTheoreticalMid * 0.45 + targetMid * 0.55 * (template.priceMultiplier ?? 1);
+    const blendedMid =
+      cappedTheoreticalMid * 0.45 + targetMid * 0.55 * (template.priceMultiplier ?? 1);
     return {
       contractId: `${symbol}-${expiry}-${formatStrike(strike)}-${template.right}`,
       right: template.right,
@@ -1184,8 +1169,7 @@ const buildBurst = (
       scenario.missingQuoteProbability ??
       clampValue((1 - session.quote_cleanliness) * 0.16, 0, 0.18),
     staleQuoteProbability:
-      scenario.staleQuoteProbability ??
-      clampValue((1 - session.quote_cleanliness) * 0.3, 0, 0.42)
+      scenario.staleQuoteProbability ?? clampValue((1 - session.quote_cleanliness) * 0.3, 0, 0.42)
   };
 };
 
@@ -1202,7 +1186,9 @@ export const listSyntheticSmartMoneyScenariosForTest = (): SyntheticSmartMoneySc
     hiddenLabel:
       id === "neutral_noise"
         ? "single_print_mid"
-        : SMART_MONEY_TEMPLATE_SCENARIOS[id as Exclude<(typeof SMART_MONEY_SCENARIO_IDS)[number], "neutral_noise">]
+        : SMART_MONEY_TEMPLATE_SCENARIOS[
+            id as Exclude<(typeof SMART_MONEY_SCENARIO_IDS)[number], "neutral_noise">
+          ]
   }));
 
 export const buildSyntheticSmartMoneyBurstForTest = (
@@ -1233,18 +1219,18 @@ export const buildSyntheticSmartMoneyBurstForTest = (
     updated_by: "system"
   } satisfies SyntheticControlState;
   const mode: SyntheticMarketMode =
-    scenarioId === "retail_whale" || scenarioId === "neutral_noise"
-      ? "realistic"
-      : "active";
+    scenarioId === "retail_whale" || scenarioId === "neutral_noise" ? "realistic" : "active";
   const profile = SYNTHETIC_PROFILES[mode];
   const coverageState = createCoverageWindowState();
   const scenario =
     scenarioId === "neutral_noise"
       ? profile.scenarios.find((candidate) => candidate.id === "single_print_mid")!
       : profile.scenarios.find(
-          (candidate) => candidate.id === SMART_MONEY_TEMPLATE_SCENARIOS[
-            scenarioId as Exclude<(typeof SMART_MONEY_SCENARIO_IDS)[number], "neutral_noise">
-          ]
+          (candidate) =>
+            candidate.id ===
+            SMART_MONEY_TEMPLATE_SCENARIOS[
+              scenarioId as Exclude<(typeof SMART_MONEY_SCENARIO_IDS)[number], "neutral_noise">
+            ]
         )!;
   return buildBurst(1, now, mode, profile, control, coverageState, scenario);
 };
@@ -1255,13 +1241,10 @@ export const buildSyntheticFlowPacketForTest = (
 ): { packet: FlowPacket; hiddenLabel: string } => {
   const burst = buildSyntheticSmartMoneyBurstForTest(scenarioId, now);
   const primaryLeg = burst.legs[0]!;
-  const corporateEventOffset = Number(
-    burst.flowFeatures.corporate_event_ts_offset_days ?? 0
-  );
+  const corporateEventOffset = Number(burst.flowFeatures.corporate_event_ts_offset_days ?? 0);
   const totalSize = burst.legs.reduce((sum, leg) => sum + leg.baseSize * burst.cycles, 0);
   const totalPremium = burst.legs.reduce(
-    (sum, leg) =>
-      sum + leg.basePrice * leg.baseSize * burst.cycles * OPTION_CONTRACT_MULTIPLIER,
+    (sum, leg) => sum + leg.basePrice * leg.baseSize * burst.cycles * OPTION_CONTRACT_MULTIPLIER,
     0
   );
   const flowFeatures: FlowPacket["features"] = {
@@ -1272,15 +1255,10 @@ export const buildSyntheticFlowPacketForTest = (
     window_ms: Math.max(0, (burst.printCount - 1) * 45),
     total_size: totalSize,
     total_premium: Number(totalPremium.toFixed(2)),
-    total_notional: Number(
-      (burst.underlying * totalSize * OPTION_CONTRACT_MULTIPLIER).toFixed(2)
-    ),
+    total_notional: Number((burst.underlying * totalSize * OPTION_CONTRACT_MULTIPLIER).toFixed(2)),
     first_price: primaryLeg.basePrice,
     last_price: Number(
-      (
-        primaryLeg.basePrice *
-        (1 + burst.priceStep * Math.max(0, burst.cycles - 1))
-      ).toFixed(2)
+      (primaryLeg.basePrice * (1 + burst.priceStep * Math.max(0, burst.cycles - 1))).toFixed(2)
     ),
     nbbo_missing_count: 0,
     nbbo_stale_count: 0,
@@ -1300,10 +1278,7 @@ export const buildSyntheticFlowPacketForTest = (
       Number(flowFeatures.total_premium ?? totalPremium),
       72_000
     );
-    flowFeatures.execution_iv_shock = Math.max(
-      Number(flowFeatures.execution_iv_shock ?? 0),
-      0.22
-    );
+    flowFeatures.execution_iv_shock = Math.max(Number(flowFeatures.execution_iv_shock ?? 0), 0.22);
   }
   if (scenarioId === "event_driven") {
     flowFeatures.count = 2;
@@ -1411,14 +1386,7 @@ export const buildSyntheticBurstForTest = (
     return cached[burstIndex - 1]!;
   }
   for (let index = cached.length + 1; index <= burstIndex; index += 1) {
-    const current = buildBurst(
-      index,
-      now + index * 1_000,
-      mode,
-      profile,
-      control,
-      coverageState
-    );
+    const current = buildBurst(index, now + index * 1_000, mode, profile, control, coverageState);
     recordCoverageHit(coverageState, current.label, now + index * 1_000);
     cached.push(current);
   }
@@ -1466,14 +1434,7 @@ export const createSyntheticOptionsAdapter = (
         };
         if (!currentBurst || remainingRuns <= 0) {
           burstIndex += 1;
-          currentBurst = buildBurst(
-            burstIndex,
-            now,
-            config.mode,
-            profile,
-            control,
-            coverageState
-          );
+          currentBurst = buildBurst(burstIndex, now, config.mode, profile, control, coverageState);
           recordCoverageHit(coverageState, currentBurst.label, now);
           remainingRuns = pickInt(
             profile.burstRunRange[0],
@@ -1565,8 +1526,7 @@ export const createSyntheticOptionsAdapter = (
           const quoteSeed = Math.abs(burst.seed + i * 17) % 1000;
           const missingQuote = quoteSeed / 1000 < burst.missingQuoteProbability;
           const staleQuote =
-            !missingQuote &&
-            ((quoteSeed + 233) % 1000) / 1000 < burst.staleQuoteProbability;
+            !missingQuote && ((quoteSeed + 233) % 1000) / 1000 < burst.staleQuoteProbability;
 
           if (handlers.onNBBO && !missingQuote) {
             nbboSeq += 1;

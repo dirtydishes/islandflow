@@ -15,6 +15,10 @@
     "dev:desktop:remote": "bun run scripts/dev-desktop.ts --remote",
     "dev:web": "bun --cwd=apps/web run dev",
     "dev:services": "bun run scripts/dev-services.ts",
+    "fmt": "biome format --write .",
+    "fmt:check": "biome format .",
+    "lint": "biome lint .",
+    "check": "biome check .",
     "package:desktop": "bun --cwd=apps/desktop run package",
     "make:desktop": "bun --cwd=apps/desktop run make",
     "deploy": "bun run scripts/deploy.ts",
@@ -26,6 +30,7 @@
     "check:docker-workspace": "bun run scripts/check-docker-workspace.ts"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.16",
     "@types/bun": "^1.3.3",
     "@types/ws": "^8.18.1",
     "typescript": "^5.9.3",

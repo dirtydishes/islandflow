@@ -18,25 +18,29 @@ const variants: Record<
 > = {
   mock1: {
     title: "Command Deck",
-    premise: "Closest to the reference: left navigation, ticker ribbon, dense evidence panes, replay rail.",
+    premise:
+      "Closest to the reference: left navigation, ticker ribbon, dense evidence panes, replay rail.",
     mode: "Dense ops",
     layout: "classic"
   },
   mock2: {
     title: "Investigation Stack",
-    premise: "A calmer analyst layout with the selected symbol story in the center and context wrapped around it.",
+    premise:
+      "A calmer analyst layout with the selected symbol story in the center and context wrapped around it.",
     mode: "Forensic",
     layout: "focus"
   },
   mock3: {
     title: "Signal Wall",
-    premise: "Prioritizes alert triage and cross-symbol scanning before a user drills into price action.",
+    premise:
+      "Prioritizes alert triage and cross-symbol scanning before a user drills into price action.",
     mode: "Triage",
     layout: "signals"
   },
   mock4: {
     title: "Replay Lab",
-    premise: "A replay-first structure with timeline, event tape, and causality context always visible.",
+    premise:
+      "A replay-first structure with timeline, event tape, and causality context always visible.",
     mode: "Replay",
     layout: "replay"
   }
@@ -93,7 +97,10 @@ export function DashboardMock({ variant }: DashboardMockProps) {
   const config = variants[variant];
 
   return (
-    <section className={`mock-terminal mock-terminal-${config.layout}`} aria-labelledby="mock-title">
+    <section
+      className={`mock-terminal mock-terminal-${config.layout}`}
+      aria-labelledby="mock-title"
+    >
       <MockHeader config={config} active={variant} />
       <TickerRail />
       {variant === "mock1" ? <ClassicLayout /> : null}
@@ -277,7 +284,11 @@ function OptionTape({ condensed = false }: { condensed?: boolean }) {
 
 function ChartPanel({ compact = false }: { compact?: boolean }) {
   return (
-    <Panel title="AAPL | Price & Flow" meta="1m / 5m / 15m" className={compact ? "mock-chart is-compact" : "mock-chart"}>
+    <Panel
+      title="AAPL | Price & Flow"
+      meta="1m / 5m / 15m"
+      className={compact ? "mock-chart is-compact" : "mock-chart"}
+    >
       <div className="mock-chart-meta">
         <strong>194.88</strong>
         <span className="mock-move is-up">+2.34 (+1.22%)</span>
@@ -306,16 +317,24 @@ function ChartPanel({ compact = false }: { compact?: boolean }) {
 
 function SignalPanel({ hero = false }: { hero?: boolean }) {
   return (
-    <Panel title="Signals & Alerts" meta="All / Signals / System" className={hero ? "mock-signals is-hero" : "mock-signals"}>
+    <Panel
+      title="Signals & Alerts"
+      meta="All / Signals / System"
+      className={hero ? "mock-signals is-hero" : "mock-signals"}
+    >
       <div className="mock-signal-list">
         {signals.map(([time, title, symbol, value, tag]) => (
           <article className="mock-signal-item" key={`${time}-${title}`}>
             <time>{time}</time>
             <div>
               <strong>{title}</strong>
-              <span>{symbol} / {value}</span>
+              <span>
+                {symbol} / {value}
+              </span>
             </div>
-            <span className={`mock-pill ${tag === "Bearish" ? "is-bearish" : tag === "News" ? "is-news" : "is-bullish"}`}>
+            <span
+              className={`mock-pill ${tag === "Bearish" ? "is-bearish" : tag === "News" ? "is-news" : "is-bullish"}`}
+            >
               {tag}
             </span>
           </article>
@@ -332,7 +351,9 @@ function FeedHealth() {
         {feedHealth.map(([feed, status, lag, rate]) => (
           <div className="mock-table-row" key={feed}>
             <span>{feed}</span>
-            <span className={`mock-pill ${status === "Degraded" ? "is-warning" : "is-bullish"}`}>{status}</span>
+            <span className={`mock-pill ${status === "Degraded" ? "is-warning" : "is-bullish"}`}>
+              {status}
+            </span>
             <span>{lag}</span>
             <span>{rate}/s</span>
           </div>
@@ -350,7 +371,9 @@ function DarkFlow() {
           <div className="mock-table-row" key={`${time}-${side}-${size}`}>
             <span>{time}</span>
             <strong>{symbol}</strong>
-            <span className={`mock-pill ${side === "Sell" ? "is-bearish" : "is-bullish"}`}>{side}</span>
+            <span className={`mock-pill ${side === "Sell" ? "is-bearish" : "is-bullish"}`}>
+              {side}
+            </span>
             <span>{size}</span>
             <span>{notional}</span>
             <span>{type}</span>
@@ -402,7 +425,11 @@ function EventContext() {
 
 function ReplayRail({ compact = false }: { compact?: boolean }) {
   return (
-    <Panel title="Replay" meta="May 16, 2024" className={compact ? "mock-replay is-compact" : "mock-replay"}>
+    <Panel
+      title="Replay"
+      meta="May 16, 2024"
+      className={compact ? "mock-replay is-compact" : "mock-replay"}
+    >
       <div className="mock-replay-controls">
         <button type="button">Prev</button>
         <button type="button">Pause</button>
@@ -430,8 +457,9 @@ function SymbolBrief() {
         <span className="mock-move is-up">+1.22%</span>
       </div>
       <p>
-        Dark sweep pressure aligns with short-window momentum and a fresh news catalyst. Context confidence is high, but
-        the largest block remains off-exchange and should be checked against next print behavior.
+        Dark sweep pressure aligns with short-window momentum and a fresh news catalyst. Context
+        confidence is high, but the largest block remains off-exchange and should be checked against
+        next print behavior.
       </p>
       <div className="mock-brief-tags">
         <span className="mock-pill is-bullish">Bullish</span>
@@ -444,7 +472,12 @@ function SymbolBrief() {
 
 function Sparkline({ direction }: { direction: string }) {
   return (
-    <svg className="mock-sparkline" viewBox="0 0 96 28" role="img" aria-label={`${direction} sparkline`}>
+    <svg
+      className="mock-sparkline"
+      viewBox="0 0 96 28"
+      role="img"
+      aria-label={`${direction} sparkline`}
+    >
       <polyline
         fill="none"
         points={

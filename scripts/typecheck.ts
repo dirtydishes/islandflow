@@ -39,10 +39,24 @@ for (const tsconfig of tsconfigs) {
   const label = relative(process.cwd(), tsconfig);
   console.log(`\nTypechecking ${label}`);
 
-  const result = Bun.spawnSync([bunExecutable, "x", "tsc", "-p", tsconfig, "--noEmit", "--incremental", "false", "--pretty", "false"], {
-    stdout: "inherit",
-    stderr: "inherit"
-  });
+  const result = Bun.spawnSync(
+    [
+      bunExecutable,
+      "x",
+      "tsc",
+      "-p",
+      tsconfig,
+      "--noEmit",
+      "--incremental",
+      "false",
+      "--pretty",
+      "false"
+    ],
+    {
+      stdout: "inherit",
+      stderr: "inherit"
+    }
+  );
 
   if (result.exitCode !== 0) {
     failed = true;

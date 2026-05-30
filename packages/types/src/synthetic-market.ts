@@ -26,10 +26,7 @@ const SMART_MONEY_PROFILE_IDS = [
   "arbitrage",
   "hedge_reactive"
 ] as const satisfies readonly SmartMoneyProfileId[];
-const SYNTHETIC_SCENARIO_FAMILY_IDS = [
-  ...SMART_MONEY_PROFILE_IDS,
-  "neutral_noise"
-] as const;
+const SYNTHETIC_SCENARIO_FAMILY_IDS = [...SMART_MONEY_PROFILE_IDS, "neutral_noise"] as const;
 const REGIME_IDS = [
   "trend_up",
   "trend_down",
@@ -54,18 +51,14 @@ export const SyntheticCoverageWindowMinutesSchema = z.union([
   z.literal(20),
   z.literal(30)
 ]);
-export type SyntheticCoverageWindowMinutes = z.infer<
-  typeof SyntheticCoverageWindowMinutesSchema
->;
+export type SyntheticCoverageWindowMinutes = z.infer<typeof SyntheticCoverageWindowMinutesSchema>;
 
 export const SyntheticProfileWeightValueSchema = z.union([
   z.literal(0.6),
   z.literal(1.0),
   z.literal(1.6)
 ]);
-export type SyntheticProfileWeightValue = z.infer<
-  typeof SyntheticProfileWeightValueSchema
->;
+export type SyntheticProfileWeightValue = z.infer<typeof SyntheticProfileWeightValueSchema>;
 
 export const SyntheticProfileWeightMapSchema = z
   .object({
@@ -77,9 +70,7 @@ export const SyntheticProfileWeightMapSchema = z
     hedge_reactive: SyntheticProfileWeightValueSchema
   })
   .strict();
-export type SyntheticProfileWeightMap = z.infer<
-  typeof SyntheticProfileWeightMapSchema
->;
+export type SyntheticProfileWeightMap = z.infer<typeof SyntheticProfileWeightMapSchema>;
 
 export const SyntheticControlStateSchema = z
   .object({
@@ -94,23 +85,14 @@ export const SyntheticControlStateSchema = z
   .strict();
 export type SyntheticControlState = z.infer<typeof SyntheticControlStateSchema>;
 
-export const SyntheticSessionPhaseSchema = z.enum([
-  "open",
-  "midday",
-  "power_hour",
-  "after_event"
-]);
+export const SyntheticSessionPhaseSchema = z.enum(["open", "midday", "power_hour", "after_event"]);
 export type SyntheticSessionPhase = z.infer<typeof SyntheticSessionPhaseSchema>;
 
 export const SyntheticRegimeSchema = z.enum(REGIME_IDS);
 export type SyntheticRegime = z.infer<typeof SyntheticRegimeSchema>;
 
-export const SyntheticScenarioFamilyIdSchema = z.enum(
-  SYNTHETIC_SCENARIO_FAMILY_IDS
-);
-export type SyntheticScenarioFamilyId = z.infer<
-  typeof SyntheticScenarioFamilyIdSchema
->;
+export const SyntheticScenarioFamilyIdSchema = z.enum(SYNTHETIC_SCENARIO_FAMILY_IDS);
+export type SyntheticScenarioFamilyId = z.infer<typeof SyntheticScenarioFamilyIdSchema>;
 
 export const SyntheticCoverageConfigSchema = z
   .object({
@@ -118,9 +100,7 @@ export const SyntheticCoverageConfigSchema = z
     coverage_window_minutes: SyntheticCoverageWindowMinutesSchema
   })
   .strict();
-export type SyntheticCoverageConfig = z.infer<
-  typeof SyntheticCoverageConfigSchema
->;
+export type SyntheticCoverageConfig = z.infer<typeof SyntheticCoverageConfigSchema>;
 
 export const SyntheticDerivedStatusSchema = z
   .object({
@@ -131,9 +111,7 @@ export const SyntheticDerivedStatusSchema = z
     coverage_window_minutes: SyntheticCoverageWindowMinutesSchema
   })
   .strict();
-export type SyntheticDerivedStatus = z.infer<
-  typeof SyntheticDerivedStatusSchema
->;
+export type SyntheticDerivedStatus = z.infer<typeof SyntheticDerivedStatusSchema>;
 
 export type SyntheticSessionState = {
   session_phase: SyntheticSessionPhase;
@@ -160,10 +138,7 @@ export type SyntheticUnderlyingState = {
   offExchangeBias: number;
 };
 
-export type SyntheticScenarioWeightMap = Record<
-  SyntheticScenarioFamilyId,
-  number
->;
+export type SyntheticScenarioWeightMap = Record<SyntheticScenarioFamilyId, number>;
 
 export type SyntheticCoverageState = {
   profile_hit_counts: Record<SmartMoneyProfileId, number>;
@@ -195,10 +170,7 @@ export const DEFAULT_SYNTHETIC_CONTROL_STATE: SyntheticControlState = {
   updated_by: "system"
 };
 
-const PRESET_REGIME_BIAS: Record<
-  SyntheticControlPresetId,
-  Record<SyntheticRegime, number>
-> = {
+const PRESET_REGIME_BIAS: Record<SyntheticControlPresetId, Record<SyntheticRegime, number>> = {
   balanced_demo: {
     trend_up: 1.0,
     trend_down: 0.95,
@@ -257,10 +229,7 @@ const PRESET_ACTIVITY_BIAS: Record<
   quiet_range: { focusCount: 2, eventCount: 1, amplitude: 0.72 }
 };
 
-const REGIME_PROFILE_BIAS: Record<
-  SyntheticRegime,
-  SyntheticScenarioWeightMap
-> = {
+const REGIME_PROFILE_BIAS: Record<SyntheticRegime, SyntheticScenarioWeightMap> = {
   trend_up: {
     institutional_directional: 1.35,
     retail_whale: 1.05,
@@ -411,16 +380,12 @@ const mixSeed = (...parts: number[]): number => {
   return seed >>> 0;
 };
 
-const pick = <T,>(items: readonly T[], seed: number): T => {
+const pick = <T>(items: readonly T[], seed: number): T => {
   const index = Math.abs(seed) % items.length;
   return items[index]!;
 };
 
-const pickManyUnique = <T,>(
-  items: readonly T[],
-  count: number,
-  seed: number
-): T[] => {
+const pickManyUnique = <T>(items: readonly T[], count: number, seed: number): T[] => {
   const pool = [...items];
   const output: T[] = [];
   let cursor = seed;
@@ -432,10 +397,7 @@ const pickManyUnique = <T,>(
   return output;
 };
 
-const weightedPick = <T extends string>(
-  weights: Record<T, number>,
-  seed: number
-): T => {
+const weightedPick = <T extends string>(weights: Record<T, number>, seed: number): T => {
   const entries = Object.entries(weights) as Array<[T, number]>;
   const total = entries.reduce((sum, [, weight]) => sum + Math.max(0.0001, weight), 0);
   let target = positiveNoise(seed) * total;
@@ -461,10 +423,7 @@ export const hashSyntheticSymbol = (value: string): number => {
   return hash;
 };
 
-export const buildEmptySyntheticProfileHitCounts = (): Record<
-  SmartMoneyProfileId,
-  number
-> => ({
+export const buildEmptySyntheticProfileHitCounts = (): Record<SmartMoneyProfileId, number> => ({
   institutional_directional: 0,
   retail_whale: 0,
   event_driven: 0,
@@ -487,10 +446,7 @@ export const normalizeSyntheticControlState = (
   return SyntheticControlStateSchema.parse(merged);
 };
 
-const resolvePhaseBias = (
-  phase: SyntheticSessionPhase,
-  regime: SyntheticRegime
-): number => {
+const resolvePhaseBias = (phase: SyntheticSessionPhase, regime: SyntheticRegime): number => {
   if (phase === "open") {
     return regime === "event_ramp" ? 1.08 : 1.02;
   }
@@ -566,10 +522,7 @@ export const getSyntheticSessionState = (
     mixSeed(activitySeed, 211)
   );
   const focus_symbols: string[] = pickManyUnique(
-    [
-      ...event_symbols,
-      ...SYNTHETIC_SYMBOLS.filter((symbol) => !event_symbols.includes(symbol))
-    ],
+    [...event_symbols, ...SYNTHETIC_SYMBOLS.filter((symbol) => !event_symbols.includes(symbol))],
     focusCount,
     mixSeed(activitySeed, 389)
   );
@@ -579,11 +532,7 @@ export const getSyntheticSessionState = (
     session_phase: phase,
     regime,
     volatility_level: roundTo(
-      clamp(
-        stateBase.volatility * amplitude + signedNoise(activitySeed + 3) * 0.08,
-        0.18,
-        1.2
-      )
+      clamp(stateBase.volatility * amplitude + signedNoise(activitySeed + 3) * 0.08, 0.18, 1.2)
     ),
     liquidity_level: roundTo(
       clamp(
@@ -656,9 +605,7 @@ export const getSyntheticUnderlyingState = (
       ? -meanRevertWave * (12 + session.liquidity_level * 10)
       : meanRevertWave * 6;
   const gammaChop =
-    session.regime === "dealer_gamma"
-      ? Math.sin((minuteOfSession + (hash % 11)) / 2.8) * 16
-      : 0;
+    session.regime === "dealer_gamma" ? Math.sin((minuteOfSession + (hash % 11)) / 2.8) * 16 : 0;
   const noiseBps =
     signedNoise(mixSeed(hash, session.seed_bucket, control.shared_seed)) *
     (6 + session.volatility_level * 18);
@@ -731,10 +678,7 @@ export const getSyntheticScenarioWeights = (
   };
 
   for (const profileId of SMART_MONEY_PROFILE_IDS) {
-    weights[profileId] = roundTo(
-      weights[profileId] * normalized.profile_weights[profileId],
-      4
-    );
+    weights[profileId] = roundTo(weights[profileId] * normalized.profile_weights[profileId], 4);
   }
 
   if (isFocus) {
@@ -745,10 +689,7 @@ export const getSyntheticScenarioWeights = (
   }
   if (isEvent) {
     weights.event_driven = roundTo(weights.event_driven * 1.36, 4);
-    weights.institutional_directional = roundTo(
-      weights.institutional_directional * 1.04,
-      4
-    );
+    weights.institutional_directional = roundTo(weights.institutional_directional * 1.04, 4);
     weights.neutral_noise = roundTo(weights.neutral_noise * 0.8, 4);
   }
   if (isPower) {
@@ -765,10 +706,7 @@ export const getSyntheticScenarioWeights = (
 export const getSyntheticCoverageBoost = (
   profileId: SmartMoneyProfileId,
   coverageState: SyntheticCoverageState,
-  control: Pick<
-    SyntheticControlState,
-    "coverage_assist" | "coverage_window_minutes"
-  >
+  control: Pick<SyntheticControlState, "coverage_assist" | "coverage_window_minutes">
 ): number => {
   if (!control.coverage_assist) {
     return 1;

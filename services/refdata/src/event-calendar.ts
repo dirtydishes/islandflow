@@ -1,6 +1,12 @@
 import { mkdir } from "node:fs/promises";
 
-export type EventCalendarKind = "earnings" | "dividend" | "corporate_action" | "m_and_a" | "news" | "other";
+export type EventCalendarKind =
+  | "earnings"
+  | "dividend"
+  | "corporate_action"
+  | "m_and_a"
+  | "news"
+  | "other";
 
 export type EventCalendarEntry = {
   underlying_id: string;
@@ -56,7 +62,8 @@ const asNumber = (value: unknown): number | null => {
   return null;
 };
 
-const asString = (value: unknown): string | null => (typeof value === "string" && value.trim() ? value.trim() : null);
+const asString = (value: unknown): string | null =>
+  typeof value === "string" && value.trim() ? value.trim() : null;
 
 const parseCsvLine = (line: string): string[] => {
   const values: string[] = [];
@@ -139,9 +146,14 @@ export const parseEventCalendarEntries = (value: unknown): EventCalendarEntry[] 
     const record = row as Record<string, unknown>;
     const underlying = asString(record.underlying_id ?? record.underlying ?? record.symbol);
     const eventTs = asNumber(record.event_ts ?? record.event_time ?? record.event_date);
-    const announcedTs = asNumber(record.announced_ts ?? record.available_ts ?? record.as_of_ts ?? record.created_ts) ?? 0;
+    const announcedTs =
+      asNumber(
+        record.announced_ts ?? record.available_ts ?? record.as_of_ts ?? record.created_ts
+      ) ?? 0;
     const rawKind = asString(record.event_kind ?? record.kind ?? record.type) ?? "other";
-    const eventKind = EVENT_KINDS.has(rawKind as EventCalendarKind) ? (rawKind as EventCalendarKind) : "other";
+    const eventKind = EVENT_KINDS.has(rawKind as EventCalendarKind)
+      ? (rawKind as EventCalendarKind)
+      : "other";
 
     if (!underlying || eventTs === null || eventTs < 0 || announcedTs < 0) {
       return [];
@@ -162,7 +174,9 @@ export const parseEventCalendarEntries = (value: unknown): EventCalendarEntry[] 
   });
 };
 
-export const createStaticEventCalendarProvider = (entries: EventCalendarEntry[]): EventCalendarProvider => {
+export const createStaticEventCalendarProvider = (
+  entries: EventCalendarEntry[]
+): EventCalendarProvider => {
   const byUnderlying = new Map<string, EventCalendarEntry[]>();
   for (const entry of entries) {
     const key = normalizeUnderlying(entry.underlying_id);
@@ -184,15 +198,20 @@ export const createStaticEventCalendarProvider = (entries: EventCalendarEntry[])
       }
 
       const bucket = byUnderlying.get(key) ?? [];
-      const entry = bucket.find((candidate) => candidate.announced_ts <= asOfTs && candidate.event_ts >= asOfTs);
+      const entry = bucket.find(
+        (candidate) => candidate.announced_ts <= asOfTs && candidate.event_ts >= asOfTs
+      );
       return entry ? { ...entry, days_to_event: (entry.event_ts - asOfTs) / MS_PER_DAY } : null;
     }
   };
 };
 
-export const createEmptyEventCalendarProvider = (): EventCalendarProvider => createStaticEventCalendarProvider([]);
+export const createEmptyEventCalendarProvider = (): EventCalendarProvider =>
+  createStaticEventCalendarProvider([]);
 
-export const loadEventCalendarProviderFromFile = async (path: string): Promise<EventCalendarProvider> => {
+export const loadEventCalendarProviderFromFile = async (
+  path: string
+): Promise<EventCalendarProvider> => {
   const text = await Bun.file(path).text();
   return createStaticEventCalendarProvider(parseEventCalendarEntries(JSON.parse(text)));
 };
@@ -212,7 +231,9 @@ export const fetchAlphaVantageEarningsCalendar = async (
   const response = await (options.fetchFn ?? fetch)(url);
   const text = await response.text();
   if (!response.ok) {
-    throw new Error(`Alpha Vantage earnings calendar request failed: ${response.status} ${text.slice(0, 160)}`);
+    throw new Error(
+      `Alpha Vantage earnings calendar request failed: ${response.status} ${text.slice(0, 160)}`
+    );
   }
   if (/^(?:\s*\{|\s*Thank you for using Alpha Vantage)/i.test(text)) {
     throw new Error(`Alpha Vantage returned a non-calendar response: ${text.slice(0, 200)}`);
@@ -221,7 +242,10 @@ export const fetchAlphaVantageEarningsCalendar = async (
   return parseAlphaVantageEarningsCalendar(text, options.nowTs ?? Date.now());
 };
 
-export const writeEventCalendarEntries = async (path: string, entries: EventCalendarEntry[]): Promise<void> => {
+export const writeEventCalendarEntries = async (
+  path: string,
+  entries: EventCalendarEntry[]
+): Promise<void> => {
   const directory = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
   if (directory) {
     await mkdir(directory, { recursive: true });

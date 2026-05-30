@@ -85,10 +85,14 @@ const decodePayload = (data: WebSocket.RawData): unknown => {
   }
 
   if (ArrayBuffer.isView(data)) {
-    return JSON.parse(new TextDecoder().decode(new Uint8Array(data.buffer, data.byteOffset, data.byteLength))) as unknown;
+    return JSON.parse(
+      new TextDecoder().decode(new Uint8Array(data.buffer, data.byteOffset, data.byteLength))
+    ) as unknown;
   }
 
-  return JSON.parse(new TextDecoder().decode(new Uint8Array(data as unknown as ArrayBuffer))) as unknown;
+  return JSON.parse(
+    new TextDecoder().decode(new Uint8Array(data as unknown as ArrayBuffer))
+  ) as unknown;
 };
 
 const extractExchangeMeta = (payload: unknown): AlpacaExchangeMetaEntry[] => {
@@ -103,8 +107,18 @@ const extractExchangeMeta = (payload: unknown): AlpacaExchangeMetaEntry[] => {
       continue;
     }
     const candidate = entry as Record<string, unknown>;
-    const code = typeof candidate.code === "string" ? candidate.code : typeof candidate.exchange === "string" ? candidate.exchange : null;
-    const name = typeof candidate.name === "string" ? candidate.name : typeof candidate.description === "string" ? candidate.description : null;
+    const code =
+      typeof candidate.code === "string"
+        ? candidate.code
+        : typeof candidate.exchange === "string"
+          ? candidate.exchange
+          : null;
+    const name =
+      typeof candidate.name === "string"
+        ? candidate.name
+        : typeof candidate.description === "string"
+          ? candidate.description
+          : null;
     if (!code || !name) {
       continue;
     }
@@ -128,9 +142,19 @@ const buildExchangeNameMap = (entries: AlpacaExchangeMetaEntry[]): Map<string, s
   return map;
 };
 
-const OFF_EXCHANGE_HINTS = ["FINRA", "TRF", "ADF", "OTC", "Trade Reporting Facility", "Alternative Display Facility"];
+const OFF_EXCHANGE_HINTS = [
+  "FINRA",
+  "TRF",
+  "ADF",
+  "OTC",
+  "Trade Reporting Facility",
+  "Alternative Display Facility"
+];
 
-export const inferOffExchangeFlag = (exchangeCode: string | undefined, exchangeNameMap: Map<string, string>): boolean => {
+export const inferOffExchangeFlag = (
+  exchangeCode: string | undefined,
+  exchangeNameMap: Map<string, string>
+): boolean => {
   if (!exchangeCode) {
     return false;
   }
@@ -151,7 +175,9 @@ const buildWsUrl = (wsBaseUrl: string, feed: AlpacaEquitiesFeed): string => {
   return `${parsed.origin}/v2/${feed}`;
 };
 
-const fetchExchangeMeta = async (config: AlpacaEquitiesAdapterConfig): Promise<Map<string, string>> => {
+const fetchExchangeMeta = async (
+  config: AlpacaEquitiesAdapterConfig
+): Promise<Map<string, string>> => {
   const url = new URL("/v2/stocks/meta/exchanges", config.restUrl);
 
   try {
@@ -243,7 +269,10 @@ export const createAlpacaEquitiesAdapter = (
             continue;
           }
 
-          const message = entry as (AlpacaTradeMessage | AlpacaQuoteMessage | { T?: string; msg?: string });
+          const message = entry as
+            | AlpacaTradeMessage
+            | AlpacaQuoteMessage
+            | { T?: string; msg?: string };
           const type = message.T;
 
           if (type === "success") {

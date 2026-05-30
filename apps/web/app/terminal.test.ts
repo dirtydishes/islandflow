@@ -311,12 +311,16 @@ describe("live manifest", () => {
   });
 
   it("includes news subscriptions on home and /news", () => {
-    expect(getLiveManifest("/", "SPY", 60000, buildDefaultFlowFilters()).map((subscription) => subscription.channel)).toContain(
-      "news"
-    );
-    expect(getLiveManifest("/news", "SPY", 60000, buildDefaultFlowFilters()).map((subscription) => subscription.channel)).toEqual([
-      "news"
-    ]);
+    expect(
+      getLiveManifest("/", "SPY", 60000, buildDefaultFlowFilters()).map(
+        (subscription) => subscription.channel
+      )
+    ).toContain("news");
+    expect(
+      getLiveManifest("/news", "SPY", 60000, buildDefaultFlowFilters()).map(
+        (subscription) => subscription.channel
+      )
+    ).toEqual(["news"]);
   });
 
   it("scopes /charts subscriptions to chart channels only", () => {
@@ -520,12 +524,36 @@ describe("route feature map", () => {
 
 describe("fixed tape virtualization config", () => {
   it("uses expected fixed row heights and overscan by table", () => {
-    expect(getTapeVirtualConfig("options")).toEqual({ rowHeight: 36, overscan: 44, debugLabel: "options" });
-    expect(getTapeVirtualConfig("equities")).toEqual({ rowHeight: 36, overscan: 36, debugLabel: "equities" });
-    expect(getTapeVirtualConfig("flow")).toEqual({ rowHeight: 44, overscan: 24, debugLabel: "flow" });
-    expect(getTapeVirtualConfig("alerts")).toEqual({ rowHeight: 44, overscan: 24, debugLabel: "alerts" });
-    expect(getTapeVirtualConfig("classifier")).toEqual({ rowHeight: 44, overscan: 24, debugLabel: "classifier" });
-    expect(getTapeVirtualConfig("dark")).toEqual({ rowHeight: 44, overscan: 24, debugLabel: "dark" });
+    expect(getTapeVirtualConfig("options")).toEqual({
+      rowHeight: 36,
+      overscan: 44,
+      debugLabel: "options"
+    });
+    expect(getTapeVirtualConfig("equities")).toEqual({
+      rowHeight: 36,
+      overscan: 36,
+      debugLabel: "equities"
+    });
+    expect(getTapeVirtualConfig("flow")).toEqual({
+      rowHeight: 44,
+      overscan: 24,
+      debugLabel: "flow"
+    });
+    expect(getTapeVirtualConfig("alerts")).toEqual({
+      rowHeight: 44,
+      overscan: 24,
+      debugLabel: "alerts"
+    });
+    expect(getTapeVirtualConfig("classifier")).toEqual({
+      rowHeight: 44,
+      overscan: 24,
+      debugLabel: "classifier"
+    });
+    expect(getTapeVirtualConfig("dark")).toEqual({
+      rowHeight: 44,
+      overscan: 24,
+      debugLabel: "dark"
+    });
   });
 });
 
@@ -712,7 +740,11 @@ describe("live tape history helpers", () => {
   });
 
   it("promotes hot-window overflow into the history tail", () => {
-    const currentHot = [makeItem("hot-3", 3, 300), makeItem("hot-2", 2, 200), makeItem("hot-1", 1, 100)];
+    const currentHot = [
+      makeItem("hot-3", 3, 300),
+      makeItem("hot-2", 2, 200),
+      makeItem("hot-1", 1, 100)
+    ];
     const incoming = [makeItem("hot-4", 4, 400)];
 
     const { kept, evicted } = mergeNewestWithOverflow(incoming, currentHot, 3);
@@ -727,7 +759,11 @@ describe("live tape history helpers", () => {
     let history: Array<ReturnType<typeof makeItem>> = [];
 
     for (let seq = 1; seq <= 5; seq += 1) {
-      const { kept, evicted } = mergeNewestWithOverflow([makeItem(`row-${seq}`, seq, seq * 100)], hot, 2);
+      const { kept, evicted } = mergeNewestWithOverflow(
+        [makeItem(`row-${seq}`, seq, seq * 100)],
+        hot,
+        2
+      );
       hot = kept;
       history = appendHistoryTail(history, evicted, hot, 5000);
     }
@@ -762,13 +798,24 @@ describe("live tape history helpers", () => {
   });
 
   it("dedupes the seam between promoted overflow and fetched history", () => {
-    const currentHot = [makeItem("hot-3", 3, 300), makeItem("hot-2", 2, 200), makeItem("hot-1", 1, 100)];
+    const currentHot = [
+      makeItem("hot-3", 3, 300),
+      makeItem("hot-2", 2, 200),
+      makeItem("hot-1", 1, 100)
+    ];
     const { kept, evicted } = mergeNewestWithOverflow([makeItem("hot-4", 4, 400)], currentHot, 3);
     const promoted = appendHistoryTail([], evicted, kept, 5000);
-    const merged = appendHistoryTail(promoted, [makeItem("hot-1", 1, 100), makeItem("older", 0, 50)], kept, 5000);
+    const merged = appendHistoryTail(
+      promoted,
+      [makeItem("hot-1", 1, 100), makeItem("older", 0, 50)],
+      kept,
+      5000
+    );
 
     expect(merged.map((item) => item.trace_id)).toEqual(["hot-1", "older"]);
-    expect(new Set([...kept, ...merged].map((item) => item.trace_id)).size).toBe(kept.length + merged.length);
+    expect(new Set([...kept, ...merged].map((item) => item.trace_id)).size).toBe(
+      kept.length + merged.length
+    );
   });
 
   it("trims the history tail to the soft cap", () => {
@@ -821,10 +868,9 @@ describe("live tape history helpers", () => {
       makeItem("hist-2", 2, 200)
     ];
 
-    expect(mergeHeldTapeHistory(displayed, incoming, frozenLive).map((item) => item.trace_id)).toEqual([
-      "hist-3",
-      "hist-2"
-    ]);
+    expect(
+      mergeHeldTapeHistory(displayed, incoming, frozenLive).map((item) => item.trace_id)
+    ).toEqual(["hist-3", "hist-2"]);
   });
 
   it("appends truly older lazy-loaded rows to the held history tail", () => {
@@ -837,12 +883,9 @@ describe("live tape history helpers", () => {
       makeItem("older-0", 0, 50)
     ];
 
-    expect(mergeHeldTapeHistory(displayed, incoming, frozenLive).map((item) => item.trace_id)).toEqual([
-      "hist-3",
-      "hist-2",
-      "older-1",
-      "older-0"
-    ]);
+    expect(
+      mergeHeldTapeHistory(displayed, incoming, frozenLive).map((item) => item.trace_id)
+    ).toEqual(["hist-3", "hist-2", "older-1", "older-0"]);
   });
 
   it("resyncs buffered live history by replacing the held segment after resume", () => {
@@ -855,7 +898,12 @@ describe("live tape history helpers", () => {
     const resynced = appendHistoryTail([], [makeItem("overflow-newer", 6, 600), ...held], [], 0);
 
     expect(held.map((item) => item.trace_id)).toEqual(["hist-3", "hist-2", "older-1"]);
-    expect(resynced.map((item) => item.trace_id)).toEqual(["overflow-newer", "hist-3", "hist-2", "older-1"]);
+    expect(resynced.map((item) => item.trace_id)).toEqual([
+      "overflow-newer",
+      "hist-3",
+      "hist-2",
+      "older-1"
+    ]);
   });
 });
 
@@ -935,9 +983,21 @@ describe("classifier row decoration helpers", () => {
 
   it("selects primary hits by confidence, source timestamp, then seq", () => {
     const hit = selectPrimaryClassifierHit([
-      { ...makeAlert({ classifier_id: "old", confidence: 0.9, source_ts: 1_000, seq: 1 }), direction: "bullish", explanations: [] },
-      { ...makeAlert({ classifier_id: "new", confidence: 0.9, source_ts: 2_000, seq: 1 }), direction: "bullish", explanations: [] },
-      { ...makeAlert({ classifier_id: "low", confidence: 0.5, source_ts: 3_000, seq: 9 }), direction: "bullish", explanations: [] }
+      {
+        ...makeAlert({ classifier_id: "old", confidence: 0.9, source_ts: 1_000, seq: 1 }),
+        direction: "bullish",
+        explanations: []
+      },
+      {
+        ...makeAlert({ classifier_id: "new", confidence: 0.9, source_ts: 2_000, seq: 1 }),
+        direction: "bullish",
+        explanations: []
+      },
+      {
+        ...makeAlert({ classifier_id: "low", confidence: 0.5, source_ts: 3_000, seq: 9 }),
+        direction: "bullish",
+        explanations: []
+      }
     ]);
 
     expect(hit?.classifier_id).toBe("new");
@@ -1010,9 +1070,9 @@ describe("signals helpers", () => {
       )
     ).toBe("bearish");
 
-    expect(deriveAlertDirection(makeAlert({ hits: [{ direction: "weird", confidence: 0.4 }] }))).toBe(
-      "neutral"
-    );
+    expect(
+      deriveAlertDirection(makeAlert({ hits: [{ direction: "weird", confidence: 0.4 }] }))
+    ).toBe("neutral");
     expect(deriveAlertDirection(makeAlert({ hits: [] }))).toBe("neutral");
   });
 

@@ -18,37 +18,103 @@ export const OptionPrintSchema = EventMetaSchema.merge(
     size: z.number().int().positive(),
     exchange: z.string().min(1),
     conditions: z.array(z.string().min(1)).optional(),
-    underlying_id: z.preprocess((value) => (value === null ? undefined : value), z.string().min(1).optional()),
-    option_type: z.preprocess((value) => (value === null ? undefined : value), OptionTypeSchema.optional()),
-    notional: z.preprocess((value) => (value === null ? undefined : value), z.number().nonnegative().optional()),
-    nbbo_side: z.preprocess((value) => (value === null ? undefined : value), OptionNbboSideSchema.optional()),
-    execution_nbbo_bid: z.preprocess((value) => (value === null ? undefined : value), z.number().optional()),
-    execution_nbbo_ask: z.preprocess((value) => (value === null ? undefined : value), z.number().optional()),
-    execution_nbbo_mid: z.preprocess((value) => (value === null ? undefined : value), z.number().optional()),
-    execution_nbbo_spread: z.preprocess((value) => (value === null ? undefined : value), z.number().optional()),
-    execution_nbbo_bid_size: z.preprocess((value) => (value === null ? undefined : value), z.number().int().nonnegative().optional()),
-    execution_nbbo_ask_size: z.preprocess((value) => (value === null ? undefined : value), z.number().int().nonnegative().optional()),
-    execution_nbbo_ts: z.preprocess((value) => (value === null ? undefined : value), z.number().int().nonnegative().optional()),
-    execution_nbbo_age_ms: z.preprocess((value) => (value === null ? undefined : value), z.number().nonnegative().optional()),
-    execution_nbbo_side: z.preprocess((value) => (value === null ? undefined : value), OptionNbboSideSchema.optional()),
-    execution_underlying_spot: z.preprocess((value) => (value === null ? undefined : value), z.number().optional()),
-    execution_underlying_bid: z.preprocess((value) => (value === null ? undefined : value), z.number().optional()),
-    execution_underlying_ask: z.preprocess((value) => (value === null ? undefined : value), z.number().optional()),
-    execution_underlying_mid: z.preprocess((value) => (value === null ? undefined : value), z.number().optional()),
-    execution_underlying_spread: z.preprocess((value) => (value === null ? undefined : value), z.number().optional()),
-    execution_underlying_ts: z.preprocess((value) => (value === null ? undefined : value), z.number().int().nonnegative().optional()),
-    execution_underlying_age_ms: z.preprocess((value) => (value === null ? undefined : value), z.number().nonnegative().optional()),
+    underlying_id: z.preprocess(
+      (value) => (value === null ? undefined : value),
+      z.string().min(1).optional()
+    ),
+    option_type: z.preprocess(
+      (value) => (value === null ? undefined : value),
+      OptionTypeSchema.optional()
+    ),
+    notional: z.preprocess(
+      (value) => (value === null ? undefined : value),
+      z.number().nonnegative().optional()
+    ),
+    nbbo_side: z.preprocess(
+      (value) => (value === null ? undefined : value),
+      OptionNbboSideSchema.optional()
+    ),
+    execution_nbbo_bid: z.preprocess(
+      (value) => (value === null ? undefined : value),
+      z.number().optional()
+    ),
+    execution_nbbo_ask: z.preprocess(
+      (value) => (value === null ? undefined : value),
+      z.number().optional()
+    ),
+    execution_nbbo_mid: z.preprocess(
+      (value) => (value === null ? undefined : value),
+      z.number().optional()
+    ),
+    execution_nbbo_spread: z.preprocess(
+      (value) => (value === null ? undefined : value),
+      z.number().optional()
+    ),
+    execution_nbbo_bid_size: z.preprocess(
+      (value) => (value === null ? undefined : value),
+      z.number().int().nonnegative().optional()
+    ),
+    execution_nbbo_ask_size: z.preprocess(
+      (value) => (value === null ? undefined : value),
+      z.number().int().nonnegative().optional()
+    ),
+    execution_nbbo_ts: z.preprocess(
+      (value) => (value === null ? undefined : value),
+      z.number().int().nonnegative().optional()
+    ),
+    execution_nbbo_age_ms: z.preprocess(
+      (value) => (value === null ? undefined : value),
+      z.number().nonnegative().optional()
+    ),
+    execution_nbbo_side: z.preprocess(
+      (value) => (value === null ? undefined : value),
+      OptionNbboSideSchema.optional()
+    ),
+    execution_underlying_spot: z.preprocess(
+      (value) => (value === null ? undefined : value),
+      z.number().optional()
+    ),
+    execution_underlying_bid: z.preprocess(
+      (value) => (value === null ? undefined : value),
+      z.number().optional()
+    ),
+    execution_underlying_ask: z.preprocess(
+      (value) => (value === null ? undefined : value),
+      z.number().optional()
+    ),
+    execution_underlying_mid: z.preprocess(
+      (value) => (value === null ? undefined : value),
+      z.number().optional()
+    ),
+    execution_underlying_spread: z.preprocess(
+      (value) => (value === null ? undefined : value),
+      z.number().optional()
+    ),
+    execution_underlying_ts: z.preprocess(
+      (value) => (value === null ? undefined : value),
+      z.number().int().nonnegative().optional()
+    ),
+    execution_underlying_age_ms: z.preprocess(
+      (value) => (value === null ? undefined : value),
+      z.number().nonnegative().optional()
+    ),
     execution_underlying_source: z.preprocess(
       (value) => (value === null ? undefined : value),
       z.literal("equity_quote_mid").optional()
     ),
-    execution_iv: z.preprocess((value) => (value === null ? undefined : value), z.number().nonnegative().optional()),
+    execution_iv: z.preprocess(
+      (value) => (value === null ? undefined : value),
+      z.number().nonnegative().optional()
+    ),
     execution_iv_source: z.preprocess(
       (value) => (value === null ? undefined : value),
       z.enum(["provider", "synthetic_pressure_model"]).optional()
     ),
     is_etf: z.preprocess((value) => (value === null ? undefined : value), z.boolean().optional()),
-    signal_pass: z.preprocess((value) => (value === null ? undefined : value), z.boolean().optional()),
+    signal_pass: z.preprocess(
+      (value) => (value === null ? undefined : value),
+      z.boolean().optional()
+    ),
     signal_reasons: z.array(z.string().min(1)).optional(),
     signal_profile: z.preprocess(
       (value) => (value === null ? undefined : value),
@@ -146,7 +212,13 @@ export const SmartMoneyProfileIdSchema = z.enum([
 
 export type SmartMoneyProfileId = z.infer<typeof SmartMoneyProfileIdSchema>;
 
-export const SmartMoneyDirectionSchema = z.enum(["bullish", "bearish", "neutral", "mixed", "unknown"]);
+export const SmartMoneyDirectionSchema = z.enum([
+  "bullish",
+  "bearish",
+  "neutral",
+  "mixed",
+  "unknown"
+]);
 
 export type SmartMoneyDirection = z.infer<typeof SmartMoneyDirectionSchema>;
 

@@ -15,14 +15,10 @@ type AlpacaCredentialEnv = {
 
 const normalize = (value: string | undefined): string => value?.trim() ?? "";
 
-export const resolveAlpacaCredentials = (
-  env: AlpacaCredentialEnv
-): AlpacaCredentials => {
+export const resolveAlpacaCredentials = (env: AlpacaCredentialEnv): AlpacaCredentials => {
   const legacyToken = normalize(env.ALPACA_API_KEY);
-  const explicitKeyId =
-    normalize(env.ALPACA_API_KEY_ID) || normalize(env.ALPACA_KEY_ID);
-  const secret =
-    normalize(env.ALPACA_API_SECRET_KEY) || normalize(env.ALPACA_SECRET_KEY);
+  const explicitKeyId = normalize(env.ALPACA_API_KEY_ID) || normalize(env.ALPACA_KEY_ID);
+  const secret = normalize(env.ALPACA_API_SECRET_KEY) || normalize(env.ALPACA_SECRET_KEY);
   const keyId = explicitKeyId || legacyToken;
   const usesLegacyBearer = !explicitKeyId && !secret && legacyToken.length > 0;
 
@@ -42,9 +38,7 @@ export const hasAlpacaCredentials = (credentials: AlpacaCredentials): boolean =>
   return credentials.keyId.length > 0 && credentials.secret.length > 0;
 };
 
-export const buildAlpacaAuthHeaders = (
-  credentials: AlpacaCredentials
-): Record<string, string> => {
+export const buildAlpacaAuthHeaders = (credentials: AlpacaCredentials): Record<string, string> => {
   if (credentials.usesLegacyBearer) {
     return {
       Authorization: `Bearer ${credentials.legacyToken}`

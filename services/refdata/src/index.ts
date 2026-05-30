@@ -12,9 +12,14 @@ const logger = createLogger({ service });
 
 logger.info("service starting");
 
-const eventCalendarPath = process.env.REFDATA_EVENT_CALENDAR_PATH ?? process.env.SMART_MONEY_EVENT_CALENDAR_PATH;
-const eventCalendarProvider = process.env.REFDATA_EVENT_CALENDAR_PROVIDER ?? process.env.EVENT_CALENDAR_PROVIDER;
-const refreshMs = Math.max(0, Number(process.env.REFDATA_EVENT_CALENDAR_REFRESH_MS ?? 86_400_000) || 0);
+const eventCalendarPath =
+  process.env.REFDATA_EVENT_CALENDAR_PATH ?? process.env.SMART_MONEY_EVENT_CALENDAR_PATH;
+const eventCalendarProvider =
+  process.env.REFDATA_EVENT_CALENDAR_PROVIDER ?? process.env.EVENT_CALENDAR_PROVIDER;
+const refreshMs = Math.max(
+  0,
+  Number(process.env.REFDATA_EVENT_CALENDAR_REFRESH_MS ?? 86_400_000) || 0
+);
 
 const getAlphaVantageOptions = (): AlphaVantageEarningsCalendarOptions | null => {
   const apiKey = process.env.ALPHA_VANTAGE_API_KEY;
@@ -33,7 +38,9 @@ const getAlphaVantageOptions = (): AlphaVantageEarningsCalendarOptions | null =>
 
 const refreshEventCalendar = async (): Promise<void> => {
   if (!eventCalendarPath) {
-    logger.warn("event calendar refresh disabled; missing SMART_MONEY_EVENT_CALENDAR_PATH or REFDATA_EVENT_CALENDAR_PATH");
+    logger.warn(
+      "event calendar refresh disabled; missing SMART_MONEY_EVENT_CALENDAR_PATH or REFDATA_EVENT_CALENDAR_PATH"
+    );
     return;
   }
   if (eventCalendarProvider !== "alpha_vantage") {

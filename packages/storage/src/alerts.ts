@@ -99,7 +99,9 @@ const safeProfileScoreArray = (value: string): SmartMoneyProfileScore[] => {
         return {
           profile_id: String(record.profile_id ?? "") as SmartMoneyProfileScore["profile_id"],
           probability: Number(record.probability ?? 0),
-          confidence_band: String(record.confidence_band ?? "low") as SmartMoneyProfileScore["confidence_band"],
+          confidence_band: String(
+            record.confidence_band ?? "low"
+          ) as SmartMoneyProfileScore["confidence_band"],
           direction: String(record.direction ?? "unknown") as SmartMoneyProfileScore["direction"],
           reasons: Array.isArray(record.reasons) ? record.reasons.map((item) => String(item)) : []
         };
@@ -122,7 +124,9 @@ export const fromAlertRecord = (record: AlertRecord): AlertEvent => {
     severity: record.severity,
     hits: safeHitArray(record.hits_json),
     evidence_refs: safeStringArray(record.evidence_refs_json),
-    ...(record.primary_profile_id ? { primary_profile_id: record.primary_profile_id as AlertEvent["primary_profile_id"] } : {}),
+    ...(record.primary_profile_id
+      ? { primary_profile_id: record.primary_profile_id as AlertEvent["primary_profile_id"] }
+      : {}),
     profile_scores: safeProfileScoreArray(record.profile_scores_json)
   };
 };

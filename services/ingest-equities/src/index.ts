@@ -240,10 +240,7 @@ const run = async () => {
     await ensureEquityQuotesTable(clickhouse);
   });
 
-  const adapter = selectAdapter(
-    env.EQUITIES_INGEST_ADAPTER,
-    () => syntheticControl
-  );
+  const adapter = selectAdapter(env.EQUITIES_INGEST_ADAPTER, () => syntheticControl);
   logger.info("ingest adapter selected", { adapter: adapter.name });
   const allowPublish = buildThrottle(env.TESTING_MODE, env.TESTING_THROTTLE_MS);
   const allowQuotePublish = buildThrottle(env.TESTING_MODE, env.TESTING_THROTTLE_MS);

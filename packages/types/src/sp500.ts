@@ -501,7 +501,7 @@ export const SP500_SYMBOLS = [
   "YUM",
   "ZBRA",
   "ZBH",
-  "ZTS",
+  "ZTS"
 ] as const;
 
-export type Sp500Symbol = typeof SP500_SYMBOLS[number];
+export type Sp500Symbol = (typeof SP500_SYMBOLS)[number];

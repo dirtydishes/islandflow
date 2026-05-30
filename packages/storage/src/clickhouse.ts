@@ -35,16 +35,8 @@ import {
   OPTION_PRINTS_TABLE
 } from "./option-prints";
 import { normalizeOptionNBBO, optionNBBOTableDDL, OPTION_NBBO_TABLE } from "./option-nbbo";
-import {
-  equityPrintsTableDDL,
-  EQUITY_PRINTS_TABLE,
-  normalizeEquityPrint
-} from "./equity-prints";
-import {
-  equityQuotesTableDDL,
-  EQUITY_QUOTES_TABLE,
-  normalizeEquityQuote
-} from "./equity-quotes";
+import { equityPrintsTableDDL, EQUITY_PRINTS_TABLE, normalizeEquityPrint } from "./equity-prints";
+import { equityQuotesTableDDL, EQUITY_QUOTES_TABLE, normalizeEquityQuote } from "./equity-quotes";
 import {
   equityCandlesTableDDL,
   EQUITY_CANDLES_TABLE,
@@ -93,13 +85,7 @@ import {
   toSmartMoneyEventRecord,
   type SmartMoneyEventRecord
 } from "./smart-money-events";
-import {
-  NEWS_TABLE,
-  newsTableDDL,
-  fromNewsRecord,
-  toNewsRecord,
-  type NewsRecord
-} from "./news";
+import { NEWS_TABLE, newsTableDDL, fromNewsRecord, toNewsRecord, type NewsRecord } from "./news";
 
 export type ClickHouseOptions = {
   url: string;
@@ -116,7 +102,11 @@ type ClickHouseQueryResult = {
 
 export type ClickHouseClient = {
   exec(params: { query: string }): Promise<void>;
-  insert(params: { table: string; values: unknown[]; format: ClickHouseQueryFormat }): Promise<void>;
+  insert(params: {
+    table: string;
+    values: unknown[];
+    format: ClickHouseQueryFormat;
+  }): Promise<void>;
   query(params: { query: string; format: ClickHouseQueryFormat }): Promise<ClickHouseQueryResult>;
   ping(): Promise<{ success: boolean; error?: Error }>;
   close(): Promise<void>;
@@ -140,7 +130,9 @@ const buildHeaders = (options: ClickHouseOptions, hasBody: boolean): Headers => 
   }
 
   if (options.username || options.password) {
-    const auth = Buffer.from(`${options.username ?? "default"}:${options.password ?? ""}`).toString("base64");
+    const auth = Buffer.from(`${options.username ?? "default"}:${options.password ?? ""}`).toString(
+      "base64"
+    );
     headers.set("authorization", `Basic ${auth}`);
   }
 
@@ -217,7 +209,8 @@ export const createClickHouseClient = (options: ClickHouseOptions): ClickHouseCl
         });
 
         if (!response.ok) {
-          const message = (await response.text()).trim() || `${response.status} ${response.statusText}`;
+          const message =
+            (await response.text()).trim() || `${response.status} ${response.statusText}`;
           return { success: false, error: new Error(message) };
         }
 
@@ -237,9 +230,7 @@ export const createClickHouseClient = (options: ClickHouseOptions): ClickHouseCl
   };
 };
 
-export const ensureOptionPrintsTable = async (
-  client: ClickHouseClient
-): Promise<void> => {
+export const ensureOptionPrintsTable = async (client: ClickHouseClient): Promise<void> => {
   await client.exec({
     query: optionPrintsTableDDL()
   });
@@ -248,73 +239,55 @@ export const ensureOptionPrintsTable = async (
   }
 };
 
-export const ensureOptionNBBOTable = async (
-  client: ClickHouseClient
-): Promise<void> => {
+export const ensureOptionNBBOTable = async (client: ClickHouseClient): Promise<void> => {
   await client.exec({
     query: optionNBBOTableDDL()
   });
 };
 
-export const ensureEquityPrintsTable = async (
-  client: ClickHouseClient
-): Promise<void> => {
+export const ensureEquityPrintsTable = async (client: ClickHouseClient): Promise<void> => {
   await client.exec({
     query: equityPrintsTableDDL()
   });
 };
 
-export const ensureEquityQuotesTable = async (
-  client: ClickHouseClient
-): Promise<void> => {
+export const ensureEquityQuotesTable = async (client: ClickHouseClient): Promise<void> => {
   await client.exec({
     query: equityQuotesTableDDL()
   });
 };
 
-export const ensureEquityCandlesTable = async (
-  client: ClickHouseClient
-): Promise<void> => {
+export const ensureEquityCandlesTable = async (client: ClickHouseClient): Promise<void> => {
   await client.exec({
     query: equityCandlesTableDDL()
   });
 };
 
-export const ensureEquityPrintJoinsTable = async (
-  client: ClickHouseClient
-): Promise<void> => {
+export const ensureEquityPrintJoinsTable = async (client: ClickHouseClient): Promise<void> => {
   await client.exec({
     query: equityPrintJoinsTableDDL()
   });
 };
 
-export const ensureInferredDarkTable = async (
-  client: ClickHouseClient
-): Promise<void> => {
+export const ensureInferredDarkTable = async (client: ClickHouseClient): Promise<void> => {
   await client.exec({
     query: inferredDarkTableDDL()
   });
 };
 
-export const ensureFlowPacketsTable = async (
-  client: ClickHouseClient
-): Promise<void> => {
+export const ensureFlowPacketsTable = async (client: ClickHouseClient): Promise<void> => {
   await client.exec({
     query: flowPacketsTableDDL()
   });
 };
 
-export const ensureSmartMoneyEventsTable = async (
-  client: ClickHouseClient
-): Promise<void> => {
+export const ensureSmartMoneyEventsTable = async (client: ClickHouseClient): Promise<void> => {
   await client.exec({
     query: smartMoneyEventsTableDDL()
   });
 };
 
-export const ensureClassifierHitsTable = async (
-  client: ClickHouseClient
-): Promise<void> => {
+export const ensureClassifierHitsTable = async (client: ClickHouseClient): Promise<void> => {
   await client.exec({
     query: classifierHitsTableDDL()
   });
@@ -464,7 +437,10 @@ export const insertAlert = async (client: ClickHouseClient, alert: AlertEvent): 
   });
 };
 
-export const insertNewsStory = async (client: ClickHouseClient, story: NewsStory): Promise<void> => {
+export const insertNewsStory = async (
+  client: ClickHouseClient,
+  story: NewsStory
+): Promise<void> => {
   const record = toNewsRecord(story);
   await client.insert({
     table: NEWS_TABLE,
@@ -617,17 +593,11 @@ export const enqueueClassifierHitInsert = (
   writer.enqueue(CLASSIFIER_HITS_TABLE, toClassifierHitRecord(hit));
 };
 
-export const enqueueAlertInsert = (
-  writer: ClickHouseBatchWriter,
-  alert: AlertEvent
-): void => {
+export const enqueueAlertInsert = (writer: ClickHouseBatchWriter, alert: AlertEvent): void => {
   writer.enqueue(ALERTS_TABLE, toAlertRecord(alert));
 };
 
-export const enqueueNewsStoryInsert = (
-  writer: ClickHouseBatchWriter,
-  story: NewsStory
-): void => {
+export const enqueueNewsStoryInsert = (writer: ClickHouseBatchWriter, story: NewsStory): void => {
   writer.enqueue(NEWS_TABLE, toNewsRecord(story));
 };
 
@@ -973,9 +943,7 @@ const normalizeFlowPacketRow = (row: unknown): FlowPacketRecord | null => {
     seq: coerceNumber(record.seq) as number,
     trace_id: String(record.trace_id ?? ""),
     id: String(record.id ?? ""),
-    members: Array.isArray(record.members)
-      ? record.members.map((value) => String(value))
-      : [],
+    members: Array.isArray(record.members) ? record.members.map((value) => String(value)) : [],
     features_json: String(record.features_json ?? "{}"),
     join_quality_json: String(record.join_quality_json ?? "{}")
   };
@@ -1011,7 +979,9 @@ const normalizeSmartMoneyEventRow = (row: unknown): SmartMoneyEventRecord | null
     seq: coerceNumber(record.seq) as number,
     trace_id: String(record.trace_id ?? ""),
     event_id: String(record.event_id ?? ""),
-    packet_ids: Array.isArray(record.packet_ids) ? record.packet_ids.map((value) => String(value)) : [],
+    packet_ids: Array.isArray(record.packet_ids)
+      ? record.packet_ids.map((value) => String(value))
+      : [],
     member_print_ids: Array.isArray(record.member_print_ids)
       ? record.member_print_ids.map((value) => String(value))
       : [],
@@ -1390,8 +1360,12 @@ export const fetchAlertContextByTraceId = async (
   const packetIds = new Set(flowPackets.flatMap((packet) => [packet.id, packet.trace_id]));
   const printIds = new Set(optionPrints.map((print) => print.trace_id));
   const missingRefs = refs.filter((ref) => {
-    const packetResolved = flowPacketCandidatesFromRef(ref).some((candidate) => packetIds.has(candidate));
-    const printResolved = optionPrintCandidatesFromRef(ref).some((candidate) => printIds.has(candidate));
+    const packetResolved = flowPacketCandidatesFromRef(ref).some((candidate) =>
+      packetIds.has(candidate)
+    );
+    const printResolved = optionPrintCandidatesFromRef(ref).some((candidate) =>
+      printIds.has(candidate)
+    );
     return !packetResolved && !printResolved;
   });
 

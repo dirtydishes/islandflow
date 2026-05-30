@@ -9,11 +9,8 @@ export async function GET(): Promise<Response> {
 }
 
 export async function PUT(req: Request): Promise<Response> {
-  return proxySyntheticAdminRequest(
-    "/admin/synthetic/control",
-    {
-      method: "PUT",
-      body: await req.text()
-    }
-  );
+  return proxySyntheticAdminRequest("/admin/synthetic/control", {
+    method: "PUT",
+    body: await req.text()
+  });
 }
