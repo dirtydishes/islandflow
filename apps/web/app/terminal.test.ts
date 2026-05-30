@@ -9,6 +9,14 @@ mock.module("next/navigation", () => ({
   redirect,
   usePathname: () => "/options"
 }));
+mock.module("next/navigation.js", () => ({
+  default: {
+    redirect,
+    usePathname: () => "/options"
+  },
+  redirect,
+  usePathname: () => "/options"
+}));
 
 const {
   NAV_ITEMS,
