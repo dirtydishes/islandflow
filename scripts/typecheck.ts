@@ -33,12 +33,13 @@ if (tsconfigs.length === 0) {
 }
 
 let failed = false;
+const bunExecutable = process.execPath;
 
 for (const tsconfig of tsconfigs) {
   const label = relative(process.cwd(), tsconfig);
   console.log(`\nTypechecking ${label}`);
 
-  const result = Bun.spawnSync(["bunx", "tsc", "-p", tsconfig, "--noEmit", "--incremental", "false", "--pretty", "false"], {
+  const result = Bun.spawnSync([bunExecutable, "x", "tsc", "-p", tsconfig, "--noEmit", "--incremental", "false", "--pretty", "false"], {
     stdout: "inherit",
     stderr: "inherit"
   });
