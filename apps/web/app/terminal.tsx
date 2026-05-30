@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import * as nextNavigation from "next/navigation";
 import {
   createContext,
   memo,
@@ -5377,7 +5377,7 @@ export const parseTickerFilterInput = (value: string): string[] => {
 };
 
 const useTerminalState = () => {
-  const pathname = usePathname();
+  const pathname = nextNavigation.usePathname();
   const routeFeatures = useMemo(() => getRouteFeatures(pathname), [pathname]);
   const [mode, setMode] = useState<TapeMode>("live");
   const [replaySource, setReplaySource] = useState<string | null>(null);
@@ -7228,7 +7228,7 @@ const FlowFilterSection = ({
 };
 
 export const FlowFilterPopover = ({ filters, onChange }: FlowFilterPopoverProps) => {
-  const pathname = usePathname();
+  const pathname = nextNavigation.usePathname();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const activeCount = countActiveFlowFilterGroups(filters);
@@ -9098,7 +9098,7 @@ function SyntheticControlDock() {
 
 export function TerminalAppShell({ children }: { children: ReactNode }) {
   const state = useTerminalState();
-  const pathname = usePathname();
+  const pathname = nextNavigation.usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const tickerFieldId = useId();
   const tickerHintId = useId();
