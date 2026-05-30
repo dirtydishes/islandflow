@@ -5,17 +5,29 @@ const redirect = mock((path: string) => {
   throw new Error(`NEXT_REDIRECT:${path}`);
 });
 
-mock.module("next/navigation", () => ({
-  redirect,
-  usePathname: () => "/options"
-}));
-mock.module("next/navigation.js", () => ({
+const nextNavigationMock = {
   default: {
     redirect,
     usePathname: () => "/options"
   },
   redirect,
   usePathname: () => "/options"
+};
+
+const nextNavigationResolved = import.meta.resolve("next/navigation");
+const nextNavigationJsResolved = import.meta.resolve("next/navigation.js");
+
+mock.module("next/navigation", () => ({
+  ...nextNavigationMock
+}));
+mock.module("next/navigation.js", () => ({
+  ...nextNavigationMock
+}));
+mock.module(nextNavigationResolved, () => ({
+  ...nextNavigationMock
+}));
+mock.module(nextNavigationJsResolved, () => ({
+  ...nextNavigationMock
 }));
 
 const {
