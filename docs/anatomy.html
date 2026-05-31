@@ -1,0 +1,893 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Islandflow Anatomy: Print to Alert</title>
+    <style>
+      :root {
+        --bg: #06080b;
+        --bg-2: #091018;
+        --panel: #101820;
+        --panel-2: #0d141b;
+        --line: #22303d;
+        --line-strong: #3b4d5f;
+        --text: #e6edf4;
+        --muted: #9aa8b8;
+        --faint: #718093;
+        --amber: #f5a623;
+        --amber-soft: rgba(245, 166, 35, 0.14);
+        --blue: #4da3ff;
+        --blue-soft: rgba(77, 163, 255, 0.14);
+        --green: #25c17a;
+        --green-soft: rgba(37, 193, 122, 0.14);
+        --red: #ff6b5f;
+        --red-soft: rgba(255, 107, 95, 0.14);
+        --violet: #b58cff;
+        --violet-soft: rgba(181, 140, 255, 0.13);
+        --shadow: rgba(0, 0, 0, 0.36);
+        color-scheme: dark;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at 15% 0%, rgba(77, 163, 255, 0.1), transparent 31rem),
+          radial-gradient(circle at 85% 4%, rgba(245, 166, 35, 0.1), transparent 28rem),
+          linear-gradient(180deg, var(--bg), #05070a 52%, #070a0e);
+        color: var(--text);
+        font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+        line-height: 1.55;
+      }
+
+      a {
+        color: var(--blue);
+      }
+
+      code,
+      pre,
+      .mono,
+      .chip,
+      .nav a,
+      .diagram text,
+      .table-label {
+        font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+      }
+
+      main {
+        width: min(1180px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 28px 0 64px;
+      }
+
+      .hero {
+        min-height: 76vh;
+        display: grid;
+        align-content: center;
+        gap: 28px;
+        padding: 40px 0 24px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .eyebrow {
+        margin: 0;
+        color: var(--amber);
+        font: 700 0.78rem/1.2 "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        text-wrap: balance;
+      }
+
+      h1 {
+        max-width: 12ch;
+        font-size: clamp(3.1rem, 8vw, 5.8rem);
+        line-height: 0.96;
+        letter-spacing: -0.03em;
+      }
+
+      h2 {
+        font-size: clamp(1.7rem, 3vw, 2.55rem);
+        line-height: 1.08;
+        letter-spacing: -0.02em;
+      }
+
+      h3 {
+        font-size: 1.06rem;
+        line-height: 1.25;
+      }
+
+      p {
+        margin: 0;
+        color: var(--muted);
+        max-width: 72ch;
+      }
+
+      .lede {
+        color: #c7d1dd;
+        font-size: clamp(1rem, 1.5vw, 1.18rem);
+        max-width: 72ch;
+      }
+
+      .hero-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 0.9fr) minmax(360px, 1.1fr);
+        gap: 32px;
+        align-items: end;
+      }
+
+      .nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 6px;
+      }
+
+      .nav a,
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 32px;
+        padding: 7px 10px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.035);
+        color: var(--text);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-decoration: none;
+        text-transform: uppercase;
+      }
+
+      .nav a:hover {
+        border-color: rgba(245, 166, 35, 0.58);
+        background: var(--amber-soft);
+      }
+
+      section {
+        padding: 54px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .section-head {
+        display: grid;
+        grid-template-columns: minmax(0, 0.55fr) minmax(320px, 0.45fr);
+        gap: 32px;
+        align-items: start;
+        margin-bottom: 24px;
+      }
+
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.018));
+        box-shadow: 0 16px 40px var(--shadow);
+      }
+
+      .diagram-panel {
+        padding: 16px;
+        overflow: hidden;
+      }
+
+      .diagram {
+        width: 100%;
+        height: auto;
+        display: block;
+      }
+
+      .diagram .box {
+        fill: #101820;
+        stroke: #2d3c4b;
+        stroke-width: 1.2;
+        rx: 10;
+      }
+
+      .diagram .box.hot {
+        fill: rgba(245, 166, 35, 0.12);
+        stroke: rgba(245, 166, 35, 0.72);
+      }
+
+      .diagram .box.blue {
+        fill: rgba(77, 163, 255, 0.12);
+        stroke: rgba(77, 163, 255, 0.64);
+      }
+
+      .diagram .box.green {
+        fill: rgba(37, 193, 122, 0.12);
+        stroke: rgba(37, 193, 122, 0.64);
+      }
+
+      .diagram .box.violet {
+        fill: rgba(181, 140, 255, 0.12);
+        stroke: rgba(181, 140, 255, 0.64);
+      }
+
+      .diagram .box.red {
+        fill: rgba(255, 107, 95, 0.12);
+        stroke: rgba(255, 107, 95, 0.64);
+      }
+
+      .diagram .label {
+        fill: var(--text);
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+      }
+
+      .diagram .detail {
+        fill: var(--muted);
+        font-size: 11px;
+      }
+
+      .diagram .arrow,
+      .diagram .branch {
+        fill: none;
+        stroke: #647488;
+        stroke-width: 1.8;
+        marker-end: url(#arrow);
+      }
+
+      .diagram .branch {
+        stroke-dasharray: 5 5;
+      }
+
+      .grid {
+        display: grid;
+        gap: 14px;
+      }
+
+      .grid.two {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .grid.three {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .fact {
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: rgba(13, 20, 27, 0.82);
+      }
+
+      .fact h3 {
+        margin-bottom: 8px;
+      }
+
+      .fact p {
+        font-size: 0.92rem;
+      }
+
+      .fact code {
+        color: #dce7f4;
+        font-size: 0.86rem;
+      }
+
+      .flow-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 12px;
+      }
+
+      .flow-list li {
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr);
+        gap: 12px;
+        align-items: start;
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: rgba(16, 24, 32, 0.76);
+      }
+
+      .num {
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 999px;
+        background: var(--amber-soft);
+        color: var(--amber);
+        font-weight: 800;
+      }
+
+      .flow-list strong {
+        color: var(--text);
+      }
+
+      .flow-list p {
+        margin-top: 4px;
+        font-size: 0.92rem;
+      }
+
+      .schema {
+        display: grid;
+        gap: 10px;
+      }
+
+      .schema-row {
+        display: grid;
+        grid-template-columns: 190px minmax(0, 1fr);
+        gap: 14px;
+        padding: 12px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .schema-row:last-child {
+        border-bottom: 0;
+      }
+
+      .schema-row code {
+        color: var(--amber);
+        font-size: 0.86rem;
+      }
+
+      .schema-row span {
+        color: var(--muted);
+      }
+
+      .matrix {
+        overflow-x: auto;
+      }
+
+      table {
+        width: 100%;
+        min-width: 760px;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        padding: 12px 14px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.04);
+        font-size: 0.76rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      td {
+        color: var(--muted);
+      }
+
+      td code {
+        color: #dce7f4;
+      }
+
+      pre {
+        margin: 0;
+        padding: 16px;
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #070b10;
+        color: #dce7f4;
+        font-size: 0.84rem;
+        line-height: 1.55;
+      }
+
+      .callout {
+        padding: 18px;
+        border: 1px solid rgba(245, 166, 35, 0.42);
+        border-radius: 14px;
+        background: linear-gradient(135deg, rgba(245, 166, 35, 0.14), rgba(77, 163, 255, 0.08));
+      }
+
+      .callout p {
+        color: #dce7f4;
+      }
+
+      .small {
+        color: var(--faint);
+        font-size: 0.86rem;
+      }
+
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 14px;
+      }
+
+      .legend .chip:nth-child(2) {
+        border-color: rgba(77, 163, 255, 0.44);
+        background: var(--blue-soft);
+      }
+
+      .legend .chip:nth-child(3) {
+        border-color: rgba(37, 193, 122, 0.44);
+        background: var(--green-soft);
+      }
+
+      .legend .chip:nth-child(4) {
+        border-color: rgba(181, 140, 255, 0.44);
+        background: var(--violet-soft);
+      }
+
+      .legend .chip:nth-child(5) {
+        border-color: rgba(255, 107, 95, 0.44);
+        background: var(--red-soft);
+      }
+
+      footer {
+        padding: 32px 0 12px;
+        color: var(--faint);
+      }
+
+      @media (max-width: 900px) {
+        main {
+          width: min(100% - 24px, 760px);
+        }
+
+        .hero {
+          min-height: auto;
+          padding-top: 24px;
+        }
+
+        .hero-grid,
+        .section-head,
+        .grid.two,
+        .grid.three {
+          grid-template-columns: 1fr;
+        }
+
+        h1 {
+          max-width: 9ch;
+          font-size: clamp(3rem, 14vw, 4.6rem);
+        }
+
+        section {
+          padding: 42px 0;
+        }
+      }
+
+      @media (max-width: 560px) {
+        .schema-row {
+          grid-template-columns: 1fr;
+          gap: 4px;
+        }
+
+        .diagram-panel {
+          padding: 10px;
+        }
+
+        .nav a,
+        .chip {
+          font-size: 0.68rem;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="hero">
+        <div class="hero-grid">
+          <div class="grid">
+            <p class="eyebrow">Islandflow system reference</p>
+            <h1>From print to alert</h1>
+            <p class="lede">
+              A compact anatomy map for the path a market print takes through ingest, the live
+              tape, flow packet construction, smart-money profiling, classifier hits, and alerts.
+            </p>
+            <nav class="nav" aria-label="Page sections">
+              <a href="#pipeline">Pipeline</a>
+              <a href="#prints">Prints</a>
+              <a href="#flow-packets">Flow packets</a>
+              <a href="#smart-money">Smart money</a>
+              <a href="#classifiers">Classifiers</a>
+              <a href="#alerts">Alerts</a>
+              <a href="#traceability">Traceability</a>
+            </nav>
+          </div>
+
+          <div class="panel diagram-panel" aria-label="High level data flow diagram">
+            <svg class="diagram" viewBox="0 0 720 420" role="img">
+              <title>Print to alert overview</title>
+              <defs>
+                <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#647488"></path>
+                </marker>
+              </defs>
+              <rect class="box blue" x="26" y="42" width="132" height="74"></rect>
+              <text class="label" x="46" y="73">Ingest</text>
+              <text class="detail" x="46" y="94">options.prints</text>
+              <text class="detail" x="46" y="108">equities.prints</text>
+
+              <rect class="box hot" x="214" y="42" width="132" height="74"></rect>
+              <text class="label" x="234" y="73">Tape</text>
+              <text class="detail" x="234" y="94">signal rows</text>
+              <text class="detail" x="234" y="108">raw context</text>
+
+              <rect class="box green" x="402" y="42" width="132" height="74"></rect>
+              <text class="label" x="422" y="73">Compute</text>
+              <text class="detail" x="422" y="94">cluster</text>
+              <text class="detail" x="422" y="108">join features</text>
+
+              <rect class="box violet" x="562" y="42" width="132" height="74"></rect>
+              <text class="label" x="582" y="73">FlowPacket</text>
+              <text class="detail" x="582" y="94">members[]</text>
+              <text class="detail" x="582" y="108">features{}</text>
+
+              <path class="arrow" d="M158 79 H212"></path>
+              <path class="arrow" d="M346 79 H400"></path>
+              <path class="arrow" d="M534 79 H560"></path>
+
+              <rect class="box violet" x="126" y="202" width="150" height="82"></rect>
+              <text class="label" x="146" y="235">SmartMoney</text>
+              <text class="detail" x="146" y="256">profile_scores[]</text>
+              <text class="detail" x="146" y="270">primary_direction</text>
+
+              <rect class="box blue" x="330" y="202" width="150" height="82"></rect>
+              <text class="label" x="350" y="235">ClassifierHit</text>
+              <text class="detail" x="350" y="256">classifier_id</text>
+              <text class="detail" x="350" y="270">confidence</text>
+
+              <rect class="box red" x="534" y="202" width="150" height="82"></rect>
+              <text class="label" x="554" y="235">Alert</text>
+              <text class="detail" x="554" y="256">score + severity</text>
+              <text class="detail" x="554" y="270">evidence_refs[]</text>
+
+              <path class="arrow" d="M628 116 C628 158 202 158 202 200"></path>
+              <path class="arrow" d="M276 243 H328"></path>
+              <path class="arrow" d="M480 243 H532"></path>
+
+              <rect class="box" x="126" y="338" width="558" height="46"></rect>
+              <text class="label" x="146" y="366">ClickHouse history + API live fanout + replay cursors</text>
+              <path class="branch" d="M202 284 V336"></path>
+              <path class="branch" d="M405 284 V336"></path>
+              <path class="branch" d="M610 284 V336"></path>
+            </svg>
+            <div class="legend">
+              <span class="chip">ingest</span>
+              <span class="chip">tape</span>
+              <span class="chip">derived</span>
+              <span class="chip">profile</span>
+              <span class="chip">alert</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <section id="pipeline">
+        <div class="section-head">
+          <div>
+            <h2>The pipeline is two paths that meet again</h2>
+          </div>
+          <p>
+            Ingest publishes the live market row. The API can show that row immediately as tape,
+            while compute consumes the signal stream and builds slower, richer derived events from
+            the same traceable print evidence.
+          </p>
+        </div>
+
+        <ol class="flow-list">
+          <li>
+            <span class="num">1</span>
+            <div>
+              <strong>Adapters publish raw market events.</strong>
+              <p>
+                Options prints, option NBBO, equity prints, and equity quotes land on NATS subjects
+                such as <code>options.prints</code>, <code>options.nbbo</code>, and
+                <code>equities.prints</code>. Each event carries <code>source_ts</code>,
+                <code>ingest_ts</code>, <code>seq</code>, and <code>trace_id</code>.
+              </p>
+            </div>
+          </li>
+          <li>
+            <span class="num">2</span>
+            <div>
+              <strong>Signal prints become the options tape head.</strong>
+              <p>
+                The options ingest path enriches prints with contract metadata, NBBO side,
+                notional, ETF classification, and <code>signal_pass</code>. Signal-qualified rows
+                are published to <code>options.prints.signal</code>.
+              </p>
+            </div>
+          </li>
+          <li>
+            <span class="num">3</span>
+            <div>
+              <strong>Compute clusters print evidence into flow packets.</strong>
+              <p>
+                Compute consumes signal prints and NBBO context, groups nearby activity, derives
+                features, writes <code>flow_packets</code>, and publishes <code>flow.packets</code>.
+              </p>
+            </div>
+          </li>
+          <li>
+            <span class="num">4</span>
+            <div>
+              <strong>Parent events, hits, and alerts preserve the evidence chain.</strong>
+              <p>
+                A flow packet can produce a <code>SmartMoneyEvent</code>, one or more
+                <code>ClassifierHitEvent</code> rows, and an <code>AlertEvent</code>. The resulting
+                alert keeps <code>evidence_refs</code> back to packet and print identifiers.
+              </p>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <section id="prints">
+        <div class="section-head">
+          <div>
+            <h2>Prints are the smallest inspectable fact</h2>
+          </div>
+          <p>
+            A print is not yet a theory. It is a timed execution row plus enough enrichment to say
+            whether it deserves live attention and whether it can support later inference.
+          </p>
+        </div>
+
+        <div class="grid two">
+          <div class="fact">
+            <h3>OptionPrint</h3>
+            <div class="schema">
+              <div class="schema-row"><code>option_contract_id</code><span>The contract key, parsed into root, expiry, strike, and right when possible.</span></div>
+              <div class="schema-row"><code>price + size</code><span>The execution terms used for premium and notional.</span></div>
+              <div class="schema-row"><code>nbbo_side</code><span>Where the trade printed versus bid, ask, midpoint, missing quote, or stale quote.</span></div>
+              <div class="schema-row"><code>signal_pass</code><span>Whether the print survives the configured smart-money, balanced, or all mode filter.</span></div>
+            </div>
+          </div>
+          <div class="fact">
+            <h3>EquityPrint</h3>
+            <div class="schema">
+              <div class="schema-row"><code>underlying_id</code><span>The equity symbol or internal underlying identifier.</span></div>
+              <div class="schema-row"><code>price + size</code><span>The trade terms used for candles and equity context.</span></div>
+              <div class="schema-row"><code>offExchangeFlag</code><span>A direct flag for off-exchange prints before dark inference adds interpretation.</span></div>
+              <div class="schema-row"><code>trace_id</code><span>The stable evidence handle used for joins, drawers, history, and replay.</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="flow-packets">
+        <div class="section-head">
+          <div>
+            <h2>Flow packets are parent evidence, not final conclusions</h2>
+          </div>
+          <p>
+            Compute creates a <code>FlowPacket</code> when activity is strong enough to inspect as a
+            grouped unit. It stores member print ids, aggregate features, and join-quality metrics
+            so later events can explain what they used.
+          </p>
+        </div>
+
+        <div class="panel diagram-panel" aria-label="Flow packet detail diagram">
+          <svg class="diagram" viewBox="0 0 900 360" role="img">
+            <title>Flow packet anatomy</title>
+            <defs>
+              <marker id="arrow2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#647488"></path>
+              </marker>
+            </defs>
+            <rect class="box hot" x="32" y="54" width="176" height="70"></rect>
+            <text class="label" x="54" y="85">Print A</text>
+            <text class="detail" x="54" y="106">trace_id: opt-101</text>
+            <rect class="box hot" x="32" y="144" width="176" height="70"></rect>
+            <text class="label" x="54" y="175">Print B</text>
+            <text class="detail" x="54" y="196">trace_id: opt-102</text>
+            <rect class="box hot" x="32" y="234" width="176" height="70"></rect>
+            <text class="label" x="54" y="265">Print C</text>
+            <text class="detail" x="54" y="286">trace_id: opt-103</text>
+
+            <rect class="box violet" x="328" y="94" width="240" height="170"></rect>
+            <text class="label" x="352" y="128">FlowPacket</text>
+            <text class="detail" x="352" y="153">members: [opt-101, opt-102, opt-103]</text>
+            <text class="detail" x="352" y="178">features: total_premium, count, dte</text>
+            <text class="detail" x="352" y="203">nbbo_aggressive_buy_ratio</text>
+            <text class="detail" x="352" y="228">join_quality: coverage, age, spread</text>
+
+            <rect class="box green" x="692" y="78" width="176" height="74"></rect>
+            <text class="label" x="714" y="110">ClickHouse</text>
+            <text class="detail" x="714" y="131">flow_packets</text>
+            <rect class="box blue" x="692" y="206" width="176" height="74"></rect>
+            <text class="label" x="714" y="238">Live API</text>
+            <text class="detail" x="714" y="259">channel: flow</text>
+
+            <path class="arrow" marker-end="url(#arrow2)" d="M208 89 C258 89 266 139 326 153"></path>
+            <path class="arrow" marker-end="url(#arrow2)" d="M208 179 H326"></path>
+            <path class="arrow" marker-end="url(#arrow2)" d="M208 269 C258 269 266 219 326 204"></path>
+            <path class="arrow" marker-end="url(#arrow2)" d="M568 140 H690"></path>
+            <path class="arrow" marker-end="url(#arrow2)" d="M568 218 H690"></path>
+          </svg>
+        </div>
+      </section>
+
+      <section id="smart-money">
+        <div class="section-head">
+          <div>
+            <h2>Smart-money events turn packet features into profiles</h2>
+          </div>
+          <p>
+            A <code>SmartMoneyEvent</code> is the parent interpretation of a flow packet. It keeps
+            packet ids and member print ids, then records profile probabilities, direction,
+            abstention state, and any suppression reasons.
+          </p>
+        </div>
+
+        <div class="grid three">
+          <div class="fact">
+            <h3>Profiles</h3>
+            <p>
+              Current profile ids include <code>institutional_directional</code>,
+              <code>retail_whale</code>, <code>event_driven</code>, <code>vol_seller</code>,
+              <code>arbitrage</code>, and <code>hedge_reactive</code>.
+            </p>
+          </div>
+          <div class="fact">
+            <h3>Direction</h3>
+            <p>
+              Direction is normalized as <code>bullish</code>, <code>bearish</code>,
+              <code>neutral</code>, <code>mixed</code>, or <code>unknown</code>, with profile reasons
+              kept beside the probability.
+            </p>
+          </div>
+          <div class="fact">
+            <h3>Suppression</h3>
+            <p>
+              Special print context, stale quotes, missing NBBO coverage, or cross-like executions
+              can lower confidence or cause an abstained event rather than a confident call.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="classifiers">
+        <div class="section-head">
+          <div>
+            <h2>Classifier hits are named detections with reasons</h2>
+          </div>
+          <p>
+            Classifiers look at packet and smart-money context, then emit hit events with a
+            classifier id, confidence, direction, and explanation strings. They are deliberately
+            narrower than alerts.
+          </p>
+        </div>
+
+        <div class="matrix panel">
+          <table>
+            <thead>
+              <tr>
+                <th class="table-label">Layer</th>
+                <th class="table-label">Primary input</th>
+                <th class="table-label">Important fields</th>
+                <th class="table-label">What the operator sees</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>FlowPacket</code></td>
+                <td>Signal option prints and quote context</td>
+                <td><code>members</code>, <code>features</code>, <code>join_quality</code></td>
+                <td>Grouped flow row, packet drawer, linked member prints</td>
+              </tr>
+              <tr>
+                <td><code>SmartMoneyEvent</code></td>
+                <td>One flow packet plus event calendar context when available</td>
+                <td><code>profile_scores</code>, <code>primary_direction</code>, <code>suppressed_reasons</code></td>
+                <td>Smart-money profile row and profile reasoning</td>
+              </tr>
+              <tr>
+                <td><code>ClassifierHitEvent</code></td>
+                <td>Derived parent event and packet feature thresholds</td>
+                <td><code>classifier_id</code>, <code>confidence</code>, <code>direction</code>, <code>explanations</code></td>
+                <td>Classifier feed row and decorators on linked tape rows</td>
+              </tr>
+              <tr>
+                <td><code>AlertEvent</code></td>
+                <td>Flow packet plus one or more classifier hits</td>
+                <td><code>score</code>, <code>severity</code>, <code>hits</code>, <code>evidence_refs</code></td>
+                <td>Alert row, severity strip, alert context drawer</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="alerts">
+        <div class="section-head">
+          <div>
+            <h2>Alerts package evidence for action</h2>
+          </div>
+          <p>
+            Alerts do not replace the underlying evidence. They score it, attach severity, and keep
+            enough references for the UI and API to reconstruct the supporting packet and prints.
+          </p>
+        </div>
+
+        <div class="grid two">
+          <pre><code>AlertEvent {
+  source_ts
+  ingest_ts
+  seq
+  trace_id
+  score
+  severity
+  hits[]
+  evidence_refs[]
+  primary_profile_id?
+  profile_scores?
+}</code></pre>
+          <div class="callout">
+            <p>
+              Alert scoring combines packet premium, strongest classifier confidence, and hit count,
+              then maps the score into <code>low</code>, <code>medium</code>, or <code>high</code>
+              severity. The important operational detail is that the alert remains reversible:
+              open it, inspect the hit, inspect the packet, then inspect the print evidence.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="traceability">
+        <div class="section-head">
+          <div>
+            <h2>Traceability is the contract between live and replay</h2>
+          </div>
+          <p>
+            Every major row carries cursor-friendly time metadata and a trace handle. The live API
+            uses NATS for fresh events, ClickHouse for snapshots and older history, and the same
+            schemas for replay.
+          </p>
+        </div>
+
+        <div class="grid two">
+          <div class="fact">
+            <h3>Live channels</h3>
+            <p>
+              The terminal subscribes to channels including <code>options</code>, <code>flow</code>,
+              <code>smart-money</code>, <code>classifier-hits</code>, and <code>alerts</code>. Each
+              channel can deliver snapshots, events, watermarks, and history cursors.
+            </p>
+          </div>
+          <div class="fact">
+            <h3>History tables</h3>
+            <p>
+              Derived rows are persisted as <code>flow_packets</code>,
+              <code>smart_money_events</code>, <code>classifier_hits</code>, and
+              <code>alerts</code>. Alert context lookup resolves evidence references across those
+              tables and the option print store.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        <p class="small">
+          Reference based on the current Islandflow TypeScript schemas, NATS subjects, compute
+          service, storage tables, and live API channel names.
+        </p>
+      </footer>
+    </main>
+  </body>
+</html>
