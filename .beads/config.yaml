@@ -56,4 +56,4 @@
 sync:
   remote: git+https://git.deltaisland.io/dirtydishes/islandflow.git
 
-sync.remote: "git+https://github.com/dirtydishes/islandflow.git"
+# sync.remote: "git+https://github.com/dirtydishes/islandflow.git"
