@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: "docs-pages"
@@ -20,6 +20,10 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    env:
+      PAGES_REPOSITORY: dirtydishes/dirtydishes.github.io
+      PAGES_BRANCH: master
+      PAGES_PREFIX: islandflow
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -29,26 +33,41 @@ jobs:
 
       - name: Prepare static site payload
         run: |
+          rm -rf site
           mkdir -p site/docs
           cp -R docs/. site/docs/
           printf '%s\n' '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=https://dirtydishes.github.io/islandflow/docs/"><title>Islandflow Docs</title><a href="https://dirtydishes.github.io/islandflow/docs/">Continue to docs</a>' > site/index.html
           touch site/.nojekyll
 
-      - name: Publish to gh-pages branch
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Checkout GitHub Pages site
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ env.PAGES_REPOSITORY }}
+          ref: ${{ env.PAGES_BRANCH }}
+          token: ${{ secrets.DOCS_PAGES_TOKEN }}
+          path: pages
+          fetch-depth: 0
+
+      - name: Mirror docs into Pages site
         run: |
           set -euo pipefail
-          rm -rf .gh-pages-tmp
-          mkdir .gh-pages-tmp
-          cp -R site/. .gh-pages-tmp/
-          cd .gh-pages-tmp
+          rm -rf "pages/${PAGES_PREFIX}"
+          mkdir -p "pages/${PAGES_PREFIX}"
+          cp -R site/. "pages/${PAGES_PREFIX}/"
+          touch pages/.nojekyll
 
-          git init
-          git checkout -b gh-pages
+      - name: Commit and push Pages mirror
+        run: |
+          set -euo pipefail
+          cd pages
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "publish docs from ${GITHUB_SHA}"
+          git add "${PAGES_PREFIX}" .nojekyll
 
-          git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages:gh-pages
+          if git diff --cached --quiet; then
+            echo "No docs changes to publish."
+            exit 0
+          fi
+
+          git commit -m "publish islandflow docs from ${GITHUB_SHA}"
+          git push origin "HEAD:${PAGES_BRANCH}"

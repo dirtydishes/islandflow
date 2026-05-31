@@ -129,8 +129,7 @@ function renderDocument(items) {
         .map((entry) => {
           const extension = path.extname(entry.relativePath).replace(".", "") || "file";
           const searchable = `${entry.relativePath} ${category}`.toLowerCase();
-          return `
-            <li class="doc-item" data-search="${escapeHtml(searchable)}">
+          return `            <li class="doc-item" data-search="${escapeHtml(searchable)}">
               <a class="doc-link" href="${docsHref(entry.relativePath)}">${escapeHtml(
                 entry.relativePath
               )}</a>
@@ -139,19 +138,16 @@ function renderDocument(items) {
                 <span>${escapeHtml(formatBytes(entry.sizeBytes))}</span>
                 <span>${escapeHtml(dateFormatter.format(entry.modifiedAt))}</span>
               </div>
-            </li>
-          `;
+            </li>`;
         })
         .join("\n");
 
-      return `
-        <section class="group" id="category-${escapeHtml(category)}">
+      return `        <section class="group" id="category-${escapeHtml(category)}">
           <h2>${escapeHtml(category)} <span>${entries.length}</span></h2>
           <ul class="doc-list">
             ${entryMarkup}
           </ul>
-        </section>
-      `;
+        </section>`;
     })
     .join("\n");
 
