@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Standup Summary for 2026-05-31</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Quantico:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: rgba(17, 24, 32, 0.94);
+        --panel-2: rgba(13, 20, 27, 0.98);
+        --line: rgba(255, 255, 255, 0.09);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --amber: #f5a623;
+        --amber-soft: rgba(245, 166, 35, 0.14);
+        --blue: #4da3ff;
+        --blue-soft: rgba(77, 163, 255, 0.12);
+        --green: #25c17a;
+        --green-soft: rgba(37, 193, 122, 0.12);
+        --red: #ff6b5f;
+        --red-soft: rgba(255, 107, 95, 0.12);
+        --shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+        --radius: 18px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at top right, rgba(245, 166, 35, 0.14), transparent 28rem),
+          radial-gradient(circle at top left, rgba(77, 163, 255, 0.1), transparent 24rem),
+          linear-gradient(180deg, #081018 0%, var(--bg) 34%, #05070a 100%);
+        color: var(--text);
+        font-family: "IBM Plex Sans", system-ui, sans-serif;
+        line-height: 1.6;
+      }
+
+      main {
+        width: min(1120px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 30px 0 56px;
+      }
+
+      .hero,
+      section {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      }
+
+      .hero {
+        padding: 30px;
+        box-shadow: var(--shadow);
+      }
+
+      section {
+        margin-top: 18px;
+        padding: 22px;
+      }
+
+      .eyebrow,
+      .chip,
+      h2,
+      .commit-id,
+      code,
+      pre {
+        font-family: "IBM Plex Mono", monospace;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: var(--amber-soft);
+        color: var(--amber);
+        font-size: 0.76rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h3 {
+        margin: 0;
+        font-family: "Quantico", sans-serif;
+        letter-spacing: 0.05em;
+      }
+
+      h1 {
+        margin-top: 16px;
+        font-size: clamp(2.2rem, 4vw, 3.7rem);
+        line-height: 1.03;
+        text-transform: uppercase;
+      }
+
+      h2 {
+        margin: 0 0 14px;
+        color: var(--amber);
+        font-size: 0.84rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h3 {
+        font-size: 1rem;
+      }
+
+      p,
+      li {
+        max-width: 80ch;
+        color: var(--muted);
+      }
+
+      .hero p {
+        margin: 16px 0 0;
+        font-size: 1.02rem;
+      }
+
+      .meta {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        gap: 12px;
+        margin-top: 22px;
+      }
+
+      .meta-card,
+      .timeline-item,
+      .summary-item,
+      .callout {
+        padding: 16px 18px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.025);
+      }
+
+      .meta-card strong,
+      .label {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--text);
+        font-size: 0.74rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .summary-list,
+      .timeline {
+        display: grid;
+        gap: 12px;
+      }
+
+      .timeline-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 14px;
+        margin-bottom: 10px;
+      }
+
+      .commit-id {
+        color: var(--blue);
+        font-size: 0.76rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .timestamp {
+        color: var(--faint);
+        font-size: 0.76rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .chip-row,
+      .file-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chip,
+      .file-pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--text);
+        font-size: 0.74rem;
+        letter-spacing: 0.04em;
+      }
+
+      .good {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .info {
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .risk {
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 1.2rem;
+      }
+
+      li + li {
+        margin-top: 8px;
+      }
+
+      code {
+        color: #ffd596;
+      }
+
+      pre {
+        margin: 12px 0 0;
+        padding: 14px 16px;
+        overflow-x: auto;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        background: rgba(5, 10, 15, 0.96);
+        color: var(--text);
+        font-size: 0.86rem;
+      }
+
+      a {
+        color: #8bc1ff;
+      }
+
+      @media (max-width: 720px) {
+        main {
+          width: min(100%, calc(100% - 20px));
+          padding: 18px 0 28px;
+        }
+
+        .hero,
+        section {
+          padding: 18px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="hero">
+        <span class="eyebrow">Daily Git Summary</span>
+        <h1>Standup Summary for 2026-05-31</h1>
+        <p>
+          Three commits landed on Sunday, May 31, 2026. The day’s git-visible work centered on
+          documentation operations: repo guidance was trimmed in <code>AGENTS.md</code>, a new
+          standalone <code>docs/anatomy.html</code> reference page was added, and the GitHub Pages
+          mirror workflow was retargeted to publish into <code>dirtydishes.github.io/islandflow</code>.
+        </p>
+        <div class="meta">
+          <div class="meta-card">
+            <strong>Commits inspected</strong>
+            3 on 2026-05-31
+          </div>
+          <div class="meta-card">
+            <strong>Files touched</strong>
+            6 unique files
+          </div>
+          <div class="meta-card">
+            <strong>Tracked issues</strong>
+            <code>islandflow-5jt</code>, <code>islandflow-m3d</code>
+          </div>
+          <div class="meta-card">
+            <strong>Open follow-up</strong>
+            <code>islandflow-8a6</code>
+          </div>
+        </div>
+      </header>
+
+      <section>
+        <h2>Summary</h2>
+        <div class="summary-list">
+          <article class="summary-item">
+            <h3>Repo turn-document rules were tightened and shortened.</h3>
+            <p>
+              Commit <code>ab35533289b4</code> removed most duplicated repository-specific turn-doc
+              prose from <code>AGENTS.md</code> and replaced it with references back to the global
+              Codex instructions plus a smaller repo override block.
+            </p>
+          </article>
+          <article class="summary-item">
+            <h3>An anatomy explainer page was added to the docs set.</h3>
+            <p>
+              Commit <code>5074b7eeaa9e</code> created <code>docs/anatomy.html</code>, updated the
+              generated docs index, and closed Beads task <code>islandflow-5jt</code>.
+            </p>
+          </article>
+          <article class="summary-item">
+            <h3>The docs mirror workflow was pointed at the actual Pages target.</h3>
+            <p>
+              Commit <code>8933e29ae83d</code> rewired <code>.github/workflows/docs-pages.yml</code>
+              to check out <code>dirtydishes/dirtydishes.github.io</code>, mirror
+              <code>site/docs</code> under <code>islandflow</code>, and push to that repository’s
+              <code>master</code> branch. The same commit closed <code>islandflow-m3d</code> and
+              left <code>islandflow-8a6</code> open for token verification.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <div class="timeline">
+          <article class="timeline-item">
+            <div class="timeline-meta">
+              <span class="commit-id">ab35533289b4</span>
+              <span class="timestamp">2026-05-31 09:29 EDT</span>
+              <span class="chip info">docs policy trim</span>
+            </div>
+            <p>
+              <strong>trim repo turn doc guidance</strong> reduced <code>AGENTS.md</code> by
+              removing duplicated turn-document instructions and keeping only the repo-specific
+              overrides: <code>docs/turns</code> location, <code>impeccable</code> usage,
+              <code>@pierre/diffs/ssr</code> for diff rendering, the minor/trivial exemption list,
+              and the completion checklist.
+            </p>
+            <div class="file-list">
+              <span class="file-pill">AGENTS.md</span>
+            </div>
+          </article>
+
+          <article class="timeline-item">
+            <div class="timeline-meta">
+              <span class="commit-id">5074b7eeaa9e</span>
+              <span class="timestamp">2026-05-31 17:26 EDT</span>
+              <span class="chip good">new docs surface</span>
+            </div>
+            <p>
+              <strong>add anatomy reference page</strong> added a new standalone docs page and
+              updated the generated docs landing page so <code>anatomy.html</code> appears in the
+              root document listing. The Beads state added and closed
+              <code>islandflow-5jt</code> with the note that the page had been linked from the docs
+              index.
+            </p>
+            <div class="file-list">
+              <span class="file-pill">docs/anatomy.html</span>
+              <span class="file-pill">docs/index.html</span>
+              <span class="file-pill">.beads/issues.jsonl</span>
+            </div>
+          </article>
+
+          <article class="timeline-item">
+            <div class="timeline-meta">
+              <span class="commit-id">8933e29ae83d</span>
+              <span class="timestamp">2026-05-31 18:13 EDT</span>
+              <span class="chip good">docs deploy fix</span>
+            </div>
+            <p>
+              <strong>fix docs pages mirror target</strong> changed the GitHub Actions workflow
+              from pushing a local <code>gh-pages</code> branch to checking out
+              <code>dirtydishes/dirtydishes.github.io</code>, copying the generated docs into
+              <code>pages/islandflow</code>, and pushing back to the Pages repo’s
+              <code>master</code> branch. It also tightened the generated HTML formatting in
+              <code>scripts/generate-docs-index.mjs</code>, regenerated <code>docs/index.html</code>,
+              and added turn doc
+              <code>docs/turns/2026-05-31-fix-docs-pages-mirror.html</code>.
+            </p>
+            <div class="file-list">
+              <span class="file-pill">.github/workflows/docs-pages.yml</span>
+              <span class="file-pill">scripts/generate-docs-index.mjs</span>
+              <span class="file-pill">docs/index.html</span>
+              <span class="file-pill">docs/turns/2026-05-31-fix-docs-pages-mirror.html</span>
+              <span class="file-pill">.beads/issues.jsonl</span>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          This report is anchored to local git history whose commit dates fall between
+          <code>2026-05-31 00:00:00 -0400</code> and <code>2026-06-01 00:00:00 -0400</code>. No PR
+          merges appear in that window, so the summary is commit-first and file-first. Beads issue
+          references are only included where they were visible in the inspected commit diffs.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <ul>
+          <li>
+            <code>AGENTS.md</code> kept the repo-specific overrides but stopped restating the global
+            turn-document policy in full, which should reduce drift between the repo file and
+            <code>~/.codex/AGENTS.md</code>.
+          </li>
+          <li>
+            The anatomy page landed as a standalone HTML asset at the docs root rather than under
+            <code>docs/turns</code> or <code>docs/general</code>, and the generated docs index was
+            updated so it appears under the root category.
+          </li>
+          <li>
+            The docs mirror workflow now uses these environment values inside the workflow job:
+            <code>PAGES_REPOSITORY=dirtydishes/dirtydishes.github.io</code>,
+            <code>PAGES_BRANCH=master</code>, and <code>PAGES_PREFIX=islandflow</code>.
+          </li>
+          <li>
+            The mirror job now depends on <code>DOCS_PAGES_TOKEN</code> rather than the default
+            <code>GITHUB_TOKEN</code>, because it pushes to a different repository.
+          </li>
+          <li>
+            The docs index generator change was mostly structural formatting: the rendered HTML for
+            list items and sections became tighter without changing the index’s overall categories or
+            sorting behavior.
+          </li>
+        </ul>
+        <pre><code>Docs Pages mirror target after 8933e29ae83d:
+
+PAGES_REPOSITORY=dirtydishes/dirtydishes.github.io
+PAGES_BRANCH=master
+PAGES_PREFIX=islandflow</code></pre>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <ul>
+          <li>
+            Contributors working with Codex repo instructions should see less duplicated policy in
+            <code>AGENTS.md</code> and clearer repo-only overrides.
+          </li>
+          <li>
+            Readers browsing project docs now have a dedicated anatomy reference page linked from the
+            docs index.
+          </li>
+          <li>
+            Once the external token is configured, GitHub Pages visitors should get the current docs
+            from <code>dirtydishes.github.io/islandflow/docs/</code> instead of relying on a
+            mismatched branch target.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li>
+            Used <code>git log</code> scoped to May 31, 2026 to enumerate the three commits included
+            in this standup window.
+          </li>
+          <li>
+            Used <code>git show --stat</code> and targeted <code>git show</code> diffs to anchor the
+            changed files, workflow behavior, and visible Beads issue IDs for each commit.
+          </li>
+          <li>
+            For the docs mirror fix, reused validation already recorded in committed turn doc
+            <code>docs/turns/2026-05-31-fix-docs-pages-mirror.html</code>: local
+            <code>node scripts/generate-docs-index.mjs</code>, <code>node --check</code> on the
+            generator, YAML parsing for <code>.github/workflows/docs-pages.yml</code>, and
+            <code>git diff --check</code>.
+          </li>
+          <li>
+            No separate automated validation was visible in the inspected May 31 commits for the
+            <code>AGENTS.md</code> trim or the anatomy page beyond the committed file additions and
+            docs index linkage.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <div class="chip-row">
+          <span class="chip risk">commit-history only</span>
+          <span class="chip risk">token still required</span>
+        </div>
+        <ul>
+          <li>
+            This summary only reflects landed git history for May 31 and does not include uncommitted
+            work, discussion, or operational checks performed outside the repository.
+          </li>
+          <li>
+            The anatomy page commit did not include a companion turn document, so its validation
+            notes here are limited to what the commit itself showed: file creation, docs index update,
+            and Beads closure text.
+          </li>
+          <li>
+            The docs mirror workflow fix is not fully effective until the GitHub mirror repository
+            secret <code>DOCS_PAGES_TOKEN</code> is present and valid. That gap is already tracked in
+            <code>islandflow-8a6</code>.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>
+            <code>islandflow-8a6</code>: verify the GitHub Pages token for the docs mirror so the
+            updated workflow can push to <code>dirtydishes/dirtydishes.github.io</code>.
+          </li>
+          <li>
+            No additional Beads follow-up was visible for the trimmed repo guidance commit
+            <code>ab35533289b4</code> in the inspected history.
+          </li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
