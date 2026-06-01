@@ -53,4 +53,4 @@
 # - github.org
 # - github.repo
 
-# sync.remote: "http://100.87.130.79:8081/islandflow"
+sync.remote: "http://dolt.deltaisland.io/islandflow"
