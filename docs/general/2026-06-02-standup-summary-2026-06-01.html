@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Standup Summary for 2026-06-01</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Quantico:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: rgba(17, 24, 32, 0.94);
+        --panel-2: rgba(13, 20, 27, 0.98);
+        --line: rgba(255, 255, 255, 0.09);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --amber: #f5a623;
+        --amber-soft: rgba(245, 166, 35, 0.14);
+        --blue: #4da3ff;
+        --blue-soft: rgba(77, 163, 255, 0.12);
+        --green: #25c17a;
+        --green-soft: rgba(37, 193, 122, 0.12);
+        --red: #ff6b5f;
+        --red-soft: rgba(255, 107, 95, 0.14);
+        --shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+        --radius: 18px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at top right, rgba(245, 166, 35, 0.14), transparent 28rem),
+          radial-gradient(circle at top left, rgba(77, 163, 255, 0.1), transparent 24rem),
+          linear-gradient(180deg, #081018 0%, var(--bg) 34%, #05070a 100%);
+        color: var(--text);
+        font-family: "IBM Plex Sans", system-ui, sans-serif;
+        line-height: 1.6;
+      }
+
+      main {
+        width: min(1100px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 30px 0 56px;
+      }
+
+      .hero,
+      section {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      }
+
+      .hero {
+        padding: 30px;
+        box-shadow: var(--shadow);
+      }
+
+      section {
+        margin-top: 18px;
+        padding: 22px;
+      }
+
+      .eyebrow,
+      h2,
+      .chip,
+      .commit-id,
+      code {
+        font-family: "IBM Plex Mono", monospace;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: var(--amber-soft);
+        color: var(--amber);
+        font-size: 0.76rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h3 {
+        margin: 0;
+        font-family: "Quantico", sans-serif;
+        letter-spacing: 0.05em;
+      }
+
+      h1 {
+        margin-top: 16px;
+        font-size: clamp(2.2rem, 4vw, 3.4rem);
+        line-height: 1.03;
+        text-transform: uppercase;
+      }
+
+      h2 {
+        margin: 0 0 14px;
+        color: var(--amber);
+        font-size: 0.84rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h3 {
+        font-size: 1rem;
+      }
+
+      p,
+      li {
+        max-width: 80ch;
+        color: var(--muted);
+      }
+
+      .hero p {
+        margin: 16px 0 0;
+        font-size: 1.02rem;
+      }
+
+      .meta,
+      .grid,
+      .timeline {
+        display: grid;
+        gap: 12px;
+      }
+
+      .meta {
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        margin-top: 22px;
+      }
+
+      .card,
+      .timeline-item,
+      .callout {
+        padding: 16px 18px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.025);
+      }
+
+      .callout {
+        border-color: rgba(245, 166, 35, 0.22);
+        background: linear-gradient(180deg, rgba(245, 166, 35, 0.08), rgba(255, 255, 255, 0.02));
+      }
+
+      .label {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--text);
+        font-size: 0.74rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .value-strong {
+        color: var(--text);
+        font-size: 1.2rem;
+        font-weight: 600;
+      }
+
+      .timeline-meta,
+      .chip-row,
+      .file-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .commit-id {
+        color: var(--blue);
+        font-size: 0.76rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .timestamp {
+        color: var(--faint);
+        font-size: 0.76rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .chip,
+      .file-pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--text);
+        font-size: 0.74rem;
+        letter-spacing: 0.04em;
+      }
+
+      .good {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .info {
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .risk {
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+
+      code {
+        padding: 0.12rem 0.32rem;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--text);
+      }
+
+      @media (max-width: 720px) {
+        main {
+          width: min(100%, calc(100% - 20px));
+          padding: 18px 0 40px;
+        }
+
+        .hero,
+        section {
+          padding: 18px;
+        }
+
+        h1 {
+          font-size: 2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <article class="hero">
+        <span class="eyebrow">Standup Summary • 2026-06-01</span>
+        <h1>CVE Remediation, Route-Type Path Flip, and Beads Remote Update</h1>
+        <p>
+          June 1 on <code>lavender/address-cve-tmp@0.2.5</code> produced four
+          committed changes: one Beads remote configuration update, one
+          dependency override fix for <code>tmp</code>, and two back-to-back
+          edits to <code>apps/web/next-env.d.ts</code> that first pointed route
+          types at the dev output path and then switched CI back to the standard
+          <code>.next</code> path.
+        </p>
+        <div class="meta">
+          <div class="card">
+            <span class="label">Commits on 2026-06-01</span>
+            <div class="value-strong">4</div>
+          </div>
+          <div class="card">
+            <span class="label">Primary Files</span>
+            <div class="value-strong"><code>next-env.d.ts</code>, <code>package.json</code>, <code>bun.lock</code></div>
+          </div>
+          <div class="card">
+            <span class="label">Closed Beads Work</span>
+            <div class="value-strong"><code>islandflow-9ur</code></div>
+          </div>
+        </div>
+      </article>
+
+      <section>
+        <h2>Summary</h2>
+        <div class="callout">
+          <p>
+            The main code-facing activity was split between package hygiene and a
+            targeted Next.js type-path adjustment. The dependency work moved the
+            root <code>tmp</code> override from <code>^0.2.5</code> to
+            <code>^0.2.6</code> and refreshed the lockfile to
+            <code>tmp@0.2.7</code>. Later in the day,
+            <code>apps/web/next-env.d.ts</code> was changed twice, first to
+            import route types from <code>.next-dev/dev/types/routes.d.ts</code>,
+            then to restore the CI-safe <code>.next/types/routes.d.ts</code>
+            import path.
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <div class="timeline">
+          <div class="timeline-item">
+            <div class="timeline-meta">
+              <span class="commit-id">d7a34f36</span>
+              <span class="timestamp">2026-06-01 02:00 EDT</span>
+            </div>
+            <h3>Point Beads sync at the Dolt host</h3>
+            <p>
+              Commit <code>d7a34f36b66e57fbc75d3533f1de4cdb79457b32</code>
+              changed <code>.beads/config.yaml</code> from a commented local IP
+              example to an active <code>sync.remote:
+              "http://dolt.deltaisland.io/islandflow"</code> entry.
+            </p>
+            <div class="file-list">
+              <span class="file-pill">.beads/config.yaml</span>
+            </div>
+          </div>
+
+          <div class="timeline-item">
+            <div class="timeline-meta">
+              <span class="commit-id">8ede8cc8</span>
+              <span class="timestamp">2026-06-01 13:36 EDT</span>
+            </div>
+            <h3>Raise the tmp override past the flagged version</h3>
+            <p>
+              Commit <code>8ede8cc8f3d4e1e39a58749f8a73b06cf008d35d</code>
+              updated <code>package.json</code> and <code>bun.lock</code> so the
+              root override moved from <code>tmp@^0.2.5</code> to
+              <code>tmp@^0.2.6</code>, with the lockfile resolving to
+              <code>tmp@0.2.7</code>. The same commit also added
+              <code>docs/turns/2026-06-01-address-tmp-cve.html</code> and closed
+              Beads issue <code>islandflow-9ur</code>.
+            </p>
+            <div class="file-list">
+              <span class="file-pill">package.json</span>
+              <span class="file-pill">bun.lock</span>
+              <span class="file-pill">docs/turns/2026-06-01-address-tmp-cve.html</span>
+            </div>
+          </div>
+
+          <div class="timeline-item">
+            <div class="timeline-meta">
+              <span class="commit-id">1bf11330</span>
+              <span class="timestamp">2026-06-01 21:05 EDT</span>
+            </div>
+            <h3>Switch Next route-type import to the dev output tree</h3>
+            <p>
+              Commit <code>1bf113300d52f318cf93afaf28a19626699e8e43</code>
+              changed <code>apps/web/next-env.d.ts</code> so it imported route
+              types from <code>./.next-dev/dev/types/routes.d.ts</code> instead
+              of <code>./.next/types/routes.d.ts</code>.
+            </p>
+            <div class="file-list">
+              <span class="file-pill">apps/web/next-env.d.ts</span>
+            </div>
+          </div>
+
+          <div class="timeline-item">
+            <div class="timeline-meta">
+              <span class="commit-id">a6061957</span>
+              <span class="timestamp">2026-06-01 21:14 EDT</span>
+            </div>
+            <h3>Restore the CI-safe route-type import path</h3>
+            <p>
+              Commit <code>a60619579bf1954514e5a2c9be9573fd877aec15</code>
+              reverted <code>apps/web/next-env.d.ts</code> back to
+              <code>./.next/types/routes.d.ts</code>. The commit also touched
+              <code>.beads/issues.jsonl</code> while carrying branch-local Beads
+              history.
+            </p>
+            <div class="file-list">
+              <span class="file-pill">apps/web/next-env.d.ts</span>
+              <span class="file-pill">.beads/issues.jsonl</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          This summary is grounded in the current branch's June 1 commit history
+          from <code>git log --first-parent</code>, plus per-commit
+          <code>git show</code> output. I excluded same-day commits that only
+          lived on other branches so the report reflects what actually landed on
+          <code>lavender/address-cve-tmp@0.2.5</code>.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <div class="grid">
+          <div class="card">
+            <span class="label">Net Result of the Two Route-Type Commits</span>
+            <p>
+              The end-of-day state for <code>apps/web/next-env.d.ts</code> is the
+              original <code>.next/types/routes.d.ts</code> import path. The
+              dev-only path existed as a committed intermediate state for about
+              nine minutes between the two evening commits.
+            </p>
+          </div>
+          <div class="card">
+            <span class="label">Recorded Validation on the CVE Fix</span>
+            <p>
+              The added turn doc for commit <code>8ede8cc8</code> records
+              <code>bun audit</code>, <code>bun why tmp</code>, and
+              <code>bun test</code> as passing, with <code>tmp@0.2.7</code>
+              shown in the resolved dependency chain.
+            </p>
+          </div>
+          <div class="card">
+            <span class="label">Beads Activity Visible in Commits</span>
+            <p>
+              June 1 included both configuration-level Beads sync work
+              (<code>.beads/config.yaml</code>) and issue-tracking churn
+              (<code>.beads/issues.jsonl</code>) alongside the code changes.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <ul>
+          <li>
+            The <code>tmp</code> override change should not alter visible product
+            behavior directly, but it removes the flagged dependency version from
+            the resolved tree recorded in the repo.
+          </li>
+          <li>
+            The two <code>next-env.d.ts</code> commits are build and type-path
+            maintenance, not a user-facing feature change.
+          </li>
+          <li>
+            The Beads remote update affects project tracking and sync behavior,
+            not the runtime product surface.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <div class="chip-row">
+          <span class="chip good">Validated with git log</span>
+          <span class="chip info">Validated with git show --stat</span>
+          <span class="chip good">CVE fix recorded bun audit</span>
+          <span class="chip good">CVE fix recorded bun why tmp</span>
+          <span class="chip good">CVE fix recorded bun test</span>
+        </div>
+        <p>
+          Validation for this report consisted of reviewing the dated commit
+          sequence and per-commit file diffs. The only explicit build or test
+          evidence attached to June 1's commits is the validation recorded in
+          <code>docs/turns/2026-06-01-address-tmp-cve.html</code> for the
+          dependency override change. I did not find separate test or build
+          evidence attached to the two <code>next-env.d.ts</code> commits.
+        </p>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>
+            This report covers committed June 1 activity on the active branch
+            only; same-day commits that exist only on other branches were
+            intentionally excluded.
+          </li>
+          <li>
+            The route-type work is represented by two fast consecutive commits,
+            so the report calls out both the intermediate state and the final
+            restored path to avoid overstating the net change.
+          </li>
+          <li>
+            The <code>.beads/issues.jsonl</code> addition in
+            <code>a6061957</code> contains tracking history but does not, by
+            itself, document a separate June 1 product change.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>
+            Closed Beads issue <code>islandflow-9ur</code> is the direct
+            follow-up record for the dependency remediation work.
+          </li>
+          <li>
+            No separate open Beads issue was created in the June 1 commit set for
+            the <code>next-env.d.ts</code> path flip.
+          </li>
+          <li>
+            If the team wants broader CI expansion beyond these spot fixes, the
+            existing open issue <code>islandflow-3ys</code> remains the closest
+            related tracker in the repo.
+          </li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
