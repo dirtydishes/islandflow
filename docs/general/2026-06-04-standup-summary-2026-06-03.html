@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Standup Summary for 2026-06-03</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Quantico:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: oklch(0.11 0.01 250);
+        --bg-elevated: oklch(0.15 0.012 250 / 0.96);
+        --bg-pane: oklch(0.18 0.013 250 / 0.98);
+        --bg-soft: oklch(0.95 0.01 250 / 0.035);
+        --line: oklch(0.72 0.012 250 / 0.16);
+        --line-strong: oklch(0.78 0.09 74 / 0.24);
+        --text: oklch(0.93 0.014 250);
+        --muted: oklch(0.74 0.018 250);
+        --faint: oklch(0.59 0.016 250);
+        --amber: oklch(0.78 0.12 74);
+        --amber-soft: oklch(0.78 0.12 74 / 0.1);
+        --blue: oklch(0.72 0.13 247);
+        --blue-soft: oklch(0.72 0.13 247 / 0.1);
+        --green: oklch(0.74 0.13 151);
+        --green-soft: oklch(0.74 0.13 151 / 0.1);
+        --red: oklch(0.68 0.16 28);
+        --red-soft: oklch(0.68 0.16 28 / 0.12);
+        --shadow: 0 26px 72px rgba(0, 0, 0, 0.42);
+        --radius-lg: 20px;
+        --radius-md: 14px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at top left, oklch(0.78 0.12 74 / 0.08), transparent 28rem),
+          radial-gradient(circle at top right, oklch(0.72 0.13 247 / 0.08), transparent 24rem),
+          linear-gradient(180deg, oklch(0.15 0.012 250) 0%, var(--bg) 34%, oklch(0.08 0.008 250) 100%);
+        color: var(--text);
+        font-family: "IBM Plex Sans", system-ui, sans-serif;
+        line-height: 1.6;
+      }
+
+      main {
+        width: min(1080px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 28px 0 56px;
+      }
+
+      .hero,
+      section {
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        background: linear-gradient(180deg, var(--bg-elevated), var(--bg-pane));
+      }
+
+      .hero {
+        padding: 30px;
+        box-shadow: var(--shadow);
+      }
+
+      section {
+        margin-top: 18px;
+        padding: 22px;
+      }
+
+      .eyebrow,
+      h2,
+      .chip,
+      .commit-id,
+      code,
+      .label,
+      .file-pill {
+        font-family: "IBM Plex Mono", monospace;
+      }
+
+      .eyebrow,
+      .chip,
+      .file-pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: 0.74rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .eyebrow {
+        background: var(--amber-soft);
+        color: var(--amber);
+      }
+
+      h1,
+      h3 {
+        margin: 0;
+        font-family: "Quantico", sans-serif;
+        letter-spacing: 0.05em;
+      }
+
+      h1 {
+        margin-top: 16px;
+        font-size: clamp(2.2rem, 4vw, 3.1rem);
+        line-height: 1.04;
+        text-transform: uppercase;
+        text-wrap: balance;
+      }
+
+      h2 {
+        margin: 0 0 14px;
+        color: var(--amber);
+        font-size: 0.82rem;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+      }
+
+      h3 {
+        font-size: 1.02rem;
+      }
+
+      p,
+      li {
+        max-width: 80ch;
+        color: var(--muted);
+      }
+
+      .hero p {
+        margin: 16px 0 0;
+        font-size: 1.02rem;
+      }
+
+      .meta,
+      .grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .meta {
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        margin-top: 22px;
+      }
+
+      .grid {
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      }
+
+      .card,
+      .timeline-item,
+      .callout {
+        padding: 16px 18px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: var(--bg-soft);
+      }
+
+      .callout {
+        border-color: var(--line-strong);
+        background: linear-gradient(180deg, oklch(0.78 0.12 74 / 0.08), oklch(0.95 0.01 250 / 0.02));
+      }
+
+      .label {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--text);
+        font-size: 0.72rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .value-strong {
+        color: var(--text);
+        font-size: 1.16rem;
+        font-weight: 600;
+      }
+
+      .timeline-meta,
+      .chip-row,
+      .file-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .commit-id {
+        color: var(--blue);
+        font-size: 0.76rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .timestamp {
+        color: var(--faint);
+        font-size: 0.76rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .chip,
+      .file-pill {
+        border: 1px solid var(--line);
+        background: oklch(0.95 0.01 250 / 0.03);
+        color: var(--text);
+      }
+
+      .chip.info {
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .chip.good {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .chip.risk {
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+
+      code {
+        padding: 0.12rem 0.32rem;
+        border-radius: 6px;
+        background: oklch(0.95 0.01 250 / 0.06);
+        color: var(--text);
+      }
+
+      a {
+        color: var(--blue);
+      }
+
+      @media (max-width: 720px) {
+        main {
+          width: min(100%, calc(100% - 20px));
+          padding: 18px 0 40px;
+        }
+
+        .hero,
+        section {
+          padding: 18px;
+        }
+
+        h1 {
+          font-size: 2rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <article class="hero">
+        <span class="eyebrow">Standup Summary • 2026-06-03</span>
+        <h1>June 3 Was a Documentation-Only Standup Publication</h1>
+        <p>
+          Git activity on June 3, 2026 consisted of one commit on
+          <code>lavender/address-cve-tmp@0.2.5</code>:
+          <code>1125471d8d03</code>,
+          <code>docs(general): add June 2 standup summary</code>. That commit
+          created
+          <code>docs/general/2026-06-03-standup-summary-2026-06-02.html</code>
+          and appended one line to <code>.beads/issues.jsonl</code>.
+        </p>
+        <div class="meta">
+          <div class="card">
+            <span class="label">Commit Count</span>
+            <span class="value-strong">1</span>
+          </div>
+          <div class="card">
+            <span class="label">Files Touched</span>
+            <span class="value-strong">2</span>
+          </div>
+          <div class="card">
+            <span class="label">Author</span>
+            <span class="value-strong">dirtydishes</span>
+          </div>
+          <div class="card">
+            <span class="label">Primary Scope</span>
+            <span class="value-strong">Standup reporting</span>
+          </div>
+        </div>
+      </article>
+
+      <section>
+        <h2>Summary</h2>
+        <div class="callout">
+          <p>
+            June 3 did not introduce runtime, API, or UI code changes. The
+            entire recorded repository activity was publishing the June 2
+            standup HTML report and persisting the corresponding Beads tracker
+            update in the same commit.
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <div class="timeline-item">
+          <div class="timeline-meta">
+            <span class="commit-id">1125471d8d03</span>
+            <span class="timestamp">2026-06-03 12:31 EDT</span>
+            <span class="chip info">docs(general)</span>
+          </div>
+          <h3>Added the June 2 standup report</h3>
+          <p>
+            Commit <code>1125471d8d03b5f701c4f0157ee0761e4b3bcfc8</code> added
+            425 lines total: 424 lines in
+            <code>docs/general/2026-06-03-standup-summary-2026-06-02.html</code>
+            and one appended line in <code>.beads/issues.jsonl</code>.
+          </p>
+          <div class="file-list">
+            <span class="file-pill">docs/general/2026-06-03-standup-summary-2026-06-02.html</span>
+            <span class="file-pill">.beads/issues.jsonl</span>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          The newly added HTML file is itself a standup artifact summarizing
+          June 2 repository activity. Based on the June 3 git log window, the
+          branch’s work for that day stayed in project coordination and
+          historical reporting rather than changing the event-sourced pipeline,
+          shared packages, or web application.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <div class="grid">
+          <div class="card">
+            <span class="label">Branch</span>
+            <p>
+              The June 3 commit was recorded on
+              <code>lavender/address-cve-tmp@0.2.5</code>.
+            </p>
+          </div>
+          <div class="card">
+            <span class="label">Commit Shape</span>
+            <p>
+              <code>git show --stat --summary</code> reports one new HTML file
+              and one Beads tracker append, with no edits under
+              <code>services/</code>, <code>packages/</code>, or
+              <code>apps/web/</code>.
+            </p>
+          </div>
+          <div class="card">
+            <span class="label">Tracker Evidence</span>
+            <p>
+              The non-document change was limited to
+              <code>.beads/issues.jsonl</code>, which matches the repo’s
+              required issue-tracking workflow for standup publication tasks.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <p>
+          No direct end-user behavior changed in the June 3 commit history.
+          Users would not have seen new application behavior, new API responses,
+          or updated UI flows from this activity. The practical effect was an
+          updated internal record of June 2 work.
+        </p>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li>
+            Reviewed the June 3 commit window with
+            <code>git log --since='2026-06-03 00:00' --until='2026-06-04 00:00'</code>.
+          </li>
+          <li>
+            Confirmed insertion counts and touched files with
+            <code>git show --stat --summary 1125471d8d03b5f701c4f0157ee0761e4b3bcfc8</code>.
+          </li>
+          <li>
+            Inspected the patch for the HTML artifact and Beads append with
+            <code>git show --unified=40 1125471d8d03b5f701c4f0157ee0761e4b3bcfc8</code>.
+          </li>
+          <li>
+            No builds, tests, or linters were present in the June 3 commit
+            itself.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>
+            This report is intentionally limited to committed repository
+            activity on June 3, 2026 and does not claim uncommitted local work
+            or activity in external systems.
+          </li>
+          <li>
+            The June 3 history did not expose linked pull request metadata, so
+            the summary stays anchored to commit and file evidence only.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <p>
+          No additional implementation follow-up was recorded in the June 3
+          commit itself. This reporting run is tracked in Beads issue
+          <code>islandflow-a1m</code>.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>
