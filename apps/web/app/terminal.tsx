@@ -8738,34 +8738,59 @@ const buildCommandDeckTickers = (state: TerminalState): CommandDeckTicker[] => {
 
 const CommandDeckHeader = ({ state }: { state: TerminalState }) => {
   const focus = state.activeTickers.length > 0 ? state.activeTickers.join(", ") : state.chartTicker;
-  const selected = state.selectedInstrumentLabel ?? "No contract lock";
+  const activeTickerFilter = state.filterInput.trim();
+  const activeContractFilter =
+    state.selectedInstrument?.kind === "option-contract" ? state.selectedInstrumentLabel : null;
   const connectionLabel =
     state.mode === "live" ? statusLabel(state.liveSession.status, false, state.mode) : "Replay";
 
   return (
-    <header className="command-deck-header" aria-label="Command deck context">
-      <div className="command-deck-brand">
-        <span className="command-deck-mark" aria-hidden="true" />
-        <div>
-          <span className="command-deck-kicker">islandflow</span>
-          <h2>Command Deck</h2>
+    <header className="command-deck-header compact-command-bar" aria-label="Command deck context">
+      <div className="compact-command-topline">
+        <div className="compact-command-title">
+          <span>islandflow</span>
+          <strong>Command Deck</strong>
+        </div>
+        <div className="compact-command-controls" aria-label="Active command deck controls">
+          <span className={`command-chip command-chip-${state.liveSession.status}`}>
+            {state.mode === "live" ? "Live" : "Replay"}: {connectionLabel}
+          </span>
+          <span className="command-chip">
+            Last {state.lastSeen ? formatTime(state.lastSeen) : "waiting"}
+          </span>
+          <button className="terminal-button" type="button" onClick={state.toggleMode}>
+            {state.mode === "live" ? "Switch to Replay" : "Switch to Live"}
+          </button>
         </div>
       </div>
-      <div className="command-deck-brief">
+      <div className="compact-command-context">
         <span>Evidence console</span>
         <strong>{focus}</strong>
-        <span>{selected}</span>
-      </div>
-      <div className="command-deck-controls" aria-label="Active command deck controls">
-        <span className={`command-chip command-chip-${state.liveSession.status}`}>
-          {state.mode === "live" ? "Live" : "Replay"}: {connectionLabel}
-        </span>
-        <span className="command-chip">
-          Last {state.lastSeen ? formatTime(state.lastSeen) : "waiting"}
-        </span>
-        <button className="terminal-button" type="button" onClick={state.toggleMode}>
-          {state.mode === "live" ? "Switch to Replay" : "Switch to Live"}
-        </button>
+        {activeContractFilter ? (
+          <span className="command-filter-tooltip">
+            <span>{activeContractFilter}</span>
+            <button
+              aria-label="Clear contract filter"
+              type="button"
+              onClick={() => state.setSelectedInstrument(null)}
+            >
+              X
+            </button>
+          </span>
+        ) : activeTickerFilter.length > 0 ? (
+          <span className="command-filter-tooltip">
+            <span>Ticker: {activeTickerFilter}</span>
+            <button
+              aria-label="Clear ticker filter"
+              type="button"
+              onClick={() => state.setFilterInput("")}
+            >
+              X
+            </button>
+          </span>
+        ) : (
+          <span>No active filter</span>
+        )}
       </div>
     </header>
   );

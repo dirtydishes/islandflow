@@ -854,6 +854,118 @@ h3 {
   flex-wrap: wrap;
 }
 
+.compact-command-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, oklch(0.17 0.013 250 / 0.95), oklch(0.13 0.011 250 / 0.95));
+}
+
+.compact-command-topline,
+.compact-command-context {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.compact-command-title,
+.compact-command-controls,
+.compact-command-context {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.compact-command-title span,
+.compact-command-context > span {
+  color: var(--text-faint);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: lowercase;
+}
+
+.compact-command-title strong {
+  color: var(--text);
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.compact-command-context strong {
+  color: var(--text);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.8rem;
+}
+
+.command-filter-tooltip {
+  position: relative;
+  min-width: 0;
+  max-width: min(360px, 38vw);
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 8px 5px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: oklch(0.78 0.12 74 / 0.09);
+  color: var(--text);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+.command-filter-tooltip span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command-filter-tooltip button {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: oklch(0.97 0.008 250 / 0.08);
+  color: var(--text-dim);
+  cursor: pointer;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.62rem;
+  opacity: 0;
+  transform: translateX(3px);
+  transition:
+    background-color 150ms ease,
+    color 150ms ease,
+    opacity 150ms ease,
+    transform 150ms ease;
+}
+
+.command-filter-tooltip:hover button,
+.command-filter-tooltip:focus-within button {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.command-filter-tooltip button:hover,
+.command-filter-tooltip button:focus-visible {
+  background: oklch(0.78 0.12 74 / 0.17);
+  color: var(--text);
+  outline: none;
+}
+
 .command-chip {
   min-height: 32px;
   display: inline-flex;
@@ -2477,6 +2589,7 @@ h3 {
   .interval-button,
   .overlay-toggle,
   .drawer-close,
+  .command-filter-tooltip button,
   .status-inline-counter,
   .missed-count,
   .synthetic-control-gear {
@@ -2504,6 +2617,10 @@ h3 {
 
   .command-deck-header {
     grid-template-columns: minmax(220px, 0.8fr) minmax(240px, 1fr);
+  }
+
+  .compact-command-topline {
+    justify-content: flex-start;
   }
 
   .command-deck-controls {
@@ -2672,6 +2789,20 @@ h3 {
   .command-chip {
     width: 100%;
     justify-content: center;
+  }
+
+  .compact-command-bar .command-chip,
+  .compact-command-bar .terminal-button,
+  .command-filter-tooltip {
+    width: auto;
+    max-width: 100%;
+    justify-content: center;
+  }
+
+  .compact-command-topline,
+  .compact-command-context {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .command-ticker-track {
