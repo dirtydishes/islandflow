@@ -1,7 +1,3 @@
-**<span style="color: red;">Note: This repository is a mirror</span>**
-
-**Development happens on Forgejo at [git.dirtydishes.dev](https://git.dirtydishes.dev/dirtydishes/islandflow).**
-
 ![Islandflow logo](assets/logo.png)
 
 ![Status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-b91c1c?style=for-the-badge)
