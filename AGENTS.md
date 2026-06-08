@@ -73,7 +73,7 @@ Working style that avoids common problems here:
 
 This repository's primary home is Forgejo:
 
-- URL: `https://git.deltaisland.io/dirtydishes/islandflow`
+- URL: `https://git.dirtydishes.dev/dirtydishes/islandflow`
 - Git remote: `forgejo`
 - Push target: `forgejo` (not GitHub)
 
