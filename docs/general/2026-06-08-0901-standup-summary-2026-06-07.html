@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Standup Summary for 2026-06-07</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: rgba(17, 24, 32, 0.94);
+        --panel-2: rgba(13, 20, 27, 0.98);
+        --line: rgba(255, 255, 255, 0.09);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --amber: #f5a623;
+        --amber-soft: rgba(245, 166, 35, 0.14);
+        --blue: #4da3ff;
+        --blue-soft: rgba(77, 163, 255, 0.12);
+        --green: #25c17a;
+        --green-soft: rgba(37, 193, 122, 0.12);
+        --shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+        --radius: 18px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at top right, rgba(245, 166, 35, 0.14), transparent 28rem),
+          radial-gradient(circle at top left, rgba(77, 163, 255, 0.1), transparent 24rem),
+          linear-gradient(180deg, #081018 0%, var(--bg) 34%, #05070a 100%);
+        color: var(--text);
+        font-family: "IBM Plex Sans", "Inter", system-ui, sans-serif;
+        line-height: 1.6;
+      }
+
+      main {
+        width: min(1080px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 30px 0 56px;
+      }
+
+      .hero,
+      section {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      }
+
+      .hero {
+        padding: 30px;
+        box-shadow: var(--shadow);
+      }
+
+      section {
+        margin-top: 18px;
+        padding: 22px;
+      }
+
+      .eyebrow,
+      h2,
+      .chip,
+      code,
+      pre,
+      .meta-label,
+      .meta-value {
+        font-family: "IBM Plex Mono", "SFMono-Regular", ui-monospace, monospace;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: var(--amber-soft);
+        color: var(--amber);
+        font-size: 0.76rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h3 {
+        margin: 0;
+        font-family: "Quantico", "IBM Plex Sans", system-ui, sans-serif;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin-top: 16px;
+        font-size: 3rem;
+        line-height: 1.02;
+      }
+
+      h2 {
+        margin: 0 0 14px;
+        color: var(--amber);
+        font-size: 0.84rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h3 {
+        font-size: 1rem;
+      }
+
+      p,
+      li {
+        max-width: 80ch;
+        color: var(--muted);
+      }
+
+      .hero p {
+        margin: 16px 0 0;
+        font-size: 1.02rem;
+      }
+
+      .meta,
+      .grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .meta {
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        margin-top: 22px;
+      }
+
+      .card,
+      .callout {
+        padding: 16px 18px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.025);
+      }
+
+      .meta-label {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--faint);
+        font-size: 0.72rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .meta-value {
+        color: var(--text);
+        font-size: 1rem;
+      }
+
+      .value-strong {
+        color: var(--text);
+        font-size: 1.2rem;
+        font-weight: 600;
+      }
+
+      .chip-row,
+      .file-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chip,
+      .file-pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--text);
+        font-size: 0.74rem;
+        letter-spacing: 0.04em;
+      }
+
+      .good {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .info {
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      ul {
+        padding-left: 18px;
+      }
+
+      pre {
+        margin: 0;
+        padding: 16px;
+        overflow: auto;
+        border-radius: 14px;
+        border: 1px solid var(--line);
+        background: rgba(5, 7, 10, 0.78);
+        color: var(--text);
+        font-size: 0.84rem;
+      }
+
+      code {
+        color: var(--text);
+      }
+
+      .summary-list {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      }
+
+      @media (max-width: 720px) {
+        main {
+          width: min(100% - 20px, 1080px);
+          padding-top: 20px;
+        }
+
+        .hero,
+        section {
+          padding: 18px;
+        }
+
+        h1 {
+          font-size: 2.3rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <article class="hero">
+        <span class="eyebrow">Git Standup Summary</span>
+        <h1>2026-06-07 Had No Recorded Git Commits</h1>
+        <p>
+          The repository had no commits on any ref between
+          <code>2026-06-07 00:00 -0400</code> and
+          <code>2026-06-08 00:00 -0400</code>. For standup, the grounded update is that
+          no code, config, tests, docs, or project files landed yesterday.
+        </p>
+        <div class="meta">
+          <div class="card">
+            <span class="meta-label">Commit Count</span>
+            <span class="value-strong">0</span>
+          </div>
+          <div class="card">
+            <span class="meta-label">Refs Checked</span>
+            <span class="meta-value">All refs via <code>git log --all</code></span>
+          </div>
+          <div class="card">
+            <span class="meta-label">Window</span>
+            <span class="meta-value">2026-06-07, America/New_York</span>
+          </div>
+          <div class="card">
+            <span class="meta-label">Nearest Prior Commit</span>
+            <span class="meta-value"><code>1dee827</code> on 2026-06-06 07:32 ET</span>
+          </div>
+        </div>
+      </article>
+
+      <section>
+        <h2>Summary</h2>
+        <div class="summary-list">
+          <div class="callout">
+            <h3>No yesterday commits</h3>
+            <p>
+              <code>git log --all</code> returned no commits inside the June 7 window, so
+              the standup summary should report no landed git activity.
+            </p>
+          </div>
+          <div class="callout">
+            <h3>Branch state at reporting time</h3>
+            <p>
+              <code>impeccable-live</code> matched <code>forgejo/impeccable-live</code>
+              when this report was generated.
+            </p>
+          </div>
+          <div class="callout">
+            <h3>Last concrete repo change before the window</h3>
+            <p>
+              The latest commit before June 8 was <code>1dee827</code>,
+              <code>refine command deck header</code>, dated 2026-06-06 07:32 ET.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <p>
+          No project changes were committed on 2026-06-07. That means there were no new
+          landed file modifications to summarize for standup from that date.
+        </p>
+        <p>
+          The nearest prior landed change was commit <code>1dee827</code>, which touched:
+        </p>
+        <div class="file-list">
+          <span class="file-pill">.beads/issues.jsonl</span>
+          <span class="file-pill">apps/web/app/globals.css</span>
+          <span class="file-pill">apps/web/app/terminal.tsx</span>
+          <span class="file-pill">docs/turns/2026-06-06-0730-refine-command-deck-header.html</span>
+        </div>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          This report was generated specifically for a daily standup check-in and is scoped
+          to git history during the full local calendar day of 2026-06-07 in the
+          <code>America/New_York</code> timezone. The history check covered all refs rather
+          than only the current branch tip, which avoids under-reporting activity that may
+          have landed elsewhere in the repository.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <ul>
+          <li>
+            The primary check used <code>git log --all --since='2026-06-07 00:00:00 -0400' --until='2026-06-08 00:00:00 -0400'</code>.
+          </li>
+          <li>
+            The current branch status was checked with <code>git status --short --branch</code>.
+          </li>
+          <li>
+            The latest commit before the window was captured with
+            <code>git log --all -1 --before='2026-06-08 00:00:00 -0400'</code>.
+          </li>
+        </ul>
+        <pre><code>COMMIT 1dee827c69a8e971484c82c784b19b4e2fb5c463
+DATE   2026-06-06T07:32:34-04:00
+SUBJECT refine command deck header</code></pre>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <p>
+          None from 2026-06-07 itself. Since no commits landed yesterday, there is no new
+          user-visible behavior, bug fix, or interface change to attribute to that date.
+        </p>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li>Verified the reporting window boundaries in <code>America/New_York</code>.</li>
+          <li>Checked <code>git log</code> on the current branch and across <code>--all</code> refs.</li>
+          <li>Confirmed the repo was synchronized at reporting time with <code>git status --short --branch</code>.</li>
+          <li>Captured the nearest prior commit for concrete context.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>
+            This summary is limited to git history present in the local repository at report
+            time. If a remote received new commits after the last fetch and they were not
+            present locally, they would not appear here.
+          </li>
+          <li>
+            No PR metadata was included because no June 7 commits were present to map back
+            to a specific PR.
+          </li>
+          <li>
+            To keep the summary grounded, this report avoids inferring intent from the June 6
+            commit and only uses it as nearby historical context.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>No Beads follow-up issue is required for June 7 repo activity because no commits landed that day.</li>
+          <li>If standup needs the latest shipped context instead of yesterday-only activity, use commit <code>1dee827</code> as the last landed reference point.</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
