@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Standup Summary for 2026-06-09</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: rgba(17, 24, 32, 0.94);
+        --panel-2: rgba(13, 20, 27, 0.98);
+        --line: rgba(255, 255, 255, 0.09);
+        --line-strong: rgba(245, 166, 35, 0.25);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --amber: #f5a623;
+        --amber-soft: rgba(245, 166, 35, 0.14);
+        --blue: #4da3ff;
+        --blue-soft: rgba(77, 163, 255, 0.12);
+        --green: #25c17a;
+        --green-soft: rgba(37, 193, 122, 0.12);
+        --radius: 18px;
+        --shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at top right, rgba(245, 166, 35, 0.14), transparent 28rem),
+          radial-gradient(circle at top left, rgba(77, 163, 255, 0.1), transparent 24rem),
+          linear-gradient(180deg, #081018 0%, var(--bg) 34%, #05070a 100%);
+        color: var(--text);
+        font-family: "IBM Plex Sans", "Inter", system-ui, sans-serif;
+        line-height: 1.6;
+      }
+
+      main {
+        width: min(1080px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 30px 0 56px;
+      }
+
+      .hero,
+      section {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      }
+
+      .hero {
+        padding: 30px;
+        box-shadow: var(--shadow);
+      }
+
+      section {
+        margin-top: 18px;
+        padding: 22px;
+      }
+
+      .eyebrow,
+      h2,
+      .chip,
+      code,
+      .meta-label,
+      .meta-value,
+      pre,
+      .file-pill {
+        font-family: "IBM Plex Mono", "SFMono-Regular", ui-monospace, monospace;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: var(--amber-soft);
+        color: var(--amber);
+        font-size: 0.76rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h3 {
+        margin: 0;
+        font-family: "Quantico", "IBM Plex Sans", system-ui, sans-serif;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin-top: 16px;
+        font-size: 2.8rem;
+        line-height: 1.04;
+      }
+
+      h2 {
+        margin: 0 0 14px;
+        color: var(--amber);
+        font-size: 0.84rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h3 {
+        font-size: 1rem;
+      }
+
+      p,
+      li {
+        max-width: 82ch;
+        color: var(--muted);
+      }
+
+      .hero p {
+        margin: 16px 0 0;
+        font-size: 1.02rem;
+      }
+
+      .meta,
+      .summary-list,
+      .change-grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .meta {
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        margin-top: 22px;
+      }
+
+      .summary-list,
+      .change-grid {
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      }
+
+      .card,
+      .callout {
+        padding: 16px 18px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.025);
+      }
+
+      .card strong,
+      .callout strong {
+        color: var(--text);
+      }
+
+      .meta-label {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--faint);
+        font-size: 0.72rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .meta-value {
+        color: var(--text);
+        font-size: 1rem;
+      }
+
+      .value-strong {
+        color: var(--text);
+        font-size: 1.2rem;
+        font-weight: 600;
+      }
+
+      .chip-row,
+      .file-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chip,
+      .file-pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--text);
+        font-size: 0.74rem;
+        letter-spacing: 0.04em;
+      }
+
+      .good {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .info {
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .warn {
+        background: var(--amber-soft);
+        color: var(--amber);
+      }
+
+      ul {
+        padding-left: 18px;
+      }
+
+      code {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 1px 5px;
+      }
+
+      pre {
+        margin: 0;
+        padding: 16px;
+        overflow: auto;
+        border-radius: 14px;
+        border: 1px solid var(--line-strong);
+        background: rgba(5, 7, 10, 0.78);
+        color: var(--text);
+        font-size: 0.84rem;
+      }
+
+      .stack {
+        display: grid;
+        gap: 16px;
+      }
+
+      @media (max-width: 720px) {
+        main {
+          width: min(100% - 20px, 1080px);
+          padding-top: 20px;
+        }
+
+        .hero,
+        section {
+          padding: 18px;
+        }
+
+        h1 {
+          font-size: 2.15rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <article class="hero">
+        <span class="eyebrow">Git Standup Summary</span>
+        <h1>June 9 Was a Single Standup-Docs Commit</h1>
+        <p>
+          Git history for <code>2026-06-09</code> in the
+          <code>America/New_York</code> window contains one commit:
+          <code>0c0a6fe71f57</code> at <code>09:04 ET</code>. The landed scope was
+          internal documentation only: a new standup HTML file in
+          <code>docs/general/</code> plus one appended Beads record in
+          <code>.beads/issues.jsonl</code>.
+        </p>
+        <div class="meta">
+          <div class="card">
+            <span class="meta-label">Commit Count</span>
+            <span class="value-strong">1</span>
+          </div>
+          <div class="card">
+            <span class="meta-label">Touched Files</span>
+            <span class="value-strong">2</span>
+          </div>
+          <div class="card">
+            <span class="meta-label">Primary Scope</span>
+            <span class="meta-value">Standup reporting and Beads tracking</span>
+          </div>
+          <div class="card">
+            <span class="meta-label">Commit Subject</span>
+            <span class="meta-value"><code>Add June 8 standup git summary</code></span>
+          </div>
+        </div>
+      </article>
+
+      <section>
+        <h2>Summary</h2>
+        <div class="summary-list">
+          <div class="card">
+            <h3>One landed commit</h3>
+            <p>
+              Commit <code>0c0a6fe71f57dff1d19b946b5c74cbc6c0273fb1</code> by
+              <code>dirtydishes</code> is the only recorded June 9 repository
+              activity.
+            </p>
+          </div>
+          <div class="card">
+            <h3>Documentation-only footprint</h3>
+            <p>
+              The diff touched one new HTML report under <code>docs/general/</code>
+              and one line in <code>.beads/issues.jsonl</code>.
+            </p>
+          </div>
+          <div class="card">
+            <h3>No runtime or product code changes</h3>
+            <p>
+              No files under <code>apps/</code>, <code>services/</code>,
+              <code>packages/</code>, deployment assets, or tests were modified in
+              the June 9 commit window.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <div class="change-grid">
+          <div class="card">
+            <h3>New standup artifact</h3>
+            <p>
+              Added
+              <code>docs/general/2026-06-09-0902-standup-summary-2026-06-08.html</code>
+              as a standalone summary document for the prior day.
+            </p>
+          </div>
+          <div class="card">
+            <h3>Beads record appended</h3>
+            <p>
+              Updated <code>.beads/issues.jsonl</code> with task
+              <code>islandflow-f09</code>, titled
+              <code>Summarize June 8 git activity for standup</code>.
+            </p>
+          </div>
+          <div class="card">
+            <h3>Commit size</h3>
+            <p>
+              <code>git show --stat</code> reports <code>419 insertions</code>
+              across <code>2 files changed</code>, with the HTML summary created as
+              a new file.
+            </p>
+          </div>
+        </div>
+        <div class="file-list" style="margin-top: 14px">
+          <span class="file-pill">.beads/issues.jsonl</span>
+          <span class="file-pill">docs/general/2026-06-09-0902-standup-summary-2026-06-08.html</span>
+        </div>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          This report is limited to landed git activity dated
+          <code>2026-06-09</code>. The branch history check and the file-level diff
+          both point to the same outcome: June 9 activity was a documentation
+          publish for standup, not a feature, bugfix, deployment, or test run.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <div class="stack">
+          <div class="callout">
+            <strong>Commit anchor:</strong> the only June 9 commit is
+            <code>0c0a6fe71f57dff1d19b946b5c74cbc6c0273fb1</code>,
+            authored and committed at <code>2026-06-09 09:04:31 -0400</code>.
+          </div>
+          <div class="callout">
+            <strong>Beads anchor:</strong> the appended issue record in
+            <code>.beads/issues.jsonl</code> is a closed task entry for
+            <code>islandflow-f09</code>, which matches the standup-summary scope.
+          </div>
+          <div class="callout">
+            <strong>PR context:</strong> no PR number, merge marker, or review link
+            appears in the commit subject, commit body, or touched files inspected
+            for this June 9 window.
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <div class="chip-row">
+          <span class="chip warn">Internal workflow impact only</span>
+          <span class="chip info">No runtime surface changes</span>
+          <span class="chip good">No user-facing behavior delta in git</span>
+        </div>
+        <p>
+          Based on the touched files in commit <code>0c0a6fe71f57</code>,
+          Islandflow end-users should see no product behavior change from June 9
+          activity. The landed output was internal reporting for the team’s daily
+          standup process.
+        </p>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li>
+            Ran
+            <code>git log --since='2026-06-09 00:00' --until='2026-06-10 00:00' --date=iso --pretty=format:'%H %ad %an %s'</code>
+            to confirm the full June 9 commit window.
+          </li>
+          <li>
+            Ran
+            <code>git log --since='2026-06-09 00:00' --until='2026-06-10 00:00' --name-only --pretty=format:'COMMIT %H %s'</code>
+            to verify the exact touched-file list.
+          </li>
+          <li>
+            Ran
+            <code>git show --stat --summary --format=fuller 0c0a6fe71f57dff1d19b946b5c74cbc6c0273fb1</code>
+            to verify author, timestamp, file count, and insertions.
+          </li>
+          <li>
+            Inspected the file-level diff for
+            <code>.beads/issues.jsonl</code> and
+            <code>docs/general/2026-06-09-0902-standup-summary-2026-06-08.html</code>
+            to confirm the scope stayed limited to standup tracking artifacts.
+          </li>
+        </ul>
+        <pre>commit 0c0a6fe71f57dff1d19b946b5c74cbc6c0273fb1
+AuthorDate: 2026-06-09 09:04:31 -0400
+Subject: Add June 8 standup git summary
+Files: .beads/issues.jsonl, docs/general/2026-06-09-0902-standup-summary-2026-06-08.html</pre>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>
+            This summary is git-grounded. Any June 9 work that was not committed
+            does not appear here.
+          </li>
+          <li>
+            The Beads entry proves task tracking activity happened, but it does not
+            add product-scope changes beyond the one recorded summary task, so this
+            report stays narrow on purpose.
+          </li>
+          <li>
+            No PR linkage was discoverable from the inspected commit metadata, so
+            the report avoids inferring review or merge context.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>
+            No additional follow-up issue was created from June 9 git activity
+            itself.
+          </li>
+          <li>
+            This automation run is tracked in <code>islandflow-iwg</code> and can
+            be closed after this new standup summary is committed and pushed.
+          </li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>
