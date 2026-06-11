@@ -17,67 +17,59 @@ type Concept = {
 
 const concepts: Record<MockVariant, Concept> = {
   mock1: {
-    title: "Signal Court",
-    shortName: "Court",
-    routeName: "Case Board",
-    premise:
-      "A fired signal is treated as a legal brief: evidence, objections, market context, and the live price trace are arranged around the claim.",
+    title: "Signal Docket",
+    shortName: "Docket",
+    routeName: "Case Tape",
+    premise: "Active claims, confirms, contra-flow, and invalidation marks on one symbol docket.",
     bodyClass: "mock-court"
   },
   mock2: {
-    title: "Triage Desk",
+    title: "Alert Queue",
     shortName: "Desk",
-    routeName: "Live Queue",
-    premise:
-      "The user works down a prioritized desk queue with clear routing, severity, source health, and next action controls always in reach.",
+    routeName: "Desk Queue",
+    premise: "Ranked live signals by urgency, source state, and tape confirmation.",
     bodyClass: "mock-desk"
   },
   mock3: {
-    title: "Replay Theatre",
-    shortName: "Theatre",
-    routeName: "Session Review",
-    premise:
-      "Replay becomes a scrub room: the time rail leads, and every event, chart move, and note locks to the current evidence frame.",
+    title: "Replay Tape",
+    shortName: "Replay",
+    routeName: "Tape Review",
+    premise: "Frame-locked replay across prints, candles, packet state, and notes.",
     bodyClass: "mock-theatre"
   },
   mock4: {
-    title: "Sector Cartography",
+    title: "Pressure Map",
     shortName: "Map",
-    routeName: "Market Map",
-    premise:
-      "Cross-market pressure is drawn as territories, so the trader can see where attention clusters before opening a single-symbol case.",
+    routeName: "Cross-Market",
+    premise: "Sector heat, linked symbols, and flow clusters before single-name drilldown.",
     bodyClass: "mock-map"
   },
   mock5: {
-    title: "Options Intake",
+    title: "OPRA Intake",
     shortName: "Options",
-    routeName: "Options",
-    premise:
-      "A dense OPRA-style blotter turns contract activity into candidate flow packets, with strike context, sweep shape, venue mix, and confidence deltas visible in one scan.",
+    routeName: "OPRA",
+    premise: "Contract tape, premium concentration, sweep shape, ask lift, and packet eligibility.",
     bodyClass: "mock-options"
   },
   mock6: {
-    title: "Packet Forensics",
+    title: "Packet Stack",
     shortName: "Packets",
-    routeName: "Flow Packets",
-    premise:
-      "Options prints, equity tape, venue imbalance, and news fragments are assembled into packets before any alert can earn attention.",
+    routeName: "Packets",
+    premise: "Flow packets scored by options burst, tape response, venue mix, and sector echo.",
     bodyClass: "mock-packets"
   },
   mock7: {
-    title: "Alert Reason Wall",
+    title: "Alert Blotter",
     shortName: "Alerts",
     routeName: "Alerts",
-    premise:
-      "Every smart money party alert is shown with the reason, type, invalidation path, and evidence lineage that caused it to fire.",
+    premise: "Smart-money alerts with trigger, read type, severity, and invalidation level.",
     bodyClass: "mock-alerts"
   },
   mock8: {
-    title: "Market Activity Graph",
-    shortName: "Graph",
-    routeName: "Activity Graph",
-    premise:
-      "A route-wide intelligence board connects options flow to packets, packets to alerts, and alerts to broader market pressure without repeating the same evidence twice.",
+    title: "Activity Matrix",
+    shortName: "Matrix",
+    routeName: "Matrix",
+    premise: "Options, packet, alert, and market context stitched into one activity map.",
     bodyClass: "mock-graph"
   }
 };
@@ -305,7 +297,7 @@ const packetSteps = [
     label: "packet ready",
     time: "09:42:44",
     weight: 86,
-    detail: "Smart money party candidate: stealth accumulation into short-dated calls"
+    detail: "SMP candidate: stealth accumulation into short-dated calls"
   }
 ];
 
@@ -320,9 +312,9 @@ const alertRows = [
   [
     "09:42:51",
     "AAPL",
-    "Party Alert",
+    "SMP Alert",
     "stealth accumulation",
-    "options led equity by 72s; dark venue share elevated",
+    "options led stock by 72s; dark share elevated",
     "accept above 194.50",
     "high"
   ],
@@ -371,7 +363,7 @@ const graphLanes = [
     x2: "88%",
     y: "22%",
     tone: "accent",
-    text: "Party Alert: stealth accumulation"
+    text: "SMP alert: stealth accumulation"
   },
   {
     label: "Market",
@@ -403,12 +395,12 @@ export function DashboardMock({ variant }: DashboardMockProps) {
 
 function MockNavigation({ active, concept }: { active: MockVariant; concept: Concept }) {
   return (
-    <header className="mock-nav" aria-label="Mock redesign navigation">
+    <header className="mock-nav" aria-label="Terminal navigation">
       <Link className="mock-brand" href="/mock1">
         <span>IF</span>
-        <strong>mock lab</strong>
+        <strong>terminal studies</strong>
       </Link>
-      <nav className="mock-route-tabs" aria-label="Mock variants">
+      <nav className="mock-route-tabs" aria-label="Terminal studies">
         {variantOrder.map((item) => (
           <Link
             aria-current={item === active ? "page" : undefined}
@@ -421,11 +413,11 @@ function MockNavigation({ active, concept }: { active: MockVariant; concept: Con
           </Link>
         ))}
       </nav>
-      <div className="mock-now" aria-label="Current session state">
-        <span>live sketch</span>
+      <div className="mock-now" aria-label="Market clock">
+        <span>live tape</span>
         <strong>09:41:23 ET</strong>
       </div>
-      <section className="mock-hero" aria-label="Concept summary">
+      <section className="mock-hero" aria-label="Route summary">
         <p>{concept.routeName}</p>
         <h1 id="mock-title">{concept.title}</h1>
         <span>{concept.premise}</span>
@@ -436,31 +428,28 @@ function MockNavigation({ active, concept }: { active: MockVariant; concept: Con
 
 function SignalCourt() {
   return (
-    <section className="mock-court-layout" aria-label="Signal court concept">
-      <Panel className="mock-verdict" title="Current claim">
+    <section className="mock-court-layout" aria-label="Signal docket">
+      <Panel className="mock-verdict" title="Active read">
         <div className="mock-verdict-mark">AAPL</div>
-        <h2>Dark sweep pressure is confirmed by call lift.</h2>
-        <p>
-          Treat the alert as a claim to prove. The board shows confirming evidence, contradictions,
-          and what must happen next before the trade deserves attention.
-        </p>
+        <h2>Dark sweep confirmed by short-dated call lift.</h2>
+        <p>AAPL holds above 194.50 with options lead, elevated dark share, and QQQ support.</p>
         <div className="mock-verdict-actions">
-          <button type="button">Open case</button>
-          <button type="button">Mark watch</button>
+          <button type="button">Open tape</button>
+          <button type="button">Set watch</button>
         </div>
       </Panel>
-      <Panel className="mock-exhibits" title="Evidence exhibits">
+      <Panel className="mock-exhibits" title="Evidence">
         <EvidenceStack />
       </Panel>
-      <Panel className="mock-court-chart" title="Price testimony">
-        <ChartSketch density={60} marker="claim filed" />
+      <Panel className="mock-court-chart" title="Price tape">
+        <ChartSketch density={60} marker="signal" />
       </Panel>
-      <Panel className="mock-objections" title="Objections">
+      <Panel className="mock-objections" title="Contra">
         <FactList
           items={[
-            ["Venue concentration", "64% off-exchange share is above normal"],
-            ["Sector check", "QQQ confirmation is present but not decisive"],
-            ["Invalidation", "Acceptance fails below 194.50"]
+            ["Venue", "64% off-exchange share, +18 pts vs session"],
+            ["Sector", "QQQ confirms; semis neutral"],
+            ["Invalid", "Below 194.50"]
           ]}
         />
       </Panel>
@@ -470,16 +459,16 @@ function SignalCourt() {
 
 function TriageDesk() {
   return (
-    <section className="mock-desk-layout" aria-label="Triage desk concept">
+    <section className="mock-desk-layout" aria-label="Alert queue">
       <aside className="mock-desk-rail" aria-label="Queue filters">
         <strong>route</strong>
-        {["all", "urgent", "needs chart", "stale source"].map((item, index) => (
+        {["all", "hot", "chart", "stale"].map((item, index) => (
           <button className={index === 1 ? "is-active" : ""} type="button" key={item}>
             {item}
           </button>
         ))}
       </aside>
-      <Panel className="mock-queue-board" title="Priority queue">
+      <Panel className="mock-queue-board" title="Priority">
         {anomalies.map((item, index) => (
           <article
             className={index === 0 ? "mock-desk-ticket is-selected" : "mock-desk-ticket"}
@@ -495,21 +484,21 @@ function TriageDesk() {
           </article>
         ))}
       </Panel>
-      <Panel className="mock-desk-workspace" title="Selected alert">
+      <Panel className="mock-desk-workspace" title="Selected">
         <div className="mock-workspace-head">
           <span>AAPL</span>
           <h2>Dark sweep aligns with call pressure</h2>
-          <p>Next action: verify whether price accepts above the prior liquidity shelf.</p>
+          <p>Monitor acceptance above 194.50; invalidate on failed retest.</p>
         </div>
-        <ChartSketch density={42} marker="decision" />
+        <ChartSketch density={42} marker="decision line" />
       </Panel>
-      <Panel className="mock-desk-health" title="Source status">
+      <Panel className="mock-desk-health" title="Feeds">
         <HealthRows />
         <FactList
           items={[
-            ["Agreement", "4 of 5 linked sources agree"],
-            ["Replay match", "Similar to Apr 26 open"],
-            ["Risk note", "Off-exchange share elevated"]
+            ["Confluence", "4/5 sources"],
+            ["Analog", "Apr 26 open"],
+            ["Risk", "Dark share elevated"]
           ]}
         />
       </Panel>
@@ -519,12 +508,12 @@ function TriageDesk() {
 
 function ReplayTheatre() {
   return (
-    <section className="mock-theatre-layout" aria-label="Replay theatre concept">
-      <Panel className="mock-stage" title="Replay frame">
+    <section className="mock-theatre-layout" aria-label="Replay tape">
+      <Panel className="mock-stage" title="Frame">
         <div className="mock-stage-head">
           <div>
             <span>May 16, 2024</span>
-            <h2>09:41:23 confirmation window</h2>
+            <h2>09:41:23 confirm window</h2>
           </div>
           <div className="mock-stage-controls" aria-label="Replay controls">
             <button type="button">-30s</button>
@@ -536,7 +525,7 @@ function ReplayTheatre() {
         <ReplayRail />
         <ChartSketch density={72} marker="cursor" />
       </Panel>
-      <Panel className="mock-script" title="Event script">
+      <Panel className="mock-script" title="Sequence">
         <ol>
           {timeline.map(([time, title, detail]) => (
             <li key={time}>
@@ -547,15 +536,15 @@ function ReplayTheatre() {
           ))}
         </ol>
       </Panel>
-      <Panel className="mock-theatre-tape" title="Synced tape">
+      <Panel className="mock-theatre-tape" title="Flow">
         <FlowRows compact />
       </Panel>
-      <Panel className="mock-director-notes" title="Director notes">
+      <Panel className="mock-director-notes" title="Notes">
         <FactList
           items={[
-            ["Lead", "Dark flow cluster arrived first"],
-            ["Confirm", "195 C sweep followed within 72s"],
-            ["Watch", "Acceptance needs one more candle"]
+            ["Lead", "Dark cluster first"],
+            ["Confirm", "195C sweep +72s"],
+            ["Watch", "One candle acceptance"]
           ]}
         />
       </Panel>
@@ -565,8 +554,8 @@ function ReplayTheatre() {
 
 function SectorCartography() {
   return (
-    <section className="mock-map-layout" aria-label="Sector cartography concept">
-      <Panel className="mock-map-canvas" title="Pressure territory">
+    <section className="mock-map-layout" aria-label="Pressure map">
+      <Panel className="mock-map-canvas" title="Pressure">
         <div className="mock-territory">
           {atlasGroups.map((group) => (
             <article
@@ -586,7 +575,7 @@ function SectorCartography() {
           ))}
         </div>
       </Panel>
-      <Panel className="mock-map-index" title="Cluster index">
+      <Panel className="mock-map-index" title="Clusters">
         {atlasGroups.map((group) => (
           <article className="mock-cluster" key={group.name}>
             <div>
@@ -597,7 +586,7 @@ function SectorCartography() {
           </article>
         ))}
       </Panel>
-      <Panel className="mock-map-flow" title="Linked flow">
+      <Panel className="mock-map-flow" title="Linked">
         <FlowRows compact />
       </Panel>
     </section>
@@ -606,19 +595,17 @@ function SectorCartography() {
 
 function OptionsIntake() {
   return (
-    <section className="mock-options-layout" aria-label="Options intake concept">
+    <section className="mock-options-layout" aria-label="OPRA intake">
       <div className="mock-options-command" aria-label="Options filters">
-        {["OPRA LIVE", "ASK SIDE", "ABOVE 2 SIGMA", "PACKETABLE", "AAPL FOCUS"].map(
-          (item, index) => (
-            <button className={index === 3 ? "is-active" : ""} type="button" key={item}>
-              {item}
-            </button>
-          )
-        )}
+        {["OPRA LIVE", "ASK LIFT", "+2 SIGMA", "PACKET FIT", "AAPL"].map((item, index) => (
+          <button className={index === 3 ? "is-active" : ""} type="button" key={item}>
+            {item}
+          </button>
+        ))}
       </div>
       <div className="mock-options-tape" role="table" aria-label="Options flow intake blotter">
         <div className="mock-options-row is-head" role="row">
-          {["Time", "Sym", "Contract", "Qty", "Premium", "Shape", "Ask", "Base", "Use"].map(
+          {["Time", "Sym", "Contract", "Qty", "Premium", "Print", "Ask", "Z", "State"].map(
             (item) => (
               <span role="columnheader" key={item}>
                 {item}
@@ -646,24 +633,24 @@ function OptionsIntake() {
           </div>
         ))}
       </div>
-      <aside className="mock-options-depth" aria-label="Selected contract depth">
-        <h2>AAPL 195C depth</h2>
+      <aside className="mock-options-depth" aria-label="Selected contract">
+        <h2>AAPL 195C</h2>
         <dl>
           <div>
-            <dt>packet fit</dt>
+            <dt>fit</dt>
             <dd>92%</dd>
           </div>
           <div>
-            <dt>repeat buyer</dt>
+            <dt>repeat</dt>
             <dd>3 prints</dd>
           </div>
           <div>
-            <dt>venue skew</dt>
+            <dt>venue</dt>
             <dd>ask 61%</dd>
           </div>
           <div>
-            <dt>alert path</dt>
-            <dd>needs equity hold</dd>
+            <dt>trigger</dt>
+            <dd>hold 194.50</dd>
           </div>
         </dl>
       </aside>
@@ -674,22 +661,22 @@ function OptionsIntake() {
 
 function PacketForensics() {
   return (
-    <section className="mock-packet-layout" aria-label="Flow packet forensics concept">
-      <div className="mock-packet-chain" aria-label="Packet assembly chain">
+    <section className="mock-packet-layout" aria-label="Packet stack">
+      <div className="mock-packet-chain" aria-label="Packet chain">
         {packetSteps.map((step, index) => (
           <article key={step.label} style={{ "--weight": step.weight } as CSSProperties}>
             <time>{step.time}</time>
             <strong>{step.label}</strong>
             <p>{step.detail}</p>
             <span>
-              {index === packetSteps.length - 1 ? "alert eligible" : `${step.weight}% contribution`}
+              {index === packetSteps.length - 1 ? "alert eligible" : `${step.weight}% weight`}
             </span>
           </article>
         ))}
       </div>
       <div className="mock-packet-ledger" role="table" aria-label="Packet state ledger">
         <div className="mock-packet-row is-head" role="row">
-          {["Packet", "Symbol", "State", "Evidence", "Reason", "Score"].map((item) => (
+          {["Packet", "Sym", "State", "Sources", "Read", "Score"].map((item) => (
             <span role="columnheader" key={item}>
               {item}
             </span>
@@ -708,13 +695,13 @@ function PacketForensics() {
           </div>
         ))}
       </div>
-      <aside className="mock-packet-inspector" aria-label="Packet evidence inspector">
+      <aside className="mock-packet-inspector" aria-label="Packet lineage">
         <h2>PKT-8841 lineage</h2>
         <FactList
           items={[
-            ["Options", "195C sweep and 200C join established the packet spine"],
-            ["Equity", "Dark print confirmed demand after the options burst"],
-            ["Alert trigger", "Party alert only fires after acceptance above 194.50"]
+            ["Options", "195C sweep + 200C join"],
+            ["Equity", "Dark buy after options burst"],
+            ["Trigger", "Acceptance above 194.50"]
           ]}
         />
       </aside>
@@ -724,16 +711,14 @@ function PacketForensics() {
 
 function AlertReasonWall() {
   return (
-    <section className="mock-alert-layout" aria-label="Smart money alert wall concept">
-      <div className="mock-alert-wall" role="table" aria-label="Alert reasons">
+    <section className="mock-alert-layout" aria-label="SMP alert blotter">
+      <div className="mock-alert-wall" role="table" aria-label="Alert blotter">
         <div className="mock-alert-row is-head" role="row">
-          {["Time", "Sym", "Type", "Reason", "Why it fired", "Invalidation", "Severity"].map(
-            (item) => (
-              <span role="columnheader" key={item}>
-                {item}
-              </span>
-            )
-          )}
+          {["Time", "Sym", "Type", "Read", "Trigger", "Invalid", "Severity"].map((item) => (
+            <span role="columnheader" key={item}>
+              {item}
+            </span>
+          ))}
         </div>
         {alertRows.map(([time, symbol, type, reason, why, invalidation, severity]) => (
           <div className={`mock-alert-row is-${severity}`} role="row" key={`${time}-${symbol}`}>
@@ -751,20 +736,20 @@ function AlertReasonWall() {
           </div>
         ))}
       </div>
-      <aside className="mock-alert-reason" aria-label="Selected alert decision path">
-        <h2>Why AAPL fired</h2>
+      <aside className="mock-alert-reason" aria-label="Selected alert stack">
+        <h2>AAPL 09:42:51</h2>
         <ol>
           <li>
-            <strong>Options flow led</strong>
-            <span>Short-dated call premium arrived before the visible equity move.</span>
+            <strong>Options lead</strong>
+            <span>Short-dated call premium before visible stock move.</span>
           </li>
           <li>
-            <strong>Packet confirmed</strong>
-            <span>Dark venue share and QQQ context removed the obvious objections.</span>
+            <strong>Packet confirm</strong>
+            <span>Dark share high; QQQ supportive.</span>
           </li>
           <li>
-            <strong>Party alert typed</strong>
-            <span>Classified as stealth accumulation, not a momentum chase.</span>
+            <strong>SMP type</strong>
+            <span>Stealth accumulation, not chase flow.</span>
           </li>
         </ol>
       </aside>
@@ -774,8 +759,8 @@ function AlertReasonWall() {
 
 function MarketActivityGraph() {
   return (
-    <section className="mock-graph-layout" aria-label="Market activity graph concept">
-      <div className="mock-graph-canvas" aria-label="Options to alert graph">
+    <section className="mock-graph-layout" aria-label="Activity matrix">
+      <div className="mock-graph-canvas" aria-label="Options packet alert matrix">
         {graphLanes.map((lane) => (
           <div
             className={`mock-graph-link is-${lane.tone}`}
@@ -786,17 +771,17 @@ function MarketActivityGraph() {
             <span>{lane.text}</span>
           </div>
         ))}
-        <div className="mock-graph-node is-options">Options intake</div>
+        <div className="mock-graph-node is-options">OPRA intake</div>
         <div className="mock-graph-node is-packet">Packet PKT-8841</div>
-        <div className="mock-graph-node is-alert">Party alert</div>
-        <div className="mock-graph-node is-market">Market context</div>
+        <div className="mock-graph-node is-alert">SMP alert</div>
+        <div className="mock-graph-node is-market">Market state</div>
       </div>
-      <div className="mock-graph-routes" aria-label="Route coverage">
+      <div className="mock-graph-routes" aria-label="Route map">
         {[
-          ["Options page", "raw prints become packet candidates"],
-          ["Packets page", "evidence sources are merged and scored"],
-          ["Alerts page", "reason/type/invalidation are exposed"],
-          ["Replay page", "the same chain can be audited after the fact"]
+          ["OPRA", "raw contract tape"],
+          ["Packets", "merged source stack"],
+          ["Alerts", "SMP read + invalidation"],
+          ["Replay", "frame audit"]
         ].map(([route, purpose]) => (
           <div key={route}>
             <strong>{route}</strong>
@@ -804,12 +789,12 @@ function MarketActivityGraph() {
           </div>
         ))}
       </div>
-      <div className="mock-graph-strip" aria-label="Non-redundant feature map">
+      <div className="mock-graph-strip" aria-label="Matrix status">
         <FactList
           items={[
-            ["No duplicate views", "Each route owns a different step in the evidence chain"],
-            ["User value", "The trader sees whether activity is raw, packeted, or alert-worthy"],
-            ["Decision path", "Every alert remains traceable to the options flow that caused it"]
+            ["State", "Raw -> packet -> alert"],
+            ["Scope", "No duplicate panes"],
+            ["Audit", "Alert traces to OPRA source"]
           ]}
         />
       </div>
@@ -855,7 +840,7 @@ function EvidenceStack() {
 
 function ChartSketch({ density, marker }: { density: number; marker: string }) {
   return (
-    <div className="mock-chart" aria-label="Synthetic price and volume sketch">
+    <div className="mock-chart" aria-label="Price and volume trace">
       <div className="mock-chart-readout">
         <span>AAPL</span>
         <strong>194.88</strong>
@@ -913,15 +898,13 @@ function FlowRows({ compact = false }: { compact?: boolean }) {
 
 function FlowLadder() {
   return (
-    <div className="mock-flow-ladder" aria-label="Options flow to alert ladder">
-      {["raw option print", "candidate flow", "packet assembly", "party alert"].map(
-        (item, index) => (
-          <div className={index === 1 ? "is-active" : ""} key={item}>
-            <span>{index + 1}</span>
-            <strong>{item}</strong>
-          </div>
-        )
-      )}
+    <div className="mock-flow-ladder" aria-label="Options flow ladder">
+      {["raw print", "candidate", "packet", "SMP alert"].map((item, index) => (
+        <div className={index === 1 ? "is-active" : ""} key={item}>
+          <span>{index + 1}</span>
+          <strong>{item}</strong>
+        </div>
+      ))}
     </div>
   );
 }
