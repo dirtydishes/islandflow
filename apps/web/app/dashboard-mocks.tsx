@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 
-type MockVariant = "mock1" | "mock2" | "mock3" | "mock4";
+type MockVariant = "mock1" | "mock2" | "mock3" | "mock4" | "mock5" | "mock6" | "mock7" | "mock8";
 
 type DashboardMockProps = {
   variant: MockVariant;
@@ -47,17 +47,93 @@ const concepts: Record<MockVariant, Concept> = {
     premise:
       "Cross-market pressure is drawn as territories, so the trader can see where attention clusters before opening a single-symbol case.",
     bodyClass: "mock-map"
+  },
+  mock5: {
+    title: "Options Intake",
+    shortName: "Options",
+    routeName: "Options",
+    premise:
+      "A dense OPRA-style blotter turns contract activity into candidate flow packets, with strike context, sweep shape, venue mix, and confidence deltas visible in one scan.",
+    bodyClass: "mock-options"
+  },
+  mock6: {
+    title: "Packet Forensics",
+    shortName: "Packets",
+    routeName: "Flow Packets",
+    premise:
+      "Options prints, equity tape, venue imbalance, and news fragments are assembled into packets before any alert can earn attention.",
+    bodyClass: "mock-packets"
+  },
+  mock7: {
+    title: "Alert Reason Wall",
+    shortName: "Alerts",
+    routeName: "Alerts",
+    premise:
+      "Every smart money party alert is shown with the reason, type, invalidation path, and evidence lineage that caused it to fire.",
+    bodyClass: "mock-alerts"
+  },
+  mock8: {
+    title: "Market Activity Graph",
+    shortName: "Graph",
+    routeName: "Activity Graph",
+    premise:
+      "A route-wide intelligence board connects options flow to packets, packets to alerts, and alerts to broader market pressure without repeating the same evidence twice.",
+    bodyClass: "mock-graph"
   }
 };
 
-const variantOrder: MockVariant[] = ["mock1", "mock2", "mock3", "mock4"];
+const variantOrder: MockVariant[] = [
+  "mock1",
+  "mock2",
+  "mock3",
+  "mock4",
+  "mock5",
+  "mock6",
+  "mock7",
+  "mock8"
+];
 
 const symbols = [
-  { symbol: "AAPL", price: "194.88", move: "+1.22%", direction: "up", score: 94, sector: "Mega cap tech" },
-  { symbol: "NVDA", price: "120.19", move: "-0.41%", direction: "down", score: 81, sector: "AI semis" },
-  { symbol: "TSLA", price: "180.72", move: "+0.72%", direction: "up", score: 76, sector: "EV complex" },
-  { symbol: "AMZN", price: "186.31", move: "+0.35%", direction: "up", score: 68, sector: "Consumer platform" },
-  { symbol: "IWM", price: "205.41", move: "+0.21%", direction: "up", score: 59, sector: "Small caps" }
+  {
+    symbol: "AAPL",
+    price: "194.88",
+    move: "+1.22%",
+    direction: "up",
+    score: 94,
+    sector: "Mega cap tech"
+  },
+  {
+    symbol: "NVDA",
+    price: "120.19",
+    move: "-0.41%",
+    direction: "down",
+    score: 81,
+    sector: "AI semis"
+  },
+  {
+    symbol: "TSLA",
+    price: "180.72",
+    move: "+0.72%",
+    direction: "up",
+    score: 76,
+    sector: "EV complex"
+  },
+  {
+    symbol: "AMZN",
+    price: "186.31",
+    move: "+0.35%",
+    direction: "up",
+    score: 68,
+    sector: "Consumer platform"
+  },
+  {
+    symbol: "IWM",
+    price: "205.41",
+    move: "+0.21%",
+    direction: "up",
+    score: 59,
+    sector: "Small caps"
+  }
 ];
 
 const anomalies = [
@@ -130,10 +206,181 @@ const timeline = [
 ];
 
 const atlasGroups = [
-  { name: "Mega cap tech", heat: 92, flow: "+$8.4M", symbols: ["AAPL", "MSFT", "AMZN"], x: 16, y: 22 },
+  {
+    name: "Mega cap tech",
+    heat: 92,
+    flow: "+$8.4M",
+    symbols: ["AAPL", "MSFT", "AMZN"],
+    x: 16,
+    y: 22
+  },
   { name: "AI semis", heat: 81, flow: "+$5.1M", symbols: ["NVDA", "AMD", "AVGO"], x: 64, y: 26 },
-  { name: "Beta basket", heat: 66, flow: "+$3.8M", symbols: ["TSLA", "COIN", "PLTR"], x: 34, y: 66 },
+  {
+    name: "Beta basket",
+    heat: 66,
+    flow: "+$3.8M",
+    symbols: ["TSLA", "COIN", "PLTR"],
+    x: 34,
+    y: 66
+  },
   { name: "Defensive", heat: 38, flow: "-$1.2M", symbols: ["XLU", "XLV", "PG"], x: 74, y: 70 }
+];
+
+const intakeRows = [
+  [
+    "09:41:23.420",
+    "AAPL",
+    "17MAY24 195C",
+    "12,480",
+    "$4.32M",
+    "sweep",
+    "61%",
+    "+3.8σ",
+    "candidate"
+  ],
+  [
+    "09:41:18.092",
+    "AAPL",
+    "21JUN24 200C",
+    "8,920",
+    "$2.74M",
+    "split sweep",
+    "58%",
+    "+2.9σ",
+    "join"
+  ],
+  [
+    "09:40:52.774",
+    "QQQ",
+    "17MAY24 458C",
+    "19,600",
+    "$5.10M",
+    "block lift",
+    "49%",
+    "+2.1σ",
+    "confirm"
+  ],
+  ["09:40:11.018", "NVDA", "24MAY24 120C", "7,340", "$2.01M", "iso sweep", "42%", "+1.7σ", "watch"],
+  [
+    "09:39:47.660",
+    "TSLA",
+    "19JUL24 205C",
+    "10,000",
+    "$3.45M",
+    "block",
+    "38%",
+    "+2.4σ",
+    "candidate"
+  ],
+  ["09:39:12.105", "AMZN", "17MAY24 185P", "4,500", "$1.20M", "sweep", "36%", "-1.9σ", "reject"],
+  ["09:38:59.443", "IWM", "17MAY24 205C", "14,250", "$1.92M", "multi-leg", "31%", "+1.4σ", "watch"]
+];
+
+const packetSteps = [
+  {
+    label: "options burst",
+    time: "09:41:23",
+    weight: 92,
+    detail: "AAPL 195C + 200C clustered inside 72s with ask-side pressure"
+  },
+  {
+    label: "equity trace",
+    time: "09:41:48",
+    weight: 74,
+    detail: "25k dark buy and visible bid lift hold above 194.50"
+  },
+  {
+    label: "venue mix",
+    time: "09:42:06",
+    weight: 68,
+    detail: "Off-exchange share at 64%, above session baseline by 18 points"
+  },
+  {
+    label: "sector echo",
+    time: "09:42:31",
+    weight: 57,
+    detail: "QQQ confirms, semis neutral, no broad risk-off objection"
+  },
+  {
+    label: "packet ready",
+    time: "09:42:44",
+    weight: 86,
+    detail: "Smart money party candidate: stealth accumulation into short-dated calls"
+  }
+];
+
+const packetRows = [
+  ["PKT-8841", "AAPL", "ready", "5 sources", "stealth accumulation", "86"],
+  ["PKT-8838", "TSLA", "building", "3 sources", "momentum ignition", "71"],
+  ["PKT-8834", "NVDA", "held", "2 sources", "call wall absorption", "63"],
+  ["PKT-8827", "AMZN", "rejected", "2 sources", "put sweep divergence", "39"]
+];
+
+const alertRows = [
+  [
+    "09:42:51",
+    "AAPL",
+    "Party Alert",
+    "stealth accumulation",
+    "options led equity by 72s; dark venue share elevated",
+    "accept above 194.50",
+    "high"
+  ],
+  [
+    "09:41:58",
+    "TSLA",
+    "Ignition Watch",
+    "momentum ignition",
+    "block call buy plus tape acceleration",
+    "fails below 178.80",
+    "medium"
+  ],
+  [
+    "09:40:34",
+    "NVDA",
+    "Absorption",
+    "call wall defense",
+    "buyers absorbed at 120 but price did not expand",
+    "rejects 120.40",
+    "watch"
+  ],
+  [
+    "09:39:22",
+    "AMZN",
+    "Divergence",
+    "put sweep against basket",
+    "bearish premium while sector bid held",
+    "reclaims 186.20",
+    "low"
+  ]
+];
+
+const graphLanes = [
+  { label: "Options", x1: "5%", x2: "31%", y: "18%", tone: "good", text: "195C sweep + 200C join" },
+  {
+    label: "Packet",
+    x1: "35%",
+    x2: "60%",
+    y: "35%",
+    tone: "info",
+    text: "PKT-8841 ready, 5 sources"
+  },
+  {
+    label: "Alert",
+    x1: "63%",
+    x2: "88%",
+    y: "22%",
+    tone: "accent",
+    text: "Party Alert: stealth accumulation"
+  },
+  {
+    label: "Market",
+    x1: "20%",
+    x2: "82%",
+    y: "69%",
+    tone: "watch",
+    text: "QQQ confirms; semis neutral"
+  }
 ];
 
 export function DashboardMock({ variant }: DashboardMockProps) {
@@ -146,6 +393,10 @@ export function DashboardMock({ variant }: DashboardMockProps) {
       {variant === "mock2" ? <TriageDesk /> : null}
       {variant === "mock3" ? <ReplayTheatre /> : null}
       {variant === "mock4" ? <SectorCartography /> : null}
+      {variant === "mock5" ? <OptionsIntake /> : null}
+      {variant === "mock6" ? <PacketForensics /> : null}
+      {variant === "mock7" ? <AlertReasonWall /> : null}
+      {variant === "mock8" ? <MarketActivityGraph /> : null}
     </main>
   );
 }
@@ -190,8 +441,8 @@ function SignalCourt() {
         <div className="mock-verdict-mark">AAPL</div>
         <h2>Dark sweep pressure is confirmed by call lift.</h2>
         <p>
-          Treat the alert as a claim to prove. The board shows confirming evidence,
-          contradictions, and what must happen next before the trade deserves attention.
+          Treat the alert as a claim to prove. The board shows confirming evidence, contradictions,
+          and what must happen next before the trade deserves attention.
         </p>
         <div className="mock-verdict-actions">
           <button type="button">Open case</button>
@@ -230,7 +481,10 @@ function TriageDesk() {
       </aside>
       <Panel className="mock-queue-board" title="Priority queue">
         {anomalies.map((item, index) => (
-          <article className={index === 0 ? "mock-desk-ticket is-selected" : "mock-desk-ticket"} key={item.time}>
+          <article
+            className={index === 0 ? "mock-desk-ticket is-selected" : "mock-desk-ticket"}
+            key={item.time}
+          >
             <time>{item.time}</time>
             <div>
               <strong>{item.symbol}</strong>
@@ -318,7 +572,13 @@ function SectorCartography() {
             <article
               className="mock-territory-node"
               key={group.name}
-              style={{ "--x": `${group.x}%`, "--y": `${group.y}%`, "--heat": group.heat } as CSSProperties}
+              style={
+                {
+                  "--x": `${group.x}%`,
+                  "--y": `${group.y}%`,
+                  "--heat": group.heat
+                } as CSSProperties
+              }
             >
               <strong>{group.name}</strong>
               <span>{group.flow}</span>
@@ -344,7 +604,228 @@ function SectorCartography() {
   );
 }
 
-function Panel({ className, title, children }: { className?: string; title: string; children: ReactNode }) {
+function OptionsIntake() {
+  return (
+    <section className="mock-options-layout" aria-label="Options intake concept">
+      <div className="mock-options-command" aria-label="Options filters">
+        {["OPRA LIVE", "ASK SIDE", "ABOVE 2 SIGMA", "PACKETABLE", "AAPL FOCUS"].map(
+          (item, index) => (
+            <button className={index === 3 ? "is-active" : ""} type="button" key={item}>
+              {item}
+            </button>
+          )
+        )}
+      </div>
+      <div className="mock-options-tape" role="table" aria-label="Options flow intake blotter">
+        <div className="mock-options-row is-head" role="row">
+          {["Time", "Sym", "Contract", "Qty", "Premium", "Shape", "Ask", "Base", "Use"].map(
+            (item) => (
+              <span role="columnheader" key={item}>
+                {item}
+              </span>
+            )
+          )}
+        </div>
+        {intakeRows.map(([time, symbol, contract, size, premium, shape, ask, baseline, use]) => (
+          <div
+            className={`mock-options-row is-${use}`}
+            role="row"
+            key={`${time}-${symbol}-${contract}`}
+          >
+            <time>{time}</time>
+            <strong>{symbol}</strong>
+            <span>{contract}</span>
+            <span>{size}</span>
+            <span>{premium}</span>
+            <span>{shape}</span>
+            <span>{ask}</span>
+            <span>{baseline}</span>
+            <Badge tone={use === "reject" ? "Bearish" : use === "watch" ? "Watch" : "Bullish"}>
+              {use}
+            </Badge>
+          </div>
+        ))}
+      </div>
+      <aside className="mock-options-depth" aria-label="Selected contract depth">
+        <h2>AAPL 195C depth</h2>
+        <dl>
+          <div>
+            <dt>packet fit</dt>
+            <dd>92%</dd>
+          </div>
+          <div>
+            <dt>repeat buyer</dt>
+            <dd>3 prints</dd>
+          </div>
+          <div>
+            <dt>venue skew</dt>
+            <dd>ask 61%</dd>
+          </div>
+          <div>
+            <dt>alert path</dt>
+            <dd>needs equity hold</dd>
+          </div>
+        </dl>
+      </aside>
+      <FlowLadder />
+    </section>
+  );
+}
+
+function PacketForensics() {
+  return (
+    <section className="mock-packet-layout" aria-label="Flow packet forensics concept">
+      <div className="mock-packet-chain" aria-label="Packet assembly chain">
+        {packetSteps.map((step, index) => (
+          <article key={step.label} style={{ "--weight": step.weight } as CSSProperties}>
+            <time>{step.time}</time>
+            <strong>{step.label}</strong>
+            <p>{step.detail}</p>
+            <span>
+              {index === packetSteps.length - 1 ? "alert eligible" : `${step.weight}% contribution`}
+            </span>
+          </article>
+        ))}
+      </div>
+      <div className="mock-packet-ledger" role="table" aria-label="Packet state ledger">
+        <div className="mock-packet-row is-head" role="row">
+          {["Packet", "Symbol", "State", "Evidence", "Reason", "Score"].map((item) => (
+            <span role="columnheader" key={item}>
+              {item}
+            </span>
+          ))}
+        </div>
+        {packetRows.map(([id, symbol, state, sources, reason, score]) => (
+          <div className={`mock-packet-row is-${state}`} role="row" key={id}>
+            <strong>{id}</strong>
+            <span>{symbol}</span>
+            <Badge tone={state === "rejected" ? "Bearish" : state === "held" ? "Watch" : "Bullish"}>
+              {state}
+            </Badge>
+            <span>{sources}</span>
+            <span>{reason}</span>
+            <span>{score}</span>
+          </div>
+        ))}
+      </div>
+      <aside className="mock-packet-inspector" aria-label="Packet evidence inspector">
+        <h2>PKT-8841 lineage</h2>
+        <FactList
+          items={[
+            ["Options", "195C sweep and 200C join established the packet spine"],
+            ["Equity", "Dark print confirmed demand after the options burst"],
+            ["Alert trigger", "Party alert only fires after acceptance above 194.50"]
+          ]}
+        />
+      </aside>
+    </section>
+  );
+}
+
+function AlertReasonWall() {
+  return (
+    <section className="mock-alert-layout" aria-label="Smart money alert wall concept">
+      <div className="mock-alert-wall" role="table" aria-label="Alert reasons">
+        <div className="mock-alert-row is-head" role="row">
+          {["Time", "Sym", "Type", "Reason", "Why it fired", "Invalidation", "Severity"].map(
+            (item) => (
+              <span role="columnheader" key={item}>
+                {item}
+              </span>
+            )
+          )}
+        </div>
+        {alertRows.map(([time, symbol, type, reason, why, invalidation, severity]) => (
+          <div className={`mock-alert-row is-${severity}`} role="row" key={`${time}-${symbol}`}>
+            <time>{time}</time>
+            <strong>{symbol}</strong>
+            <span>{type}</span>
+            <span>{reason}</span>
+            <p>{why}</p>
+            <span>{invalidation}</span>
+            <Badge
+              tone={severity === "low" ? "Bearish" : severity === "watch" ? "Watch" : "Bullish"}
+            >
+              {severity}
+            </Badge>
+          </div>
+        ))}
+      </div>
+      <aside className="mock-alert-reason" aria-label="Selected alert decision path">
+        <h2>Why AAPL fired</h2>
+        <ol>
+          <li>
+            <strong>Options flow led</strong>
+            <span>Short-dated call premium arrived before the visible equity move.</span>
+          </li>
+          <li>
+            <strong>Packet confirmed</strong>
+            <span>Dark venue share and QQQ context removed the obvious objections.</span>
+          </li>
+          <li>
+            <strong>Party alert typed</strong>
+            <span>Classified as stealth accumulation, not a momentum chase.</span>
+          </li>
+        </ol>
+      </aside>
+    </section>
+  );
+}
+
+function MarketActivityGraph() {
+  return (
+    <section className="mock-graph-layout" aria-label="Market activity graph concept">
+      <div className="mock-graph-canvas" aria-label="Options to alert graph">
+        {graphLanes.map((lane) => (
+          <div
+            className={`mock-graph-link is-${lane.tone}`}
+            key={lane.label}
+            style={{ "--x1": lane.x1, "--x2": lane.x2, "--y": lane.y } as CSSProperties}
+          >
+            <strong>{lane.label}</strong>
+            <span>{lane.text}</span>
+          </div>
+        ))}
+        <div className="mock-graph-node is-options">Options intake</div>
+        <div className="mock-graph-node is-packet">Packet PKT-8841</div>
+        <div className="mock-graph-node is-alert">Party alert</div>
+        <div className="mock-graph-node is-market">Market context</div>
+      </div>
+      <div className="mock-graph-routes" aria-label="Route coverage">
+        {[
+          ["Options page", "raw prints become packet candidates"],
+          ["Packets page", "evidence sources are merged and scored"],
+          ["Alerts page", "reason/type/invalidation are exposed"],
+          ["Replay page", "the same chain can be audited after the fact"]
+        ].map(([route, purpose]) => (
+          <div key={route}>
+            <strong>{route}</strong>
+            <span>{purpose}</span>
+          </div>
+        ))}
+      </div>
+      <div className="mock-graph-strip" aria-label="Non-redundant feature map">
+        <FactList
+          items={[
+            ["No duplicate views", "Each route owns a different step in the evidence chain"],
+            ["User value", "The trader sees whether activity is raw, packeted, or alert-worthy"],
+            ["Decision path", "Every alert remains traceable to the options flow that caused it"]
+          ]}
+        />
+      </div>
+    </section>
+  );
+}
+
+function Panel({
+  className,
+  title,
+  children
+}: {
+  className?: string;
+  title: string;
+  children: ReactNode;
+}) {
   return (
     <section className={`mock-panel ${className ?? ""}`} aria-label={title}>
       <header>
@@ -430,6 +911,21 @@ function FlowRows({ compact = false }: { compact?: boolean }) {
   );
 }
 
+function FlowLadder() {
+  return (
+    <div className="mock-flow-ladder" aria-label="Options flow to alert ladder">
+      {["raw option print", "candidate flow", "packet assembly", "party alert"].map(
+        (item, index) => (
+          <div className={index === 1 ? "is-active" : ""} key={item}>
+            <span>{index + 1}</span>
+            <strong>{item}</strong>
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
 function HealthRows() {
   return (
     <div className="mock-health">
@@ -481,7 +977,13 @@ function Meter({ value }: { value: number }) {
 
 function Badge({ tone, children }: { tone: string; children: ReactNode }) {
   const normalized =
-    tone === "Bearish" ? "bearish" : tone === "Watch" || tone === "Mixed" ? "watch" : tone === "Info" ? "info" : "bullish";
+    tone === "Bearish"
+      ? "bearish"
+      : tone === "Watch" || tone === "Mixed"
+        ? "watch"
+        : tone === "Info"
+          ? "info"
+          : "bullish";
 
   return <span className={`mock-badge is-${normalized}`}>{children}</span>;
 }
