@@ -10,43 +10,43 @@ type DashboardMockProps = {
 type Concept = {
   title: string;
   shortName: string;
+  routeName: string;
   premise: string;
-  bestFor: string;
-  layout: string;
+  bodyClass: string;
 };
 
 const concepts: Record<MockVariant, Concept> = {
   mock1: {
-    title: "Evidence Canvas",
-    shortName: "Canvas",
+    title: "Signal Court",
+    shortName: "Court",
+    routeName: "Case Board",
     premise:
-      "A selected anomaly becomes the organizing object. Price, options, prints, news, and replay evidence attach around one decision path.",
-    bestFor: "single-symbol investigation",
-    layout: "canvas"
+      "A fired signal is treated as a legal brief: evidence, objections, market context, and the live price trace are arranged around the claim.",
+    bodyClass: "mock-court"
   },
   mock2: {
-    title: "Anomaly Queue",
-    shortName: "Queue",
+    title: "Triage Desk",
+    shortName: "Desk",
+    routeName: "Live Queue",
     premise:
-      "The terminal behaves like an alert operations room: ranked work enters from the left, evidence resolves in the center, and confidence checks stay pinned.",
-    bestFor: "live triage under volume",
-    layout: "queue"
+      "The user works down a prioritized desk queue with clear routing, severity, source health, and next action controls always in reach.",
+    bodyClass: "mock-desk"
   },
   mock3: {
-    title: "Replay Room",
-    shortName: "Replay",
+    title: "Replay Theatre",
+    shortName: "Theatre",
+    routeName: "Session Review",
     premise:
-      "Historical sessions become inspectable rooms. The time spine leads, with every event and chart panel synchronized to the replay cursor.",
-    bestFor: "after-action review",
-    layout: "replay"
+      "Replay becomes a scrub room: the time rail leads, and every event, chart move, and note locks to the current evidence frame.",
+    bodyClass: "mock-theatre"
   },
   mock4: {
-    title: "Market Atlas",
-    shortName: "Atlas",
+    title: "Sector Cartography",
+    shortName: "Map",
+    routeName: "Market Map",
     premise:
-      "Symbols are mapped as related territories. Sector pressure, cross-asset flow, and event clusters reveal where attention is concentrating.",
-    bestFor: "cross-market scanning",
-    layout: "atlas"
+      "Cross-market pressure is drawn as territories, so the trader can see where attention clusters before opening a single-symbol case.",
+    bodyClass: "mock-map"
   }
 };
 
@@ -108,11 +108,11 @@ const evidence = [
 ];
 
 const optionRows = [
-  ["2m", "AAPL", "May 17", "195 C", "5,240", "$2.31M", "Sweep", "Bullish"],
-  ["3m", "AAPL", "Jun 21", "200 C", "6,800", "$1.87M", "Block", "Bullish"],
-  ["4m", "NVDA", "May 24", "120 C", "9,150", "$2.01M", "Split", "Mixed"],
-  ["5m", "TSLA", "Jul 19", "205 C", "10,000", "$3.45M", "Block", "Bullish"],
-  ["6m", "AMZN", "May 17", "185 P", "4,500", "$1.20M", "Sweep", "Bearish"]
+  ["2m", "AAPL", "May 17 195 C", "5,240", "$2.31M", "Sweep", "Bullish"],
+  ["3m", "AAPL", "Jun 21 200 C", "6,800", "$1.87M", "Block", "Bullish"],
+  ["4m", "NVDA", "May 24 120 C", "9,150", "$2.01M", "Split", "Mixed"],
+  ["5m", "TSLA", "Jul 19 205 C", "10,000", "$3.45M", "Block", "Bullish"],
+  ["6m", "AMZN", "May 17 185 P", "4,500", "$1.20M", "Sweep", "Bearish"]
 ];
 
 const health = [
@@ -130,40 +130,34 @@ const timeline = [
 ];
 
 const atlasGroups = [
-  { name: "Mega cap tech", heat: 92, flow: "+$8.4M", symbols: ["AAPL", "MSFT", "AMZN"], x: 12, y: 14 },
-  { name: "AI semis", heat: 81, flow: "+$5.1M", symbols: ["NVDA", "AMD", "AVGO"], x: 56, y: 22 },
-  { name: "Beta basket", heat: 66, flow: "+$3.8M", symbols: ["TSLA", "COIN", "PLTR"], x: 30, y: 58 },
-  { name: "Defensive", heat: 38, flow: "-$1.2M", symbols: ["XLU", "XLV", "PG"], x: 68, y: 64 }
+  { name: "Mega cap tech", heat: 92, flow: "+$8.4M", symbols: ["AAPL", "MSFT", "AMZN"], x: 16, y: 22 },
+  { name: "AI semis", heat: 81, flow: "+$5.1M", symbols: ["NVDA", "AMD", "AVGO"], x: 64, y: 26 },
+  { name: "Beta basket", heat: 66, flow: "+$3.8M", symbols: ["TSLA", "COIN", "PLTR"], x: 34, y: 66 },
+  { name: "Defensive", heat: 38, flow: "-$1.2M", symbols: ["XLU", "XLV", "PG"], x: 74, y: 70 }
 ];
 
 export function DashboardMock({ variant }: DashboardMockProps) {
   const concept = concepts[variant];
 
   return (
-    <main className={`mock-redesign mock-redesign-${concept.layout}`} aria-labelledby="mock-title">
-      <MockHeader active={variant} concept={concept} />
-      {variant === "mock1" ? <EvidenceCanvas /> : null}
-      {variant === "mock2" ? <AnomalyQueue /> : null}
-      {variant === "mock3" ? <ReplayRoom /> : null}
-      {variant === "mock4" ? <MarketAtlas /> : null}
+    <main className={`mock-redesign ${concept.bodyClass}`} aria-labelledby="mock-title">
+      <MockNavigation active={variant} concept={concept} />
+      {variant === "mock1" ? <SignalCourt /> : null}
+      {variant === "mock2" ? <TriageDesk /> : null}
+      {variant === "mock3" ? <ReplayTheatre /> : null}
+      {variant === "mock4" ? <SectorCartography /> : null}
     </main>
   );
 }
 
-function MockHeader({ active, concept }: { active: MockVariant; concept: Concept }) {
+function MockNavigation({ active, concept }: { active: MockVariant; concept: Concept }) {
   return (
-    <header className="mock-redesign-header">
-      <div className="mock-redesign-title">
-        <span className="mock-redesign-product">islandflow concepts</span>
-        <h1 id="mock-title">{concept.title}</h1>
-        <p>{concept.premise}</p>
-      </div>
-      <div className="mock-redesign-meta" aria-label="Concept metadata">
-        <span>best for: {concept.bestFor}</span>
-        <span>09:41:23 ET</span>
-        <span className="is-live">live data sketch</span>
-      </div>
-      <nav className="mock-redesign-switcher" aria-label="Mock variants">
+    <header className="mock-nav" aria-label="Mock redesign navigation">
+      <Link className="mock-brand" href="/mock1">
+        <span>IF</span>
+        <strong>mock lab</strong>
+      </Link>
+      <nav className="mock-route-tabs" aria-label="Mock variants">
         {variantOrder.map((item) => (
           <Link
             aria-current={item === active ? "page" : undefined}
@@ -171,102 +165,125 @@ function MockHeader({ active, concept }: { active: MockVariant; concept: Concept
             href={`/${item}`}
             key={item}
           >
-            {concepts[item].shortName}
+            <span>{concepts[item].routeName}</span>
+            <strong>{concepts[item].shortName}</strong>
           </Link>
         ))}
       </nav>
+      <div className="mock-now" aria-label="Current session state">
+        <span>live sketch</span>
+        <strong>09:41:23 ET</strong>
+      </div>
+      <section className="mock-hero" aria-label="Concept summary">
+        <p>{concept.routeName}</p>
+        <h1 id="mock-title">{concept.title}</h1>
+        <span>{concept.premise}</span>
+      </section>
     </header>
   );
 }
 
-function EvidenceCanvas() {
+function SignalCourt() {
   return (
-    <section className="mock-canvas-grid" aria-label="Evidence canvas concept">
-      <div className="mock-symbol-strip">
-        {symbols.map((item) => (
-          <article className="mock-symbol-tile" key={item.symbol}>
-            <div>
-              <strong>{item.symbol}</strong>
-              <span>{item.sector}</span>
-            </div>
-            <ScoreDial score={item.score} />
-          </article>
-        ))}
-      </div>
-      <Panel className="mock-canvas-brief" label="active case">
-        <div className="mock-case-heading">
-          <span className="mock-case-symbol">AAPL</span>
-          <div>
-            <h2>Dark sweep pressure is confirmed by options lift</h2>
-            <p>
-              The interface treats one fired anomaly as a case file. Every pane answers whether the
-              signal is meaningful, explainable, and worth continued attention.
-            </p>
-          </div>
-          <span className="mock-confidence">94 confidence</span>
+    <section className="mock-court-layout" aria-label="Signal court concept">
+      <Panel className="mock-verdict" title="Current claim">
+        <div className="mock-verdict-mark">AAPL</div>
+        <h2>Dark sweep pressure is confirmed by call lift.</h2>
+        <p>
+          Treat the alert as a claim to prove. The board shows confirming evidence,
+          contradictions, and what must happen next before the trade deserves attention.
+        </p>
+        <div className="mock-verdict-actions">
+          <button type="button">Open case</button>
+          <button type="button">Mark watch</button>
         </div>
-        <EvidenceLinks />
       </Panel>
-      <ChartPanel className="mock-canvas-chart" mode="annotated" />
-      <FlowTape className="mock-canvas-tape" />
-      <CausalityPanel className="mock-canvas-context" />
+      <Panel className="mock-exhibits" title="Evidence exhibits">
+        <EvidenceStack />
+      </Panel>
+      <Panel className="mock-court-chart" title="Price testimony">
+        <ChartSketch density={60} marker="claim filed" />
+      </Panel>
+      <Panel className="mock-objections" title="Objections">
+        <FactList
+          items={[
+            ["Venue concentration", "64% off-exchange share is above normal"],
+            ["Sector check", "QQQ confirmation is present but not decisive"],
+            ["Invalidation", "Acceptance fails below 194.50"]
+          ]}
+        />
+      </Panel>
     </section>
   );
 }
 
-function AnomalyQueue() {
+function TriageDesk() {
   return (
-    <section className="mock-queue-grid" aria-label="Anomaly queue concept">
-      <Panel className="mock-queue-list" label="ranked work">
+    <section className="mock-desk-layout" aria-label="Triage desk concept">
+      <aside className="mock-desk-rail" aria-label="Queue filters">
+        <strong>route</strong>
+        {["all", "urgent", "needs chart", "stale source"].map((item, index) => (
+          <button className={index === 1 ? "is-active" : ""} type="button" key={item}>
+            {item}
+          </button>
+        ))}
+      </aside>
+      <Panel className="mock-queue-board" title="Priority queue">
         {anomalies.map((item, index) => (
-          <article className={index === 0 ? "mock-queue-item is-selected" : "mock-queue-item"} key={item.time}>
+          <article className={index === 0 ? "mock-desk-ticket is-selected" : "mock-desk-ticket"} key={item.time}>
             <time>{item.time}</time>
             <div>
               <strong>{item.symbol}</strong>
               <span>{item.title}</span>
+              <em>{item.cause}</em>
             </div>
-            <Badge tone={item.direction}>{item.direction}</Badge>
+            <Badge tone={item.direction}>{item.confidence}</Badge>
           </article>
         ))}
       </Panel>
-      <Panel className="mock-queue-inspector" label="current anomaly">
-        <div className="mock-inspector-header">
+      <Panel className="mock-desk-workspace" title="Selected alert">
+        <div className="mock-workspace-head">
           <span>AAPL</span>
           <h2>Dark sweep aligns with call pressure</h2>
-          <p>Off-exchange prints led the options burst by 72 seconds. The next decision is whether the move is being accepted above the liquidity shelf.</p>
+          <p>Next action: verify whether price accepts above the prior liquidity shelf.</p>
         </div>
-        <EvidenceLinks compact />
-        <ChartPanel mode="compressed" />
+        <ChartSketch density={42} marker="decision" />
       </Panel>
-      <Panel className="mock-queue-checks" label="confidence checks">
-        <CheckList />
-        <FeedHealth />
+      <Panel className="mock-desk-health" title="Source status">
+        <HealthRows />
+        <FactList
+          items={[
+            ["Agreement", "4 of 5 linked sources agree"],
+            ["Replay match", "Similar to Apr 26 open"],
+            ["Risk note", "Off-exchange share elevated"]
+          ]}
+        />
       </Panel>
     </section>
   );
 }
 
-function ReplayRoom() {
+function ReplayTheatre() {
   return (
-    <section className="mock-replay-grid" aria-label="Replay room concept">
-      <Panel className="mock-replay-stage" label="session replay">
-        <div className="mock-replay-hero">
+    <section className="mock-theatre-layout" aria-label="Replay theatre concept">
+      <Panel className="mock-stage" title="Replay frame">
+        <div className="mock-stage-head">
           <div>
             <span>May 16, 2024</span>
-            <h2>09:41:23, signal confirmation window</h2>
+            <h2>09:41:23 confirmation window</h2>
           </div>
-          <div className="mock-replay-controls" aria-label="Replay controls">
-            <button type="button">Back 30s</button>
-            <button type="button">Pause replay</button>
-            <button type="button">Forward 30s</button>
-            <span>32x</span>
+          <div className="mock-stage-controls" aria-label="Replay controls">
+            <button type="button">-30s</button>
+            <button type="button">Pause</button>
+            <button type="button">+30s</button>
+            <strong>32x</strong>
           </div>
         </div>
-        <ReplayTrack />
-        <ChartPanel mode="replay" />
+        <ReplayRail />
+        <ChartSketch density={72} marker="cursor" />
       </Panel>
-      <Panel className="mock-replay-spine" label="event spine">
-        <ol className="mock-time-spine">
+      <Panel className="mock-script" title="Event script">
+        <ol>
           {timeline.map(([time, title, detail]) => (
             <li key={time}>
               <time>{time}</time>
@@ -276,20 +293,30 @@ function ReplayRoom() {
           ))}
         </ol>
       </Panel>
-      <FlowTape className="mock-replay-tape" condensed />
-      <CausalityPanel className="mock-replay-notes" />
+      <Panel className="mock-theatre-tape" title="Synced tape">
+        <FlowRows compact />
+      </Panel>
+      <Panel className="mock-director-notes" title="Director notes">
+        <FactList
+          items={[
+            ["Lead", "Dark flow cluster arrived first"],
+            ["Confirm", "195 C sweep followed within 72s"],
+            ["Watch", "Acceptance needs one more candle"]
+          ]}
+        />
+      </Panel>
     </section>
   );
 }
 
-function MarketAtlas() {
+function SectorCartography() {
   return (
-    <section className="mock-atlas-grid" aria-label="Market atlas concept">
-      <Panel className="mock-atlas-map" label="attention map">
-        <div className="mock-atlas-field">
+    <section className="mock-map-layout" aria-label="Sector cartography concept">
+      <Panel className="mock-map-canvas" title="Pressure territory">
+        <div className="mock-territory">
           {atlasGroups.map((group) => (
             <article
-              className="mock-atlas-node"
+              className="mock-territory-node"
               key={group.name}
               style={{ "--x": `${group.x}%`, "--y": `${group.y}%`, "--heat": group.heat } as CSSProperties}
             >
@@ -299,43 +326,44 @@ function MarketAtlas() {
           ))}
         </div>
       </Panel>
-      <Panel className="mock-atlas-symbols" label="cluster detail">
+      <Panel className="mock-map-index" title="Cluster index">
         {atlasGroups.map((group) => (
-          <article className="mock-cluster-row" key={group.name}>
+          <article className="mock-cluster" key={group.name}>
             <div>
               <strong>{group.name}</strong>
               <span>{group.symbols.join(" / ")}</span>
             </div>
-            <ScoreDial score={group.heat} />
+            <Meter value={group.heat} />
           </article>
         ))}
       </Panel>
-      <Panel className="mock-atlas-correlation" label="linked evidence">
-        <EvidenceLinks compact />
-        <FlowTape condensed />
+      <Panel className="mock-map-flow" title="Linked flow">
+        <FlowRows compact />
       </Panel>
     </section>
   );
 }
 
-function Panel({ className, label, children }: { className?: string; label: string; children: ReactNode }) {
+function Panel({ className, title, children }: { className?: string; title: string; children: ReactNode }) {
   return (
-    <section className={`mock-redesign-panel ${className ?? ""}`} aria-label={label}>
-      <div className="mock-panel-label">{label}</div>
+    <section className={`mock-panel ${className ?? ""}`} aria-label={title}>
+      <header>
+        <h2>{title}</h2>
+      </header>
       {children}
     </section>
   );
 }
 
-function EvidenceLinks({ compact = false }: { compact?: boolean }) {
+function EvidenceStack() {
   return (
-    <div className={compact ? "mock-evidence-list is-compact" : "mock-evidence-list"}>
+    <div className="mock-evidence-stack">
       {evidence.map(([source, title, value, tone]) => (
-        <article className="mock-evidence-card" key={`${source}-${title}`}>
+        <article className="mock-evidence" key={`${source}-${title}`}>
           <span>{source}</span>
           <strong>{title}</strong>
           <div>
-            <span>{value}</span>
+            <em>{value}</em>
             <Badge tone={tone}>{tone}</Badge>
           </div>
         </article>
@@ -344,98 +372,67 @@ function EvidenceLinks({ compact = false }: { compact?: boolean }) {
   );
 }
 
-function FlowTape({ className = "", condensed = false }: { className?: string; condensed?: boolean }) {
-  const rows = condensed ? optionRows.slice(0, 4) : optionRows;
-
+function ChartSketch({ density, marker }: { density: number; marker: string }) {
   return (
-    <Panel className={`mock-flow-tape ${className}`} label="flow tape">
-      <div className="mock-redesign-table">
-        <div className="mock-redesign-row is-head">
-          <span>Time</span>
-          <span>Symbol</span>
-          <span>Contract</span>
-          <span>Size</span>
-          <span>Premium</span>
-          <span>Read</span>
-        </div>
-        {rows.map(([time, symbol, exp, strike, size, premium, type, read]) => (
-          <div className="mock-redesign-row" key={`${time}-${symbol}-${strike}`}>
-            <span>{time}</span>
-            <strong>{symbol}</strong>
-            <span>{exp} {strike}</span>
-            <span>{size}</span>
-            <span>{premium}</span>
-            <Badge tone={read}>{type}</Badge>
-          </div>
-        ))}
-      </div>
-    </Panel>
-  );
-}
-
-function ChartPanel({ className = "", mode }: { className?: string; mode: "annotated" | "compressed" | "replay" }) {
-  const count = mode === "compressed" ? 38 : 64;
-
-  return (
-    <Panel className={`mock-redesign-chart ${className} is-${mode}`} label="price and flow">
-      <div className="mock-chart-topline">
-        <div>
-          <span>AAPL</span>
-          <strong>194.88</strong>
-        </div>
+    <div className="mock-chart" aria-label="Synthetic price and volume sketch">
+      <div className="mock-chart-readout">
+        <span>AAPL</span>
+        <strong>194.88</strong>
         <Badge tone="Bullish">+1.22%</Badge>
       </div>
-      <div className="mock-chart-field" aria-hidden="true">
-        {Array.from({ length: count }).map((_, index) => (
+      <div className="mock-bars" aria-hidden="true">
+        {Array.from({ length: density }).map((_, index) => (
           <span
-            className={index % 8 === 0 || index % 13 === 0 ? "is-red" : "is-green"}
+            className={index % 8 === 0 || index % 13 === 0 ? "is-down" : "is-up"}
             key={index}
-            style={{ "--height": `${18 + ((index * 19) % 66)}%` } as CSSProperties}
+            style={{ "--height": `${16 + ((index * 19) % 68)}%` } as CSSProperties}
           />
         ))}
-        <i className="mock-chart-marker" />
+        <i>{marker}</i>
       </div>
-      <div className="mock-volume-field" aria-hidden="true">
-        {Array.from({ length: 42 }).map((_, index) => (
+      <div className="mock-volume" aria-hidden="true">
+        {Array.from({ length: 36 }).map((_, index) => (
           <span
-            className={index % 7 === 0 ? "is-red" : "is-green"}
+            className={index % 7 === 0 ? "is-down" : "is-up"}
             key={index}
-            style={{ "--height": `${14 + ((index * 23) % 70)}%` } as CSSProperties}
+            style={{ "--height": `${12 + ((index * 23) % 70)}%` } as CSSProperties}
           />
         ))}
       </div>
-    </Panel>
+    </div>
   );
 }
 
-function CausalityPanel({ className = "" }: { className?: string }) {
+function FlowRows({ compact = false }: { compact?: boolean }) {
+  const rows = compact ? optionRows.slice(0, 4) : optionRows;
+
   return (
-    <Panel className={`mock-causality ${className}`} label="why it fired">
-      <dl>
-        <div>
-          <dt>Lead indicator</dt>
-          <dd>Dark flow cluster</dd>
+    <div className="mock-flow-table">
+      <div className="mock-flow-row is-head">
+        <span>Age</span>
+        <span>Symbol</span>
+        <span>Contract</span>
+        <span>Size</span>
+        <span>Premium</span>
+        <span>Read</span>
+      </div>
+      {rows.map(([time, symbol, contract, size, premium, type, read]) => (
+        <div className="mock-flow-row" key={`${time}-${symbol}-${contract}`}>
+          <span>{time}</span>
+          <strong>{symbol}</strong>
+          <span>{contract}</span>
+          <span>{size}</span>
+          <span>{premium}</span>
+          <Badge tone={read}>{type}</Badge>
         </div>
-        <div>
-          <dt>Confirming evidence</dt>
-          <dd>195 C sweep pressure</dd>
-        </div>
-        <div>
-          <dt>Contradiction</dt>
-          <dd>Venue concentration is high</dd>
-        </div>
-        <div>
-          <dt>Next check</dt>
-          <dd>Acceptance above 194.50</dd>
-        </div>
-      </dl>
-    </Panel>
+      ))}
+    </div>
   );
 }
 
-function FeedHealth() {
+function HealthRows() {
   return (
-    <div className="mock-feed-health">
+    <div className="mock-health">
       {health.map(([name, state, lag]) => (
         <div key={name}>
           <strong>{name}</strong>
@@ -447,29 +444,22 @@ function FeedHealth() {
   );
 }
 
-function CheckList() {
-  const checks = [
-    ["Source agreement", "4 of 5 linked sources agree"],
-    ["Staleness", "last event 11s ago"],
-    ["Replay match", "similar to Apr 26 open"],
-    ["Risk note", "off-exchange share elevated"]
-  ];
-
+function FactList({ items }: { items: string[][] }) {
   return (
-    <div className="mock-check-list">
-      {checks.map(([label, value]) => (
+    <dl className="mock-facts">
+      {items.map(([label, value]) => (
         <div key={label}>
-          <span>{label}</span>
-          <strong>{value}</strong>
+          <dt>{label}</dt>
+          <dd>{value}</dd>
         </div>
       ))}
-    </div>
+    </dl>
   );
 }
 
-function ReplayTrack() {
+function ReplayRail() {
   return (
-    <div className="mock-replay-track-redesign">
+    <div className="mock-replay-rail">
       <span>09:00</span>
       <div>
         <i />
@@ -480,10 +470,11 @@ function ReplayTrack() {
   );
 }
 
-function ScoreDial({ score }: { score: number }) {
+function Meter({ value }: { value: number }) {
   return (
-    <span className="mock-score-dial" style={{ "--score": score } as CSSProperties}>
-      {score}
+    <span className="mock-meter" style={{ "--value": `${value}%` } as CSSProperties}>
+      <i />
+      <em>{value}</em>
     </span>
   );
 }

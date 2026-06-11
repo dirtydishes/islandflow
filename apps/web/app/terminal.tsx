@@ -9441,6 +9441,23 @@ function SyntheticControlDock() {
 }
 
 export function TerminalAppShell({ children }: { children: ReactNode }) {
+  const pathname = nextNavigation.usePathname();
+
+  if (pathname?.startsWith("/mock")) {
+    return (
+      <div className="mock-shell">
+        <a className="skip-link mock-skip-link" href="#mock-title">
+          Skip to mock content
+        </a>
+        {children}
+      </div>
+    );
+  }
+
+  return <TerminalChrome>{children}</TerminalChrome>;
+}
+
+function TerminalChrome({ children }: { children: ReactNode }) {
   const state = useTerminalState();
   const pathname = nextNavigation.usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
