@@ -1,7 +1,19 @@
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 
-type MockVariant = "mock1" | "mock2" | "mock3" | "mock4" | "mock5" | "mock6" | "mock7" | "mock8";
+type MockVariant =
+  | "mock1"
+  | "mock2"
+  | "mock3"
+  | "mock4"
+  | "mock5"
+  | "mock6"
+  | "mock7"
+  | "mock8"
+  | "mock9"
+  | "mock10"
+  | "mock11"
+  | "mock12";
 
 type DashboardMockProps = {
   variant: MockVariant;
@@ -71,6 +83,34 @@ const concepts: Record<MockVariant, Concept> = {
     routeName: "Matrix",
     premise: "Options, packet, alert, and market context stitched into one activity map.",
     bodyClass: "mock-graph"
+  },
+  mock9: {
+    title: "Market Command",
+    shortName: "Command",
+    routeName: "Main Board",
+    premise: "Session regime, priority symbols, active packets, and invalidation levels without route switching.",
+    bodyClass: "mock-command"
+  },
+  mock10: {
+    title: "Signal Radar",
+    shortName: "Radar",
+    routeName: "Signal Radar",
+    premise: "Cross-symbol pressure ranked by confirmation, decay, source count, and nearest decision level.",
+    bodyClass: "mock-radar"
+  },
+  mock11: {
+    title: "Risk Ledger",
+    shortName: "Risk",
+    routeName: "Risk Ledger",
+    premise: "Directional exposure, live invalidations, sector crowding, and stale assumptions in one operating view.",
+    bodyClass: "mock-risk"
+  },
+  mock12: {
+    title: "Source Control",
+    shortName: "Sources",
+    routeName: "Source Control",
+    premise: "Feed quality, lag, packet eligibility, route pressure, and replay gaps for the current session.",
+    bodyClass: "mock-source"
   }
 };
 
@@ -82,7 +122,11 @@ const variantOrder: MockVariant[] = [
   "mock5",
   "mock6",
   "mock7",
-  "mock8"
+  "mock8",
+  "mock9",
+  "mock10",
+  "mock11",
+  "mock12"
 ];
 
 const symbols = [
@@ -375,6 +419,72 @@ const graphLanes = [
   }
 ];
 
+const commandMetrics = [
+  ["Regime", "Risk-on, narrow", "QQQ +0.82%, IWM lagging"],
+  ["Priority", "AAPL / TSLA / NVDA", "3 packets above 70"],
+  ["Decision", "194.50 AAPL", "acceptance level"],
+  ["Risk", "AMZN contra", "put sweep against basket"]
+];
+
+const commandRows = [
+  ["09:42:51", "AAPL", "PKT-8841", "stealth accumulation", "86", "194.50", "confirm"],
+  ["09:41:58", "TSLA", "PKT-8838", "momentum ignition", "71", "178.80", "watch"],
+  ["09:40:34", "NVDA", "PKT-8834", "call wall absorption", "63", "120.40", "hold"],
+  ["09:39:22", "AMZN", "PKT-8827", "put divergence", "39", "186.20", "reject"],
+  ["09:38:59", "IWM", "PKT-8821", "small-cap echo", "44", "205.00", "watch"]
+];
+
+const commandLevels = [
+  ["AAPL", "194.50", "above", "packet valid"],
+  ["QQQ", "458.20", "above", "market confirm"],
+  ["NVDA", "120.40", "below", "absorption fails"],
+  ["TSLA", "178.80", "above", "ignition intact"]
+];
+
+const radarRows = [
+  ["AAPL", "92", "5", "00:29", "ask lift", "194.50", "bullish"],
+  ["TSLA", "78", "3", "01:14", "block call", "178.80", "bullish"],
+  ["NVDA", "64", "2", "02:06", "absorbed", "120.40", "watch"],
+  ["AMZN", "41", "2", "03:51", "put sweep", "186.20", "bearish"],
+  ["IWM", "38", "1", "05:08", "basket lag", "205.00", "watch"]
+];
+
+const radarBands = [
+  { label: "Mega cap tech", score: 88, symbols: "AAPL MSFT AMZN", tone: "good" },
+  { label: "AI semis", score: 63, symbols: "NVDA AMD AVGO", tone: "watch" },
+  { label: "Beta", score: 74, symbols: "TSLA COIN PLTR", tone: "info" },
+  { label: "Small caps", score: 38, symbols: "IWM KRE XBI", tone: "bad" }
+];
+
+const riskRows = [
+  ["Long delta", "$12.8M", "AAPL / TSLA", "+18%", "194.50 fail"],
+  ["Short premium", "$3.1M", "AMZN puts", "+6%", "186.20 reclaim"],
+  ["Crowded calls", "$8.4M", "front-week tech", "+31%", "QQQ loses 458.20"],
+  ["Replay debt", "2 gaps", "09:36-09:39", "open", "audit before alert"]
+];
+
+const riskInvalidations = [
+  ["AAPL", "194.50", "2 ticks", "live"],
+  ["QQQ", "458.20", "5 ticks", "live"],
+  ["TSLA", "178.80", "14 ticks", "watch"],
+  ["AMZN", "186.20", "9 ticks", "against"]
+];
+
+const sourceRows = [
+  ["OPRA", "120ms", "99.98%", "eligible", "1,284/s"],
+  ["CTA", "84ms", "99.99%", "eligible", "422/s"],
+  ["NYSE", "412ms", "98.10%", "degraded", "91/s"],
+  ["News", "1.2s", "99.20%", "eligible", "8/s"],
+  ["Replay", "0 gaps", "synced", "eligible", "32x"]
+];
+
+const sourceRoutes = [
+  ["OPRA -> Packets", "clear", "AAPL 195C joined"],
+  ["CTA -> Alerts", "clear", "price acceptance confirmed"],
+  ["NYSE -> Packets", "limited", "venue lag above threshold"],
+  ["News -> Replay", "clear", "headline aligned at 09:40:21"]
+];
+
 export function DashboardMock({ variant }: DashboardMockProps) {
   const concept = concepts[variant];
 
@@ -389,6 +499,10 @@ export function DashboardMock({ variant }: DashboardMockProps) {
       {variant === "mock6" ? <PacketForensics /> : null}
       {variant === "mock7" ? <AlertReasonWall /> : null}
       {variant === "mock8" ? <MarketActivityGraph /> : null}
+      {variant === "mock9" ? <MarketCommand /> : null}
+      {variant === "mock10" ? <SignalRadar /> : null}
+      {variant === "mock11" ? <RiskLedger /> : null}
+      {variant === "mock12" ? <SourceControl /> : null}
     </main>
   );
 }
@@ -798,6 +912,190 @@ function MarketActivityGraph() {
           ]}
         />
       </div>
+    </section>
+  );
+}
+
+function MarketCommand() {
+  return (
+    <section className="mock-command-layout" aria-label="Market command dashboard">
+      <div className="mock-command-strip" aria-label="Session read">
+        {commandMetrics.map(([label, value, detail]) => (
+          <div key={label}>
+            <span>{label}</span>
+            <strong>{value}</strong>
+            <em>{detail}</em>
+          </div>
+        ))}
+      </div>
+      <div className="mock-command-board" role="table" aria-label="Priority board">
+        <div className="mock-command-row is-head" role="row">
+          {["Time", "Sym", "Packet", "Read", "Score", "Invalid", "State"].map((item) => (
+            <span role="columnheader" key={item}>
+              {item}
+            </span>
+          ))}
+        </div>
+        {commandRows.map(([time, symbol, packet, read, score, invalid, state]) => (
+          <div className={`mock-command-row is-${state}`} role="row" key={`${time}-${packet}`}>
+            <time>{time}</time>
+            <strong>{symbol}</strong>
+            <span>{packet}</span>
+            <span>{read}</span>
+            <Meter value={Number(score)} />
+            <span>{invalid}</span>
+            <Badge tone={state === "reject" ? "Bearish" : state === "watch" || state === "hold" ? "Watch" : "Bullish"}>
+              {state}
+            </Badge>
+          </div>
+        ))}
+      </div>
+      <aside className="mock-command-levels" aria-label="Decision levels">
+        <h2>Decision levels</h2>
+        <FactList items={commandLevels.map(([symbol, level, side, read]) => [symbol, `${side} ${level}: ${read}`])} />
+      </aside>
+      <div className="mock-command-flow" aria-label="Live context">
+        <FlowRows compact />
+      </div>
+    </section>
+  );
+}
+
+function SignalRadar() {
+  return (
+    <section className="mock-radar-layout" aria-label="Signal radar dashboard">
+      <div className="mock-radar-sweep" aria-label="Pressure sweep">
+        {radarBands.map((band) => (
+          <div className={`mock-radar-band is-${band.tone}`} key={band.label}>
+            <strong>{band.label}</strong>
+            <span>{band.symbols}</span>
+            <Meter value={band.score} />
+          </div>
+        ))}
+      </div>
+      <div className="mock-radar-board" role="table" aria-label="Signal ranking">
+        <div className="mock-radar-row is-head" role="row">
+          {["Sym", "Pressure", "Sources", "Decay", "Driver", "Decision", "Bias"].map((item) => (
+            <span role="columnheader" key={item}>
+              {item}
+            </span>
+          ))}
+        </div>
+        {radarRows.map(([symbol, pressure, sources, decay, driver, decision, bias]) => (
+          <div className={`mock-radar-row is-${bias}`} role="row" key={symbol}>
+            <strong>{symbol}</strong>
+            <Meter value={Number(pressure)} />
+            <span>{sources}</span>
+            <time>{decay}</time>
+            <span>{driver}</span>
+            <span>{decision}</span>
+            <Badge tone={bias === "bearish" ? "Bearish" : bias === "watch" ? "Watch" : "Bullish"}>
+              {bias}
+            </Badge>
+          </div>
+        ))}
+      </div>
+      <aside className="mock-radar-context" aria-label="Selected signal context">
+        <h2>AAPL pressure</h2>
+        <FactList
+          items={[
+            ["Lead", "OPRA before equity by 72s"],
+            ["Tape", "Acceptance above 194.50"],
+            ["Decay", "29s until stale"],
+            ["Reject", "QQQ below 458.20"]
+          ]}
+        />
+      </aside>
+    </section>
+  );
+}
+
+function RiskLedger() {
+  return (
+    <section className="mock-risk-layout" aria-label="Risk ledger dashboard">
+      <div className="mock-risk-board" role="table" aria-label="Exposure ledger">
+        <div className="mock-risk-row is-head" role="row">
+          {["Bucket", "Size", "Source", "Change", "Invalidation"].map((item) => (
+            <span role="columnheader" key={item}>
+              {item}
+            </span>
+          ))}
+        </div>
+        {riskRows.map(([bucket, size, source, change, invalid]) => (
+          <div className="mock-risk-row" role="row" key={bucket}>
+            <strong>{bucket}</strong>
+            <span>{size}</span>
+            <span>{source}</span>
+            <span>{change}</span>
+            <span>{invalid}</span>
+          </div>
+        ))}
+      </div>
+      <div className="mock-risk-map" aria-label="Invalidation proximity">
+        {riskInvalidations.map(([symbol, level, distance, state]) => (
+          <div className={`mock-risk-level is-${state}`} key={symbol}>
+            <strong>{symbol}</strong>
+            <span>{level}</span>
+            <em>{distance}</em>
+          </div>
+        ))}
+      </div>
+      <aside className="mock-risk-notes" aria-label="Risk notes">
+        <h2>Operating constraints</h2>
+        <FactList
+          items={[
+            ["Crowding", "Front-week tech calls concentrated"],
+            ["Contra", "AMZN put sweep not confirmed by basket"],
+            ["Stale", "Two replay gaps before 09:39"],
+            ["Action", "Require QQQ above 458.20"]
+          ]}
+        />
+      </aside>
+    </section>
+  );
+}
+
+function SourceControl() {
+  return (
+    <section className="mock-source-layout" aria-label="Source control dashboard">
+      <div className="mock-source-board" role="table" aria-label="Source state">
+        <div className="mock-source-row is-head" role="row">
+          {["Source", "Lag", "Uptime", "Packet", "Rate"].map((item) => (
+            <span role="columnheader" key={item}>
+              {item}
+            </span>
+          ))}
+        </div>
+        {sourceRows.map(([source, lag, uptime, packet, rate]) => (
+          <div className={`mock-source-row is-${packet}`} role="row" key={source}>
+            <strong>{source}</strong>
+            <span>{lag}</span>
+            <span>{uptime}</span>
+            <Badge tone={packet === "degraded" ? "Watch" : "Bullish"}>{packet}</Badge>
+            <span>{rate}</span>
+          </div>
+        ))}
+      </div>
+      <div className="mock-source-routes" aria-label="Route state">
+        {sourceRoutes.map(([route, state, detail]) => (
+          <div className={`is-${state}`} key={route}>
+            <strong>{route}</strong>
+            <Badge tone={state === "limited" ? "Watch" : "Bullish"}>{state}</Badge>
+            <span>{detail}</span>
+          </div>
+        ))}
+      </div>
+      <aside className="mock-source-audit" aria-label="Audit state">
+        <h2>Session audit</h2>
+        <FactList
+          items={[
+            ["Replay", "Synced through 09:42:51"],
+            ["Drops", "0 critical, 2 informational"],
+            ["Blocked", "NYSE venue lag excluded from PKT-8841"],
+            ["Next", "Backfill check at 09:45"]
+          ]}
+        />
+      </aside>
     </section>
   );
 }
