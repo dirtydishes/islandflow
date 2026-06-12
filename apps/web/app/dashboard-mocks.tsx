@@ -78,10 +78,10 @@ const concepts: Record<MockVariant, Concept> = {
     bodyClass: "mock-alerts"
   },
   mock8: {
-    title: "Activity Matrix",
-    shortName: "Matrix",
-    routeName: "Matrix",
-    premise: "Options, packet, alert, and market context stitched into one activity map.",
+    title: "Alert Lineage",
+    shortName: "Lineage",
+    routeName: "Signal Trace",
+    premise: "Selected alert formation from raw prints through packet, confirmation, invalidation, and replay audit.",
     bodyClass: "mock-graph"
   },
   mock9: {
@@ -391,32 +391,40 @@ const alertRows = [
   ]
 ];
 
-const graphLanes = [
-  { label: "Options", x1: "5%", x2: "31%", y: "18%", tone: "good", text: "195C sweep + 200C join" },
-  {
-    label: "Packet",
-    x1: "35%",
-    x2: "60%",
-    y: "35%",
-    tone: "info",
-    text: "PKT-8841 ready, 5 sources"
-  },
-  {
-    label: "Alert",
-    x1: "63%",
-    x2: "88%",
-    y: "22%",
-    tone: "accent",
-    text: "SMP alert: stealth accumulation"
-  },
-  {
-    label: "Market",
-    x1: "20%",
-    x2: "82%",
-    y: "69%",
-    tone: "watch",
-    text: "QQQ confirms; semis neutral"
-  }
+const lineageScope = [
+  ["Scope", "All symbols", "ranked formations"],
+  ["Focus", "AAPL SMP", "top active alert"],
+  ["Valid", "above 194.50", "QQQ above 458.20"],
+  ["Packet", "PKT-8841", "86 / 5 sources"]
+];
+
+const lineageQueue = [
+  ["09:42:51", "AAPL", "SMP Alert", "86", "stealth accumulation", "active"],
+  ["09:41:58", "TSLA", "Ignition Watch", "71", "momentum ignition", "watch"],
+  ["09:40:34", "NVDA", "Absorption", "63", "call wall defense", "hold"],
+  ["09:39:22", "AMZN", "Divergence", "39", "put sweep against basket", "reject"]
+];
+
+const lineageEvents = [
+  ["09:41:23.420", "OPRA", "17MAY 195C sweep", "$4.32M", "ask 61%", "confirming"],
+  ["09:41:48.018", "Equity", "dark buy cluster", "$4.87M", "off-ex 64%", "confirming"],
+  ["09:42:06.130", "Packet", "PKT-8841 ready", "86", "5 sources", "confirming"],
+  ["09:42:31.004", "Market", "QQQ confirms", "458.20 held", "semis neutral", "confirming"],
+  ["09:42:51.000", "Alert", "SMP fired", "high", "valid above 194.50", "active"]
+];
+
+const lineageChecks = [
+  ["Options lead", "OPRA led stock by 72s", "confirming"],
+  ["Dark share", "+18 pts vs session baseline", "confirming"],
+  ["Market", "QQQ supportive; semis neutral", "confirming"],
+  ["Contra", "AMZN put sweep remains isolated", "against"],
+  ["Replay", "synced through alert frame", "audit"]
+];
+
+const lineageInvalidations = [
+  ["AAPL", "194.50", "alert invalid"],
+  ["QQQ", "458.20", "market confirm fails"],
+  ["Packet", "2 source loss", "score below 70"]
 ];
 
 const commandMetrics = [
@@ -873,45 +881,64 @@ function AlertReasonWall() {
 
 function MarketActivityGraph() {
   return (
-    <section className="mock-graph-layout" aria-label="Activity matrix">
-      <div className="mock-graph-canvas" aria-label="Options packet alert matrix">
-        {graphLanes.map((lane) => (
-          <div
-            className={`mock-graph-link is-${lane.tone}`}
-            key={lane.label}
-            style={{ "--x1": lane.x1, "--x2": lane.x2, "--y": lane.y } as CSSProperties}
-          >
-            <strong>{lane.label}</strong>
-            <span>{lane.text}</span>
-          </div>
-        ))}
-        <div className="mock-graph-node is-options">OPRA intake</div>
-        <div className="mock-graph-node is-packet">Packet PKT-8841</div>
-        <div className="mock-graph-node is-alert">SMP alert</div>
-        <div className="mock-graph-node is-market">Market state</div>
-      </div>
-      <div className="mock-graph-routes" aria-label="Route map">
-        {[
-          ["OPRA", "raw contract tape"],
-          ["Packets", "merged source stack"],
-          ["Alerts", "SMP read + invalidation"],
-          ["Replay", "frame audit"]
-        ].map(([route, purpose]) => (
-          <div key={route}>
-            <strong>{route}</strong>
-            <span>{purpose}</span>
+    <section className="mock-graph-layout" aria-label="Alert lineage">
+      <div className="mock-lineage-scope" aria-label="Current scope">
+        {lineageScope.map(([label, value, detail]) => (
+          <div key={label}>
+            <span>{label}</span>
+            <strong>{value}</strong>
+            <em>{detail}</em>
           </div>
         ))}
       </div>
-      <div className="mock-graph-strip" aria-label="Matrix status">
-        <FactList
-          items={[
-            ["State", "Raw -> packet -> alert"],
-            ["Scope", "No duplicate panes"],
-            ["Audit", "Alert traces to OPRA source"]
-          ]}
-        />
+      <div className="mock-lineage-chain" role="table" aria-label="Selected alert evidence chain">
+        <div className="mock-lineage-row is-head" role="row">
+          {["Time", "Source", "Event", "Value", "Read", "State"].map((item) => (
+            <span role="columnheader" key={item}>
+              {item}
+            </span>
+          ))}
+        </div>
+        {lineageEvents.map(([time, source, event, value, read, state]) => (
+          <div className={`mock-lineage-row is-${state}`} role="row" key={`${time}-${source}`}>
+            <time>{time}</time>
+            <strong>{source}</strong>
+            <span>{event}</span>
+            <span>{value}</span>
+            <span>{read}</span>
+            <Badge tone={state === "active" ? "Bullish" : "Info"}>{state}</Badge>
+          </div>
+        ))}
       </div>
+      <div className="mock-lineage-queue" role="table" aria-label="All-symbol alert formations">
+        <div className="mock-lineage-queue-row is-head" role="row">
+          {["Time", "Sym", "Type", "Score", "Read", "State"].map((item) => (
+            <span role="columnheader" key={item}>
+              {item}
+            </span>
+          ))}
+        </div>
+        {lineageQueue.map(([time, symbol, type, score, read, state]) => (
+          <div className={`mock-lineage-queue-row is-${state}`} role="row" key={`${time}-${symbol}`}>
+            <time>{time}</time>
+            <strong>{symbol}</strong>
+            <span>{type}</span>
+            <span>{score}</span>
+            <span>{read}</span>
+            <Badge tone={state === "reject" ? "Bearish" : state === "watch" || state === "hold" ? "Watch" : "Bullish"}>
+              {state}
+            </Badge>
+          </div>
+        ))}
+      </div>
+      <aside className="mock-lineage-inspector" aria-label="Selected alert read">
+        <h2>AAPL SMP 09:42:51</h2>
+        <FactList items={lineageChecks.map(([label, value]) => [label, value])} />
+      </aside>
+      <aside className="mock-lineage-invalid" aria-label="Invalidation levels">
+        <h2>Invalidates</h2>
+        <FactList items={lineageInvalidations.map(([label, level, result]) => [label, `${level}: ${result}`])} />
+      </aside>
     </section>
   );
 }

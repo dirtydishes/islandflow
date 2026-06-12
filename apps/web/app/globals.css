@@ -5210,104 +5210,137 @@ h3 {
 }
 
 .mock-graph-layout {
-  grid-template-columns: minmax(680px, 1fr) 310px;
+  grid-template-columns: minmax(720px, 1fr) 320px;
   grid-template-areas:
-    "canvas routes"
-    "canvas strip";
+    "scope scope"
+    "chain inspector"
+    "queue invalid";
 }
 
-.mock-graph-canvas {
-  grid-area: canvas;
-  position: relative;
-  min-height: 620px;
-  border-block: 1px solid var(--mock-line);
-  overflow: hidden;
-  background:
-    linear-gradient(0deg, var(--mock-line) 1px, transparent 1px) 0 0 / 100% 62px,
-    linear-gradient(90deg, var(--mock-line) 1px, transparent 1px) 0 0 / 82px 100%;
-}
-
-.mock-graph-link {
-  position: absolute;
-  left: var(--x1);
-  top: var(--y);
-  width: calc(var(--x2) - var(--x1));
+.mock-lineage-scope {
+  grid-area: scope;
   display: grid;
-  gap: 4px;
-  border-top: 2px solid var(--mock-accent);
-  padding-top: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-block: 1px solid var(--mock-line);
 }
 
-.mock-graph-link.is-good {
-  border-color: var(--mock-good);
+.mock-lineage-scope div {
+  min-width: 0;
+  min-height: 86px;
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  border-right: 1px solid var(--mock-line);
+  padding: 12px;
 }
 
-.mock-graph-link.is-info {
-  border-color: var(--mock-info);
+.mock-lineage-scope div:last-child {
+  border-right: 0;
 }
 
-.mock-graph-link.is-watch {
-  border-color: var(--mock-alt);
-}
-
-.mock-graph-link strong {
+.mock-lineage-scope span,
+.mock-lineage-scope em,
+.mock-lineage-row time,
+.mock-lineage-row span,
+.mock-lineage-queue-row time,
+.mock-lineage-queue-row span {
+  color: var(--mock-faint);
   font-family: var(--font-mono), monospace;
-  font-size: 0.74rem;
-  text-transform: uppercase;
+  font-size: 0.68rem;
+  font-style: normal;
 }
 
-.mock-graph-link span {
+.mock-lineage-scope strong {
+  color: var(--mock-ink);
+  font-size: 1rem;
+  line-height: 1.12;
+}
+
+.mock-lineage-chain,
+.mock-lineage-queue {
+  overflow-x: auto;
+  border-block: 1px solid var(--mock-line);
+}
+
+.mock-lineage-chain {
+  grid-area: chain;
+}
+
+.mock-lineage-queue {
+  grid-area: queue;
+}
+
+.mock-lineage-row {
+  min-width: 900px;
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: 116px 86px minmax(210px, 1fr) 104px minmax(150px, 0.72fr) 106px;
+  gap: 10px;
+  align-items: center;
+  border-bottom: 1px solid var(--mock-line);
+  padding: 0 10px;
   color: var(--mock-muted);
-  font-size: 0.8rem;
+  font-size: 0.76rem;
 }
 
-.mock-graph-node {
-  position: absolute;
+.mock-lineage-queue-row {
+  min-width: 720px;
+  min-height: 42px;
   display: grid;
-  place-items: center;
-  min-height: 46px;
-  border: 1px solid var(--mock-line-strong);
-  border-radius: 6px;
-  padding: 9px 12px;
-  background: var(--mock-surface-2);
-  color: var(--mock-ink);
+  grid-template-columns: 76px 66px 112px 58px minmax(170px, 1fr) 88px;
+  gap: 10px;
+  align-items: center;
+  border-bottom: 1px solid var(--mock-line);
+  padding: 0 10px;
+  color: var(--mock-muted);
+  font-size: 0.76rem;
+}
+
+.mock-lineage-row:last-child,
+.mock-lineage-queue-row:last-child {
+  border-bottom: 0;
+}
+
+.mock-lineage-row.is-head,
+.mock-lineage-queue-row.is-head {
+  min-height: 30px;
+  color: var(--mock-faint);
   font-family: var(--font-mono), monospace;
-  font-size: 0.72rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-.mock-graph-node.is-options {
-  left: 7%;
-  top: 14%;
-}
-
-.mock-graph-node.is-packet {
-  left: 38%;
-  top: 31%;
-}
-
-.mock-graph-node.is-alert {
-  right: 8%;
-  top: 17%;
-}
-
-.mock-graph-node.is-market {
-  left: 24%;
-  bottom: 19%;
-}
-
-.mock-graph-routes {
-  grid-area: routes;
-  border-block: 1px solid var(--mock-line);
-  padding-block: 8px;
-}
-
-.mock-graph-routes strong {
+.mock-lineage-row.is-active,
+.mock-lineage-queue-row.is-active {
+  background: var(--mock-accent-soft);
   color: var(--mock-ink);
 }
 
-.mock-graph-strip {
-  grid-area: strip;
+.mock-lineage-queue-row.is-reject {
+  color: color-mix(in oklch, var(--mock-bad) 72%, var(--mock-muted));
+}
+
+.mock-lineage-inspector,
+.mock-lineage-invalid {
+  border-block: 1px solid var(--mock-line);
+  padding-block: 12px;
+}
+
+.mock-lineage-inspector {
+  grid-area: inspector;
+}
+
+.mock-lineage-invalid {
+  grid-area: invalid;
+}
+
+.mock-lineage-inspector h2,
+.mock-lineage-invalid h2 {
+  margin: 0 0 12px;
+  color: var(--mock-ink);
+  font-size: 1rem;
+  letter-spacing: -0.01em;
 }
 
 .mock-command-layout,
@@ -5705,6 +5738,7 @@ h3 {
 
   .mock-packet-chain,
   .mock-flow-ladder,
+  .mock-lineage-scope,
   .mock-command-strip,
   .mock-radar-sweep,
   .mock-risk-map {
@@ -5713,6 +5747,7 @@ h3 {
 
   .mock-packet-chain article,
   .mock-flow-ladder div,
+  .mock-lineage-scope div,
   .mock-command-strip div,
   .mock-radar-band,
   .mock-risk-level {
@@ -5722,6 +5757,7 @@ h3 {
 
   .mock-packet-chain article:last-child,
   .mock-flow-ladder div:last-child,
+  .mock-lineage-scope div:last-child,
   .mock-command-strip div:last-child,
   .mock-radar-band:last-child,
   .mock-risk-level:last-child {
@@ -5778,16 +5814,7 @@ h3 {
     font-size: 1rem;
   }
 
-  .mock-graph-canvas {
-    min-height: 520px;
-  }
-
-  .mock-graph-link {
-    width: 42%;
-  }
-
-  .mock-graph-node {
-    max-width: 150px;
-    text-align: center;
+  .mock-lineage-scope strong {
+    font-size: 1rem;
   }
 }
