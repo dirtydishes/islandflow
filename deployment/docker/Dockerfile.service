@@ -1,6 +1,12 @@
 # syntax=docker/dockerfile:1.7
 
-FROM oven/bun:1.3.11
+ARG BUN_IMAGE=oven/bun:1.3.14
+
+FROM ${BUN_IMAGE}
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends --only-upgrade libssl3t64 openssl-provider-legacy \
+  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
