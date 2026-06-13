@@ -138,6 +138,12 @@ import {
   recordSyntheticProfileHit,
   resolveSyntheticBackendMode
 } from "./synthetic-control";
+import {
+  DEFAULT_API_CORS_ORIGINS,
+  createCorsPreflightResponse,
+  parseCorsAllowedOrigins,
+  withCorsHeaders
+} from "./cors";
 
 const service = "api";
 const logger = createLogger({ service });
@@ -172,10 +178,12 @@ const envSchema = z.object({
       return value;
     }, z.boolean())
     .default(false),
-  SYNTHETIC_ADMIN_TOKEN: z.string().default("")
+  SYNTHETIC_ADMIN_TOKEN: z.string().default(""),
+  API_CORS_ORIGINS: z.string().default(DEFAULT_API_CORS_ORIGINS)
 });
 
 const env = readEnv(envSchema);
+const corsAllowedOrigins = parseCorsAllowedOrigins(env.API_CORS_ORIGINS);
 
 const state = {
   shuttingDown: false,
@@ -1363,11 +1371,16 @@ const run = async () => {
     hostname: env.API_HOST,
     port: env.API_PORT,
     fetch: async (req: Request, serverRef: any) => {
-      const url = new URL(req.url);
+      const handleApiRequest = async (): Promise<Response> => {
+        const url = new URL(req.url);
 
-      if (req.method === "GET" && url.pathname === "/health") {
-        return jsonResponse({ status: "ok" });
-      }
+        if (req.method === "OPTIONS") {
+          return createCorsPreflightResponse(req, corsAllowedOrigins);
+        }
+
+        if (req.method === "GET" && url.pathname === "/health") {
+          return jsonResponse({ status: "ok" });
+        }
 
       if (req.method === "GET" && url.pathname === "/admin/synthetic/status") {
         const authError = authenticateSyntheticAdminRequest(req);
@@ -1951,7 +1964,11 @@ const run = async () => {
         return jsonResponse({ error: "websocket upgrade failed" }, 400);
       }
 
-      return jsonResponse({ error: "not found" }, 404);
+        return jsonResponse({ error: "not found" }, 404);
+      };
+
+      const response = await handleApiRequest();
+      return withCorsHeaders(req, response, corsAllowedOrigins);
     },
     websocket: {
       open: (socket: any) => {
