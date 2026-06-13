@@ -139,7 +139,7 @@ const LIVE_SESSION_HOT_CHANNELS = new Set<LiveSubscription["channel"]>([
   "equity-overlay"
 ]);
 
-type TapeVirtualPane = "options" | "equities" | "flow" | "alerts" | "classifier" | "dark";
+type TapeVirtualPane = "options" | "equities" | "flow" | "alerts" | "classifier" | "dark" | "news";
 
 type TapeVirtualListConfig = {
   rowHeight: number;
@@ -153,7 +153,8 @@ const TAPE_VIRTUAL_CONFIG: Record<TapeVirtualPane, TapeVirtualListConfig> = {
   flow: { rowHeight: 44, overscan: 24, debugLabel: "flow" },
   alerts: { rowHeight: 44, overscan: 24, debugLabel: "alerts" },
   classifier: { rowHeight: 44, overscan: 24, debugLabel: "classifier" },
-  dark: { rowHeight: 44, overscan: 24, debugLabel: "dark" }
+  dark: { rowHeight: 44, overscan: 24, debugLabel: "dark" },
+  news: { rowHeight: 52, overscan: 28, debugLabel: "news" }
 };
 
 export const getTapeVirtualConfig = (pane: TapeVirtualPane): TapeVirtualListConfig =>
@@ -1276,15 +1277,45 @@ export const formatNewsTimestamp = (ts: number, now = Date.now()): string => {
       });
 };
 
+const NEWS_TEXT_ENTITIES: Record<string, string> = {
+  amp: "&",
+  apos: "'",
+  gt: ">",
+  lt: "<",
+  nbsp: " ",
+  quot: '"'
+};
+
+export const decodeNewsText = (value: string): string =>
+  value.replace(/&(#\d+|#x[\da-f]+|[a-z][\da-z]+);/gi, (match, entity: string) => {
+    if (entity[0] === "#") {
+      const radix = entity[1]?.toLowerCase() === "x" ? 16 : 10;
+      const rawCodePoint = radix === 16 ? entity.slice(2) : entity.slice(1);
+      const codePoint = Number.parseInt(rawCodePoint, radix);
+      if (!Number.isFinite(codePoint)) {
+        return match;
+      }
+      try {
+        return String.fromCodePoint(codePoint);
+      } catch {
+        return match;
+      }
+    }
+
+    return NEWS_TEXT_ENTITIES[entity.toLowerCase()] ?? match;
+  });
+
 const sanitizeNewsHtml = (
   value: string
 ): { html: string; fallbackText: string; sanitized: boolean } => {
-  const fallbackText = value
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  const fallbackText = decodeNewsText(
+    value
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+  );
 
   try {
     const sanitized = value
@@ -5016,13 +5047,15 @@ type NewsDrawerProps = {
 
 const NewsDrawer = ({ story, onClose }: NewsDrawerProps) => {
   const body = sanitizeNewsHtml(story.content_html);
+  const headline = decodeNewsText(story.headline);
+  const summary = decodeNewsText(story.summary);
 
   return (
     <aside className="drawer">
       <div className="drawer-header">
         <div>
           <p className="drawer-eyebrow">News wire</p>
-          <h3>{story.headline}</h3>
+          <h3>{headline}</h3>
           <p className="drawer-subtitle">
             {story.source} · Published {formatDateTime(story.published_ts)}
             {story.updated_ts !== story.published_ts
@@ -5044,10 +5077,10 @@ const NewsDrawer = ({ story, onClose }: NewsDrawerProps) => {
         <span className="drawer-chip">{story.symbol_resolution}</span>
       </div>
 
-      {story.summary ? (
+      {summary ? (
         <div className="drawer-section">
           <h4>Summary</h4>
-          <p className="drawer-note">{story.summary}</p>
+          <p className="drawer-note">{summary}</p>
         </div>
       ) : null}
 
@@ -5602,6 +5635,7 @@ const useTerminalState = () => {
   const darkScroll = useListScroll();
   const alertsScroll = useListScroll();
   const classifierScroll = useListScroll();
+  const newsScroll = useListScroll();
 
   const optionsAnchor = useScrollAnchor(optionsScroll.listRef, optionsScroll.isAtTopRef);
   const equitiesAnchor = useScrollAnchor(equitiesScroll.listRef, equitiesScroll.isAtTopRef);
@@ -5609,6 +5643,7 @@ const useTerminalState = () => {
   const darkAnchor = useScrollAnchor(darkScroll.listRef, darkScroll.isAtTopRef);
   const alertsAnchor = useScrollAnchor(alertsScroll.listRef, alertsScroll.isAtTopRef);
   const classifierAnchor = useScrollAnchor(classifierScroll.listRef, classifierScroll.isAtTopRef);
+  const newsAnchor = useScrollAnchor(newsScroll.listRef, newsScroll.isAtTopRef);
   const disableReplayGrouping = useCallback(() => null, []);
   const optionQueryParams = useMemo<Record<string, string | undefined>>(
     () => buildOptionTapeQueryParams(effectiveOptionPrintFilters, optionScope),
@@ -5791,6 +5826,18 @@ const useTerminalState = () => {
     shouldHold: () => !flowScroll.isAtTopRef.current,
     resumeSignal: flowScroll.resumeTick
   });
+  const liveNews = usePausableTapeView<NewsStory>({
+    enabled: mode === "live",
+    sourceStatus: liveSession.status,
+    sourceItems: liveSession.news,
+    historyTail: liveSession.newsHistory,
+    lastUpdate: liveSession.lastUpdate,
+    retentionLimit: LIVE_OPTIONS_HEAD_LIMIT,
+    captureScroll: newsAnchor.capture,
+    onNewItems: newsScroll.onNewItems,
+    shouldHold: () => !newsScroll.isAtTopRef.current,
+    resumeSignal: newsScroll.resumeTick
+  });
 
   const seededLiveOptionsItems = useMemo(
     () =>
@@ -5831,14 +5878,7 @@ const useTerminalState = () => {
         )
       : equityJoins;
   const flowFeed = mode === "live" ? liveFlow : flow;
-  const newsFeed =
-    mode === "live"
-      ? toStaticTapeState(
-          liveSession.status,
-          composeTapeItems([], liveSession.news, liveSession.newsHistory),
-          liveSession.lastUpdate
-        )
-      : toStaticTapeState("disconnected", [], null);
+  const newsFeed = mode === "live" ? liveNews : toStaticTapeState("disconnected", [], null);
   const alertsFeed =
     mode === "live"
       ? toStaticTapeState(
@@ -5895,6 +5935,10 @@ const useTerminalState = () => {
   useLayoutEffect(() => {
     classifierAnchor.apply();
   }, [smartMoneyFeed.items, classifierHitsFeed.items, classifierAnchor.apply]);
+
+  useLayoutEffect(() => {
+    newsAnchor.apply();
+  }, [newsFeed.items, newsAnchor.apply]);
 
   const nbboMap = useMemo(() => {
     const map = new Map<string, OptionNBBO>();
@@ -7248,6 +7292,7 @@ const useTerminalState = () => {
     darkScroll,
     alertsScroll,
     classifierScroll,
+    newsScroll,
     options: optionsFeed,
     equities: equitiesFeed,
     equityJoins: equityJoinsFeed,
@@ -7320,22 +7365,30 @@ const useTerminal = (): TerminalState => {
 };
 
 export const NAV_ITEMS = [
-  { href: "/", label: "Home" },
+  { href: "/", label: "Dashboard" },
   { href: "/options", label: "Options" },
   { href: "/news", label: "News" }
 ] as const;
 
+type PageFrameVariant = "default" | "dashboard" | "options" | "news";
+
 type PageFrameProps = {
   title: string;
+  eyebrow?: string;
+  variant?: PageFrameVariant;
   actions?: ReactNode;
   children: ReactNode;
 };
 
-const PageFrame = ({ title, actions, children }: PageFrameProps) => {
+const PageFrame = ({ title, eyebrow, variant = "default", actions, children }: PageFrameProps) => {
+  const classes = ["page-shell", `page-shell-${variant}`].join(" ");
   return (
-    <div className="page-shell">
+    <div className={classes} data-route-variant={variant}>
       <header className="page-header">
-        <h1 className="page-title">{title}</h1>
+        <div className="page-heading">
+          {eyebrow ? <span className="page-eyebrow">{eyebrow}</span> : null}
+          <h1 className="page-title">{title}</h1>
+        </div>
         {actions ? <div className="page-actions">{actions}</div> : null}
       </header>
       {children}
@@ -7611,9 +7664,11 @@ const ShellMetricStrip = () => {
 type OptionsPaneProps = {
   state: TerminalState;
   limit?: number;
+  title?: string;
+  className?: string;
 };
 
-const OptionsPane = memo(({ state, limit }: OptionsPaneProps) => {
+const OptionsPane = memo(({ state, limit, title = "Options", className }: OptionsPaneProps) => {
   const items = limit ? state.filteredOptions.slice(0, limit) : state.filteredOptions;
   const virtual = useTapeVirtualList(
     items,
@@ -7638,7 +7693,8 @@ const OptionsPane = memo(({ state, limit }: OptionsPaneProps) => {
 
   return (
     <Pane
-      title="Options"
+      className={className}
+      title={title}
       status={
         <TapeStatus
           status={state.options.status}
@@ -7972,9 +8028,10 @@ type FlowPaneProps = {
   state: TerminalState;
   limit?: number;
   title?: string;
+  className?: string;
 };
 
-const FlowPane = memo(({ state, limit, title = "Flow" }: FlowPaneProps) => {
+const FlowPane = memo(({ state, limit, title = "Flow", className }: FlowPaneProps) => {
   const items = limit ? state.filteredFlow.slice(0, limit) : state.filteredFlow;
   const virtual = useTapeVirtualList(items, state.flowScroll.listRef, getTapeVirtualConfig("flow"));
   useVirtualHistoryGate(
@@ -7986,6 +8043,7 @@ const FlowPane = memo(({ state, limit, title = "Flow" }: FlowPaneProps) => {
 
   return (
     <Pane
+      className={className}
       title={title}
       status={
         <TapeStatus
@@ -8272,79 +8330,156 @@ type NewsPaneProps = {
   className?: string;
 };
 
+const formatNewsSymbolsLabel = (story: NewsStory): string => {
+  if (story.resolved_symbols.length === 0) {
+    return story.symbol_resolution === "none" ? "unmapped" : "market";
+  }
+  const visible = story.resolved_symbols.slice(0, 4);
+  const extra = story.resolved_symbols.length - visible.length;
+  return extra > 0 ? `${visible.join(", ")} +${extra}` : visible.join(", ");
+};
+
+const getNewsWireStatus = (story: NewsStory): "updated" | "mapped" | "unmapped" => {
+  if (story.updated_ts > story.published_ts) {
+    return "updated";
+  }
+  return story.resolved_symbols.length > 0 ? "mapped" : "unmapped";
+};
+
+const openNewsStory = (state: TerminalState, story: NewsStory): void => {
+  state.setSelectedNewsStory(null);
+  state.setSelectedAlert(null);
+  state.setSelectedClassifierHit(null);
+  state.setSelectedSmartMoneyEvent(null);
+  state.setSelectedDarkEvent(null);
+  state.setSelectedNewsStory(story);
+};
+
 const NewsPane = memo(({ state, limit, className }: NewsPaneProps) => {
   const items = limit ? state.filteredNews.slice(0, limit) : state.filteredNews;
-  const canLoadOlder = state.mode === "live" && !limit && items.length > 0;
+  const virtual = useTapeVirtualList(items, state.newsScroll.listRef, getTapeVirtualConfig("news"));
+  const newsHistorySubscription = state.liveSession.manifest.find(
+    (subscription) => subscription.channel === "news"
+  );
+  const newsHistoryKey = newsHistorySubscription
+    ? getLiveSubscriptionKey(newsHistorySubscription)
+    : null;
+  const newsHistoryLoading = newsHistoryKey
+    ? Boolean(state.liveSession.historyLoading[newsHistoryKey])
+    : false;
+  const newsHistoryError = newsHistoryKey ? state.liveSession.historyErrors[newsHistoryKey] : null;
+  useVirtualHistoryGate(
+    state.mode === "live" && !limit,
+    items.length,
+    virtual.virtualItems.at(-1)?.index ?? -1,
+    () => void state.liveSession.loadOlder("news")
+  );
 
   return (
     <Pane
       className={className}
       title="News Wire"
       status={
+        <TapeStatus
+          status={state.news.status}
+          lastUpdate={state.news.lastUpdate}
+          replayTime={state.news.replayTime}
+          replayComplete={state.news.replayComplete}
+          paused={state.news.paused}
+          dropped={state.news.dropped}
+          mode={state.mode}
+        />
+      }
+      actions={
         limit ? (
           <Link className="terminal-button terminal-link-button" href="/news">
             View all
           </Link>
         ) : (
-          <div className="status-inline status-connected">
-            <span className="status-dot" />
-            <span>{state.mode === "live" ? "Live wire" : "Live-only in v1"}</span>
-          </div>
+          <TapeControls
+            mode={state.mode}
+            paused={state.news.paused}
+            onTogglePause={state.news.togglePause}
+            isAtTop={state.newsScroll.isAtTop}
+            missed={state.newsScroll.missed}
+            onJump={state.newsScroll.jumpToTop}
+          />
         )
       }
-      actions={
-        canLoadOlder ? (
-          <button
-            className="terminal-button"
-            type="button"
-            onClick={() => void state.liveSession.loadOlder("news")}
-          >
-            Older
-          </button>
-        ) : null
-      }
     >
-      {state.mode === "replay" ? (
-        <div className="empty">News is live-only in v1.</div>
-      ) : items.length === 0 ? (
-        <div className="empty">
-          {state.tickerSet.size > 0
-            ? "No news stories match the current filter."
-            : "Waiting for live news stories."}
-        </div>
-      ) : (
-        <div className="news-list" role="list" aria-label="News stories">
-          {items.map((story) => (
-            <button
-              className="news-row"
-              key={`${story.trace_id}:${story.updated_ts}:${story.seq}`}
-              type="button"
-              onClick={() => {
-                state.setSelectedNewsStory(null);
-                state.setSelectedAlert(null);
-                state.setSelectedClassifierHit(null);
-                state.setSelectedSmartMoneyEvent(null);
-                state.setSelectedDarkEvent(null);
-                state.setSelectedNewsStory(story);
-              }}
-            >
-              <div className="news-row-head">
-                <h3>{story.headline}</h3>
-                <span className="news-row-time">{formatNewsTimestamp(story.published_ts)}</span>
+      <div className="data-table-shell news-wire-shell">
+        {state.mode === "live" && newsHistoryError ? (
+          <div className="history-load-warning" role="status">
+            Older news history failed to load: {newsHistoryError}
+          </div>
+        ) : null}
+        {state.mode === "live" && newsHistoryLoading ? (
+          <div className="history-load-warning history-load-muted" role="status">
+            Loading older wire history.
+          </div>
+        ) : null}
+        {state.mode === "replay" ? (
+          <div className="empty">News is live only in v1.</div>
+        ) : items.length === 0 ? (
+          <div className="empty">
+            {state.tickerSet.size > 0
+              ? "No news stories match the current filter."
+              : "Waiting for live news stories."}
+          </div>
+        ) : (
+          <div className="data-table-wrap">
+            <div className="data-table data-table-news" role="table" aria-label="News wire">
+              <div className="data-table-head" role="row">
+                <span className="data-table-cell">TIME</span>
+                <span className="data-table-cell">SOURCE</span>
+                <span className="data-table-cell">SYMBOLS</span>
+                <span className="data-table-cell">STATE</span>
+                <span className="data-table-cell">HEADLINE</span>
+                <span className="data-table-cell">SUMMARY</span>
               </div>
-              <div className="news-row-meta">
-                <span>{story.source}</span>
-                {story.resolved_symbols.map((symbol) => (
-                  <span className="drawer-chip" key={`${story.trace_id}-${symbol}`}>
-                    {symbol}
-                  </span>
-                ))}
+              <div className="data-table-scroll" ref={state.newsScroll.setListRef}>
+                <div
+                  className="data-table-body"
+                  style={{ height: `${virtual.totalSize}px` }}
+                  aria-hidden={virtual.virtualItems.length === 0}
+                >
+                  {virtual.virtualItems.map(({ item: story, key, index, start, size }) => {
+                    const wireStatus = getNewsWireStatus(story);
+                    const headline = decodeNewsText(story.headline);
+                    const summary = decodeNewsText(story.summary || story.provider);
+                    return (
+                      <button
+                        className={`data-table-row data-table-row-button data-table-row-news data-table-virtual-row${index % 2 === 1 ? " is-even" : ""} news-wire-row-${wireStatus}`}
+                        key={key}
+                        type="button"
+                        data-index={index}
+                        data-row-start={String(start)}
+                        data-row-size={String(size)}
+                        data-tape-key={key}
+                        style={{ transform: `translateY(${start}px)` }}
+                        onClick={() => openNewsStory(state, story)}
+                      >
+                        <span className="data-table-cell data-table-cell-number">
+                          {formatNewsTimestamp(story.published_ts)}
+                        </span>
+                        <span className="data-table-cell">{story.source}</span>
+                        <span className="data-table-cell">{formatNewsSymbolsLabel(story)}</span>
+                        <span className="data-table-cell">
+                          <span className={`news-state news-state-${wireStatus}`}>
+                            {wireStatus}
+                          </span>
+                        </span>
+                        <span className="data-table-cell news-headline-cell">{headline}</span>
+                        <span className="data-table-cell news-summary-cell">{summary}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-              {!limit && story.summary ? <p className="drawer-note">{story.summary}</p> : null}
-            </button>
-          ))}
-        </div>
-      )}
+            </div>
+          </div>
+        )}
+      </div>
     </Pane>
   );
 });
@@ -8736,47 +8871,341 @@ const buildCommandDeckTickers = (state: TerminalState): CommandDeckTicker[] => {
     });
 };
 
+type CommandPriorityState = "confirm" | "watch" | "hold" | "reject" | "info";
+
+type CommandPriorityRow = {
+  key: string;
+  ts: number;
+  symbol: string;
+  packet: string;
+  read: string;
+  score: number;
+  invalidation: string;
+  state: CommandPriorityState;
+  onOpen: () => void;
+};
+
+const clampCommandScore = (value: number): number => {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.max(0, Math.min(100, Math.round(value)));
+};
+
+const commandStateFromDirection = (direction: string): CommandPriorityState => {
+  const normalized = normalizeDirection(direction);
+  if (normalized === "bullish") {
+    return "confirm";
+  }
+  if (normalized === "bearish") {
+    return "reject";
+  }
+  return "watch";
+};
+
+const inferCommandSymbolFromTrace = (traceId: string): string | null => {
+  const token = traceId
+    .toUpperCase()
+    .split(/[^A-Z0-9]+/)
+    .find((part) => /^[A-Z]{1,6}$/.test(part) && !["ALERT", "FLOW", "SMART"].includes(part));
+  return token ?? null;
+};
+
+const buildCommandPriorityRows = (state: TerminalState): CommandPriorityRow[] => {
+  const rows: CommandPriorityRow[] = [];
+
+  for (const event of state.filteredSmartMoneyEvents.slice(0, 8)) {
+    const primaryScore =
+      event.profile_scores.find((score) => score.profile_id === event.primary_profile_id) ??
+      event.profile_scores[0];
+    const read =
+      primaryScore?.reasons[0] ??
+      (event.primary_profile_id
+        ? smartMoneyProfileLabel(event.primary_profile_id)
+        : event.event_kind);
+    rows.push({
+      key: `smart-${event.event_id}-${event.seq}`,
+      ts: event.source_ts,
+      symbol: event.underlying_id.toUpperCase(),
+      packet: event.packet_ids[0] ?? event.event_id,
+      read,
+      score: clampCommandScore((primaryScore?.probability ?? 0) * 100),
+      invalidation:
+        event.packet_ids.length > 0
+          ? `${event.packet_ids.length} packet${event.packet_ids.length === 1 ? "" : "s"}`
+          : `${formatFlowMetric(event.features.print_count)} prints`,
+      state: event.abstained ? "hold" : commandStateFromDirection(event.primary_direction),
+      onOpen: () => state.openFromSmartMoneyEvent(event)
+    });
+  }
+
+  for (const alert of state.filteredAlerts.slice(0, 8)) {
+    const primary = alert.hits[0];
+    const direction = deriveAlertDirection(alert);
+    const severity = normalizeAlertSeverity(alert);
+    rows.push({
+      key: `alert-${alert.trace_id}-${alert.seq}`,
+      ts: alert.source_ts,
+      symbol: inferCommandSymbolFromTrace(alert.trace_id) ?? "ALERT",
+      packet: getAlertFlowPacketRefs(alert)[0] ?? alert.trace_id,
+      read: primary?.explanations?.[0] ?? primary?.classifier_id ?? "Classifier alert",
+      score: clampCommandScore(alert.score),
+      invalidation: `${alert.evidence_refs.length} refs`,
+      state:
+        severity === "high"
+          ? commandStateFromDirection(direction)
+          : severity === "medium"
+            ? "watch"
+            : "hold",
+      onOpen: () => {
+        state.setSelectedNewsStory(null);
+        state.setSelectedDarkEvent(null);
+        state.setSelectedClassifierHit(null);
+        state.setSelectedSmartMoneyEvent(null);
+        state.setSelectedAlert(alert);
+      }
+    });
+  }
+
+  for (const packet of state.filteredFlow.slice(0, 6)) {
+    const contract = String(packet.features.option_contract_id ?? packet.id);
+    const symbol = extractUnderlying(contract);
+    const notional = parseNumber(packet.features.total_notional, 0);
+    rows.push({
+      key: `flow-${packet.id}-${packet.seq}`,
+      ts: packet.source_ts,
+      symbol,
+      packet: packet.id,
+      read:
+        typeof packet.features.structure_type === "string"
+          ? packet.features.structure_type.replace(/_/g, " ")
+          : "Flow packet",
+      score: clampCommandScore(parseNumber(packet.join_quality.nbbo_coverage_ratio, 0) * 100),
+      invalidation: notional > 0 ? `$${formatCompactUsd(notional)}` : "packet fit",
+      state: "watch",
+      onOpen: () => state.setFilterInput(symbol)
+    });
+  }
+
+  for (const story of state.filteredNews.slice(0, 4)) {
+    rows.push({
+      key: `news-${story.trace_id}-${story.seq}`,
+      ts: story.published_ts,
+      symbol: story.resolved_symbols[0]?.toUpperCase() ?? "WIRE",
+      packet: story.source,
+      read: decodeNewsText(story.headline),
+      score: story.resolved_symbols.length > 0 ? 55 : 25,
+      invalidation: getNewsWireStatus(story),
+      state: "info",
+      onOpen: () => openNewsStory(state, story)
+    });
+  }
+
+  return rows.sort((a, b) => b.ts - a.ts).slice(0, 8);
+};
+
+const CommandMetricsStrip = ({ state }: { state: TerminalState }) => {
+  const priorityCount =
+    state.filteredSmartMoneyEvents.length + state.filteredAlerts.length + state.filteredFlow.length;
+  const focus = state.activeTickers.length > 0 ? state.activeTickers.join(", ") : "All symbols";
+  const decision =
+    state.selectedInstrument?.kind === "option-contract"
+      ? (state.selectedInstrumentLabel ?? "Contract focus")
+      : `${state.chartTicker.toUpperCase()} / ${formatIntervalLabel(state.chartIntervalMs)}`;
+  const risk =
+    state.filteredAlerts[0]?.severity ??
+    (state.filteredInferredDark.length > 0 ? "dark context" : "no active alert");
+  const metrics = [
+    {
+      label: "Regime",
+      value:
+        state.mode === "live" ? statusLabel(state.liveSession.status, false, state.mode) : "Replay",
+      detail: state.lastSeen ? `last ${formatTime(state.lastSeen)}` : "waiting"
+    },
+    {
+      label: "Priority",
+      value: `${formatFlowMetric(priorityCount)} events`,
+      detail: focus
+    },
+    {
+      label: "Decision",
+      value: decision,
+      detail: state.selectedInstrument ? "focused instrument" : "chart context"
+    },
+    {
+      label: "Risk",
+      value: risk,
+      detail: `${state.filteredNews.length} wire / ${state.filteredInferredDark.length} dark`
+    }
+  ];
+
+  return (
+    <section className="command-metric-strip" aria-label="Session command metrics">
+      {metrics.map((metric) => (
+        <div className="command-metric-cell" key={metric.label}>
+          <span>{metric.label}</span>
+          <strong>{metric.value}</strong>
+          <em>{metric.detail}</em>
+        </div>
+      ))}
+    </section>
+  );
+};
+
+const CommandPriorityBoard = ({ state }: { state: TerminalState }) => {
+  const rows = useMemo(() => buildCommandPriorityRows(state), [state]);
+
+  return (
+    <Pane
+      className="command-priority-pane"
+      title="Priority Board"
+      status={<span className="command-pane-meta">{rows.length} active rows</span>}
+    >
+      {rows.length === 0 ? (
+        <div className="empty">No priority events are available for this scope yet.</div>
+      ) : (
+        <div className="command-priority-table" role="table" aria-label="Priority board">
+          <div className="command-priority-row is-head" role="row">
+            {["Time", "Sym", "Packet", "Read", "Score", "Decision", "State"].map((label) => (
+              <span role="columnheader" key={label}>
+                {label}
+              </span>
+            ))}
+          </div>
+          {rows.map((row) => (
+            <button
+              className={`command-priority-row is-${row.state}`}
+              key={row.key}
+              type="button"
+              onClick={row.onOpen}
+            >
+              <time>{formatTime(row.ts)}</time>
+              <strong>{row.symbol}</strong>
+              <span>{row.packet}</span>
+              <span>{row.read}</span>
+              <span
+                className="command-score-meter"
+                style={{ "--score": `${row.score}%` } as CSSProperties}
+              >
+                <i />
+                <em>{row.score}</em>
+              </span>
+              <span>{row.invalidation}</span>
+              <span className={`command-state command-state-${row.state}`}>{row.state}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </Pane>
+  );
+};
+
+const CommandDecisionLevels = ({ state }: { state: TerminalState }) => {
+  const topOption = state.filteredOptions[0];
+  const topOptionLabel = topOption
+    ? (formatOptionContractLabel(normalizeContractId(topOption.option_contract_id))?.strike ??
+      formatContractLabel(topOption.option_contract_id))
+    : "--";
+  const topAlert = state.filteredAlerts[0];
+  const topDark = state.filteredInferredDark[0];
+  const rows = [
+    ["Focus", state.activeTickers.length > 0 ? state.activeTickers.join(", ") : state.chartTicker],
+    ["Contract", state.selectedInstrumentLabel ?? topOptionLabel],
+    ["Chart", `${state.chartTicker.toUpperCase()} ${formatIntervalLabel(state.chartIntervalMs)}`],
+    [
+      "Evidence",
+      topAlert
+        ? `${normalizeAlertSeverity(topAlert)} alert at ${formatTime(topAlert.source_ts)}`
+        : topDark
+          ? `${humanizeClassifierId(topDark.type)} ${formatConfidence(topDark.confidence)}`
+          : "waiting"
+    ]
+  ];
+
+  return (
+    <Pane
+      className="command-levels-pane"
+      title="Decision Levels"
+      status={<span className="command-pane-meta">current scope</span>}
+    >
+      <dl className="command-level-list">
+        {rows.map(([label, value]) => (
+          <div key={label}>
+            <dt>{label}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </Pane>
+  );
+};
+
 const CommandDeckHeader = ({ state }: { state: TerminalState }) => {
   const focus = state.activeTickers.length > 0 ? state.activeTickers.join(", ") : state.chartTicker;
-  const selected = state.selectedInstrumentLabel ?? "No contract lock";
+  const activeTickerFilter = state.filterInput.trim();
+  const activeContractFilter =
+    state.selectedInstrument?.kind === "option-contract" ? state.selectedInstrumentLabel : null;
   const connectionLabel =
     state.mode === "live" ? statusLabel(state.liveSession.status, false, state.mode) : "Replay";
 
   return (
-    <header className="command-deck-header" aria-label="Command deck context">
-      <div className="command-deck-brand">
-        <span className="command-deck-mark" aria-hidden="true" />
-        <div>
-          <span className="command-deck-kicker">islandflow</span>
-          <h2>Command Deck</h2>
+    <header className="command-deck-header compact-command-bar" aria-label="Command deck context">
+      <div className="compact-command-topline">
+        <div className="compact-command-title">
+          <span>islandflow</span>
+          <strong>Market Command</strong>
+        </div>
+        <div className="compact-command-controls" aria-label="Active command deck controls">
+          <span className={`command-chip command-chip-${state.liveSession.status}`}>
+            {state.mode === "live" ? "Live" : "Replay"}: {connectionLabel}
+          </span>
+          <span className="command-chip">
+            Last {state.lastSeen ? formatTime(state.lastSeen) : "waiting"}
+          </span>
+          <button className="terminal-button" type="button" onClick={state.toggleMode}>
+            {state.mode === "live" ? "Switch to Replay" : "Switch to Live"}
+          </button>
         </div>
       </div>
-      <div className="command-deck-brief">
+      <div className="compact-command-context">
         <span>Evidence console</span>
         <strong>{focus}</strong>
-        <span>{selected}</span>
-      </div>
-      <div className="command-deck-controls" aria-label="Active command deck controls">
-        <span className={`command-chip command-chip-${state.liveSession.status}`}>
-          {state.mode === "live" ? "Live" : "Replay"}: {connectionLabel}
-        </span>
-        <span className="command-chip">
-          Last {state.lastSeen ? formatTime(state.lastSeen) : "waiting"}
-        </span>
-        <button className="terminal-button" type="button" onClick={state.toggleMode}>
-          {state.mode === "live" ? "Switch to Replay" : "Switch to Live"}
-        </button>
+        {activeContractFilter ? (
+          <span className="command-filter-tooltip">
+            <span>{activeContractFilter}</span>
+            <button
+              aria-label="Clear contract filter"
+              type="button"
+              onClick={() => state.setSelectedInstrument(null)}
+            >
+              X
+            </button>
+          </span>
+        ) : activeTickerFilter.length > 0 ? (
+          <span className="command-filter-tooltip">
+            <span>Ticker: {activeTickerFilter}</span>
+            <button
+              aria-label="Clear ticker filter"
+              type="button"
+              onClick={() => state.setFilterInput("")}
+            >
+              X
+            </button>
+          </span>
+        ) : (
+          <span>No active filter</span>
+        )}
       </div>
     </header>
   );
 };
 
-const TickerRail = ({ state }: { state: TerminalState }) => {
+const CommandSymbolRail = ({ state }: { state: TerminalState }) => {
   const tickers = useMemo(() => buildCommandDeckTickers(state), [state]);
 
   return (
-    <div className="command-ticker-rail" aria-label="Live ticker focus rail">
-      <div className="command-ticker-track">
+    <div className="command-symbol-rail" aria-label="Live ticker focus rail">
+      <div className="command-symbol-track">
         {tickers.map((ticker) => {
           const direction = ticker.move === null ? "flat" : ticker.move >= 0 ? "up" : "down";
           const equity = state.filteredEquities.find(
@@ -8784,23 +9213,23 @@ const TickerRail = ({ state }: { state: TerminalState }) => {
           );
           return (
             <button
-              className={`command-ticker-card is-${direction}`}
+              className={`command-symbol-row is-${direction}`}
               key={ticker.symbol}
               type="button"
               onClick={() =>
                 equity ? state.focusEquityTicker(equity) : state.setFilterInput(ticker.symbol)
               }
             >
-              <span className="command-ticker-symbol">{ticker.symbol}</span>
-              <span className="command-ticker-price">
+              <span className="command-symbol-name">{ticker.symbol}</span>
+              <span className="command-symbol-price">
                 {ticker.price === null ? "--" : `$${formatPrice(ticker.price)}`}
               </span>
-              <span className="command-ticker-move">
+              <span className="command-symbol-move">
                 {ticker.move === null
                   ? "Move n/a"
                   : `${direction === "up" ? "Up" : "Down"} ${formatPct(Math.abs(ticker.move))}`}
               </span>
-              <span className="command-ticker-meta">
+              <span className="command-symbol-meta">
                 {ticker.options} opt / {ticker.alerts} alerts
               </span>
             </button>
@@ -8875,7 +9304,7 @@ const EventContextPane = ({ state }: { state: TerminalState }) => {
       key: `news-${story.trace_id}-${story.seq}`,
       ts: story.published_ts,
       label: "News",
-      title: story.headline,
+      title: decodeNewsText(story.headline),
       detail: story.resolved_symbols.length > 0 ? story.resolved_symbols.join(", ") : story.source,
       action: () => state.setSelectedNewsStory(story)
     }))
@@ -9096,6 +9525,141 @@ const ReplayConsole = memo(({ state }: { state: TerminalState }) => {
     </Pane>
   );
 });
+
+const OpraIntakeRail = ({ state }: { state: TerminalState }) => {
+  const contractActive = state.selectedInstrument?.kind === "option-contract";
+  const contractLabel = contractActive
+    ? (state.selectedInstrumentLabel ?? "Contract focus")
+    : "No contract focus";
+  const filterCount = countActiveFlowFilterGroups(state.flowFilters);
+
+  return (
+    <section className="opra-command-rail" aria-label="OPRA intake controls">
+      <div className="opra-command-cell">
+        <span>Mode</span>
+        <strong>{state.mode === "live" ? "OPRA Live" : "Replay"}</strong>
+        <em>{state.options.lastUpdate ? formatTime(state.options.lastUpdate) : "waiting"}</em>
+      </div>
+      <div className="opra-command-cell">
+        <span>Scope</span>
+        <strong>
+          {state.activeTickers.length > 0 ? state.activeTickers.join(", ") : "All symbols"}
+        </strong>
+        <em>{state.filteredOptions.length} prints visible</em>
+      </div>
+      <div className="opra-command-cell">
+        <span>Contract</span>
+        <strong>{contractLabel}</strong>
+        <em>{contractActive ? "click clear to release" : "select any option row"}</em>
+      </div>
+      <div className="opra-command-cell">
+        <span>Flow Filters</span>
+        <strong>{filterCount > 0 ? `${filterCount} active` : "baseline"}</strong>
+        <em>{state.flowFilters.view === "raw" ? "all prints" : "signal view"}</em>
+      </div>
+      <div className="opra-command-actions">
+        <button
+          className={`terminal-button contract-filter-button${contractActive ? " is-active" : ""}`}
+          type="button"
+          disabled={!contractActive}
+          onClick={() => state.setSelectedInstrument(null)}
+          title={
+            contractActive ? "Clear active contract filter" : "Focus a contract in the OPRA tape"
+          }
+        >
+          <span className="contract-filter-button-label">
+            {contractActive ? "Clear Contract" : "Contract Focus"}
+          </span>
+        </button>
+        <FlowFilterPopover filters={state.flowFilters} onChange={state.setFlowFilters} />
+      </div>
+    </section>
+  );
+};
+
+const NewsControlRails = ({ state }: { state: TerminalState }) => {
+  const sources = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const story of state.filteredNews) {
+      counts.set(story.source, (counts.get(story.source) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+  }, [state.filteredNews]);
+  const symbols = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const story of state.filteredNews) {
+      for (const symbol of story.resolved_symbols) {
+        const normalized = symbol.toUpperCase();
+        counts.set(normalized, (counts.get(normalized) ?? 0) + 1);
+      }
+    }
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8);
+  }, [state.filteredNews]);
+  const statusRows = [
+    {
+      label: "Wire",
+      value:
+        state.mode === "live"
+          ? statusLabel(state.news.status, state.news.paused, state.mode)
+          : "Live only",
+      detail: state.news.lastUpdate ? formatTime(state.news.lastUpdate) : "waiting"
+    },
+    {
+      label: "Stories",
+      value: formatFlowMetric(state.filteredNews.length),
+      detail: state.activeTickers.length > 0 ? state.activeTickers.join(", ") : "all symbols"
+    },
+    {
+      label: "History",
+      value: state.mode === "live" ? "scroll gate" : "disabled",
+      detail: state.newsScroll.isAtTop ? "at live head" : `${state.newsScroll.missed} queued`
+    }
+  ];
+
+  return (
+    <section className="wire-control-rails" aria-label="Wire control rails">
+      <div className="wire-status-rail">
+        {statusRows.map((row) => (
+          <div className="wire-rail-row" key={row.label}>
+            <span>{row.label}</span>
+            <strong>{row.value}</strong>
+            <em>{row.detail}</em>
+          </div>
+        ))}
+      </div>
+      <div className="wire-source-rail" aria-label="News sources">
+        <span className="wire-rail-label">Sources</span>
+        {sources.length === 0 ? (
+          <span className="wire-empty-label">waiting</span>
+        ) : (
+          sources.map(([source, count]) => (
+            <span className="wire-source-pill" key={source}>
+              <strong>{source}</strong>
+              <em>{count}</em>
+            </span>
+          ))
+        )}
+      </div>
+      <div className="wire-symbol-rail" aria-label="News symbols">
+        <span className="wire-rail-label">Symbols</span>
+        {symbols.length === 0 ? (
+          <span className="wire-empty-label">unmapped</span>
+        ) : (
+          symbols.map(([symbol, count]) => (
+            <button key={symbol} type="button" onClick={() => state.setFilterInput(symbol)}>
+              <strong>{symbol}</strong>
+              <em>{count}</em>
+            </button>
+          ))
+        )}
+      </div>
+    </section>
+  );
+};
 
 function SyntheticControlDock() {
   const visible = isSyntheticAdminVisible();
@@ -9416,6 +9980,23 @@ function SyntheticControlDock() {
 }
 
 export function TerminalAppShell({ children }: { children: ReactNode }) {
+  const pathname = nextNavigation.usePathname();
+
+  if (pathname?.startsWith("/mock")) {
+    return (
+      <div className="mock-shell">
+        <a className="skip-link mock-skip-link" href="#mock-title">
+          Skip to mock content
+        </a>
+        {children}
+      </div>
+    );
+  }
+
+  return <TerminalChrome>{children}</TerminalChrome>;
+}
+
+function TerminalChrome({ children }: { children: ReactNode }) {
   const state = useTerminalState();
   const pathname = nextNavigation.usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -9638,16 +10219,22 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
 export function OverviewRoute() {
   const state = useTerminal();
   return (
-    <PageFrame title="Home">
-      <div className="command-deck-shell">
+    <PageFrame title="Market Command" eyebrow="Dashboard" variant="dashboard">
+      <div className="market-command-shell">
         <CommandDeckHeader state={state} />
-        <TickerRail state={state} />
-        <div className="command-deck-grid">
-          <OptionsPane state={state} limit={14} />
-          <ChartPane state={state} title="Price / Flow" />
-          <AlertsPane state={state} limit={8} withStrip className="command-signals-pane" />
+        <CommandMetricsStrip state={state} />
+        <CommandSymbolRail state={state} />
+        <div className="market-command-grid">
+          <CommandPriorityBoard state={state} />
+          <ChartPane state={state} title="Chart Context" />
+          <CommandDecisionLevels state={state} />
+          <OptionsPane
+            state={state}
+            limit={12}
+            title="Recent Contracts"
+            className="command-contracts-pane"
+          />
           <FeedHealthPane state={state} />
-          <DarkPane state={state} limit={8} className="command-dark-pane" />
           <EventContextPane state={state} />
           <HomeReplayRail state={state} />
         </div>
@@ -9659,8 +10246,9 @@ export function OverviewRoute() {
 export function NewsRoute() {
   const state = useTerminal();
   return (
-    <PageFrame title="News">
-      <div className="page-grid page-grid-news">
+    <PageFrame title="Newswire" eyebrow="News" variant="news">
+      <div className="wire-control-shell">
+        <NewsControlRails state={state} />
         <NewsPane state={state} className="news-pane-full" />
       </div>
     </PageFrame>
@@ -9670,34 +10258,13 @@ export function NewsRoute() {
 export function OptionsRoute() {
   const state = useTerminal();
   return (
-    <PageFrame
-      title="Options"
-      actions={
-        <>
-          <button
-            className={`terminal-button contract-filter-button${state.selectedInstrument?.kind === "option-contract" ? " is-active" : ""}`}
-            type="button"
-            disabled={state.selectedInstrument?.kind !== "option-contract"}
-            onClick={() => state.setSelectedInstrument(null)}
-            title={
-              state.selectedInstrument?.kind === "option-contract"
-                ? "Clear active contract filter"
-                : "Contract filter activates when you focus a contract in the Options tape"
-            }
-          >
-            <span className="contract-filter-button-label">
-              {state.selectedInstrument?.kind === "option-contract"
-                ? state.selectedInstrumentLabel
-                : "Contract Filter"}
-            </span>
-          </button>
-          <FlowFilterPopover filters={state.flowFilters} onChange={state.setFlowFilters} />
-        </>
-      }
-    >
-      <div className="page-grid page-grid-options">
-        <OptionsPane state={state} />
-        <FlowPane state={state} title="Packets" />
+    <PageFrame title="OPRA Intake" eyebrow="Options" variant="options">
+      <div className="opra-intake-shell">
+        <OpraIntakeRail state={state} />
+        <div className="opra-intake-grid">
+          <OptionsPane state={state} title="OPRA Tape" className="opra-options-pane" />
+          <FlowPane state={state} title="Packet Fit" className="opra-flow-pane" />
+        </div>
       </div>
     </PageFrame>
   );

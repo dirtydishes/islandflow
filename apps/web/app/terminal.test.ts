@@ -41,6 +41,7 @@ const {
   composeTapeItems,
   deriveAlertDirection,
   countActiveFlowFilterGroups,
+  decodeNewsText,
   filterOptionTapeItems,
   findAnchorRestoreIndex,
   formatCompactUsd,
@@ -554,6 +555,25 @@ describe("fixed tape virtualization config", () => {
       overscan: 24,
       debugLabel: "dark"
     });
+    expect(getTapeVirtualConfig("news")).toEqual({
+      rowHeight: 52,
+      overscan: 28,
+      debugLabel: "news"
+    });
+  });
+});
+
+describe("news text formatting", () => {
+  it("decodes common html entities in provider text", () => {
+    expect(
+      decodeNewsText(
+        "Palantir CEO Alex Karp Is &#39;Rooting For Elon&#39; &amp; Clients &#x27;Screaming&#x27;"
+      )
+    ).toBe("Palantir CEO Alex Karp Is 'Rooting For Elon' & Clients 'Screaming'");
+  });
+
+  it("leaves unknown entities untouched", () => {
+    expect(decodeNewsText("Keep &market; literal")).toBe("Keep &market; literal");
   });
 });
 
@@ -574,9 +594,9 @@ describe("dark underlying route dependency helper", () => {
 });
 
 describe("terminal navigation", () => {
-  it("exposes Home, Options, and News as top-level destinations", () => {
+  it("exposes Dashboard, Options, and News as top-level destinations", () => {
     expect(NAV_ITEMS).toEqual([
-      { href: "/", label: "Home" },
+      { href: "/", label: "Dashboard" },
       { href: "/options", label: "Options" },
       { href: "/news", label: "News" }
     ]);
