@@ -1,9 +1,16 @@
 import { rm } from "node:fs/promises";
 
+const DEFAULT_REMOTE_API_URL = "https://api.flow.deltaisland.io";
+
 const run = async () => {
   const port = 3000;
   const distDir = ".next-dev";
   console.log(`[web] starting Next.js dev server on port ${port}`);
+  console.log(
+    `[web] API origin: ${Bun.env.NEXT_PUBLIC_API_URL ?? DEFAULT_REMOTE_API_URL}${
+      Bun.env.NEXT_PUBLIC_API_URL ? " (from NEXT_PUBLIC_API_URL)" : " (default)"
+    }`
+  );
 
   const path = Bun.env.PATH ?? "";
   const cwd = `${import.meta.dir}/..`;
@@ -21,6 +28,7 @@ const run = async () => {
     env: {
       ...Bun.env,
       PATH: `${cwd}/node_modules/.bin:${path}`,
+      NEXT_PUBLIC_API_URL: Bun.env.NEXT_PUBLIC_API_URL ?? DEFAULT_REMOTE_API_URL,
       PORT: String(port)
     }
   });
