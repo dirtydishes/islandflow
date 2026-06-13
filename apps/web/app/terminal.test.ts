@@ -574,9 +574,9 @@ describe("dark underlying route dependency helper", () => {
 });
 
 describe("terminal navigation", () => {
-  it("exposes Home, Options, and News as top-level destinations", () => {
+  it("exposes Dashboard, Options, and News as top-level destinations", () => {
     expect(NAV_ITEMS).toEqual([
-      { href: "/", label: "Home" },
+      { href: "/", label: "Dashboard" },
       { href: "/options", label: "Options" },
       { href: "/news", label: "News" }
     ]);

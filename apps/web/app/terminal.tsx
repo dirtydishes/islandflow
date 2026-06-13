@@ -7320,7 +7320,7 @@ const useTerminal = (): TerminalState => {
 };
 
 export const NAV_ITEMS = [
-  { href: "/", label: "Home" },
+  { href: "/", label: "Dashboard" },
   { href: "/options", label: "Options" },
   { href: "/news", label: "News" }
 ] as const;
@@ -8836,6 +8836,514 @@ const TickerRail = ({ state }: { state: TerminalState }) => {
   );
 };
 
+type DashboardRowState = "confirm" | "hold" | "watch" | "reject";
+type DashboardDirection = "bullish" | "bearish" | "neutral";
+
+type DashboardPriorityRow = {
+  key: string;
+  time: number;
+  symbol: string;
+  packet: string;
+  read: string;
+  score: number;
+  level: number | null;
+  direction: DashboardDirection;
+  state: DashboardRowState;
+  action?: () => void;
+};
+
+type DashboardDecisionLevel = {
+  key: string;
+  symbol: string;
+  side: "above" | "below" | "near";
+  level: number | null;
+  read: string;
+  state: DashboardRowState;
+};
+
+const compactPacketId = (value: string): string => {
+  const normalized = value.replace(/^flowpacket:/, "");
+  if (normalized.length <= 12) {
+    return normalized;
+  }
+  const parts = normalized.split(":");
+  if (parts.length >= 2) {
+    return `PKT-${parts.at(-1)?.slice(-4) ?? normalized.slice(-4)}`;
+  }
+  return `PKT-${normalized.slice(-4)}`;
+};
+
+const featureString = (packet: FlowPacket, key: string): string | null => {
+  const value = packet.features[key];
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+};
+
+const packetContractId = (packet: FlowPacket): string => {
+  const contract = featureString(packet, "option_contract_id");
+  if (contract) {
+    return contract;
+  }
+  const match = packet.id.match(/^flowpacket:([^:]+):/);
+  return match?.[1] ?? packet.id;
+};
+
+const packetSymbol = (packet: FlowPacket): string => {
+  const underlying = featureString(packet, "underlying_id");
+  if (underlying) {
+    return underlying.toUpperCase();
+  }
+  return extractUnderlying(packetContractId(packet));
+};
+
+const inferSymbolFromText = (value: string): string | null => {
+  const contractMatch = value.match(/([A-Z][A-Z0-9.]{0,5})-\d{4}-\d{2}-\d{2}-/);
+  if (contractMatch?.[1]) {
+    return contractMatch[1].toUpperCase();
+  }
+  const tokenMatch = value.match(/\b[A-Z][A-Z0-9.]{0,5}\b/);
+  return tokenMatch?.[0]?.toUpperCase() ?? null;
+};
+
+const evidenceMatchesPacket = (packet: FlowPacket, refs: string[]): boolean => {
+  const candidates = new Set([
+    packet.id,
+    packet.trace_id,
+    packet.id.replace(/^flowpacket:/, ""),
+    packet.trace_id.replace(/^flowpacket:/, ""),
+    `flowpacket:${packet.id}`,
+    `flowpacket:${packet.trace_id}`
+  ]);
+  return refs.some((ref) => candidates.has(ref) || candidates.has(ref.replace(/^flowpacket:/, "")));
+};
+
+const findAlertPacket = (alert: AlertEvent, packets: FlowPacket[]): FlowPacket | null => {
+  const refs = alert.evidence_refs ?? [];
+  return packets.find((packet) => evidenceMatchesPacket(packet, refs)) ?? null;
+};
+
+const packetDecisionLevel = (packet: FlowPacket): number | null => {
+  const underlyingMid = parseNumber(packet.features.underlying_mid, Number.NaN);
+  if (Number.isFinite(underlyingMid) && underlyingMid > 0) {
+    return underlyingMid;
+  }
+
+  const contract = parseOptionContractId(packetContractId(packet));
+  const moneyness = parseNumber(packet.features.moneyness, Number.NaN);
+  if (contract && Number.isFinite(moneyness) && moneyness > 0) {
+    return contract.strike / moneyness;
+  }
+
+  return null;
+};
+
+const packetDirection = (packet: FlowPacket): DashboardDirection => {
+  const contract = parseOptionContractId(packetContractId(packet));
+  const optionType = featureString(packet, "option_type");
+  const right =
+    contract?.right ??
+    (optionType === "call" ? "C" : optionType === "put" ? "P" : undefined);
+  const buy = parseNumber(packet.features.nbbo_aggressive_buy_ratio, 0);
+  const sell = parseNumber(packet.features.nbbo_aggressive_sell_ratio, 0);
+
+  if (right === "C") {
+    return buy >= sell ? "bullish" : "bearish";
+  }
+  if (right === "P") {
+    return buy >= sell ? "bearish" : "bullish";
+  }
+  return "neutral";
+};
+
+const packetRead = (packet: FlowPacket): string => {
+  const structure = featureString(packet, "structure_type");
+  if (structure) {
+    return structure.replace(/_/g, " ");
+  }
+
+  const direction = packetDirection(packet);
+  if (direction === "bullish") {
+    return "flow acceptance";
+  }
+  if (direction === "bearish") {
+    return "contra pressure";
+  }
+  return "packet watch";
+};
+
+const dashboardStateFromScore = (score: number): DashboardRowState => {
+  if (score >= 80) {
+    return "confirm";
+  }
+  if (score >= 60) {
+    return "hold";
+  }
+  if (score >= 40) {
+    return "watch";
+  }
+  return "reject";
+};
+
+const packetScore = (packet: FlowPacket): number => {
+  const totalPremium = parseNumber(packet.features.total_premium, 0);
+  const count = parseNumber(packet.features.count, packet.members.length);
+  const coverage = parseNumber(packet.features.nbbo_coverage_ratio, 0);
+  const premiumScore = clamp(totalPremium / 150_000, 0, 0.68) * 70;
+  const countScore = clamp(count / 8, 0, 1) * 14;
+  const coverageScore = clamp(coverage, 0, 1) * 16;
+  return Math.round(clamp(premiumScore + countScore + coverageScore, 0, 100));
+};
+
+const buildDashboardPriorityRows = (state: TerminalState): DashboardPriorityRow[] => {
+  const rows: DashboardPriorityRow[] = [];
+
+  for (const alert of state.filteredAlerts.slice(0, 5)) {
+    const packet = findAlertPacket(alert, state.filteredFlow);
+    const direction = deriveAlertDirection(alert);
+    const symbol =
+      packet?.features.underlying_id && typeof packet.features.underlying_id === "string"
+        ? packet.features.underlying_id.toUpperCase()
+        : packet
+          ? packetSymbol(packet)
+          : inferSymbolFromText(alert.trace_id) ?? state.chartTicker.toUpperCase();
+    const primary = alert.hits[0];
+    rows.push({
+      key: `alert-${alert.trace_id}-${alert.seq}`,
+      time: alert.source_ts,
+      symbol,
+      packet: packet ? compactPacketId(packet.id) : compactPacketId(alert.trace_id),
+      read: primary ? humanizeClassifierId(primary.classifier_id) : "Classifier alert",
+      score: Math.round(alert.score),
+      level: packet ? packetDecisionLevel(packet) : null,
+      direction,
+      state: dashboardStateFromScore(alert.score),
+      action: () => {
+        state.setSelectedNewsStory(null);
+        state.setSelectedDarkEvent(null);
+        state.setSelectedClassifierHit(null);
+        state.setSelectedSmartMoneyEvent(null);
+        state.setSelectedAlert(alert);
+      }
+    });
+  }
+
+  for (const event of state.filteredSmartMoneyEvents.slice(0, 5)) {
+    const maxProbability = event.profile_scores.reduce(
+      (max, score) => Math.max(max, score.probability),
+      0
+    );
+    const contract = event.features.option_contract_id
+      ? parseOptionContractId(event.features.option_contract_id)
+      : null;
+    const level =
+      contract && event.features.moneyness && event.features.moneyness > 0
+        ? contract.strike / event.features.moneyness
+        : null;
+    const score = Math.round(maxProbability * 100);
+    rows.push({
+      key: `smart-${event.event_id}-${event.seq}`,
+      time: event.source_ts,
+      symbol: event.underlying_id.toUpperCase(),
+      packet: compactPacketId(event.packet_ids[0] ?? event.event_id),
+      read: smartMoneyProfileLabel(event.primary_profile_id),
+      score,
+      level,
+      direction: normalizeDirection(event.primary_direction),
+      state: dashboardStateFromScore(score),
+      action: () => state.openFromSmartMoneyEvent(event)
+    });
+  }
+
+  for (const packet of state.filteredFlow.slice(0, 8)) {
+    const score = packetScore(packet);
+    rows.push({
+      key: `packet-${packet.id}-${packet.seq}`,
+      time: parseNumber(packet.features.end_ts, packet.source_ts),
+      symbol: packetSymbol(packet),
+      packet: compactPacketId(packet.id),
+      read: packetRead(packet),
+      score,
+      level: packetDecisionLevel(packet),
+      direction: packetDirection(packet),
+      state: dashboardStateFromScore(score)
+    });
+  }
+
+  const seen = new Set<string>();
+  return rows
+    .sort((a, b) => b.score - a.score || b.time - a.time)
+    .filter((row) => {
+      const key = `${row.symbol}:${row.packet}:${row.read}`;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 6);
+};
+
+const dashboardDecisionLevels = (rows: DashboardPriorityRow[]): DashboardDecisionLevel[] => {
+  return rows
+    .filter((row) => row.level !== null)
+    .slice(0, 5)
+    .map((row) => {
+      const side = row.direction === "bearish" ? "below" : row.direction === "bullish" ? "above" : "near";
+      const read =
+        row.state === "confirm"
+          ? "packet valid"
+          : row.state === "hold"
+            ? "thesis intact"
+            : row.state === "watch"
+              ? "needs confirm"
+              : "context failed";
+      return {
+        key: `level-${row.key}`,
+        symbol: row.symbol,
+        side,
+        level: row.level,
+        read,
+        state: row.state
+      };
+    });
+};
+
+const optionPrintRead = (print: OptionPrint): string => {
+  switch (print.nbbo_side) {
+    case "AA":
+    case "A":
+      return "ask lift";
+    case "BB":
+    case "B":
+      return "bid hit";
+    case "MID":
+      return "mid print";
+    case "STALE":
+      return "stale quote";
+    case "MISSING":
+      return "quote missing";
+    default:
+      return print.signal_reasons?.[0] ?? "flow print";
+  }
+};
+
+const optionPrintTone = (print: OptionPrint): DashboardRowState => {
+  if (print.nbbo_side === "AA" || print.nbbo_side === "A") {
+    return "confirm";
+  }
+  if (print.nbbo_side === "BB" || print.nbbo_side === "B") {
+    return "reject";
+  }
+  return print.signal_pass ? "hold" : "watch";
+};
+
+const formatAge = (ts: number, now: number): string => {
+  const ageMs = Math.max(0, now - ts);
+  const minutes = Math.floor(ageMs / 60_000);
+  if (minutes < 1) {
+    return "<1m";
+  }
+  if (minutes < 60) {
+    return `${minutes}m`;
+  }
+  return `${Math.floor(minutes / 60)}h`;
+};
+
+const DashboardMetricStrip = ({
+  state,
+  rows,
+  levels
+}: {
+  state: TerminalState;
+  rows: DashboardPriorityRow[];
+  levels: DashboardDecisionLevel[];
+}) => {
+  const topSymbols = Array.from(new Set(rows.map((row) => row.symbol))).slice(0, 3);
+  const confirmed = rows.filter((row) => row.state === "confirm" || row.state === "hold").length;
+  const decision = levels[0];
+  const risk = rows.find((row) => row.direction === "bearish" || row.state === "reject");
+  const connectionLabel =
+    state.mode === "live" ? statusLabel(state.liveSession.status, false, state.mode) : "Replay";
+
+  const metrics = [
+    {
+      label: "Regime",
+      value: state.mode === "live" ? connectionLabel : "Replay scan",
+      detail: `${state.filteredAlerts.length} alerts, ${state.filteredFlow.length} packets`
+    },
+    {
+      label: "Priority",
+      value: topSymbols.length > 0 ? topSymbols.join(" / ") : state.chartTicker.toUpperCase(),
+      detail: `${confirmed} packets holding above watch threshold`
+    },
+    {
+      label: "Decision",
+      value: decision?.level ? `${formatPrice(decision.level)} ${decision.symbol}` : state.chartTicker.toUpperCase(),
+      detail: decision ? `${decision.side} level` : "waiting for derived level"
+    },
+    {
+      label: "Risk",
+      value: risk ? `${risk.symbol} ${risk.direction}` : "No contra focus",
+      detail: risk ? risk.read : "no bearish packet leading this scope"
+    }
+  ];
+
+  return (
+    <section className="dashboard-command-strip" aria-label="Session read">
+      {metrics.map((metric) => (
+        <div className="dashboard-command-metric" key={metric.label}>
+          <span>{metric.label}</span>
+          <strong>{metric.value}</strong>
+          <em>{metric.detail}</em>
+        </div>
+      ))}
+    </section>
+  );
+};
+
+const DashboardScore = ({ value }: { value: number }) => (
+  <span className="dashboard-score" aria-label={`Score ${Math.round(value)}`}>
+    <i style={{ width: `${clamp(value, 0, 100)}%` }} />
+    <b>{Math.round(value)}</b>
+  </span>
+);
+
+const DashboardStateBadge = ({ state }: { state: DashboardRowState }) => (
+  <span className={`dashboard-state dashboard-state-${state}`}>{state}</span>
+);
+
+const DashboardPriorityBoard = ({ rows }: { rows: DashboardPriorityRow[] }) => {
+  return (
+    <Pane
+      className="dashboard-priority-pane"
+      title="Priority Board"
+      status={<span className="command-pane-meta">{rows.length} active reads</span>}
+    >
+      {rows.length === 0 ? (
+        <div className="empty">No packets are active in this scope yet.</div>
+      ) : (
+        <div className="dashboard-priority-table" role="table" aria-label="Priority board">
+          <div className="dashboard-priority-row is-head" role="row">
+            {["Time", "Sym", "Packet", "Read", "Score", "Decision", "State"].map((item) => (
+              <span role="columnheader" key={item}>
+                {item}
+              </span>
+            ))}
+          </div>
+          {rows.map((row) => {
+            const content = (
+              <>
+                <time>{formatTime(row.time)}</time>
+                <strong>{row.symbol}</strong>
+                <span>{row.packet}</span>
+                <span>{row.read}</span>
+                <DashboardScore value={row.score} />
+                <span>{row.level ? formatPrice(row.level) : "--"}</span>
+                <DashboardStateBadge state={row.state} />
+              </>
+            );
+
+            return row.action ? (
+              <button
+                className={`dashboard-priority-row is-${row.state}`}
+                role="row"
+                type="button"
+                key={row.key}
+                onClick={row.action}
+              >
+                {content}
+              </button>
+            ) : (
+              <div className={`dashboard-priority-row is-${row.state}`} role="row" key={row.key}>
+                {content}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Pane>
+  );
+};
+
+const DashboardDecisionLevels = ({ levels }: { levels: DashboardDecisionLevel[] }) => (
+  <Pane
+    className="dashboard-levels-pane"
+    title="Decision Levels"
+    status={<span className="command-pane-meta">derived context</span>}
+  >
+    {levels.length === 0 ? (
+      <div className="empty">Decision levels appear after packets include underlying context.</div>
+    ) : (
+      <div className="dashboard-level-list">
+        {levels.map((level) => (
+          <div className={`dashboard-level-row is-${level.state}`} key={level.key}>
+            <span>{level.symbol}</span>
+            <strong>
+              {level.side} {level.level ? formatPrice(level.level) : "--"}
+            </strong>
+            <em>{level.read}</em>
+          </div>
+        ))}
+      </div>
+    )}
+  </Pane>
+);
+
+const DashboardRecentContracts = ({ state }: { state: TerminalState }) => {
+  const now = state.lastSeen ?? Date.now();
+  const items = state.filteredOptions.slice(0, 5);
+
+  return (
+    <Pane
+      className="dashboard-contracts-pane"
+      title="Live Context"
+      status={<span className="command-pane-meta">recent contracts</span>}
+    >
+      {items.length === 0 ? (
+        <div className="empty">No option prints match the current dashboard scope.</div>
+      ) : (
+        <div className="dashboard-contract-table" role="table" aria-label="Recent option contracts">
+          <div className="dashboard-contract-row is-head" role="row">
+            {["Age", "Symbol", "Contract", "Size", "Premium", "Read"].map((item) => (
+              <span role="columnheader" key={item}>
+                {item}
+              </span>
+            ))}
+          </div>
+          {items.map((print) => {
+            const contractId = normalizeContractId(print.option_contract_id);
+            const symbol = (
+              print.underlying_id ??
+              parseOptionContractId(contractId)?.root ??
+              extractUnderlying(contractId)
+            ).toUpperCase();
+            const premium = print.notional ?? print.price * print.size * 100;
+            const tone = optionPrintTone(print);
+            return (
+              <button
+                className={`dashboard-contract-row is-${tone}`}
+                role="row"
+                type="button"
+                key={`${print.trace_id}-${print.seq}`}
+                onClick={() => state.focusOptionContract(print)}
+              >
+                <time>{formatAge(print.ts, now)}</time>
+                <strong>{symbol}</strong>
+                <span>{formatContractLabel(contractId)}</span>
+                <span>{formatSize(print.size)}</span>
+                <span>${formatCompactUsd(premium)}</span>
+                <span className="dashboard-contract-read">
+                  <DashboardStateBadge state={tone} />
+                  <em>{optionPrintRead(print)}</em>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </Pane>
+  );
+};
+
 const FeedHealthPane = ({ state }: { state: TerminalState }) => {
   const rows = [
     { label: "Options", tape: state.options, subscribed: state.routeFeatures.options },
@@ -9677,20 +10185,25 @@ function TerminalChrome({ children }: { children: ReactNode }) {
   );
 }
 
-export function OverviewRoute() {
+export function DashboardRoute() {
   const state = useTerminal();
+  const dashboardRows = useMemo(() => buildDashboardPriorityRows(state), [state]);
+  const decisionLevels = useMemo(() => dashboardDecisionLevels(dashboardRows), [dashboardRows]);
+
   return (
-    <PageFrame title="Home">
-      <div className="command-deck-shell">
-        <CommandDeckHeader state={state} />
-        <TickerRail state={state} />
-        <div className="command-deck-grid">
-          <OptionsPane state={state} limit={14} />
+    <PageFrame title="Dashboard">
+      <div className="dashboard-shell">
+        <DashboardMetricStrip state={state} rows={dashboardRows} levels={decisionLevels} />
+        <div className="dashboard-chart-row">
           <ChartPane state={state} title="Price / Flow" />
-          <AlertsPane state={state} limit={8} withStrip className="command-signals-pane" />
-          <FeedHealthPane state={state} />
-          <DarkPane state={state} limit={8} className="command-dark-pane" />
+          <DashboardDecisionLevels levels={decisionLevels} />
+        </div>
+        <div className="dashboard-grid">
+          <DashboardPriorityBoard rows={dashboardRows} />
+          <DashboardRecentContracts state={state} />
           <EventContextPane state={state} />
+          <FeedHealthPane state={state} />
+          <DarkPane state={state} limit={6} className="dashboard-dark-pane" />
           <HomeReplayRail state={state} />
         </div>
       </div>
