@@ -25,5 +25,5 @@ This workspace packages a thin Electron shell around the hosted Islandflow app.
 ## Development Notes
 
 - `ISLANDFLOW_DESKTOP_START_URL` controls which trusted app URL Electron loads. Prefer `/options` for deep links; `/tape` remains supported and redirects in the web app for compatibility.
-- `NEXT_PUBLIC_API_URL` remains a web-app setting and should typically be `https://flow.deltaisland.io` when developing the local UI inside Electron.
+- `NEXT_PUBLIC_API_URL` remains a web-app setting and should typically be `https://api.flow.deltaisland.io` when developing the local UI inside Electron.
 - `assets/` currently contains placeholders only; a real `.icns` icon is deferred.
