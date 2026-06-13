@@ -1,18 +1,28 @@
 #!/usr/bin/env bun
 
+import { type SpawnSyncOptions, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { spawnSync, type SpawnSyncOptions } from "node:child_process";
 import path from "node:path";
+import * as readline from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 
-type DeployMode = "main" | "current-branch";
+type DeployMode = "main" | "current-branch" | "branch";
 type DeployRuntime = "docker" | "native";
 type DeployScope = "full" | "web" | "api" | "services" | "workers";
+type DeployPiece =
+  | "web"
+  | "api"
+  | "compute"
+  | "candles"
+  | "ingest-options"
+  | "ingest-equities"
+  | "ingest-news";
 
 type DeployOptions = {
   mode: DeployMode;
+  branch: string | null;
   runtime: DeployRuntime;
-  scope: DeployScope;
+  pieces: DeployPiece[];
   fast: boolean;
   forceRecreate: boolean;
   noBuild: boolean;
@@ -75,6 +85,18 @@ const DOCKER_WORKER_SERVICES = [
   "ingest-equities",
   "ingest-news"
 ] as const;
+const ALL_DEPLOY_PIECES = [...DOCKER_CORE_SERVICES] satisfies DeployPiece[];
+const BACKEND_DEPLOY_PIECES = [...DOCKER_BACKEND_SERVICES] satisfies DeployPiece[];
+const WORKER_DEPLOY_PIECES = [...DOCKER_WORKER_SERVICES] satisfies DeployPiece[];
+const DEPLOY_PIECE_LABELS = {
+  web: "web",
+  api: "api",
+  compute: "compute",
+  candles: "candles",
+  "ingest-options": "ingest-options",
+  "ingest-equities": "ingest-equities",
+  "ingest-news": "ingest-news"
+} satisfies Record<DeployPiece, string>;
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(scriptPath), "..");
@@ -82,28 +104,34 @@ const isLocalServerExecution = !DEPLOY_FORCE_SSH && repoRoot === REMOTE_REPO;
 
 function usage(exitCode = 1): never {
   console.error(`Usage:
+  ./deploy
   ./deploy main [--runtime docker|native] [--web-only|--api-only|--services-only|--workers-only] [--fast] [--no-build] [--force-recreate]
   ./deploy current-branch [--runtime docker|native] [--web-only|--api-only|--services-only|--workers-only] [--fast] [--no-build] [--force-recreate]
   ./deploy current branch [--runtime docker|native] [--web-only|--api-only|--services-only|--workers-only] [--fast] [--no-build] [--force-recreate]
+  ./deploy branch <name> [--runtime docker|native] [--pieces api,web,compute] [--fast] [--no-build] [--force-recreate]
 
 Modes:
+  no args         Open an interactive deploy prompt.
   main            Deploy <remote>/main to the live server checkout.
   current-branch  Push the current local branch, switch the server to it, and deploy it.
+  branch <name>   Deploy another local or remote branch by name.
 
 Runtimes:
   docker          Roll out from deployment/docker with Docker Compose (default, recommended).
   native          Experimental host-native Bun services managed by systemd.
 
 Scopes:
-  default         Full rollout (web + API + backend services).
-  --web-only      Deploy only the Next.js web surface.
-  --api-only      Deploy only the API service.
-  --services-only Deploy API + backend services without the web service.
-  --workers-only  Deploy compute/candles/ingest workers without touching web or API.
+  default              Full rollout (web + API + backend services).
+  --pieces <list>      Comma-separated pieces: web, api, compute, candles, ingest-options, ingest-equities, ingest-news.
+  --piece <name>       Add one deploy piece. May be repeated.
+  --web-only           Deploy only the Next.js web surface.
+  --api-only           Deploy only the API service.
+  --services-only      Deploy API + backend services without the web service.
+  --workers-only       Deploy compute/candles/ingest workers without touching web or API.
 
 Options:
   --runtime <name>     Explicit runtime selector (docker or native).
-  --fast               Prefer a quicker rollout profile (defaults full scope to --services-only for docker and --workers-only for native, and skips the public API route suite when API scope is included).
+  --fast               Prefer a quicker rollout profile (defaults all pieces to services for docker and workers for native, and skips the public API route suite when API scope is included).
   --no-build           Skip docker image builds or native bun install/web build steps.
   --force-recreate     Docker-only escalation path for docker compose when a normal refresh is not enough.
   --help               Show this help text.
@@ -264,7 +292,47 @@ function parseRuntime(rawArgs: string[]): DeployRuntime {
   return "docker";
 }
 
-function parseScope(rawArgs: string[]): DeployScope {
+function piecesForScope(scope: DeployScope): DeployPiece[] {
+  switch (scope) {
+    case "web":
+      return ["web"];
+    case "api":
+      return ["api"];
+    case "services":
+      return [...BACKEND_DEPLOY_PIECES];
+    case "workers":
+      return [...WORKER_DEPLOY_PIECES];
+    default:
+      return [...ALL_DEPLOY_PIECES];
+  }
+}
+
+function isDeployPiece(value: string): value is DeployPiece {
+  return Object.hasOwn(DEPLOY_PIECE_LABELS, value);
+}
+
+function parsePieceList(rawValue: string): DeployPiece[] {
+  const pieces = rawValue
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+
+  if (pieces.length === 0) {
+    console.error("--pieces requires at least one deploy piece.");
+    process.exit(1);
+  }
+
+  const invalid = pieces.filter((value) => !isDeployPiece(value));
+  if (invalid.length > 0) {
+    console.error(`Unknown deploy piece${invalid.length === 1 ? "" : "s"}: ${invalid.join(", ")}`);
+    console.error(`Allowed pieces: ${ALL_DEPLOY_PIECES.join(", ")}`);
+    process.exit(1);
+  }
+
+  return Array.from(new Set(pieces)) as DeployPiece[];
+}
+
+function parsePieces(rawArgs: string[]): DeployPiece[] {
   const scopes = [
     rawArgs.includes("--web-only") ? "web" : null,
     rawArgs.includes("--api-only") ? "api" : null,
@@ -279,7 +347,34 @@ function parseScope(rawArgs: string[]): DeployScope {
     process.exit(1);
   }
 
-  return scopes[0] ?? "full";
+  const explicitPieces: DeployPiece[] = [];
+  for (let index = 0; index < rawArgs.length; index += 1) {
+    const arg = rawArgs[index];
+    if (arg === "--pieces") {
+      explicitPieces.push(...parsePieceList(rawArgs[index + 1] ?? ""));
+      continue;
+    }
+
+    if (arg.startsWith("--pieces=")) {
+      explicitPieces.push(...parsePieceList(arg.slice("--pieces=".length)));
+      continue;
+    }
+
+    if (arg === "--piece") {
+      explicitPieces.push(...parsePieceList(rawArgs[index + 1] ?? ""));
+    }
+  }
+
+  if (scopes.length > 0 && explicitPieces.length > 0) {
+    console.error("Use either a legacy scope flag or --pieces/--piece, not both.");
+    process.exit(1);
+  }
+
+  if (explicitPieces.length > 0) {
+    return Array.from(new Set(explicitPieces));
+  }
+
+  return piecesForScope(scopes[0] ?? "full");
 }
 
 function parseArgs(rawArgs: string[]): DeployOptions {
@@ -288,7 +383,7 @@ function parseArgs(rawArgs: string[]): DeployOptions {
   }
 
   const runtime = parseRuntime(rawArgs);
-  const scope = parseScope(rawArgs);
+  const pieces = parsePieces(rawArgs);
   const fast = rawArgs.includes("--fast");
   const forceRecreate = rawArgs.includes("--force-recreate");
   const noBuild = rawArgs.includes("--no-build");
@@ -303,7 +398,12 @@ function parseArgs(rawArgs: string[]): DeployOptions {
       arg !== "--workers-only" &&
       arg !== "--runtime" &&
       rawArgs[index - 1] !== "--runtime" &&
-      !arg.startsWith("--runtime=")
+      !arg.startsWith("--runtime=") &&
+      arg !== "--pieces" &&
+      rawArgs[index - 1] !== "--pieces" &&
+      !arg.startsWith("--pieces=") &&
+      arg !== "--piece" &&
+      rawArgs[index - 1] !== "--piece"
   );
 
   if (forceRecreate && runtime !== "docker") {
@@ -312,7 +412,7 @@ function parseArgs(rawArgs: string[]): DeployOptions {
   }
 
   if (positional.length === 1 && positional[0] === "main") {
-    return { mode: "main", runtime, scope, fast, forceRecreate, noBuild };
+    return { mode: "main", branch: null, runtime, pieces, fast, forceRecreate, noBuild };
   }
 
   if (
@@ -321,8 +421,21 @@ function parseArgs(rawArgs: string[]): DeployOptions {
   ) {
     return {
       mode: "current-branch",
+      branch: null,
       runtime,
-      scope,
+      pieces,
+      fast,
+      forceRecreate,
+      noBuild
+    };
+  }
+
+  if (positional.length === 2 && positional[0] === "branch" && positional[1]) {
+    return {
+      mode: "branch",
+      branch: positional[1],
+      runtime,
+      pieces,
       fast,
       forceRecreate,
       noBuild
@@ -330,6 +443,176 @@ function parseArgs(rawArgs: string[]): DeployOptions {
   }
 
   usage();
+}
+
+async function promptLine(
+  rl: readline.Interface,
+  question: string,
+  defaultValue: string | null = null
+): Promise<string> {
+  const suffix = defaultValue ? ` [${defaultValue}]` : "";
+  const answer = (await rl.question(`${question}${suffix}: `)).trim();
+  return answer || defaultValue || "";
+}
+
+async function promptChoice<T extends string>(
+  rl: readline.Interface,
+  question: string,
+  choices: { value: T; label: string; disabled?: boolean }[],
+  defaultValue: T
+): Promise<T> {
+  console.log(`\n${question}`);
+  choices.forEach((choice, index) => {
+    const marker = choice.value === defaultValue ? " (default)" : "";
+    const disabled = choice.disabled ? " (unavailable)" : "";
+    console.log(`  ${index + 1}. ${choice.label}${marker}${disabled}`);
+  });
+
+  while (true) {
+    const answer = await promptLine(
+      rl,
+      "Choose",
+      String(choices.findIndex((choice) => choice.value === defaultValue) + 1)
+    );
+    const selectedIndex = Number(answer) - 1;
+    const selected = choices[selectedIndex];
+    if (selected && !selected.disabled) {
+      return selected.value;
+    }
+
+    const byValue = choices.find((choice) => choice.value === answer && !choice.disabled);
+    if (byValue) {
+      return byValue.value;
+    }
+
+    console.log("Please choose one of the available options.");
+  }
+}
+
+async function promptBoolean(
+  rl: readline.Interface,
+  question: string,
+  defaultValue: boolean
+): Promise<boolean> {
+  const answer = (
+    await promptLine(rl, `${question} (${defaultValue ? "Y/n" : "y/N"})`)
+  ).toLowerCase();
+  if (!answer) {
+    return defaultValue;
+  }
+  return answer === "y" || answer === "yes";
+}
+
+function optionalCurrentBranchName(): string | null {
+  const branch = tryCapture("git", ["branch", "--show-current"])?.trim();
+  return branch || null;
+}
+
+function parseInteractivePieces(answer: string): DeployPiece[] | null {
+  const normalized = answer.trim().toLowerCase();
+  if (!normalized || normalized === "all") {
+    return [...ALL_DEPLOY_PIECES];
+  }
+
+  if (normalized === "services") {
+    return [...BACKEND_DEPLOY_PIECES];
+  }
+
+  if (normalized === "workers") {
+    return [...WORKER_DEPLOY_PIECES];
+  }
+
+  return parsePieceList(normalized);
+}
+
+async function promptDeployOptions(): Promise<DeployOptions> {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    usage();
+  }
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+
+  try {
+    console.log("Islandflow deploy");
+    const runtime = await promptChoice<DeployRuntime>(
+      rl,
+      "Runtime",
+      [
+        { value: "docker", label: "Docker Compose" },
+        { value: "native", label: "Native systemd/Bun" }
+      ],
+      "docker"
+    );
+
+    const currentBranch = optionalCurrentBranchName();
+    const mode = await promptChoice<DeployMode>(
+      rl,
+      "Git target",
+      [
+        { value: "main", label: "main" },
+        {
+          value: "current-branch",
+          label: currentBranch ? `current branch (${currentBranch})` : "current branch",
+          disabled: currentBranch === null
+        },
+        { value: "branch", label: "another branch" }
+      ],
+      "main"
+    );
+
+    const branch =
+      mode === "branch"
+        ? await promptLine(rl, "Branch name")
+        : mode === "current-branch"
+          ? currentBranch
+          : null;
+
+    if (mode !== "main" && !branch) {
+      console.error("A branch name is required for this deploy target.");
+      process.exit(1);
+    }
+
+    console.log("\nPieces");
+    console.log("  Default: all");
+    console.log(
+      `  Groups: services (${BACKEND_DEPLOY_PIECES.join(", ")}), workers (${WORKER_DEPLOY_PIECES.join(", ")})`
+    );
+    console.log(`  Individual pieces: ${ALL_DEPLOY_PIECES.join(", ")}`);
+    const piecesAnswer = await promptLine(rl, "Deploy pieces", "all");
+    const pieces = parseInteractivePieces(piecesAnswer) ?? [...ALL_DEPLOY_PIECES];
+
+    const fast = await promptBoolean(rl, "Fast mode", false);
+    const noBuild = await promptBoolean(rl, "Skip builds/install steps", false);
+    const forceRecreate =
+      runtime === "docker"
+        ? await promptBoolean(rl, "Force recreate Docker containers", false)
+        : false;
+
+    console.log(
+      `\nReady to deploy ${
+        mode === "main" ? "main" : mode === "current-branch" ? `current branch ${branch}` : branch
+      } via ${describeRuntime(runtime)} (${describePieces(effectivePieces(pieces, runtime, fast))}).`
+    );
+
+    if (!(await promptBoolean(rl, "Continue", false))) {
+      console.log("Deploy cancelled.");
+      process.exit(0);
+    }
+
+    return { mode, branch, runtime, pieces, fast, forceRecreate, noBuild };
+  } finally {
+    rl.close();
+  }
+}
+
+async function resolveOptions(rawArgs: string[]): Promise<DeployOptions> {
+  if (rawArgs.length === 0) {
+    return promptDeployOptions();
+  }
+  return parseArgs(rawArgs);
 }
 
 function assertSshKeyExists(): void {
@@ -395,7 +678,7 @@ function resolveDeployRemote(mode: DeployMode, branch: string | null): string {
     candidates.push(DEPLOY_GIT_REMOTE_OVERRIDE);
   }
 
-  if (mode === "current-branch" && branch) {
+  if ((mode === "current-branch" || mode === "branch") && branch) {
     const branchRemote = tryCapture("git", ["config", "--get", `branch.${branch}.remote`])?.trim();
     if (branchRemote) {
       candidates.push(branchRemote);
@@ -446,113 +729,86 @@ function printRuntimeAdvisory(runtime: DeployRuntime): void {
   );
 }
 
-function describeScope(scope: DeployScope): string {
-  switch (scope) {
+function samePieces(left: DeployPiece[], right: DeployPiece[]): boolean {
+  return left.length === right.length && left.every((piece) => right.includes(piece));
+}
+
+function describePieces(pieces: DeployPiece[]): string {
+  if (samePieces(pieces, ALL_DEPLOY_PIECES)) {
+    return "all app pieces";
+  }
+  if (samePieces(pieces, BACKEND_DEPLOY_PIECES)) {
+    return "api + backend services";
+  }
+  if (samePieces(pieces, WORKER_DEPLOY_PIECES)) {
+    return "worker services only";
+  }
+  if (pieces.length === 1) {
+    return `${DEPLOY_PIECE_LABELS[pieces[0]]} only`;
+  }
+  return pieces.map((piece) => DEPLOY_PIECE_LABELS[piece]).join(", ");
+}
+
+function effectivePieces(
+  pieces: DeployPiece[],
+  runtime: DeployRuntime,
+  fast: boolean
+): DeployPiece[] {
+  if (fast && samePieces(pieces, ALL_DEPLOY_PIECES)) {
+    return runtime === "native" ? [...WORKER_DEPLOY_PIECES] : [...BACKEND_DEPLOY_PIECES];
+  }
+  return pieces;
+}
+
+function piecesIncludeWeb(pieces: DeployPiece[]): boolean {
+  return pieces.includes("web");
+}
+
+function piecesIncludeApi(pieces: DeployPiece[]): boolean {
+  return pieces.includes("api");
+}
+
+function piecesIncludeWorkers(pieces: DeployPiece[]): boolean {
+  return pieces.some((piece) => WORKER_DEPLOY_PIECES.includes(piece));
+}
+
+function piecesTouchPublicEdge(pieces: DeployPiece[]): boolean {
+  return piecesIncludeWeb(pieces) || piecesIncludeApi(pieces);
+}
+
+function dockerServicesForPieces(pieces: DeployPiece[]): string[] {
+  return samePieces(pieces, ALL_DEPLOY_PIECES) ? [] : [...pieces];
+}
+
+function dockerBuildServicesForPieces(pieces: DeployPiece[]): string[] {
+  return [...pieces];
+}
+
+function dockerLogServicesForPieces(pieces: DeployPiece[]): string[] {
+  return [...pieces];
+}
+
+function nativeUnitForPiece(piece: DeployPiece): string {
+  switch (piece) {
     case "web":
-      return "web only";
+      return NATIVE_UNITS.web;
     case "api":
-      return "api only";
-    case "services":
-      return "api + backend services";
-    case "workers":
-      return "worker services only";
-    default:
-      return "full stack";
+      return NATIVE_UNITS.api;
+    case "compute":
+      return NATIVE_UNITS.compute;
+    case "candles":
+      return NATIVE_UNITS.candles;
+    case "ingest-options":
+      return NATIVE_UNITS.ingestOptions;
+    case "ingest-equities":
+      return NATIVE_UNITS.ingestEquities;
+    case "ingest-news":
+      return NATIVE_UNITS.ingestNews;
   }
 }
 
-function effectiveScope(scope: DeployScope, runtime: DeployRuntime, fast: boolean): DeployScope {
-  if (fast && scope === "full") {
-    return runtime === "native" ? "workers" : "services";
-  }
-  return scope;
-}
-
-function scopeIncludesWeb(scope: DeployScope): boolean {
-  return scope === "full" || scope === "web";
-}
-
-function scopeIncludesApi(scope: DeployScope): boolean {
-  return scope === "full" || scope === "api" || scope === "services";
-}
-
-function scopeTouchesPublicEdge(scope: DeployScope): boolean {
-  return scopeIncludesWeb(scope) || scopeIncludesApi(scope);
-}
-
-function dockerServicesForScope(scope: DeployScope): string[] {
-  switch (scope) {
-    case "web":
-      return ["web"];
-    case "api":
-      return ["api"];
-    case "services":
-      return [...DOCKER_BACKEND_SERVICES];
-    case "workers":
-      return [...DOCKER_WORKER_SERVICES];
-    default:
-      return [];
-  }
-}
-
-function dockerBuildServicesForScope(scope: DeployScope): string[] {
-  switch (scope) {
-    case "full":
-      return [...DOCKER_CORE_SERVICES];
-    default:
-      return dockerServicesForScope(scope);
-  }
-}
-
-function dockerLogServicesForScope(scope: DeployScope): string[] {
-  switch (scope) {
-    case "web":
-      return ["web"];
-    case "api":
-      return ["api"];
-    case "services":
-      return [...DOCKER_BACKEND_SERVICES];
-    case "workers":
-      return [...DOCKER_WORKER_SERVICES];
-    default:
-      return [...DOCKER_CORE_SERVICES];
-  }
-}
-
-function nativeUnitsForScope(scope: DeployScope): string[] {
-  switch (scope) {
-    case "web":
-      return [NATIVE_UNITS.web];
-    case "api":
-      return [NATIVE_UNITS.api];
-    case "services":
-      return [
-        NATIVE_UNITS.api,
-        NATIVE_UNITS.compute,
-        NATIVE_UNITS.candles,
-        NATIVE_UNITS.ingestOptions,
-        NATIVE_UNITS.ingestEquities,
-        NATIVE_UNITS.ingestNews
-      ];
-    case "workers":
-      return [
-        NATIVE_UNITS.compute,
-        NATIVE_UNITS.candles,
-        NATIVE_UNITS.ingestOptions,
-        NATIVE_UNITS.ingestEquities,
-        NATIVE_UNITS.ingestNews
-      ];
-    default:
-      return [
-        NATIVE_UNITS.web,
-        NATIVE_UNITS.api,
-        NATIVE_UNITS.compute,
-        NATIVE_UNITS.candles,
-        NATIVE_UNITS.ingestOptions,
-        NATIVE_UNITS.ingestEquities,
-        NATIVE_UNITS.ingestNews
-      ];
-  }
+function nativeUnitsForPieces(pieces: DeployPiece[]): string[] {
+  return pieces.map((piece) => nativeUnitForPiece(piece));
 }
 
 function localDockerWorkspaceSnapshotPrecheck(): void {
@@ -570,8 +826,8 @@ function localDockerWorkspaceSnapshotPrecheck(): void {
   }
 }
 
-function assertNativeEdgeReady(scope: DeployScope): void {
-  if (!scopeTouchesPublicEdge(scope) || DEPLOY_NATIVE_EDGE_READY) {
+function assertNativeEdgeReady(pieces: DeployPiece[]): void {
+  if (!piecesTouchPublicEdge(pieces) || DEPLOY_NATIVE_EDGE_READY) {
     return;
   }
 
@@ -587,21 +843,25 @@ function assertNativeEdgeReady(scope: DeployScope): void {
   process.exit(1);
 }
 
-function localRuntimePrecheck(runtime: DeployRuntime, scope: DeployScope, noBuild: boolean): void {
+function localRuntimePrecheck(
+  runtime: DeployRuntime,
+  pieces: DeployPiece[],
+  noBuild: boolean
+): void {
   if (runtime === "docker" && !noBuild) {
     localDockerWorkspaceSnapshotPrecheck();
     return;
   }
 
   if (runtime === "native") {
-    assertNativeEdgeReady(scope);
+    assertNativeEdgeReady(pieces);
   }
 }
 
 function localMainPrecheck(
   remote: string,
   runtime: DeployRuntime,
-  scope: DeployScope,
+  pieces: DeployPiece[],
   noBuild: boolean
 ): void {
   section("Local Precheck");
@@ -609,7 +869,7 @@ function localMainPrecheck(
   runChecked("git", ["status", "--short", "--branch"]);
   runChecked("git", ["rev-parse", "--verify", "HEAD"]);
   runChecked("git", ["rev-parse", `${remote}/main`]);
-  localRuntimePrecheck(runtime, scope, noBuild);
+  localRuntimePrecheck(runtime, pieces, noBuild);
 }
 
 function currentBranchName(): string {
@@ -625,7 +885,7 @@ function localBranchPrecheck(
   remote: string,
   branch: string,
   runtime: DeployRuntime,
-  scope: DeployScope,
+  pieces: DeployPiece[],
   noBuild: boolean
 ): void {
   section("Local Precheck");
@@ -641,7 +901,38 @@ function localBranchPrecheck(
     process.exit(1);
   }
 
-  localRuntimePrecheck(runtime, scope, noBuild);
+  localRuntimePrecheck(runtime, pieces, noBuild);
+}
+
+function localNamedBranchPrecheck(
+  remote: string,
+  branch: string,
+  runtime: DeployRuntime,
+  pieces: DeployPiece[],
+  noBuild: boolean
+): void {
+  section("Local Precheck");
+  runChecked("git", ["status", "--short", "--branch"]);
+  runChecked("git", ["fetch", remote]);
+
+  const localBranchExists =
+    spawnSync("git", ["show-ref", "--verify", "--quiet", `refs/heads/${branch}`], {
+      cwd: repoRoot,
+      stdio: "ignore"
+    }).status === 0;
+  const remoteBranchExists =
+    spawnSync("git", ["show-ref", "--verify", "--quiet", `refs/remotes/${remote}/${branch}`], {
+      cwd: repoRoot,
+      stdio: "ignore"
+    }).status === 0;
+
+  if (!localBranchExists && !remoteBranchExists) {
+    console.error(`Refusing to deploy unknown branch ${branch}.`);
+    console.error(`Expected local branch ${branch} or remote branch ${remote}/${branch}.`);
+    process.exit(1);
+  }
+
+  localRuntimePrecheck(runtime, pieces, noBuild);
 }
 
 function publishCurrentBranch(remote: string, branch: string): void {
@@ -662,6 +953,24 @@ function publishCurrentBranch(remote: string, branch: string): void {
   }
 
   runChecked("git", ["push", "-u", remote, branch]);
+}
+
+function publishNamedBranch(remote: string, branch: string): void {
+  const localBranchExists =
+    spawnSync("git", ["show-ref", "--verify", "--quiet", `refs/heads/${branch}`], {
+      cwd: repoRoot,
+      stdio: "ignore"
+    }).status === 0;
+
+  if (!localBranchExists) {
+    console.log(
+      `[deploy] No local branch named ${branch}; using ${remote}/${branch} already fetched from remote.`
+    );
+    return;
+  }
+
+  section("Local Publish");
+  runChecked("git", ["push", remote, `${branch}:${branch}`]);
 }
 
 function remoteGitPrecheck(): void {
@@ -705,7 +1014,7 @@ done <<< "$status"
   );
 }
 
-function remoteRuntimePrecheck(runtime: DeployRuntime, scope: DeployScope): void {
+function remoteRuntimePrecheck(runtime: DeployRuntime, pieces: DeployPiece[]): void {
   if (runtime === "docker") {
     runRemoteScript(
       "Remote Runtime Precheck",
@@ -727,7 +1036,7 @@ fi
     return;
   }
 
-  const units = nativeUnitsForScope(scope)
+  const units = nativeUnitsForPieces(pieces)
     .map((value) => shellEscape(value))
     .join(" ");
   runRemoteScript(
@@ -790,16 +1099,16 @@ function remoteDockerRollout(
   mode: DeployMode,
   remote: string,
   branch: string | null,
-  scope: DeployScope,
+  pieces: DeployPiece[],
   forceRecreate: boolean,
   noBuild: boolean
 ): void {
-  const rolloutServices = dockerServicesForScope(scope);
+  const rolloutServices = dockerServicesForPieces(pieces);
   const upArgs = ["up", "-d"];
   if (forceRecreate) {
     upArgs.push("--force-recreate");
   }
-  const buildServices = dockerBuildServicesForScope(scope);
+  const buildServices = dockerBuildServicesForPieces(pieces);
   const buildCommand = noBuild ? null : `docker compose build ${buildServices.join(" ")}`;
   const upCommand = `docker compose ${[...upArgs, ...rolloutServices].join(" ")}`;
 
@@ -820,23 +1129,23 @@ function remoteNativeRollout(
   mode: DeployMode,
   remote: string,
   branch: string | null,
-  scope: DeployScope,
+  pieces: DeployPiece[],
   noBuild: boolean
 ): void {
-  const units = nativeUnitsForScope(scope)
+  const units = nativeUnitsForPieces(pieces)
     .map((value) => shellEscape(value))
     .join(" ");
   const buildSteps: string[] = [];
 
   if (!noBuild) {
     buildSteps.push("bun install --frozen-lockfile");
-    if (scopeIncludesWeb(scope)) {
+    if (piecesIncludeWeb(pieces)) {
       buildSteps.push("bun --cwd=apps/web run build");
     }
   }
 
   buildSteps.push(
-    `${NATIVE_SYSTEMCTL_PREFIX} restart ${nativeUnitsForScope(scope)
+    `${NATIVE_SYSTEMCTL_PREFIX} restart ${nativeUnitsForPieces(pieces)
       .map((value) => shellEscape(value))
       .join(" ")}`
   );
@@ -868,21 +1177,21 @@ function remoteRollout(
   remote: string,
   runtime: DeployRuntime,
   branch: string | null,
-  scope: DeployScope,
+  pieces: DeployPiece[],
   forceRecreate: boolean,
   noBuild: boolean
 ): void {
   if (runtime === "docker") {
-    remoteDockerRollout(mode, remote, branch, scope, forceRecreate, noBuild);
+    remoteDockerRollout(mode, remote, branch, pieces, forceRecreate, noBuild);
     return;
   }
 
-  remoteNativeRollout(mode, remote, branch, scope, noBuild);
+  remoteNativeRollout(mode, remote, branch, pieces, noBuild);
 }
 
-function remoteDockerVerification(scope: DeployScope, fast: boolean): void {
-  const psServices = dockerServicesForScope(scope);
-  const logServices = dockerLogServicesForScope(scope);
+function remoteDockerVerification(pieces: DeployPiece[], fast: boolean): void {
+  const psServices = dockerServicesForPieces(pieces);
+  const logServices = dockerLogServicesForPieces(pieces);
   const psCommand =
     psServices.length > 0 ? `docker compose ps ${psServices.join(" ")}` : "docker compose ps";
   const logCommand = fast
@@ -890,13 +1199,13 @@ function remoteDockerVerification(scope: DeployScope, fast: boolean): void {
     : `docker compose logs --tail=100 ${logServices.join(" ")}`;
   const checks: string[] = [];
 
-  if (scopeIncludesApi(scope)) {
+  if (piecesIncludeApi(pieces)) {
     checks.push(
       `docker compose exec -T api bun -e 'const r = await fetch("http://127.0.0.1:4000/health"); if (!r.ok) throw new Error("api healthcheck failed: " + r.status); console.log(await r.text())'`
     );
   }
 
-  if (scopeIncludesWeb(scope)) {
+  if (piecesIncludeWeb(pieces)) {
     checks.push(
       `docker compose exec -T web bun -e 'const r = await fetch("http://127.0.0.1:3000/"); if (!r.ok) throw new Error("web healthcheck failed: " + r.status); console.log(r.status)'`
     );
@@ -915,21 +1224,21 @@ ${checks.join("\n")}
   );
 }
 
-function remoteNativeVerification(scope: DeployScope, fast: boolean): void {
-  const units = nativeUnitsForScope(scope)
+function remoteNativeVerification(pieces: DeployPiece[], fast: boolean): void {
+  const units = nativeUnitsForPieces(pieces)
     .map((value) => shellEscape(value))
     .join(" ");
   const checks: string[] = [];
 
-  if (scope === "full" || scope === "api" || scope === "services" || scope === "workers") {
+  if (piecesIncludeApi(pieces) || piecesIncludeWorkers(pieces)) {
     checks.push("./deployment/native/check-native-infra.sh");
   }
 
-  if (scopeIncludesApi(scope)) {
+  if (piecesIncludeApi(pieces)) {
     checks.push("curl -fksS http://127.0.0.1:4000/health");
   }
 
-  if (scopeIncludesWeb(scope)) {
+  if (piecesIncludeWeb(pieces)) {
     checks.push("curl -I -fksS http://127.0.0.1:3000/");
   }
 
@@ -954,29 +1263,29 @@ ${checks.join("\n")}
   );
 }
 
-function remoteVerification(runtime: DeployRuntime, scope: DeployScope, fast: boolean): void {
+function remoteVerification(runtime: DeployRuntime, pieces: DeployPiece[], fast: boolean): void {
   if (runtime === "docker") {
-    remoteDockerVerification(scope, fast);
+    remoteDockerVerification(pieces, fast);
     return;
   }
 
-  remoteNativeVerification(scope, fast);
+  remoteNativeVerification(pieces, fast);
 }
 
-function publicVerification(scope: DeployScope, fast: boolean): void {
+function publicVerification(pieces: DeployPiece[], fast: boolean): void {
   section("Public Verification");
-  if (scopeIncludesWeb(scope)) {
+  if (piecesIncludeWeb(pieces)) {
     runChecked("curl", ["-I", "-fksS", PUBLIC_APP_URL]);
   } else {
     console.log("[deploy] Skipping public app HEAD check because web scope is not included.");
   }
 
-  if (scopeIncludesApi(scope) && PUBLIC_API_HEALTH_URL) {
+  if (piecesIncludeApi(pieces) && PUBLIC_API_HEALTH_URL) {
     runChecked("curl", ["-fksS", PUBLIC_API_HEALTH_URL]);
     return;
   }
 
-  if (scopeIncludesApi(scope)) {
+  if (piecesIncludeApi(pieces)) {
     if (fast) {
       console.log(
         "[deploy] Fast mode: skipping scripts/check-public-api-routes.ts route suite. Set DEPLOY_PUBLIC_API_HEALTH_URL to keep a public API health probe in fast mode."
@@ -987,24 +1296,29 @@ function publicVerification(scope: DeployScope, fast: boolean): void {
   }
 }
 
-function main(): void {
-  const options = parseArgs(process.argv.slice(2));
-  const scope = effectiveScope(options.scope, options.runtime, options.fast);
+async function main(): Promise<void> {
+  const options = await resolveOptions(process.argv.slice(2));
+  const pieces = effectivePieces(options.pieces, options.runtime, options.fast);
   const timings: PhaseTiming[] = [];
-  const currentBranch = options.mode === "current-branch" ? currentBranchName() : null;
-  const deployRemote = resolveDeployRemote(options.mode, currentBranch);
+  const branch = options.mode === "current-branch" ? currentBranchName() : options.branch;
+  const deployRemote = resolveDeployRemote(options.mode, branch);
   assertSshKeyExists();
   printRuntimeAdvisory(options.runtime);
 
   console.log(
-    `Deploying ${options.mode === "main" ? `${deployRemote}/main` : "the current local branch"} ` +
-      `via ${describeRuntime(options.runtime)} (${describeScope(scope)}${options.fast ? ", fast mode" : ""}).`
+    `Deploying ${
+      options.mode === "main"
+        ? `${deployRemote}/main`
+        : options.mode === "current-branch"
+          ? `current local branch ${branch}`
+          : `${deployRemote}/${branch}`
+    } via ${describeRuntime(options.runtime)} (${describePieces(pieces)}${options.fast ? ", fast mode" : ""}).`
   );
   console.log(`[deploy] Using git remote: ${deployRemote}`);
   console.log(
     `[deploy] Execution mode: ${isLocalServerExecution ? "local server checkout" : `ssh to ${REMOTE_HOST}`}`
   );
-  if (options.fast && options.scope === "full") {
+  if (options.fast && samePieces(options.pieces, ALL_DEPLOY_PIECES)) {
     console.log(
       `[deploy] Fast mode changed default full scope to ${options.runtime === "native" ? "--workers-only" : "--services-only"}.`
     );
@@ -1012,11 +1326,11 @@ function main(): void {
 
   if (options.mode === "main") {
     timedPhase(timings, "local precheck", () =>
-      localMainPrecheck(deployRemote, options.runtime, scope, options.noBuild)
+      localMainPrecheck(deployRemote, options.runtime, pieces, options.noBuild)
     );
     timedPhase(timings, "remote git precheck", () => remoteGitPrecheck());
     timedPhase(timings, "remote runtime precheck", () =>
-      remoteRuntimePrecheck(options.runtime, scope)
+      remoteRuntimePrecheck(options.runtime, pieces)
     );
     timedPhase(timings, "remote rollout", () =>
       remoteRollout(
@@ -1024,24 +1338,23 @@ function main(): void {
         deployRemote,
         options.runtime,
         null,
-        scope,
+        pieces,
         options.forceRecreate,
         options.noBuild
       )
     );
-  } else {
-    const branch = currentBranch;
+  } else if (options.mode === "current-branch") {
     if (!branch) {
       console.error("Unable to resolve current branch for current-branch deploy mode.");
       process.exit(1);
     }
     timedPhase(timings, "local precheck", () =>
-      localBranchPrecheck(deployRemote, branch, options.runtime, scope, options.noBuild)
+      localBranchPrecheck(deployRemote, branch, options.runtime, pieces, options.noBuild)
     );
     timedPhase(timings, "local publish", () => publishCurrentBranch(deployRemote, branch));
     timedPhase(timings, "remote git precheck", () => remoteGitPrecheck());
     timedPhase(timings, "remote runtime precheck", () =>
-      remoteRuntimePrecheck(options.runtime, scope)
+      remoteRuntimePrecheck(options.runtime, pieces)
     );
     timedPhase(timings, "remote rollout", () =>
       remoteRollout(
@@ -1049,7 +1362,31 @@ function main(): void {
         deployRemote,
         options.runtime,
         branch,
-        scope,
+        pieces,
+        options.forceRecreate,
+        options.noBuild
+      )
+    );
+  } else {
+    if (!branch) {
+      console.error("Unable to resolve branch for deploy mode.");
+      process.exit(1);
+    }
+    timedPhase(timings, "local precheck", () =>
+      localNamedBranchPrecheck(deployRemote, branch, options.runtime, pieces, options.noBuild)
+    );
+    timedPhase(timings, "local publish", () => publishNamedBranch(deployRemote, branch));
+    timedPhase(timings, "remote git precheck", () => remoteGitPrecheck());
+    timedPhase(timings, "remote runtime precheck", () =>
+      remoteRuntimePrecheck(options.runtime, pieces)
+    );
+    timedPhase(timings, "remote rollout", () =>
+      remoteRollout(
+        options.mode,
+        deployRemote,
+        options.runtime,
+        branch,
+        pieces,
         options.forceRecreate,
         options.noBuild
       )
@@ -1057,10 +1394,10 @@ function main(): void {
   }
 
   timedPhase(timings, "remote verification", () =>
-    remoteVerification(options.runtime, scope, options.fast)
+    remoteVerification(options.runtime, pieces, options.fast)
   );
-  timedPhase(timings, "public verification", () => publicVerification(scope, options.fast));
+  timedPhase(timings, "public verification", () => publicVerification(pieces, options.fast));
   printTimingSummary(timings);
 }
 
-main();
+await main();

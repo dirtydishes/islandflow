@@ -43,6 +43,7 @@
     "@electron/node-gyp": "^10.2.0-electron.2"
   },
   "dependencies": {
-    "@pierre/diffs": "^1.2.2"
+    "@pierre/diffs": "^1.2.2",
+    "@pierre/theme": "^1.0.3"
   }
 }

@@ -7,6 +7,10 @@ Docker remains the default rollout path before native cutover and the rollback p
 - `--runtime docker` for this Docker Compose stack
 - `--runtime native` for the host-native Bun + systemd rollout described in `deployment/native/README.md`
 
+Run `./deploy` with no arguments for a guided prompt. It asks for Docker or
+native runtime, main/current/another branch, and which app pieces to roll out.
+Docker remains the default runtime and `all` remains the default piece selection.
+
 The public VPS edge remains Nginx Proxy Manager. Docker fallback can be reached either through the shared Docker network service names or the host ports published by this stack.
 
 It is separate from the repo-root `docker-compose.yml`, which remains the lightweight local infra stack for development.
@@ -187,6 +191,20 @@ If IBKR is running somewhere else, change:
 
 This deployment installs dependencies from `deployment/docker/workspace-root/bun.lock` rather than the repo-root lockfile.
 
+For a guided rollout, use:
+
+```bash
+./deploy
+```
+
+For scripted rollouts, keep using explicit flags:
+
+```bash
+./deploy main --runtime docker
+./deploy main --runtime docker --pieces api,web
+./deploy branch lavender/some-branch --runtime docker --pieces compute,candles
+```
+
 When dependencies change in any workspace used by Docker builds, refresh and validate the deployment snapshot first:
 
 ```bash
@@ -277,6 +295,8 @@ Examples:
 ./deploy main --runtime docker --api-only
 ./deploy current-branch --runtime docker --services-only
 ./deploy main --runtime docker --workers-only
+./deploy main --runtime docker --pieces api,web
+./deploy branch lavender/some-branch --runtime docker --pieces compute,candles
 ./deploy main --runtime docker --fast
 ./deploy main --runtime docker --web-only --no-build
 ```
@@ -287,6 +307,7 @@ Scoped Docker deploys now build only the selected image set and then restart onl
 - `--api-only`: `docker compose build api`, then `docker compose up -d api`
 - `--services-only`: builds and restarts `api`, `compute`, `candles`, `ingest-options`, and `ingest-equities`
 - `--workers-only`: builds and restarts `compute`, `candles`, `ingest-options`, `ingest-equities`, and `ingest-news` without touching `web` or `api`
+- `--pieces`: builds and restarts exactly the comma-separated app pieces you choose
 - `--fast`: when no explicit scope flag is given, treats the deploy as `--services-only` and skips the public API route suite for quicker completion. It still runs remote service health checks.
 
 Use `--no-build` only when the image is already correct and you need Compose to recreate or restart containers, such as after changing server-side environment values that do not affect a Next.js build-time variable. Do not use `--no-build` for dependency changes, application source changes, or `NEXT_PUBLIC_*` changes.
