@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fix Live Tape Scroll Stability</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: oklch(0.14 0.012 250);
+        --panel: oklch(0.18 0.014 250);
+        --text: oklch(0.92 0.012 250);
+        --muted: oklch(0.72 0.018 250);
+        --accent: oklch(0.76 0.12 74);
+        --border: oklch(0.72 0.012 250 / 0.18);
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.6 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      main {
+        max-width: 920px;
+        margin: 0 auto;
+        padding: 48px 24px 64px;
+      }
+
+      header {
+        margin-bottom: 28px;
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 2rem;
+        line-height: 1.15;
+      }
+
+      h2 {
+        margin: 28px 0 10px;
+        color: var(--accent);
+        font-size: 1rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      p,
+      li {
+        color: var(--muted);
+      }
+
+      code {
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        padding: 1px 5px;
+        background: var(--panel);
+        color: var(--text);
+      }
+
+      pre {
+        overflow: auto;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 14px;
+        background: var(--panel);
+      }
+
+      pre code {
+        border: 0;
+        padding: 0;
+        background: transparent;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Fix Live Tape Scroll Stability</h1>
+        <p>
+          Completed on 2026-05-17 at 03:31 America/New_York for Beads issue
+          <code>islandflow-9dg</code>.
+        </p>
+      </header>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          The live tape now keeps the visible scrolled segment stable while new prints arrive. When
+          the user is away from the top, the view freezes both the hot live head and the displayed
+          history segment, only allowing genuinely older history to append below the current tail.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Added <code>mergeHeldTapeHistory</code> to filter held history updates by the visible tail.</li>
+          <li>Updated <code>usePausableTapeView</code> to keep a displayed history ref while scroll-held.</li>
+          <li>Resynced displayed history automatically when the user jumps back to the top or otherwise resumes.</li>
+          <li>Increased tape virtualizer overscan for options, equities, flow, alerts, classifier, and dark panes.</li>
+          <li>Added a fixed row-lane table background so fast scrolling shows a stable substrate instead of blank holes.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          Live session history receives both ClickHouse history and hot-window overflow from new live
+          prints. Before this change, the pausable view froze live rows during scroll hold but still
+          composed against the mutating history array, so newer overflow rows could insert above the
+          user's current viewport.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <p>
+          The stable merge compares incoming history with the current displayed history tail. Rows
+          newer than that tail are withheld during hold, duplicates from the frozen live head are
+          removed, and older lazy-loaded rows remain eligible to append.
+        </p>
+        <pre><code>const next = mergeHeldTapeHistory(displayedHistoryRef.current, historyItems, projected.items);</code></pre>
+        <p>
+          When hold ends, <code>displayedHistoryRef</code> is replaced with the latest live session
+          history, so buffered overflow catches up cleanly on jump-to-top.
+        </p>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <p>
+          Users can scroll into older options or equities prints without the rows shifting under them
+          as new live prints arrive. The <code>+N new</code> counter can continue accumulating until
+          they jump back to the top, where the tape catches up.
+        </p>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li><code>bun test apps/web/app/terminal.test.ts services/api/tests/live.test.ts</code>: passed, 90 tests.</li>
+          <li><code>bun --cwd=apps/web run build</code>: passed.</li>
+          <li><code>curl -I http://localhost:3000/tape</code> against the local dev server: returned 200 OK.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <p>
+          This change preserves row stability in the frontend view model. It does not alter backend
+          history pagination or wire protocols. The fixed table substrate mitigates visual blanking
+          during fast scrolls, while actual row rendering remains virtualized. Browser automation was
+          attempted, but the local Node automation runtime did not have Playwright installed, so the
+          handoff relies on unit tests, production build, and the local HTTP smoke check.
+        </p>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <p>No follow-up Beads issues were needed for this turn.</p>
+      </section>
+    </main>
+  </body>
+</html>

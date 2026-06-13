@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Turn Report: Forgejo CI Baseline</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Quantico:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #06080b;
+      --bg-elevated: #0b1016;
+      --pane: #111820;
+      --pane-2: #0d141b;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-strong: rgba(245, 166, 35, 0.28);
+      --text: #e6edf4;
+      --text-dim: #90a0b2;
+      --text-faint: #6e7b8c;
+      --amber: #f5a623;
+      --amber-soft: rgba(245, 166, 35, 0.12);
+      --green: #25c17a;
+      --green-soft: rgba(37, 193, 122, 0.12);
+      --blue: #4da3ff;
+      --blue-soft: rgba(77, 163, 255, 0.12);
+      --red: #ff6b5f;
+      --red-soft: rgba(255, 107, 95, 0.12);
+      --shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "IBM Plex Sans", system-ui, sans-serif;
+      background:
+        radial-gradient(1000px 700px at 0% -10%, rgba(245, 166, 35, 0.08), transparent 50%),
+        radial-gradient(900px 600px at 100% 0%, rgba(77, 163, 255, 0.08), transparent 45%),
+        linear-gradient(180deg, #05070a 0%, #06080b 100%);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    main {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 28px 18px 40px;
+    }
+
+    header {
+      background:
+        linear-gradient(145deg, rgba(245, 166, 35, 0.08), rgba(255, 255, 255, 0) 32%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)),
+        var(--bg-elevated);
+      border: 1px solid var(--border-strong);
+      border-radius: 16px;
+      padding: 22px 20px 18px;
+      box-shadow: var(--shadow);
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-family: "Quantico", sans-serif;
+      font-size: clamp(1.8rem, 3vw, 2.5rem);
+      line-height: 1.04;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .meta {
+      margin: 0;
+      color: var(--text-dim);
+      font-size: 0.94rem;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      padding: 4px 10px;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.76rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    section {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.01)), var(--pane);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 16px 15px;
+    }
+
+    h2 {
+      margin: 0 0 10px;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.84rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--amber);
+    }
+
+    p {
+      margin: 0.45rem 0;
+    }
+
+    ul {
+      margin: 0.4rem 0 0;
+      padding-left: 18px;
+    }
+
+    li + li {
+      margin-top: 0.3rem;
+    }
+
+    code,
+    pre {
+      font-family: "IBM Plex Mono", monospace;
+    }
+
+    code {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 6px;
+      padding: 0.08rem 0.3rem;
+      color: #f7fbff;
+    }
+
+    .callout {
+      margin-top: 10px;
+      border: 1px solid rgba(77, 163, 255, 0.18);
+      background: var(--blue-soft);
+      border-radius: 12px;
+      padding: 12px 13px;
+      color: #d7e8ff;
+    }
+
+    .good { color: var(--green); }
+    .warn { color: #ffd37f; }
+    .bad { color: var(--red); }
+
+    .diff-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .diff-shell {
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      overflow: hidden;
+      background: var(--pane-2);
+    }
+
+    .diff-title {
+      margin: 0;
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.03);
+      color: #d8e2ee;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.8rem;
+    }
+
+    .diff-view {
+      padding: 6px;
+    }
+
+    .diff-fallback {
+      margin: 0;
+      padding: 12px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      color: #dae6f2;
+      font-size: 0.83rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .diff-shell.rendered .diff-fallback {
+      display: none;
+    }
+
+    .note {
+      margin-top: 10px;
+      color: var(--text-dim);
+      font-size: 0.9rem;
+    }
+
+    a {
+      color: #8cc2ff;
+    }
+
+    @media (max-width: 720px) {
+      main {
+        padding: 18px 12px 28px;
+      }
+
+      header,
+      section {
+        padding-left: 14px;
+        padding-right: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Forgejo CI Baseline</h1>
+      <p class="meta">Created: 2026-05-23 20:34 EDT · Repo: <code>islandflow</code> · Branch: <code>lavender/forgejo-ci-baseline</code></p>
+      <div class="chips">
+        <span class="chip">Beads islandflow-1gq</span>
+        <span class="chip">Forgejo Actions</span>
+        <span class="chip">Fast Validate Path</span>
+        <span class="chip">Self-hosted Docker Runner</span>
+      </div>
+    </header>
+
+    <div class="grid">
+      <section>
+        <h2>Summary</h2>
+        <p>Added a Forgejo-native CI baseline at <code>.forgejo/workflows/ci.yml</code> that runs the repo’s fast, high-signal Bun validation path on pull requests, pushes to <code>main</code>, and manual dispatches. The repo documentation now describes the required runner labels, what the workflow covers, what it intentionally leaves out, and how to rerun it from Forgejo.</p>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Added the canonical Forgejo workflow file at <code>.forgejo/workflows/ci.yml</code>.</li>
+          <li>Configured a single <code>validate</code> job that runs checkout, Bun bootstrap, <code>bun install --frozen-lockfile</code>, <code>bun test</code>, <code>bun run check:docker-workspace</code>, and <code>bun --cwd=apps/web run build</code>.</li>
+          <li>Added workflow concurrency cancellation so stale branch and PR runs do not pile up.</li>
+          <li>Used a fully qualified Forgejo-hosted checkout action URL: <code>https://data.forgejo.org/actions/checkout@v4</code>.</li>
+          <li>Added a short CI section to <code>README.md</code> covering runner labels, scope, exclusions, and manual reruns.</li>
+          <li>Synced the generated Docker workspace snapshot files after the repo’s own snapshot check revealed drift that would have made the new CI job fail immediately.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>This first wave is aimed at early-stage confidence rather than full release automation. The chosen checks were already the strongest local signals in the repo, so the workflow stays fast enough for PR gating while still catching real regressions in tests, dependency shape, Docker workspace sync, and the production web build.</p>
+        <div class="callout">
+          Forgejo’s current docs recommend <code>.forgejo/workflows</code> as the canonical workflow location and recommend fully qualified action URLs because an instance can change its default action source. The runner guidance also notes that checkout is a Node-based action, which is why the documented label uses a Node-capable Docker image.
+        </div>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <ul>
+          <li>The workflow targets <code>runs-on: ubuntu-latest</code> so maintainers can back that label with a Docker image such as <code>ubuntu-latest:docker://node:20-bookworm</code>.</li>
+          <li>Bun is installed explicitly inside the job rather than through another shared setup action. That keeps the baseline dependency surface smaller and avoids adding another remote action source to the first Forgejo CI pass.</li>
+          <li>The workspace snapshot sync touched generated files under <code>deployment/docker/workspace-root</code>, including the mirrored manifest and lockfile, because <code>check:docker-workspace</code> enforces parity between the repo root and the deployment workspace snapshot.</li>
+          <li>Existing <code>.github/workflows</code> files were left alone so GitHub-specific docs and notification behavior can continue separately without becoming the canonical CI path.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <div class="diff-grid">
+          <div class="diff-shell" id="diff-shell-1">
+            <p class="diff-title">.forgejo/workflows/ci.yml</p>
+            <div class="diff-view" id="diff-1"></div>
+            <pre class="diff-fallback"><code>+name: CI
++
++on:
++  pull_request:
++  push:
++    branches:
++      - main
++  workflow_dispatch:
++
++concurrency:
++  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
++  cancel-in-progress: true</code></pre>
+          </div>
+
+          <div class="diff-shell" id="diff-shell-2">
+            <p class="diff-title">README.md · CI section</p>
+            <div class="diff-view" id="diff-2"></div>
+            <pre class="diff-fallback"><code>+## CI
++
++Forgejo Actions under `.forgejo/workflows` are the canonical CI path for this repository.
++...
++- `bun test`
++- `bun run check:docker-workspace`
++- `bun --cwd=apps/web run build`</code></pre>
+          </div>
+
+          <div class="diff-shell" id="diff-shell-3">
+            <p class="diff-title">deployment/docker/workspace-root/package.json</p>
+            <div class="diff-view" id="diff-3"></div>
+            <pre class="diff-fallback"><code>+  "overrides": {
++    "postcss": "^8.5.15",
++    "tar": "^7.5.15",
++    "tmp": "^0.2.5"
++  },
++  "dependencies": {
++    "@pierre/diffs": "^1.2.2"
++  }</code></pre>
+          </div>
+        </div>
+        <p class="note">These snippets render client-side with <code>@pierre/diffs</code> and include inline fallback text for offline viewing.</p>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <p>There is no direct product-surface change for trading or replay users. The main effect is on contributor and maintainer experience: pull requests and mainline pushes can now get fast, consistent validation in Forgejo before heavier CI layers exist, which should reduce broken merges and make failures easier to interpret.</p>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li><span class="good">Passed:</span> <code>ruby -e 'require "yaml"; YAML.load_file(".forgejo/workflows/ci.yml")'</code> (<code>yaml ok</code>).</li>
+          <li><span class="good">Passed:</span> <code>bun install --frozen-lockfile</code>.</li>
+          <li><span class="good">Passed:</span> <code>bun test</code> with <code>246 pass</code>, <code>0 fail</code>.</li>
+          <li><span class="good">Passed:</span> <code>bun run check:docker-workspace</code> after syncing the generated deployment workspace snapshot.</li>
+          <li><span class="good">Passed:</span> <code>bun --cwd=apps/web run build</code>.</li>
+          <li><span class="warn">Not completed locally:</span> a runner-like Docker smoke test could not be performed from this workstation because the local Docker daemon socket was unavailable at the time of validation.</li>
+          <li><span class="warn">Forgejo-side validation pending push:</span> workflow discovery in the Actions UI, manual dispatch, and PR-trigger confirmation must happen against the pushed branch on the Forgejo instance.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>The workflow currently installs Bun during each run, which adds a small amount of startup cost. Mitigation: this keeps the first baseline explicit and avoids another remote setup action dependency.</li>
+          <li>The local environment could not fully emulate the self-hosted Docker runner because Docker was not reachable from this machine. Mitigation: the workflow syntax and repo checks were validated locally, and the remaining discovery/dispatch checks are clearly called out for Forgejo-side verification.</li>
+          <li>The generated deployment workspace snapshot had already drifted before this change. Mitigation: the new CI path now includes <code>check:docker-workspace</code>, and the snapshot was synced in the same turn so the baseline starts green.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li><code>islandflow-3ys</code>: expand Forgejo CI beyond the fast validate path with Docker builds, service-container integration coverage, and later deploy or release automation.</li>
+          <li>After this branch is pushed, manually dispatch the <code>CI</code> workflow from Forgejo and confirm runner label resolution plus checkout/Bun bootstrap on the self-hosted runner.</li>
+          <li>If Bun setup time becomes noticeable, consider a later follow-up that either bakes Bun into the CI image or introduces a deliberately chosen cache/setup strategy after the baseline proves stable.</li>
+        </ul>
+      </section>
+    </div>
+  </main>
+
+  <script type="module">
+    const snippets = [
+      {
+        shellId: "diff-shell-1",
+        containerId: "diff-1",
+        name: ".forgejo/workflows/ci.yml",
+        oldContents: ``,
+        newContents: `name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-\${{ github.workflow }}-\${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: https://data.forgejo.org/actions/checkout@v4
+      - run: ~/.bun/bin/bun test`
+      },
+      {
+        shellId: "diff-shell-2",
+        containerId: "diff-2",
+        name: "README.md",
+        oldContents: `This keeps Docker in the local workflow where it helps most, for NATS, ClickHouse, and Redis, while keeping the app services in native Bun/Next.js loops.
+
+## Deployment Workflow`,
+        newContents: `This keeps Docker in the local workflow where it helps most, for NATS, ClickHouse, and Redis, while keeping the app services in native Bun/Next.js loops.
+
+## CI
+
+Forgejo Actions under \`.forgejo/workflows\` are the canonical CI path for this repository.
+
+- \`bun install --frozen-lockfile\`
+- \`bun test\`
+- \`bun run check:docker-workspace\`
+- \`bun --cwd=apps/web run build\`
+
+## Deployment Workflow`
+      },
+      {
+        shellId: "diff-shell-3",
+        containerId: "diff-3",
+        name: "deployment/docker/workspace-root/package.json",
+        oldContents: `{
+  "devDependencies": {
+    "typescript-language-server": "^5.1.3"
+  }
+}`,
+        newContents: `{
+  "devDependencies": {
+    "typescript-language-server": "^5.1.3"
+  },
+  "overrides": {
+    "postcss": "^8.5.15",
+    "tar": "^7.5.15",
+    "tmp": "^0.2.5"
+  },
+  "dependencies": {
+    "@pierre/diffs": "^1.2.2"
+  }
+}`
+      }
+    ];
+
+    try {
+      const { FileDiff } = await import("https://esm.sh/@pierre/diffs");
+
+      for (const snippet of snippets) {
+        const container = document.getElementById(snippet.containerId);
+        const shell = document.getElementById(snippet.shellId);
+        if (!container || !shell) {
+          continue;
+        }
+
+        const instance = new FileDiff({
+          theme: { dark: "pierre-dark", light: "pierre-light" },
+          diffStyle: "split"
+        });
+
+        instance.render({
+          oldFile: {
+            name: snippet.name,
+            contents: snippet.oldContents
+          },
+          newFile: {
+            name: snippet.name,
+            contents: snippet.newContents
+          },
+          containerWrapper: container
+        });
+
+        shell.classList.add("rendered");
+      }
+    } catch (error) {
+      console.warn("Failed to render diff snippets with Diffs.", error);
+    }
+  </script>
+</body>
+</html>

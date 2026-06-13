@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Turn Report - Publish Docs to GitHub Pages</title>
+    <style>
+      :root {
+        --bg: #f6f8fb;
+        --surface: #ffffff;
+        --text: #172133;
+        --muted: #56637a;
+        --border: #d5dde8;
+        --accent: #0b7a75;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: "Inter", "Segoe UI", sans-serif;
+        line-height: 1.5;
+      }
+      main {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 28px 16px 44px;
+      }
+      h1, h2 { line-height: 1.2; }
+      h1 { margin: 0 0 8px; font-size: clamp(1.6rem, 2.2vw, 2.1rem); }
+      h2 {
+        margin: 0;
+        font-size: 1.18rem;
+      }
+      .meta {
+        margin: 0 0 20px;
+        color: var(--muted);
+      }
+      section {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 14px 16px;
+        margin-bottom: 12px;
+      }
+      p, li { margin: 0; }
+      p + p { margin-top: 8px; }
+      ul {
+        margin: 10px 0 0;
+        padding-left: 18px;
+      }
+      li + li { margin-top: 6px; }
+      code {
+        font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+        font-size: 0.92em;
+      }
+      pre {
+        margin: 10px 0 0;
+        overflow-x: auto;
+        padding: 12px;
+        border-radius: 8px;
+        background: #0f172a;
+        color: #e2e8f0;
+        border: 1px solid #1e293b;
+      }
+      .note {
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+      a { color: var(--accent); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Publish docs/ to GitHub Pages with navigable index</h1>
+      <p class="meta">Completed on May 19, 2026 at 9:38 AM ET.</p>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          Added an automated docs publishing flow to GitHub Pages and generated a new
+          <code>docs/index.html</code> browsing experience so docs are easy to navigate at
+          <code>/islandflow/docs/</code>.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Added <code>scripts/generate-docs-index.mjs</code> to build a browsable index of files under <code>docs/</code>.</li>
+          <li>Added <code>.github/workflows/docs-pages.yml</code> to publish docs to GitHub Pages on pushes to <code>main</code>.</li>
+          <li>Generated <code>docs/index.html</code> from current docs content.</li>
+          <li>Configured deployment artifact layout so docs are available at <code>/docs/</code> under the project Pages site.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          The repository already stores operational and implementation documentation under
+          <code>docs/</code>, but there was no dedicated GitHub Pages pipeline and no curated
+          index page for discovery. This task focused on syncing that folder to Pages and
+          making it easy to browse by category and filename.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <ul>
+          <li>The index generator excludes hidden files and avoids self-including <code>docs/index.html</code>.</li>
+          <li>Files are grouped by first path segment (<code>turns</code>, <code>general</code>, <code>plans</code>, and others) with quick category chips.</li>
+          <li>The index includes client-side filtering so users can search docs by path text in-browser.</li>
+          <li>Pages deployment packages a <code>site/</code> payload where docs are copied into <code>site/docs</code> and root redirects to <code>./docs/</code>.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p class="note">
+          Snippets are shown in a compact style aligned with <a href="https://diffs.com/docs">diffs.com</a> presentation patterns.
+        </p>
+        <pre><code class="language-diff">+++ .github/workflows/docs-pages.yml
+name: Publish Docs
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "scripts/generate-docs-index.mjs"
+      - ".github/workflows/docs-pages.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - run: node scripts/generate-docs-index.mjs
+      - run: cp -R docs/. site/docs/
+      - uses: actions/upload-pages-artifact@v3
+  deploy:
+    needs: build
+    steps:
+      - uses: actions/deploy-pages@v4</code></pre>
+        <pre><code class="language-diff">+++ scripts/generate-docs-index.mjs
+const files = await collectDocsFiles(docsDir);
+const html = renderDocument(files);
+await fs.writeFile(outputFile, html, "utf8");
+
+// Generated index features:
+// - grouped sections
+// - search filter
+// - file size and modified time metadata
+// - links preserving docs folder structure</code></pre>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <ul>
+          <li>Docs are reachable via a stable Pages URL path: <code>dirtydishes.github.io/islandflow/docs/</code>.</li>
+          <li>Readers can quickly scan categories and search by filename instead of relying on raw directory browsing.</li>
+          <li>New docs added to the repository are published automatically on <code>main</code> pushes.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li>Ran <code>node scripts/generate-docs-index.mjs</code> successfully.</li>
+          <li>Ran <code>node --check scripts/generate-docs-index.mjs</code> for syntax validation.</li>
+          <li>Confirmed generated index contains expected navigation/search markers and category anchors.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>GitHub Pages must be enabled for this repository and set to GitHub Actions deployment.</li>
+          <li>The index reflects files present at build time and does not include full-text search inside documents.</li>
+          <li>Markdown files are linked as-is; rendering behavior depends on GitHub Pages static hosting behavior.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>Add a docs landing page summary for key collections (turn docs, runbooks, daily notes).</li>
+          <li>Optionally add link-checking in CI for docs URLs and local references.</li>
+          <li>Consider tagging docs with metadata for richer filtering by date, topic, and type.</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

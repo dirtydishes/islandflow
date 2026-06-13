@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Turn Doc | ClickHouse Alert Context Hydration</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: oklch(0.16 0.012 244);
+        --bg-2: oklch(0.2 0.014 244);
+        --surface: oklch(0.23 0.016 244);
+        --surface-2: oklch(0.26 0.018 244);
+        --line: oklch(0.42 0.02 244 / 0.42);
+        --line-strong: oklch(0.62 0.055 76 / 0.42);
+        --text: oklch(0.93 0.012 244);
+        --text-muted: oklch(0.76 0.014 244);
+        --text-faint: oklch(0.64 0.014 244);
+        --accent: oklch(0.78 0.14 76);
+        --ok: oklch(0.78 0.14 152);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background:
+          radial-gradient(1100px 520px at 96% -8%, oklch(0.34 0.05 76 / 0.18), transparent 60%),
+          linear-gradient(180deg, var(--bg-2), var(--bg));
+        color: var(--text);
+        font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      }
+
+      .page {
+        padding: 30px 20px 64px;
+      }
+
+      .layout {
+        margin: 0 auto;
+        max-width: 1140px;
+        display: grid;
+        gap: 26px;
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .mast {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: linear-gradient(180deg, oklch(0.25 0.017 244 / 0.94), oklch(0.22 0.015 244 / 0.94));
+        padding: 22px 20px 18px;
+      }
+
+      .kicker {
+        margin: 0;
+        font-size: 0.74rem;
+        font-weight: 650;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+      }
+
+      h1 {
+        margin: 8px 0 10px;
+        font-family: "Quantico", "IBM Plex Sans", sans-serif;
+        font-size: clamp(1.55rem, 2.2vw, 2.05rem);
+        line-height: 1.1;
+        letter-spacing: 0.01em;
+      }
+
+      .summary {
+        margin: 0;
+        max-width: 72ch;
+        color: var(--text-muted);
+      }
+
+      .status {
+        margin-top: 14px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 10px;
+        border-radius: 999px;
+        border: 1px solid oklch(0.68 0.09 152 / 0.42);
+        background: oklch(0.28 0.034 152 / 0.2);
+        color: var(--ok);
+        font-size: 0.7rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        font-weight: 700;
+      }
+
+      .status::before {
+        content: "";
+        width: 0.48rem;
+        height: 0.48rem;
+        border-radius: 999px;
+        background: currentColor;
+      }
+
+      .body {
+        display: grid;
+        gap: 20px;
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      aside {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: oklch(0.22 0.015 244 / 0.9);
+        padding: 14px;
+      }
+
+      .meta-row {
+        display: grid;
+        gap: 6px;
+        padding: 9px 8px;
+      }
+
+      .meta-label {
+        margin: 0;
+        font-size: 0.66rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--text-faint);
+        font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      .meta-value {
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 0.88rem;
+      }
+
+      article {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: oklch(0.22 0.015 244 / 0.9);
+      }
+
+      section {
+        padding: 18px 18px 20px;
+      }
+
+      section + section {
+        border-top: 1px solid var(--line);
+      }
+
+      h2 {
+        margin: 0 0 9px;
+        font-size: 0.77rem;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+        color: var(--accent);
+        font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      p {
+        margin: 0;
+        max-width: 74ch;
+        color: var(--text-muted);
+        line-height: 1.58;
+      }
+
+      p + p {
+        margin-top: 10px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--text-muted);
+        display: grid;
+        gap: 8px;
+      }
+
+      li {
+        line-height: 1.54;
+      }
+
+      code {
+        padding: 2px 6px;
+        border-radius: 6px;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--text);
+        font-size: 0.92em;
+        font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      pre {
+        margin: 10px 0 0;
+        padding: 12px;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        overflow-x: auto;
+      }
+
+      pre code {
+        padding: 0;
+        border: 0;
+        background: transparent;
+      }
+
+      .callout {
+        margin-top: 10px;
+        padding: 10px 11px;
+        border: 1px solid var(--line-strong);
+        border-radius: 10px;
+        background: oklch(0.3 0.04 76 / 0.12);
+        color: var(--text);
+      }
+
+      @media (min-width: 940px) {
+        .body {
+          grid-template-columns: 280px minmax(0, 1fr);
+          align-items: start;
+        }
+
+        aside {
+          position: sticky;
+          top: 18px;
+        }
+      }
+
+      @media (prefers-reduced-motion: no-preference) {
+        .mast,
+        aside,
+        article {
+          animation: reveal 220ms cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        @keyframes reveal {
+          from {
+            opacity: 0;
+            transform: translateY(6px);
+          }
+
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <div class="layout">
+        <header class="mast">
+          <p class="kicker">Turn Documentation</p>
+          <h1>ClickHouse Alert Context Hydration</h1>
+          <p class="summary">
+            Alert detail drawers now load persisted evidence context from ClickHouse by alert trace id, then hydrate linked flow packets and option prints into the existing pinned evidence maps.
+          </p>
+          <span class="status">Validation complete</span>
+        </header>
+
+        <div class="body">
+          <aside aria-label="Document metadata">
+            <div class="meta-row">
+              <p class="meta-label">Date</p>
+              <p class="meta-value">2026-05-17</p>
+            </div>
+            <div class="meta-row">
+              <p class="meta-label">Scope</p>
+              <p class="meta-value">Storage, API, Web Terminal</p>
+            </div>
+            <div class="meta-row">
+              <p class="meta-label">Issue</p>
+              <p class="meta-value"><code>islandflow-cif</code></p>
+            </div>
+            <div class="meta-row">
+              <p class="meta-label">Route</p>
+              <p class="meta-value"><code>GET /flow/alerts/:trace_id/context</code></p>
+            </div>
+            <div class="meta-row">
+              <p class="meta-label">Status</p>
+              <p class="meta-value">Merged context hydration path</p>
+            </div>
+          </aside>
+
+          <article>
+            <section>
+              <h2>Summary</h2>
+              <p>
+                Alert detail hydration no longer depends only on live cache residency. When a user selects an alert, the terminal now requests a persisted context bundle and resolves linked evidence from ClickHouse.
+              </p>
+            </section>
+
+            <section>
+              <h2>Changes Made</h2>
+              <ul>
+                <li>Added storage lookup for alert context by <code>trace_id</code> with explicit <code>missing_refs</code> diagnostics.</li>
+                <li>Added API endpoint <code>GET /flow/alerts/:trace_id/context</code> for detail-time evidence hydration.</li>
+                <li>Updated terminal selection flow so hydrated packets and prints merge into pinned evidence maps shared by drawers and support paths.</li>
+                <li>Updated drawer copy from live-cache miss language to persisted-context language.</li>
+                <li>Preserved dense drawer structure while surfacing execution context fields such as NBBO side, bid/ask/mid/spread, quote age, and underlying spot/bid/ask/mid.</li>
+              </ul>
+            </section>
+
+            <section>
+              <h2>Context</h2>
+              <p>
+                Existing list feeds remain unchanged, including <code>/flow/alerts</code>, <code>/history/alerts</code>, <code>/replay/alerts</code>, and live websocket rows. This keeps burst-time payloads lean while moving heavy evidence lookup to detail interactions.
+              </p>
+            </section>
+
+            <section>
+              <h2>Important Implementation Details</h2>
+              <p>Context endpoint payload:</p>
+              <pre><code>{
+  alert: AlertEvent | null,
+  flow_packets: FlowPacket[],
+  option_prints: OptionPrint[],
+  missing_refs: string[]
+}</code></pre>
+              <p class="callout">
+                Evidence refs are resolved without failing the whole response when some refs are stale or absent. Unresolved refs are surfaced to UI as diagnostics.
+              </p>
+            </section>
+
+            <section>
+              <h2>Expected Impact for End-Users</h2>
+              <p>
+                Alert investigation should remain reliable after live cache churn. Users can open an alert and still inspect preserved evidence context needed for decision-making, even when original live rows rotated out.
+              </p>
+            </section>
+
+            <section>
+              <h2>Validation</h2>
+              <ul>
+                <li><code>bun test packages/storage/tests</code> passed</li>
+                <li><code>bun test services/api/tests</code> passed</li>
+                <li><code>bun test apps/web/app/terminal.test.ts</code> passed</li>
+                <li><code>bun --cwd=apps/web run build</code> passed</li>
+              </ul>
+            </section>
+
+            <section>
+              <h2>Issues, Limitations, and Mitigations</h2>
+              <ul>
+                <li>Detail-time hydration adds a request on selection; this intentionally avoids inflating live alert table payloads.</li>
+                <li>Malformed trace ids are rejected safely at the route layer.</li>
+                <li>Missing evidence refs are reported as <code>missing_refs</code> instead of causing hard failure.</li>
+              </ul>
+            </section>
+
+            <section>
+              <h2>Follow-up Work</h2>
+              <p>
+                No mandatory follow-up remains for baseline delivery. Further UI refinement could add richer missing-ref drilldown and stronger loading placeholders if desired.
+              </p>
+            </section>
+          </article>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

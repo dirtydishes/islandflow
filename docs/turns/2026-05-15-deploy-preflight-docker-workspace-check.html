@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Turn Report - 2026-05-15 - Deploy preflight docker workspace check</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.5; margin: 2rem auto; max-width: 920px; padding: 0 1rem; }
+    h1, h2 { line-height: 1.25; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    pre { background: #f6f8fa; border-radius: 8px; padding: 0.75rem; overflow-x: auto; }
+    .summary { background: #eef6ff; border: 1px solid #cfe3ff; border-radius: 8px; padding: 0.85rem 1rem; }
+  </style>
+</head>
+<body>
+  <h1>Turn Report: Deploy script preflight guard for Docker workspace snapshot</h1>
+  <p><strong>Date/Time:</strong> 2026-05-15 19:03:09 EDT</p>
+
+  <h2>Summary</h2>
+  <div class="summary">
+    Updated <code>scripts/deploy.ts</code> so <code>./deploy</code> now fails fast when
+    <code>deployment/docker/workspace-root</code> is stale. The script now runs
+    <code>bun run check:docker-workspace</code> during local prechecks and prints a clear remediation
+    message to run sync + commit before deployment.
+  </div>
+
+  <h2>Changes Made</h2>
+  <ul>
+    <li>Created <code>localWorkspaceSnapshotPrecheck()</code> in <code>scripts/deploy.ts</code>.</li>
+    <li>Added preflight invocation to both deployment modes:
+      <ul>
+        <li><code>localMainPrecheck()</code></li>
+        <li><code>localBranchPrecheck()</code></li>
+      </ul>
+    </li>
+    <li>On failure, deploy now exits with an explicit message:</li>
+  </ul>
+  <pre>Refusing deploy: deployment/docker/workspace-root is out of sync.
+Run bun run sync:docker-workspace, commit updated snapshot files, then retry deploy.</pre>
+  <ul>
+    <li>Refreshed lock state to keep checks green:
+      <ul>
+        <li><code>bun.lock</code></li>
+        <li><code>deployment/docker/workspace-root/bun.lock</code></li>
+      </ul>
+    </li>
+  </ul>
+
+  <h2>Context</h2>
+  <p>
+    The deployment compose stack builds from a snapshot under
+    <code>deployment/docker/workspace-root</code>. If that snapshot drifts from the active
+    workspace graph, Docker build-time <code>bun install --frozen-lockfile</code> fails remotely.
+    This change catches drift locally before any remote rollout starts.
+  </p>
+
+  <h2>Important Implementation Details</h2>
+  <ul>
+    <li>Preflight uses <code>spawnSync("bun", ["run", "check:docker-workspace"])</code> with inherited stdio for transparent output.</li>
+    <li>Failure exits with the same non-zero status, preserving script CI/shell behavior.</li>
+    <li>Guard applies to both <code>./deploy main</code> and <code>./deploy current-branch</code> flows.</li>
+  </ul>
+
+  <h2>Validation</h2>
+  <ul>
+    <li>Passed: <code>bun run scripts/deploy.ts --help</code></li>
+    <li>Passed: <code>bun run check:docker-workspace</code> (after lock sync)</li>
+  </ul>
+
+  <h2>Issues, Limitations, and Mitigations</h2>
+  <ul>
+    <li><strong>Limitation:</strong> Did not execute a full remote deploy during this turn.</li>
+    <li><strong>Mitigation:</strong> The guard is in the local precheck path, so next real deploy run will enforce the new check automatically.</li>
+  </ul>
+
+  <h2>Follow-up Work</h2>
+  <ul>
+    <li>Optional defense-in-depth: run <code>bun run check:docker-workspace</code> on the server in remote rollout before <code>docker compose up -d --build</code>.</li>
+    <li>Optional CI gate: add <code>bun run check:docker-workspace</code> to PR checks to prevent stale snapshots reaching <code>main</code>.</li>
+    <li>Beads issue: <code>islandflow-k4f</code>.</li>
+  </ul>
+</body>
+</html>

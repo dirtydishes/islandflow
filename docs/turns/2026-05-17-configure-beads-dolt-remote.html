@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Turn Document - Configure Beads Dolt Remote</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #071018;
+        --panel: #101a24;
+        --panel-2: #0b141d;
+        --border: rgba(255, 255, 255, 0.12);
+        --text: #e7edf5;
+        --muted: #94a5b8;
+        --accent: #7cc7ff;
+        --good: #55d38a;
+        --warn: #ffb454;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Inter, Arial, sans-serif;
+        background: linear-gradient(180deg, #08111a 0%, #05080d 100%);
+        color: var(--text);
+      }
+      main {
+        width: min(980px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 28px 0 40px;
+      }
+      section {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 22px 24px;
+        margin-bottom: 18px;
+      }
+      h1, h2 { margin-top: 0; }
+      h1 { font-size: 2rem; }
+      h2 { font-size: 1rem; text-transform: uppercase; letter-spacing: 0.08em; }
+      p, li { line-height: 1.6; }
+      ul { margin-bottom: 0; }
+      code, pre { font-family: "IBM Plex Mono", Menlo, monospace; }
+      code { color: #a8d8ff; }
+      pre {
+        margin: 0;
+        padding: 14px;
+        overflow-x: auto;
+        border-radius: 12px;
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+      }
+      .meta { color: var(--muted); }
+      .pill {
+        display: inline-block;
+        margin: 6px 8px 0 0;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        font-size: 0.86rem;
+      }
+      .good { background: rgba(85, 211, 138, 0.14); }
+      .warn { background: rgba(255, 180, 84, 0.14); }
+      .accent { background: rgba(124, 199, 255, 0.14); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section>
+        <h1>Configure Beads Dolt Remote</h1>
+        <p>
+          Configured a persistent beads/Dolt sync remote for this repo using the server-hosted Forgejo instance at
+          <code>git.deltaisland.io</code>, published Dolt data to <code>refs/dolt/data</code>, and documented the
+          operational constraints around Nginx Proxy Manager, HTTPS, and SSH reachability.
+        </p>
+        <p class="meta">Generated: 2026-05-17 06:36 EDT</p>
+        <div>
+          <span class="pill accent">Beads issue: islandflow-8kj</span>
+          <span class="pill good">Remote published</span>
+          <span class="pill good">HTTPS validated</span>
+          <span class="pill warn">SSH follow-up: islandflow-zsy</span>
+        </div>
+      </section>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          The repo now has a committed beads sync target in <code>.beads/config.yaml</code> and the server now has the
+          required local tooling and credentials to run <code>bd dolt push</code> successfully against Forgejo over HTTPS.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Installed <code>bd</code> 1.0.4 for the <code>delta</code> user.</li>
+          <li>Installed <code>dolt</code> 2.0.3 in <code>~/.local/bin</code>.</li>
+          <li>Configured a persistent local Forgejo credential for non-interactive beads/Dolt pushes on this server.</li>
+          <li>Added the public beads sync URL to <code>.beads/config.yaml</code>:</li>
+        </ul>
+        <pre><code>sync:
+  remote: git+https://git.deltaisland.io/dirtydishes/islandflow.git</code></pre>
+        <ul>
+          <li>Published the current Dolt history to Forgejo and verified <code>refs/dolt/data</code> exists on the remote.</li>
+          <li>Created a follow-up issue for SSH reachability via DNS/Cloudflare: <code>islandflow-zsy</code>.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          This repo already used beads locally, but it had no Dolt remote configured. Earlier work in the repo had
+          explicitly noted that <code>bd dolt pull</code> was unavailable because no remote existed.
+        </p>
+        <p>
+          The server already hosted Forgejo behind Nginx Proxy Manager at <code>git.deltaisland.io</code>, which made an
+          HTTPS-backed beads remote the lowest-friction persistent option.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <ul>
+          <li>
+            The public remote URL for collaborators is:
+            <code>git+https://git.deltaisland.io/dirtydishes/islandflow.git</code>
+          </li>
+          <li>
+            The actual server-side push path is authenticated locally with a Forgejo personal access token stored only on
+            the server, so the committed repo configuration does not contain secrets.
+          </li>
+          <li>
+            The Nginx Proxy Manager host for <code>git.deltaisland.io</code> already proxies Forgejo on ports 80/443, so no
+            new public port exposure was needed for the working HTTPS path.
+          </li>
+          <li>
+            A dedicated Forgejo SSH key was also prepared on the server, but end-to-end SSH to <code>git.deltaisland.io:2222</code>
+            is still blocked by the current DNS/proxy setup rather than by the host listener itself.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <ul>
+          <li>Future clones can bootstrap beads from the server-backed remote instead of starting with an empty local database.</li>
+          <li>Operators can now run <code>bd dolt push</code> on this server without manual one-off setup.</li>
+          <li>Beads issue history is now backed by a persistent remote rather than being local-only state.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li><code>bd version</code> → 1.0.4</li>
+          <li><code>dolt version</code> → 2.0.3</li>
+          <li><code>bd dolt push</code> completed successfully.</li>
+          <li><code>git ls-remote https://git.deltaisland.io/dirtydishes/islandflow.git refs/dolt/data</code> returned a ref.</li>
+          <li><code>ss -tulpn</code> confirmed listeners on 80, 443, and 2222.</li>
+          <li>Inspected the Nginx Proxy Manager config for <code>git.deltaisland.io</code> and confirmed HTTPS proxying to the Forgejo container.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>
+            <strong>SSH hostname reachability:</strong> Forgejo is listening on host port <code>2222</code>, but the
+            current public hostname resolves through a proxy path that does not complete SSH connections. HTTPS remains the
+            supported path today.
+          </li>
+          <li>
+            <strong>Server-local credential material:</strong> a local Forgejo token was required so this server can push
+            beads data non-interactively. The secret was kept out of tracked repo files.
+          </li>
+          <li>
+            <strong>Pre-existing repo dirtiness:</strong> unrelated local changes already existed in this working tree and
+            were intentionally left untouched.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li><code>islandflow-zsy</code> — expose Forgejo SSH on a direct DNS hostname if SSH-based Git/beads sync should work publicly.</li>
+          <li>If additional machines need write access, create Forgejo credentials or PATs for those operators and use the public HTTPS remote above.</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

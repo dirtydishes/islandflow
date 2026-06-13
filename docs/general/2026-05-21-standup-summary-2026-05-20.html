@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Standup Summary for 2026-05-20</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Quantico:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: rgba(17, 24, 32, 0.94);
+        --panel-2: rgba(13, 20, 27, 0.98);
+        --line: rgba(255, 255, 255, 0.09);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --amber: #f5a623;
+        --amber-soft: rgba(245, 166, 35, 0.14);
+        --blue: #4da3ff;
+        --blue-soft: rgba(77, 163, 255, 0.12);
+        --green: #25c17a;
+        --green-soft: rgba(37, 193, 122, 0.12);
+        --red: #ff6b5f;
+        --red-soft: rgba(255, 107, 95, 0.12);
+        --shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+        --radius: 18px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at top right, rgba(245, 166, 35, 0.14), transparent 28rem),
+          radial-gradient(circle at top left, rgba(77, 163, 255, 0.1), transparent 24rem),
+          linear-gradient(180deg, #081018 0%, var(--bg) 34%, #05070a 100%);
+        color: var(--text);
+        font-family: "IBM Plex Sans", system-ui, sans-serif;
+        line-height: 1.6;
+      }
+
+      main {
+        width: min(1100px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 30px 0 56px;
+      }
+
+      .hero,
+      section {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      }
+
+      .hero {
+        padding: 30px;
+        box-shadow: var(--shadow);
+      }
+
+      section {
+        margin-top: 18px;
+        padding: 22px;
+      }
+
+      .eyebrow,
+      .chip,
+      h2,
+      .commit-id,
+      code,
+      pre {
+        font-family: "IBM Plex Mono", monospace;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: var(--amber-soft);
+        color: var(--amber);
+        font-size: 0.76rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h3 {
+        margin: 0;
+        font-family: "Quantico", sans-serif;
+        letter-spacing: 0.05em;
+      }
+
+      h1 {
+        margin-top: 16px;
+        font-size: clamp(2.2rem, 4vw, 3.7rem);
+        line-height: 1.03;
+        text-transform: uppercase;
+      }
+
+      h2 {
+        margin: 0 0 14px;
+        color: var(--amber);
+        font-size: 0.84rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h3 {
+        font-size: 1rem;
+      }
+
+      p,
+      li {
+        max-width: 78ch;
+        color: var(--muted);
+      }
+
+      .hero p {
+        margin: 16px 0 0;
+        font-size: 1.02rem;
+      }
+
+      .meta {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px;
+        margin-top: 22px;
+      }
+
+      .meta-card,
+      .timeline-item,
+      .summary-item,
+      .callout {
+        padding: 16px 18px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.025);
+      }
+
+      .meta-card strong,
+      .label {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--text);
+        font-size: 0.74rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .summary-list,
+      .timeline {
+        display: grid;
+        gap: 12px;
+      }
+
+      .timeline-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 14px;
+        margin-bottom: 10px;
+      }
+
+      .commit-id {
+        color: var(--blue);
+        font-size: 0.76rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .timestamp {
+        color: var(--faint);
+        font-size: 0.76rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .chip-row,
+      .file-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chip,
+      .file-pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--text);
+        font-size: 0.74rem;
+        letter-spacing: 0.04em;
+      }
+
+      .good {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .info {
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .risk {
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 1.2rem;
+      }
+
+      li + li {
+        margin-top: 8px;
+      }
+
+      code {
+        color: #ffd596;
+      }
+
+      pre {
+        margin: 12px 0 0;
+        padding: 14px 16px;
+        overflow-x: auto;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        background: rgba(5, 10, 15, 0.96);
+        color: var(--text);
+        font-size: 0.86rem;
+      }
+
+      a {
+        color: #8bc1ff;
+      }
+
+      @media (max-width: 720px) {
+        main {
+          width: min(100%, calc(100% - 20px));
+          padding: 18px 0 28px;
+        }
+
+        .hero,
+        section {
+          padding: 18px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="hero">
+        <span class="eyebrow">Daily Git Summary</span>
+        <h1>Standup Summary for 2026-05-20</h1>
+        <p>
+          Yesterday’s visible git activity on <code>main</code> grouped into three concrete buckets:
+          a web-terminal fix for historical alert packet resolution landed through PR <code>#6</code>,
+          a one-time GitHub ↔ Forgejo backfill sync was documented, and the root
+          <code>README.md</code> was refreshed to match the current classification flow and system shape.
+        </p>
+        <div class="meta">
+          <div class="meta-card">
+            <strong>Commits inspected</strong>
+            4 total on 2026-05-20
+          </div>
+          <div class="meta-card">
+            <strong>Unique workstreams</strong>
+            3 landed changes
+          </div>
+          <div class="meta-card">
+            <strong>Functional change</strong>
+            <code>apps/web/app/terminal.tsx</code>
+          </div>
+          <div class="meta-card">
+            <strong>Docs-heavy follow-through</strong>
+            3 HTML turn docs plus README refresh
+          </div>
+        </div>
+      </header>
+
+      <section>
+        <h2>Summary</h2>
+        <div class="summary-list">
+          <article class="summary-item">
+            <h3>Historical alert context lookup stopped assuming the first evidence ref was the packet.</h3>
+            <p>
+              Commit <code>adba1f6</code> changed alert packet selection in the terminal so historical
+              context hydration scans packet refs explicitly, then PR merge commit <code>fb25b5a</code>
+              landed that fix on <code>main</code>.
+            </p>
+          </article>
+          <article class="summary-item">
+            <h3>Remote migration state was captured in repo docs.</h3>
+            <p>
+              Commit <code>df9c9f3</code> added a turn document describing a one-time bidirectional sync
+              between the GitHub and Forgejo remotes, including branch parity validation.
+            </p>
+          </article>
+          <article class="summary-item">
+            <h3>README positioning now matches the current classification pipeline.</h3>
+            <p>
+              Commit <code>1e2ed3e</code> updated <code>README.md</code> to describe current ingest,
+              reconstruction, profile scoring, and explainable artifact output more precisely.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <div class="timeline">
+          <article class="timeline-item">
+            <div class="timeline-meta">
+              <span class="commit-id">adba1f6</span>
+              <span class="timestamp">2026-05-20 02:59 EDT</span>
+              <span class="chip good">web behavior change</span>
+            </div>
+            <p>
+              <strong>fix historical alert flow packet resolution</strong> updated
+              <code>apps/web/app/terminal.tsx</code> and <code>apps/web/app/terminal.test.ts</code>.
+              The patch added <code>getAlertFlowPacketRefs</code> and
+              <code>resolveAlertFlowPacket</code>, then replaced several
+              <code>evidence_refs[0]</code>-based lookups with packet-ref scanning.
+            </p>
+            <div class="file-list">
+              <span class="file-pill">apps/web/app/terminal.tsx</span>
+              <span class="file-pill">apps/web/app/terminal.test.ts</span>
+              <span class="file-pill">docs/turns/2026-05-20-fix-alert-flow-packet-history.html</span>
+            </div>
+          </article>
+
+          <article class="timeline-item">
+            <div class="timeline-meta">
+              <span class="commit-id">fb25b5a</span>
+              <span class="timestamp">2026-05-20 03:09 EDT</span>
+              <span class="chip info">merge on main</span>
+            </div>
+            <p>
+              <strong>Merge pull request 'fix historical alert flow packet resolution' (#6)</strong>
+              landed the terminal fix onto <code>main</code>. The merge body records review on
+              Forgejo pull request <code>#6</code>.
+            </p>
+          </article>
+
+          <article class="timeline-item">
+            <div class="timeline-meta">
+              <span class="commit-id">df9c9f3</span>
+              <span class="timestamp">2026-05-20 21:26 EDT</span>
+              <span class="chip info">repo operations doc</span>
+            </div>
+            <p>
+              <strong>docs: record github-forgejo one-time backfill sync</strong> added
+              <code>docs/turns/2026-05-20-remote-backfill-sync.html</code> and updated
+              <code>.beads/issues.jsonl</code> with the corresponding tracking state.
+            </p>
+            <div class="file-list">
+              <span class="file-pill">docs/turns/2026-05-20-remote-backfill-sync.html</span>
+              <span class="file-pill">.beads/issues.jsonl</span>
+            </div>
+          </article>
+
+          <article class="timeline-item">
+            <div class="timeline-meta">
+              <span class="commit-id">1e2ed3e</span>
+              <span class="timestamp">2026-05-20 21:56 EDT</span>
+              <span class="chip info">docs refresh</span>
+            </div>
+            <p>
+              <strong>refresh readme description with current classification flow</strong> revised
+              the repo overview in <code>README.md</code> and added a current-step explanation for
+              ingest, parent-event reconstruction, feature computation, profile scoring, and emitted
+              artifacts.
+            </p>
+            <div class="file-list">
+              <span class="file-pill">README.md</span>
+              <span class="file-pill">docs/turns/2026-05-20-refresh-readme-github-description.html</span>
+              <span class="file-pill">.beads/issues.jsonl</span>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          This summary only covers commits present in local git history with commit dates on
+          <code>2026-05-20</code>. The functional change and validation details were grounded in the
+          commit diff for <code>adba1f6</code>, the merge metadata for <code>fb25b5a</code>, and the
+          turn documents committed the same day for the remote-sync and README work.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <ul>
+          <li>
+            The alert fix stopped relying on <code>selectedAlert.evidence_refs[0]</code> in several
+            places, including selected alert packet resolution, visible alert prefetching, active
+            pinned packet keys, and classifier-hit-to-alert matching.
+          </li>
+          <li>
+            New tests in <code>apps/web/app/terminal.test.ts</code> explicitly cover alerts whose
+            first evidence ref is not the flow packet, using evidence like
+            <code>smartmoney:single_leg_event:flowpacket:1</code> ahead of
+            <code>flowpacket:1</code>.
+          </li>
+          <li>
+            The remote sync documentation records that GitHub and Forgejo branch parity was checked
+            after a two-way backfill, and it names Beads issue <code>islandflow-xc5</code> in the
+            follow-up section.
+          </li>
+          <li>
+            The README refresh expanded the top-level product description from a shorter bullet list
+            into a more specific current-state explanation of adapters, derived artifacts, and
+            smart-money classification behavior.
+          </li>
+        </ul>
+        <pre><code>Key terminal helpers added on 2026-05-20:
+
+getAlertFlowPacketRefs(alert)
+resolveAlertFlowPacket(alert, packets)
+
+These helpers replaced first-item packet assumptions in the web terminal.</code></pre>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <ul>
+          <li>
+            Historical alert drilldowns in the web terminal should resolve the correct flow packet
+            more reliably when packet refs are not the first evidence entry.
+          </li>
+          <li>
+            Maintainers now have a committed record of the one-time GitHub ↔ Forgejo backfill sync
+            and its parity checks.
+          </li>
+          <li>
+            Readers landing on the repository should get a more accurate picture of the current
+            classification pipeline and user-facing surfaces from the refreshed README.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li>
+            Used <code>git log</code> scoped to <code>2026-05-20</code> to enumerate the day’s four
+            commits.
+          </li>
+          <li>
+            Inspected the functional diff for <code>adba1f6</code> with
+            <code>git show</code>, including the added tests in
+            <code>apps/web/app/terminal.test.ts</code>.
+          </li>
+          <li>
+            Used the committed turn doc for the alert fix to anchor the reported quality gates:
+            <code>bun test apps/web/app/terminal.test.ts</code> passed with 72 tests and
+            <code>bun --cwd=apps/web run build</code> passed on Next.js 16.2.6.
+          </li>
+          <li>
+            Used the committed turn docs for the remote sync and README refresh to anchor their
+            recorded validation steps instead of inferring extra runtime checks.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <div class="chip-row">
+          <span class="chip risk">history-only view</span>
+          <span class="chip risk">no speculation</span>
+        </div>
+        <ul>
+          <li>
+            This summary is intentionally limited to landed git history on <code>2026-05-20</code>;
+            it does not include uncommitted work, private discussion, or work that happened outside
+            this repository.
+          </li>
+          <li>
+            The merge commit duplicates the file changes from <code>adba1f6</code>, so the summary
+            treats them as one landed workstream plus its merge event rather than two separate fixes.
+          </li>
+          <li>
+            The remote sync and README updates are described from their committed docs and diffs, not
+            from re-running the original operational commands.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>
+            No new follow-up issue was created from this summary itself beyond
+            <code>islandflow-hgm</code>, which tracks publishing this standup artifact.
+          </li>
+          <li>
+            Existing follow-up reference from yesterday’s commits: the remote sync turn doc names
+            <code>islandflow-xc5</code>.
+          </li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

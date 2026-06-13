@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Turn Report - 2026-05-15 - Docker workspace lockfile sync</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.5; margin: 2rem auto; max-width: 920px; padding: 0 1rem; }
+    h1, h2 { line-height: 1.25; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    pre { background: #f6f8fa; border-radius: 8px; padding: 0.75rem; overflow-x: auto; }
+    .summary { background: #eef6ff; border: 1px solid #cfe3ff; border-radius: 8px; padding: 0.85rem 1rem; }
+  </style>
+</head>
+<body>
+  <h1>Turn Report: Docker frozen-lockfile build fix</h1>
+  <p><strong>Date/Time:</strong> 2026-05-15 18:53:46 EDT</p>
+
+  <h2>Summary</h2>
+  <div class="summary">
+    Docker build failures were caused by an out-of-sync deployment workspace snapshot at
+    <code>deployment/docker/workspace-root/</code>. I refreshed the snapshot files so Docker builds
+    use current manifest and lock data for <code>bun install --frozen-lockfile</code>.
+  </div>
+
+  <h2>Changes Made</h2>
+  <ul>
+    <li>Created and claimed Beads issue <code>islandflow-xll</code>.</li>
+    <li>Ran <code>bun run sync:docker-workspace</code>.</li>
+    <li>Updated:
+      <ul>
+        <li><code>deployment/docker/workspace-root/package.json</code></li>
+        <li><code>deployment/docker/workspace-root/bun.lock</code></li>
+      </ul>
+    </li>
+    <li>Added this turn report in <code>docs/turns/</code>.</li>
+  </ul>
+
+  <h2>Context</h2>
+  <p>
+    The deployment compose stack uses additional build context named <code>workspace</code>, pointing to
+    <code>deployment/docker/workspace-root</code>. Dockerfiles copy root files from that snapshot instead of directly
+    from repository root. If snapshot files are stale, frozen lockfile installs fail in container builds.
+  </p>
+
+  <h2>Important Implementation Details</h2>
+  <ul>
+    <li>Pre-sync check failed with snapshot drift and missing workspace entries in deployment lock data.</li>
+    <li>Post-sync check passed and reported the deployment snapshot is in sync.</li>
+    <li>This directly addresses the server-side error where frozen lockfile install detected changes.</li>
+  </ul>
+
+  <h2>Validation</h2>
+  <ul>
+    <li>Passed: <code>bun run check:docker-workspace</code> (after sync).</li>
+    <li>Passed: <code>bun install --frozen-lockfile</code> at repo root.</li>
+    <li>Could not run: <code>docker compose -f deployment/docker/docker-compose.yml build candles web</code>
+      because local Docker daemon was unavailable.</li>
+  </ul>
+  <pre>Cannot connect to the Docker daemon at unix:///Users/kell/.orbstack/run/docker.sock. Is the docker daemon running?</pre>
+
+  <h2>Issues, Limitations, and Mitigations</h2>
+  <ul>
+    <li><strong>Limitation:</strong> Full container build validation was not possible in this environment.</li>
+    <li><strong>Mitigation:</strong> Updated the exact snapshot files Docker consumes and verified snapshot consistency with the project check script.</li>
+  </ul>
+
+  <h2>Follow-up Work</h2>
+  <ul>
+    <li>On the deployment host, pull and rebuild target images:</li>
+  </ul>
+  <pre>cd /home/delta/islandflow
+git pull --ff-only
+docker compose -f deployment/docker/docker-compose.yml build candles web ingest-equities</pre>
+  <ul>
+    <li>If this recurs after dependency changes, run and commit:</li>
+  </ul>
+  <pre>bun run sync:docker-workspace
+bun run check:docker-workspace</pre>
+  <ul>
+    <li>Tracking issue: <code>islandflow-xll</code>.</li>
+  </ul>
+</body>
+</html>

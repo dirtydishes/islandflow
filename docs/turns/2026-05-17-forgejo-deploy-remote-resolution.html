@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Turn Report: Forgejo-Aware Deploy Remote Resolution</title>
+    <style>
+      :root {
+        --bg: #f5f7fa;
+        --panel: #ffffff;
+        --text: #1f2d3d;
+        --muted: #5b6b7a;
+        --accent: #0e6ba8;
+        --line: #d7e0ea;
+        --code: #eef3f8;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: linear-gradient(180deg, #f7fafc, #eef3f8);
+        color: var(--text);
+        font: 16px/1.58 "Avenir Next", "Segoe UI", system-ui, sans-serif;
+      }
+      main {
+        max-width: 920px;
+        margin: 36px auto;
+        padding: 0 18px 32px;
+      }
+      article {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 24px;
+      }
+      h1 { margin: 0 0 6px; font-size: 1.8rem; }
+      h2 { margin: 24px 0 10px; color: var(--accent); font-size: 1.15rem; }
+      p { margin: 0 0 10px; }
+      ul { margin: 0 0 12px 20px; }
+      .meta { color: var(--muted); font-size: 0.95rem; margin-bottom: 14px; }
+      code {
+        background: var(--code);
+        border-radius: 6px;
+        padding: 2px 6px;
+        font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+      }
+      pre {
+        margin: 0 0 12px;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--code);
+        overflow-x: auto;
+        font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <article>
+        <h1>Deploy helper now resolves Forgejo/GitHub remotes without hardcoded <code>origin</code></h1>
+        <p class="meta">Date: 2026-05-17 · Issue: islandflow-1ei · Files changed: scripts/deploy.ts</p>
+
+        <h2>Summary</h2>
+        <p>
+          Updated <code>scripts/deploy.ts</code> so deploy operations no longer assume a git remote named <code>origin</code>. The deploy helper now auto-resolves an available remote (Forgejo-aware), uses it consistently across fetch/pull/push and remote checkout updates, and supports explicit override with <code>DEPLOY_GIT_REMOTE</code>.
+        </p>
+
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Added <code>DEPLOY_GIT_REMOTE</code> environment override to force a specific remote when needed.</li>
+          <li>Added local helper functions to discover remotes, inspect branch upstream metadata, and resolve deploy remote candidates.</li>
+          <li>Changed local prechecks from hardcoded <code>git fetch origin</code> / <code>origin/main</code> to resolved remote values.</li>
+          <li>Changed branch publish from hardcoded pushes to remote-aware push commands.</li>
+          <li>Changed remote VPS git update steps from hardcoded <code>origin</code> fetch/pull/track to remote-aware commands.</li>
+          <li>Updated deploy CLI help/environment text and rollout log output to show selected git remote.</li>
+        </ul>
+
+        <h2>Context</h2>
+        <p>
+          The repository now includes <code>forgejo</code> and <code>github</code> remotes and may not define <code>origin</code> at all. Hardcoding <code>origin</code> caused deploy fragility in both local precheck and remote rollout flows.
+        </p>
+
+        <h2>Important Implementation Details</h2>
+        <p>
+          Remote resolution prioritizes explicit operator intent and branch metadata, then falls back to a stable preference order and discovered remotes.
+        </p>
+        <pre><code>candidates = [
+  DEPLOY_GIT_REMOTE,
+  branch.&lt;name&gt;.remote,
+  upstream remote,
+  branch.main.remote,
+  forgejo, origin, github,
+  all discovered remotes
+]</code></pre>
+        <p>
+          The selected remote is then threaded through all deploy git operations to avoid local/remote mismatch from hardcoded remote names.
+        </p>
+
+        <h2>Expected Impact for End-Users</h2>
+        <p>
+          Operators should no longer see deploy failures caused solely by missing <code>origin</code>. Deploy commands should work in mixed Forgejo/GitHub environments with fewer manual fixes and less confusion.
+        </p>
+
+        <h2>Validation</h2>
+        <ul>
+          <li>Ran <code>bun run scripts/deploy.ts --help</code> to verify updated usage and environment output.</li>
+          <li>Ran <code>bun test</code> (232 passing, 0 failing) after code changes.</li>
+          <li>Searched the updated file to verify key <code>origin</code> hardcodes were removed from deploy flow paths.</li>
+        </ul>
+
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>If local and VPS remote naming differ unexpectedly, deploy can still fail during remote git update.</li>
+          <li>Mitigation: <code>DEPLOY_GIT_REMOTE</code> allows explicit remote selection per run.</li>
+          <li>The current change does not rewrite deployment README examples; they may still mention <code>origin</code> in historical/manual sections.</li>
+        </ul>
+
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>Optional: update deployment docs to describe dynamic remote resolution and <code>DEPLOY_GIT_REMOTE</code> usage examples.</li>
+          <li>No additional code follow-up required for the reported deploy.ts Forgejo mismatch.</li>
+        </ul>
+      </article>
+    </main>
+  </body>
+</html>

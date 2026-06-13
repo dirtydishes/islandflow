@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Fix Durable Options History Routing</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: oklch(0.14 0.012 250);
+        --panel: oklch(0.19 0.018 250);
+        --panel-soft: oklch(0.23 0.018 250);
+        --border: oklch(0.44 0.018 250);
+        --text: oklch(0.9 0.018 250);
+        --muted: oklch(0.7 0.028 250);
+        --amber: oklch(0.78 0.14 72);
+        --green: oklch(0.72 0.16 154);
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: IBM Plex Sans, Inter, ui-sans-serif, system-ui, sans-serif;
+        line-height: 1.55;
+      }
+
+      main {
+        width: min(960px, calc(100vw - 40px));
+        margin: 0 auto;
+        padding: 48px 0;
+      }
+
+      header {
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 20px;
+        margin-bottom: 28px;
+      }
+
+      h1,
+      h2 {
+        line-height: 1.1;
+        margin: 0;
+      }
+
+      h1 {
+        font-size: clamp(2rem, 4vw, 3rem);
+        letter-spacing: 0;
+      }
+
+      h2 {
+        margin-top: 30px;
+        font-size: 1rem;
+        color: var(--amber);
+        text-transform: uppercase;
+      }
+
+      p {
+        max-width: 74ch;
+        color: var(--muted);
+      }
+
+      ul {
+        padding-left: 1.2rem;
+      }
+
+      li {
+        margin: 0.45rem 0;
+      }
+
+      code,
+      pre {
+        font-family: IBM Plex Mono, ui-monospace, SFMono-Regular, monospace;
+      }
+
+      pre {
+        overflow-x: auto;
+        padding: 14px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--panel);
+      }
+
+      .summary {
+        padding: 18px;
+        border: 1px solid oklch(0.58 0.08 72);
+        border-radius: 8px;
+        background: oklch(0.21 0.035 72);
+        color: var(--text);
+      }
+
+      .status {
+        display: inline-flex;
+        gap: 8px;
+        align-items: center;
+        padding: 4px 9px;
+        border: 1px solid oklch(0.55 0.11 154);
+        border-radius: 999px;
+        color: var(--green);
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      section {
+        border-top: 1px solid oklch(0.32 0.018 250);
+        padding-top: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <span class="status">Validated</span>
+        <h1>Fix Durable Options History Routing</h1>
+        <p>Turn completed on 2026-05-16 21:59 America/New_York.</p>
+      </header>
+
+      <section>
+        <h2>Summary</h2>
+        <p class="summary">
+          Options tape history now has a durable public route through same-origin deployments. The live Nginx Proxy Manager route was updated to include <code>/history/*</code>, deployment checks now fail when required API paths reach the web app, and the tape UI surfaces older-history load failures instead of leaving the user to infer that only the hot window exists.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Added <code>scripts/check-public-api-routes.ts</code> and the <code>check:public-api-routes</code> package script.</li>
+          <li>Updated <code>scripts/deploy.ts</code> so same-origin API deploy verification probes required public routes.</li>
+          <li>Updated <code>deployment/docker/README.md</code> to include <code>/history/*</code> in same-origin proxy routing and document the Nginx Proxy Manager regex.</li>
+          <li>Added an options tape warning banner for live <code>/history/options</code> load errors.</li>
+          <li>Updated live Nginx Proxy Manager config for <code>flow.deltaisland.io</code> so the public route regex includes <code>history</code>.</li>
+          <li>Created follow-up Beads issue <code>islandflow-qd7</code> for the later <code>api.flow.deltaisland.io</code> migration.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          The API and ClickHouse path already supported older options history, but the public same-origin route sent <code>/history/options</code> to the Next.js app. That made the live tape feel capped at the newest hot-window rows even though durable history existed behind the API.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <p>
+          The deploy smoke check performs GET probes and verifies JSON responses for these same-origin routes:
+        </p>
+        <pre>/prints/options
+/history/options
+/replay/options
+/nbbo/options
+/ws/live</pre>
+        <p>
+          The live proxy matcher is now:
+        </p>
+        <pre>^/(ws|replay|prints|joins|nbbo|dark|flow|candles|history)/</pre>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <p>
+          Users on <code>/tape</code> can scroll beyond the initial options hot window and receive older ClickHouse-backed rows through the same cursor path for Signal and All prints. If public routing regresses, the tape now shows a visible history loading failure.
+        </p>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li>Passed: <code>bun test apps/web/app/terminal.test.ts</code></li>
+          <li>Passed: <code>bun test</code></li>
+          <li>Passed: <code>bun --cwd=apps/web run build</code></li>
+          <li>Passed: <code>bun run check:public-api-routes</code></li>
+          <li>Passed: remote Nginx syntax check after updating the route.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>The long-term API subdomain migration remains separate work. Mitigation: tracked as <code>islandflow-qd7</code>.</li>
+          <li>The Nginx Proxy Manager database and generated proxy host file were both updated because the existing live file had prior generated-file edits. Mitigation: deployment docs now call out the durable advanced-config/API path.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <p>
+          Complete <code>islandflow-qd7</code> to move production API traffic to <code>api.flow.deltaisland.io</code> deliberately, including DNS, proxy behavior, CORS/websocket checks, docs, and deployment verification.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

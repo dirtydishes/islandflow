@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Clarify Repo Turn Documentation Rules</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --paper: #f7f3ec;
+        --ink: #1f211c;
+        --muted: #666b5d;
+        --line: #d8d0c1;
+        --accent: #405f54;
+        --accent-soft: #e4ece5;
+        --code-bg: #eee7db;
+      }
+
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font: 16px/1.62 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      main {
+        max-width: 920px;
+        margin: 0 auto;
+        padding: 48px 28px 72px;
+      }
+
+      header {
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 34px;
+        padding-bottom: 26px;
+      }
+
+      .eyebrow {
+        color: var(--accent);
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        font-size: clamp(2.1rem, 5vw, 4rem);
+        letter-spacing: 0;
+        line-height: 1.02;
+        margin: 10px 0 14px;
+        max-width: 11ch;
+      }
+
+      h2 {
+        color: var(--accent);
+        font-size: 1rem;
+        letter-spacing: 0.04em;
+        margin: 0 0 10px;
+        text-transform: uppercase;
+      }
+
+      p {
+        margin: 0 0 12px;
+        max-width: 72ch;
+      }
+
+      section {
+        border-top: 1px solid var(--line);
+        padding: 22px 0;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 1.25rem;
+      }
+
+      li + li {
+        margin-top: 6px;
+      }
+
+      code {
+        background: var(--code-bg);
+        border-radius: 4px;
+        font: 0.92em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        padding: 0.12rem 0.32rem;
+      }
+
+      pre {
+        background: var(--code-bg);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        overflow-x: auto;
+        padding: 14px;
+      }
+
+      pre code {
+        background: transparent;
+        padding: 0;
+      }
+
+      .summary {
+        color: var(--muted);
+        font-size: 1.08rem;
+      }
+
+      .note {
+        background: var(--accent-soft);
+        border: 1px solid #c7d8cc;
+        border-radius: 6px;
+        padding: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="eyebrow">Turn document · 2026-05-19 08:05 America/New_York</div>
+        <h1>Clarify Repo Turn Documentation Rules</h1>
+        <p class="summary">
+          Updated the repository instructions so Islandflow turn documents are clearly repo-local and styled through <code>impeccable</code>, without inheriting global non-repo computer-task styling.
+        </p>
+      </header>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          The repo <code>AGENTS.md</code> now removes a stray non-repo location rule and explicitly states that <code>impeccable</code> is the styling and layout authority for Islandflow turn documents when available.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Removed the confusing instruction to save non-repo documentation under <code>~/dev/docs/turns/</code>.</li>
+          <li>Clarified that repository turn documents stay in <code>docs/turns/</code>.</li>
+          <li>Updated the format rule to say <code>impeccable</code> handles both structure and styling.</li>
+          <li>Added an explicit guard against applying global non-repo computer-task house styling to this repository's turn documents.</li>
+          <li>Clarified that the fallback standalone HTML path only applies when <code>impeccable</code> is unavailable or blocked by an actual error.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          The global agent instructions now distinguish repository implementation documentation from non-repo computer-task documentation. This repo file needed a small cleanup so it would not reintroduce ambiguity about location or styling.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <p>
+          This was a documentation-only change in <code>AGENTS.md</code>. It changes future agent behavior but does not alter runtime code, tests, deployment scripts, or application behavior.
+        </p>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <pre><code>-## Important: If you are not working inside a git repository, save the document to `~/dev/docs/turns/`
+
+-Use the impeccable skill to structure the document as clean, readable HTML.
++Use the `impeccable` skill to structure and style the document as clean, readable HTML.
++
++For this repository, `impeccable` is the styling and layout authority for turn documents when available. Do not apply global non-repo computer-task house styling to repository turn documents.
+
+-If the impeccable skill is unavailable, still create a well-structured standalone HTML file with:
++If the `impeccable` skill is unavailable or blocked by an actual tool/file error, still create a well-structured standalone HTML file with:</code></pre>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <p>
+          Future Islandflow turns should produce documentation in the repo's <code>docs/turns/</code> folder and let <code>impeccable</code> drive the visual treatment, making repo documentation less likely to inherit global computer-task styling.
+        </p>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li>Reviewed the <code>AGENTS.md</code> diff after patching.</li>
+          <li>Ran <code>git diff --check</code> with no whitespace errors.</li>
+          <li>No application test suite was run because this change only updates repository instructions.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <p class="note">
+          This clarification depends on future agents reading both global and repo instructions. The new wording is intentionally direct about repo scope, location, and styling to reduce that risk.
+        </p>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <p>
+          No follow-up issue is required for this patch. The related Beads task for this documentation cleanup is <code>islandflow-lm6</code>.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

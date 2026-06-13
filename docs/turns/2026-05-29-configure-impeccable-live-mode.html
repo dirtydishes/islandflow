@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Configure Impeccable Live Mode</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --surface: #0b1016;
+        --pane: #111820;
+        --pane-soft: #0d141b;
+        --border: rgba(255, 255, 255, 0.12);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --accent-soft: rgba(245, 166, 35, 0.14);
+        --blue: #4da3ff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at 18% 0%, rgba(245, 166, 35, 0.08), transparent 30rem),
+          linear-gradient(180deg, var(--surface), var(--bg));
+        color: var(--text);
+        font: 16px/1.55 IBM Plex Sans, Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      main {
+        width: min(980px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 48px 0 64px;
+      }
+
+      header {
+        padding-bottom: 24px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      h1,
+      h2,
+      h3 {
+        font-family: IBM Plex Mono, ui-monospace, SFMono-Regular, Menlo, monospace;
+        line-height: 1.15;
+        letter-spacing: 0;
+      }
+
+      h1 {
+        max-width: 760px;
+        margin: 0 0 12px;
+        font-size: clamp(2rem, 4vw, 3.25rem);
+      }
+
+      h2 {
+        margin: 32px 0 12px;
+        color: var(--accent);
+        font-size: 1rem;
+      }
+
+      p {
+        max-width: 75ch;
+        margin: 0 0 14px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 1.2rem;
+      }
+
+      li {
+        margin: 0 0 8px;
+      }
+
+      code,
+      pre {
+        font-family: IBM Plex Mono, ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      pre {
+        overflow: auto;
+        padding: 14px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--pane-soft);
+        color: var(--text);
+      }
+
+      .summary {
+        margin-top: 20px;
+        padding: 16px 18px;
+        border: 1px solid rgba(245, 166, 35, 0.24);
+        border-radius: 12px;
+        background: var(--accent-soft);
+      }
+
+      .meta {
+        color: var(--muted);
+        font-family: IBM Plex Mono, ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.82rem;
+      }
+
+      .section {
+        padding: 2px 0;
+      }
+
+      .note {
+        color: var(--muted);
+      }
+
+      a {
+        color: var(--blue);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="meta">Turn document · 2026-05-29 04:04 EDT · Beads issue islandflow-ep2</p>
+        <h1>Configure Impeccable Live Mode</h1>
+        <div class="summary">
+          <p>Initialized Impeccable live-mode configuration for the Next.js app router so future visual iteration can inject the picker through <code>apps/web/app/layout.tsx</code> without a first-time setup detour.</p>
+        </div>
+      </header>
+
+      <section class="section">
+        <h2>Summary</h2>
+        <p>The repository already had <code>PRODUCT.md</code> and <code>DESIGN.md</code>, so initialization preserved the existing Islandflow design context and added the missing live-mode configuration.</p>
+      </section>
+
+      <section class="section">
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Added <code>.impeccable/live/config.json</code> for a Next.js App Router project.</li>
+          <li>Configured live injection to target <code>apps/web/app/layout.tsx</code> before <code>&lt;/body&gt;</code> using JSX comment syntax.</li>
+          <li>Marked CSP as checked after the detector reported no Content Security Policy to patch.</li>
+          <li>Ignored the local runtime file <code>.impeccable/live/server.json</code>, which is regenerated when the live helper starts.</li>
+          <li>Created and claimed Beads issue <code>islandflow-ep2</code> for the setup work.</li>
+        </ul>
+      </section>
+
+      <section class="section">
+        <h2>Context</h2>
+        <p>The Impeccable setup flow found existing product and design documents. The project register is <code>product</code>, and the UI conventions are already established around a dark evidence-console interface with amber as a sparse action and attention signal.</p>
+      </section>
+
+      <section class="section">
+        <h2>Important Implementation Details</h2>
+        <ul>
+          <li>The app uses the Next.js App Router, so the canonical live target is <code>apps/web/app/layout.tsx</code>.</li>
+          <li>The app shell already loads Quantico, IBM Plex Sans, and IBM Plex Mono, matching the documented Islandflow Terminal design system.</li>
+          <li>CSP detection returned <code>{"shape": null, "signals": []}</code>, so no source-level CSP patch was needed.</li>
+          <li>Running <code>live.mjs</code> creates <code>.impeccable/live/server.json</code> locally and temporarily injects a live script marker into <code>layout.tsx</code>; the source marker was removed after validation because the committed setup should stay configuration-only.</li>
+        </ul>
+      </section>
+
+      <section class="section">
+        <h2>Relevant Diff Snippets</h2>
+        <p class="note"><code>@pierre/diffs</code> could not be run in this environment because the package did not expose a detectable executable, so this section uses a plain labeled diff fallback.</p>
+        <pre><code>diff --git a/.impeccable/live/config.json b/.impeccable/live/config.json
+new file mode 100644
+--- /dev/null
++++ b/.impeccable/live/config.json
+@@
++{
++  "files": ["apps/web/app/layout.tsx"],
++  "insertBefore": "&lt;/body&gt;",
++  "commentSyntax": "jsx",
++  "cspChecked": true
++}
+
+diff --git a/.gitignore b/.gitignore
+@@
+ # Local assistant artifacts
+ session-ses_*.md
+ token-usage-output.txt
++.impeccable/live/server.json</code></pre>
+      </section>
+
+      <section class="section">
+        <h2>Expected Impact for End-Users</h2>
+        <p>This does not change the Islandflow web UI for normal users. It improves the design workflow for contributors by letting <code>$impeccable live</code> start against the existing app shell and preserve the documented product/design identity during visual iteration.</p>
+      </section>
+
+      <section class="section">
+        <h2>Validation</h2>
+        <ul>
+          <li>Ran <code>node .agents/skills/impeccable/scripts/context.mjs</code> and confirmed existing <code>PRODUCT.md</code> and <code>DESIGN.md</code>.</li>
+          <li>Read <code>reference/init.md</code>, <code>reference/product.md</code>, and the live-mode setup guidance.</li>
+          <li>Ran <code>node .agents/skills/impeccable/scripts/detect-csp.mjs</code>; no CSP was detected.</li>
+          <li>Ran <code>node .agents/skills/impeccable/scripts/live.mjs</code>; it returned <code>"ok": true</code>, <code>pageFiles: ["apps/web/app/layout.tsx"]</code>, and <code>configDrift: null</code>.</li>
+          <li>Confirmed and removed the temporary live script injection from <code>apps/web/app/layout.tsx</code> so production source is not coupled to a localhost helper port.</li>
+        </ul>
+      </section>
+
+      <section class="section">
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li><code>@pierre/diffs</code> was unavailable as a runnable CLI, so the documentation includes a plain diff fallback.</li>
+          <li>The live helper was only boot-validated. No interactive browser live session was started because the request was initialization, not variant generation.</li>
+          <li>Future <code>$impeccable live</code> runs may temporarily reinject the localhost script marker while live mode is active; review that diff before committing unrelated UI work.</li>
+          <li>The generated <code>server.json</code> file is intentionally ignored to avoid committing local helper state.</li>
+        </ul>
+      </section>
+
+      <section class="section">
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>Run <code>$impeccable live</code> during the next UI iteration to select elements in the browser and generate on-brand variants.</li>
+          <li>Run <code>$impeccable critique apps/web/app/terminal.tsx</code> if you want a scored review of the main terminal surface.</li>
+          <li>No Beads follow-up issue was created because this task completed the requested initialization.</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

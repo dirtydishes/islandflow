@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Turn Doc: Remote Backfill Sync (GitHub ↔ Forgejo)</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: Inter, system-ui, sans-serif; line-height: 1.5; margin: 2rem auto; max-width: 920px; padding: 0 1rem; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    pre { padding: 0.75rem; border: 1px solid #7774; border-radius: 10px; overflow-x: auto; }
+    h1, h2 { line-height: 1.25; }
+  </style>
+</head>
+<body>
+  <h1>One-Time Bidirectional Remote Backfill Sync</h1>
+  <p><strong>Date:</strong> 2026-05-20 21:25:21 EDT</p>
+
+  <h2>Summary</h2>
+  <p>Executed a one-time two-way backfill between <code>github</code> and <code>forgejo</code>, including older GitHub-only branches and newer Forgejo-only branches, then resolved <code>main</code> divergence by fast-forwarding GitHub <code>main</code> to Forgejo <code>main</code>.</p>
+
+  <h2>Changes Made</h2>
+  <ul>
+    <li>Verified remote configuration and connectivity/auth.</li>
+    <li>Fetched and pruned both remotes with tags.</li>
+    <li>Created safety snapshot: <code>.backups/2026-05-20-remote-backfill-pre-sync.bundle</code>.</li>
+    <li>Computed pre-sync branch/tag differences.</li>
+    <li>Pushed 33 GitHub-only branches to Forgejo.</li>
+    <li>Pushed 9 Forgejo-only branches to GitHub.</li>
+    <li>Detected and resolved <code>main</code> tip mismatch by pushing <code>forgejo/main</code> → <code>github/main</code> (fast-forward).</li>
+    <li>Re-fetched both remotes and validated parity.</li>
+  </ul>
+
+  <h2>Context</h2>
+  <p>The repository transitioned from GitHub to Forgejo and retained historical refs unevenly. This turn backfilled both directions once so both remotes hold equivalent refs and commit history.</p>
+
+  <h2>Important Implementation Details</h2>
+  <p>Key commands used:</p>
+  <pre><code>git remote -v
+git ls-remote --heads github
+git ls-remote --heads forgejo
+
+git fetch github --prune --tags
+git fetch forgejo --prune --tags
+
+git bundle create .backups/2026-05-20-remote-backfill-pre-sync.bundle --all
+
+# computed missing refs using git ls-remote + comm
+
+# GitHub-only branches -> Forgejo
+xargs git push --dry-run forgejo &lt; /tmp/remote-sync/gh-only-to-fj-refspecs.txt
+xargs git push forgejo &lt; /tmp/remote-sync/gh-only-to-fj-refspecs.txt
+
+# Forgejo-only branches -> GitHub
+xargs git push --dry-run github &lt; /tmp/remote-sync/fj-only-to-gh-refspecs.txt
+xargs git push github &lt; /tmp/remote-sync/fj-only-to-gh-refspecs.txt
+
+# main divergence resolution
+git push --dry-run github refs/remotes/forgejo/main:refs/heads/main
+git push github refs/remotes/forgejo/main:refs/heads/main
+
+# final verification
+git fetch github --prune --tags
+git fetch forgejo --prune --tags
+git log --left-right --cherry-pick --oneline github/main...forgejo/main</code></pre>
+
+  <h2>Expected Impact for End-Users</h2>
+  <p>Maintainers can now use either remote with consistent branch/tag availability and matching <code>main</code> history, reducing migration-era confusion and sync drift.</p>
+
+  <h2>Validation</h2>
+  <ul>
+    <li>Pre-sync diff: 33 heads only on GitHub, 9 heads only on Forgejo, 0 tag deltas.</li>
+    <li>Dry-run and real pushes succeeded for missing branches in both directions.</li>
+    <li>Post-sync: 0 heads only on either remote, 0 tags only on either remote.</li>
+    <li>Post-resolution: 0 common branches with mismatched tip SHAs.</li>
+    <li><code>github/main...forgejo/main</code> produced no divergence output after sync.</li>
+  </ul>
+
+  <h2>Issues, Limitations, and Mitigations</h2>
+  <ul>
+    <li>Initial all-branches dry-run from GitHub to Forgejo showed non-fast-forward rejection for <code>main</code>; mitigated by explicit direction-aware push (<code>forgejo/main</code> to <code>github/main</code>) after ancestry check.</li>
+    <li>Backfill included system-like branch <code>__dolt_remote_info__</code> from Forgejo to GitHub; retained intentionally for parity.</li>
+  </ul>
+
+  <h2>Follow-up Work</h2>
+  <ul>
+    <li>No immediate follow-up required.</li>
+    <li>If branch hygiene is desired, create cleanup issues for stale historical branches now mirrored on both remotes.</li>
+    <li>Beads issue: <code>islandflow-xc5</code>.</li>
+  </ul>
+</body>
+</html>

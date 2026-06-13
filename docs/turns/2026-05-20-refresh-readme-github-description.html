@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>README GitHub Description Refresh</title>
+    <style>
+      :root {
+        --bg: #0f1220;
+        --panel: #171b2f;
+        --panel-2: #1f2540;
+        --text: #e8ecff;
+        --muted: #b8c0e8;
+        --line: #2f3763;
+        --accent: #9eb1ff;
+        --accent-2: #f2a8d6;
+      }
+
+      body {
+        margin: 0;
+        background: radial-gradient(1200px 600px at 20% -10%, #202a52 0%, var(--bg) 60%);
+        color: var(--text);
+        font-family: "IBM Plex Sans", Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+        line-height: 1.6;
+      }
+
+      main {
+        width: min(980px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 44px 0 64px;
+      }
+
+      header {
+        margin-bottom: 24px;
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      h1, h2, code, pre {
+        font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      h1 {
+        margin: 8px 0 10px;
+        font-size: clamp(1.8rem, 3.8vw, 2.8rem);
+      }
+
+      h2 {
+        margin: 0 0 10px;
+        color: var(--accent);
+        font-size: 1rem;
+      }
+
+      .meta {
+        color: var(--accent-2);
+        font-size: 0.82rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      section {
+        background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 20px;
+        margin: 14px 0;
+      }
+
+      p {
+        margin: 0 0 10px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 22px;
+      }
+
+      li + li {
+        margin-top: 6px;
+      }
+
+      code {
+        background: #0f1327;
+        border: 1px solid #303a68;
+        border-radius: 5px;
+        padding: 0.12rem 0.32rem;
+        color: #ffd7ec;
+      }
+
+      pre {
+        margin: 10px 0 0;
+        padding: 14px;
+        overflow-x: auto;
+        background: #0c1022;
+        border: 1px solid #303a68;
+        border-radius: 8px;
+        color: #dfe5ff;
+      }
+
+      pre code {
+        background: transparent;
+        border: 0;
+        padding: 0;
+        color: inherit;
+      }
+
+      a {
+        color: #c8d4ff;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="meta">Turn document · 2026-05-20 America/New_York</div>
+        <h1>README GitHub Description Refresh</h1>
+        <p>
+          Updated the repository README description so GitHub visitors get an accurate current-state view of Islandflow, including a concise explanation of how print classification works today.
+        </p>
+      </header>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          Refined the README overview and added a new section describing the live classification pipeline: ingest, parent-event reconstruction, evidence feature extraction, multi-profile scoring, and explainable output artifacts.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Kept the heading image untouched at the top of <code>README.md</code>.</li>
+          <li>Rewrote the opening capability bullets to match current architecture and app surfaces.</li>
+          <li>Added a short current-state paragraph describing the event-sourced intelligence flow across NATS/JetStream and ClickHouse.</li>
+          <li>Added <code>How Print Classification Works (Current Approach)</code>, aligned to <code>smartmoney.md</code> and current compute behavior.</li>
+          <li>Documented key behavior: abstention, suppression guards, and compatibility surfaces.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          The prior README already contained significant platform detail but needed a more GitHub-friendly “what this app is now” description and a direct explanation of print classification logic, especially the taxonomy-first approach instead of a binary smart-money label.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <ul>
+          <li>Classification language intentionally tracks the current compute path and event types: <code>FlowPacket</code>, <code>SmartMoneyEvent</code>, <code>ClassifierHitEvent</code>, and <code>AlertEvent</code>.</li>
+          <li>The new section references <code>smartmoney.md</code> for conceptual grounding while staying concise enough for README readers.</li>
+          <li>No API contracts or runtime logic changed; this is a documentation-only update.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p>
+          Snippets below follow standard unified diff formatting as used by tools such as <a href="https://diffs.com/docs">diffs.com</a>.
+        </p>
+        <pre><code class="language-diff">- Islandflow is a Bun + TypeScript monorepo for a personal-use, event-sourced market microstructure research platform focused on:
+- - options prints + NBBO,
+- - off-exchange equity prints,
+- - market news context,
+- - explainable smart-money flow classification,
++ Islandflow is a Bun + TypeScript monorepo for a personal-use, event-sourced market microstructure research platform focused on:
++ - multi-source options/equities/news ingest (synthetic + live adapters),
++ - deterministic parent-event reconstruction over prints, quotes, and NBBO,
++ - explainable participant-style flow classification (not a single binary "smart money" flag),
++ - real-time + historical + replay delivery over REST and WebSocket,</code></pre>
+        <pre><code class="language-diff">+ ## How Print Classification Works (Current Approach)
++
++ Islandflow follows the same high-level philosophy captured in [smartmoney.md]:
++ the tape is informative but noisy, and a useful classifier should model multiple
++ participant-style hypotheses instead of forcing every print into one bucket.
++
++ 1. Ingest + normalize
++ 2. Reconstruct parent events
++ 3. Compute evidence features
++ 4. Score profile hypotheses
++ 5. Emit explainable artifacts</code></pre>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <p>
+          GitHub readers should understand Islandflow’s current value faster: what the app does, how data flows through the system, and why classification output is multi-profile and evidence-based rather than a simplistic label.
+        </p>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li>Reviewed patch with <code>git diff -- README.md</code>.</li>
+          <li>Ran <code>git diff --check</code>; no whitespace or patch format issues.</li>
+          <li>Verified the heading image line remained present and unchanged at the top of the README.</li>
+          <li>No runtime/tests were required because only documentation changed.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>README still summarizes classification behavior at a high level; detailed methodology remains in <code>smartmoney.md</code> and compute source.</li>
+          <li>Because this is docs-only, there is no direct behavioral verification beyond content accuracy checks against current code paths.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>Add a compact architecture diagram in README linking services to public API channels.</li>
+          <li>Add a short “classification caveats” subsection for expected false-positive classes.</li>
+          <li>Consider adding a dedicated docs page that maps each profile ID to real payload fields and UI representation.</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

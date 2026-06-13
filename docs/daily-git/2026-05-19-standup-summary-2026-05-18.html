@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Daily Git Summary for 2026-05-18 (Merged View)</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #111820;
+        --panel-2: #0d141b;
+        --border: rgba(255, 255, 255, 0.09);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --accent-soft: rgba(245, 166, 35, 0.14);
+        --blue: #4da3ff;
+        --blue-soft: rgba(77, 163, 255, 0.14);
+        --green: #25c17a;
+        --green-soft: rgba(37, 193, 122, 0.14);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at top right, rgba(245, 166, 35, 0.1), transparent 24%),
+          linear-gradient(180deg, #091018 0%, var(--bg) 30%, #05070a 100%);
+        color: var(--text);
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+        line-height: 1.58;
+      }
+
+      main {
+        width: min(1120px, calc(100% - 36px));
+        margin: 28px auto 48px;
+      }
+
+      .hero,
+      section {
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        background: linear-gradient(180deg, rgba(17, 24, 32, 0.95), rgba(13, 20, 27, 0.98));
+      }
+
+      .hero {
+        padding: 28px;
+        box-shadow: 0 22px 56px rgba(0, 0, 0, 0.34);
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        font-family: "Quantico", "Segoe UI", sans-serif;
+        letter-spacing: 0.04em;
+      }
+
+      h1 {
+        margin-top: 14px;
+        font-size: clamp(1.9rem, 3.3vw, 2.7rem);
+      }
+
+      h2 {
+        font-size: 1.2rem;
+        margin-bottom: 14px;
+      }
+
+      h3 {
+        font-size: 1rem;
+      }
+
+      p {
+        margin: 0;
+        color: var(--muted);
+        max-width: 86ch;
+      }
+
+      section {
+        margin-top: 14px;
+        padding: 22px;
+      }
+
+      .eyebrow,
+      .pill,
+      .commit,
+      .time,
+      .label {
+        font-family: "IBM Plex Mono", monospace;
+      }
+
+      .eyebrow {
+        display: inline-block;
+        padding: 6px 10px;
+        border-radius: 999px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        font-size: 12px;
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      .meta {
+        margin-top: 20px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+      }
+
+      .meta-card {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.03);
+        padding: 12px 14px;
+      }
+
+      .label {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--text);
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        font-size: 0.74rem;
+      }
+
+      .metric {
+        color: var(--text);
+        font-weight: 700;
+        font-size: 1.45rem;
+      }
+
+      .cards,
+      .impact-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 10px;
+      }
+
+      .card {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.025);
+        padding: 14px;
+      }
+
+      .card.feature {
+        border-color: rgba(37, 193, 122, 0.28);
+        background: linear-gradient(180deg, rgba(37, 193, 122, 0.1), rgba(255, 255, 255, 0.02));
+      }
+
+      .card.ops {
+        border-color: rgba(77, 163, 255, 0.28);
+        background: linear-gradient(180deg, rgba(77, 163, 255, 0.1), rgba(255, 255, 255, 0.02));
+      }
+
+      .timeline {
+        display: grid;
+        gap: 11px;
+      }
+
+      .entry {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.022);
+        padding: 14px;
+      }
+
+      .entry-head {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 12px;
+        align-items: baseline;
+        margin-bottom: 7px;
+      }
+
+      .commit {
+        color: var(--blue);
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.08em;
+      }
+
+      .time {
+        color: var(--faint);
+        text-transform: uppercase;
+        font-size: 0.74rem;
+        letter-spacing: 0.08em;
+      }
+
+      .pill {
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 5px 8px;
+        background: rgba(255, 255, 255, 0.04);
+        font-size: 0.72rem;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 19px;
+        color: var(--muted);
+      }
+
+      li + li {
+        margin-top: 8px;
+      }
+
+      pre {
+        margin: 10px 0 0;
+        padding: 12px;
+        overflow-x: auto;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+        background: rgba(6, 8, 11, 0.9);
+        color: #d7e2ec;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.79rem;
+      }
+
+      code {
+        font-family: "IBM Plex Mono", monospace;
+      }
+
+      @media (max-width: 720px) {
+        main {
+          width: min(100%, calc(100% - 20px));
+          margin: 18px auto 30px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="hero">
+        <span class="eyebrow">Daily Git Summary</span>
+        <h1>Standup summary for Monday, May 18, 2026 (after merge)</h1>
+        <p>
+          This regenerated report uses merged history for the full May 18 local-day window
+          (<code>2026-05-18 00:00 -0400</code> through <code>2026-05-19 00:00 -0400</code>). It now includes eight commits,
+          including native deployment work and the merge commit that landed that line of work on <code>main</code>.
+        </p>
+        <div class="meta">
+          <div class="meta-card">
+            <span class="label">Commits</span>
+            <div class="metric">8</div>
+          </div>
+          <div class="meta-card">
+            <span class="label">Unique Files</span>
+            <div class="metric">68</div>
+          </div>
+          <div class="meta-card">
+            <span class="label">Insertions</span>
+            <div class="metric">4244</div>
+          </div>
+          <div class="meta-card">
+            <span class="label">Deletions</span>
+            <div class="metric">194</div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Summary</h2>
+        <div class="cards">
+          <div class="card feature">
+            <span class="label">User-facing delivery</span>
+            <p>
+              Commit <code>906fe411</code> added Alpaca news wire support across ingest, storage, API, and web terminal/news
+              route surfaces.
+            </p>
+          </div>
+          <div class="card ops">
+            <span class="label">Platform and deployment delivery</span>
+            <p>
+              Commits <code>d589858c</code> and <code>bdb9d9a9</code> added native deployment workflow, infra/user units,
+              cutover, rollback, and health-check scripts, then merged via <code>8f0794dd</code> (PR #2).
+            </p>
+          </div>
+          <div class="card">
+            <span class="label">Workflow and docs updates</span>
+            <p>
+              Commits <code>687a2170</code>, <code>62aae708</code>, <code>48095fce</code>, and <code>04baeceb</code> updated
+              beads/docs instructions and added turn/standup documentation.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <div class="timeline">
+          <article class="entry">
+            <div class="entry-head">
+              <strong>update beads</strong>
+              <span class="commit">687a2170</span>
+              <span class="time">2026-05-18 03:15 -0400</span>
+              <span class="pill">1 file</span>
+            </div>
+            <p>Touched <code>deployment/docker/workspace-root/package.json</code> with one-line change.</p>
+          </article>
+
+          <article class="entry">
+            <div class="entry-head">
+              <strong>Implement native fast iterative deploy workflow</strong>
+              <span class="commit">d589858c</span>
+              <span class="time">2026-05-18 03:34 -0400</span>
+              <span class="pill">17 files</span>
+              <span class="pill">+873 / -110</span>
+            </div>
+            <ul>
+              <li>Expanded <code>scripts/deploy.ts</code> for native deploy runtime behavior.</li>
+              <li>Added native user-unit templates and rollback/health tooling in <code>deployment/native/</code>.</li>
+              <li>Added associated plan and turn documents in <code>docs/plans</code> and <code>docs/turns</code>.</li>
+            </ul>
+          </article>
+
+          <article class="entry">
+            <div class="entry-head">
+              <strong>fix(api): remove duplicate alert context import</strong>
+              <span class="commit">48095fce</span>
+              <span class="time">2026-05-18 09:04 -0400</span>
+              <span class="pill">2 files</span>
+            </div>
+            <p>Removed duplicate import in <code>services/api/src/index.ts</code> and added a turn doc.</p>
+          </article>
+
+          <article class="entry">
+            <div class="entry-head">
+              <strong>docs(general): add 2026-05-17 standup summary</strong>
+              <span class="commit">62aae708</span>
+              <span class="time">2026-05-18 09:05 -0400</span>
+              <span class="pill">2 files</span>
+            </div>
+            <p>Added <code>docs/general/2026-05-18-standup-summary-2026-05-17.html</code> and updated beads state.</p>
+          </article>
+
+          <article class="entry">
+            <div class="entry-head">
+              <strong>add alpaca news wire across ingest api and web</strong>
+              <span class="commit">906fe411</span>
+              <span class="time">2026-05-18 16:55 -0400</span>
+              <span class="pill">31 files</span>
+              <span class="pill">+1407 / -50</span>
+            </div>
+            <ul>
+              <li>Created <code>services/ingest-news</code> and wired Alpaca backfill/websocket ingestion.</li>
+              <li>Added news types/storage contracts in <code>packages/types</code> and <code>packages/storage</code>.</li>
+              <li>Extended API live/history endpoints and web terminal/news route rendering.</li>
+            </ul>
+          </article>
+
+          <article class="entry">
+            <div class="entry-head">
+              <strong>Implement native public edge cutover</strong>
+              <span class="commit">bdb9d9a9</span>
+              <span class="time">2026-05-18 19:55 -0400</span>
+              <span class="pill">29 files</span>
+              <span class="pill">+1215 / -31</span>
+            </div>
+            <ul>
+              <li>Added native infra system units and scripts for bootstrap/start/stop/cutover/full rollback.</li>
+              <li>Updated deploy docs and runtime config files under <code>deployment/native/config</code>.</li>
+              <li>Added turn doc <code>docs/turns/2026-05-18-native-public-edge-cutover.html</code>.</li>
+            </ul>
+          </article>
+
+          <article class="entry">
+            <div class="entry-head">
+              <strong>Merge pull request 'Native public edge cutover with Docker rollback path' (#2)</strong>
+              <span class="commit">8f0794dd</span>
+              <span class="time">2026-05-19 00:09 +0000</span>
+              <span class="pill">merge commit</span>
+            </div>
+            <p>Merged <code>native-deploy</code> into <code>main</code> within the May 18 US/Eastern day window.</p>
+          </article>
+
+          <article class="entry">
+            <div class="entry-head">
+              <strong>update turn docs and beads workflow</strong>
+              <span class="commit">04baeceb</span>
+              <span class="time">2026-05-18 21:32 -0400</span>
+              <span class="pill">1 file</span>
+            </div>
+            <p>Updated repository-level instructions in <code>AGENTS.md</code>.</p>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          The earlier report was generated before merged history included the native deployment branch on <code>main</code>.
+          This recreation uses <code>git log --all</code> over the same date window, so it captures both feature work and
+          merged operational/deployment work visible after PR merge.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <div class="cards">
+          <div class="card">
+            <h3>News wire ingestion and delivery path</h3>
+            <p>
+              The news pipeline added a new ingest service and API fanout channel, then exposed UI surfaces in
+              <code>/news</code> and terminal panes.
+            </p>
+            <pre><code>if (features.news) {
+  subscriptions.push({ channel: "news", snapshot_limit: LIVE_OPTIONS_HEAD_LIMIT });
+}</code></pre>
+          </div>
+          <div class="card">
+            <h3>Native deployment hardening</h3>
+            <p>
+              Deployment scripts and unit templates now include direct scripts for cutover and rollback, with infra and
+              service checks under <code>deployment/native/</code>.
+            </p>
+            <pre><code>deployment/native/cutover.sh
+deployment/native/full-rollback.sh
+deployment/native/install-infra-units.sh</code></pre>
+          </div>
+          <div class="card">
+            <h3>Merged history effect on standup scope</h3>
+            <p>
+              The merged view increased the standup scope from 4 to 8 commits and from 35 to 68 unique files touched for the
+              same local-day window.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <div class="impact-cards">
+          <div class="card">
+            <span class="label">Trading UI users</span>
+            <p>Live news wire data is now available in terminal surfaces alongside existing market/event feeds.</p>
+          </div>
+          <div class="card">
+            <span class="label">Operators</span>
+            <p>Native deployment and rollback procedures now have first-class scripted and documented paths.</p>
+          </div>
+          <div class="card">
+            <span class="label">Team reporting</span>
+            <p>This standup report now matches merged repository history instead of pre-merge branch-local history.</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li>Used <code>git fetch --all --prune</code> before recomputing history.</li>
+          <li>Used <code>git log --all</code> over the May 18 ET window to include merged commits.</li>
+          <li>Used <code>git log --stat --summary</code> and <code>--numstat</code> to ground file and line-count statements.</li>
+          <li>No build/test commands were run because this task only regenerates reporting documentation.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>This report describes commit history only and does not infer intent beyond commit messages and touched files.</li>
+          <li>Commit <code>8f0794dd</code> is timestamped in UTC; it still falls on May 18 in US/Eastern, so it is included.</li>
+          <li>Metrics are based on local git history at regeneration time and can change if additional backdated commits appear.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>This regeneration is tracked by beads issue <code>islandflow-0ty</code>.</li>
+          <li>No additional follow-up work was identified during this documentation-only task.</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

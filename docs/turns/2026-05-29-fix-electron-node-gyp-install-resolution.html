@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CI Dependency Resolution Fix</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        margin: 0;
+        padding: 24px;
+        line-height: 1.45;
+        color: #111;
+        background: #fff;
+      }
+      h1,
+      h2,
+      h3 {
+        margin-top: 1.2em;
+      }
+      section {
+        margin-bottom: 1.4em;
+      }
+      .stack {
+        background: #f6f8fa;
+        padding: 12px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        overflow: auto;
+      }
+      code,
+      pre {
+        font-family: ui-monospace, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      }
+      a {
+        color: #0b57d0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>CI Dependency Resolution Fix</h1>
+
+    <section>
+      <h2>Summary</h2>
+      <p>
+        I fixed the failing Forgejo CI install by removing the GitHub git-commit dependency on
+        <code>@electron/node-gyp</code> from lock resolution and forcing it through the npm package
+        <code>@electron/node-gyp@^10.2.0-electron.2</code> via repository overrides.
+      </p>
+    </section>
+
+    <section>
+      <h2>Changes Made</h2>
+      <ul>
+        <li>
+          Added an override in <a href="/Users/kell/dev/islandflow/package.json:35">package.json</a>:
+          <code>@electron/node-gyp: ^10.2.0-electron.2</code>.
+        </li>
+        <li>
+          Synchronized lock files so both roots resolve from the npm package instead of the
+          short GitHub tarball ref:
+          <a href="/Users/kell/dev/islandflow/bun.lock:172">bun.lock</a> and
+          <a href="/Users/kell/dev/islandflow/deployment/docker/workspace-root/bun.lock:172">deployment/docker/workspace-root/bun.lock</a>.
+        </li>
+        <li>
+          Updated mirrored workspace package manifest:
+          <a href="/Users/kell/dev/islandflow/deployment/docker/workspace-root/package.json:35">deployment/docker/workspace-root/package.json</a>.
+        </li>
+        <li>
+          Re-synced docker workspace files using <code>bun run sync:docker-workspace</code>.
+        </li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Context</h2>
+      <p>
+        CI was failing in dependency install with this error:
+      </p>
+      <pre class="stack">error: failed to download @electron/node-gyp@github:electron/node-gyp#06b29aa ... 404 Not Found</pre>
+      <p>
+        In this environment, that endpoint is interpreted by the Forgejo git proxy and the
+        short SHA is resolved against an unavailable internal mirror path. For a CI runner, this is
+        a fragile install path.
+      </p>
+    </section>
+
+    <section>
+      <h2>Important Implementation Details</h2>
+      <ul>
+        <li>
+          Using an override keeps all transitive graph consumers of <code>@electron/node-gyp</code>
+          on the same npm release and avoids GitHub tarball URL resolution entirely.
+        </li>
+        <li>
+          The lockfile entry moved from a git URL spec to
+          <code>@electron/node-gyp@10.2.0-electron.2</code> with a resolved tarball checksum entry,
+          which is stable in CI contexts.
+        </li>
+        <li>
+          The Docker workspace copy was updated to avoid drift between root and
+          deployment lock snapshots.
+        </li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Relevant Diff Snippets</h2>
+      <pre class="stack"><code>diff --git a/package.json b/package.json
+@@
+   "overrides": {
+     "postcss": "^8.5.15",
+     "tar": "^7.5.15",
+-    "tmp": "^0.2.5"
++    "tmp": "^0.2.5",
++    "@electron/node-gyp": "^10.2.0-electron.2"
+   },
+@@
+ diff --git a/deployment/docker/workspace-root/package.json b/deployment/docker/workspace-root/package.json
+@@
+   "overrides": {
+     "postcss": "^8.5.15",
+     "tar": "^7.5.15",
+-    "tmp": "^0.2.5"
++    "tmp": "^0.2.5",
++    "@electron/node-gyp": "^10.2.0-electron.2"
+   },
+@@
+ diff --git a/bun.lock b/bun.lock
+@@
+-    "@electron/node-gyp": ["@electron/node-gyp@github:electron/node-gyp#06b29aa", { "dependencies": { "env-paths": "^2.2.0", "exponential-backoff": "^3.1.1", "glob": "^8.1.0", "graceful-fs": "^4.2.6", "make-fetch-happen": "^10.2.1", "nopt": "^6.0.0", "proc-log": "^2.0.1", "semver": "^7.3.5", "tar": "^6.2.1", "which": "^2.0.2" }, "bin": "./bin/node-gyp.js" }, "electron-node-gyp-06b29aa"],
++    "@electron/node-gyp": ["@electron/node-gyp@10.2.0-electron.2", "", { "dependencies": { "env-paths": "^2.2.0", "exponential-backoff": "^3.1.1", "glob": "^8.1.0", "graceful-fs": "^4.2.6", "make-fetch-happen": "^10.2.1", "nopt": "^6.0.0", "proc-log": "^2.0.1", "semver": "^7.3.5", "tar": "^6.2.1", "which": "^2.0.2" }, "bin": { "node-gyp": "bin/node-gyp.js" } }, "sha512-OhO6fwqpetMO1vWI3+J8mb3a4s4A405tgKoUCJsgd4nyQDdFh0VvZm+gj/Cc70iRLQoIYUfSaAgYSVwmLsQHig=="],
+@@
+ diff --git a/deployment/docker/workspace-root/bun.lock b/deployment/docker/workspace-root/bun.lock
+@@
+-    "@electron/node-gyp": ["@electron/node-gyp@github:electron/node-gyp#06b29aa", { "dependencies": { "env-paths": "^2.2.0", "exponential-backoff": "^3.1.1", "glob": "^8.1.0", "graceful-fs": "^4.2.6", "make-fetch-happen": "^10.2.1", "nopt": "^6.0.0", "proc-log": "^2.0.1", "semver": "^7.3.5", "tar": "^6.2.1", "which": "^2.0.2" }, "bin": "./bin/node-gyp.js" }, "electron-node-gyp-06b29aa"],
++    "@electron/node-gyp": ["@electron/node-gyp@10.2.0-electron.2", "", { "dependencies": { "env-paths": "^2.2.0", "exponential-backoff": "^3.1.1", "glob": "^8.1.0", "graceful-fs": "^4.2.6", "make-fetch-happen": "^10.2.1", "nopt": "^6.0.0", "proc-log": "^2.0.1", "semver": "^7.3.5", "tar": "^6.2.1", "which": "^2.0.2" }, "bin": { "node-gyp": "bin/node-gyp.js" } }, "sha512-OhO6fwqpetMO1vWI3+J8mb3a4s4A405tgKoUCJsgd4nyQDdFh0VvZm+gj/Cc70iRLQoIYUfSaAgYSVwmLsQHig=="],
+</code></pre>
+      <p>
+        Note: For this repository-required documentation rule, lockfile snippets were summarized
+        directly because rendered <code>@pierre/diffs</code> output is very verbose with embedded
+        style payloads for each file block.
+      </p>
+    </section>
+
+    <section>
+      <h2>Expected Impact for End-Users</h2>
+      <ul>
+        <li>Forgejo CI installs should no longer fail on unresolved <code>@electron/node-gyp</code> GitHub commit tarball lookups.</li>
+        <li>Dependency install becomes deterministic using a versioned npm package artifact.</li>
+        <li>Docker workspace and root lockfiles remain in sync.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Validation</h2>
+      <ul>
+        <li><code>bun install</code> (lock refresh after override)</li>
+        <li><code>bun install --frozen-lockfile</code></li>
+        <li><code>bun run typecheck</code></li>
+        <li><code>bun run check:docker-workspace</code></li>
+        <li><code>bun test</code></li>
+        <li><code>bun --cwd=apps/web run build</code></li>
+      </ul>
+      <p>All checks completed successfully.</p>
+    </section>
+
+    <section>
+      <h2>Issues, Limitations, and Mitigations</h2>
+      <ul>
+        <li>
+          The transitive package <code>@electron/rebuild</code> still references the same GitHub commit in its
+          dependency metadata, but override forces resolution to the npm package, which is now what the lock
+          consumes in this repo.
+        </li>
+        <li>
+          If another service writes lockfile with a different package-manager behavior, a re-sync is required.
+          We already captured this in the workflow by syncing the docker workspace copy.
+        </li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Follow-up Work</h2>
+      <ul>
+        <li>Watch one CI run on Forgejo to confirm the endpoint that caused 404 is fully gone.</li>
+        <li>Consider a small dependency bump for <code>@electron/rebuild</code> if it later publishes a lockfile-safe package-only variant.</li>
+        <li>Pin lockfile sync as a required step in any scripted dependency maintenance path.</li>
+      </ul>
+    </section>
+  </body>
+</html>
