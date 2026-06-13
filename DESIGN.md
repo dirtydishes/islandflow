@@ -108,7 +108,7 @@ This system explicitly rejects the anti-references in PRODUCT.md: no meme-stock 
 - Accent color treated as scarce signal.
 - Monospace-assisted precision for time, numeric, and status data.
 - Readability preserved during bursty live updates.
-- Route-specific signatures: Dashboard is Market Command, Options is OPRA Intake, News is Wire Control.
+- Route-specific signatures: Dashboard is Market Command, Options is OPRA Intake, News is Newswire.
 - Flat terminal sections: border-block dividers and compact headers are the default; rounded cards are not.
 
 ## Colors
@@ -203,7 +203,7 @@ The system is flat by default. Depth is primarily tonal (background and border d
 
 - **Dashboard / Market Command:** command metrics, priority board, decision levels, chart context, source health, recent contracts, replay state, and evidence context in one dense operating board.
 - **Options / OPRA Intake:** production `OptionsPane` and `FlowPane` remain the source of truth, with TanStack virtual rows, contract focus, scroll gates, and filters tuned for option decision work.
-- **News / Wire Control:** virtualized wire rows, source rails, symbol rails, live-only state, older-history scroll gates, and the existing news drawer.
+- **News / Newswire:** virtualized wire rows, source rails, symbol rails, live-only state, older-history scroll gates, and the existing news drawer.
 
 ### Inputs / Fields
 

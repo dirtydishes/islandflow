@@ -41,6 +41,7 @@ const {
   composeTapeItems,
   deriveAlertDirection,
   countActiveFlowFilterGroups,
+  decodeNewsText,
   filterOptionTapeItems,
   findAnchorRestoreIndex,
   formatCompactUsd,
@@ -559,6 +560,20 @@ describe("fixed tape virtualization config", () => {
       overscan: 28,
       debugLabel: "news"
     });
+  });
+});
+
+describe("news text formatting", () => {
+  it("decodes common html entities in provider text", () => {
+    expect(
+      decodeNewsText(
+        "Palantir CEO Alex Karp Is &#39;Rooting For Elon&#39; &amp; Clients &#x27;Screaming&#x27;"
+      )
+    ).toBe("Palantir CEO Alex Karp Is 'Rooting For Elon' & Clients 'Screaming'");
+  });
+
+  it("leaves unknown entities untouched", () => {
+    expect(decodeNewsText("Keep &market; literal")).toBe("Keep &market; literal");
   });
 });
 

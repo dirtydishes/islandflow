@@ -1277,15 +1277,45 @@ export const formatNewsTimestamp = (ts: number, now = Date.now()): string => {
       });
 };
 
+const NEWS_TEXT_ENTITIES: Record<string, string> = {
+  amp: "&",
+  apos: "'",
+  gt: ">",
+  lt: "<",
+  nbsp: " ",
+  quot: '"'
+};
+
+export const decodeNewsText = (value: string): string =>
+  value.replace(/&(#\d+|#x[\da-f]+|[a-z][\da-z]+);/gi, (match, entity: string) => {
+    if (entity[0] === "#") {
+      const radix = entity[1]?.toLowerCase() === "x" ? 16 : 10;
+      const rawCodePoint = radix === 16 ? entity.slice(2) : entity.slice(1);
+      const codePoint = Number.parseInt(rawCodePoint, radix);
+      if (!Number.isFinite(codePoint)) {
+        return match;
+      }
+      try {
+        return String.fromCodePoint(codePoint);
+      } catch {
+        return match;
+      }
+    }
+
+    return NEWS_TEXT_ENTITIES[entity.toLowerCase()] ?? match;
+  });
+
 const sanitizeNewsHtml = (
   value: string
 ): { html: string; fallbackText: string; sanitized: boolean } => {
-  const fallbackText = value
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  const fallbackText = decodeNewsText(
+    value
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+  );
 
   try {
     const sanitized = value
@@ -5017,13 +5047,15 @@ type NewsDrawerProps = {
 
 const NewsDrawer = ({ story, onClose }: NewsDrawerProps) => {
   const body = sanitizeNewsHtml(story.content_html);
+  const headline = decodeNewsText(story.headline);
+  const summary = decodeNewsText(story.summary);
 
   return (
     <aside className="drawer">
       <div className="drawer-header">
         <div>
           <p className="drawer-eyebrow">News wire</p>
-          <h3>{story.headline}</h3>
+          <h3>{headline}</h3>
           <p className="drawer-subtitle">
             {story.source} · Published {formatDateTime(story.published_ts)}
             {story.updated_ts !== story.published_ts
@@ -5045,10 +5077,10 @@ const NewsDrawer = ({ story, onClose }: NewsDrawerProps) => {
         <span className="drawer-chip">{story.symbol_resolution}</span>
       </div>
 
-      {story.summary ? (
+      {summary ? (
         <div className="drawer-section">
           <h4>Summary</h4>
-          <p className="drawer-note">{story.summary}</p>
+          <p className="drawer-note">{summary}</p>
         </div>
       ) : null}
 
@@ -8413,6 +8445,8 @@ const NewsPane = memo(({ state, limit, className }: NewsPaneProps) => {
                 >
                   {virtual.virtualItems.map(({ item: story, key, index, start, size }) => {
                     const wireStatus = getNewsWireStatus(story);
+                    const headline = decodeNewsText(story.headline);
+                    const summary = decodeNewsText(story.summary || story.provider);
                     return (
                       <button
                         className={`data-table-row data-table-row-button data-table-row-news data-table-virtual-row${index % 2 === 1 ? " is-even" : ""} news-wire-row-${wireStatus}`}
@@ -8435,10 +8469,8 @@ const NewsPane = memo(({ state, limit, className }: NewsPaneProps) => {
                             {wireStatus}
                           </span>
                         </span>
-                        <span className="data-table-cell news-headline-cell">{story.headline}</span>
-                        <span className="data-table-cell news-summary-cell">
-                          {story.summary || story.provider}
-                        </span>
+                        <span className="data-table-cell news-headline-cell">{headline}</span>
+                        <span className="data-table-cell news-summary-cell">{summary}</span>
                       </button>
                     );
                   })}
@@ -8961,7 +8993,7 @@ const buildCommandPriorityRows = (state: TerminalState): CommandPriorityRow[] =>
       ts: story.published_ts,
       symbol: story.resolved_symbols[0]?.toUpperCase() ?? "WIRE",
       packet: story.source,
-      read: story.headline,
+      read: decodeNewsText(story.headline),
       score: story.resolved_symbols.length > 0 ? 55 : 25,
       invalidation: getNewsWireStatus(story),
       state: "info",
@@ -9272,7 +9304,7 @@ const EventContextPane = ({ state }: { state: TerminalState }) => {
       key: `news-${story.trace_id}-${story.seq}`,
       ts: story.published_ts,
       label: "News",
-      title: story.headline,
+      title: decodeNewsText(story.headline),
       detail: story.resolved_symbols.length > 0 ? story.resolved_symbols.join(", ") : story.source,
       action: () => state.setSelectedNewsStory(story)
     }))
@@ -10214,7 +10246,7 @@ export function OverviewRoute() {
 export function NewsRoute() {
   const state = useTerminal();
   return (
-    <PageFrame title="Wire Control" eyebrow="News" variant="news">
+    <PageFrame title="Newswire" eyebrow="News" variant="news">
       <div className="wire-control-shell">
         <NewsControlRails state={state} />
         <NewsPane state={state} className="news-pane-full" />
