@@ -400,6 +400,7 @@ Default `smart-money` policy rejects lower-information prints and keeps higher-c
 | `REST_DEFAULT_LIMIT` | `200` | Default REST record count. |
 | `API_DELIVER_POLICY` | `new` | JetStream consumer start policy used by API live subscribers. |
 | `API_CONSUMER_RESET` | `false` | Resets/recreates API live durable consumers on startup when true. |
+| `API_CORS_ORIGINS` | `https://flow.deltaisland.io,http://127.0.0.1:3000,http://localhost:3000,http://127.0.0.1:3100,http://localhost:3100` | Comma-separated browser origins allowed to call the API directly; local web and desktop-local dev rely on these headers. |
 | `LIVE_LIMIT_DEFAULT` | `1000` | Optional generic live cache depth default. |
 | `LIVE_LIMIT_FLOW` | `500` | Live cache depth for flow packet events unless overridden. |
 | `LIVE_LIMIT_SMART_MONEY` | `300` | Live cache depth for smart-money events unless overridden. |
