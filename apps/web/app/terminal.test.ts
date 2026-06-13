@@ -554,6 +554,11 @@ describe("fixed tape virtualization config", () => {
       overscan: 24,
       debugLabel: "dark"
     });
+    expect(getTapeVirtualConfig("news")).toEqual({
+      rowHeight: 52,
+      overscan: 28,
+      debugLabel: "news"
+    });
   });
 });
 
@@ -574,9 +579,9 @@ describe("dark underlying route dependency helper", () => {
 });
 
 describe("terminal navigation", () => {
-  it("exposes Home, Options, and News as top-level destinations", () => {
+  it("exposes Dashboard, Options, and News as top-level destinations", () => {
     expect(NAV_ITEMS).toEqual([
-      { href: "/", label: "Home" },
+      { href: "/", label: "Dashboard" },
       { href: "/options", label: "Options" },
       { href: "/news", label: "News" }
     ]);

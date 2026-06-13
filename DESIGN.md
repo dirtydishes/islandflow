@@ -75,11 +75,11 @@ components:
     typography: "{typography.label}"
     rounded: "{rounded.md}"
     padding: "12px 14px"
-  pane-surface:
+  terminal-section:
     backgroundColor: "{colors.bg-pane}"
     textColor: "{colors.text-primary}"
-    rounded: "{rounded.xl}"
-    padding: "16px 18px"
+    rounded: "0"
+    padding: "8px 10px"
   status-chip:
     backgroundColor: "{colors.bg-soft}"
     textColor: "{colors.text-primary}"
@@ -98,6 +98,8 @@ Islandflow's interface behaves like an investigation instrument, not a presentat
 
 The visual atmosphere is dark and controlled, with amber used as a directional signal rather than ambient decoration. Surfaces are compact and information-dense, but each zone is explicit about purpose so the user can move from detection to validation without losing context.
 
+The production aesthetic is now centered on mock9 through mock12: table-first command surfaces, dense route-specific operating boards, border-block separation, minimal radius, and no dashboard-card composition as the default. Mock5 remains the workflow reference for Options only: OPRA intake, contract focus, filter controls, and packet eligibility.
+
 This system explicitly rejects the anti-references in PRODUCT.md: no meme-stock hype aesthetics, no generic SaaS card fog, and no Bloomberg cosplay density unless density is earning its keep with decision value.
 
 **Key Characteristics:**
@@ -106,6 +108,8 @@ This system explicitly rejects the anti-references in PRODUCT.md: no meme-stock 
 - Accent color treated as scarce signal.
 - Monospace-assisted precision for time, numeric, and status data.
 - Readability preserved during bursty live updates.
+- Route-specific signatures: Dashboard is Market Command, Options is OPRA Intake, News is Wire Control.
+- Flat terminal sections: border-block dividers and compact headers are the default; rounded cards are not.
 
 ## Colors
 
@@ -187,13 +191,19 @@ The system is flat by default. Depth is primarily tonal (background and border d
 - **Style:** pill chips (`999px`) with thin border and semantic soft fill.
 - **State:** direction/severity/status chips map to green/red/blue semantic channels with text labels always present.
 
-### Cards / Containers
+### Sections / Containers
 
-- **Corner Style:** medium-soft corners (`12px` or `14px`) depending on container prominence.
-- **Background:** layered dark surfaces (`#111820`, `#0d141b`) with restrained top-to-bottom sheen.
-- **Shadow Strategy:** no default card shadow; only overlays and floating inspectors use lift shadows.
-- **Border:** subtle perimeter lines (`rgba(255,255,255,0.08)` baseline).
-- **Internal Padding:** primarily `16px-18px` with tighter inner rhythm (`8px-12px`) for controls.
+- **Default Shape:** square terminal sections (`0px radius`) with border-block dividers.
+- **Background:** flat dark surfaces (`#111820`, `#0d141b`) with tonal contrast only.
+- **Shadow Strategy:** no shadows on production route sections; only drawers, popovers, and tooltips use lift shadows.
+- **Border:** top/bottom rules carry separation; perimeter boxes are reserved for true tables, overlays, and controls that need hit-area clarity.
+- **Internal Padding:** primarily `8px-12px` so rows, headers, and controls stay dense.
+
+### Route Signatures
+
+- **Dashboard / Market Command:** command metrics, priority board, decision levels, chart context, source health, recent contracts, replay state, and evidence context in one dense operating board.
+- **Options / OPRA Intake:** production `OptionsPane` and `FlowPane` remain the source of truth, with TanStack virtual rows, contract focus, scroll gates, and filters tuned for option decision work.
+- **News / Wire Control:** virtualized wire rows, source rails, symbol rails, live-only state, older-history scroll gates, and the existing news drawer.
 
 ### Inputs / Fields
 
@@ -220,6 +230,8 @@ The system is flat by default. Depth is primarily tonal (background and border d
 - **Do** use amber as a sparse decision signal for active controls, focus rails, and key counters.
 - **Do** keep overlays visually separated with dedicated shadow roles while leaving primary panes flat.
 - **Do** design live updates to avoid flashing, excessive animation, and layout shifts during high-volume periods.
+- **Do** prefer dense tables, rails, and flat sections for production routes.
+- **Do** let each primary route have a tasteful accent and layout signature without duplicating the data model.
 
 ### Don't:
 
@@ -228,3 +240,4 @@ The system is flat by default. Depth is primarily tonal (background and border d
 - **Don't** make Islandflow feel like Bloomberg-style visual density used as aesthetic cosplay instead of as a genuinely useful information structure.
 - **Don't** rely on red/green alone for directional meaning or severity.
 - **Don't** use colored side-stripe accents on rows/cards as the primary signifier; use complete semantic chips and labels instead.
+- **Don't** default to card grids, decorative shadows, hero treatments, or static mock copy in production routes.
