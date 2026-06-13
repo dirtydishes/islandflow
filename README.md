@@ -412,6 +412,7 @@ Default `smart-money` policy rejects lower-information prints and keeps higher-c
 | `NEXT_PUBLIC_LIVE_HOT_WINDOW_OPTIONS` | `1200` | Dedicated max hot-window items retained for options prints. |
 | `NEXT_PUBLIC_NBBO_MAX_AGE_MS` | `1000` | Frontend NBBO staleness threshold. |
 | `NEXT_PUBLIC_FLOW_FILTER_PRESET` | `smart-money` | Default flow filter preset: `smart-money`, `balanced`, or `all`. |
+| `NEXT_ALLOWED_DEV_ORIGINS` | empty, plus auto-detected local IPv4 addresses | Optional comma-separated extra hostnames/IPs allowed to load Next.js dev resources when local browser tooling reaches the dev server through a nonstandard local interface. |
 
 ### Replay and testing controls
 
