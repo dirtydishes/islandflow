@@ -81,35 +81,40 @@ const concepts: Record<MockVariant, Concept> = {
     title: "Alert Lineage",
     shortName: "Lineage",
     routeName: "Signal Trace",
-    premise: "Selected alert formation from raw prints through packet, confirmation, invalidation, and replay audit.",
+    premise:
+      "Selected alert formation from raw prints through packet, confirmation, invalidation, and replay audit.",
     bodyClass: "mock-graph"
   },
   mock9: {
     title: "Market Command",
     shortName: "Command",
     routeName: "Main Board",
-    premise: "Session regime, priority symbols, active packets, and invalidation levels without route switching.",
+    premise:
+      "Session regime, priority symbols, active packets, and invalidation levels without route switching.",
     bodyClass: "mock-command"
   },
   mock10: {
     title: "Signal Radar",
     shortName: "Radar",
     routeName: "Signal Radar",
-    premise: "Cross-symbol pressure ranked by confirmation, decay, source count, and nearest decision level.",
+    premise:
+      "Cross-symbol pressure ranked by confirmation, decay, source count, and nearest decision level.",
     bodyClass: "mock-radar"
   },
   mock11: {
     title: "Risk Ledger",
     shortName: "Risk",
     routeName: "Risk Ledger",
-    premise: "Directional exposure, live invalidations, sector crowding, and stale assumptions in one operating view.",
+    premise:
+      "Directional exposure, live invalidations, sector crowding, and stale assumptions in one operating view.",
     bodyClass: "mock-risk"
   },
   mock12: {
     title: "Source Control",
     shortName: "Sources",
     routeName: "Source Control",
-    premise: "Feed quality, lag, packet eligibility, route pressure, and replay gaps for the current session.",
+    premise:
+      "Feed quality, lag, packet eligibility, route pressure, and replay gaps for the current session.",
     bodyClass: "mock-source"
   }
 };
@@ -919,13 +924,25 @@ function MarketActivityGraph() {
           ))}
         </div>
         {lineageQueue.map(([time, symbol, type, score, read, state]) => (
-          <div className={`mock-lineage-queue-row is-${state}`} role="row" key={`${time}-${symbol}`}>
+          <div
+            className={`mock-lineage-queue-row is-${state}`}
+            role="row"
+            key={`${time}-${symbol}`}
+          >
             <time>{time}</time>
             <strong>{symbol}</strong>
             <span>{type}</span>
             <span>{score}</span>
             <span>{read}</span>
-            <Badge tone={state === "reject" ? "Bearish" : state === "watch" || state === "hold" ? "Watch" : "Bullish"}>
+            <Badge
+              tone={
+                state === "reject"
+                  ? "Bearish"
+                  : state === "watch" || state === "hold"
+                    ? "Watch"
+                    : "Bullish"
+              }
+            >
               {state}
             </Badge>
           </div>
@@ -937,7 +954,12 @@ function MarketActivityGraph() {
       </aside>
       <aside className="mock-lineage-invalid" aria-label="Invalidation levels">
         <h2>Invalidates</h2>
-        <FactList items={lineageInvalidations.map(([label, level, result]) => [label, `${level}: ${result}`])} />
+        <FactList
+          items={lineageInvalidations.map(([label, level, result]) => [
+            label,
+            `${level}: ${result}`
+          ])}
+        />
       </aside>
     </section>
   );
@@ -971,7 +993,15 @@ function MarketCommand() {
             <span>{read}</span>
             <Meter value={Number(score)} />
             <span>{invalid}</span>
-            <Badge tone={state === "reject" ? "Bearish" : state === "watch" || state === "hold" ? "Watch" : "Bullish"}>
+            <Badge
+              tone={
+                state === "reject"
+                  ? "Bearish"
+                  : state === "watch" || state === "hold"
+                    ? "Watch"
+                    : "Bullish"
+              }
+            >
               {state}
             </Badge>
           </div>
@@ -979,7 +1009,12 @@ function MarketCommand() {
       </div>
       <aside className="mock-command-levels" aria-label="Decision levels">
         <h2>Decision levels</h2>
-        <FactList items={commandLevels.map(([symbol, level, side, read]) => [symbol, `${side} ${level}: ${read}`])} />
+        <FactList
+          items={commandLevels.map(([symbol, level, side, read]) => [
+            symbol,
+            `${side} ${level}: ${read}`
+          ])}
+        />
       </aside>
       <div className="mock-command-flow" aria-label="Live context">
         <FlowRows compact />
