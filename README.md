@@ -280,7 +280,7 @@ bun run make:desktop
 Desktop-specific environment:
 
 - `ISLANDFLOW_DESKTOP_START_URL` is only used by the Electron shell and is restricted to trusted Islandflow app origins.
-- `NEXT_PUBLIC_API_URL` remains the web app API/WebSocket origin control and usually points at `https://flow.deltaisland.io` when developing local UI inside Electron.
+- `NEXT_PUBLIC_API_URL` remains the web app API/WebSocket origin control and usually points at `https://api.flow.deltaisland.io` when developing local UI inside Electron.
 
 ## Environment Configuration
 
@@ -400,17 +400,19 @@ Default `smart-money` policy rejects lower-information prints and keeps higher-c
 | `REST_DEFAULT_LIMIT` | `200` | Default REST record count. |
 | `API_DELIVER_POLICY` | `new` | JetStream consumer start policy used by API live subscribers. |
 | `API_CONSUMER_RESET` | `false` | Resets/recreates API live durable consumers on startup when true. |
+| `API_CORS_ORIGINS` | `https://flow.deltaisland.io,http://127.0.0.1:3000,http://localhost:3000,http://127.0.0.1:3100,http://localhost:3100` | Comma-separated browser origins allowed to call the API directly; local web and desktop-local dev rely on these headers. |
 | `LIVE_LIMIT_DEFAULT` | `1000` | Optional generic live cache depth default. |
 | `LIVE_LIMIT_FLOW` | `500` | Live cache depth for flow packet events unless overridden. |
 | `LIVE_LIMIT_SMART_MONEY` | `300` | Live cache depth for smart-money events unless overridden. |
 | `LIVE_LIMIT_OPTIONS` | `1000` | Live cache depth for options channel unless overridden. |
 | `LIVE_LIMIT_ALERTS` | `300` | Live cache depth for alerts channel unless overridden. |
 | `LIVE_LIMIT_NEWS` | `100` | Live cache depth for news channel unless overridden. |
-| `NEXT_PUBLIC_API_URL` | auto-detected in browser, `http://127.0.0.1:4000` fallback | Explicit base URL for API/WS calls from the web app. |
+| `NEXT_PUBLIC_API_URL` | `https://api.flow.deltaisland.io` for local web dev, auto-detected in browser when unset by other runners | Explicit base URL for API/WS calls from the web app. |
 | `NEXT_PUBLIC_LIVE_HOT_WINDOW` | `600` | Max hot-window items retained for non-options live streams in UI state. |
 | `NEXT_PUBLIC_LIVE_HOT_WINDOW_OPTIONS` | `1200` | Dedicated max hot-window items retained for options prints. |
 | `NEXT_PUBLIC_NBBO_MAX_AGE_MS` | `1000` | Frontend NBBO staleness threshold. |
 | `NEXT_PUBLIC_FLOW_FILTER_PRESET` | `smart-money` | Default flow filter preset: `smart-money`, `balanced`, or `all`. |
+| `NEXT_ALLOWED_DEV_ORIGINS` | empty, plus auto-detected local IPv4 addresses | Optional comma-separated extra hostnames/IPs allowed to load Next.js dev resources when local browser tooling reaches the dev server through a nonstandard local interface. |
 
 ### Replay and testing controls
 

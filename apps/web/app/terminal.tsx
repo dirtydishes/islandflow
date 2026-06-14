@@ -542,6 +542,87 @@ const readErrorDetail = async (response: Response): Promise<string> => {
   }
 };
 
+const OPTION_PRINT_LOOKUP_BATCH_SIZE = 100;
+const FLOW_PACKET_LOOKUP_BATCH_SIZE = 12;
+
+const isAbortLikeError = (error: unknown): boolean => {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    (error as { name?: unknown }).name === "AbortError"
+  );
+};
+
+const uniqueNonEmpty = (items: string[]): string[] => {
+  return Array.from(new Set(items.map((item) => item.trim()).filter(Boolean)));
+};
+
+const chunkItems = <T,>(items: T[], size: number): T[][] => {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+};
+
+const fetchFlowPacketsByIds = async (
+  packetIds: string[],
+  signal?: AbortSignal
+): Promise<FlowPacket[]> => {
+  const packets: FlowPacket[] = [];
+  for (const batch of chunkItems(uniqueNonEmpty(packetIds), FLOW_PACKET_LOOKUP_BATCH_SIZE)) {
+    if (signal?.aborted) {
+      break;
+    }
+    const batchPackets = await Promise.all(
+      batch.map(async (packetId) => {
+        const response = await fetch(buildApiUrl(`/flow/packets/${encodeURIComponent(packetId)}`), {
+          signal
+        });
+        if (!response.ok) {
+          throw new Error(await readErrorDetail(response));
+        }
+        const payload = (await response.json()) as { data?: FlowPacket | null };
+        return payload.data ?? null;
+      })
+    );
+    for (const packet of batchPackets) {
+      if (packet) {
+        packets.push(packet);
+      }
+    }
+  }
+  return packets;
+};
+
+const fetchOptionPrintsByTraceIds = async (
+  traceIds: string[],
+  signal?: AbortSignal
+): Promise<OptionPrint[]> => {
+  const prints: OptionPrint[] = [];
+  for (const batch of chunkItems(uniqueNonEmpty(traceIds), OPTION_PRINT_LOOKUP_BATCH_SIZE)) {
+    if (signal?.aborted) {
+      break;
+    }
+    const url = new URL(buildApiUrl("/option-prints/by-trace"));
+    for (const traceId of batch) {
+      url.searchParams.append("trace_id", traceId);
+    }
+    const response = await fetch(url.toString(), { signal });
+    if (!response.ok) {
+      throw new Error(await readErrorDetail(response));
+    }
+    const payload = (await response.json()) as { data?: OptionPrint[] };
+    for (const item of payload.data ?? []) {
+      if (item?.trace_id) {
+        prints.push(item);
+      }
+    }
+  }
+  return prints;
+};
+
 type WsStatus = "connecting" | "connected" | "disconnected" | "stale";
 
 type TapeMode = "live" | "replay";
@@ -4515,7 +4596,7 @@ const CandleChart = ({
       url.searchParams.set("underlying_id", ticker);
       url.searchParams.set("start_ts", Math.floor(startTs).toString());
       url.searchParams.set("end_ts", Math.floor(endTs).toString());
-      url.searchParams.set("limit", "2500");
+      url.searchParams.set("limit", "1000");
 
       const response = await fetch(url.toString(), { signal: abort.signal });
       if (!response.ok) {
@@ -6350,8 +6431,10 @@ const useTerminalState = () => {
     }
 
     let cancelled = false;
+    const abort = new AbortController();
     void fetch(buildApiUrl("/lookup/options-support"), {
       method: "POST",
+      signal: abort.signal,
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         trace_ids: uniqueTraceIds,
@@ -6417,11 +6500,15 @@ const useTerminalState = () => {
         }
       })
       .catch((error) => {
+        if (cancelled || abort.signal.aborted || isAbortLikeError(error)) {
+          return;
+        }
         console.warn("Failed to hydrate option row support", error);
       });
 
     return () => {
       cancelled = true;
+      abort.abort();
     };
   }, [
     mode,
@@ -6526,35 +6613,26 @@ const useTerminalState = () => {
       return;
     }
 
+    const abort = new AbortController();
     const missingPacketIds = selectedSmartMoneyEvent.packet_ids.filter(
       (id) => !resolvedFlowPacketMap.has(id)
     );
     if (missingPacketIds.length > 0) {
       incrementRetentionMetric("pinnedFetchMisses", missingPacketIds.length);
-      void Promise.all(
-        missingPacketIds.map(async (packetId) => {
-          const response = await fetch(
-            buildApiUrl(`/flow/packets/${encodeURIComponent(packetId)}`)
-          );
-          if (!response.ok) {
-            throw new Error(await readErrorDetail(response));
-          }
-          const payload = (await response.json()) as { data?: FlowPacket | null };
-          return payload.data ?? null;
-        })
-      )
+      void fetchFlowPacketsByIds(missingPacketIds, abort.signal)
         .then((packets) => {
           const next = new Map<string, FlowPacket>();
           for (const packet of packets) {
-            if (packet) {
-              next.set(packet.id, packet);
-            }
+            next.set(packet.id, packet);
           }
           if (next.size > 0) {
             setPinnedFlowPacketMap((prev) => upsertPinnedEntries(prev, next, Date.now()));
           }
         })
         .catch((error) => {
+          if (abort.signal.aborted || isAbortLikeError(error)) {
+            return;
+          }
           incrementRetentionMetric("pinnedFetchFailures", 1);
           console.warn("Failed to fetch smart-money flow packets", error);
         });
@@ -6563,37 +6641,28 @@ const useTerminalState = () => {
     const missingPrintIds = selectedSmartMoneyEvent.member_print_ids.filter(
       (id) => !resolvedOptionPrintMap.has(id)
     );
-    if (missingPrintIds.length === 0) {
-      return;
-    }
-    incrementRetentionMetric("pinnedFetchMisses", missingPrintIds.length);
-    const url = new URL(buildApiUrl("/option-prints/by-trace"));
-    for (const traceId of missingPrintIds) {
-      url.searchParams.append("trace_id", traceId);
-    }
-    void fetch(url.toString())
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error(await readErrorDetail(response));
-        }
-        return response.json();
-      })
-      .then((payload: { data?: OptionPrint[] }) => {
-        const next = new Map<string, OptionPrint>();
-        for (const item of payload.data ?? []) {
-          if (!item || !item.trace_id) {
-            continue;
+    if (missingPrintIds.length > 0) {
+      incrementRetentionMetric("pinnedFetchMisses", missingPrintIds.length);
+      void fetchOptionPrintsByTraceIds(missingPrintIds, abort.signal)
+        .then((prints) => {
+          const next = new Map<string, OptionPrint>();
+          for (const item of prints) {
+            next.set(item.trace_id, item);
           }
-          next.set(item.trace_id, item);
-        }
-        if (next.size > 0) {
-          setPinnedOptionPrintMap((prev) => upsertPinnedEntries(prev, next, Date.now()));
-        }
-      })
-      .catch((error) => {
-        incrementRetentionMetric("pinnedFetchFailures", 1);
-        console.warn("Failed to fetch smart-money option prints", error);
-      });
+          if (next.size > 0) {
+            setPinnedOptionPrintMap((prev) => upsertPinnedEntries(prev, next, Date.now()));
+          }
+        })
+        .catch((error) => {
+          if (abort.signal.aborted || isAbortLikeError(error)) {
+            return;
+          }
+          incrementRetentionMetric("pinnedFetchFailures", 1);
+          console.warn("Failed to fetch smart-money option prints", error);
+        });
+    }
+
+    return () => abort.abort();
   }, [mode, resolvedFlowPacketMap, resolvedOptionPrintMap, selectedSmartMoneyEvent]);
 
   const inferAlertUnderlying = useCallback(
@@ -6902,6 +6971,7 @@ const useTerminalState = () => {
       return;
     }
 
+    const abort = new AbortController();
     const visiblePacketIds = visibleAlerts.flatMap((alert) => getAlertFlowPacketRefs(alert));
     const missingPacketIds = Array.from(new Set(visiblePacketIds)).filter(
       (id) => !resolvedFlowPacketMap.has(id)
@@ -6909,24 +6979,11 @@ const useTerminalState = () => {
 
     if (missingPacketIds.length > 0) {
       incrementRetentionMetric("pinnedFetchMisses", missingPacketIds.length);
-      void Promise.all(
-        missingPacketIds.map(async (packetId) => {
-          const response = await fetch(
-            buildApiUrl(`/flow/packets/${encodeURIComponent(packetId)}`)
-          );
-          if (!response.ok) {
-            throw new Error(await readErrorDetail(response));
-          }
-          const payload = (await response.json()) as { data?: FlowPacket | null };
-          return payload.data ?? null;
-        })
-      )
+      void fetchFlowPacketsByIds(missingPacketIds, abort.signal)
         .then((packets) => {
           const next = new Map<string, FlowPacket>();
           for (const packet of packets) {
-            if (packet) {
-              next.set(packet.id, packet);
-            }
+            next.set(packet.id, packet);
           }
           if (next.size > 0) {
             const now = Date.now();
@@ -6934,6 +6991,9 @@ const useTerminalState = () => {
           }
         })
         .catch((error) => {
+          if (abort.signal.aborted || isAbortLikeError(error)) {
+            return;
+          }
           incrementRetentionMetric("pinnedFetchFailures", 1);
           console.warn("Failed to prefetch visible alert packets", error);
         });
@@ -6942,39 +7002,29 @@ const useTerminalState = () => {
     const missingPrintIds = Array.from(visibleAlertEvidenceRefs).filter(
       (id) => !resolvedFlowPacketMap.has(id) && !resolvedOptionPrintMap.has(id)
     );
-    if (missingPrintIds.length === 0) {
-      return;
+    if (missingPrintIds.length > 0) {
+      incrementRetentionMetric("pinnedFetchMisses", missingPrintIds.length);
+      void fetchOptionPrintsByTraceIds(missingPrintIds, abort.signal)
+        .then((prints) => {
+          const next = new Map<string, OptionPrint>();
+          for (const item of prints) {
+            next.set(item.trace_id, item);
+          }
+          if (next.size > 0) {
+            const now = Date.now();
+            setPinnedOptionPrintMap((prev) => upsertPinnedEntries(prev, next, now));
+          }
+        })
+        .catch((error) => {
+          if (abort.signal.aborted || isAbortLikeError(error)) {
+            return;
+          }
+          incrementRetentionMetric("pinnedFetchFailures", 1);
+          console.warn("Failed to prefetch visible alert evidence", error);
+        });
     }
 
-    incrementRetentionMetric("pinnedFetchMisses", missingPrintIds.length);
-    const url = new URL(buildApiUrl("/option-prints/by-trace"));
-    for (const traceId of missingPrintIds) {
-      url.searchParams.append("trace_id", traceId);
-    }
-    void fetch(url.toString())
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error(await readErrorDetail(response));
-        }
-        return response.json();
-      })
-      .then((payload: { data?: OptionPrint[] }) => {
-        const next = new Map<string, OptionPrint>();
-        for (const item of payload.data ?? []) {
-          if (!item || !item.trace_id) {
-            continue;
-          }
-          next.set(item.trace_id, item);
-        }
-        if (next.size > 0) {
-          const now = Date.now();
-          setPinnedOptionPrintMap((prev) => upsertPinnedEntries(prev, next, now));
-        }
-      })
-      .catch((error) => {
-        incrementRetentionMetric("pinnedFetchFailures", 1);
-        console.warn("Failed to prefetch visible alert evidence", error);
-      });
+    return () => abort.abort();
   }, [
     mode,
     visibleAlerts,
@@ -7866,10 +7916,11 @@ const OptionsPane = memo(({ state, limit, title = "Options", className }: Option
                     );
 
                     return decor ? (
-                      <button
-                        type="button"
+                      <div
                         {...commonProps}
                         key={key}
+                        role="button"
+                        tabIndex={0}
                         onClick={() =>
                           decor.smartMoney
                             ? state.openFromSmartMoneyEvent(decor.smartMoney)
@@ -7889,7 +7940,7 @@ const OptionsPane = memo(({ state, limit, title = "Options", className }: Option
                         }}
                       >
                         {cells}
-                      </button>
+                      </div>
                     ) : (
                       <div {...commonProps} key={key}>
                         {cells}
