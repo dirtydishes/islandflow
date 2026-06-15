@@ -9200,28 +9200,37 @@ const CommandDeckHeader = ({ state }: { state: TerminalState }) => {
     state.mode === "live" ? statusLabel(state.liveSession.status, false, state.mode) : "Replay";
 
   return (
-    <header className="command-deck-header compact-command-bar dashboard-command-header" aria-label="Dashboard command context">
+    <header className="dashboard-command-header" aria-label="Dashboard command context">
       <div className="dashboard-command-row">
-        <div className="dashboard-command-title">
-          <strong>Dashboard</strong>
-        </div>
         <div className="dashboard-command-rail" aria-label="Dashboard status and scope">
-          <span className={`dashboard-command-cell dashboard-command-state command-chip-${state.liveSession.status}`}>
+          <span
+            className={`dashboard-command-cell dashboard-command-state command-chip-${state.liveSession.status}`}
+          >
             {state.mode === "live" ? "Live" : "Replay"}: {connectionLabel}
           </span>
-          <span className="dashboard-command-cell">Last: {state.lastSeen ? formatTime(state.lastSeen) : "waiting"}</span>
+          <span className="dashboard-command-cell">
+            Last: {state.lastSeen ? formatTime(state.lastSeen) : "waiting"}
+          </span>
           <span className="dashboard-command-cell">Scope: {focus}</span>
           {activeContractFilter ? (
             <span className="dashboard-command-cell dashboard-command-filter">
               Filter: {activeContractFilter}
-              <button aria-label="Clear contract filter" type="button" onClick={() => state.setSelectedInstrument(null)}>
+              <button
+                aria-label="Clear contract filter"
+                type="button"
+                onClick={() => state.setSelectedInstrument(null)}
+              >
                 X
               </button>
             </span>
           ) : activeTickerFilter.length > 0 ? (
             <span className="dashboard-command-cell dashboard-command-filter">
               Ticker: {activeTickerFilter}
-              <button aria-label="Clear ticker filter" type="button" onClick={() => state.setFilterInput("")}>
+              <button
+                aria-label="Clear ticker filter"
+                type="button"
+                onClick={() => state.setFilterInput("")}
+              >
                 X
               </button>
             </span>
@@ -10256,7 +10265,7 @@ function TerminalChrome({ children }: { children: ReactNode }) {
 export function OverviewRoute() {
   const state = useTerminal();
   return (
-    <PageFrame title="Market Command" eyebrow="Dashboard" variant="dashboard">
+    <PageFrame title="Dashboard" variant="dashboard">
       <div className="market-command-shell">
         <CommandDeckHeader state={state} />
         <CommandMetricsStrip state={state} />

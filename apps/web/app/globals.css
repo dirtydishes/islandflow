@@ -1011,36 +1011,30 @@ h3 {
 }
 
 .dashboard-command-header {
-  display: block;
+  min-width: 0;
+  padding: 8px 0;
+  border-top: 1px solid var(--route-line);
+  border-bottom: 1px solid var(--border);
+  background: transparent;
 }
 
 .dashboard-command-row {
   min-width: 0;
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  align-items: center;
-  gap: 14px;
-  white-space: nowrap;
-}
-
-.dashboard-command-title strong {
-  color: var(--text);
-  font-family: var(--font-display), sans-serif;
-  font-size: 1rem;
-  line-height: 1;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  display: block;
+  overflow: hidden;
 }
 
 .dashboard-command-rail {
+  width: 100%;
   min-width: 0;
   display: grid;
-  grid-template-columns: repeat(4, minmax(92px, max-content)) max-content;
+  grid-template-columns: max-content max-content minmax(110px, max-content) minmax(150px, 1fr) max-content;
   align-items: center;
-  justify-content: end;
+  justify-content: stretch;
   overflow: hidden;
   border: 1px solid var(--border);
   background: oklch(0.97 0.008 250 / 0.026);
+  white-space: nowrap;
 }
 
 .dashboard-command-cell {
@@ -1058,6 +1052,7 @@ h3 {
   text-transform: uppercase;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dashboard-command-state.command-chip-connected {
@@ -1077,7 +1072,6 @@ h3 {
 }
 
 .dashboard-command-filter {
-  max-width: min(380px, 30vw);
   color: var(--text);
 }
 
@@ -1098,15 +1092,29 @@ h3 {
   cursor: pointer;
   font-family: var(--font-mono), monospace;
   font-size: 0.58rem;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+.dashboard-command-cell button:hover,
+.dashboard-command-cell button:focus-visible {
+  background: oklch(0.78 0.12 74 / 0.17);
+  color: var(--text);
+  outline: none;
 }
 
 .dashboard-command-action {
   min-width: max-content;
   min-height: 30px;
   border: 0;
-  border-left: 1px solid var(--border);
   border-radius: 0;
   background: transparent;
+}
+
+.dashboard-command-action:hover,
+.dashboard-command-action:focus-visible {
+  background: var(--route-accent-soft);
 }
 
 .command-filter-tooltip {
@@ -3219,6 +3227,8 @@ h3 {
   .overlay-toggle,
   .drawer-close,
   .command-filter-tooltip button,
+  .dashboard-command-cell button,
+  .dashboard-command-action,
   .status-inline-counter,
   .missed-count,
   .synthetic-control-gear {
@@ -3492,6 +3502,21 @@ h3 {
   .compact-command-context {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .dashboard-command-row {
+    overflow-x: auto;
+  }
+
+  .dashboard-command-rail {
+    width: max-content;
+    min-width: 100%;
+    grid-template-columns: max-content minmax(92px, max-content) minmax(150px, 1fr) max-content;
+  }
+
+  .dashboard-command-cell,
+  .dashboard-command-action {
+    min-height: 44px;
   }
 
   .command-ticker-track {

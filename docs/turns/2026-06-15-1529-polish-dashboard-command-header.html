@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Polish Dashboard Command Header</title>
+  <title>Polish Dashboard Route and Command Rail</title>
   <style>
     :root {
       color-scheme: dark;
@@ -162,18 +162,18 @@
   <main>
     <header>
       <p class="eyebrow">Turn Document · June 15, 2026</p>
-      <h1>Polish Dashboard Command Header</h1>
+      <h1>Polish Dashboard Route and Command Rail</h1>
       <div class="facts">
-        <div class="fact"><span>Branch</span><strong>lavender/configure-hosted-api-endpoint</strong></div>
-        <div class="fact"><span>Issue</span><strong>islandflow-j30</strong></div>
-        <div class="fact"><span>Surface</span><strong>Dashboard command header</strong></div>
+        <div class="fact"><span>Branch</span><strong>lavender/dashboard-route-polish</strong></div>
+        <div class="fact"><span>Issues</span><strong>islandflow-j30, islandflow-h0k</strong></div>
+        <div class="fact"><span>Surface</span><strong>Dashboard route and command rail</strong></div>
         <div class="fact"><span>Validation</span><strong>Next production build passed</strong></div>
       </div>
     </header>
 
     <section>
       <h2>Summary</h2>
-      <p>The dashboard command header now reads as a compact page header. The left-side copy is reduced to <code>Dashboard</code>, and the prior two-line context area is replaced with one status rail that labels live state, last update time, ticker scope, and active filters.</p>
+      <p>The dashboard route now has a single visible page title, <code>Dashboard</code>, and a compact command rail below it for live state, update time, ticker scope, filters, and replay switching. The polish removes duplicated page-header language and isolates the rail from legacy compact-header styles.</p>
     </section>
 
     <section>
@@ -184,12 +184,14 @@
         <li>Changed the vague default filter text from <code>No active filter</code> to <code>Filters: All flow</code>.</li>
         <li>Clarified the standalone ticker value by labeling it as <code>Scope</code>, so <code>SPY</code> no longer appears without context.</li>
         <li>Moved accepted live-preview styles into durable dashboard-specific CSS classes.</li>
+        <li>Promoted <code>Dashboard</code> to the route-level title and removed duplicated visible title copy from the command rail.</li>
+        <li>Added explicit narrow-screen rail overflow, mobile touch sizing, hover/focus feedback, and reduced-motion coverage.</li>
       </ul>
     </section>
 
     <section>
       <h2>Context</h2>
-      <p>This was an Impeccable live-mode polish pass on the root dashboard header. The user selected the header and asked for simpler left copy, one-line layout, clearer filter copy, and an explanation of what the ticker value signified.</p>
+      <p>This started as an Impeccable live-mode polish pass on the root dashboard header. The follow-up pass moved the work onto a dedicated branch and tightened the whole <code>/</code> route hierarchy so the page title and command rail do distinct jobs.</p>
     </section>
 
     <section>
@@ -197,7 +199,8 @@
       <ul>
         <li>The accepted live variant was carbonized by the helper, then cleaned into normal source by removing live markers, temporary wrappers, and scoped preview CSS.</li>
         <li>The header keeps the existing Islandflow terminal identity: dark surfaces, mono metadata, sparse state color, flat borders, and compact density.</li>
-        <li>The responsive rule hides the last-seen cell below the existing <code>1180px</code> breakpoint so the rail stays compact instead of falling back to the old stacked composition.</li>
+        <li>The command rail no longer inherits <code>command-deck-header</code> or <code>compact-command-bar</code>, which prevents generic mobile rules from changing its display mode.</li>
+        <li>The responsive rule hides the last-seen cell below the existing <code>1180px</code> breakpoint, then uses horizontal overflow and <code>44px</code> touch-height cells below <code>720px</code>.</li>
       </ul>
     </section>
 
@@ -206,20 +209,17 @@
       <p class="diff-note">Focused unified diff excerpt. A styled fallback is used here because the change is small and the excerpt is clearer than a full rendered Diffs embed.</p>
       <div class="diff" role="region" aria-label="Relevant diff snippets" tabindex="0">
 <pre><code><span class="file">diff --git a/apps/web/app/terminal.tsx b/apps/web/app/terminal.tsx</span>
-<span class="hunk">@@ -9200,53 +9200,39 @@ const CommandDeckHeader = ({ state }: { state: TerminalState }) =&gt; {</span>
+<span class="hunk">@@ -9200,53 +9200,48 @@ const CommandDeckHeader = ({ state }: { state: TerminalState }) =&gt; {</span>
 <span class="del">-    &lt;header className="command-deck-header compact-command-bar" aria-label="Command deck context"&gt;</span>
 <span class="del">-      &lt;div className="compact-command-topline"&gt;</span>
 <span class="del">-        &lt;div className="compact-command-title"&gt;</span>
 <span class="del">-          &lt;span&gt;islandflow&lt;/span&gt;</span>
 <span class="del">-          &lt;strong&gt;Market Command&lt;/strong&gt;</span>
-<span class="add">+    &lt;header className="command-deck-header compact-command-bar dashboard-command-header" aria-label="Dashboard command context"&gt;</span>
+<span class="add">+    &lt;header className="dashboard-command-header" aria-label="Dashboard command context"&gt;</span>
 <span class="add">+      &lt;div className="dashboard-command-row"&gt;</span>
-<span class="add">+        &lt;div className="dashboard-command-title"&gt;</span>
-<span class="add">+          &lt;strong&gt;Dashboard&lt;/strong&gt;</span>
-         &lt;/div&gt;
 <span class="del">-        &lt;div className="compact-command-controls" aria-label="Active command deck controls"&gt;</span>
 <span class="add">+        &lt;div className="dashboard-command-rail" aria-label="Dashboard status and scope"&gt;</span>
-           &lt;span className={`dashboard-command-cell dashboard-command-state command-chip-${state.liveSession.status}`}&gt;
+<span class="add">+          &lt;span className={`dashboard-command-cell dashboard-command-state command-chip-${state.liveSession.status}`}&gt;</span>
              {state.mode === "live" ? "Live" : "Replay"}: {connectionLabel}
            &lt;/span&gt;
 <span class="add">+          &lt;span className="dashboard-command-cell"&gt;Last: {state.lastSeen ? formatTime(state.lastSeen) : "waiting"}&lt;/span&gt;</span>
@@ -240,21 +240,22 @@
        &lt;/div&gt;
 <span class="del">-      &lt;div className="compact-command-context"&gt;...&lt;/div&gt;</span>
      &lt;/header&gt;
+<span class="hunk">@@ -10256,7 +10265,7 @@ export function OverviewRoute() {</span>
+<span class="del">-    &lt;PageFrame title="Market Command" eyebrow="Dashboard" variant="dashboard"&gt;</span>
+<span class="add">+    &lt;PageFrame title="Dashboard" variant="dashboard"&gt;</span>
 
 <span class="file">diff --git a/apps/web/app/globals.css b/apps/web/app/globals.css</span>
 <span class="hunk">@@ -1010,6 +1010,105 @@ h3 {</span>
-<span class="add">+.dashboard-command-row {</span>
-<span class="add">+  display: grid;</span>
-<span class="add">+  grid-template-columns: max-content minmax(0, 1fr);</span>
-<span class="add">+  align-items: center;</span>
-<span class="add">+  gap: 14px;</span>
-<span class="add">+  white-space: nowrap;</span>
+<span class="add">+.dashboard-command-header {</span>
+<span class="add">+  padding: 8px 0;</span>
+<span class="add">+  border-top: 1px solid var(--route-line);</span>
+<span class="add">+  border-bottom: 1px solid var(--border);</span>
 <span class="add">+}</span>
 <span class="add">+</span>
 <span class="add">+.dashboard-command-rail {</span>
 <span class="add">+  display: grid;</span>
-<span class="add">+  grid-template-columns: repeat(4, minmax(92px, max-content)) max-content;</span>
-<span class="add">+  justify-content: end;</span>
+<span class="add">+  grid-template-columns: max-content max-content minmax(110px, max-content) minmax(150px, 1fr) max-content;</span>
+<span class="add">+  justify-content: stretch;</span>
 <span class="add">+  overflow: hidden;</span>
 <span class="add">+  border: 1px solid var(--border);</span>
 <span class="add">+  background: oklch(0.97 0.008 250 / 0.026);</span>
@@ -270,13 +271,21 @@
 <span class="add">+</span>
 <span class="add">+  .dashboard-command-cell:nth-of-type(2) {</span>
 <span class="add">+    display: none;</span>
-<span class="add">+  }</span></code></pre>
+<span class="add">+  }</span>
+<span class="hunk">@@ -3494,6 +3504,21 @@ h3 {</span>
+<span class="add">+  .dashboard-command-row { overflow-x: auto; }</span>
+<span class="add">+  .dashboard-command-rail {</span>
+<span class="add">+    width: max-content;</span>
+<span class="add">+    min-width: 100%;</span>
+<span class="add">+  }</span>
+<span class="add">+  .dashboard-command-cell,</span>
+<span class="add">+  .dashboard-command-action { min-height: 44px; }</span></code></pre>
       </div>
     </section>
 
     <section>
       <h2>Expected Impact for End-Users</h2>
-      <p>The dashboard header should scan faster and feel less cluttered. Users can now tell that <code>SPY</code> is the active scope, not an unexplained label, and the empty filter state reads as an intentional all-flow view.</p>
+      <p>The root dashboard should now scan with less duplication: the page title says where the user is, while the rail shows operational state. Users can tell that <code>SPY</code> is the active scope, not an unexplained label, and the empty filter state reads as an intentional all-flow view.</p>
     </section>
 
     <section>
@@ -285,6 +294,8 @@
         <li>Ran Impeccable live mode, generated three header variants, and accepted variant 3.</li>
         <li>Confirmed no live markers or temporary variant wrappers remain in source.</li>
         <li>Confirmed the dev page responds at <code>http://localhost:3000/</code>.</li>
+        <li>Ran the Impeccable detector on <code>apps/web/app/terminal.tsx</code>, <code>apps/web/app/globals.css</code>, and <code>apps/web/app/page.tsx</code>. Remaining warnings are broad pre-existing copy/style signals, plus a 1px separator false positive outside the changed rail.</li>
+        <li>Ran <code>bun test apps/web/app/terminal.test.ts</code>; all 76 tests passed.</li>
         <li>Ran <code>bun --cwd=apps/web run build</code>; Next.js production build and TypeScript completed successfully.</li>
       </ul>
     </section>
@@ -295,6 +306,7 @@
         <li>The command rail is intentionally dense. To protect narrower widths, the last-seen cell hides at the existing <code>1180px</code> breakpoint.</li>
         <li>The in-app browser surface was unavailable in this session, so visual iteration happened through the live helper and system browser fallback.</li>
         <li>The live helper stored a stale diagnostic about carbonize cleanup, but source inspection and build validation confirmed cleanup was completed.</li>
+        <li>For this follow-up pass, Chrome/in-app browser automation was still unavailable, so final visual validation used route fetches, source inspection, detector output, focused tests, and production build validation.</li>
       </ul>
     </section>
 
