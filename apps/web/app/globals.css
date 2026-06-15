@@ -1010,6 +1010,105 @@ h3 {
   font-size: 0.8rem;
 }
 
+.dashboard-command-header {
+  display: block;
+}
+
+.dashboard-command-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  white-space: nowrap;
+}
+
+.dashboard-command-title strong {
+  color: var(--text);
+  font-family: var(--font-display), sans-serif;
+  font-size: 1rem;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dashboard-command-rail {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(92px, max-content)) max-content;
+  align-items: center;
+  justify-content: end;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: oklch(0.97 0.008 250 / 0.026);
+}
+
+.dashboard-command-cell {
+  min-width: 0;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border-right: 1px solid var(--border);
+  color: var(--text-dim);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dashboard-command-state.command-chip-connected {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.dashboard-command-state.command-chip-stale,
+.dashboard-command-state.command-chip-connecting {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.dashboard-command-state.command-chip-disconnected {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.dashboard-command-filter {
+  max-width: min(380px, 30vw);
+  color: var(--text);
+}
+
+.dashboard-command-empty {
+  color: var(--text-faint);
+}
+
+.dashboard-command-cell button {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: oklch(0.97 0.008 250 / 0.08);
+  color: var(--text-dim);
+  cursor: pointer;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.58rem;
+}
+
+.dashboard-command-action {
+  min-width: max-content;
+  min-height: 30px;
+  border: 0;
+  border-left: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+}
+
 .command-filter-tooltip {
   position: relative;
   min-width: 0;
@@ -3151,6 +3250,14 @@ h3 {
 
   .compact-command-topline {
     justify-content: flex-start;
+  }
+
+  .dashboard-command-rail {
+    grid-template-columns: repeat(3, minmax(82px, max-content)) max-content;
+  }
+
+  .dashboard-command-cell:nth-of-type(2) {
+    display: none;
   }
 
   .command-deck-controls {

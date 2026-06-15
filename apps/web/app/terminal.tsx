@@ -9200,52 +9200,38 @@ const CommandDeckHeader = ({ state }: { state: TerminalState }) => {
     state.mode === "live" ? statusLabel(state.liveSession.status, false, state.mode) : "Replay";
 
   return (
-    <header className="command-deck-header compact-command-bar" aria-label="Command deck context">
-      <div className="compact-command-topline">
-        <div className="compact-command-title">
-          <span>islandflow</span>
-          <strong>Market Command</strong>
+    <header className="command-deck-header compact-command-bar dashboard-command-header" aria-label="Dashboard command context">
+      <div className="dashboard-command-row">
+        <div className="dashboard-command-title">
+          <strong>Dashboard</strong>
         </div>
-        <div className="compact-command-controls" aria-label="Active command deck controls">
-          <span className={`command-chip command-chip-${state.liveSession.status}`}>
+        <div className="dashboard-command-rail" aria-label="Dashboard status and scope">
+          <span className={`dashboard-command-cell dashboard-command-state command-chip-${state.liveSession.status}`}>
             {state.mode === "live" ? "Live" : "Replay"}: {connectionLabel}
           </span>
-          <span className="command-chip">
-            Last {state.lastSeen ? formatTime(state.lastSeen) : "waiting"}
-          </span>
-          <button className="terminal-button" type="button" onClick={state.toggleMode}>
+          <span className="dashboard-command-cell">Last: {state.lastSeen ? formatTime(state.lastSeen) : "waiting"}</span>
+          <span className="dashboard-command-cell">Scope: {focus}</span>
+          {activeContractFilter ? (
+            <span className="dashboard-command-cell dashboard-command-filter">
+              Filter: {activeContractFilter}
+              <button aria-label="Clear contract filter" type="button" onClick={() => state.setSelectedInstrument(null)}>
+                X
+              </button>
+            </span>
+          ) : activeTickerFilter.length > 0 ? (
+            <span className="dashboard-command-cell dashboard-command-filter">
+              Ticker: {activeTickerFilter}
+              <button aria-label="Clear ticker filter" type="button" onClick={() => state.setFilterInput("")}>
+                X
+              </button>
+            </span>
+          ) : (
+            <span className="dashboard-command-cell dashboard-command-empty">Filters: All flow</span>
+          )}
+          <button className="terminal-button dashboard-command-action" type="button" onClick={state.toggleMode}>
             {state.mode === "live" ? "Switch to Replay" : "Switch to Live"}
           </button>
         </div>
-      </div>
-      <div className="compact-command-context">
-        <span>Evidence console</span>
-        <strong>{focus}</strong>
-        {activeContractFilter ? (
-          <span className="command-filter-tooltip">
-            <span>{activeContractFilter}</span>
-            <button
-              aria-label="Clear contract filter"
-              type="button"
-              onClick={() => state.setSelectedInstrument(null)}
-            >
-              X
-            </button>
-          </span>
-        ) : activeTickerFilter.length > 0 ? (
-          <span className="command-filter-tooltip">
-            <span>Ticker: {activeTickerFilter}</span>
-            <button
-              aria-label="Clear ticker filter"
-              type="button"
-              onClick={() => state.setFilterInput("")}
-            >
-              X
-            </button>
-          </span>
-        ) : (
-          <span>No active filter</span>
-        )}
       </div>
     </header>
   );

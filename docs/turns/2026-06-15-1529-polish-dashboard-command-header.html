@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Polish Dashboard Command Header</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #06080b;
+      --panel: #101720;
+      --panel-2: #0b1118;
+      --ink: #e6edf4;
+      --muted: #9aa8b8;
+      --faint: #738195;
+      --line: rgba(255, 255, 255, 0.12);
+      --line-strong: rgba(245, 166, 35, 0.34);
+      --accent: #f5a623;
+      --green: #25c17a;
+      --red: #ff6b5f;
+      --blue: #4da3ff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 12% 0%, rgba(245, 166, 35, 0.08), transparent 28%),
+        linear-gradient(180deg, #0b1016 0%, var(--bg) 42%);
+      color: var(--ink);
+      font-family: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+
+    main {
+      width: min(1120px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 48px 0 64px;
+    }
+
+    header {
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 24px;
+      margin-bottom: 28px;
+    }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      color: var(--accent);
+      font: 700 0.76rem/1.2 "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3 {
+      margin: 0;
+      text-wrap: balance;
+      line-height: 1.1;
+    }
+
+    h1 {
+      max-width: 760px;
+      font-size: 2.35rem;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin-bottom: 12px;
+      font-size: 1.05rem;
+      color: #f3f7fb;
+    }
+
+    p { max-width: 78ch; }
+    p, ul { margin: 0; color: var(--muted); }
+
+    section {
+      margin-top: 18px;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.018)), var(--panel);
+    }
+
+    ul { padding-left: 1.2rem; }
+    li + li { margin-top: 6px; }
+
+    code {
+      color: #ffe0a8;
+      background: rgba(255,255,255,0.055);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 6px;
+      padding: 0.1rem 0.32rem;
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.93em;
+    }
+
+    .facts {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .fact {
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel-2);
+    }
+
+    .fact span {
+      display: block;
+      color: var(--faint);
+      font: 700 0.72rem/1.2 "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .fact strong {
+      display: block;
+      margin-top: 4px;
+      color: var(--ink);
+      font-size: 0.94rem;
+      overflow-wrap: anywhere;
+    }
+
+    .diff-note {
+      margin-bottom: 12px;
+      color: var(--faint);
+      font-size: 0.92rem;
+    }
+
+    .diff {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #080d12;
+    }
+
+    pre {
+      margin: 0;
+      padding: 14px 16px;
+      min-width: 760px;
+      color: #dbe7f3;
+      font: 0.82rem/1.5 "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      white-space: pre;
+    }
+
+    .file { color: #9fc5ff; }
+    .hunk { color: #f5c76f; }
+    .add { color: #92e6b8; }
+    .del { color: #ff9b94; }
+
+    a {
+      color: #9fc5ff;
+      text-decoration-color: rgba(159, 197, 255, 0.5);
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">Turn Document · June 15, 2026</p>
+      <h1>Polish Dashboard Command Header</h1>
+      <div class="facts">
+        <div class="fact"><span>Branch</span><strong>lavender/configure-hosted-api-endpoint</strong></div>
+        <div class="fact"><span>Issue</span><strong>islandflow-j30</strong></div>
+        <div class="fact"><span>Surface</span><strong>Dashboard command header</strong></div>
+        <div class="fact"><span>Validation</span><strong>Next production build passed</strong></div>
+      </div>
+    </header>
+
+    <section>
+      <h2>Summary</h2>
+      <p>The dashboard command header now reads as a compact page header. The left-side copy is reduced to <code>Dashboard</code>, and the prior two-line context area is replaced with one status rail that labels live state, last update time, ticker scope, and active filters.</p>
+    </section>
+
+    <section>
+      <h2>Changes Made</h2>
+      <ul>
+        <li>Replaced the old <code>islandflow / Market Command</code> header copy with a direct <code>Dashboard</code> page title.</li>
+        <li>Collapsed live status, last-seen time, scope, filters, and replay toggle into one compact rail.</li>
+        <li>Changed the vague default filter text from <code>No active filter</code> to <code>Filters: All flow</code>.</li>
+        <li>Clarified the standalone ticker value by labeling it as <code>Scope</code>, so <code>SPY</code> no longer appears without context.</li>
+        <li>Moved accepted live-preview styles into durable dashboard-specific CSS classes.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Context</h2>
+      <p>This was an Impeccable live-mode polish pass on the root dashboard header. The user selected the header and asked for simpler left copy, one-line layout, clearer filter copy, and an explanation of what the ticker value signified.</p>
+    </section>
+
+    <section>
+      <h2>Important Implementation Details</h2>
+      <ul>
+        <li>The accepted live variant was carbonized by the helper, then cleaned into normal source by removing live markers, temporary wrappers, and scoped preview CSS.</li>
+        <li>The header keeps the existing Islandflow terminal identity: dark surfaces, mono metadata, sparse state color, flat borders, and compact density.</li>
+        <li>The responsive rule hides the last-seen cell below the existing <code>1180px</code> breakpoint so the rail stays compact instead of falling back to the old stacked composition.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Relevant Diff Snippets</h2>
+      <p class="diff-note">Focused unified diff excerpt. A styled fallback is used here because the change is small and the excerpt is clearer than a full rendered Diffs embed.</p>
+      <div class="diff" role="region" aria-label="Relevant diff snippets" tabindex="0">
+<pre><code><span class="file">diff --git a/apps/web/app/terminal.tsx b/apps/web/app/terminal.tsx</span>
+<span class="hunk">@@ -9200,53 +9200,39 @@ const CommandDeckHeader = ({ state }: { state: TerminalState }) =&gt; {</span>
+<span class="del">-    &lt;header className="command-deck-header compact-command-bar" aria-label="Command deck context"&gt;</span>
+<span class="del">-      &lt;div className="compact-command-topline"&gt;</span>
+<span class="del">-        &lt;div className="compact-command-title"&gt;</span>
+<span class="del">-          &lt;span&gt;islandflow&lt;/span&gt;</span>
+<span class="del">-          &lt;strong&gt;Market Command&lt;/strong&gt;</span>
+<span class="add">+    &lt;header className="command-deck-header compact-command-bar dashboard-command-header" aria-label="Dashboard command context"&gt;</span>
+<span class="add">+      &lt;div className="dashboard-command-row"&gt;</span>
+<span class="add">+        &lt;div className="dashboard-command-title"&gt;</span>
+<span class="add">+          &lt;strong&gt;Dashboard&lt;/strong&gt;</span>
+         &lt;/div&gt;
+<span class="del">-        &lt;div className="compact-command-controls" aria-label="Active command deck controls"&gt;</span>
+<span class="add">+        &lt;div className="dashboard-command-rail" aria-label="Dashboard status and scope"&gt;</span>
+           &lt;span className={`dashboard-command-cell dashboard-command-state command-chip-${state.liveSession.status}`}&gt;
+             {state.mode === "live" ? "Live" : "Replay"}: {connectionLabel}
+           &lt;/span&gt;
+<span class="add">+          &lt;span className="dashboard-command-cell"&gt;Last: {state.lastSeen ? formatTime(state.lastSeen) : "waiting"}&lt;/span&gt;</span>
+<span class="add">+          &lt;span className="dashboard-command-cell"&gt;Scope: {focus}&lt;/span&gt;</span>
+           {activeContractFilter ? (
+<span class="add">+            &lt;span className="dashboard-command-cell dashboard-command-filter"&gt;</span>
+<span class="add">+              Filter: {activeContractFilter}</span>
+             &lt;/span&gt;
+           ) : activeTickerFilter.length &gt; 0 ? (
+<span class="add">+            &lt;span className="dashboard-command-cell dashboard-command-filter"&gt;</span>
+<span class="add">+              Ticker: {activeTickerFilter}</span>
+             &lt;/span&gt;
+           ) : (
+<span class="del">-            &lt;span&gt;No active filter&lt;/span&gt;</span>
+<span class="add">+            &lt;span className="dashboard-command-cell dashboard-command-empty"&gt;Filters: All flow&lt;/span&gt;</span>
+           )}
+         &lt;/div&gt;
+       &lt;/div&gt;
+<span class="del">-      &lt;div className="compact-command-context"&gt;...&lt;/div&gt;</span>
+     &lt;/header&gt;
+
+<span class="file">diff --git a/apps/web/app/globals.css b/apps/web/app/globals.css</span>
+<span class="hunk">@@ -1010,6 +1010,105 @@ h3 {</span>
+<span class="add">+.dashboard-command-row {</span>
+<span class="add">+  display: grid;</span>
+<span class="add">+  grid-template-columns: max-content minmax(0, 1fr);</span>
+<span class="add">+  align-items: center;</span>
+<span class="add">+  gap: 14px;</span>
+<span class="add">+  white-space: nowrap;</span>
+<span class="add">+}</span>
+<span class="add">+</span>
+<span class="add">+.dashboard-command-rail {</span>
+<span class="add">+  display: grid;</span>
+<span class="add">+  grid-template-columns: repeat(4, minmax(92px, max-content)) max-content;</span>
+<span class="add">+  justify-content: end;</span>
+<span class="add">+  overflow: hidden;</span>
+<span class="add">+  border: 1px solid var(--border);</span>
+<span class="add">+  background: oklch(0.97 0.008 250 / 0.026);</span>
+<span class="add">+}</span>
+<span class="add">+</span>
+<span class="add">+.dashboard-command-empty {</span>
+<span class="add">+  color: var(--text-faint);</span>
+<span class="add">+}</span>
+<span class="hunk">@@ -3153,6 +3252,14 @@ h3 {</span>
+<span class="add">+  .dashboard-command-rail {</span>
+<span class="add">+    grid-template-columns: repeat(3, minmax(82px, max-content)) max-content;</span>
+<span class="add">+  }</span>
+<span class="add">+</span>
+<span class="add">+  .dashboard-command-cell:nth-of-type(2) {</span>
+<span class="add">+    display: none;</span>
+<span class="add">+  }</span></code></pre>
+      </div>
+    </section>
+
+    <section>
+      <h2>Expected Impact for End-Users</h2>
+      <p>The dashboard header should scan faster and feel less cluttered. Users can now tell that <code>SPY</code> is the active scope, not an unexplained label, and the empty filter state reads as an intentional all-flow view.</p>
+    </section>
+
+    <section>
+      <h2>Validation</h2>
+      <ul>
+        <li>Ran Impeccable live mode, generated three header variants, and accepted variant 3.</li>
+        <li>Confirmed no live markers or temporary variant wrappers remain in source.</li>
+        <li>Confirmed the dev page responds at <code>http://localhost:3000/</code>.</li>
+        <li>Ran <code>bun --cwd=apps/web run build</code>; Next.js production build and TypeScript completed successfully.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Issues, Limitations, and Mitigations</h2>
+      <ul>
+        <li>The command rail is intentionally dense. To protect narrower widths, the last-seen cell hides at the existing <code>1180px</code> breakpoint.</li>
+        <li>The in-app browser surface was unavailable in this session, so visual iteration happened through the live helper and system browser fallback.</li>
+        <li>The live helper stored a stale diagnostic about carbonize cleanup, but source inspection and build validation confirmed cleanup was completed.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Follow-up Work</h2>
+      <ul>
+        <li>No required follow-up is filed for this polish pass.</li>
+        <li>Optional future pass: add focused interaction coverage for the dashboard header rail and its clear-filter buttons.</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>
