@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Standup Summary for 2026-06-14</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --bg-top: #0a121b;
+        --panel: rgba(17, 24, 32, 0.94);
+        --panel-2: rgba(12, 18, 25, 0.98);
+        --line: rgba(255, 255, 255, 0.09);
+        --line-strong: rgba(245, 166, 35, 0.26);
+        --text: #e6edf4;
+        --muted: #95a4b8;
+        --faint: #6f7d90;
+        --amber: #f5a623;
+        --amber-soft: rgba(245, 166, 35, 0.14);
+        --blue: #4da3ff;
+        --blue-soft: rgba(77, 163, 255, 0.12);
+        --green: #25c17a;
+        --green-soft: rgba(37, 193, 122, 0.12);
+        --radius: 18px;
+        --shadow: 0 28px 72px rgba(0, 0, 0, 0.36);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+      }
+
+      body {
+        background:
+          radial-gradient(circle at top left, rgba(245, 166, 35, 0.12), transparent 26rem),
+          radial-gradient(circle at top right, rgba(77, 163, 255, 0.1), transparent 22rem),
+          linear-gradient(180deg, var(--bg-top) 0%, var(--bg) 34%, #040609 100%);
+        color: var(--text);
+        font-family: "IBM Plex Sans", "Inter", system-ui, sans-serif;
+        line-height: 1.6;
+      }
+
+      main {
+        width: min(1120px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 30px 0 56px;
+      }
+
+      .hero,
+      section {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      }
+
+      .hero {
+        padding: 30px;
+        box-shadow: var(--shadow);
+      }
+
+      section {
+        margin-top: 18px;
+        padding: 22px;
+      }
+
+      .eyebrow,
+      h2,
+      .chip,
+      code,
+      .meta-label,
+      .meta-value,
+      .commit-hash,
+      .file-pill,
+      .issue-pill {
+        font-family: "IBM Plex Mono", "SFMono-Regular", ui-monospace, monospace;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: var(--amber-soft);
+        color: var(--amber);
+        font-size: 0.76rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h3 {
+        margin: 0;
+        font-family: "Quantico", "IBM Plex Sans", system-ui, sans-serif;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin-top: 16px;
+        font-size: 2.72rem;
+        line-height: 1.04;
+      }
+
+      h2 {
+        margin: 0 0 14px;
+        color: var(--amber);
+        font-size: 0.84rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h3 {
+        font-size: 1rem;
+      }
+
+      p,
+      li {
+        max-width: 84ch;
+        color: var(--muted);
+      }
+
+      .hero p {
+        margin: 16px 0 0;
+        font-size: 1.02rem;
+      }
+
+      .meta,
+      .summary-grid,
+      .commit-grid,
+      .detail-grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .meta {
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        margin-top: 22px;
+      }
+
+      .summary-grid,
+      .detail-grid {
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      }
+
+      .commit-grid {
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      }
+
+      .card,
+      .commit-card,
+      .callout {
+        padding: 16px 18px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.025);
+      }
+
+      .card strong,
+      .commit-card strong,
+      .callout strong {
+        color: var(--text);
+      }
+
+      .meta-label {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--faint);
+        font-size: 0.72rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .meta-value {
+        color: var(--text);
+        font-size: 1rem;
+      }
+
+      .value-strong {
+        color: var(--text);
+        font-size: 1.18rem;
+        font-weight: 600;
+      }
+
+      .chip-row,
+      .file-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chip,
+      .file-pill,
+      .issue-pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--text);
+        font-size: 0.74rem;
+        letter-spacing: 0.04em;
+      }
+
+      .good {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .info {
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .warn {
+        background: var(--amber-soft);
+        color: var(--amber);
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+
+      li + li {
+        margin-top: 8px;
+      }
+
+      code {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 1px 5px;
+      }
+
+      .stack {
+        display: grid;
+        gap: 16px;
+      }
+
+      .commit-hash {
+        color: var(--faint);
+        font-size: 0.78rem;
+      }
+
+      .commit-card p {
+        margin: 10px 0 0;
+      }
+
+      .inline-note {
+        color: var(--faint);
+        font-size: 0.92rem;
+      }
+
+      @media (max-width: 720px) {
+        main {
+          width: min(100%, calc(100% - 20px));
+          padding-top: 18px;
+          padding-bottom: 40px;
+        }
+
+        .hero,
+        section {
+          padding: 18px;
+        }
+
+        h1 {
+          font-size: 2.1rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <article class="hero">
+        <span class="eyebrow">Git Standup Summary</span>
+        <h1>June 14 centered on a single PR validation fix</h1>
+        <p>
+          Yesterday's git activity was one commit, <code>ce65e7b</code> (<code>fix pr ci
+          validation</code>), tied to Beads issue <code>islandflow-0e3</code> for PR 23 CI
+          failures. The patch closed the issue, synced the Docker workspace dependency snapshot
+          from <code>tmp ^0.2.5</code> to <code>^0.2.6</code> / <code>0.2.7</code>, and cleaned up
+          formatting in API request handlers and one CORS test.
+        </p>
+        <div class="meta">
+          <div class="card">
+            <span class="meta-label">Activity Date</span>
+            <span class="meta-value">Sunday, June 14, 2026</span>
+          </div>
+          <div class="card">
+            <span class="meta-label">Commits</span>
+            <span class="meta-value value-strong">1</span>
+          </div>
+          <div class="card">
+            <span class="meta-label">Primary Commit</span>
+            <span class="meta-value">ce65e7b</span>
+          </div>
+          <div class="card">
+            <span class="meta-label">Touched Files</span>
+            <span class="meta-value">5 files</span>
+          </div>
+        </div>
+      </article>
+
+      <section>
+        <h2>Summary</h2>
+        <div class="summary-grid">
+          <div class="card">
+            <strong>Commit scope</strong>
+            <p>
+              The only recorded git activity for June 14 was commit <code>ce65e7b</code> by
+              <code>dirtydishes</code> at 15:37 EDT.
+            </p>
+          </div>
+          <div class="card">
+            <strong>Why it was made</strong>
+            <p>
+              The same commit added and closed Beads issue <code>islandflow-0e3</code>, titled
+              <code>Fix PR 23 CI failures</code>, with the close reason
+              <code>Local Validate workflow passes after applying formatter output and syncing the Docker workspace snapshot.</code>
+            </p>
+          </div>
+          <div class="card">
+            <strong>What changed most</strong>
+            <p>
+              File churn was dominated by <code>services/api/src/index.ts</code>, but a
+              whitespace-ignored diff reduces the commit to 19 insertions and 10 deletions across
+              the whole patch.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <div class="stack">
+          <div class="commit-grid">
+            <div class="commit-card">
+              <h3>Commit ce65e7b</h3>
+              <div class="commit-hash">ce65e7b45f13bc69e0a9d102e650b6af009d40b5</div>
+              <p>
+                Message: <code>fix pr ci validation</code>
+              </p>
+              <div class="chip-row">
+                <span class="chip good">Beads issue closed</span>
+                <span class="chip info">PR 23 CI context</span>
+                <span class="chip warn">Mostly formatter churn</span>
+              </div>
+            </div>
+            <div class="commit-card">
+              <h3>Files In Play</h3>
+              <div class="file-list">
+                <span class="file-pill">.beads/issues.jsonl</span>
+                <span class="file-pill">deployment/docker/workspace-root/package.json</span>
+                <span class="file-pill">deployment/docker/workspace-root/bun.lock</span>
+                <span class="file-pill">services/api/src/index.ts</span>
+                <span class="file-pill">services/api/tests/cors.test.ts</span>
+              </div>
+            </div>
+          </div>
+          <ul>
+            <li>
+              <code>.beads/issues.jsonl</code> gained issue <code>islandflow-0e3</code> and marked
+              it closed in the same commit, explicitly tying the work to PR 23 validation.
+            </li>
+            <li>
+              <code>deployment/docker/workspace-root/package.json</code> changed the Docker
+              workspace override for <code>tmp</code> from <code>^0.2.5</code> to
+              <code>^0.2.6</code>.
+            </li>
+            <li>
+              <code>deployment/docker/workspace-root/bun.lock</code> refreshed the same override
+              and resolved the package snapshot from <code>tmp@0.2.5</code> to <code>tmp@0.2.7</code>.
+            </li>
+            <li>
+              <code>services/api/src/index.ts</code> was reformatted around API response builders
+              and several history and replay handlers; the whitespace-ignored diff shows only small
+              indentation and line-break corrections.
+            </li>
+            <li>
+              <code>services/api/tests/cors.test.ts</code> compressed one multiline expectation for
+              <code>access-control-allow-headers</code> into the formatter's preferred single-line
+              shape.
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          This activity followed the earlier June 13 API CORS fix tracked as
+          <code>islandflow-9w7</code>. The June 14 commit did not introduce a new feature branch of
+          work. Instead, it recorded a PR-validation cleanup pass, with the commit itself and the
+          new Beads issue both naming CI validation as the target.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <div class="detail-grid">
+          <div class="callout">
+            <strong>Whitespace versus behavior</strong>
+            <p>
+              Raw <code>git show --stat</code> reports 930 changed lines in
+              <code>services/api/src/index.ts</code>, but <code>git diff -w</code> narrows the
+              meaningful delta for the whole commit to 29 total changed lines.
+            </p>
+          </div>
+          <div class="callout">
+            <strong>Dependency sync was explicit</strong>
+            <p>
+              Both Docker workspace files were updated together, so the override declaration and the
+              lock snapshot stayed aligned on the <code>tmp</code> patch line.
+            </p>
+          </div>
+          <div class="callout">
+            <strong>PR tracking stayed local</strong>
+            <p>
+              The PR reference comes from the Beads issue text inside the commit. No additional PR
+              metadata was added elsewhere in the repo on June 14.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <p>
+          No direct end-user feature change is visible in the June 14 patch. The commit was aimed
+          at making the PR 23 validation path pass cleanly and keeping the Docker workspace
+          dependency snapshot current with the configured override.
+        </p>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li>
+            Commit <code>ce65e7b</code> closed <code>islandflow-0e3</code> with the recorded result
+            <code>Local Validate workflow passes after applying formatter output and syncing the Docker workspace snapshot.</code>
+          </li>
+          <li>
+            The standup summary itself was grounded with <code>git log</code>, <code>git show</code>,
+            <code>git diff -w</code>, and the June 14 Beads record.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>
+            The commit message and Beads issue confirm that validation passed locally, but this
+            document does not add an external CI run URL because none was recorded in the repo
+            history for June 14.
+          </li>
+          <li>
+            The API file churn is visually large, so this summary explicitly uses a
+            whitespace-ignored review to avoid overstating formatter-only movement as logic change.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>
+            No additional follow-up issue was created in commit <code>ce65e7b</code> beyond closing
+            <code>islandflow-0e3</code>.
+          </li>
+          <li>
+            The repo still shows unrelated ongoing work in <code>islandflow-2op</code>, but that
+            issue was not updated by the June 14 commit.
+          </li>
+        </ul>
+        <p class="inline-note">
+          Generated on June 15, 2026 for standup coverage of June 14, 2026.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>
