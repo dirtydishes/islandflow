@@ -165,15 +165,15 @@
       <h1>Polish Dashboard Route and Command Rail</h1>
       <div class="facts">
         <div class="fact"><span>Branch</span><strong>lavender/dashboard-route-polish</strong></div>
-        <div class="fact"><span>Issues</span><strong>islandflow-j30, islandflow-h0k</strong></div>
-        <div class="fact"><span>Surface</span><strong>Dashboard route and command rail</strong></div>
+        <div class="fact"><span>Issues</span><strong>islandflow-j30, islandflow-h0k, islandflow-v6f</strong></div>
+        <div class="fact"><span>Surface</span><strong>Dashboard route, command rail, and Priority Board</strong></div>
         <div class="fact"><span>Validation</span><strong>Next production build passed</strong></div>
       </div>
     </header>
 
     <section>
       <h2>Summary</h2>
-      <p>The dashboard route now has a single visible page title, <code>Dashboard</code>, and a compact command rail below it for live state, update time, ticker scope, filters, and replay switching. The polish removes duplicated page-header language and isolates the rail from legacy compact-header styles.</p>
+      <p>The dashboard route now has a single visible page title, <code>Dashboard</code>, a compact command rail below it, and a more readable virtualized Priority Board. The latest live pass removes the redundant packet column, strips the noisy <code>flowpacket:</code> prefix from secondary metadata, and changes vague decision language to review-oriented copy.</p>
     </section>
 
     <section>
@@ -186,12 +186,16 @@
         <li>Moved accepted live-preview styles into durable dashboard-specific CSS classes.</li>
         <li>Promoted <code>Dashboard</code> to the route-level title and removed duplicated visible title copy from the command rail.</li>
         <li>Added explicit narrow-screen rail overflow, mobile touch sizing, hover/focus feedback, and reduced-motion coverage.</li>
+        <li>Rebuilt the Priority Board as a four-column layout: event, evidence read, score, and review.</li>
+        <li>Moved packet IDs into secondary evidence metadata and removed the redundant <code>flowpacket:</code> prefix.</li>
+        <li>Added TanStack virtual scrolling to the Priority Board rows so the table can scroll smoothly without rendering every row at once.</li>
+        <li>Renamed visible dashboard <code>Decision</code> copy to clearer <code>Focus</code>, <code>Review</code>, and <code>Review Levels</code> labels.</li>
       </ul>
     </section>
 
     <section>
       <h2>Context</h2>
-      <p>This started as an Impeccable live-mode polish pass on the root dashboard header. The follow-up pass moved the work onto a dedicated branch and tightened the whole <code>/</code> route hierarchy so the page title and command rail do distinct jobs.</p>
+      <p>This started as an Impeccable live-mode polish pass on the root dashboard header. The follow-up pass moved the work onto a dedicated branch and tightened the whole <code>/</code> route hierarchy so the page title, command rail, and high-priority evidence table each do distinct jobs.</p>
     </section>
 
     <section>
@@ -201,6 +205,8 @@
         <li>The header keeps the existing Islandflow terminal identity: dark surfaces, mono metadata, sparse state color, flat borders, and compact density.</li>
         <li>The command rail no longer inherits <code>command-deck-header</code> or <code>compact-command-bar</code>, which prevents generic mobile rules from changing its display mode.</li>
         <li>The responsive rule hides the last-seen cell below the existing <code>1180px</code> breakpoint, then uses horizontal overflow and <code>44px</code> touch-height cells below <code>720px</code>.</li>
+        <li>The Priority Board uses <code>useVirtualizer</code> with a fixed <code>56px</code> estimate, <code>overscan: 8</code>, and stable row keys from the existing priority-row model.</li>
+        <li>The virtualized table keeps the header outside the scroll viewport so column labels remain stable while rows scroll.</li>
       </ul>
     </section>
 
@@ -279,21 +285,72 @@
 <span class="add">+    min-width: 100%;</span>
 <span class="add">+  }</span>
 <span class="add">+  .dashboard-command-cell,</span>
-<span class="add">+  .dashboard-command-action { min-height: 44px; }</span></code></pre>
+<span class="add">+  .dashboard-command-action { min-height: 44px; }</span>
+
+<span class="file">diff --git a/apps/web/app/terminal.tsx b/apps/web/app/terminal.tsx</span>
+<span class="hunk">@@ -9105,35 +9125,57 @@ const CommandPriorityBoard = ({ state }: { state: TerminalState }) =&gt; {</span>
+<span class="add">+  const tableRef = useRef&lt;HTMLDivElement | null&gt;(null);</span>
+<span class="add">+  const rowVirtualizer = useVirtualizer&lt;HTMLDivElement, HTMLElement&gt;({</span>
+<span class="add">+    count: rows.length,</span>
+<span class="add">+    getScrollElement: () =&gt; tableRef.current,</span>
+<span class="add">+    estimateSize: () =&gt; 56,</span>
+<span class="add">+    overscan: 8,</span>
+<span class="add">+    getItemKey: (index) =&gt; rows[index]?.key ?? index</span>
+<span class="add">+  });</span>
+<span class="add">+  const virtualRows = rowVirtualizer.getVirtualItems();</span>
+<span class="del">-          &lt;div className="command-priority-row is-head" role="row"&gt;</span>
+<span class="del">-            {["Time", "Sym", "Packet", "Read", "Score", "Decision", "State"].map((label) =&gt; (</span>
+<span class="add">+          &lt;div className="command-priority-head" role="row"&gt;</span>
+<span class="add">+            &lt;span role="columnheader"&gt;Event&lt;/span&gt;</span>
+<span class="add">+            &lt;span role="columnheader"&gt;Evidence read&lt;/span&gt;</span>
+<span class="add">+            &lt;span role="columnheader"&gt;Score&lt;/span&gt;</span>
+<span class="add">+            &lt;span role="columnheader"&gt;Review&lt;/span&gt;</span>
+<span class="del">-          {rows.map((row) =&gt; (</span>
+<span class="add">+          &lt;div className="command-priority-viewport" ref={tableRef}&gt;</span>
+<span class="add">+            &lt;div className="command-priority-spacer" style={{ height: `${rowVirtualizer.getTotalSize()}px` }}&gt;</span>
+<span class="add">+              {virtualRows.map((virtualRow) =&gt; {</span>
+<span class="add">+                const row = rows[virtualRow.index];</span>
+<span class="del">-              &lt;span&gt;{row.packet}&lt;/span&gt;</span>
+<span class="del">-              &lt;span&gt;{row.read}&lt;/span&gt;</span>
+<span class="add">+                    &lt;span className="command-priority-read"&gt;</span>
+<span class="add">+                      &lt;strong&gt;{row.read}&lt;/strong&gt;</span>
+<span class="add">+                      &lt;em&gt;{row.packet.replace(/^flowpacket:/, "")}&lt;/em&gt;</span>
+<span class="add">+                    &lt;/span&gt;</span>
+
+<span class="file">diff --git a/apps/web/app/globals.css b/apps/web/app/globals.css</span>
+<span class="hunk">@@ -1386,19 +1386,48 @@ h3 {</span>
+<span class="del">-  min-width: 760px;</span>
+<span class="del">-  overflow-x: auto;</span>
+<span class="add">+  min-width: 0;</span>
+<span class="add">+  height: 100%;</span>
+<span class="add">+  display: grid;</span>
+<span class="add">+  grid-template-rows: 30px minmax(0, 1fr);</span>
+<span class="add">+  overflow: hidden;</span>
+<span class="del">-  grid-template-columns: 76px 58px 112px minmax(160px, 1fr) 104px 96px 78px;</span>
+<span class="add">+  grid-template-columns: 132px minmax(220px, 1fr) 112px 148px;</span>
+<span class="add">+.command-priority-viewport {</span>
+<span class="add">+  min-height: 0;</span>
+<span class="add">+  overflow: auto;</span>
+<span class="add">+}</span>
+<span class="add">+.command-priority-row {</span>
+<span class="add">+  position: absolute;</span>
+<span class="add">+  top: 0;</span>
+<span class="add">+  left: 0;</span></code></pre>
       </div>
     </section>
 
     <section>
       <h2>Expected Impact for End-Users</h2>
-      <p>The root dashboard should now scan with less duplication: the page title says where the user is, while the rail shows operational state. Users can tell that <code>SPY</code> is the active scope, not an unexplained label, and the empty filter state reads as an intentional all-flow view.</p>
+      <p>The root dashboard should now scan with less duplication: the page title says where the user is, the rail shows operational state, and the Priority Board keeps evidence readable in a compact table. Users no longer have to decode a redundant packet column, and larger priority lists can scroll without turning the table into a cramped horizontal strip.</p>
     </section>
 
     <section>
       <h2>Validation</h2>
       <ul>
         <li>Ran Impeccable live mode, generated three header variants, and accepted variant 3.</li>
+        <li>Ran a second Impeccable live pass on the Priority Board, generated three table variants, accepted the virtualized four-column direction, then integrated it as production source.</li>
         <li>Confirmed no live markers or temporary variant wrappers remain in source.</li>
-        <li>Confirmed the dev page responds at <code>http://localhost:3000/</code>.</li>
+        <li>Confirmed the dev page responds at <code>http://localhost:3000/</code>; the smoke fetch returned a <code>23264</code>-byte HTML response.</li>
         <li>Ran the Impeccable detector on <code>apps/web/app/terminal.tsx</code>, <code>apps/web/app/globals.css</code>, and <code>apps/web/app/page.tsx</code>. Remaining warnings are broad pre-existing copy/style signals, plus a 1px separator false positive outside the changed rail.</li>
         <li>Ran <code>bun test apps/web/app/terminal.test.ts</code>; all 76 tests passed.</li>
         <li>Ran <code>bun --cwd=apps/web run build</code>; Next.js production build and TypeScript completed successfully.</li>
@@ -304,17 +361,18 @@
       <h2>Issues, Limitations, and Mitigations</h2>
       <ul>
         <li>The command rail is intentionally dense. To protect narrower widths, the last-seen cell hides at the existing <code>1180px</code> breakpoint.</li>
+        <li>The Priority Board row height is estimated at <code>56px</code> for virtualization. If future row content becomes multi-line, the estimate may need to be revisited.</li>
         <li>The in-app browser surface was unavailable in this session, so visual iteration happened through the live helper and system browser fallback.</li>
         <li>The live helper stored a stale diagnostic about carbonize cleanup, but source inspection and build validation confirmed cleanup was completed.</li>
-        <li>For this follow-up pass, Chrome/in-app browser automation was still unavailable, so final visual validation used route fetches, source inspection, detector output, focused tests, and production build validation.</li>
+        <li>For this follow-up pass, Playwright browser automation could not launch because the local Chromium and default Chrome binaries were missing. Final validation used route fetches, source inspection, detector output, focused tests, and production build validation.</li>
       </ul>
     </section>
 
     <section>
       <h2>Follow-up Work</h2>
       <ul>
-        <li>No required follow-up is filed for this polish pass.</li>
-        <li>Optional future pass: add focused interaction coverage for the dashboard header rail and its clear-filter buttons.</li>
+        <li>No required follow-up remains for this polish pass.</li>
+        <li>Optional future pass: add focused interaction coverage for the dashboard header rail, clear-filter buttons, and Priority Board row virtualization.</li>
       </ul>
     </section>
   </main>

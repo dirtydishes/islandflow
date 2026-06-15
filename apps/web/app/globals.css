@@ -1386,38 +1386,26 @@ h3 {
 }
 
 .command-priority-table {
-  min-width: 760px;
-  overflow-x: auto;
+  min-width: 0;
+  height: 100%;
+  display: grid;
+  grid-template-rows: 30px minmax(0, 1fr);
+  overflow: hidden;
   border-top: 1px solid var(--border);
 }
 
+.command-priority-head,
 .command-priority-row {
   width: 100%;
-  min-height: 42px;
   display: grid;
-  grid-template-columns: 76px 58px 112px minmax(160px, 1fr) 104px 96px 78px;
-  gap: 8px;
+  grid-template-columns: 132px minmax(220px, 1fr) 112px 148px;
+  gap: 10px;
   align-items: center;
   padding: 0 10px;
-  border: 0;
   border-bottom: 1px solid oklch(0.72 0.012 250 / 0.09);
-  background: transparent;
-  color: var(--text-dim);
-  text-align: left;
 }
 
-.command-priority-row:not(.is-head) {
-  cursor: pointer;
-}
-
-.command-priority-row:not(.is-head):hover,
-.command-priority-row:not(.is-head):focus-visible {
-  background: var(--route-accent-soft);
-  color: var(--text);
-  outline: none;
-}
-
-.command-priority-row.is-head {
+.command-priority-head {
   min-height: 30px;
   color: var(--text-faint);
   font-family: var(--font-mono), monospace;
@@ -1426,25 +1414,68 @@ h3 {
   text-transform: uppercase;
 }
 
+.command-priority-viewport {
+  min-height: 0;
+  overflow: auto;
+}
+
+.command-priority-spacer {
+  position: relative;
+  min-width: 0;
+}
+
+.command-priority-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 0;
+  border-bottom: 1px solid oklch(0.72 0.012 250 / 0.09);
+  background: transparent;
+  color: var(--text-dim);
+  text-align: left;
+}
+
+.command-priority-row:hover,
+.command-priority-row:focus-visible {
+  background: var(--route-accent-soft);
+  color: var(--text);
+  outline: none;
+}
+
+.command-priority-head span,
 .command-priority-row time,
 .command-priority-row span,
-.command-priority-row strong {
+.command-priority-row strong,
+.command-priority-row em {
   min-width: 0;
   overflow: hidden;
+  font-family: var(--font-mono), monospace;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .command-priority-row time,
 .command-priority-row span {
-  font-family: var(--font-mono), monospace;
   font-size: 0.7rem;
 }
 
 .command-priority-row strong {
   color: var(--text);
-  font-family: var(--font-mono), monospace;
   font-size: 0.76rem;
+}
+
+.command-priority-event,
+.command-priority-read,
+.command-priority-review {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.command-priority-read em {
+  color: var(--text-faint);
+  font-style: normal;
+  font-size: 0.64rem;
 }
 
 .command-priority-row.is-reject strong,

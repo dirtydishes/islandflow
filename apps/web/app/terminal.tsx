@@ -9079,7 +9079,7 @@ const CommandMetricsStrip = ({ state }: { state: TerminalState }) => {
       detail: focus
     },
     {
-      label: "Decision",
+      label: "Focus",
       value: decision,
       detail: state.selectedInstrument ? "focused instrument" : "chart context"
     },
@@ -9105,6 +9105,15 @@ const CommandMetricsStrip = ({ state }: { state: TerminalState }) => {
 
 const CommandPriorityBoard = ({ state }: { state: TerminalState }) => {
   const rows = useMemo(() => buildCommandPriorityRows(state), [state]);
+  const tableRef = useRef<HTMLDivElement | null>(null);
+  const rowVirtualizer = useVirtualizer<HTMLDivElement, HTMLElement>({
+    count: rows.length,
+    getScrollElement: () => tableRef.current,
+    estimateSize: () => 56,
+    overscan: 8,
+    getItemKey: (index) => rows[index]?.key ?? index
+  });
+  const virtualRows = rowVirtualizer.getVirtualItems();
 
   return (
     <Pane
@@ -9116,42 +9125,64 @@ const CommandPriorityBoard = ({ state }: { state: TerminalState }) => {
         <div className="empty">No priority events are available for this scope yet.</div>
       ) : (
         <div className="command-priority-table" role="table" aria-label="Priority board">
-          <div className="command-priority-row is-head" role="row">
-            {["Time", "Sym", "Packet", "Read", "Score", "Decision", "State"].map((label) => (
-              <span role="columnheader" key={label}>
-                {label}
-              </span>
-            ))}
+          <div className="command-priority-head" role="row">
+            <span role="columnheader">Event</span>
+            <span role="columnheader">Evidence read</span>
+            <span role="columnheader">Score</span>
+            <span role="columnheader">Review</span>
           </div>
-          {rows.map((row) => (
-            <button
-              className={`command-priority-row is-${row.state}`}
-              key={row.key}
-              type="button"
-              onClick={row.onOpen}
+          <div className="command-priority-viewport" ref={tableRef}>
+            <div
+              className="command-priority-spacer"
+              style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
             >
-              <time>{formatTime(row.ts)}</time>
-              <strong>{row.symbol}</strong>
-              <span>{row.packet}</span>
-              <span>{row.read}</span>
-              <span
-                className="command-score-meter"
-                style={{ "--score": `${row.score}%` } as CSSProperties}
-              >
-                <i />
-                <em>{row.score}</em>
-              </span>
-              <span>{row.invalidation}</span>
-              <span className={`command-state command-state-${row.state}`}>{row.state}</span>
-            </button>
-          ))}
+              {virtualRows.map((virtualRow) => {
+                const row = rows[virtualRow.index];
+                if (!row) {
+                  return null;
+                }
+                return (
+                  <button
+                    className={`command-priority-row is-${row.state}`}
+                    key={virtualRow.key}
+                    type="button"
+                    onClick={row.onOpen}
+                    style={{
+                      height: `${virtualRow.size}px`,
+                      transform: `translateY(${virtualRow.start}px)`
+                    }}
+                  >
+                    <span className="command-priority-event">
+                      <time>{formatTime(row.ts)}</time>
+                      <strong>{row.symbol}</strong>
+                    </span>
+                    <span className="command-priority-read">
+                      <strong>{row.read}</strong>
+                      <em>{row.packet.replace(/^flowpacket:/, "")}</em>
+                    </span>
+                    <span
+                      className="command-score-meter"
+                      style={{ "--score": `${row.score}%` } as CSSProperties}
+                    >
+                      <i />
+                      <em>{row.score}</em>
+                    </span>
+                    <span className="command-priority-review">
+                      <span>{row.invalidation}</span>
+                      <span className={`command-state command-state-${row.state}`}>{row.state}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
     </Pane>
   );
 };
 
-const CommandDecisionLevels = ({ state }: { state: TerminalState }) => {
+const CommandReviewLevels = ({ state }: { state: TerminalState }) => {
   const topOption = state.filteredOptions[0];
   const topOptionLabel = topOption
     ? (formatOptionContractLabel(normalizeContractId(topOption.option_contract_id))?.strike ??
@@ -9176,7 +9207,7 @@ const CommandDecisionLevels = ({ state }: { state: TerminalState }) => {
   return (
     <Pane
       className="command-levels-pane"
-      title="Decision Levels"
+      title="Review Levels"
       status={<span className="command-pane-meta">current scope</span>}
     >
       <dl className="command-level-list">
@@ -10273,7 +10304,7 @@ export function OverviewRoute() {
         <div className="market-command-grid">
           <CommandPriorityBoard state={state} />
           <ChartPane state={state} title="Chart Context" />
-          <CommandDecisionLevels state={state} />
+          <CommandReviewLevels state={state} />
           <OptionsPane
             state={state}
             limit={12}
