@@ -12,6 +12,7 @@ Scoring should wait until the system can represent evidence clearly and syntheti
 
 - Architecture plan: [`docs/plans/smart-flow-architecture-review.md`](../../plans/smart-flow-architecture-review.md)
 - Research report: [`docs/research-docs/smart-flow-market-mechanics.md`](../../research-docs/smart-flow-market-mechanics.md)
+- Research architecture review copy: [`docs/research-docs/smart-flow-architecture-review.md`](../../research-docs/smart-flow-architecture-review.md)
 
 These documents are rationale, not added scope. This phase implements only cautious hypothesis scoring, alternatives, penalties, and abstention.
 

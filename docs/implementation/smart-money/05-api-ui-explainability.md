@@ -12,6 +12,7 @@ The presentation layer should wait until contracts, evidence, scoring, and repla
 
 - Architecture plan: [`docs/plans/smart-flow-architecture-review.md`](../../plans/smart-flow-architecture-review.md)
 - Research report: [`docs/research-docs/smart-flow-market-mechanics.md`](../../research-docs/smart-flow-market-mechanics.md)
+- Research architecture review copy: [`docs/research-docs/smart-flow-architecture-review.md`](../../research-docs/smart-flow-architecture-review.md)
 
 These documents are rationale, not added scope. This phase implements only API, websocket, and UI explainability surfaces for validated outputs.
 

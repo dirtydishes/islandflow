@@ -12,6 +12,7 @@ The current system has useful infrastructure but overconfident domain names. Bef
 
 - Architecture plan: [`docs/plans/smart-flow-architecture-review.md`](../../plans/smart-flow-architecture-review.md)
 - Research report: [`docs/research-docs/smart-flow-market-mechanics.md`](../../research-docs/smart-flow-market-mechanics.md)
+- Research architecture review copy: [`docs/research-docs/smart-flow-architecture-review.md`](../../research-docs/smart-flow-architecture-review.md)
 
 These documents are rationale, not added scope. This phase implements only vocabulary, contracts, versioning, and compatibility notes.
 
@@ -27,7 +28,7 @@ These documents are rationale, not added scope. This phase implements only vocab
 
 ## Dependencies on earlier phases
 
-- `islandflow-259.1` - Synthetic deterministic spine, so contract work can align with canonical raw event and provenance assumptions.
+None. This phase can safely run in parallel with `islandflow-259.1`; align on the existing canonical raw market event contracts and provenance assumptions, but do not wait for synthetic package implementation.
 
 ## Likely files/modules touched
 

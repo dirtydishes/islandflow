@@ -12,6 +12,7 @@ It is useful to name the future work now so early designs keep calibration hooks
 
 - Architecture plan: [`docs/plans/synthetic-market-data-architecture-review.md`](../../plans/synthetic-market-data-architecture-review.md)
 - Research report: [`docs/research-docs/synthetic-market-data-generation.md`](../../research-docs/synthetic-market-data-generation.md)
+- Research architecture review copy: [`docs/research-docs/synthetic-data-architecture-review.md`](../../research-docs/synthetic-data-architecture-review.md)
 
 These documents are rationale, not added scope. This future phase is the place to turn research ideas into scoped calibration work after MVP.
 

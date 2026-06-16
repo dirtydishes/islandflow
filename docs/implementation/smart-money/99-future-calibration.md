@@ -12,6 +12,7 @@ The architecture should leave room for calibration, but calibration should not b
 
 - Architecture plan: [`docs/plans/smart-flow-architecture-review.md`](../../plans/smart-flow-architecture-review.md)
 - Research report: [`docs/research-docs/smart-flow-market-mechanics.md`](../../research-docs/smart-flow-market-mechanics.md)
+- Research architecture review copy: [`docs/research-docs/smart-flow-architecture-review.md`](../../research-docs/smart-flow-architecture-review.md)
 
 These documents are rationale, not added scope. This future phase is the place to turn research ideas into scoped calibration work after MVP.
 

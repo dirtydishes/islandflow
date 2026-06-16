@@ -23,7 +23,7 @@ The research documents are background and rationale only. Scope comes from the B
 
 | Phase | Beads issue | Depends on | Purpose |
 | --- | --- | --- | --- |
-| 01 - Contracts and vocabulary | `islandflow-zxh.1` | `islandflow-259.1` | Define evidence/hypothesis/insight contracts and retire canonical overconfidence. |
+| 01 - Contracts and vocabulary | `islandflow-zxh.1` | None; safe parallel with `islandflow-259.1` | Define evidence/hypothesis/insight contracts and retire canonical overconfidence. |
 | 02 - Evidence clustering and features | `islandflow-zxh.2` | `islandflow-259.2` | Extract eligibility, evidence facts, clusters, and traceable features. |
 | 03 - Hypothesis scoring and abstention | `islandflow-zxh.3` | `islandflow-259.3` | Score cautious hypotheses and represent abstention/alternatives. |
 | 04 - Replay evaluation and golden tests | `islandflow-zxh.4` | `islandflow-259.4` | Validate derived outputs through deterministic replay and golden fixtures. |

@@ -12,6 +12,7 @@ Replay evaluation should come after synthetic replay can select stable runs and 
 
 - Architecture plan: [`docs/plans/smart-flow-architecture-review.md`](../../plans/smart-flow-architecture-review.md)
 - Research report: [`docs/research-docs/smart-flow-market-mechanics.md`](../../research-docs/smart-flow-market-mechanics.md)
+- Research architecture review copy: [`docs/research-docs/smart-flow-architecture-review.md`](../../research-docs/smart-flow-architecture-review.md)
 - Synthetic research report: [`docs/research-docs/synthetic-market-data-generation.md`](../../research-docs/synthetic-market-data-generation.md)
 
 These documents are rationale, not added scope. This phase implements only deterministic replay evaluation and compact golden tests.

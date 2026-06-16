@@ -8,10 +8,12 @@ The architecture reviews in `docs/plans/` and research reports in `docs/research
 
 Use this precedence order when planning or implementing phase work:
 
-1. Beads issue
-2. Phase document in `docs/implementation/`
-3. Architecture plan in `docs/plans/`
-4. Research report in `docs/research-docs/`
+1. Current Beads issue
+2. Referenced phase document under `docs/implementation/`
+3. Architecture plan under `docs/plans/`
+4. Research report under `docs/research-docs/`
+
+This repository uses `docs/research-docs/` for research reports; `docs/research/` is not present.
 
 Research reports provide rationale and useful constraints. They do not add active implementation scope unless that scope is explicitly pulled into a phase document and Beads issue.
 
@@ -46,16 +48,16 @@ This is the intended MVP ordering. Future calibration phases sit after the MVP c
 
 | Order | Phase | Beads issue | Blocks next because |
 | ---: | --- | --- | --- |
-| 1 | Synthetic deterministic spine | `islandflow-259.1` | The smart-flow vocabulary needs stable raw event/provenance assumptions. |
-| 2 | Smart-flow contracts and vocabulary | `islandflow-zxh.1` | Synthetic manifests should target the eventual evidence/hypothesis language. |
-| 3 | Synthetic manifests, fixtures, and CLI | `islandflow-259.2` | Evidence clustering needs deterministic fixtures before broad behavior changes. |
-| 4 | Smart-flow evidence clustering and features | `islandflow-zxh.2` | Scenario labels need the evidence vocabulary they are expected to exercise. |
-| 5 | Synthetic scenarios, labels, and expected outputs | `islandflow-259.3` | Hypothesis scoring needs labeled positive, negative, and abstention cases. |
-| 6 | Smart-flow hypothesis scoring and abstention | `islandflow-zxh.3` | Synthetic replay integration should validate the derived hypothesis pipeline. |
-| 7 | Synthetic replay integration | `islandflow-259.4` | Smart-flow golden tests need replayable synthetic runs. |
-| 8 | Smart-flow replay evaluation and golden tests | `islandflow-zxh.4` | Demos should wait until replay proves the semantics. |
-| 9 | Synthetic demo and load profiles | `islandflow-259.5` | API/UI explainability should show stable, named, deterministic runs. |
-| 10 | Smart-flow API/UI explainability | `islandflow-zxh.5` | This is the final MVP presentation layer after the evidence pipeline is validated. |
+| 1A | Synthetic deterministic spine | `islandflow-259.1` | Establishes seeded raw event generation and provenance assumptions for later synthetic work. |
+| 1B | Smart-flow contracts and vocabulary | `islandflow-zxh.1` | Can safely run in parallel with synthetic phase 01; defines evidence/hypothesis language before scoring work. |
+| 2 | Synthetic manifests, fixtures, and CLI | `islandflow-259.2` | Evidence clustering needs deterministic fixtures before broad behavior changes. |
+| 3 | Smart-flow evidence clustering and features | `islandflow-zxh.2` | Scenario labels need the evidence vocabulary they are expected to exercise. |
+| 4 | Synthetic scenarios, labels, and expected outputs | `islandflow-259.3` | Hypothesis scoring needs labeled positive, negative, and abstention cases. |
+| 5 | Smart-flow hypothesis scoring and abstention | `islandflow-zxh.3` | Synthetic replay integration should validate the derived hypothesis pipeline. |
+| 6 | Synthetic replay integration | `islandflow-259.4` | Smart-flow golden tests need replayable synthetic runs. |
+| 7 | Smart-flow replay evaluation and golden tests | `islandflow-zxh.4` | Demos should wait until replay proves the semantics. |
+| 8 | Synthetic demo and load profiles | `islandflow-259.5` | API/UI explainability should show stable, named, deterministic runs. |
+| 9 | Smart-flow API/UI explainability | `islandflow-zxh.5` | This is the final MVP presentation layer after the evidence pipeline is validated. |
 
 ## Future Work
 

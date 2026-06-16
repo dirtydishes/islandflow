@@ -12,6 +12,7 @@ The generator and manifest layers should exist before scenario authoring. Smart-
 
 - Architecture plan: [`docs/plans/synthetic-market-data-architecture-review.md`](../../plans/synthetic-market-data-architecture-review.md)
 - Research report: [`docs/research-docs/synthetic-market-data-generation.md`](../../research-docs/synthetic-market-data-generation.md)
+- Research architecture review copy: [`docs/research-docs/synthetic-data-architecture-review.md`](../../research-docs/synthetic-data-architecture-review.md)
 - Smart-flow research report: [`docs/research-docs/smart-flow-market-mechanics.md`](../../research-docs/smart-flow-market-mechanics.md)
 
 These documents are rationale, not added scope. This phase implements only named scenarios, separate labels, and expected-output contracts.

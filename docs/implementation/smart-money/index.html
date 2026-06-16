@@ -486,7 +486,7 @@ tr:last-child td { border-bottom: 0; }
 <div class="table-wrap"><table>
 <thead><tr><th>Phase</th><th>Beads issue</th><th>Depends on</th><th>Purpose</th></tr></thead>
 <tbody>
-<tr><td>01 - Contracts and vocabulary</td><td><code>islandflow-zxh.1</code></td><td><code>islandflow-259.1</code></td><td>Define evidence/hypothesis/insight contracts and retire canonical overconfidence.</td></tr>
+<tr><td>01 - Contracts and vocabulary</td><td><code>islandflow-zxh.1</code></td><td>None; safe parallel with <code>islandflow-259.1</code></td><td>Define evidence/hypothesis/insight contracts and retire canonical overconfidence.</td></tr>
 <tr><td>02 - Evidence clustering and features</td><td><code>islandflow-zxh.2</code></td><td><code>islandflow-259.2</code></td><td>Extract eligibility, evidence facts, clusters, and traceable features.</td></tr>
 <tr><td>03 - Hypothesis scoring and abstention</td><td><code>islandflow-zxh.3</code></td><td><code>islandflow-259.3</code></td><td>Score cautious hypotheses and represent abstention/alternatives.</td></tr>
 <tr><td>04 - Replay evaluation and golden tests</td><td><code>islandflow-zxh.4</code></td><td><code>islandflow-259.4</code></td><td>Validate derived outputs through deterministic replay and golden fixtures.</td></tr>
@@ -529,6 +529,7 @@ tr:last-child td { border-bottom: 0; }
 <ul>
 <li>Architecture plan: <a href="../../plans/smart-flow-architecture-review.md">docs/plans/smart-flow-architecture-review.md</a></li>
 <li>Research report: <a href="../../research-docs/smart-flow-market-mechanics.md">docs/research-docs/smart-flow-market-mechanics.md</a></li>
+<li>Research architecture review copy: <a href="../../research-docs/smart-flow-architecture-review.md">docs/research-docs/smart-flow-architecture-review.md</a></li>
 </ul>
 <p>These documents are rationale, not added scope. This phase implements only vocabulary, contracts, versioning, and compatibility notes.</p>
 <h3 id="01-contracts-vocabulary-research-basis">Research basis</h3>
@@ -542,9 +543,7 @@ tr:last-child td { border-bottom: 0; }
 <li>Participant identity claims and research-grade calibration stay outside the vocabulary foundation.</li>
 </ul>
 <h3 id="01-contracts-vocabulary-dependencies-on-earlier-phases">Dependencies on earlier phases</h3>
-<ul>
-<li><code>islandflow-259.1</code> - Synthetic deterministic spine, so contract work can align with canonical raw event and provenance assumptions.</li>
-</ul>
+<p>None. This phase can safely run in parallel with <code>islandflow-259.1</code>; align on the existing canonical raw market event contracts and provenance assumptions, but do not wait for synthetic package implementation.</p>
 <h3 id="01-contracts-vocabulary-likely-files-modules-touched">Likely files/modules touched</h3>
 <ul>
 <li><code>packages/types/src/events.ts</code></li>
@@ -613,6 +612,7 @@ tr:last-child td { border-bottom: 0; }
 <ul>
 <li>Architecture plan: <a href="../../plans/smart-flow-architecture-review.md">docs/plans/smart-flow-architecture-review.md</a></li>
 <li>Research report: <a href="../../research-docs/smart-flow-market-mechanics.md">docs/research-docs/smart-flow-market-mechanics.md</a></li>
+<li>Research architecture review copy: <a href="../../research-docs/smart-flow-architecture-review.md">docs/research-docs/smart-flow-architecture-review.md</a></li>
 </ul>
 <p>These documents are rationale, not added scope. This phase implements only eligibility, evidence facts, clustering, and traceable features.</p>
 <h3 id="02-evidence-clustering-features-research-basis">Research basis</h3>
@@ -700,6 +700,7 @@ tr:last-child td { border-bottom: 0; }
 <ul>
 <li>Architecture plan: <a href="../../plans/smart-flow-architecture-review.md">docs/plans/smart-flow-architecture-review.md</a></li>
 <li>Research report: <a href="../../research-docs/smart-flow-market-mechanics.md">docs/research-docs/smart-flow-market-mechanics.md</a></li>
+<li>Research architecture review copy: <a href="../../research-docs/smart-flow-architecture-review.md">docs/research-docs/smart-flow-architecture-review.md</a></li>
 </ul>
 <p>These documents are rationale, not added scope. This phase implements only cautious hypothesis scoring, alternatives, penalties, and abstention.</p>
 <h3 id="03-hypothesis-scoring-abstention-research-basis">Research basis</h3>
@@ -788,6 +789,7 @@ tr:last-child td { border-bottom: 0; }
 <ul>
 <li>Architecture plan: <a href="../../plans/smart-flow-architecture-review.md">docs/plans/smart-flow-architecture-review.md</a></li>
 <li>Research report: <a href="../../research-docs/smart-flow-market-mechanics.md">docs/research-docs/smart-flow-market-mechanics.md</a></li>
+<li>Research architecture review copy: <a href="../../research-docs/smart-flow-architecture-review.md">docs/research-docs/smart-flow-architecture-review.md</a></li>
 <li>Synthetic research report: <a href="../../research-docs/synthetic-market-data-generation.md">docs/research-docs/synthetic-market-data-generation.md</a></li>
 </ul>
 <p>These documents are rationale, not added scope. This phase implements only deterministic replay evaluation and compact golden tests.</p>
@@ -876,6 +878,7 @@ tr:last-child td { border-bottom: 0; }
 <ul>
 <li>Architecture plan: <a href="../../plans/smart-flow-architecture-review.md">docs/plans/smart-flow-architecture-review.md</a></li>
 <li>Research report: <a href="../../research-docs/smart-flow-market-mechanics.md">docs/research-docs/smart-flow-market-mechanics.md</a></li>
+<li>Research architecture review copy: <a href="../../research-docs/smart-flow-architecture-review.md">docs/research-docs/smart-flow-architecture-review.md</a></li>
 </ul>
 <p>These documents are rationale, not added scope. This phase implements only API, websocket, and UI explainability surfaces for validated outputs.</p>
 <h3 id="05-api-ui-explainability-research-basis">Research basis</h3>
@@ -966,6 +969,7 @@ tr:last-child td { border-bottom: 0; }
 <ul>
 <li>Architecture plan: <a href="../../plans/smart-flow-architecture-review.md">docs/plans/smart-flow-architecture-review.md</a></li>
 <li>Research report: <a href="../../research-docs/smart-flow-market-mechanics.md">docs/research-docs/smart-flow-market-mechanics.md</a></li>
+<li>Research architecture review copy: <a href="../../research-docs/smart-flow-architecture-review.md">docs/research-docs/smart-flow-architecture-review.md</a></li>
 </ul>
 <p>These documents are rationale, not added scope. This future phase is the place to turn research ideas into scoped calibration work after MVP.</p>
 <h3 id="99-future-calibration-research-basis">Research basis</h3>
