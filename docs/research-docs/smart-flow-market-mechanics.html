@@ -1,0 +1,729 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Islandflow Research: Smart Flow Market Mechanics</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg-core: #06080b;
+      --bg-elevated: #0b1016;
+      --bg-pane: #111820;
+      --bg-pane-2: #0d141b;
+      --bg-soft: #ffffff08;
+      --border-subtle: #ffffff14;
+      --border-strong: #ffffff24;
+      --border-accent: #ffb13059;
+      --text-primary: #e6edf4;
+      --text-dim: #a7b4c4;
+      --text-faint: #7d8b9c;
+      --signal-amber: #f5a623;
+      --signal-amber-soft: #f5a6231f;
+      --confirm-green: #25c17a;
+      --risk-red: #ff6b5f;
+      --info-blue: #4da3ff;
+      --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+      --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+      --display: Quantico, "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      background:
+        linear-gradient(180deg, rgba(77, 163, 255, 0.07), transparent 360px),
+        radial-gradient(circle at 82% 12%, rgba(245, 166, 35, 0.11), transparent 280px),
+        var(--bg-core);
+      color: var(--text-primary);
+      font-family: var(--sans);
+      font-size: 16px;
+      line-height: 1.65;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    .shell {
+      display: grid;
+      grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      border-right: 1px solid var(--border-subtle);
+      background: rgba(6, 8, 11, 0.92);
+      padding: 22px 18px;
+    }
+
+    .brand {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 24px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .brand-mark {
+      color: var(--signal-amber);
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .brand-title {
+      margin: 0;
+      font-family: var(--display);
+      font-size: 1.35rem;
+      line-height: 1.05;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      text-wrap: balance;
+    }
+
+    .brand-meta {
+      color: var(--text-faint);
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      line-height: 1.4;
+    }
+
+    .toc {
+      display: grid;
+      gap: 5px;
+    }
+
+    .toc-label {
+      margin: 0 0 10px;
+      color: var(--text-faint);
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .toc-link {
+      display: block;
+      border-radius: 8px;
+      color: var(--text-dim);
+      font-family: var(--mono);
+      font-size: 0.74rem;
+      line-height: 1.25;
+      padding: 8px 10px;
+      text-decoration: none;
+    }
+
+    .toc-link:hover,
+    .toc-link:focus {
+      background: var(--bg-soft);
+      color: var(--text-primary);
+      outline: none;
+    }
+
+    .toc-l2 {
+      padding-left: 20px;
+      color: var(--text-faint);
+    }
+
+    main {
+      min-width: 0;
+    }
+
+    .hero {
+      border-bottom: 1px solid var(--border-subtle);
+      padding: clamp(36px, 6vw, 72px) clamp(24px, 7vw, 96px) 30px;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(240px, 360px);
+      gap: clamp(24px, 5vw, 64px);
+      align-items: end;
+    }
+
+    .kicker {
+      width: fit-content;
+      margin: 0 0 16px;
+      border: 1px solid var(--border-accent);
+      border-radius: 999px;
+      background: var(--signal-amber-soft);
+      color: var(--signal-amber);
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      padding: 5px 10px;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 980px;
+      margin: 0;
+      font-family: var(--display);
+      font-size: clamp(2.15rem, 5vw, 5.2rem);
+      line-height: 0.98;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      text-wrap: balance;
+    }
+
+    .hero-deck {
+      margin: 18px 0 0;
+      max-width: 72ch;
+      color: var(--text-dim);
+      font-size: 1.02rem;
+      text-wrap: pretty;
+    }
+
+    .principles {
+      display: grid;
+      gap: 10px;
+      border-top: 1px solid var(--border-subtle);
+      border-bottom: 1px solid var(--border-subtle);
+      background: rgba(17, 24, 32, 0.72);
+      padding: 14px;
+    }
+
+    .principle {
+      display: grid;
+      grid-template-columns: 18px 1fr;
+      gap: 10px;
+      align-items: start;
+      color: var(--text-dim);
+      font-size: 0.88rem;
+      line-height: 1.45;
+    }
+
+    .principle::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      margin-top: 8px;
+      border: 1px solid var(--signal-amber);
+      background: var(--signal-amber-soft);
+    }
+
+    .content {
+      width: min(100%, 1040px);
+      min-width: 0;
+      padding: 34px clamp(20px, 5vw, 72px) 80px;
+    }
+
+    article {
+      display: grid;
+      min-width: 0;
+      gap: 0;
+    }
+
+    article > * {
+      min-width: 0;
+    }
+
+    h2,
+    h3 {
+      text-wrap: balance;
+    }
+
+    h2 {
+      margin: 54px 0 16px;
+      border-top: 1px solid var(--border-strong);
+      padding-top: 22px;
+      color: var(--text-primary);
+      font-family: var(--display);
+      font-size: 1.55rem;
+      line-height: 1.15;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    h3 {
+      margin: 32px 0 12px;
+      color: var(--signal-amber);
+      font-family: var(--mono);
+      font-size: 0.9rem;
+      line-height: 1.3;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    article > h1 {
+      display: none;
+    }
+
+    p,
+    li {
+      max-width: 75ch;
+      color: var(--text-dim);
+      text-wrap: pretty;
+    }
+
+    p {
+      margin: 0 0 16px;
+    }
+
+    .lead-term {
+      max-width: 86ch;
+      border-top: 1px solid var(--border-subtle);
+      margin: 0;
+      padding: 13px 0;
+    }
+
+    .lead-term strong {
+      color: var(--text-primary);
+    }
+
+    strong {
+      color: var(--text-primary);
+      font-weight: 700;
+    }
+
+    ul,
+    ol {
+      display: grid;
+      gap: 8px;
+      margin: 0 0 18px;
+      padding-left: 24px;
+    }
+
+    li::marker {
+      color: var(--signal-amber);
+    }
+
+    code {
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-primary);
+      font-family: var(--mono);
+      font-size: 0.88em;
+      padding: 0.1em 0.32em;
+    }
+
+    pre {
+      max-width: 100%;
+      overflow-x: auto;
+      border: 1px solid var(--border-subtle);
+      background: #05080d;
+      margin: 18px 0 28px;
+      padding: 18px;
+    }
+
+    pre code {
+      border: 0;
+      background: transparent;
+      color: #dce7f3;
+      display: block;
+      font-size: 0.82rem;
+      line-height: 1.55;
+      padding: 0;
+    }
+
+    .table-wrap {
+      max-width: 100%;
+      overflow-x: auto;
+      border-top: 1px solid var(--border-strong);
+      border-bottom: 1px solid var(--border-strong);
+      margin: 18px 0 30px;
+    }
+
+    table {
+      width: 100%;
+      min-width: 900px;
+      border-collapse: collapse;
+      font-size: 0.86rem;
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 11px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #0b1016;
+      color: var(--text-primary);
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    td {
+      color: var(--text-dim);
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.025);
+    }
+
+    .citation {
+      display: inline-flex;
+      align-items: center;
+      max-width: 100%;
+      border: 1px solid rgba(77, 163, 255, 0.28);
+      border-radius: 999px;
+      background: rgba(77, 163, 255, 0.1);
+      color: #9cccff;
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      line-height: 1;
+      margin-left: 0.25rem;
+      padding: 0.28rem 0.45rem;
+      vertical-align: 0.12em;
+      white-space: nowrap;
+    }
+
+    .doc-footer {
+      border-top: 1px solid var(--border-subtle);
+      color: var(--text-faint);
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      margin-top: 56px;
+      padding-top: 18px;
+    }
+
+    @media (max-width: 980px) {
+      .shell {
+        display: block;
+      }
+
+      .sidebar {
+        position: static;
+        height: auto;
+        border-right: 0;
+        border-bottom: 1px solid var(--border-subtle);
+      }
+
+      .toc {
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      }
+
+      .hero-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      body {
+        font-size: 15px;
+      }
+
+      .hero {
+        padding-inline: 18px;
+      }
+
+      .content {
+        padding-inline: 18px;
+      }
+
+      .principles {
+        padding: 12px;
+      }
+
+      h1 {
+        font-size: 2.2rem;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html {
+        scroll-behavior: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar" aria-label="Document navigation">
+      <div class="brand">
+        <div class="brand-mark">Islandflow Research</div>
+        <p class="brand-title">Smart Flow Market Mechanics</p>
+        <div class="brand-meta">Readable HTML edition<br>Generated Jun 16, 2026, 1:01 PM</div>
+      </div>
+      <nav class="toc" aria-label="Table of contents">
+        <p class="toc-label">Contents</p>
+        <a class="toc-link toc-l1" href="#islandflow-research-report-on-informed-flow-detection-in-equities-and-options">Islandflow Research Report on Informed Flow Detection in Equities and Options</a>
+<a class="toc-link toc-l2" href="#executive-summary">Executive summary</a>
+<a class="toc-link toc-l2" href="#options-market-mechanics">Options market mechanics</a>
+<a class="toc-link toc-l2" href="#equity-market-mechanics">Equity market mechanics</a>
+<a class="toc-link toc-l2" href="#cross-asset-confirmation-and-participant-hypotheses">Cross-asset confirmation and participant hypotheses</a>
+<a class="toc-link toc-l2" href="#signal-catalog">Signal catalog</a>
+<a class="toc-link toc-l2" href="#false-positives-and-scoring-philosophy">False positives and scoring philosophy</a>
+<a class="toc-link toc-l2" href="#data-requirements-validation-and-final-recommendations">Data requirements, validation, and final recommendations</a>
+      </nav>
+    </aside>
+    <main>
+      <header class="hero">
+        <div class="hero-grid">
+          <div>
+            <p class="kicker">Market-Structure Evidence Engine</p>
+            <h1>Informed Flow Detection in Equities and Options</h1>
+            <p class="hero-deck">A readable, evidence-first version of the Islandflow research report. The emphasis is on direct observation, explicit inference, false-positive control, and product labels that can admit uncertainty.</p>
+          </div>
+          <div class="principles" aria-label="Core research posture">
+            <div class="principle">Direct observation first: preserve raw trades, quotes, timestamps, condition codes, and reference context.</div>
+            <div class="principle">Inference second: score aggressor side, opening likelihood, IV demand, package structure, and confirmation quality separately.</div>
+            <div class="principle">Hypothesis third: surface directional, volatility, hedge, event, or ambiguous candidates only when evidence survives competing explanations.</div>
+          </div>
+        </div>
+      </header>
+      <section class="content">
+        <article>
+<h1 id="islandflow-research-report-on-informed-flow-detection-in-equities-and-options">Islandflow Research Report on Informed Flow Detection in Equities and Options</h1>
+<h2 id="executive-summary">Executive summary</h2>
+<p>The practical lesson from the market-structure literature is not “smart money leaves obvious footprints.” It is the opposite: <strong>good flow detection is mostly a disciplined exercise in ruling out bad explanations</strong>. Public options and equity data can reliably show that a trade happened, where it printed relative to the quote, whether it was exchange or TRF-reported, whether an options print was flagged as multi-leg or auction-like, how the quote looked at that time, and how volume/open interest/IV compared with history. Public data usually <strong>cannot</strong> directly identify the trader, directly identify whether a specific trade opened or closed a position, directly reveal a parent order, or prove that a print reflected fundamental information rather than hedging, rebalancing, inventory transfer, or event-volatility trading. OPRA disseminates consolidated listed-options last sale and quote information, but not a trader identity field; FINRA TRFs disseminate off-exchange equity reports, but off-exchange is broader than “dark pool.” OCC calculates options open interest end-of-day, and exchange proprietary open/close summaries exist, but those are not the same thing as trade-level public truth. <span class="citation" aria-label="source references">t24search5 · t27search6 · t1search12 · t24search2 · t24search3</span></p>
+<p>For an implementation like Islandflow, the most useful posture is: <strong>direct observation first, inference second, hypothesis third</strong>. Direct observations should be stored losslessly and replayably: timestamps, trade price/size, bid/ask/mid, spread width, sale/condition codes, venue/TRF flags, OI snapshots, contract metadata, adjusted-contract status, and catalyst context. Inference layers should be explicit and probabilistic: aggressor-side confidence, spread-package likelihood, open/close likelihood, volatility-demand likelihood, equity-confirmation quality, and evidence-quality penalties. Product labels should be built from these components, not from a single magic “smart money score.” <span class="citation" aria-label="source references">t20search1 · t30view2 · t24search8 · t18view0 · t34search3</span></p>
+<p>The strongest retail-accessible signals are not raw “whale” notional prints. They are <strong>bundles</strong>: quote-consistent options aggression in a liquid contract, abnormal size relative to that contract’s own baseline, supportive IV/skew behavior, supportive underlying equity prints or price/volume response, and no obvious event-noise or spread/hedge explanation. The weakest signals are standalone large premium, isolated deep-ITM trades, isolated 0DTE bursts near known catalysts, mid-quote or wide-spread prints in illiquid contracts, and late/corrected/off-hours equity prints treated as if they were contemporaneous intent. <span class="citation" aria-label="source references">t21search2 · t31view2 · t32search5 · t11view1 · t31view1 · t18view2</span></p>
+<p>A skeptical reading of the evidence says the platform should optimize for <strong>confidence scoring, abstention, and preserved evidence</strong>, not bravado. There is credible literature that some options flow contains information about future equity returns or volatility, especially when buyer-initiated opening activity is known; there is also credible literature showing that options quotes often do not lead stock prices, that trade-signing is noisy, and that market-maker hedging and demand pressure can move options prices and IV without implying directional information. Both camps are right often enough that any serious product must keep the uncertainty visible. <span class="citation" aria-label="source references">t11view6 · t21search2 · t4search3 · t4search11 · t32search5 · t32search21</span></p>
+<h2 id="options-market-mechanics">Options market mechanics</h2>
+<p class="lead-term"><strong>NBBO, bid/ask/mid interpretation.</strong> Plain English: the NBBO is the best displayed national bid and offer for an options series, and the midpoint is the arithmetic middle of those quotes. Market mechanism: listed options are quote-driven and fragmented across many exchanges; order protection and locked/crossed-market rules exist, but what you usually see in retail-accessible data is top-of-book consolidated quote context rather than full depth. Required data: OPRA trades, OPRA NBBO quotes, contract metadata, and timestamps. Reliable inferences: a trade at or through the ask is <em>more likely</em> buyer-initiated; at or through the bid is <em>more likely</em> seller-initiated; a narrow spread and fresh quote make that inference better. Unreliable inferences: mid-prints, crossed/locked or stale quotes, and trades in complex/auctioned packages. Common false positives: price improvement, midpoint executions, quote flicker, and venue-specific auctions. Algorithmically, use a quote-rule classifier with tolerance bands around bid/ask, record distance-to-mid and spread percentile, and downweight or abstain when spread is wide, quote age is elevated, or the print is flagged as complex/auction-like. Caveat: even in older proprietary tests, option trade-signing accuracy was only around 80% to 83% for common quote-based rules, and modern fast markets complicate this further. <span class="citation" aria-label="source references">t8search7 · t24search5 · t20search1 · t30view2 · t11view1</span></p>
+<p class="lead-term"><strong>Aggressor-side inference.</strong> Plain English: you are inferring who demanded liquidity, not observing it directly. Mechanism: standard trade-signing rules compare the print to the prevailing quote, then use tick-rule fallbacks for midpoint trades. Required data: synchronized trades and quotes with event timestamps. Reliable inferences: bid/ask prints in liquid names with narrow spreads and correctly aligned quotes. Unreliable inferences: inside-spread prints, auction prints, complex orders, fast markets, and one-cent spread environments where price-improvement rules can invert naïve assumptions. False positives: “buy at bid / sell at ask” edge cases, quote reversals, or trade/quote timestamp mismatch. Detection idea: produce an <code>aggressor_confidence</code> score instead of a boolean. One practical scheme is 1.0 for trades touching ask/bid on a fresh narrow quote, lower for inside-spread prints, and zero for excluded condition codes or stale quotes. Caveat: your model should preserve the raw quote and classification path so the user can audit why you called it buyer- or seller-initiated. <span class="citation" aria-label="source references">t20search1 · t30view2 · t30view1</span></p>
+<p class="lead-term"><strong>Quote staleness and quote-quality problems.</strong> Plain English: the quote you match against may already be wrong by the time the trade hits your feed. Mechanism: options quotes must constantly reprice off the underlying; when the stock moves quickly, an options market maker can be “stale” for milliseconds, creating latency-arbitrage opportunities and making print-vs-quote interpretation unreliable. Required data: trade timestamp, quote timestamp, underlying trade/quote timestamps, and optionally provider receive timestamps. Reliable inferences: only after checking quote recency and quote continuity. Unreliable inferences: during fast stock moves, large quote bursts, crossed/locked quotes, and wide-spread periods. False positives: a print near ask during a stale quote can look like urgent bullish buying when it is really a stale-market capture. Detection idea: compute quote age in event time, underlying move since quote, quote-update burst rate, and spread percentile; heavily penalize if the underlying moved materially after the displayed option quote was formed. Caveat: options SIP data are operationally bursty, and different vendors expose different timestamp layers; replay must preserve both event and receive timestamps when available. <span class="citation" aria-label="source references">t9search2 · t30view2 · t33search4 · t33search6</span></p>
+<p class="lead-term"><strong>Sweeps versus blocks.</strong> Plain English: a “sweep” is urgency across liquidity pools; a “block” is just a big print, which may or may not reflect urgency. Mechanism: in options, intermarket sweep orders are formal order types under the options order-protection framework; in retail “flow” tooling, a sweep often means multiple near-simultaneous fills in the same contract across exchanges. Required data: per-trade venue, timestamps, trade size, and order-condition fields; for better fidelity, underlying quote changes too. Reliable inferences: near-simultaneous same-series fills across multiple exchanges at escalating prices are decent evidence of urgency. Unreliable inferences: a single large print can be a cross, facilitation, QCC-like mechanism, or part of a spread. False positives: auction/cross prints, negotiated facilitation, delayed reporting, or a single broker slicing patiently across time. Detection idea: cluster same-series fills within a short event-time window, require multi-venue participation or monotone price taking, and penalize if condition codes indicate auction/cross/complex structure. Caveat: “large” should be contract-relative and liquidity-relative, never an absolute threshold. <span class="citation" aria-label="source references">t26search14 · t26search2 · t29view4</span></p>
+<p class="lead-term"><strong>Trade condition codes.</strong> Plain English: these are the market’s own labels telling you the trade mechanics were unusual, complex, late, out of sequence, official, or otherwise special. Mechanism: OPRA and the equity SIPs encode transaction types and sale conditions; some condition codes explicitly say complex stock-option trades, floor trades, crosses, compression trades, or extended-hours trades that do not update O/H/L/C. Required data: raw condition codes retained exactly as delivered. Reliable inferences: condition codes are high-value disqualifiers and context fields. Unreliable inferences: treating every disseminated trade as a “normal” price-discovery event. False positives: counting extended-hours, compression, official close/open, or qualified contingent trades as directional signals. Detection idea: maintain a condition-code policy table with <code>eligible_for_alert</code>, <code>eligible_for_aggressor</code>, <code>eligible_for_baseline</code>, and <code>eligible_for_price_confirmation</code> flags. Caveat: the safest default is to exclude or sharply downweight anything not clearly regular and contemporaneous. <span class="citation" aria-label="source references">t29view4 · t29view1 · t19view4 · t19view6</span></p>
+<p class="lead-term"><strong>Multi-leg spread detection.</strong> Plain English: many options prints are not single-view directional bets; they are spreads, rolls, collars, stock-option packages, or auctioned complex orders. Mechanism: OPRA trade message types explicitly identify many multi-leg, stock-option, auction, and cross executions. Required data: OPRA trade condition/message type, series metadata, near-simultaneous trades across strikes/expiries/put-call sides, and underlying equity prints for stock-option packages. Reliable inferences: a trade flagged as multi-leg or stock-option should be treated as structure-first, direction-second. Unreliable inferences: reading one leg of a spread as a standalone bullish or bearish order. False positives: vertical spreads, straddles, strangles, risk reversals, collars, delta hedges, rolls, and basis/arbitrage packages. Detection idea: first use explicit OPRA complex flags; then add rule-based package reconstruction over short windows using common size, opposing deltas, equal-premium families, and strike/expiry geometry. Caveat: public data will miss some parent-order linkage, so package reconstruction should produce a probability and an abstain option, not fake certainty. <span class="citation" aria-label="source references">t29view4 · t2search16</span></p>
+<p class="lead-term"><strong>Opening versus closing inference.</strong> Plain English: public trade tape usually does not tell you whether a specific customer trade opened or closed a position. Mechanism: OCC computes open interest after the session by netting opening and closing activity, exercises, and assignments; exchanges separately sell proprietary open/close summary products. Required data: at minimum daily OCC open interest and the prior day’s value; optionally exchange proprietary open/close summaries. Reliable inferences: if same-day volume massively exceeds prior open interest, at least some flow must have opened new positions; if exchange open/close datasets show buy-to-open or sell-to-close volume, that is useful but exchange-scoped. Unreliable inferences: “volume &gt; OI means all opening” or “OI tomorrow up means this exact print opened.” False positives: rolls, exercises/assignments, multi-exchange fragmentation, and exchange-only open/close data mistaken for market-wide truth. Detection idea: compute <code>volume / prior_OI</code>, next-day <code>ΔOI</code>, and exchange-scoped open/close summaries when available; expose that as an opening-likelihood band, not a hard label. Caveat: OPRA itself is not an open/close feed. <span class="citation" aria-label="source references">t6search4 · t24search2 · t24search3 · t24search9</span></p>
+<p class="lead-term"><strong>Volume versus open interest.</strong> Plain English: volume is today’s trading activity; open interest is yesterday’s remaining outstanding contracts after clearing. Mechanism: OCC calculates OI centrally at end-of-day after consolidating exchange reports and exercise/assignment effects. Required data: intraday volume, prior-day OI, and next-day OI if available for ex-post validation. Reliable inferences: high volume with low prior OI indicates position turnover or creation pressure worth watching. Unreliable inferences: using OI as if it were intraday live inventory. False positives: contracts near expiration, rolls into new strikes/dates, corporate-action adjustments, and assignment effects. Detection idea: rank <code>volume / max(prior_OI, 1)</code> and <code>premium / prior_OI</code> by contract and by ticker; penalize expiry-week contracts and adjusted options. Caveat: same-day alerting must use prior OI, not tomorrow’s OI. <span class="citation" aria-label="source references">t6search4 · t29view3</span></p>
+<p class="lead-term"><strong>Premium concentration.</strong> Plain English: concentrating a lot of premium in one contract can matter, but premium alone is not information. Mechanism: option premium reflects intrinsic value, time value, IV, and demand pressure; deep-ITM contracts can carry huge notional premium with near-stock-like exposure, while small OTM contracts can look dramatic in percentage terms with little capital at risk. Required data: premium paid, contract multiplier, delta, moneyness, tenor, contract ADV/OI, and ticker-level historical baseline. Reliable inferences: concentrated premium in liquid ATM/OTM contracts with supportive IV and equity response can be informative. Unreliable inferences: ranking by gross premium alone. False positives: deep-ITM stock replacement, covered-call overwrites, collars, rolls, and volatility trades. Detection idea: normalize premium by contract baseline, by ticker daily option premium, and by delta-adjusted notional; separately tag intrinsic-heavy versus extrinsic-heavy flow. Caveat: “largest premium of the day” is a marketing metric, not a microstructure conclusion. <span class="citation" aria-label="source references">t23search5 · t31view2 · t32search5</span></p>
+<p class="lead-term"><strong>Short-dated and 0DTE flow.</strong> Plain English: same-day and ultra-short-dated options are now a big part of the market, but much of that activity is tactical hedging or volatility trading rather than classic directional information. Mechanism: 0DTE contracts have extreme gamma and fast-decaying time value; market-makers must hedge them dynamically, and both retail and proprietary accounts use them heavily around intraday events. Required data: days-to-expiry, intraday quotes, IV, greeks, underlying prints, macro/earnings calendar. Reliable inferences: 0DTE bursts are evidence of urgency and event sensitivity, not evidence of informed direction by default. Unreliable inferences: treating 0DTE size as a stronger “smart money” signal than longer-dated positioning. False positives: CPI/FOMC days, dealer gamma hedging, retail lottery trades, intraday gamma scalping. Detection idea: add a strong 0DTE penalty unless the flow is repeated, liquid, quote-aligned, and confirmed by underlying and IV behavior. Caveat: SEC support data show 0DTE’s share of listed-options volume rose materially through 2025, but institutional and hedging activity still concentrates heavily in longer maturities; one recent paper on SPX 0DTEs finds evidence more consistent with delta-hedging than with information-based trading. <span class="citation" aria-label="source references">t11view0 · t11view3 · t31view1</span></p>
+<p class="lead-term"><strong>Deep ITM versus ATM versus OTM interpretation.</strong> Plain English: moneyness changes what a trade probably means. Mechanism: deep-ITM options have large delta and mostly intrinsic value; ATM options maximize gamma sensitivity; OTM options are cheap convexity and event-lottery instruments. Required data: underlying spot, strike, tenor, delta, extrinsic value, and dividend/early-exercise context if relevant. Reliable inferences: deep-ITM flow often resembles stock replacement or hedge; ATM flow often reflects directional or gamma-sensitive positioning; OTM flow often reflects convexity demand or event speculation. Unreliable inferences: “OTM calls = informed bull; ITM puts = informed bear” without context. False positives: collars, covered overwrites, protective puts, merger-event convexity. Detection idea: bucket by delta or moneyness bands and score differently; e.g., deep-ITM contracts should require much stronger cross-asset confirmation before any directional label. Caveat: OIC explicitly notes that deep-ITM options have much larger delta and far-OTM options very low delta/probability of finishing ITM. <span class="citation" aria-label="source references">t23search5 · t22search1</span></p>
+<p class="lead-term"><strong>Implied-volatility expansion and skew changes.</strong> Plain English: IV and skew can confirm that the market repriced risk, but that repricing can come from demand pressure and dealer constraints, not only information. Mechanism: buying pressure affects the shape and level of the implied-volatility surface; skew is the strike-by-strike IV difference across the same expiry. Required data: trade prices, contemporaneous quotes, model IV, historical IV baseline, strike surface snapshots, and ideally greeks. Reliable inferences: if a contract prints aggressively and local IV lifts relative to the rest of the surface, that is useful evidence of demand. Unreliable inferences: “IV up, therefore informed” or “skew steepening, therefore directional smart money.” False positives: scheduled events, broad crash-hedge demand, dealer supply constraints, and ETF/index hedges that bleed into single-name surfaces. Detection idea: compute local IV shock, term-structure shock, and skew-slope change after excluding obvious event windows. Caveat: academic work shows public order flow can move IV shape directly, and demand-based option pricing models explain why option prices can deviate from simplistic no-demand intuition even without pure information. <span class="citation" aria-label="source references">t6search15 · t31view2 · t32search5</span></p>
+<p class="lead-term"><strong>Delta, gamma, vega context and market-maker hedging.</strong> Plain English: you cannot interpret options flow well without knowing what risk was traded. Mechanism: delta tracks directional sensitivity, gamma captures how fast delta changes, and vega captures sensitivity to IV; market makers typically hedge net delta and sometimes other greeks, pushing activity into the underlying or related options. Required data: greeks per trade or contract snapshot, underlying price path, and ideally surface snapshots. Reliable inferences: high-delta deep-ITM prints can be stock substitutes; high-gamma short-dated ATM prints can force aggressive dealer hedging; high-vega longer-dated prints may be volatility positioning. Unreliable inferences: equating large premium with large directional conviction without greek context. False positives: a vega trade into earnings, a gamma scalp, or a delta-neutral structure can all look “massive” while expressing little or no simple directional view. Detection idea: always compute delta-adjusted notional, gamma-per-day-to-expiry, and vega concentration; if the signal is strong on vega but weak on net delta, classify as volatility demand, not directional flow. Caveat: OIC treats greeks as theoretical guides, not exact realized sensitivities, and both theory and newer evidence indicate market-maker hedging materially affects both options and underlying-stock behavior. <span class="citation" aria-label="source references">t22search1 · t22search5 · t32search21 · t32search5</span></p>
+<p class="lead-term"><strong>Why large premium does not automatically imply directional conviction.</strong> This is the single biggest anti-hype principle. Large premium can come from intrinsic-heavy deep-ITM stock replacement, protective hedges, overwrites, spread packages, roll activity, event-volatility buying, index hedging, and demand-pressure-driven repricing. The literature most supportive of informed options trading becomes much stronger when the data know who initiated the trade and whether it opened a position; the public-tape version is weaker. That means a public “huge call premium” alert should never be treated as self-sufficient evidence of informed bullish conviction. <span class="citation" aria-label="source references">t11view4 · t11view6 · t21search2 · t31view2 · t32search5</span></p>
+<h2 id="equity-market-mechanics">Equity market mechanics</h2>
+<p class="lead-term"><strong>Lit exchange prints versus off-exchange/TRF prints.</strong> Plain English: lit prints happen on exchanges; off-exchange prints are reported to FINRA facilities. Mechanism: FINRA TRFs exist to report OTC transactions in NMS stocks effected otherwise than on an exchange. Off-exchange includes ATS/dark-pool activity, wholesaler/internalizer activity, and other broker-dealer OTC prints; it is not synonymous with dark pools. Required data: trade venue/exchange/TRF flag, sale conditions, timestamps, and SIP quotes. Reliable inferences: a TRF flag tells you the print was off-exchange. Unreliable inferences: “TRF = dark pool institution” or “off-exchange = hidden accumulation.” False positives: retail-wholesaler internalization, delayed reports, average-price reports, and administrative/corrective prints. Detection idea: classify off-exchange as a separate evidence channel with lower directional weight unless size, timing, and quote alignment are unusually strong and corroborated by other signals. Caveat: FINRA’s venue-level ATS and non-ATS transparency data are published on a delayed basis, so the real-time tape usually does not give venue-level dark-pool truth. <span class="citation" aria-label="source references">t27search6 · t17view0 · t28search1 · t28search13 · t27search19</span></p>
+<p class="lead-term"><strong>Trade reporting delays and corrections.</strong> Plain English: some equity prints arrive late, out of sequence, or corrected, so they can look like current intent when they are stale bookkeeping. Mechanism: FINRA’s trade reporting rules require rapid reporting in regular hours, with specific late/out-of-sequence modifiers; the SIP sale-condition matrices also encode prior reference price, average price, official open/close, contingent trade, and similar exceptions. Required data: execution timestamp, report timestamp if available, sale conditions/modifiers, and correction/cancel messages. Reliable inferences: only contemporaneously reported, last-sale-eligible regular prints should heavily influence real-time intent inference. Unreliable inferences: any print with late/out-of-sequence/correction pricing logic treated as fresh pressure. False positives: after-hours reports, NAV-based or average-price trades, prior-reference-price corrections, or late-reported blocks. Detection idea: maintain an equity eligibility state machine keyed off sale conditions and late thresholds; drop or heavily penalize <code>.Z</code>, <code>.U</code>, prior-reference-price, average-price, and corrected/cancelled activity from directional alerts. Caveat: what matters for replay is event time, not when your app happened to ingest the message. <span class="citation" aria-label="source references">t18view0 · t18view2 · t19view4 · t19view6 · t33search16</span></p>
+<p class="lead-term"><strong>Bid/mid/ask classification.</strong> Plain English: trade-signing in equities is also an inference problem. Mechanism: classic quote rule, tick rule, and Lee-Ready combine price-vs-quote and last-price direction to classify prints. Required data: high-quality trade-and-quote data with participant timestamps if possible. Reliable inferences: prints clearly at ask or bid on fresh narrow quotes. Unreliable inferences: midpoint/inside-spread prints and high-speed environments with trade/quote lag. False positives: ECN/internalized midpoint activity, short-sale bias in certain classification settings, and high-volume periods where trade signing degrades. Detection idea: use quote rule first, then tick fallback only when necessary, and report confidence. Caveat: the literature consistently finds classification algorithms degrade for inside-quote trades and fast markets; they are useful, but not ground truth. <span class="citation" aria-label="source references">t30view1 · t30view3 · t30view2</span></p>
+<p class="lead-term"><strong>Large block prints.</strong> Plain English: a big print can matter, but a big print is often plumbing, not alpha. Mechanism: institutions and brokers use crosses, contingent trades, and other large negotiated mechanisms to minimize market impact; those prints may hit the tape in ways that do not represent fresh, aggressive price discovery. Required data: size versus symbol baseline, sale conditions, report timing, TRF/lit flag, and quote context. Reliable inferences: a large print at or through the quote, reported contemporaneously, followed by related activity, is more meaningful than a standalone large out-of-sequence cross. Unreliable inferences: “large print = accumulation/distribution” without quote and condition context. False positives: VWAP/average-price allocations, portfolio transitions, ETF basket hedges, step-outs, and contingent trades. Detection idea: rank size by symbol intraday percentile, require quote alignment and contemporaneous reporting, and reduce weight if sale conditions indicate contingent/cross/official pricing logic. Caveat: publicly available equity tape generally shows the print, not the parent order, broker intent, or portfolio context. <span class="citation" aria-label="source references">t19view2 · t19view6 · t17view0</span></p>
+<p class="lead-term"><strong>Accumulation/distribution inference limits.</strong> Plain English: repeated buying-like prints do not prove a long-term institution is accumulating, and repeated selling-like prints do not prove distribution. Mechanism: a parent order can be sliced across venues and brokers, but so can hedges, passive rebalancing, or execution algorithms chasing benchmarks. Required data: sequential trade-signing, quote changes, off-exchange/lit mix, and volume baselines. Reliable inferences: persistent quote-consistent imbalance that also moves price/quote and survives event-noise filters. Unreliable inferences: isolated net-buy or net-sell tape counts. False positives: benchmark execution, ETF rebalance days, opening/closing auction effects, and market-making inventory management. Detection idea: look for multi-window persistence, price response, and quote depletion rather than raw counts. Caveat: without order-book provenance or account data, accumulation is a hypothesis, not an observed fact. <span class="citation" aria-label="source references">t30view2 · t7search0</span></p>
+<p class="lead-term"><strong>Quote/spread context.</strong> Plain English: the same print means different things in a one-cent spread than in a thirty-cent spread. Mechanism: effective spread measures execution relative to the midpoint, while quoted spread describes visible trading cost; spreads vary enormously by liquidity tier. Required data: NBBO at execution, spread width, trade price, and liquidity baseline. Reliable inferences: quote-aligned prints in tight spreads are more informative. Unreliable inferences: quote-aligned prints in wide spreads or thin names. False positives: any classifier that ignores spread regime will overstate confidence in illiquid names. Detection idea: attach a quality penalty as spread percentile widens and as quote depth thins. Caveat: SEC support data show even listed-options spreads are much worse outside the most liquid underliers, which is exactly where retail “unusual activity” tools often overfire. <span class="citation" aria-label="source references">t11view1 · t11view2</span></p>
+<p class="lead-term"><strong>Odd lots and liquidity issues.</strong> Plain English: small-share prints and small-size quotes can matter in modern equities, but they complicate simplistic tape reading. Mechanism: odd-lot information has been added and expanded under recent Regulation NMS changes, and best odd-lot orders can improve on the displayed NBBO. Required data: odd-lot quote/transaction support from the provider, round-lot size metadata, and quote depth. Reliable inferences: none, unless you know how your provider handles odd-lot information and mixed lots. Unreliable inferences: using only displayed round-lot NBBO when meaningful odd-lot liquidity exists inside it, or assuming every small print is noise. False positives: apparent quote “crossings,” phantom slippage, and mismeasured midpoint prints if odd-lot improvement is ignored. Detection idea: if your provider does not fully support odd-lot quote information, lower confidence for high-priced names and small-size prints. Caveat: the rules and implementations have been changing, so provider normalization differences matter a lot. <span class="citation" aria-label="source references">t17view1 · t14search13 · t14search11</span></p>
+<p class="lead-term"><strong>Dark-pool inference limits from public trade/quote data.</strong> Plain English: the public tape can tell you a lot about off-exchange activity, but usually not enough to say which dark pool matched the trade or what the resting hidden liquidity looked like in real time. Mechanism: ATS and non-ATS transparency data exist, but on delayed publication schedules; real-time SIP/TRF dissemination does not usually solve attribution at the same granularity. Required data: TRF flag in real time, plus delayed FINRA ATS/non-ATS transparency for ex-post study. Reliable inferences: rising off-exchange share in a ticker may matter as context. Unreliable inferences: “this TRF print came from a specific dark pool” or “this dark print is institutional accumulation.” False positives: internalized retail orders and non-ATS broker activity inside TRF totals. Detection idea: use real-time off-exchange prints as weak confirmation only, and use delayed FINRA transparency data to build ticker-level venue profiles for research, not same-minute alert certainty. <span class="citation" aria-label="source references">t28search1 · t28search3 · t27search19 · t27search1</span></p>
+<h2 id="cross-asset-confirmation-and-participant-hypotheses">Cross-asset confirmation and participant hypotheses</h2>
+<p>The most meaningful confirmations are <strong>mechanically linked confirmations</strong>, not vibe-based ones. Stronger confirmation examples are: aggressive call buying in a liquid contract followed by quote-consistent buy pressure or price-strength in the underlying; put buying or downside skew steepening accompanied by weak underlying tape; volatility-demand flow followed by realized-volatility expansion; repeated activity in the same ticker across sessions; and single-name flow occurring close to identifiable catalysts such as earnings, FDA meetings, or corporate filings. Weaker confirmations are: one random off-exchange print, one isolated “large premium” options trade without IV context, or sector peers moving for unrelated macro reasons. Highly overfit confirmations are those that chain together many weak clues until everything looks significant. <span class="citation" aria-label="source references">t21search2 · t21search0 · t21search18 · t34search13 · t34search10</span></p>
+<p>Options flow confirmed by equity prints is meaningful when the linkage is <strong>time-tight, quote-consistent, and liquidity-aware</strong>. Example: buyer-initiated call activity in liquid weekly or monthly options, near-ATM or moderately OTM, accompanied by aggressive underlying equity prints or upward quote revision within minutes. Equity activity confirmed by options flow is strongest when the options are not obviously hedges or spreads and when IV/skew reacts in the same direction as the tape story. Price/volume confirmation in the underlying is stronger than pure social-volume or “mentions” confirmation because the options market and stock market are explicitly linked by hedging and arbitrage. IV confirmation matters most when the flow’s hypothesis is volatility demand or event repricing, and less when the trade is deep-ITM stock replacement. Realized-volatility confirmation matters for volatility-buyer and 0DTE-type hypotheses, but it is too slow to be primary confirmation for same-session direction. Sector/theme clustering can help, but it becomes overfit fast unless the catalyst is known to be sector-wide, such as a macro release or an industry headline. <span class="citation" aria-label="source references">t4search3 · t4search11 · t21search2 · t31view1 · t32search21</span></p>
+<p>A useful participant-hypothesis layer is this:</p>
+<p class="lead-term"><strong>Institutional directional buyer.</strong> Supporting evidence: buy-side options aggression in liquid contracts, repeated bursts or multi-venue sweeps, strong <code>volume / prior_OI</code>, supportive underlying tape, and no spread/hedge flags. Weakening evidence: multi-leg/stock-option condition codes, deep-ITM structure, isolated 0DTE bursts, earnings proximity without cross-asset follow-through. Data required: trades, quotes, OI, moneyness, greeks, underlying prints, catalyst calendar. Realistic confidence: moderate at best with public data. Common misclassification: volatility buyers, call overwrites being mistaken for call buying, or spread legs misread directionally. <span class="citation" aria-label="source references">t11view4 · t11view6 · t29view4 · t24search2</span></p>
+<p class="lead-term"><strong>Institutional directional seller.</strong> Supporting evidence: ask-side put demand or bid-side call selling with supportive downside stock response and rising downside skew. Weakening evidence: protective-hedge patterns around earnings, index/ETF hedge spillover, or put volume concentrated in standard downside-hedge expiries. Confidence: moderate at best. Common misclassification: portfolio hedging labeled as alpha. <span class="citation" aria-label="source references">t6search15 · t21search2 · t25search0</span></p>
+<p class="lead-term"><strong>Volatility buyer.</strong> Supporting evidence: straddle-/strangle-like package likelihood, high vega concentration, IV expansion, realized-vol uptick after the trade, or event proximity with noncommittal delta profile. Weakening evidence: strong one-sided equity confirmation or deep directional delta concentration. Confidence: moderate when grecian context is good. Common misclassification: directional call or put buyers who also happen to lift IV. <span class="citation" aria-label="source references">t21search2 · t22search1 · t31view2</span></p>
+<p class="lead-term"><strong>Volatility seller.</strong> Supporting evidence: net sell pressure in rich IV regimes, covered-write/collar-like structures, or post-event premium harvesting patterns. Weakening evidence: strong one-sided underlying tape or repeated near-ask buying in the same series. Confidence: low-to-moderate with public data because many short-vol structures are packaged. Common misclassification: bearish or bullish stance inferred from premium collection. <span class="citation" aria-label="source references">t25search8 · t24search2 · t24search3</span></p>
+<p class="lead-term"><strong>Hedge or reactive flow.</strong> Supporting evidence: deep-ITM stock-replacement characteristics, stock-option package flags, ETF/index coincidence, expiries concentrated around known events, or flow patterns literature says are consistent with dealer delta hedging rather than information. Weakening evidence: repeated same-name activity across sessions with longer-dated maturities and supportive stock follow-through. Confidence: often higher than directional inference because “hedge/reactive” is a broader, humbler category. Common misclassification: almost all whale-alert systems underweight this bucket. <span class="citation" aria-label="source references">t29view4 · t31view1 · t32search21</span></p>
+<p class="lead-term"><strong>Spread or arbitrage structure.</strong> Supporting evidence: explicit multi-leg codes, paired strikes/expiries, put-call parity or box-like geometry, stock-option package flags, and isolated leg prices that make no standalone sense. Weakening evidence: single-leg regular prints in very active liquid contracts without companion legs. Confidence: moderate when complex flags are present, lower when reconstructing heuristically. Common misclassification: one leg of a vertical spread presented as a clean bullish call buy. <span class="citation" aria-label="source references">t29view4 · t2search16</span></p>
+<p class="lead-term"><strong>Retail momentum or speculation.</strong> Supporting evidence: 0DTE or very short-dated OTM flow, crowded meme names, small-lot clustering, and weak or chaotic cross-asset confirmation. Weakening evidence: longer-dated liquid contracts, repeated institution-like bursts, and strong contract-relative anomaly versus a ticker’s normal retail profile. Confidence: low-to-moderate; retail and professional tactical flow can look similar on public tape. Common misclassification: every flashy short-dated OTM call burst labeled “institutional bullish.” <span class="citation" aria-label="source references">t11view0 · t31view1 · t5search0</span></p>
+<p class="lead-term"><strong>Event-driven positioning.</strong> Supporting evidence: flow concentrated ahead of earnings, FDA meetings, SEC filings, M&amp;A rumor windows, or major macro releases; elevated front-end IV; straddle-like or one-sided convexity demand. Weakening evidence: no nearby catalyst and no realized move after repeated alerts. Confidence: moderate for “event-driven,” low for exact direction. Common misclassification: informed alpha versus generic event repricing. <span class="citation" aria-label="source references">t21search0 · t21search18 · t34search13 · t34search10</span></p>
+<p class="lead-term"><strong>Unknown or abstain.</strong> Supporting evidence: conflicting clues, poor quote quality, wide spreads, stale quotes, complex conditions, low-liquidity contracts, corrected prints, or better hedge explanations. Weakening evidence: there often is no need to weaken this. Confidence: this should be frequent. Common misclassification: systems that force every alert into a story create false authority. <span class="citation" aria-label="source references">t9search2 · t20search1 · t18view2</span></p>
+<h2 id="signal-catalog">Signal catalog</h2>
+<p>Below is a catalog optimized for explainability and deterministic reconstruction rather than hype. “Thresholds” are deliberately framed as <strong>relative baselines</strong> or percentiles because absolute cutoffs age badly across tickers, expiries, and regime shifts.</p>
+<p class="lead-term"><strong>Directional options aggression.</strong> Market mechanism: liquidity-taking in a single option series. Supported hypothesis: institutional directional buyer or seller. Required data: OPRA trades, NBBO quotes, contract metadata, timestamps. Helpful data: greeks, underlying trades/quotes, next-day OI. Detection: classify print vs bid/ask/mid; require narrow spread and fresh quote; aggregate signed premium or delta-adjusted notional in a short window. Suggested threshold: contract-level signed premium or delta-notional above the ticker-expiry-strike percentile baseline. Confidence components: aggressor confidence, spread tightness, quote age, liquidity tier, repeat persistence. False-positive penalties: multi-leg flags, 0DTE, deep-ITM, catalyst proximity without confirmation. Abstain when quote is stale or midpoint-heavy. Preserve evidence: raw trade, quote snapshot, distance to bid/ask/mid, spread, timestamps, condition code, classification path. Stage: <strong>MVP</strong>. <span class="citation" aria-label="source references">t20search1 · t9search2 · t22search1</span></p>
+<p class="lead-term"><strong>Premium anomaly.</strong> Mechanism: unusually large premium concentration in a contract or ticker. Supported hypothesis: broad “attention-demand” rather than directly directional. Required data: premium, historical baselines, contract metadata. Helpful data: delta, extrinsic/intrinsic split, OI, IV, underlying ADV. Detection: rank premium versus own-history and ticker-day distribution; split into intrinsic-heavy and extrinsic-heavy buckets. Threshold: top decile or top percentile relative to contract and ticker baselines, not absolute dollars. Confidence components: baseline rarity, liquidity, extrinsic share. Penalties: deep-ITM high-delta stock replacement, spread/hedge flags. Abstain when premium is mostly intrinsic or the contract is adjusted. Preserve evidence: premium, multiplier, moneyness, delta, OI, IV, condition codes. Stage: <strong>MVP</strong>, but never user-facing on its own. <span class="citation" aria-label="source references">t23search5 · t31view2 · t34search7</span></p>
+<p class="lead-term"><strong>Volume/Open-interest anomaly.</strong> Mechanism: current trading dwarfs prior outstanding positions. Supported hypothesis: new positioning or major turnover. Required data: intraday volume and prior-day OI. Helpful data: next-day OI for validation, exchange open/close summaries. Detection: compute <code>volume / prior_OI</code>, <code>signed_delta_notional / prior_OI</code>, and ticker-relative ranks. Threshold: high percentile by contract and by ticker. Confidence components: liquidity, repeated activity, next-day OI consistency in research mode. Penalties: expiry-week rolls, corporate actions, adjusted series. Abstain when OI is stale after unusual corporate events or contract adjustments. Preserve evidence: volume trajectory, prior OI, next OI when later available, expiry, adjusted flag. Stage: <strong>MVP</strong>. <span class="citation" aria-label="source references">t6search4 · t24search2 · t34search3</span></p>
+<p class="lead-term"><strong>Repeat burst or sweep clustering.</strong> Mechanism: urgency or persistent parent-order slicing. Supported hypothesis: institutional directional or volatility buyer/seller. Required data: per-trade timestamp, venue, series ID, price. Helpful data: underlying prints, quote updates. Detection: cluster same-series or same-thesis prints within short event-time windows; identify multi-venue sweeps or repeated bursts over several minutes/hours. Threshold: cluster count, total signed delta-notional, and venue diversity above baseline. Confidence components: multi-venue evidence, price escalation, persistence. Penalties: auction or complex condition codes. Abstain when burst consists mostly of complex or midpoint trades. Preserve evidence: member prints in cluster, venues, micro-timing, price ladder. Stage: <strong>MVP</strong> for same-series sweeps, <strong>v2</strong> for multi-series thesis clustering. <span class="citation" aria-label="source references">t26search14 · t29view4</span></p>
+<p class="lead-term"><strong>Block trade interpretation.</strong> Mechanism: single large print or tight local cluster. Supported hypothesis: only weakly directional unless corroborated. Required data: trade size, quote context, condition codes, venue/TRF flag. Helpful data: subsequent same-series or underlying activity. Detection: size percentile + contemporaneous quote test + sale-condition eligibility. Threshold: top size percentile within contract or ticker. Confidence components: contemporaneous reporting, quote alignment, follow-on activity. Penalties: cross/auction/contingent/average-price/official conditions. Abstain when large print is non-regular or unconfirmed. Preserve evidence: size percentile, code, quote snapshot, late/correction state. Stage: <strong>MVP</strong>, but conservative. <span class="citation" aria-label="source references">t19view6 · t18view0 · t29view4</span></p>
+<p class="lead-term"><strong>Spread/hedge likelihood.</strong> Mechanism: identifying that a “signal” is probably not a clean directional single-leg bet. Supported hypothesis: spread/arbitrage or hedge/reactive flow. Required data: condition codes, nearby trades across strikes/expiries/put-call sides, underlying trades. Helpful data: greeks. Detection: explicit OPRA complex flags first; then geometric matching for verticals, straddles, strangles, collars, rolls, stock-option combinations. Threshold: probability model or rule count over a confidence bar. Confidence components: explicit complex code, size symmetry, delta offset, shared timestamps. Penalties: none; this is itself a safety signal. Abstain when package reconstruction is ambiguous. Preserve evidence: all linked legs and linkage rationale. Stage: <strong>MVP</strong> for explicit codes, <strong>v2</strong> for heuristic reconstruction. <span class="citation" aria-label="source references">t29view4 · t2search16</span></p>
+<p class="lead-term"><strong>IV expansion confirmation.</strong> Mechanism: local demand reprices IV upward. Supported hypothesis: volatility buyer, event-driven positioning, sometimes directional buyer. Required data: trade price, quote snapshot, model IV, historical IV baseline. Helpful data: surface/skew snapshots and greeks. Detection: compare post-trade IV to pre-trade and to local surface neighborhood. Threshold: local IV shock above contract-specific baseline percentile. Confidence components: localized IV lift, not just market-wide lift; persistence after the print. Penalties: scheduled-event windows, broad market vol regime jumps, surface-wide repricing. Abstain when IV is vendor-derived from sparse stale quotes. Preserve evidence: pre/post IV, surrounding strikes’ IV, tenor bucket. Stage: <strong>v2</strong> if IV quality is good; otherwise wait. <span class="citation" aria-label="source references">t31view2 · t25search8 · t22search5</span></p>
+<p class="lead-term"><strong>Price/volume confirmation in the underlying.</strong> Mechanism: genuine information or strong hedging pressure often leaks into the stock. Supported hypothesis: institutional directional or strong hedge/reactive flow. Required data: underlying trades and quotes, symbol baseline volume, event-time clocks. Helpful data: off-exchange flags, short-term realized vol. Detection: measure post-alert price drift, quote revision, and volume imbalance over controlled windows. Threshold: short-horizon abnormal move or abnormal signed-volume percentile relative to same time-of-day baseline. Confidence components: immediacy, persistence, quote-based classification quality. Penalties: macro tape shock or sector-wide move. Abstain on market-wide news minutes. Preserve evidence: pre/post price, short-horizon volume, same-window market/sector moves. Stage: <strong>MVP</strong>. <span class="citation" aria-label="source references">t4search3 · t21search0 · t32search21</span></p>
+<p class="lead-term"><strong>Equity off-exchange confirmation.</strong> Mechanism: related risk transfer occurs off-exchange. Supported hypothesis: hedge/reactive flow or institution-sized execution. Required data: TRF flags, size, timing, sale conditions. Helpful data: delayed FINRA ATS/non-ATS profiles for research. Detection: require real-time TRF activity in the same ticker during or just after the options cluster, but only count eligible and contemporaneous prints. Threshold: ticker- and time-of-day-adjusted off-exchange size anomaly. Confidence components: size anomaly plus price/quote response. Penalties: non-ATS context, average-price or late modifiers. Abstain when the off-exchange activation is purely delayed or condition-ineligible. Preserve evidence: TRF print details and modifier eligibility. Stage: <strong>v2</strong>. <span class="citation" aria-label="source references">t27search6 · t28search1 · t18view0 · t19view6</span></p>
+<p class="lead-term"><strong>Equity quote-aligned print classification.</strong> Mechanism: infer aggressive stock-side prints as supporting evidence. Supported hypothesis: directional or hedge/reactive flow. Required data: stock trades and quotes. Helpful data: participant timestamps. Detection: quote rule + Lee-Ready fallback with confidence. Threshold: signed notional imbalance over short horizon. Confidence components: fresh quote, inside-spread share, spread width. Penalties: midpoint-heavy or fast-market mismatch. Abstain when classification confidence is poor. Preserve evidence: trade/quote join and confidence path. Stage: <strong>MVP</strong>. <span class="citation" aria-label="source references">t30view1 · t30view3 · t30view2</span></p>
+<p class="lead-term"><strong>Catalyst proximity adjustment.</strong> Mechanism: event windows explain a lot of seemingly unusual flow. Supported hypothesis: event-driven positioning or volatility demand. Required data: earnings calendar, SEC filing/news feed, biotech/FDA event feed if covering that universe, macro calendar. Helpful data: historical event responses by ticker. Detection: compute distance to scheduled earnings, advisory meetings, SEC filing bursts, or known macro releases. Threshold: e.g., same day, next day, or pre-defined event windows. Confidence components: proximity and relevance. Penalties: strong because events create lots of informed-looking but non-informational or broadly expected flow. Abstain when event context dominates the tape story. Preserve evidence: event type, source, timestamp. Stage: <strong>MVP</strong> for earnings and SEC filings, <strong>v2</strong> for broader news/FDA. <span class="citation" aria-label="source references">t34search0 · t34search10 · t34search13</span></p>
+<p class="lead-term"><strong>Low-liquidity and wide-spread penalty.</strong> Mechanism: bad markets create fake conviction. Supported hypothesis: none; this is a quality control signal. Required data: spread width, quote size, trade count, contract ADV/OI. Helpful data: SEC/Cboe liquidity-tier baselines. Detection: percentile-rank spread, zero-depth frequency, and quote-age instability. Threshold: heavy penalties in the worst liquidity buckets. Confidence components: tighter markets get less penalty. Penalties: n/a. Abstain when spread percentile and quote staleness are both extreme. Preserve evidence: spread, depth, quote age, contract liquidity rank. Stage: <strong>MVP</strong>. <span class="citation" aria-label="source references">t11view1 · t11view2 · t9search2</span></p>
+<p class="lead-term"><strong>Stale-quote penalty.</strong> Mechanism: old quotes break most downstream inferences. Supported hypothesis: none. Required data: trade time, quote time, underlying move since quote, provider receive times if available. Helpful data: packet timestamps. Detection: compute option-quote age and underlying return since quote. Threshold: penalty rises sharply once quote age or underlying move exceeds regime-specific tolerance. Confidence components: fresh quote reduces penalty. Abstain when your trade/quote join is visibly compromised. Preserve evidence: original timestamps and join method. Stage: <strong>MVP</strong>. <span class="citation" aria-label="source references">t9search2 · t33search4 · t33search6</span></p>
+<p class="lead-term"><strong>Earnings or event-noise penalty.</strong> Mechanism: scheduled uncertainty inflates both directional and volatility-looking activity. Supported hypothesis: event-driven, not necessarily informed. Required data: earnings/news/event calendar and IV term structure. Helpful data: historical event IV patterns. Detection: penalize front-end anomalies into scheduled events unless the system explicitly labels them event-driven. Threshold: event window based on same-day or next-day timing and front-end IV elevation. Confidence components: if the product category is “event flow,” this becomes category context instead of pure penalty. Abstain when the event explains the anomaly better than any directional hypothesis. Preserve evidence: event timeline, front-end IV, historical event seasonality. Stage: <strong>MVP</strong>. <span class="citation" aria-label="source references">t25search0 · t25search8 · t34search0</span></p>
+<h2 id="false-positives-and-scoring-philosophy">False positives and scoring philosophy</h2>
+<p>The most common false positive is <strong>spreads misread as single-leg conviction</strong>. Simple systems fail because they rank each print independently and ignore explicit complex flags or nearby compensating legs. Detect or penalize by reading OPRA condition codes first, then reconstructing likely packages. Abstain when a leg can plausibly belong to a complex or stock-option package and the package confidence is non-trivial. Closely related is <strong>hedges misread as alpha</strong>: protective puts, covered calls, collars, ETF overlays, and stock-replacement trades can create huge premium and size without expressing fresh fundamental insight. Penalize deep-ITM, pairings with stock prints, and sector/index hedge overlap, and abstain when the greek profile screams hedge more than directional bet. <span class="citation" aria-label="source references">t29view4 · t32search21 · t23search5</span></p>
+<p>Another major failure mode is <strong>market-maker/dealer hedging effects</strong>. Options demand can move IV and induce stock hedging flows; that does not mean the initiating trade carried information about fundamentals. Papers on demand pressure and market-maker hedging make this point bluntly, and 0DTE research strengthens it for ultra-short-dated flow. Penalize signals that are mainly explained by gamma/vega concentration, especially near expiry or macro events, and abstain when the evidence points more naturally to hedging propagation than to informed direction. <span class="citation" aria-label="source references">t31view2 · t32search5 · t31view1</span></p>
+<p>Then there is <strong>earnings lottery flow and event repricing</strong>. Simple systems see elevated front-end IV, big OTM call/put buying, and large premium into earnings and assume information. But earnings mechanically attract volatility demand, and even directionally “right” traders can lose from post-event IV crush. Detect and penalize with catalyst calendars, front-end IV elevation, and repeated historical event patterns. Abstain liberally in the final 24 to 48 hours before scheduled earnings unless the product is explicitly labeling the flow as event-driven rather than smart. Similar logic applies to FDA calendars, merger windows, and macro releases. <span class="citation" aria-label="source references">t25search8 · t25search19 · t34search13 · t21search18</span></p>
+<p class="lead-term"><strong>ETF and index hedges</strong> fool simple systems because they can splash into single-name names via baskets, sector ETFs, and dealer hedge propagation. A large put buyer in an index or ETF can alter local greeks, skew, and stock hedging demand without saying much about any one constituent. Penalize single-name directional claims when broad-market or sector vol is simultaneously repricing. Abstain if the single-name options signal has weak idiosyncratic confirmation and strong broad-market-correlation explanation. <span class="citation" aria-label="source references">t31view2 · t32search21</span></p>
+<p class="lead-term"><strong>Meme or retail momentum</strong> is another trap. Retail-heavy 0DTE or weekly OTM flow can produce dramatic tape and premium. Simple systems overinterpret it because urgency and convexity look “institutional.” Detect with short tenor, low dollar commitment relative to socialized volume, repeated crowd-favorite names, and poor cross-asset discipline. Penalize when the name is liquidity-fragmented and the flow is one-session, one-strike, one-expiry noise. Abstain if the trade only looks special because the contract is cheap. <span class="citation" aria-label="source references">t11view0 · t5search0</span></p>
+<p class="lead-term"><strong>Illiquid contracts, wide/stale quotes, delayed/corrected prints, and corporate actions</strong> are the classic data traps. Illiquid options make aggressor-side and IV extraction unreliable; wide quotes make midpoint logic almost meaningless; delayed or corrected equity prints create phantom accumulation; adjusted options after splits, mergers, or special dividends break naïve notional and OI comparisons. Penalize each directly from the feed and from OCC memos, and abstain whenever the raw market quality or reference data are clearly compromised. <span class="citation" aria-label="source references">t11view1 · t9search2 · t18view2 · t34search7</span></p>
+<p>A sound scoring framework therefore needs at least four layers:</p>
+<p class="lead-term"><strong>Evidence quality score.</strong> Inputs: quote freshness, spread percentile, liquidity tier, condition-code eligibility, timestamp completeness, adjusted-contract status, and provider coverage quality. This is about whether the data can support inference at all. <span class="citation" aria-label="source references">t9search2 · t11view1 · t33search4</span></p>
+<p class="lead-term"><strong>Signal strength score.</strong> Inputs: signed delta-notional anomaly, <code>volume / prior_OI</code>, sweep/burst persistence, IV/skew shock, and underlying confirmation. This is about what happened in the market. <span class="citation" aria-label="source references">t11view6 · t21search2 · t31view2</span></p>
+<p class="lead-term"><strong>False-positive penalty score.</strong> Inputs: spread/hedge likelihood, 0DTE/event noise, ETF/index overlay, late/corrected/off-hours status, and low-liquidity pathology. This is about alternative explanations. <span class="citation" aria-label="source references">t29view4 · t31view1 · t18view0 · t19view6</span></p>
+<p class="lead-term"><strong>Hypothesis confidence score.</strong> Inputs: how well the surviving evidence specifically matches a participant hypothesis such as directional buyer, volatility buyer, or hedge/reactive flow. This is distinct from conviction. A strong anomaly can have <strong>high strength but low confidence</strong> if multiple explanations remain plausible. <span class="citation" aria-label="source references">t21search2 · t32search21</span></p>
+<p>A single “smart money score” is misleading because it collapses all of these dimensions into one number and invites users to mistake anomaly for information. The product-facing compromise is a label like <strong>Smart Flow candidate</strong> only when: evidence quality is high, signal strength is high, penalties are modest, and at least one participant hypothesis has a clear lead. Even then, the UI should show the label as a <strong>candidate with confidence band</strong>, not as a verdict. Good alerts read like: “High-quality bullish directional candidate; ask-side call aggression in liquid ATM weeklys; supportive underlying buy pressure; no explicit complex flags; earnings not imminent.” Bad alerts read like: “$5M call premium in XYZ.” The second version is clickbait with no epistemic spine. <span class="citation" aria-label="source references">t20search1 · t24search2 · t25search8</span></p>
+<h2 id="data-requirements-validation-and-final-recommendations">Data requirements, validation, and final recommendations</h2>
+<h3 id="data-requirement-matrix">Data requirement matrix</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Data type</th><th>Why it matters</th><th>Required or optional</th><th>Latency sensitivity</th><th>Retail-accessible availability</th><th>Common limitations</th></tr></thead>
+<tbody>
+<tr><td>OPRA options trades</td><td>Core record of listed-options prints, sizes, prices, and conditions.</td><td><strong>Required</strong></td><td>High</td><td>Available through retail-facing vendors and APIs that source OPRA. <span class="citation" aria-label="source references">t24search5 · t15search2 · t15search0</span></td><td>No trader identity; no direct aggressor flag; no trade-level open/close.</td></tr>
+<tr><td>Options NBBO quotes</td><td>Needed for bid/ask/mid classification, spread, quote age, IV extraction.</td><td><strong>Required</strong></td><td>High</td><td>Available from OPRA-based providers; some free plans are delayed or indicative. <span class="citation" aria-label="source references">t15search2 · t15search5 · t15search11</span></td><td>Top-of-book only in many retail stacks; stale or conflated delivery may exist.</td></tr>
+<tr><td>Options trade condition codes</td><td>Essential for excluding complex, auction, cross, extended-hours, or compression activity.</td><td><strong>Required</strong></td><td>High</td><td>Present in OPRA/native specs. <span class="citation" aria-label="source references">t29view4 · t29view1</span></td><td>Easy for downstream vendors to normalize away unless preserved raw.</td></tr>
+<tr><td>Open interest</td><td>Needed for <code>volume / OI</code>, opening-likelihood, and baseline context.</td><td><strong>Required</strong></td><td>Low intraday, medium daily</td><td>OCC publishes OI; many vendors redistribute it. <span class="citation" aria-label="source references">t6search4 · t29view3</span></td><td>End-of-day only; not live inventory.</td></tr>
+<tr><td>Greeks</td><td>Needed to distinguish delta, gamma, and vega-driven flow.</td><td><strong>Strongly preferred</strong></td><td>Medium</td><td>Some vendors provide modeled greeks; Cboe trade-by-trade greeks are T+1. <span class="citation" aria-label="source references">t22search5 · t15search15</span></td><td>Vendor methodology differs; real-time greeks may be model-dependent.</td></tr>
+<tr><td>Implied volatility</td><td>Needed for IV shock, skew, tenor context, event repricing.</td><td><strong>Strongly preferred</strong></td><td>Medium</td><td>Often vendor-derived or model-derived. <span class="citation" aria-label="source references">t25search8 · t15search15</span></td><td>Sparse quotes and stale markets can make IV noisy.</td></tr>
+<tr><td>Underlying equity trades</td><td>Needed for cross-asset confirmation and dealer-hedge effects.</td><td><strong>Required</strong></td><td>High</td><td>SIP-based access is common; free plans may only expose one venue like IEX. <span class="citation" aria-label="source references">t16search5 · t16search8</span></td><td>Single-venue feeds are not full-market truth.</td></tr>
+<tr><td>Underlying equity quotes</td><td>Needed for stock trade-signing, spread context, and event-time joins.</td><td><strong>Required</strong></td><td>High</td><td>SIP feeds widely available at paid tiers. <span class="citation" aria-label="source references">t16search5 · t16search2</span></td><td>Trade-signing remains inferred, not explicit.</td></tr>
+<tr><td>Off-exchange/TRF flags</td><td>Needed to separate lit from off-exchange confirmation.</td><td><strong>Required</strong></td><td>High</td><td>Included in SIP/TAQ-style trade data and vendor-normalized schemas. <span class="citation" aria-label="source references">t27search6 · t16search6</span></td><td>TRF is broader than ATS/dark pool.</td></tr>
+<tr><td>Corporate actions</td><td>Needed to detect adjusted contracts, split effects, and broken baselines.</td><td><strong>Required</strong></td><td>Medium</td><td>OCC info memos and market data reference feeds. <span class="citation" aria-label="source references">t34search3 · t34search7</span></td><td>Easy to miss or lag if reference-data pipeline is weak.</td></tr>
+<tr><td>Earnings calendar</td><td>Needed for event-noise and earnings repricing penalties.</td><td><strong>Required</strong></td><td>Medium</td><td>Public calendars are common. <span class="citation" aria-label="source references">t34search0</span></td><td>Time-of-day and revisions can be messy across providers.</td></tr>
+<tr><td>News or event feeds</td><td>Needed for SEC filings, M&amp;A, FDA, and macro context.</td><td><strong>Optional for raw MVP, required for good product quality</strong></td><td>Medium to High</td><td>SEC EDGAR and FDA calendars are public; richer news feeds are separate. <span class="citation" aria-label="source references">t34search10 · t34search13</span></td><td>Entity mapping and deduping are nontrivial.</td></tr>
+<tr><td>Sector or industry classification</td><td>Needed for theme clustering and market-relative analysis.</td><td><strong>Optional</strong></td><td>Low</td><td>Common in reference datasets.</td><td>Taxonomy mismatch across providers.</td></tr>
+<tr><td>Historical baselines</td><td>Needed for anomaly scoring and percentile thresholds.</td><td><strong>Required</strong></td><td>Low for storage, high for research correctness</td><td>Build from your own normalized history.</td><td>Regime change, splits, symbol changes, survivorship issues.</td></tr>
+<tr><td>Exchange proprietary open/close summaries</td><td>Needed for better opening/closing and participant-type research.</td><td><strong>Optional but very valuable for v2</strong></td><td>Low to Medium</td><td>Cboe and NYSE sell them. <span class="citation" aria-label="source references">t24search2 · t24search3</span></td><td>Exchange-scoped, not full-market.</td></tr>
+</tbody></table></div>
+<p>The biggest provider gap for a retail-accessible MVP is not raw trades. It is <strong>high-quality quotes, raw condition codes, timestamps, contract-reference hygiene, and consistent greeks/IV</strong>. A second important gap is <strong>trade-level open/close and participant-type attribution</strong>, which generally requires proprietary exchange datasets rather than plain OPRA. A third is <strong>venue-granular off-exchange attribution in real time</strong>; FINRA transparency is useful, but delayed. <span class="citation" aria-label="source references">t15search2 · t15search5 · t22search5 · t28search1 · t24search2</span></p>
+<h3 id="validation-and-backtesting">Validation and backtesting</h3>
+<p>Validation has to be done in <strong>event time</strong>, not processing time. The tape often contains multiple timestamps, and providers differ on what they expose. If your alerts are built on when your system <em>received</em> data instead of when the market event occurred, you will confuse network delay with signal timing and accidentally create lookahead or mis-ordering artifacts. Preserve raw event timestamps, provider receive timestamps, and quote/trade join rules so any alert can be reconstructed exactly. <span class="citation" aria-label="source references">t33search1 · t33search4 · t33search6 · t33search16</span></p>
+<p>Avoid lookahead bias aggressively. Same-day alerting may use prior-day OI, but not tomorrow’s OI; it may use contemporaneous IV and quotes, but not later quote repairs; it may use known earnings calendars, but not future news that had not yet arrived. Validation windows should be time-of-day aware and should compare against historical distribution for that ticker, tenor bucket, and regime. A baseline for “unusual” should generally use rolling windows with exclusions for recent event days and contract-adjustment periods. <span class="citation" aria-label="source references">t6search4 · t34search7 · t34search0</span></p>
+<p>Naïve testing like “did price go up after a bullish alert?” is not enough. It fails because some signals are volatility signals, some are hedge signals, some are event signals, and some are simply data-quality failures. Better evaluation metrics include: hypothesis-calibrated outcomes, such as short-horizon drift for directional candidates, realized-vol expansion for volatility-buyer candidates, and abstention quality for ambiguous samples; precision at top confidence deciles; outcome monotonicity by confidence bucket; false-positive rate around earnings and macro events; and robustness across liquidity tiers and spread regimes. The literature is mixed precisely because the signal is conditional. Pan and Poteshman find predictive content in buyer-to-open option volume, but Muravyev and coauthors find little incremental price discovery in options quotes beyond stocks. Your backtest should therefore validate <strong>which contexts</strong> work, not whether “options flow works” in the abstract. <span class="citation" aria-label="source references">t11view4 · t11view6 · t4search11 · t21search2</span></p>
+<p>Useful validation tests include: replay tests for deterministic re-creation of every alert; ablation tests removing one evidence component at a time; placebo tests on condition-ineligible prints; event-window stress tests around earnings, FOMC, CPI, and FDA meetings; liquidity stratification tests; and hand-audited samples where a human reviewer checks whether the preserved evidence really supports the alert hypothesis. If a signal only “works” when you keep event days, illiquid contracts, or stale quotes, that is usually a red flag, not a breakthrough. <span class="citation" aria-label="source references">t18view0 · t29view4 · t11view1 · t34search13</span></p>
+<h3 id="final-deliverables">Final deliverables</h3>
+<p class="lead-term"><strong>Executive synthesis.</strong> The defensible product is not a whale-alert engine. It is a <strong>market-structure evidence engine</strong> that scores hypotheses under uncertainty. Public data can support useful directional, volatility, and hedge/reactive candidates, but only after condition-code filtering, quote-quality control, liquidity penalties, and catalyst-aware abstention. <span class="citation" aria-label="source references">t20search1 · t31view2 · t32search21</span></p>
+<p class="lead-term"><strong>Ranked list of the most useful signals for an MVP-to-v2 roadmap.</strong></p>
+<ol>
+<li>Directional options aggression in liquid contracts, with quote-quality scoring and underlying confirmation. <span class="citation" aria-label="source references">t20search1 · t11view6</span></li>
+<li>Volume/open-interest anomaly with contract-relative baselines. <span class="citation" aria-label="source references">t6search4 · t11view6</span></li>
+<li>Repeat burst or sweep clustering in the same contract or thesis family. <span class="citation" aria-label="source references">t26search14 · t29view4</span></li>
+<li>Price/volume confirmation in the underlying equity. <span class="citation" aria-label="source references">t4search3 · t21search0</span></li>
+<li>Spread/hedge-likelihood suppression using explicit complex flags. <span class="citation" aria-label="source references">t29view4</span></li>
+<li>Stale-quote and wide-spread penalties. <span class="citation" aria-label="source references">t9search2 · t11view1</span></li>
+<li>Catalyst proximity adjustment, especially earnings. <span class="citation" aria-label="source references">t25search8 · t34search0</span></li>
+<li>IV/skew confirmation once IV quality is trustworthy. <span class="citation" aria-label="source references">t31view2 · t6search15</span></li>
+<li>Equity off-exchange confirmation as a weak secondary layer, not a primary driver. <span class="citation" aria-label="source references">t27search6 · t28search1</span></li>
+</ol>
+<p class="lead-term"><strong>Signals that are probably noise unless strongly corroborated.</strong></p>
+<ul>
+<li>Standalone gross premium rankings. <span class="citation" aria-label="source references">t31view2 · t23search5</span></li>
+<li>Standalone 0DTE bursts. <span class="citation" aria-label="source references">t31view1 · t11view0</span></li>
+<li>Standalone deep-ITM prints. <span class="citation" aria-label="source references">t23search5</span></li>
+<li>Midpoint-heavy or wide-spread options prints. <span class="citation" aria-label="source references">t20search1 · t11view1</span></li>
+<li>Single TRF prints interpreted as dark-pool accumulation. <span class="citation" aria-label="source references">t27search6 · t28search1</span></li>
+<li>Late, corrected, official, average-price, or contingent equity prints counted as real-time intent. <span class="citation" aria-label="source references">t18view0 · t19view6</span></li>
+</ul>
+<p class="lead-term"><strong>MVP recommendation.</strong> Build around: OPRA trades and NBBO, stock SIP trades and quotes, raw condition codes, prior-day OI, corporate-action handling, earnings calendar, deterministic replay, and explicit abstention. Use contract-relative baselines, not fixed-dollar thresholds. Do <strong>not</strong> promise participant identity. <span class="citation" aria-label="source references">t24search5 · t16search5 · t6search4 · t34search7 · t34search0</span></p>
+<p class="lead-term"><strong>v2 recommendation.</strong> Add: better greeks and IV surfaces, exchange open/close summaries, smarter multi-leg reconstruction, delayed FINRA ATS/non-ATS research datasets for ticker profiling, broader event feeds, and richer timestamp handling. <span class="citation" aria-label="source references">t22search5 · t24search2 · t24search3 · t28search1</span></p>
+<p class="lead-term"><strong>Avoid-for-now list.</strong></p>
+<ul>
+<li>“Smart money score” as a singular authoritative product value. <span class="citation" aria-label="source references">t4search11 · t32search5</span></li>
+<li>Venue-specific dark-pool attribution in real time from public data. <span class="citation" aria-label="source references">t28search1 · t27search19</span></li>
+<li>Aggressor-side certainty on illiquid options or midpoint-heavy prints. <span class="citation" aria-label="source references">t20search1 · t9search2</span></li>
+<li>Exact opening/closing labels at trade level from plain OPRA. <span class="citation" aria-label="source references">t24search5 · t6search4</span></li>
+</ul>
+<p class="lead-term"><strong>Implementation-neutral signal formulas.</strong> These are synthesis formulas, not claims of exchange-defined truth.</p>
+<pre><code>evidence_quality
+  = w1 * quote_freshness_score
+  + w2 * spread_tightness_score
+  + w3 * liquidity_score
+  + w4 * condition_eligibility_score
+  - w5 * adjusted_contract_penalty
+
+directional_strength
+  = signed_delta_notional_z
+  + signed_premium_z * aggressor_confidence
+  + sweep_cluster_score
+  + underlying_confirmation_score
+
+volatility_strength
+  = vega_notional_z
+  + local_iv_shock_z
+  + skew_shift_score
+  + realized_vol_followthrough_score
+
+false_positive_penalty
+  = spread_structure_penalty
+  + 0dte_penalty
+  + catalyst_noise_penalty
+  + stale_quote_penalty
+  + off_exchange_ambiguity_penalty
+  + late_or_corrected_print_penalty
+
+hypothesis_score[h]
+  = evidence_quality
+  + strength_terms_matching_h
+  - false_positive_penalty
+  - contradiction_terms_for_h
+
+alert_if
+  evidence_quality &gt;= q_min
+  and max_h hypothesis_score[h] &gt;= h_min
+  and runner_up_gap &gt;= gap_min
+  else abstain</code></pre>
+<p>This design separates <strong>confidence</strong> from <strong>conviction</strong>. Confidence comes from evidence quality and hypothesis separation; conviction comes from signal strength. A strong but low-confidence anomaly should surface as “interesting, ambiguous,” not “smart.” <span class="citation" aria-label="source references">t20search1 · t30view2 · t32search5</span></p>
+<p class="lead-term"><strong>Evidence fields to preserve for every signal.</strong></p>
+<ul>
+<li>Raw trade record, raw quote snapshot(s), and raw condition codes. <span class="citation" aria-label="source references">t29view4 · t19view6</span></li>
+<li>Event timestamp, receive timestamp, and join methodology. <span class="citation" aria-label="source references">t33search1 · t33search4 · t33search6</span></li>
+<li>Bid, ask, midpoint, spread width, quoted size, and quote age. <span class="citation" aria-label="source references">t11view1 · t9search2</span></li>
+<li>Contract metadata: strike, expiry, call/put, multiplier, adjusted flag. <span class="citation" aria-label="source references">t34search7</span></li>
+<li>Moneyness, delta, gamma, vega, implied volatility, and local skew if available. <span class="citation" aria-label="source references">t22search1 · t22search5 · t6search15</span></li>
+<li>Prior-day OI, current volume path, and next-day OI for research reconciliation. <span class="citation" aria-label="source references">t6search4</span></li>
+<li>Underlying stock confirmation window and market/sector control move. <span class="citation" aria-label="source references">t32search21 · t21search0</span></li>
+<li>Event/catalyst context and source. <span class="citation" aria-label="source references">t34search0 · t34search10 · t34search13</span></li>
+<li>Scoring breakdown and abstention reason if suppressed. This is product design synthesis based on the evidence-quality literature above. <span class="citation" aria-label="source references">t20search1 · t30view2</span></li>
+</ul>
+<p class="lead-term"><strong>Glossary of market-structure terms.</strong></p>
+<ul>
+<li><strong>NBBO:</strong> the best national bid and offer for a security or option series. <span class="citation" aria-label="source references">t8search7 · t8search3</span></li>
+<li><strong>Midpoint:</strong> the arithmetic middle between bid and ask. <span class="citation" aria-label="source references">t11view1</span></li>
+<li><strong>Aggressor-side / trade sign:</strong> inferred liquidity demander, not directly carried in most public SIP feeds. <span class="citation" aria-label="source references">t30view1 · t33search9</span></li>
+<li><strong>TRF:</strong> FINRA Trade Reporting Facility for off-exchange equity trades. <span class="citation" aria-label="source references">t27search6</span></li>
+<li><strong>ATS / dark pool:</strong> non-displayed trading venue; only a subset of off-exchange prints. <span class="citation" aria-label="source references">t27search1 · t28search1</span></li>
+<li><strong>Open interest:</strong> outstanding contracts after netting daily opening and closing activity, exercises, and assignments. <span class="citation" aria-label="source references">t6search4</span></li>
+<li><strong>IV:</strong> model-implied volatility reflected in option prices. <span class="citation" aria-label="source references">t25search8</span></li>
+<li><strong>Skew:</strong> IV differences across strikes for the same expiry. <span class="citation" aria-label="source references">t6search15</span></li>
+<li><strong>Delta / gamma / vega:</strong> first-order price sensitivity to the underlying, rate of delta change, and sensitivity to IV. <span class="citation" aria-label="source references">t22search1</span></li>
+<li><strong>0DTE:</strong> option expiring the same trading day. <span class="citation" aria-label="source references">t11view0</span></li>
+<li><strong>ISO / sweep:</strong> order type or execution pattern intended to quickly access multiple venues’ liquidity. <span class="citation" aria-label="source references">t26search14 · t26search2</span></li>
+<li><strong>QCC / cross / auction / complex trade:</strong> special execution mechanisms often incompatible with naïve directional interpretation. <span class="citation" aria-label="source references">t29view4</span></li>
+<li><strong>BOLO / odd-lot information:</strong> best odd-lot order data added through recent Regulation NMS changes. <span class="citation" aria-label="source references">t17view1</span></li>
+</ul>
+<p class="lead-term"><strong>Source bibliography.</strong></p>
+<p class="lead-term"><strong>Primary and official market-structure sources</strong></p>
+<ul>
+<li>SEC, <em>Final Rule: Regulation NMS</em> and later NMS amendments on odd lots and better-priced orders. <span class="citation" aria-label="source references">t8search1 · t14search0</span></li>
+<li>SEC Division of Trading and Markets, <em>Roundtable on Options Market Structure Supporting Data</em>, 2026. <span class="citation" aria-label="source references">t9search0</span></li>
+<li>OPRA, official home page and 2026 participant interface specification. <span class="citation" aria-label="source references">t24search5 · t2search0</span></li>
+<li>OCC, open interest and information-memo resources. <span class="citation" aria-label="source references">t6search4 · t34search3</span></li>
+<li>OIC / OptionsEducation, resources on greeks, skew, delta, 0DTE, and market data. <span class="citation" aria-label="source references">t22search1 · t6search15 · t23search5 · t5search5</span></li>
+<li>FINRA, TRF overview, trade-reporting FAQ, OTC transparency, and dark-pool investor explainer. <span class="citation" aria-label="source references">t27search6 · t17view0 · t28search1 · t27search1</span></li>
+<li>CTA/UTP SIP specifications for equity sale conditions and timestamps. <span class="citation" aria-label="source references">t3search1 · t3search0</span></li>
+<li>Nasdaq and options order-protection definitions for NBBO and ISO. <span class="citation" aria-label="source references">t8search7 · t26search2</span></li>
+</ul>
+<p class="lead-term"><strong>Core academic papers</strong></p>
+<ul>
+<li>Pan and Poteshman, <em>The Information in Option Volume for Future Stock Prices</em>. <span class="citation" aria-label="source references">t4search0</span></li>
+<li>Chakravarty, Gulen, and Mayhew, <em>Informed Trading in Stock and Option Markets</em>. <span class="citation" aria-label="source references">t4search3</span></li>
+<li>Muravyev, Pearson, and Broussard, <em>Is There Price Discovery in Equity Options?</em> <span class="citation" aria-label="source references">t4search11</span></li>
+<li>Ni, Pan, and Poteshman, <em>Volatility Information Trading in the Option Market</em>. <span class="citation" aria-label="source references">t21search2</span></li>
+<li>Cao, Chen, and Griffin, <em>Informational Content of Option Volume Prior to Takeovers</em>. <span class="citation" aria-label="source references">t21search0</span></li>
+<li>Augustin, Brenner, Hu, and Subrahmanyam, <em>Informed Options Trading Prior to M&amp;A Announcements</em>. <span class="citation" aria-label="source references">t21search18</span></li>
+<li>Bollen and Whaley, <em>Does Net Buying Pressure Affect the Shape of Implied Volatility Functions?</em> <span class="citation" aria-label="source references">t22search2</span></li>
+<li>Gârleanu, Pedersen, and Poteshman, <em>Demand-Based Option Pricing</em>. <span class="citation" aria-label="source references">t32search5</span></li>
+<li>Savickas and Wilson, <em>On Inferring the Direction of Option Trades</em>. <span class="citation" aria-label="source references">t20search1</span></li>
+<li>Lee and Ready; Ellis, Michaely, and O’Hara; Asquith et al.; Jurkatis on trade classification accuracy and fast-market limitations. <span class="citation" aria-label="source references">t30view1 · t30view3 · t30view2</span></li>
+<li>Dim, Eraker, and Vilkov, <em>0DTEs: Trading, Gamma Risk and Volatility Propagation</em>. <span class="citation" aria-label="source references">t31view1</span></li>
+</ul>
+<p><strong>Operational or vendor-documentation sources useful for implementation, but weaker for causal inference</strong></p>
+<ul>
+<li>Databento documentation on OPRA, SIPs, timestamps, and normalized fields. <span class="citation" aria-label="source references">t15search0 · t33search4 · t33search1</span></li>
+<li>Massive documentation on trades, quotes, timestamps, and SIP normalization. <span class="citation" aria-label="source references">t16search2 · t16search6 · t33search6</span></li>
+<li>Alpaca documentation on SIP versus IEX and OPRA access limitations. <span class="citation" aria-label="source references">t16search5 · t15search2 · t15search11</span></li>
+</ul>
+<p>The bottom line for Islandflow is blunt: <strong>build a system that can say “this is probably a hedge,” “this is probably an event-vol trade,” or “I don’t know,” and mean it.</strong> That restraint is not a weakness. In this domain, it is the entire product moat. <span class="citation" aria-label="source references">t32search5 · t31view1 · t20search1</span></p>
+
+        </article>
+        <footer class="doc-footer">Source: docs/research-docs/smart-flow-market-mechanics.md · Output: docs/research-docs/smart-flow-market-mechanics.html</footer>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
