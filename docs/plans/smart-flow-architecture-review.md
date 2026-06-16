@@ -4,9 +4,16 @@
 
 No source code was modified. The current architecture is **not suitable as-is**, but it is **close enough to refactor, not rewrite**. The stack is right; the domain language and pipeline shape are not.
 
-Research direction: direct observation → inference → hypothesis, with preserved evidence and visible uncertainty. See [smart-flow-market-mechanics.md](/Users/kell/dev/islandflow/docs/research-docs/smart-flow-market-mechanics.md:7).
+Research direction: direct observation → inference → hypothesis, with preserved evidence and visible uncertainty.
 
 Key code evidence: `FlowPacket` is a generic feature bag in [events.ts](/Users/kell/dev/islandflow/packages/types/src/events.ts:193), `SmartMoneyEvent` already has useful score/abstention fields in [events.ts](/Users/kell/dev/islandflow/packages/types/src/events.ts:283), compute emits smart-money events then compatibility hits/alerts in [index.ts](/Users/kell/dev/islandflow/services/compute/src/index.ts:1086), storage keeps core hypothesis detail as JSON in [smart-money-events.ts](/Users/kell/dev/islandflow/packages/storage/src/smart-money-events.ts:24), and replay currently replays raw market streams rather than validating the whole derived pipeline in [replay/index.ts](/Users/kell/dev/islandflow/services/replay/src/index.ts:69).
+
+## Source Documents
+
+- Research report: [`docs/research-docs/smart-flow-market-mechanics.md`](../research-docs/smart-flow-market-mechanics.md)
+- Research architecture review copy: [`docs/research-docs/smart-flow-architecture-review.md`](../research-docs/smart-flow-architecture-review.md)
+
+These research documents explain the rationale. They are background, not implementation scope; execution scope lives in the Beads issue and the relevant phase document.
 
 ## Area Classification
 

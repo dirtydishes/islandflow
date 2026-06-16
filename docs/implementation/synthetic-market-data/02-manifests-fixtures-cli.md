@@ -8,6 +8,23 @@ Turn the deterministic generator into reusable artifacts: fixture files, run man
 
 The deterministic spine gives the repo stable raw events. The next step is to make those events durable and addressable so downstream phases can reference exact generated runs instead of recreating ad hoc local randomness.
 
+## Source documents
+
+- Architecture plan: [`docs/plans/synthetic-market-data-architecture-review.md`](../../plans/synthetic-market-data-architecture-review.md)
+- Research report: [`docs/research-docs/synthetic-market-data-generation.md`](../../research-docs/synthetic-market-data-generation.md)
+
+These documents are rationale, not added scope. This phase implements only manifests, fixtures, and CLI support.
+
+## Research basis
+
+- Deterministic replay and reviewable artifacts are necessary for synthetic data to be useful as validation data, not just demo data.
+- Expected-output manifests should pin seed, profile, generator version, event hashes, and replay ordering.
+- Hidden labels must stay separate from market events so tests do not leak ground truth into production-like paths.
+
+## Deferred research ideas
+
+- Empirical residual resampling and historical-window bootstrapping are future artifact sources, not this CLI's first requirement.
+
 ## Dependencies on earlier phases
 
 - `islandflow-259.1` - Synthetic deterministic spine

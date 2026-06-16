@@ -8,6 +8,23 @@ Expose deterministic synthetic runs as named demo and load profiles after the ge
 
 Demos are useful only after the underlying data can be trusted. This phase deliberately waits until replay and golden evaluation prove the event semantics, so hosted controls do not become a front door to ambient randomness.
 
+## Source documents
+
+- Architecture plan: [`docs/plans/synthetic-market-data-architecture-review.md`](../../plans/synthetic-market-data-architecture-review.md)
+- Research report: [`docs/research-docs/synthetic-market-data-generation.md`](../../research-docs/synthetic-market-data-generation.md)
+
+These documents are rationale, not added scope. This phase implements only named deterministic demo and load profiles.
+
+## Research basis
+
+- Demo streams should use named, seeded profiles so product behavior is reproducible.
+- Load profiles should scale rate or volume without changing event semantics.
+- Realism should come from the generator and scenarios, not hidden UI knobs or wall-clock randomness.
+
+## Deferred research ideas
+
+- Historically bootstrapped demo streams, learned realism upgrades, and full LOB-style demos stay future work.
+
 ## Dependencies on earlier phases
 
 - `islandflow-259.1` - Synthetic deterministic spine

@@ -5,13 +5,6 @@
 - Recommendation: **Option B — Refactor**. Conservative work would trap determinism inside ingest adapters; full redesign is premature. Refactor makes synthetic generation first-class while keeping the useful NATS, ClickHouse, compute, API, and web stack.
 - Core direction: build a no-history, seeded, manifest-driven synthetic event engine with canonical real event types, separate labels/manifests, deterministic replay, fixture generation, load profiles, and demo scenarios.
 
-## Source Documents
-
-- Research report: [`docs/research-docs/synthetic-market-data-generation.md`](../research-docs/synthetic-market-data-generation.md)
-- Research architecture review copy: [`docs/research-docs/synthetic-data-architecture-review.md`](../research-docs/synthetic-data-architecture-review.md)
-
-These research documents explain the rationale. They are background, not implementation scope; execution scope lives in the Beads issue and the relevant phase document.
-
 ## Direct Answers
 1. Synthetic generation should be a **combination**: a reusable `@islandflow/synthetic-market` package, a CLI for fixture/run generation, replay-source integration, test fixture helpers, and demo presets. A service should be only a thin live/demo emitter.
 2. Synthetic events should map to existing canonical event types: `OptionPrint`, `OptionNBBO`, `EquityPrint`, and `EquityQuote`. Do not create parallel synthetic-only market event types for the main pipeline.

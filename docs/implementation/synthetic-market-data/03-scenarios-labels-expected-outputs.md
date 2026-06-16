@@ -8,6 +8,24 @@ Author named deterministic scenarios, separate ground-truth labels, and expected
 
 The generator and manifest layers should exist before scenario authoring. Smart-flow evidence clustering should also define enough vocabulary for expected outputs to describe evidence requirements without leaking labels into emitted market events.
 
+## Source documents
+
+- Architecture plan: [`docs/plans/synthetic-market-data-architecture-review.md`](../../plans/synthetic-market-data-architecture-review.md)
+- Research report: [`docs/research-docs/synthetic-market-data-generation.md`](../../research-docs/synthetic-market-data-generation.md)
+- Smart-flow research report: [`docs/research-docs/smart-flow-market-mechanics.md`](../../research-docs/smart-flow-market-mechanics.md)
+
+These documents are rationale, not added scope. This phase implements only named scenarios, separate labels, and expected-output contracts.
+
+## Research basis
+
+- Scenario injection into a realistic synthetic background is mandatory for labeled, replayable alert tests.
+- Negative, noisy, stale, wide-market, and event-context cases matter as much as positive "should detect" scenarios.
+- Labels and expected outputs need required evidence, forbidden evidence, confidence bands, and false-positive penalties.
+
+## Deferred research ideas
+
+- Empirical tuning of scenario frequencies, full historical replay-plus-mutation, and learned scenario generation belong after the MVP scenario catalog is stable.
+
 ## Dependencies on earlier phases
 
 - `islandflow-259.1` - Synthetic deterministic spine

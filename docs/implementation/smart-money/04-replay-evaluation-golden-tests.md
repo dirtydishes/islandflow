@@ -8,6 +8,24 @@ Make deterministic replay and golden output comparison the acceptance gate for s
 
 Replay evaluation should come after synthetic replay can select stable runs and after hypothesis scoring has outputs worth validating. This phase turns architecture discipline into a repeatable test path.
 
+## Source documents
+
+- Architecture plan: [`docs/plans/smart-flow-architecture-review.md`](../../plans/smart-flow-architecture-review.md)
+- Research report: [`docs/research-docs/smart-flow-market-mechanics.md`](../../research-docs/smart-flow-market-mechanics.md)
+- Synthetic research report: [`docs/research-docs/synthetic-market-data-generation.md`](../../research-docs/synthetic-market-data-generation.md)
+
+These documents are rationale, not added scope. This phase implements only deterministic replay evaluation and compact golden tests.
+
+## Research basis
+
+- Replay is the acceptance gate for derived smart-flow outputs because evidence and hypotheses must be reproducible.
+- Validation must include positive cases, false positives, noisy contexts, and abstentions.
+- Tests should avoid lookahead bias and compare stable signatures instead of brittle full-payload dumps.
+
+## Deferred research ideas
+
+- Historical backtesting windows, empirical calibration datasets, and broad benchmark reports belong in later calibration work.
+
 ## Dependencies on earlier phases
 
 - `islandflow-zxh.1` - Smart-flow contracts and vocabulary

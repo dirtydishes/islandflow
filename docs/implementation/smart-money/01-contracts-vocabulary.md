@@ -8,6 +8,23 @@ Introduce the domain vocabulary and contracts that distinguish observations, evi
 
 The current system has useful infrastructure but overconfident domain names. Before changing classifier behavior, the codebase needs the language to express what is observed, what is inferred, what is uncertain, and when the system should abstain.
 
+## Source documents
+
+- Architecture plan: [`docs/plans/smart-flow-architecture-review.md`](../../plans/smart-flow-architecture-review.md)
+- Research report: [`docs/research-docs/smart-flow-market-mechanics.md`](../../research-docs/smart-flow-market-mechanics.md)
+
+These documents are rationale, not added scope. This phase implements only vocabulary, contracts, versioning, and compatibility notes.
+
+## Research basis
+
+- The research direction is direct observation to inference to hypothesis, with preserved evidence and visible uncertainty.
+- "Smart money" should not be modeled as a canonical fact; user-facing insight should be a projection from evidence-backed hypotheses.
+- Confidence, conviction, alternatives, and abstention need separate language before behavior changes.
+
+## Deferred research ideas
+
+- Participant identity claims and research-grade calibration stay outside the vocabulary foundation.
+
 ## Dependencies on earlier phases
 
 - `islandflow-259.1` - Synthetic deterministic spine, so contract work can align with canonical raw event and provenance assumptions.

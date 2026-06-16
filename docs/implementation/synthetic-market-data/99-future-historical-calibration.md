@@ -8,6 +8,23 @@ Plan future calibration of synthetic generator parameters from historical market
 
 It is useful to name the future work now so early designs keep calibration hooks in mind. It should not come before deterministic generation, manifests, scenarios, replay, or demo profiles.
 
+## Source documents
+
+- Architecture plan: [`docs/plans/synthetic-market-data-architecture-review.md`](../../plans/synthetic-market-data-architecture-review.md)
+- Research report: [`docs/research-docs/synthetic-market-data-generation.md`](../../research-docs/synthetic-market-data-generation.md)
+
+These documents are rationale, not added scope. This future phase is the place to turn research ideas into scoped calibration work after MVP.
+
+## Research basis
+
+- Once historical data exists, calibration should fit arrival curves, spread states, size mixtures, venue shares, and options-chain activity weights.
+- Replay-plus-mutation can improve realism while preserving deterministic test intent.
+- Calibration should layer onto the deterministic engine rather than replace it wholesale.
+
+## Deferred research ideas
+
+- Generative ML, learned LOB simulators, and agent-based models remain later research tracks unless a future Beads issue scopes them explicitly.
+
 ## Dependencies on earlier phases
 
 - `islandflow-259.5` - Synthetic demo and load profiles

@@ -8,6 +8,23 @@ Make replay consume synthetic runs deterministically, either directly from gener
 
 Replay should not be wired to synthetic data until the generator, manifests, labels, and smart-flow hypothesis pipeline have stable semantics. At this point, replay can become a serious acceptance gate instead of a demo convenience.
 
+## Source documents
+
+- Architecture plan: [`docs/plans/synthetic-market-data-architecture-review.md`](../../plans/synthetic-market-data-architecture-review.md)
+- Research report: [`docs/research-docs/synthetic-market-data-generation.md`](../../research-docs/synthetic-market-data-generation.md)
+
+These documents are rationale, not added scope. This phase implements only deterministic synthetic replay integration.
+
+## Research basis
+
+- Replay must preserve event-time ordering and deterministic run identity to prove derived behavior.
+- Synthetic runs should be selectable by source and run metadata rather than ambient randomness.
+- Optional ClickHouse/NATS materialization can exist later, but fast validation should remain infra-free.
+
+## Deferred research ideas
+
+- Historical replay-plus-mutation and calibrated replay benchmarks are future layers after synthetic replay semantics are stable.
+
 ## Dependencies on earlier phases
 
 - `islandflow-259.1` - Synthetic deterministic spine

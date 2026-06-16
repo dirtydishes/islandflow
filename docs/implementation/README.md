@@ -2,7 +2,18 @@
 
 This directory is the active planning layer for the synthetic market-data and smart-money/smart-flow architecture work.
 
-The architecture reviews in `docs/plans/` are background guidance. Future implementation work should use the current phase document and matching Beads issue as the active scope. If a phase document and an older architecture review disagree, pause and update the phase document or Beads issue before writing code.
+The architecture reviews in `docs/plans/` and research reports in `docs/research-docs/` are background guidance. Future implementation work should use the current phase document and matching Beads issue as the active scope. If a phase document and an older architecture review or research report disagree, pause and update the phase document or Beads issue before writing code.
+
+## Document Precedence
+
+Use this precedence order when planning or implementing phase work:
+
+1. Beads issue
+2. Phase document in `docs/implementation/`
+3. Architecture plan in `docs/plans/`
+4. Research report in `docs/research-docs/`
+
+Research reports provide rationale and useful constraints. They do not add active implementation scope unless that scope is explicitly pulled into a phase document and Beads issue.
 
 ## Source Plans
 

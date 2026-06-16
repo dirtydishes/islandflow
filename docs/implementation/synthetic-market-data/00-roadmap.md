@@ -2,6 +2,14 @@
 
 This roadmap breaks `docs/plans/synthetic-market-data-architecture-review.md` into implementation-sized phases. The recommended direction is still Option B: extract deterministic synthetic generation into a first-class reusable engine while keeping the useful NATS, ClickHouse, compute, API, replay, and web stack.
 
+## Source Documents
+
+- Architecture plan: [`docs/plans/synthetic-market-data-architecture-review.md`](../../plans/synthetic-market-data-architecture-review.md)
+- Research report: [`docs/research-docs/synthetic-market-data-generation.md`](../../research-docs/synthetic-market-data-generation.md)
+- Research architecture review copy: [`docs/research-docs/synthetic-data-architecture-review.md`](../../research-docs/synthetic-data-architecture-review.md)
+
+The research documents are background and rationale only. Scope comes from the Beads issue and the phase document.
+
 ## Core Constraints
 
 - Emit canonical market event types: `OptionPrint`, `OptionNBBO`, `EquityPrint`, and `EquityQuote`.

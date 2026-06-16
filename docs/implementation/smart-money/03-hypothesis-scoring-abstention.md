@@ -8,6 +8,23 @@ Convert evidence clusters into cautious flow hypotheses with explicit score vect
 
 Scoring should wait until the system can represent evidence clearly and synthetic scenarios can describe expected positive, negative, and abstention cases. This phase is where the product stops acting like every signal is a confident "smart money" claim.
 
+## Source documents
+
+- Architecture plan: [`docs/plans/smart-flow-architecture-review.md`](../../plans/smart-flow-architecture-review.md)
+- Research report: [`docs/research-docs/smart-flow-market-mechanics.md`](../../research-docs/smart-flow-market-mechanics.md)
+
+These documents are rationale, not added scope. This phase implements only cautious hypothesis scoring, alternatives, penalties, and abstention.
+
+## Research basis
+
+- Premium concentration, sweep-like activity, IV movement, and equity confirmation support hypotheses only when evidence quality and context agree.
+- False positives from deep-ITM stock replacement, spreads/hedges, stale quotes, and event-driven flow need explicit penalties or abstention.
+- Confidence should reflect policy confidence in the evidence, not a claim of hidden participant identity.
+
+## Deferred research ideas
+
+- Empirical threshold tuning, historical calibration, and ML-based scoring stay future work until replay/golden validation exists.
+
 ## Dependencies on earlier phases
 
 - `islandflow-zxh.1` - Smart-flow contracts and vocabulary

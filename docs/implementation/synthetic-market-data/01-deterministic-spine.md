@@ -8,6 +8,23 @@ Create the reusable deterministic foundation for synthetic market data. This pha
 
 Everything else depends on reproducible raw events. Manifests, labels, replay, demos, and smart-flow tests are only trustworthy if the same seed/profile bundle produces the same canonical market event stream every time.
 
+## Source documents
+
+- Architecture plan: [`docs/plans/synthetic-market-data-architecture-review.md`](../../plans/synthetic-market-data-architecture-review.md)
+- Research report: [`docs/research-docs/synthetic-market-data-generation.md`](../../research-docs/synthetic-market-data-generation.md)
+
+These documents are rationale, not added scope. This phase implements only the deterministic spine described below.
+
+## Research basis
+
+- The research recommends a no-history-first, transparent, deterministic generator rather than historical replay as an MVP prerequisite.
+- The generator needs core market realism handles from the start: discrete ticks, varying spreads, clustered arrivals, heterogeneous sizes, quote/trade separation, and options-chain sparsity.
+- Full agent-based, limit-order-book, and generative-ML simulation are too heavy for the first foundation.
+
+## Deferred research ideas
+
+- Full LOB simulation, agent-based simulation, generative ML, and empirical calibration stay out of this phase.
+
 ## Dependencies on earlier phases
 
 None. This is the first synthetic phase.

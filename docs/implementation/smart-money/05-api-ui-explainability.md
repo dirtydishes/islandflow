@@ -8,6 +8,23 @@ Expose evidence-backed smart-flow outputs through API, websocket, and UI surface
 
 The presentation layer should wait until contracts, evidence, scoring, and replay evaluation are stable. Otherwise the UI will harden old overconfident language or teach users to trust unvalidated outputs.
 
+## Source documents
+
+- Architecture plan: [`docs/plans/smart-flow-architecture-review.md`](../../plans/smart-flow-architecture-review.md)
+- Research report: [`docs/research-docs/smart-flow-market-mechanics.md`](../../research-docs/smart-flow-market-mechanics.md)
+
+These documents are rationale, not added scope. This phase implements only API, websocket, and UI explainability surfaces for validated outputs.
+
+## Research basis
+
+- Users need to see evidence quality, confidence versus conviction, alternatives, and abstention instead of a single certainty label.
+- The research supports cautious smart-flow insight projections, not canonical "smart money" facts.
+- Why-not and penalty context are part of the product surface because false positives are central to the domain.
+
+## Deferred research ideas
+
+- Advanced explanatory analytics, learned confidence calibration, and broad catalyst intelligence should wait for future scoped work.
+
 ## Dependencies on earlier phases
 
 - `islandflow-zxh.1` - Smart-flow contracts and vocabulary

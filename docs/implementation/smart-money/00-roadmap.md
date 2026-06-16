@@ -2,6 +2,14 @@
 
 This roadmap breaks `docs/plans/smart-flow-architecture-review.md` into implementation-sized phases. The recommended direction is Option B: keep the working stack, but rebuild the domain pipeline around observations, evidence clusters, cautious hypotheses, confidence, alternatives, abstention, replay evaluation, and user-facing insight projections.
 
+## Source Documents
+
+- Architecture plan: [`docs/plans/smart-flow-architecture-review.md`](../../plans/smart-flow-architecture-review.md)
+- Research report: [`docs/research-docs/smart-flow-market-mechanics.md`](../../research-docs/smart-flow-market-mechanics.md)
+- Research architecture review copy: [`docs/research-docs/smart-flow-architecture-review.md`](../../research-docs/smart-flow-architecture-review.md)
+
+The research documents are background and rationale only. Scope comes from the Beads issue and the phase document.
+
 ## Core Constraints
 
 - Do not treat "smart money" as a canonical fact emitted by the system.

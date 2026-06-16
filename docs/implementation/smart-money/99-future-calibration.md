@@ -8,6 +8,23 @@ Plan future calibration of smart-flow confidence, policy thresholds, penalties, 
 
 The architecture should leave room for calibration, but calibration should not block the MVP. The system first needs clean facts, evidence, hypotheses, and replayable evaluation before tuning can be meaningful.
 
+## Source documents
+
+- Architecture plan: [`docs/plans/smart-flow-architecture-review.md`](../../plans/smart-flow-architecture-review.md)
+- Research report: [`docs/research-docs/smart-flow-market-mechanics.md`](../../research-docs/smart-flow-market-mechanics.md)
+
+These documents are rationale, not added scope. This future phase is the place to turn research ideas into scoped calibration work after MVP.
+
+## Research basis
+
+- Historical validation should be time-of-day aware and avoid lookahead bias.
+- Baselines for "unusual" should account for ticker, tenor bucket, regime, and event-day exclusions.
+- Confidence, penalties, abstention, and alternatives need versioned policy outputs so calibration stays auditable.
+
+## Deferred research ideas
+
+- ML scoring, learned calibration, richer catalyst feeds, and large historical benchmark suites require separate future Beads scope.
+
 ## Dependencies on earlier phases
 
 - `islandflow-zxh.5` - Smart-flow API/UI explainability

@@ -8,6 +8,23 @@ Make evidence extraction, eligibility, quote/context joins, clustering, and feat
 
 Contracts alone do not change behavior. This phase gives the system a clean evidence layer so later scoring can reason from auditable facts instead of a generic feature bag or overconfident classifier labels.
 
+## Source documents
+
+- Architecture plan: [`docs/plans/smart-flow-architecture-review.md`](../../plans/smart-flow-architecture-review.md)
+- Research report: [`docs/research-docs/smart-flow-market-mechanics.md`](../../research-docs/smart-flow-market-mechanics.md)
+
+These documents are rationale, not added scope. This phase implements only eligibility, evidence facts, clustering, and traceable features.
+
+## Research basis
+
+- Trade signing, quote context, sale conditions, stale quotes, wide markets, and event context all affect whether a print is usable evidence.
+- Evidence should preserve raw refs, eligibility decisions, quality signals, and negative context before any hypothesis is scored.
+- Ingest should normalize observations; signal policy belongs in explicit evidence/scoring stages.
+
+## Deferred research ideas
+
+- Full IV-surface modeling, broad news/FDA event feeds, and deep historical baselines can be added later when scoped.
+
 ## Dependencies on earlier phases
 
 - `islandflow-zxh.1` - Smart-flow contracts and vocabulary
