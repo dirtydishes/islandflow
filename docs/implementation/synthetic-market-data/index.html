@@ -1,0 +1,1040 @@
+<!doctype html>
+<html lang="en" data-accent="amber">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Synthetic Market-Data Implementation Phases</title>
+  <meta name="description" content="Readable implementation phase document for Synthetic Market Data.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Quantico:wght@700&display=swap" rel="stylesheet">
+  <style>
+:root {
+  color-scheme: dark;
+  --bg: oklch(0.105 0.012 250);
+  --bg-elevated: oklch(0.145 0.012 250);
+  --bg-pane: oklch(0.18 0.013 250);
+  --bg-pane-2: oklch(0.155 0.012 250);
+  --bg-soft: oklch(0.97 0.008 250 / 0.045);
+  --line: oklch(0.72 0.012 250 / 0.18);
+  --line-strong: oklch(0.78 0.09 74 / 0.34);
+  --text: oklch(0.93 0.014 250);
+  --text-dim: oklch(0.76 0.018 250);
+  --text-faint: oklch(0.62 0.016 250);
+  --amber: oklch(0.78 0.12 74);
+  --amber-soft: oklch(0.78 0.12 74 / 0.12);
+  --blue: oklch(0.72 0.13 247);
+  --blue-soft: oklch(0.72 0.13 247 / 0.12);
+  --green: oklch(0.74 0.13 151);
+  --green-soft: oklch(0.74 0.13 151 / 0.1);
+  --red: oklch(0.68 0.16 28);
+  --red-soft: oklch(0.68 0.16 28 / 0.12);
+  --accent: var(--amber);
+  --accent-soft: var(--amber-soft);
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --display: Quantico, var(--sans);
+}
+
+[data-accent="blue"] {
+  --accent: var(--blue);
+  --accent-soft: var(--blue-soft);
+  --line-strong: oklch(0.72 0.13 247 / 0.34);
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--text);
+  background: var(--bg);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  z-index: 10;
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  transform: translateY(-180%);
+  transition: transform 160ms ease;
+}
+.skip-link:focus { transform: translateY(0); }
+
+.shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(230px, 280px) minmax(0, 1fr);
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  padding: 22px 18px;
+  border-right: 1px solid var(--line);
+  background: var(--bg-elevated);
+  overflow: auto;
+}
+
+.brand {
+  display: grid;
+  gap: 8px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.brand-mark {
+  font-family: var(--display);
+  font-size: 1.35rem;
+  line-height: 1.05;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.brand-meta,
+.kicker,
+.nav-title,
+.phase-label,
+th,
+.status-chip,
+.issue-chip,
+.section-label {
+  font-family: var(--mono);
+  font-size: 0.71rem;
+  line-height: 1.25;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.brand-meta { color: var(--text-faint); }
+
+.nav-title {
+  margin: 18px 0 8px;
+  color: var(--text-faint);
+}
+
+.nav-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nav-list a {
+  display: block;
+  padding: 9px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--text-dim);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.nav-list a:hover,
+.nav-list a:focus-visible {
+  border-color: var(--line);
+  background: var(--bg-soft);
+  color: var(--text);
+  outline: none;
+}
+
+.main {
+  min-width: 0;
+  padding: 28px clamp(18px, 4vw, 56px) 52px;
+}
+
+.hero {
+  display: grid;
+  gap: 18px;
+  padding: 24px 0 28px;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.kicker { color: var(--accent); }
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  color: var(--text);
+  text-wrap: balance;
+}
+
+h1 {
+  max-width: 920px;
+  font-family: var(--display);
+  font-size: clamp(2rem, 4.2vw, 3.85rem);
+  line-height: 1.02;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+
+.hero p {
+  max-width: 72ch;
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 1rem;
+  text-wrap: pretty;
+}
+
+.meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.status-chip,
+.issue-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-soft);
+  color: var(--text-dim);
+}
+
+.issue-chip {
+  border-color: var(--line-strong);
+  color: var(--text);
+  background: var(--accent-soft);
+}
+
+.phase-overview {
+  margin-top: 24px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.phase-row {
+  display: grid;
+  grid-template-columns: minmax(92px, 120px) minmax(180px, 0.7fr) minmax(0, 1.5fr);
+  gap: 16px;
+  align-items: baseline;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+.phase-row:first-child { border-top: 0; }
+.phase-label { color: var(--accent); }
+.phase-title { font-weight: 700; color: var(--text); }
+.phase-summary { color: var(--text-dim); }
+
+.content-stack {
+  min-width: 0;
+  display: grid;
+  gap: 30px;
+  margin-top: 34px;
+}
+
+.doc-section {
+  min-width: 0;
+  border-top: 1px solid var(--line-strong);
+  background: linear-gradient(180deg, var(--bg-pane) 0%, var(--bg-pane-2) 100%);
+}
+
+.doc-head {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.doc-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.doc-head h2 {
+  font-size: 1.15rem;
+  line-height: 1.2;
+}
+
+.doc-source {
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  overflow-wrap: anywhere;
+}
+
+.doc-body {
+  min-width: 0;
+  padding: 16px;
+}
+
+.doc-body h3 {
+  margin: 28px 0 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 1rem;
+}
+.doc-body h3:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+.doc-body h4 { margin: 18px 0 8px; font-size: 0.95rem; color: var(--text-dim); }
+.doc-body p { max-width: 74ch; margin: 0 0 12px; color: var(--text-dim); text-wrap: pretty; }
+.doc-body ul { margin: 0 0 14px; padding-left: 1.1rem; color: var(--text-dim); }
+.doc-body li { margin: 5px 0; padding-left: 2px; }
+.doc-body strong { color: var(--text); }
+
+code {
+  padding: 0.1em 0.36em;
+  border-radius: 5px;
+  background: oklch(0.07 0.01 250 / 0.76);
+  color: oklch(0.86 0.055 74);
+  font-family: var(--mono);
+  font-size: 0.88em;
+}
+
+pre {
+  margin: 14px 0 18px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: oklch(0.075 0.01 250);
+}
+
+pre code {
+  display: block;
+  padding: 14px;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.table-wrap {
+  min-width: 0;
+  max-width: 100%;
+  margin: 14px 0 18px;
+  overflow: auto;
+  border: 1px solid var(--line);
+}
+
+table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  background: oklch(0.13 0.011 250);
+}
+
+th,
+td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+th { color: var(--text-faint); background: oklch(0.1 0.01 250); }
+td { color: var(--text-dim); }
+tr:last-child td { border-bottom: 0; }
+
+.footer {
+  margin-top: 34px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+}
+
+@media (max-width: 920px) {
+  .shell { grid-template-columns: 1fr; }
+  .sidebar { position: relative; height: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+  .nav-list { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+  .phase-row { grid-template-columns: 1fr; gap: 4px; }
+  .main { padding-top: 20px; }
+}
+
+@media (max-width: 560px) {
+  body { font-size: 14px; }
+  h1 { font-size: 2rem; overflow-wrap: anywhere; }
+  .doc-body, .doc-head { padding-inline: 12px; }
+  .main { padding-inline: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+  }
+}
+</style>
+</head>
+<body>
+  <a class="skip-link" href="#content">Skip to content</a>
+  <div class="shell">
+    <aside class="sidebar" aria-label="Document navigation">
+      <div class="brand">
+        <div class="brand-mark">Islandflow</div>
+        <div class="brand-meta">Implementation packet<br>Synthetic Market Data</div>
+      </div>
+      <div class="nav-title">Phase index</div>
+      <ul class="nav-list">
+        <li><a href="#00-roadmap"><span class="phase-label">Roadmap</span><br>Roadmap</a></li>
+        <li><a href="#01-deterministic-spine"><span class="phase-label">Phase 01</span><br>Phase 01: Deterministic Spine</a></li>
+        <li><a href="#02-manifests-fixtures-cli"><span class="phase-label">Phase 02</span><br>Phase 02: Manifests, Fixtures, and CLI</a></li>
+        <li><a href="#03-scenarios-labels-expected-outputs"><span class="phase-label">Phase 03</span><br>Phase 03: Scenarios, Labels, and Expected Outputs</a></li>
+        <li><a href="#04-replay-integration"><span class="phase-label">Phase 04</span><br>Phase 04: Replay Integration</a></li>
+        <li><a href="#05-demo-load-profiles"><span class="phase-label">Phase 05</span><br>Phase 05: Demo and Load Profiles</a></li>
+        <li><a href="#99-future-historical-calibration"><span class="phase-label">Future</span><br>Phase 99: Future Historical Calibration</a></li>
+      </ul>
+    </aside>
+    <main class="main" id="content">
+      <header class="hero">
+        <div class="kicker">Readable phase dossier</div>
+        <h1>Synthetic Market-Data Implementation Phases</h1>
+        <p>Deterministic generation, manifests, scenarios, replay, demos, and future calibration. Research reports remain background rationale; active scope comes from Beads and the phase Markdown.</p>
+        <div class="meta-row">
+          <span class="issue-chip">Beads islandflow-259</span>
+          <span class="status-chip">7 source docs</span>
+          <span class="status-chip">No app code</span>
+        </div>
+      </header>
+
+      <section class="phase-overview" aria-label="Phase overview">
+
+    <a class="phase-row" href="#00-roadmap">
+      <span class="phase-label">Roadmap</span>
+      <span class="phase-title">Roadmap</span>
+      <span class="phase-summary">This roadmap breaks <code>docs/plans/synthetic-market-data-architecture-review.md</code> into implementation-sized phases. The recommended direction is still Option B: extract deterministic synthetic generation into a first-class reusable engine while keeping the useful NATS, ClickHouse, compute, API, replay, and web stack.</span>
+    </a>
+    <a class="phase-row" href="#01-deterministic-spine">
+      <span class="phase-label">Phase 01</span>
+      <span class="phase-title">Phase 01: Deterministic Spine</span>
+      <span class="phase-summary">Create the reusable deterministic foundation for synthetic market data. This phase should define the package/API shape for seeded generation, stable run identity, profile inputs, canonical event outputs, and provenance metadata.</span>
+    </a>
+    <a class="phase-row" href="#02-manifests-fixtures-cli">
+      <span class="phase-label">Phase 02</span>
+      <span class="phase-title">Phase 02: Manifests, Fixtures, and CLI</span>
+      <span class="phase-summary">Turn the deterministic generator into reusable artifacts: fixture files, run manifests, and a CLI that can produce repeatable synthetic runs for tests, replay, demos, and later evaluation.</span>
+    </a>
+    <a class="phase-row" href="#03-scenarios-labels-expected-outputs">
+      <span class="phase-label">Phase 03</span>
+      <span class="phase-title">Phase 03: Scenarios, Labels, and Expected Outputs</span>
+      <span class="phase-summary">Author named deterministic scenarios, separate ground-truth labels, and expected-output manifests that downstream smart-flow logic can use for positive, negative, abstention, and false-positive validation.</span>
+    </a>
+    <a class="phase-row" href="#04-replay-integration">
+      <span class="phase-label">Phase 04</span>
+      <span class="phase-title">Phase 04: Replay Integration</span>
+      <span class="phase-summary">Make replay consume synthetic runs deterministically, either directly from generated fixtures or from materialized storage rows, while preserving the same ordering semantics the real replay path uses.</span>
+    </a>
+    <a class="phase-row" href="#05-demo-load-profiles">
+      <span class="phase-label">Phase 05</span>
+      <span class="phase-title">Phase 05: Demo and Load Profiles</span>
+      <span class="phase-summary">Expose deterministic synthetic runs as named demo and load profiles after the generation, manifest, scenario, and replay foundations are in place.</span>
+    </a>
+    <a class="phase-row" href="#99-future-historical-calibration">
+      <span class="phase-label">Future</span>
+      <span class="phase-title">Phase 99: Future Historical Calibration</span>
+      <span class="phase-summary">Plan future calibration of synthetic generator parameters from historical market data without making historical data a dependency for the MVP generator.</span>
+    </a>
+      </section>
+
+      <div class="content-stack">
+
+      <article class="doc-section" id="00-roadmap">
+        <header class="doc-head">
+          <div class="doc-title-row">
+            <span class="phase-label">Roadmap</span>
+            <span class="status-chip">synthetic-market-data</span>
+          </div>
+          <h2>Synthetic Market-Data Roadmap</h2>
+          <div class="doc-source">Source Markdown: <a href="00-roadmap.md">00-roadmap.md</a></div>
+        </header>
+        <div class="doc-body">
+<p>This roadmap breaks <code>docs/plans/synthetic-market-data-architecture-review.md</code> into implementation-sized phases. The recommended direction is still Option B: extract deterministic synthetic generation into a first-class reusable engine while keeping the useful NATS, ClickHouse, compute, API, replay, and web stack.</p>
+<h3 id="00-roadmap-source-documents">Source Documents</h3>
+<ul>
+<li>Architecture plan: <a href="../../plans/synthetic-market-data-architecture-review.md">docs/plans/synthetic-market-data-architecture-review.md</a></li>
+<li>Research report: <a href="../../research-docs/synthetic-market-data-generation.md">docs/research-docs/synthetic-market-data-generation.md</a></li>
+<li>Research architecture review copy: <a href="../../research-docs/synthetic-data-architecture-review.md">docs/research-docs/synthetic-data-architecture-review.md</a></li>
+</ul>
+<p>The research documents are background and rationale only. Scope comes from the Beads issue and the phase document.</p>
+<h3 id="00-roadmap-core-constraints">Core Constraints</h3>
+<ul>
+<li>Emit canonical market event types: <code>OptionPrint</code>, <code>OptionNBBO</code>, <code>EquityPrint</code>, and <code>EquityQuote</code>.</li>
+<li>Do not create synthetic-only market event types for the main pipeline.</li>
+<li>Keep hidden ground-truth labels separate from emitted market events.</li>
+<li>Keep early quality gates infra-free: <code>bun test</code> should not require Docker, ClickHouse, NATS, or Redis.</li>
+<li>Build deterministic foundations before demos, UI controls, or live synthetic service behavior.</li>
+<li>Treat historical calibration as future work, not as a dependency for the MVP synthetic generator.</li>
+</ul>
+<h3 id="00-roadmap-phase-sequence">Phase Sequence</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Phase</th><th>Beads issue</th><th>Depends on</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td>01 - Deterministic spine</td><td><code>islandflow-259.1</code></td><td>None</td><td>Create the seeded generation foundation and canonical event output contract.</td></tr>
+<tr><td>02 - Manifests, fixtures, CLI</td><td><code>islandflow-259.2</code></td><td><code>islandflow-zxh.1</code></td><td>Turn deterministic generation into durable fixtures and manifests.</td></tr>
+<tr><td>03 - Scenarios, labels, expected outputs</td><td><code>islandflow-259.3</code></td><td><code>islandflow-zxh.2</code></td><td>Author named scenarios, separate labels, and expected derived outputs.</td></tr>
+<tr><td>04 - Replay integration</td><td><code>islandflow-259.4</code></td><td><code>islandflow-zxh.3</code></td><td>Make replay consume synthetic runs with stable ordering and output comparison.</td></tr>
+<tr><td>05 - Demo and load profiles</td><td><code>islandflow-259.5</code></td><td><code>islandflow-zxh.4</code></td><td>Expose named deterministic demo/load profiles after replay validation.</td></tr>
+<tr><td>99 - Future historical calibration</td><td><code>islandflow-259.6</code></td><td><code>islandflow-259.5</code></td><td>Calibrate parameters from historical data later, after the MVP is stable.</td></tr>
+</tbody></table></div>
+<h3 id="00-roadmap-pr-split-notes">PR Split Notes</h3>
+<p>Most phases are intended to fit in one focused PR. Phase 03 is already split into PR-sized Beads children because scenario authoring and expected-output comparison can grow quickly:</p>
+<ul>
+<li><code>islandflow-259.3.1</code> - Split synthetic phase 03a: scenario catalog and labels</li>
+<li><code>islandflow-259.3.2</code> - Split synthetic phase 03b: expected-output manifests</li>
+</ul>
+<p>If any other phase starts touching unrelated service, API, UI, and storage behavior in one PR, split it before implementation continues.</p>
+<h3 id="00-roadmap-matching-beads-epic">Matching Beads Epic</h3>
+<ul>
+<li><code>islandflow-259</code> - Plan synthetic market-data implementation phases</li>
+</ul>
+        </div>
+      </article>
+
+      <article class="doc-section" id="01-deterministic-spine">
+        <header class="doc-head">
+          <div class="doc-title-row">
+            <span class="phase-label">Phase 01</span>
+            <span class="status-chip">synthetic-market-data</span>
+          </div>
+          <h2>Synthetic Market-Data Phase 01: Deterministic Spine</h2>
+          <div class="doc-source">Source Markdown: <a href="01-deterministic-spine.md">01-deterministic-spine.md</a></div>
+        </header>
+        <div class="doc-body">
+<h3 id="01-deterministic-spine-purpose">Purpose</h3>
+<p>Create the reusable deterministic foundation for synthetic market data. This phase should define the package/API shape for seeded generation, stable run identity, profile inputs, canonical event outputs, and provenance metadata.</p>
+<h3 id="01-deterministic-spine-why-this-phase-comes-now">Why this phase comes now</h3>
+<p>Everything else depends on reproducible raw events. Manifests, labels, replay, demos, and smart-flow tests are only trustworthy if the same seed/profile bundle produces the same canonical market event stream every time.</p>
+<h3 id="01-deterministic-spine-source-documents">Source documents</h3>
+<ul>
+<li>Architecture plan: <a href="../../plans/synthetic-market-data-architecture-review.md">docs/plans/synthetic-market-data-architecture-review.md</a></li>
+<li>Research report: <a href="../../research-docs/synthetic-market-data-generation.md">docs/research-docs/synthetic-market-data-generation.md</a></li>
+<li>Research architecture review copy: <a href="../../research-docs/synthetic-data-architecture-review.md">docs/research-docs/synthetic-data-architecture-review.md</a></li>
+</ul>
+<p>These documents are rationale, not added scope. This phase implements only the deterministic spine described below.</p>
+<h3 id="01-deterministic-spine-research-basis">Research basis</h3>
+<ul>
+<li>The research recommends a no-history-first, transparent, deterministic generator rather than historical replay as an MVP prerequisite.</li>
+<li>The generator needs core market realism handles from the start: discrete ticks, varying spreads, clustered arrivals, heterogeneous sizes, quote/trade separation, and options-chain sparsity.</li>
+<li>Full agent-based, limit-order-book, and generative-ML simulation are too heavy for the first foundation.</li>
+</ul>
+<h3 id="01-deterministic-spine-deferred-research-ideas">Deferred research ideas</h3>
+<ul>
+<li>Full LOB simulation, agent-based simulation, generative ML, and empirical calibration stay out of this phase.</li>
+</ul>
+<h3 id="01-deterministic-spine-dependencies-on-earlier-phases">Dependencies on earlier phases</h3>
+<p>None. This is the first synthetic phase.</p>
+<h3 id="01-deterministic-spine-likely-files-modules-touched">Likely files/modules touched</h3>
+<ul>
+<li>Future <code>packages/synthetic-market/</code> workspace or equivalent package boundary</li>
+<li><code>packages/types/src/events.ts</code></li>
+<li>Synthetic logic currently embedded in <code>services/ingest-options/</code> and <code>services/ingest-equities/</code></li>
+<li>Shared package manifests such as <code>package.json</code>, <code>bunfig.toml</code>, or workspace config if a new package is added</li>
+<li>Infra-free unit tests under the new package or nearby package test folders</li>
+</ul>
+<h3 id="01-deterministic-spine-in-scope-work">In-scope work</h3>
+<ul>
+<li>Define <code>SyntheticRun</code>, <code>SeedBundle</code>, <code>ParameterSnapshot</code>, <code>SymbolProfile</code>, <code>LiquidityProfile</code>, <code>VolatilityRegime</code>, <code>OptionChainProfile</code>, and <code>GeneratedEventBatch</code> shapes.</li>
+<li>Pick and wrap a deterministic PRNG so fixed inputs produce stable output.</li>
+<li>Emit canonical <code>OptionPrint</code>, <code>OptionNBBO</code>, <code>EquityPrint</code>, and <code>EquityQuote</code> events.</li>
+<li>Attach provenance such as <code>source_kind</code>, <code>run_id</code>, <code>parameter_snapshot_hash</code>, and optional <code>scenario_id</code>.</li>
+<li>Preserve compatibility with the existing pipeline's raw market event contracts.</li>
+<li>Add fast deterministic tests that run in plain <code>bun test</code>.</li>
+</ul>
+<h3 id="01-deterministic-spine-explicitly-out-of-scope-work">Explicitly out-of-scope work</h3>
+<ul>
+<li>Scenario catalogs and ground-truth label records.</li>
+<li>Manifest generation and CLI workflows.</li>
+<li>Replay service integration.</li>
+<li>Hosted demo controls or live synthetic emitters.</li>
+<li>Historical calibration from real market data.</li>
+<li>Docker, ClickHouse, NATS, or Redis integration tests.</li>
+</ul>
+<h3 id="01-deterministic-spine-acceptance-criteria">Acceptance criteria</h3>
+<ul>
+<li>A fixed seed/profile bundle produces byte-stable or hash-stable event output.</li>
+<li>Generated events use canonical market event contracts, not synthetic-only pipeline event types.</li>
+<li>Hidden labels are not embedded in emitted market events.</li>
+<li>Provenance metadata is available for downstream filtering and auditing.</li>
+<li>Tests cover determinism, tick validity, quote/trade invariants, and basic profile normalization without requiring infrastructure.</li>
+</ul>
+<h3 id="01-deterministic-spine-test-strategy">Test strategy</h3>
+<p>Use infra-free Bun tests. Cover PRNG repeatability, profile parsing, event ordering within generated batches, option quote/print validity, equity quote/print validity, and provenance field stability. Avoid any test that needs Docker, ClickHouse, NATS, or Redis.</p>
+<h3 id="01-deterministic-spine-risks-design-traps">Risks / design traps</h3>
+<ul>
+<li>Hiding wall-clock timers or random calls inside the generator will break determinism.</li>
+<li>Creating synthetic-only market event types will fork the pipeline contract.</li>
+<li>Embedding labels directly on market events will leak ground truth into production-like paths.</li>
+<li>Over-designing a full market simulator now will slow down the MVP.</li>
+</ul>
+<h3 id="01-deterministic-spine-suggested-future-codex-implementation-prompt">Suggested future Codex implementation prompt</h3>
+<pre><code class="language-text">Implement docs/implementation/synthetic-market-data/01-deterministic-spine.md for Beads issue islandflow-259.1. Stay inside the deterministic synthetic market-data foundation only. Do not add scenario labels, manifests, replay integration, demos, or historical calibration. Emit canonical market event types and keep early tests infra-free.</code></pre>
+<h3 id="01-deterministic-spine-matching-beads-issue-title-id">Matching Beads issue title/id</h3>
+<ul>
+<li><code>islandflow-259.1</code> - Synthetic market-data phase 01: deterministic spine</li>
+</ul>
+        </div>
+      </article>
+
+      <article class="doc-section" id="02-manifests-fixtures-cli">
+        <header class="doc-head">
+          <div class="doc-title-row">
+            <span class="phase-label">Phase 02</span>
+            <span class="status-chip">synthetic-market-data</span>
+          </div>
+          <h2>Synthetic Market-Data Phase 02: Manifests, Fixtures, and CLI</h2>
+          <div class="doc-source">Source Markdown: <a href="02-manifests-fixtures-cli.md">02-manifests-fixtures-cli.md</a></div>
+        </header>
+        <div class="doc-body">
+<h3 id="02-manifests-fixtures-cli-purpose">Purpose</h3>
+<p>Turn the deterministic generator into reusable artifacts: fixture files, run manifests, and a CLI that can produce repeatable synthetic runs for tests, replay, demos, and later evaluation.</p>
+<h3 id="02-manifests-fixtures-cli-why-this-phase-comes-now">Why this phase comes now</h3>
+<p>The deterministic spine gives the repo stable raw events. The next step is to make those events durable and addressable so downstream phases can reference exact generated runs instead of recreating ad hoc local randomness.</p>
+<h3 id="02-manifests-fixtures-cli-source-documents">Source documents</h3>
+<ul>
+<li>Architecture plan: <a href="../../plans/synthetic-market-data-architecture-review.md">docs/plans/synthetic-market-data-architecture-review.md</a></li>
+<li>Research report: <a href="../../research-docs/synthetic-market-data-generation.md">docs/research-docs/synthetic-market-data-generation.md</a></li>
+<li>Research architecture review copy: <a href="../../research-docs/synthetic-data-architecture-review.md">docs/research-docs/synthetic-data-architecture-review.md</a></li>
+</ul>
+<p>These documents are rationale, not added scope. This phase implements only manifests, fixtures, and CLI support.</p>
+<h3 id="02-manifests-fixtures-cli-research-basis">Research basis</h3>
+<ul>
+<li>Deterministic replay and reviewable artifacts are necessary for synthetic data to be useful as validation data, not just demo data.</li>
+<li>Expected-output manifests should pin seed, profile, generator version, event hashes, and replay ordering.</li>
+<li>Hidden labels must stay separate from market events so tests do not leak ground truth into production-like paths.</li>
+</ul>
+<h3 id="02-manifests-fixtures-cli-deferred-research-ideas">Deferred research ideas</h3>
+<ul>
+<li>Empirical residual resampling and historical-window bootstrapping are future artifact sources, not this CLI's first requirement.</li>
+</ul>
+<h3 id="02-manifests-fixtures-cli-dependencies-on-earlier-phases">Dependencies on earlier phases</h3>
+<ul>
+<li><code>islandflow-259.1</code> - Synthetic deterministic spine</li>
+<li><code>islandflow-zxh.1</code> - Smart-flow contracts and vocabulary, so manifest expectations can align with the emerging evidence/hypothesis language</li>
+</ul>
+<h3 id="02-manifests-fixtures-cli-likely-files-modules-touched">Likely files/modules touched</h3>
+<ul>
+<li>Future <code>packages/synthetic-market/</code> CLI entrypoints</li>
+<li>Fixture directories under a package or service test area</li>
+<li>Manifest schemas, likely JSON or YAML</li>
+<li><code>package.json</code> scripts if a repo command is added</li>
+<li>Tests for manifest parsing and fixture generation</li>
+</ul>
+<h3 id="02-manifests-fixtures-cli-in-scope-work">In-scope work</h3>
+<ul>
+<li>Define <code>ExpectedOutputManifest</code>, <code>ReplayPlan</code>, and generated fixture artifact layout.</li>
+<li>Add a CLI command that accepts seed bundle, profile, scenario/run name, output directory, and deterministic generation options.</li>
+<li>Write manifests that pin generator version, seed bundle, parameter snapshot hash, generated event hashes, replay ordering, and run metadata.</li>
+<li>Add fixture helpers for tests to load generated batches without infrastructure.</li>
+<li>Keep labels as separate records or future manifest sections, not market-event fields.</li>
+</ul>
+<h3 id="02-manifests-fixtures-cli-explicitly-out-of-scope-work">Explicitly out-of-scope work</h3>
+<ul>
+<li>Full scenario catalog authoring.</li>
+<li>Smart-flow expected output comparisons.</li>
+<li>Replay service source selection.</li>
+<li>ClickHouse fixture materialization.</li>
+<li>UI demo selection.</li>
+<li>Historical calibration.</li>
+</ul>
+<h3 id="02-manifests-fixtures-cli-acceptance-criteria">Acceptance criteria</h3>
+<ul>
+<li>A CLI can generate repeatable fixtures and manifests from fixed inputs.</li>
+<li>Manifests include generator version, seed/profile identity, parameter hash, event hashes, and replay ordering.</li>
+<li>Fixture helpers can load generated event batches in infra-free tests.</li>
+<li>Generated artifacts do not embed hidden labels into canonical market events.</li>
+<li>Re-running generation with the same inputs produces stable manifests or an intentional diff.</li>
+</ul>
+<h3 id="02-manifests-fixtures-cli-test-strategy">Test strategy</h3>
+<p>Use plain Bun tests for CLI argument parsing, manifest schema parsing, deterministic fixture output, and fixture-loader helpers. Golden files should be small and intentionally reviewed. Do not require Docker, ClickHouse, NATS, or Redis.</p>
+<h3 id="02-manifests-fixtures-cli-risks-design-traps">Risks / design traps</h3>
+<ul>
+<li>Manifests that omit generator version or parameter hashes will become hard to audit.</li>
+<li>Large generated fixtures can create noisy reviews; keep early fixtures tiny.</li>
+<li>A CLI that silently uses defaults will make tests look deterministic while hiding input drift.</li>
+<li>Mixing expected smart-flow outputs too early can couple this phase to unfinished classifier changes.</li>
+</ul>
+<h3 id="02-manifests-fixtures-cli-suggested-future-codex-implementation-prompt">Suggested future Codex implementation prompt</h3>
+<pre><code class="language-text">Implement docs/implementation/synthetic-market-data/02-manifests-fixtures-cli.md for Beads issue islandflow-259.2. Build manifest, fixture, and CLI support on top of the deterministic spine. Keep tests infra-free and do not implement scenario labels, replay integration, demo profiles, or historical calibration.</code></pre>
+<h3 id="02-manifests-fixtures-cli-matching-beads-issue-title-id">Matching Beads issue title/id</h3>
+<ul>
+<li><code>islandflow-259.2</code> - Synthetic market-data phase 02: manifests, fixtures, and CLI</li>
+</ul>
+        </div>
+      </article>
+
+      <article class="doc-section" id="03-scenarios-labels-expected-outputs">
+        <header class="doc-head">
+          <div class="doc-title-row">
+            <span class="phase-label">Phase 03</span>
+            <span class="status-chip">synthetic-market-data</span>
+          </div>
+          <h2>Synthetic Market-Data Phase 03: Scenarios, Labels, and Expected Outputs</h2>
+          <div class="doc-source">Source Markdown: <a href="03-scenarios-labels-expected-outputs.md">03-scenarios-labels-expected-outputs.md</a></div>
+        </header>
+        <div class="doc-body">
+<h3 id="03-scenarios-labels-expected-outputs-purpose">Purpose</h3>
+<p>Author named deterministic scenarios, separate ground-truth labels, and expected-output manifests that downstream smart-flow logic can use for positive, negative, abstention, and false-positive validation.</p>
+<h3 id="03-scenarios-labels-expected-outputs-why-this-phase-comes-now">Why this phase comes now</h3>
+<p>The generator and manifest layers should exist before scenario authoring. Smart-flow evidence clustering should also define enough vocabulary for expected outputs to describe evidence requirements without leaking labels into emitted market events.</p>
+<h3 id="03-scenarios-labels-expected-outputs-source-documents">Source documents</h3>
+<ul>
+<li>Architecture plan: <a href="../../plans/synthetic-market-data-architecture-review.md">docs/plans/synthetic-market-data-architecture-review.md</a></li>
+<li>Research report: <a href="../../research-docs/synthetic-market-data-generation.md">docs/research-docs/synthetic-market-data-generation.md</a></li>
+<li>Research architecture review copy: <a href="../../research-docs/synthetic-data-architecture-review.md">docs/research-docs/synthetic-data-architecture-review.md</a></li>
+<li>Smart-flow research report: <a href="../../research-docs/smart-flow-market-mechanics.md">docs/research-docs/smart-flow-market-mechanics.md</a></li>
+</ul>
+<p>These documents are rationale, not added scope. This phase implements only named scenarios, separate labels, and expected-output contracts.</p>
+<h3 id="03-scenarios-labels-expected-outputs-research-basis">Research basis</h3>
+<ul>
+<li>Scenario injection into a realistic synthetic background is mandatory for labeled, replayable alert tests.</li>
+<li>Negative, noisy, stale, wide-market, and event-context cases matter as much as positive &quot;should detect&quot; scenarios.</li>
+<li>Labels and expected outputs need required evidence, forbidden evidence, confidence bands, and false-positive penalties.</li>
+</ul>
+<h3 id="03-scenarios-labels-expected-outputs-deferred-research-ideas">Deferred research ideas</h3>
+<ul>
+<li>Empirical tuning of scenario frequencies, full historical replay-plus-mutation, and learned scenario generation belong after the MVP scenario catalog is stable.</li>
+</ul>
+<h3 id="03-scenarios-labels-expected-outputs-dependencies-on-earlier-phases">Dependencies on earlier phases</h3>
+<ul>
+<li><code>islandflow-259.1</code> - Synthetic deterministic spine</li>
+<li><code>islandflow-zxh.1</code> - Smart-flow contracts and vocabulary</li>
+<li><code>islandflow-259.2</code> - Manifests, fixtures, and CLI</li>
+<li><code>islandflow-zxh.2</code> - Evidence clustering and features</li>
+</ul>
+<h3 id="03-scenarios-labels-expected-outputs-likely-files-modules-touched">Likely files/modules touched</h3>
+<ul>
+<li>Future scenario catalog files under <code>packages/synthetic-market/</code></li>
+<li>Label schema definitions</li>
+<li>Manifest expected-output sections</li>
+<li>Fixture generation tests</li>
+<li>Smart-flow fixture expectations in compute test areas, once available</li>
+</ul>
+<h3 id="03-scenarios-labels-expected-outputs-in-scope-work">In-scope work</h3>
+<ul>
+<li>Define <code>ScenarioInjection</code> and <code>GroundTruthLabel</code> records.</li>
+<li>Add named scenario profiles for institutional directional flow, retail-attention flow, event/noise flow, volatility-seller behavior, hedge-reactive flow, arbitrage-like structure, and no-alert negatives.</li>
+<li>Keep labels keyed by <code>run_id</code>, <code>scenario_id</code>, event IDs or trace IDs, expected class, expected direction, confidence band, required evidence, forbidden evidence, and false-positive penalties.</li>
+<li>Extend manifests with expected derived events, alert/no-alert expectations, and evidence requirements.</li>
+<li>Make generated scenario outputs reviewable and deterministic.</li>
+</ul>
+<h3 id="03-scenarios-labels-expected-outputs-explicitly-out-of-scope-work">Explicitly out-of-scope work</h3>
+<ul>
+<li>Emitting labels on market events.</li>
+<li>Building a live synthetic service.</li>
+<li>Adding UI scenario controls.</li>
+<li>Implementing historical calibration.</li>
+<li>Rewriting smart-flow scoring behavior beyond what is needed to express expected outputs.</li>
+</ul>
+<h3 id="03-scenarios-labels-expected-outputs-acceptance-criteria">Acceptance criteria</h3>
+<ul>
+<li>Scenario fixtures are named, deterministic, and small enough for review.</li>
+<li>Labels remain separate from emitted market events.</li>
+<li>Expected-output manifests include positive expectations, no-alert expectations, evidence requirements, forbidden evidence, and false-positive penalties.</li>
+<li>The phase can test both &quot;should detect&quot; and &quot;should abstain or suppress&quot; cases.</li>
+<li>Existing issue <code>islandflow-9dz</code> is treated as related scenario-tuning context, not as the broad phase tracker.</li>
+</ul>
+<h3 id="03-scenarios-labels-expected-outputs-test-strategy">Test strategy</h3>
+<p>Use fixture-generation and manifest-validation tests first. Add focused golden comparisons only where the smart-flow contract is ready. Keep the default test path infra-free. Optional service-backed scenario loading can wait for a later integration phase.</p>
+<h3 id="03-scenarios-labels-expected-outputs-risks-design-traps">Risks / design traps</h3>
+<ul>
+<li>Labels leaking into canonical event payloads will invalidate evaluation.</li>
+<li>Only authoring positive scenarios will make the classifier overfit demos.</li>
+<li>Broad scenario catalogs can become too large for one PR.</li>
+<li>Expected outputs that name legacy &quot;smart money&quot; certainty can undermine the new evidence/hypothesis model.</li>
+</ul>
+<h3 id="03-scenarios-labels-expected-outputs-suggested-future-codex-implementation-prompt">Suggested future Codex implementation prompt</h3>
+<pre><code class="language-text">Implement docs/implementation/synthetic-market-data/03-scenarios-labels-expected-outputs.md for Beads issue islandflow-259.3. Split the work using islandflow-259.3.1 and islandflow-259.3.2 if needed. Keep labels separate from emitted events, include negative/no-alert expectations, and avoid demos or live service work.</code></pre>
+<h3 id="03-scenarios-labels-expected-outputs-matching-beads-issue-title-id">Matching Beads issue title/id</h3>
+<ul>
+<li><code>islandflow-259.3</code> - Synthetic market-data phase 03: scenarios, labels, and expected outputs</li>
+<li>PR split: <code>islandflow-259.3.1</code> - Split synthetic phase 03a: scenario catalog and labels</li>
+<li>PR split: <code>islandflow-259.3.2</code> - Split synthetic phase 03b: expected-output manifests</li>
+</ul>
+        </div>
+      </article>
+
+      <article class="doc-section" id="04-replay-integration">
+        <header class="doc-head">
+          <div class="doc-title-row">
+            <span class="phase-label">Phase 04</span>
+            <span class="status-chip">synthetic-market-data</span>
+          </div>
+          <h2>Synthetic Market-Data Phase 04: Replay Integration</h2>
+          <div class="doc-source">Source Markdown: <a href="04-replay-integration.md">04-replay-integration.md</a></div>
+        </header>
+        <div class="doc-body">
+<h3 id="04-replay-integration-purpose">Purpose</h3>
+<p>Make replay consume synthetic runs deterministically, either directly from generated fixtures or from materialized storage rows, while preserving the same ordering semantics the real replay path uses.</p>
+<h3 id="04-replay-integration-why-this-phase-comes-now">Why this phase comes now</h3>
+<p>Replay should not be wired to synthetic data until the generator, manifests, labels, and smart-flow hypothesis pipeline have stable semantics. At this point, replay can become a serious acceptance gate instead of a demo convenience.</p>
+<h3 id="04-replay-integration-source-documents">Source documents</h3>
+<ul>
+<li>Architecture plan: <a href="../../plans/synthetic-market-data-architecture-review.md">docs/plans/synthetic-market-data-architecture-review.md</a></li>
+<li>Research report: <a href="../../research-docs/synthetic-market-data-generation.md">docs/research-docs/synthetic-market-data-generation.md</a></li>
+<li>Research architecture review copy: <a href="../../research-docs/synthetic-data-architecture-review.md">docs/research-docs/synthetic-data-architecture-review.md</a></li>
+</ul>
+<p>These documents are rationale, not added scope. This phase implements only deterministic synthetic replay integration.</p>
+<h3 id="04-replay-integration-research-basis">Research basis</h3>
+<ul>
+<li>Replay must preserve event-time ordering and deterministic run identity to prove derived behavior.</li>
+<li>Synthetic runs should be selectable by source and run metadata rather than ambient randomness.</li>
+<li>Optional ClickHouse/NATS materialization can exist later, but fast validation should remain infra-free.</li>
+</ul>
+<h3 id="04-replay-integration-deferred-research-ideas">Deferred research ideas</h3>
+<ul>
+<li>Historical replay-plus-mutation and calibrated replay benchmarks are future layers after synthetic replay semantics are stable.</li>
+</ul>
+<h3 id="04-replay-integration-dependencies-on-earlier-phases">Dependencies on earlier phases</h3>
+<ul>
+<li><code>islandflow-259.1</code> - Synthetic deterministic spine</li>
+<li><code>islandflow-259.2</code> - Manifests, fixtures, and CLI</li>
+<li><code>islandflow-259.3</code> - Scenarios, labels, and expected outputs</li>
+<li><code>islandflow-zxh.3</code> - Hypothesis scoring and abstention</li>
+</ul>
+<h3 id="04-replay-integration-likely-files-modules-touched">Likely files/modules touched</h3>
+<ul>
+<li><code>services/replay/src/</code></li>
+<li>API replay routes in <code>services/api/</code></li>
+<li>Replay-related shared types in <code>packages/types/</code></li>
+<li>Optional fixture materialization helpers in <code>packages/storage/</code></li>
+<li>Replay tests or golden comparison helpers</li>
+</ul>
+<h3 id="04-replay-integration-in-scope-work">In-scope work</h3>
+<ul>
+<li>Add replay source/run selectors for synthetic runs.</li>
+<li>Support fixture-backed replay without infrastructure where practical.</li>
+<li>Preserve ordering by event time, ingest time, sequence, and stable event ID.</li>
+<li>Compare replayed derived outputs against manifest signatures or expected-output sections.</li>
+<li>Keep optional ClickHouse/NATS materialized replay tests behind non-default gates.</li>
+</ul>
+<h3 id="04-replay-integration-explicitly-out-of-scope-work">Explicitly out-of-scope work</h3>
+<ul>
+<li>Building new scenario labels.</li>
+<li>Reworking smart-flow scoring policy.</li>
+<li>Demo profile controls.</li>
+<li>Load testing.</li>
+<li>Historical calibration.</li>
+</ul>
+<h3 id="04-replay-integration-acceptance-criteria">Acceptance criteria</h3>
+<ul>
+<li>Replay can select a synthetic source and <code>run_id</code>.</li>
+<li>Fixture-backed replay respects manifest ordering.</li>
+<li>Derived output signatures can be compared with expected manifests.</li>
+<li>Fast replay tests remain infra-free by default.</li>
+<li>Optional infra-backed tests are clearly named and gated.</li>
+</ul>
+<h3 id="04-replay-integration-test-strategy">Test strategy</h3>
+<p>Start with fixture-backed replay ordering tests and manifest-signature comparisons. Add optional service-container or ClickHouse materialization tests only after the fast path is stable, and do not make those tests part of the default <code>bun test</code> requirement.</p>
+<h3 id="04-replay-integration-risks-design-traps">Risks / design traps</h3>
+<ul>
+<li>Creating a synthetic-only replay path with different ordering will hide bugs.</li>
+<li>Letting optional infra tests become default will slow or destabilize CI.</li>
+<li>Comparing full raw payloads everywhere may make tests brittle; use stable signatures where better.</li>
+<li>Replay selectors that are not run-scoped can mix synthetic and live data.</li>
+</ul>
+<h3 id="04-replay-integration-suggested-future-codex-implementation-prompt">Suggested future Codex implementation prompt</h3>
+<pre><code class="language-text">Implement docs/implementation/synthetic-market-data/04-replay-integration.md for Beads issue islandflow-259.4. Add synthetic source/run replay support with stable ordering and manifest comparison. Do not add demo controls, load profiles, or historical calibration, and keep the fast test path infra-free.</code></pre>
+<h3 id="04-replay-integration-matching-beads-issue-title-id">Matching Beads issue title/id</h3>
+<ul>
+<li><code>islandflow-259.4</code> - Synthetic market-data phase 04: replay integration</li>
+</ul>
+        </div>
+      </article>
+
+      <article class="doc-section" id="05-demo-load-profiles">
+        <header class="doc-head">
+          <div class="doc-title-row">
+            <span class="phase-label">Phase 05</span>
+            <span class="status-chip">synthetic-market-data</span>
+          </div>
+          <h2>Synthetic Market-Data Phase 05: Demo and Load Profiles</h2>
+          <div class="doc-source">Source Markdown: <a href="05-demo-load-profiles.md">05-demo-load-profiles.md</a></div>
+        </header>
+        <div class="doc-body">
+<h3 id="05-demo-load-profiles-purpose">Purpose</h3>
+<p>Expose deterministic synthetic runs as named demo and load profiles after the generation, manifest, scenario, and replay foundations are in place.</p>
+<h3 id="05-demo-load-profiles-why-this-phase-comes-now">Why this phase comes now</h3>
+<p>Demos are useful only after the underlying data can be trusted. This phase deliberately waits until replay and golden evaluation prove the event semantics, so hosted controls do not become a front door to ambient randomness.</p>
+<h3 id="05-demo-load-profiles-source-documents">Source documents</h3>
+<ul>
+<li>Architecture plan: <a href="../../plans/synthetic-market-data-architecture-review.md">docs/plans/synthetic-market-data-architecture-review.md</a></li>
+<li>Research report: <a href="../../research-docs/synthetic-market-data-generation.md">docs/research-docs/synthetic-market-data-generation.md</a></li>
+<li>Research architecture review copy: <a href="../../research-docs/synthetic-data-architecture-review.md">docs/research-docs/synthetic-data-architecture-review.md</a></li>
+</ul>
+<p>These documents are rationale, not added scope. This phase implements only named deterministic demo and load profiles.</p>
+<h3 id="05-demo-load-profiles-research-basis">Research basis</h3>
+<ul>
+<li>Demo streams should use named, seeded profiles so product behavior is reproducible.</li>
+<li>Load profiles should scale rate or volume without changing event semantics.</li>
+<li>Realism should come from the generator and scenarios, not hidden UI knobs or wall-clock randomness.</li>
+</ul>
+<h3 id="05-demo-load-profiles-deferred-research-ideas">Deferred research ideas</h3>
+<ul>
+<li>Historically bootstrapped demo streams, learned realism upgrades, and full LOB-style demos stay future work.</li>
+</ul>
+<h3 id="05-demo-load-profiles-dependencies-on-earlier-phases">Dependencies on earlier phases</h3>
+<ul>
+<li><code>islandflow-259.1</code> - Synthetic deterministic spine</li>
+<li><code>islandflow-259.2</code> - Manifests, fixtures, and CLI</li>
+<li><code>islandflow-259.3</code> - Scenarios, labels, and expected outputs</li>
+<li><code>islandflow-259.4</code> - Replay integration</li>
+<li><code>islandflow-zxh.4</code> - Smart-flow replay evaluation and golden tests</li>
+</ul>
+<h3 id="05-demo-load-profiles-likely-files-modules-touched">Likely files/modules touched</h3>
+<ul>
+<li>Thin synthetic emitters in <code>services/ingest-options/</code> and <code>services/ingest-equities/</code></li>
+<li>Demo/run selection API surfaces in <code>services/api/</code></li>
+<li>Web demo controls in <code>apps/web/</code></li>
+<li>Load profile definitions in the synthetic package</li>
+<li>Tests for profile selection and rate scaling</li>
+</ul>
+<h3 id="05-demo-load-profiles-in-scope-work">In-scope work</h3>
+<ul>
+<li>Add named <code>DemoProfile</code> and <code>LoadProfile</code> definitions.</li>
+<li>Make live/demo emitters thin consumers of deterministic synthetic runs.</li>
+<li>Let demo controls select named runs/scenarios rather than changing hidden random behavior.</li>
+<li>Ensure load profiles scale event rates without changing event semantics.</li>
+<li>Document local demo usage once implemented.</li>
+</ul>
+<h3 id="05-demo-load-profiles-explicitly-out-of-scope-work">Explicitly out-of-scope work</h3>
+<ul>
+<li>Foundation generator work.</li>
+<li>New smart-flow scoring policy.</li>
+<li>Replacing replay evaluation with UI-only checks.</li>
+<li>Historical calibration.</li>
+<li>Production provider configuration decisions.</li>
+</ul>
+<h3 id="05-demo-load-profiles-acceptance-criteria">Acceptance criteria</h3>
+<ul>
+<li>Demo profiles are deterministic and named.</li>
+<li>Load profiles scale rate or volume without mutating scenario semantics.</li>
+<li>Hosted or local controls select known runs/scenarios.</li>
+<li>Live/demo emitters remain thin and do not own generator policy.</li>
+<li>The UI does not expose synthetic controls before the backing deterministic runs exist.</li>
+</ul>
+<h3 id="05-demo-load-profiles-test-strategy">Test strategy</h3>
+<p>Use unit tests for profile parsing, profile selection, and rate-scaling semantics. Add replay-driven smoke checks for named demo runs. Manual UI validation is appropriate only after automated replay/golden checks pass.</p>
+<h3 id="05-demo-load-profiles-risks-design-traps">Risks / design traps</h3>
+<ul>
+<li>Demo controls can pressure the codebase back into wall-clock randomness.</li>
+<li>Load profiles may accidentally change business semantics while changing only rate was intended.</li>
+<li>UI-first implementation can hide missing run provenance.</li>
+<li>Reusing production config for synthetic demos can make operator behavior ambiguous.</li>
+</ul>
+<h3 id="05-demo-load-profiles-suggested-future-codex-implementation-prompt">Suggested future Codex implementation prompt</h3>
+<pre><code class="language-text">Implement docs/implementation/synthetic-market-data/05-demo-load-profiles.md for Beads issue islandflow-259.5. Add named deterministic demo/load profiles and thin emitter/control integration only after replay validation exists. Do not implement historical calibration or change production provider policy.</code></pre>
+<h3 id="05-demo-load-profiles-matching-beads-issue-title-id">Matching Beads issue title/id</h3>
+<ul>
+<li><code>islandflow-259.5</code> - Synthetic market-data phase 05: demo and load profiles</li>
+</ul>
+        </div>
+      </article>
+
+      <article class="doc-section" id="99-future-historical-calibration">
+        <header class="doc-head">
+          <div class="doc-title-row">
+            <span class="phase-label">Future</span>
+            <span class="status-chip">synthetic-market-data</span>
+          </div>
+          <h2>Synthetic Market-Data Phase 99: Future Historical Calibration</h2>
+          <div class="doc-source">Source Markdown: <a href="99-future-historical-calibration.md">99-future-historical-calibration.md</a></div>
+        </header>
+        <div class="doc-body">
+<h3 id="99-future-historical-calibration-purpose">Purpose</h3>
+<p>Plan future calibration of synthetic generator parameters from historical market data without making historical data a dependency for the MVP generator.</p>
+<h3 id="99-future-historical-calibration-why-this-phase-comes-now">Why this phase comes now</h3>
+<p>It is useful to name the future work now so early designs keep calibration hooks in mind. It should not come before deterministic generation, manifests, scenarios, replay, or demo profiles.</p>
+<h3 id="99-future-historical-calibration-source-documents">Source documents</h3>
+<ul>
+<li>Architecture plan: <a href="../../plans/synthetic-market-data-architecture-review.md">docs/plans/synthetic-market-data-architecture-review.md</a></li>
+<li>Research report: <a href="../../research-docs/synthetic-market-data-generation.md">docs/research-docs/synthetic-market-data-generation.md</a></li>
+<li>Research architecture review copy: <a href="../../research-docs/synthetic-data-architecture-review.md">docs/research-docs/synthetic-data-architecture-review.md</a></li>
+</ul>
+<p>These documents are rationale, not added scope. This future phase is the place to turn research ideas into scoped calibration work after MVP.</p>
+<h3 id="99-future-historical-calibration-research-basis">Research basis</h3>
+<ul>
+<li>Once historical data exists, calibration should fit arrival curves, spread states, size mixtures, venue shares, and options-chain activity weights.</li>
+<li>Replay-plus-mutation can improve realism while preserving deterministic test intent.</li>
+<li>Calibration should layer onto the deterministic engine rather than replace it wholesale.</li>
+</ul>
+<h3 id="99-future-historical-calibration-deferred-research-ideas">Deferred research ideas</h3>
+<ul>
+<li>Generative ML, learned LOB simulators, and agent-based models remain later research tracks unless a future Beads issue scopes them explicitly.</li>
+</ul>
+<h3 id="99-future-historical-calibration-dependencies-on-earlier-phases">Dependencies on earlier phases</h3>
+<ul>
+<li><code>islandflow-259.5</code> - Synthetic demo and load profiles</li>
+</ul>
+<h3 id="99-future-historical-calibration-likely-files-modules-touched">Likely files/modules touched</h3>
+<ul>
+<li>Future calibration tools under the synthetic package</li>
+<li>Historical data import or sampling utilities</li>
+<li>Parameter fitting scripts</li>
+<li>Documentation for data provenance and licensing constraints</li>
+<li>Optional research notebooks or reports if the repo later adopts them</li>
+</ul>
+<h3 id="99-future-historical-calibration-in-scope-work">In-scope work</h3>
+<ul>
+<li>Define calibration datasets and constraints.</li>
+<li>Specify how historical distributions map to <code>ParameterSnapshot</code>, liquidity, volatility, and option-chain profiles.</li>
+<li>Preserve deterministic replay from calibrated parameters.</li>
+<li>Document privacy, licensing, and provenance requirements for historical data.</li>
+</ul>
+<h3 id="99-future-historical-calibration-explicitly-out-of-scope-work">Explicitly out-of-scope work</h3>
+<ul>
+<li>MVP synthetic generator requirements.</li>
+<li>Early tests and fixture generation.</li>
+<li>Live synthetic demos.</li>
+<li>Smart-flow scoring changes.</li>
+<li>Any assumption that historical data is needed to start implementation.</li>
+</ul>
+<h3 id="99-future-historical-calibration-acceptance-criteria">Acceptance criteria</h3>
+<ul>
+<li>Historical calibration remains outside the MVP blocker chain.</li>
+<li>Calibration inputs and ownership constraints are documented before implementation.</li>
+<li>Fitted parameters can still be pinned into deterministic seed/profile bundles.</li>
+<li>Calibration does not require emitted synthetic events to diverge from canonical market event contracts.</li>
+</ul>
+<h3 id="99-future-historical-calibration-test-strategy">Test strategy</h3>
+<p>When this future phase is implemented, use small public or licensed calibration samples with deterministic parameter fitting tests. Add regression checks that calibrated profiles still produce stable manifests. Do not retrofit historical data into earlier infra-free tests.</p>
+<h3 id="99-future-historical-calibration-risks-design-traps">Risks / design traps</h3>
+<ul>
+<li>Treating calibration as necessary for MVP will delay foundational work.</li>
+<li>Historical data licensing can constrain what can be committed or shared.</li>
+<li>Overfitting synthetic profiles to a tiny period can produce misleading demos.</li>
+<li>Calibration tools can accidentally leak proprietary or sensitive data into fixtures.</li>
+</ul>
+<h3 id="99-future-historical-calibration-suggested-future-codex-implementation-prompt">Suggested future Codex implementation prompt</h3>
+<pre><code class="language-text">Implement docs/implementation/synthetic-market-data/99-future-historical-calibration.md for Beads issue islandflow-259.6 only after MVP synthetic phases are complete. Keep calibration optional, documented, and deterministic. Do not make historical data a dependency for earlier synthetic tests or demos.</code></pre>
+<h3 id="99-future-historical-calibration-matching-beads-issue-title-id">Matching Beads issue title/id</h3>
+<ul>
+<li><code>islandflow-259.6</code> - Future synthetic market-data phase 99: historical calibration</li>
+</ul>
+        </div>
+      </article>
+      </div>
+
+      <footer class="footer">
+        Generated from Markdown in docs/implementation/synthetic-market-data. Edit the Markdown source first, then regenerate this readable HTML companion.
+      </footer>
+    </main>
+  </div>
+</body>
+</html>

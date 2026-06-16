@@ -69,6 +69,10 @@ Working style that avoids common problems here:
 - Keep `.env` aligned with `.env.example`; adapters default to synthetic modes for local development.
 - Dev runners persist child PID state in `.tmp/`; if a previous run crashed, restart via the standard `bun run dev*` commands so stale processes are cleaned up.
 
+## Implementation Phase Plans
+
+Before beginning synthetic market-data or smart-money/smart-flow implementation work, read `docs/implementation/README.md` and the specific phase file linked from the active Beads issue. Treat `docs/plans/*architecture-review.md` files as background guidance only; the current phase document and Beads issue define the active scope. Keep PRs phase-bounded and reviewable, split smaller Beads child issues when a phase is too large, and add/update Beads dependencies when one phase blocks another.
+
 ## Forgejo Is Canonical
 
 This repository's primary home is Forgejo:

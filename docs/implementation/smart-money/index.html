@@ -1,0 +1,1045 @@
+<!doctype html>
+<html lang="en" data-accent="blue">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Smart-Flow Implementation Phases</title>
+  <meta name="description" content="Readable implementation phase document for Smart Flow.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Quantico:wght@700&display=swap" rel="stylesheet">
+  <style>
+:root {
+  color-scheme: dark;
+  --bg: oklch(0.105 0.012 250);
+  --bg-elevated: oklch(0.145 0.012 250);
+  --bg-pane: oklch(0.18 0.013 250);
+  --bg-pane-2: oklch(0.155 0.012 250);
+  --bg-soft: oklch(0.97 0.008 250 / 0.045);
+  --line: oklch(0.72 0.012 250 / 0.18);
+  --line-strong: oklch(0.78 0.09 74 / 0.34);
+  --text: oklch(0.93 0.014 250);
+  --text-dim: oklch(0.76 0.018 250);
+  --text-faint: oklch(0.62 0.016 250);
+  --amber: oklch(0.78 0.12 74);
+  --amber-soft: oklch(0.78 0.12 74 / 0.12);
+  --blue: oklch(0.72 0.13 247);
+  --blue-soft: oklch(0.72 0.13 247 / 0.12);
+  --green: oklch(0.74 0.13 151);
+  --green-soft: oklch(0.74 0.13 151 / 0.1);
+  --red: oklch(0.68 0.16 28);
+  --red-soft: oklch(0.68 0.16 28 / 0.12);
+  --accent: var(--amber);
+  --accent-soft: var(--amber-soft);
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --display: Quantico, var(--sans);
+}
+
+[data-accent="blue"] {
+  --accent: var(--blue);
+  --accent-soft: var(--blue-soft);
+  --line-strong: oklch(0.72 0.13 247 / 0.34);
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--text);
+  background: var(--bg);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  z-index: 10;
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  transform: translateY(-180%);
+  transition: transform 160ms ease;
+}
+.skip-link:focus { transform: translateY(0); }
+
+.shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(230px, 280px) minmax(0, 1fr);
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  padding: 22px 18px;
+  border-right: 1px solid var(--line);
+  background: var(--bg-elevated);
+  overflow: auto;
+}
+
+.brand {
+  display: grid;
+  gap: 8px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.brand-mark {
+  font-family: var(--display);
+  font-size: 1.35rem;
+  line-height: 1.05;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.brand-meta,
+.kicker,
+.nav-title,
+.phase-label,
+th,
+.status-chip,
+.issue-chip,
+.section-label {
+  font-family: var(--mono);
+  font-size: 0.71rem;
+  line-height: 1.25;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.brand-meta { color: var(--text-faint); }
+
+.nav-title {
+  margin: 18px 0 8px;
+  color: var(--text-faint);
+}
+
+.nav-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nav-list a {
+  display: block;
+  padding: 9px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--text-dim);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.nav-list a:hover,
+.nav-list a:focus-visible {
+  border-color: var(--line);
+  background: var(--bg-soft);
+  color: var(--text);
+  outline: none;
+}
+
+.main {
+  min-width: 0;
+  padding: 28px clamp(18px, 4vw, 56px) 52px;
+}
+
+.hero {
+  display: grid;
+  gap: 18px;
+  padding: 24px 0 28px;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.kicker { color: var(--accent); }
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  color: var(--text);
+  text-wrap: balance;
+}
+
+h1 {
+  max-width: 920px;
+  font-family: var(--display);
+  font-size: clamp(2rem, 4.2vw, 3.85rem);
+  line-height: 1.02;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+
+.hero p {
+  max-width: 72ch;
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 1rem;
+  text-wrap: pretty;
+}
+
+.meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.status-chip,
+.issue-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-soft);
+  color: var(--text-dim);
+}
+
+.issue-chip {
+  border-color: var(--line-strong);
+  color: var(--text);
+  background: var(--accent-soft);
+}
+
+.phase-overview {
+  margin-top: 24px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.phase-row {
+  display: grid;
+  grid-template-columns: minmax(92px, 120px) minmax(180px, 0.7fr) minmax(0, 1.5fr);
+  gap: 16px;
+  align-items: baseline;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+.phase-row:first-child { border-top: 0; }
+.phase-label { color: var(--accent); }
+.phase-title { font-weight: 700; color: var(--text); }
+.phase-summary { color: var(--text-dim); }
+
+.content-stack {
+  min-width: 0;
+  display: grid;
+  gap: 30px;
+  margin-top: 34px;
+}
+
+.doc-section {
+  min-width: 0;
+  border-top: 1px solid var(--line-strong);
+  background: linear-gradient(180deg, var(--bg-pane) 0%, var(--bg-pane-2) 100%);
+}
+
+.doc-head {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.doc-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.doc-head h2 {
+  font-size: 1.15rem;
+  line-height: 1.2;
+}
+
+.doc-source {
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  overflow-wrap: anywhere;
+}
+
+.doc-body {
+  min-width: 0;
+  padding: 16px;
+}
+
+.doc-body h3 {
+  margin: 28px 0 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 1rem;
+}
+.doc-body h3:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+.doc-body h4 { margin: 18px 0 8px; font-size: 0.95rem; color: var(--text-dim); }
+.doc-body p { max-width: 74ch; margin: 0 0 12px; color: var(--text-dim); text-wrap: pretty; }
+.doc-body ul { margin: 0 0 14px; padding-left: 1.1rem; color: var(--text-dim); }
+.doc-body li { margin: 5px 0; padding-left: 2px; }
+.doc-body strong { color: var(--text); }
+
+code {
+  padding: 0.1em 0.36em;
+  border-radius: 5px;
+  background: oklch(0.07 0.01 250 / 0.76);
+  color: oklch(0.86 0.055 74);
+  font-family: var(--mono);
+  font-size: 0.88em;
+}
+
+pre {
+  margin: 14px 0 18px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: oklch(0.075 0.01 250);
+}
+
+pre code {
+  display: block;
+  padding: 14px;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.table-wrap {
+  min-width: 0;
+  max-width: 100%;
+  margin: 14px 0 18px;
+  overflow: auto;
+  border: 1px solid var(--line);
+}
+
+table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  background: oklch(0.13 0.011 250);
+}
+
+th,
+td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+th { color: var(--text-faint); background: oklch(0.1 0.01 250); }
+td { color: var(--text-dim); }
+tr:last-child td { border-bottom: 0; }
+
+.footer {
+  margin-top: 34px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+}
+
+@media (max-width: 920px) {
+  .shell { grid-template-columns: 1fr; }
+  .sidebar { position: relative; height: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+  .nav-list { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+  .phase-row { grid-template-columns: 1fr; gap: 4px; }
+  .main { padding-top: 20px; }
+}
+
+@media (max-width: 560px) {
+  body { font-size: 14px; }
+  h1 { font-size: 2rem; overflow-wrap: anywhere; }
+  .doc-body, .doc-head { padding-inline: 12px; }
+  .main { padding-inline: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+  }
+}
+</style>
+</head>
+<body>
+  <a class="skip-link" href="#content">Skip to content</a>
+  <div class="shell">
+    <aside class="sidebar" aria-label="Document navigation">
+      <div class="brand">
+        <div class="brand-mark">Islandflow</div>
+        <div class="brand-meta">Implementation packet<br>Smart Flow</div>
+      </div>
+      <div class="nav-title">Phase index</div>
+      <ul class="nav-list">
+        <li><a href="#00-roadmap"><span class="phase-label">Roadmap</span><br>Smart Money / Smart Flow Roadmap</a></li>
+        <li><a href="#01-contracts-vocabulary"><span class="phase-label">Phase 01</span><br>Phase 01: Contracts and Vocabulary</a></li>
+        <li><a href="#02-evidence-clustering-features"><span class="phase-label">Phase 02</span><br>Phase 02: Evidence Clustering and Features</a></li>
+        <li><a href="#03-hypothesis-scoring-abstention"><span class="phase-label">Phase 03</span><br>Phase 03: Hypothesis Scoring and Abstention</a></li>
+        <li><a href="#04-replay-evaluation-golden-tests"><span class="phase-label">Phase 04</span><br>Phase 04: Replay Evaluation and Golden Tests</a></li>
+        <li><a href="#05-api-ui-explainability"><span class="phase-label">Phase 05</span><br>Phase 05: API/UI Explainability</a></li>
+        <li><a href="#99-future-calibration"><span class="phase-label">Future</span><br>Phase 99: Future Calibration</a></li>
+      </ul>
+    </aside>
+    <main class="main" id="content">
+      <header class="hero">
+        <div class="kicker">Readable phase dossier</div>
+        <h1>Smart-Flow Implementation Phases</h1>
+        <p>Evidence contracts, clustering, cautious hypotheses, replay evaluation, explainability, and future calibration. Research reports remain background rationale; active scope comes from Beads and the phase Markdown.</p>
+        <div class="meta-row">
+          <span class="issue-chip">Beads islandflow-zxh</span>
+          <span class="status-chip">7 source docs</span>
+          <span class="status-chip">No app code</span>
+        </div>
+      </header>
+
+      <section class="phase-overview" aria-label="Phase overview">
+
+    <a class="phase-row" href="#00-roadmap">
+      <span class="phase-label">Roadmap</span>
+      <span class="phase-title">Smart Money / Smart Flow Roadmap</span>
+      <span class="phase-summary">This roadmap breaks <code>docs/plans/smart-flow-architecture-review.md</code> into implementation-sized phases. The recommended direction is Option B: keep the working stack, but rebuild the domain pipeline around observations, evidence clusters, cautious hypotheses, confidence, alternatives, abstention, replay evaluation, and user-facing insight projections.</span>
+    </a>
+    <a class="phase-row" href="#01-contracts-vocabulary">
+      <span class="phase-label">Phase 01</span>
+      <span class="phase-title">Phase 01: Contracts and Vocabulary</span>
+      <span class="phase-summary">Introduce the domain vocabulary and contracts that distinguish observations, evidence clusters, hypotheses, confidence, abstention, and user-facing insight projections.</span>
+    </a>
+    <a class="phase-row" href="#02-evidence-clustering-features">
+      <span class="phase-label">Phase 02</span>
+      <span class="phase-title">Phase 02: Evidence Clustering and Features</span>
+      <span class="phase-summary">Make evidence extraction, eligibility, quote/context joins, clustering, and feature construction explicit and traceable before hypothesis scoring changes.</span>
+    </a>
+    <a class="phase-row" href="#03-hypothesis-scoring-abstention">
+      <span class="phase-label">Phase 03</span>
+      <span class="phase-title">Phase 03: Hypothesis Scoring and Abstention</span>
+      <span class="phase-summary">Convert evidence clusters into cautious flow hypotheses with explicit score vectors, alternatives, penalties, confidence, conviction, and abstention reasons.</span>
+    </a>
+    <a class="phase-row" href="#04-replay-evaluation-golden-tests">
+      <span class="phase-label">Phase 04</span>
+      <span class="phase-title">Phase 04: Replay Evaluation and Golden Tests</span>
+      <span class="phase-summary">Make deterministic replay and golden output comparison the acceptance gate for smart-flow behavior changes.</span>
+    </a>
+    <a class="phase-row" href="#05-api-ui-explainability">
+      <span class="phase-label">Phase 05</span>
+      <span class="phase-title">Phase 05: API/UI Explainability</span>
+      <span class="phase-summary">Expose evidence-backed smart-flow outputs through API, websocket, and UI surfaces that make evidence quality, confidence, conviction, alternatives, and abstention understandable.</span>
+    </a>
+    <a class="phase-row" href="#99-future-calibration">
+      <span class="phase-label">Future</span>
+      <span class="phase-title">Phase 99: Future Calibration</span>
+      <span class="phase-summary">Plan future calibration of smart-flow confidence, policy thresholds, penalties, and abstention behavior after the MVP evidence/hypothesis pipeline is working and replay-validated.</span>
+    </a>
+      </section>
+
+      <div class="content-stack">
+
+      <article class="doc-section" id="00-roadmap">
+        <header class="doc-head">
+          <div class="doc-title-row">
+            <span class="phase-label">Roadmap</span>
+            <span class="status-chip">smart-flow</span>
+          </div>
+          <h2>Smart Money / Smart Flow Roadmap</h2>
+          <div class="doc-source">Source Markdown: <a href="00-roadmap.md">00-roadmap.md</a></div>
+        </header>
+        <div class="doc-body">
+<p>This roadmap breaks <code>docs/plans/smart-flow-architecture-review.md</code> into implementation-sized phases. The recommended direction is Option B: keep the working stack, but rebuild the domain pipeline around observations, evidence clusters, cautious hypotheses, confidence, alternatives, abstention, replay evaluation, and user-facing insight projections.</p>
+<h3 id="00-roadmap-source-documents">Source Documents</h3>
+<ul>
+<li>Architecture plan: <a href="../../plans/smart-flow-architecture-review.md">docs/plans/smart-flow-architecture-review.md</a></li>
+<li>Research report: <a href="../../research-docs/smart-flow-market-mechanics.md">docs/research-docs/smart-flow-market-mechanics.md</a></li>
+<li>Research architecture review copy: <a href="../../research-docs/smart-flow-architecture-review.md">docs/research-docs/smart-flow-architecture-review.md</a></li>
+</ul>
+<p>The research documents are background and rationale only. Scope comes from the Beads issue and the phase document.</p>
+<h3 id="00-roadmap-core-constraints">Core Constraints</h3>
+<ul>
+<li>Do not treat &quot;smart money&quot; as a canonical fact emitted by the system.</li>
+<li>Distinguish direct facts, evidence, hypotheses, confidence, alternatives, and abstention.</li>
+<li>Preserve evidence and uncertainty in storage, API, websocket, and UI surfaces.</li>
+<li>Keep Redis as hot cache only, not hidden baseline truth.</li>
+<li>Make replay evaluation the acceptance gate before expanding UI confidence.</li>
+<li>Keep historical or research-grade calibration as future work, not an MVP dependency.</li>
+</ul>
+<h3 id="00-roadmap-phase-sequence">Phase Sequence</h3>
+<div class="table-wrap"><table>
+<thead><tr><th>Phase</th><th>Beads issue</th><th>Depends on</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td>01 - Contracts and vocabulary</td><td><code>islandflow-zxh.1</code></td><td>None; safe parallel with <code>islandflow-259.1</code></td><td>Define evidence/hypothesis/insight contracts and retire canonical overconfidence.</td></tr>
+<tr><td>02 - Evidence clustering and features</td><td><code>islandflow-zxh.2</code></td><td><code>islandflow-259.2</code></td><td>Extract eligibility, evidence facts, clusters, and traceable features.</td></tr>
+<tr><td>03 - Hypothesis scoring and abstention</td><td><code>islandflow-zxh.3</code></td><td><code>islandflow-259.3</code></td><td>Score cautious hypotheses and represent abstention/alternatives.</td></tr>
+<tr><td>04 - Replay evaluation and golden tests</td><td><code>islandflow-zxh.4</code></td><td><code>islandflow-259.4</code></td><td>Validate derived outputs through deterministic replay and golden fixtures.</td></tr>
+<tr><td>05 - API/UI explainability</td><td><code>islandflow-zxh.5</code></td><td><code>islandflow-259.5</code></td><td>Expose evidence-backed insights and uncertainty to API, WS, and UI.</td></tr>
+<tr><td>99 - Future calibration</td><td><code>islandflow-zxh.6</code></td><td><code>islandflow-zxh.5</code>, <code>islandflow-259.6</code></td><td>Calibrate confidence and policy behavior later with richer datasets.</td></tr>
+</tbody></table></div>
+<h3 id="00-roadmap-pr-split-notes">PR Split Notes</h3>
+<p>Several phases are broad enough to split before implementation:</p>
+<ul>
+<li><code>islandflow-zxh.2.1</code> - Split smart-flow phase 02a: eligibility and evidence facts</li>
+<li><code>islandflow-zxh.2.2</code> - Split smart-flow phase 02b: clustering and feature vectors</li>
+<li><code>islandflow-zxh.3.1</code> - Split smart-flow phase 03a: hypothesis score vectors</li>
+<li><code>islandflow-zxh.3.2</code> - Split smart-flow phase 03b: abstention and insight projection</li>
+<li><code>islandflow-zxh.5.1</code> - Split smart-flow phase 05a: evidence API and websocket surfaces</li>
+<li><code>islandflow-zxh.5.2</code> - Split smart-flow phase 05b: UI explainability surfaces</li>
+</ul>
+<p>If an implementation PR crosses contracts, compute, storage, API, and UI in one change, stop and split it.</p>
+<h3 id="00-roadmap-matching-beads-epic">Matching Beads Epic</h3>
+<ul>
+<li><code>islandflow-zxh</code> - Plan smart-money to smart-flow implementation phases</li>
+</ul>
+        </div>
+      </article>
+
+      <article class="doc-section" id="01-contracts-vocabulary">
+        <header class="doc-head">
+          <div class="doc-title-row">
+            <span class="phase-label">Phase 01</span>
+            <span class="status-chip">smart-flow</span>
+          </div>
+          <h2>Smart-Flow Phase 01: Contracts and Vocabulary</h2>
+          <div class="doc-source">Source Markdown: <a href="01-contracts-vocabulary.md">01-contracts-vocabulary.md</a></div>
+        </header>
+        <div class="doc-body">
+<h3 id="01-contracts-vocabulary-purpose">Purpose</h3>
+<p>Introduce the domain vocabulary and contracts that distinguish observations, evidence clusters, hypotheses, confidence, abstention, and user-facing insight projections.</p>
+<h3 id="01-contracts-vocabulary-why-this-phase-comes-now">Why this phase comes now</h3>
+<p>The current system has useful infrastructure but overconfident domain names. Before changing classifier behavior, the codebase needs the language to express what is observed, what is inferred, what is uncertain, and when the system should abstain.</p>
+<h3 id="01-contracts-vocabulary-source-documents">Source documents</h3>
+<ul>
+<li>Architecture plan: <a href="../../plans/smart-flow-architecture-review.md">docs/plans/smart-flow-architecture-review.md</a></li>
+<li>Research report: <a href="../../research-docs/smart-flow-market-mechanics.md">docs/research-docs/smart-flow-market-mechanics.md</a></li>
+<li>Research architecture review copy: <a href="../../research-docs/smart-flow-architecture-review.md">docs/research-docs/smart-flow-architecture-review.md</a></li>
+</ul>
+<p>These documents are rationale, not added scope. This phase implements only vocabulary, contracts, versioning, and compatibility notes.</p>
+<h3 id="01-contracts-vocabulary-research-basis">Research basis</h3>
+<ul>
+<li>The research direction is direct observation to inference to hypothesis, with preserved evidence and visible uncertainty.</li>
+<li>&quot;Smart money&quot; should not be modeled as a canonical fact; user-facing insight should be a projection from evidence-backed hypotheses.</li>
+<li>Confidence, conviction, alternatives, and abstention need separate language before behavior changes.</li>
+</ul>
+<h3 id="01-contracts-vocabulary-deferred-research-ideas">Deferred research ideas</h3>
+<ul>
+<li>Participant identity claims and research-grade calibration stay outside the vocabulary foundation.</li>
+</ul>
+<h3 id="01-contracts-vocabulary-dependencies-on-earlier-phases">Dependencies on earlier phases</h3>
+<p>None. This phase can safely run in parallel with <code>islandflow-259.1</code>; align on the existing canonical raw market event contracts and provenance assumptions, but do not wait for synthetic package implementation.</p>
+<h3 id="01-contracts-vocabulary-likely-files-modules-touched">Likely files/modules touched</h3>
+<ul>
+<li><code>packages/types/src/events.ts</code></li>
+<li>Shared type exports in <code>packages/types/</code></li>
+<li>Compatibility type aliases where legacy names are still needed</li>
+<li>Storage schema planning docs or migration notes</li>
+<li>Tests for schema parsing or event compatibility</li>
+</ul>
+<h3 id="01-contracts-vocabulary-in-scope-work">In-scope work</h3>
+<ul>
+<li>Define or prepare contracts for <code>FlowEvidenceCluster</code>, <code>FlowCandidate</code>, <code>FlowHypothesisEvent</code>, <code>SmartFlowInsight</code>, <code>EvidenceQuality</code>, <code>BaselineSnapshot</code>, and version fields.</li>
+<li>Mark legacy &quot;smart money&quot; naming as compatibility or projection language, not canonical truth.</li>
+<li>Define how facts, evidence, hypotheses, scores, confidence, and abstention differ.</li>
+<li>Preserve compatibility aliases for existing API/UI paths where necessary.</li>
+<li>Add concise migration notes for future phases.</li>
+</ul>
+<h3 id="01-contracts-vocabulary-explicitly-out-of-scope-work">Explicitly out-of-scope work</h3>
+<ul>
+<li>Rewriting classifier scoring.</li>
+<li>Moving ingest policy.</li>
+<li>Adding new API endpoints or UI drawers.</li>
+<li>Building replay golden suites.</li>
+<li>Historical calibration or research-grade model fitting.</li>
+</ul>
+<h3 id="01-contracts-vocabulary-acceptance-criteria">Acceptance criteria</h3>
+<ul>
+<li>Contracts distinguish observations, evidence, hypotheses, insight projections, confidence, alternatives, and abstention.</li>
+<li>Legacy naming remains only where compatibility requires it.</li>
+<li>Version fields are included for policy/model evolution.</li>
+<li>Future phases can refer to these contracts without redefining the vocabulary.</li>
+<li>Migration risk and compatibility aliases are documented.</li>
+</ul>
+<h3 id="01-contracts-vocabulary-test-strategy">Test strategy</h3>
+<p>Use type-level checks and schema/serialization tests where practical. Add compatibility tests only for public contracts that must remain stable. Avoid broad behavior tests until evidence extraction and scoring phases exist.</p>
+<h3 id="01-contracts-vocabulary-risks-design-traps">Risks / design traps</h3>
+<ul>
+<li>Renaming everything without compatibility will break consumers.</li>
+<li>Keeping &quot;smart money&quot; as canonical language will preserve the old overconfidence.</li>
+<li>Mixing facts and hypotheses in one event shape will make replay evaluation weaker.</li>
+<li>Adding too many future fields can make contracts noisy before behavior exists.</li>
+</ul>
+<h3 id="01-contracts-vocabulary-suggested-future-codex-implementation-prompt">Suggested future Codex implementation prompt</h3>
+<pre><code class="language-text">Implement docs/implementation/smart-money/01-contracts-vocabulary.md for Beads issue islandflow-zxh.1. Focus on contracts, vocabulary, version fields, and compatibility aliases only. Do not rewrite scoring, API/UI explainability, replay tests, or calibration.</code></pre>
+<h3 id="01-contracts-vocabulary-matching-beads-issue-title-id">Matching Beads issue title/id</h3>
+<ul>
+<li><code>islandflow-zxh.1</code> - Smart-flow phase 01: contracts and vocabulary</li>
+</ul>
+        </div>
+      </article>
+
+      <article class="doc-section" id="02-evidence-clustering-features">
+        <header class="doc-head">
+          <div class="doc-title-row">
+            <span class="phase-label">Phase 02</span>
+            <span class="status-chip">smart-flow</span>
+          </div>
+          <h2>Smart-Flow Phase 02: Evidence Clustering and Features</h2>
+          <div class="doc-source">Source Markdown: <a href="02-evidence-clustering-features.md">02-evidence-clustering-features.md</a></div>
+        </header>
+        <div class="doc-body">
+<h3 id="02-evidence-clustering-features-purpose">Purpose</h3>
+<p>Make evidence extraction, eligibility, quote/context joins, clustering, and feature construction explicit and traceable before hypothesis scoring changes.</p>
+<h3 id="02-evidence-clustering-features-why-this-phase-comes-now">Why this phase comes now</h3>
+<p>Contracts alone do not change behavior. This phase gives the system a clean evidence layer so later scoring can reason from auditable facts instead of a generic feature bag or overconfident classifier labels.</p>
+<h3 id="02-evidence-clustering-features-source-documents">Source documents</h3>
+<ul>
+<li>Architecture plan: <a href="../../plans/smart-flow-architecture-review.md">docs/plans/smart-flow-architecture-review.md</a></li>
+<li>Research report: <a href="../../research-docs/smart-flow-market-mechanics.md">docs/research-docs/smart-flow-market-mechanics.md</a></li>
+<li>Research architecture review copy: <a href="../../research-docs/smart-flow-architecture-review.md">docs/research-docs/smart-flow-architecture-review.md</a></li>
+</ul>
+<p>These documents are rationale, not added scope. This phase implements only eligibility, evidence facts, clustering, and traceable features.</p>
+<h3 id="02-evidence-clustering-features-research-basis">Research basis</h3>
+<ul>
+<li>Trade signing, quote context, sale conditions, stale quotes, wide markets, and event context all affect whether a print is usable evidence.</li>
+<li>Evidence should preserve raw refs, eligibility decisions, quality signals, and negative context before any hypothesis is scored.</li>
+<li>Ingest should normalize observations; signal policy belongs in explicit evidence/scoring stages.</li>
+</ul>
+<h3 id="02-evidence-clustering-features-deferred-research-ideas">Deferred research ideas</h3>
+<ul>
+<li>Full IV-surface modeling, broad news/FDA event feeds, and deep historical baselines can be added later when scoped.</li>
+</ul>
+<h3 id="02-evidence-clustering-features-dependencies-on-earlier-phases">Dependencies on earlier phases</h3>
+<ul>
+<li><code>islandflow-zxh.1</code> - Smart-flow contracts and vocabulary</li>
+<li><code>islandflow-259.2</code> - Synthetic manifests, fixtures, and CLI</li>
+</ul>
+<h3 id="02-evidence-clustering-features-likely-files-modules-touched">Likely files/modules touched</h3>
+<ul>
+<li><code>services/compute/src/</code></li>
+<li><code>packages/types/src/events.ts</code></li>
+<li><code>packages/storage/src/</code> for typed evidence storage planning or implementation</li>
+<li>Tests under <code>services/compute/tests/</code></li>
+<li>Fixture helpers from the synthetic package</li>
+</ul>
+<h3 id="02-evidence-clustering-features-in-scope-work">In-scope work</h3>
+<ul>
+<li>Represent direct observations, quote joins, execution context, and eligibility decisions as evidence facts.</li>
+<li>Build deterministic evidence clusters with traceable source refs.</li>
+<li>Compute feature vectors from evidence while preserving whether a value is observed, derived, or inferred.</li>
+<li>Carry evidence quality, stale quote, wide spread, odd lot, complex spread, and noisy context signals.</li>
+<li>Move toward ingest-as-normalization, not ingest-as-signal-policy.</li>
+</ul>
+<h3 id="02-evidence-clustering-features-explicitly-out-of-scope-work">Explicitly out-of-scope work</h3>
+<ul>
+<li>Final hypothesis score policy.</li>
+<li>API and UI explainability.</li>
+<li>Historical calibration.</li>
+<li>Claiming participant identity.</li>
+<li>Replacing all storage tables in the same PR.</li>
+</ul>
+<h3 id="02-evidence-clustering-features-acceptance-criteria">Acceptance criteria</h3>
+<ul>
+<li>Eligibility decisions have explicit accept, reject, or down-weight reasons.</li>
+<li>Evidence clusters have deterministic keys/windows and preserve raw refs.</li>
+<li>Feature values trace back to evidence refs.</li>
+<li>Stale, wide, noisy, or ambiguous conditions can be represented without pretending to know intent.</li>
+<li>The phase is split into PR-sized children when implementation starts.</li>
+</ul>
+<h3 id="02-evidence-clustering-features-test-strategy">Test strategy</h3>
+<p>Use deterministic fixtures from synthetic phase 02 where available. Add focused tests for quote joining, eligibility rejection, cluster key stability, feature derivation, and trace refs. Keep tests infra-free unless a later optional storage integration explicitly needs services.</p>
+<h3 id="02-evidence-clustering-features-risks-design-traps">Risks / design traps</h3>
+<ul>
+<li>Recreating the old <code>FlowPacket</code> as a renamed generic feature bag.</li>
+<li>Letting ingest services make signal-policy decisions.</li>
+<li>Losing evidence refs during aggregation.</li>
+<li>Treating cluster features as hypotheses before the scoring phase.</li>
+</ul>
+<h3 id="02-evidence-clustering-features-suggested-future-codex-implementation-prompt">Suggested future Codex implementation prompt</h3>
+<pre><code class="language-text">Implement docs/implementation/smart-money/02-evidence-clustering-features.md for Beads issue islandflow-zxh.2. Use split issues islandflow-zxh.2.1 and islandflow-zxh.2.2 for PR-sized work. Focus on evidence facts, eligibility, clustering, and traceable features. Do not implement final scoring, API/UI explainability, or calibration.</code></pre>
+<h3 id="02-evidence-clustering-features-matching-beads-issue-title-id">Matching Beads issue title/id</h3>
+<ul>
+<li><code>islandflow-zxh.2</code> - Smart-flow phase 02: evidence clustering and features</li>
+<li>PR split: <code>islandflow-zxh.2.1</code> - Split smart-flow phase 02a: eligibility and evidence facts</li>
+<li>PR split: <code>islandflow-zxh.2.2</code> - Split smart-flow phase 02b: clustering and feature vectors</li>
+</ul>
+        </div>
+      </article>
+
+      <article class="doc-section" id="03-hypothesis-scoring-abstention">
+        <header class="doc-head">
+          <div class="doc-title-row">
+            <span class="phase-label">Phase 03</span>
+            <span class="status-chip">smart-flow</span>
+          </div>
+          <h2>Smart-Flow Phase 03: Hypothesis Scoring and Abstention</h2>
+          <div class="doc-source">Source Markdown: <a href="03-hypothesis-scoring-abstention.md">03-hypothesis-scoring-abstention.md</a></div>
+        </header>
+        <div class="doc-body">
+<h3 id="03-hypothesis-scoring-abstention-purpose">Purpose</h3>
+<p>Convert evidence clusters into cautious flow hypotheses with explicit score vectors, alternatives, penalties, confidence, conviction, and abstention reasons.</p>
+<h3 id="03-hypothesis-scoring-abstention-why-this-phase-comes-now">Why this phase comes now</h3>
+<p>Scoring should wait until the system can represent evidence clearly and synthetic scenarios can describe expected positive, negative, and abstention cases. This phase is where the product stops acting like every signal is a confident &quot;smart money&quot; claim.</p>
+<h3 id="03-hypothesis-scoring-abstention-source-documents">Source documents</h3>
+<ul>
+<li>Architecture plan: <a href="../../plans/smart-flow-architecture-review.md">docs/plans/smart-flow-architecture-review.md</a></li>
+<li>Research report: <a href="../../research-docs/smart-flow-market-mechanics.md">docs/research-docs/smart-flow-market-mechanics.md</a></li>
+<li>Research architecture review copy: <a href="../../research-docs/smart-flow-architecture-review.md">docs/research-docs/smart-flow-architecture-review.md</a></li>
+</ul>
+<p>These documents are rationale, not added scope. This phase implements only cautious hypothesis scoring, alternatives, penalties, and abstention.</p>
+<h3 id="03-hypothesis-scoring-abstention-research-basis">Research basis</h3>
+<ul>
+<li>Premium concentration, sweep-like activity, IV movement, and equity confirmation support hypotheses only when evidence quality and context agree.</li>
+<li>False positives from deep-ITM stock replacement, spreads/hedges, stale quotes, and event-driven flow need explicit penalties or abstention.</li>
+<li>Confidence should reflect policy confidence in the evidence, not a claim of hidden participant identity.</li>
+</ul>
+<h3 id="03-hypothesis-scoring-abstention-deferred-research-ideas">Deferred research ideas</h3>
+<ul>
+<li>Empirical threshold tuning, historical calibration, and ML-based scoring stay future work until replay/golden validation exists.</li>
+</ul>
+<h3 id="03-hypothesis-scoring-abstention-dependencies-on-earlier-phases">Dependencies on earlier phases</h3>
+<ul>
+<li><code>islandflow-zxh.1</code> - Smart-flow contracts and vocabulary</li>
+<li><code>islandflow-zxh.2</code> - Evidence clustering and features</li>
+<li><code>islandflow-259.3</code> - Synthetic scenarios, labels, and expected outputs</li>
+</ul>
+<h3 id="03-hypothesis-scoring-abstention-likely-files-modules-touched">Likely files/modules touched</h3>
+<ul>
+<li><code>services/compute/src/</code></li>
+<li><code>packages/types/src/events.ts</code></li>
+<li><code>packages/storage/src/smart-money-events.ts</code> or successor storage modules</li>
+<li>Compute tests and fixture/golden comparison helpers</li>
+<li>Compatibility projection code for legacy alerts or classifier hits</li>
+</ul>
+<h3 id="03-hypothesis-scoring-abstention-in-scope-work">In-scope work</h3>
+<ul>
+<li>Define score vectors for hypothesis type, direction, evidence strength, confidence, conviction, and penalties.</li>
+<li>Preserve alternative explanations and negative evidence.</li>
+<li>Make abstention a first-class output with reasons.</li>
+<li>Add policy/model version fields.</li>
+<li>Derive compatibility <code>SmartFlowInsight</code> or legacy projections from canonical hypothesis events.</li>
+</ul>
+<h3 id="03-hypothesis-scoring-abstention-explicitly-out-of-scope-work">Explicitly out-of-scope work</h3>
+<ul>
+<li>UI presentation overhaul.</li>
+<li>API endpoint expansion.</li>
+<li>Historical calibration.</li>
+<li>Participant identity claims.</li>
+<li>Tuning all thresholds against live historical data.</li>
+</ul>
+<h3 id="03-hypothesis-scoring-abstention-acceptance-criteria">Acceptance criteria</h3>
+<ul>
+<li>Hypothesis scores separate evidence strength, confidence, conviction, and penalties.</li>
+<li>Abstention outputs include machine-readable and user-readable reasons.</li>
+<li>Alternative explanations are preserved.</li>
+<li>Compatibility projections do not become the canonical domain model.</li>
+<li>Score policy changes are deterministic against synthetic fixtures.</li>
+</ul>
+<h3 id="03-hypothesis-scoring-abstention-test-strategy">Test strategy</h3>
+<p>Use synthetic scenario fixtures and expected-output manifests. Cover positive hypotheses, abstentions, false-positive suppressions, alternative explanations, and noisy scenarios. Keep output comparisons stable and focused on score signatures rather than brittle full payload dumps.</p>
+<h3 id="03-hypothesis-scoring-abstention-risks-design-traps">Risks / design traps</h3>
+<ul>
+<li>Rebranding old classifier hits as hypotheses without changing semantics.</li>
+<li>Treating confidence as probability when it is only policy confidence.</li>
+<li>Hiding abstention in logs instead of output events.</li>
+<li>Letting compatibility alert projections dictate canonical scoring design.</li>
+</ul>
+<h3 id="03-hypothesis-scoring-abstention-suggested-future-codex-implementation-prompt">Suggested future Codex implementation prompt</h3>
+<pre><code class="language-text">Implement docs/implementation/smart-money/03-hypothesis-scoring-abstention.md for Beads issue islandflow-zxh.3. Use split issues islandflow-zxh.3.1 and islandflow-zxh.3.2 for PR-sized work. Build cautious hypothesis scoring, alternatives, and abstention from evidence clusters. Do not add API/UI explainability or historical calibration.</code></pre>
+<h3 id="03-hypothesis-scoring-abstention-matching-beads-issue-title-id">Matching Beads issue title/id</h3>
+<ul>
+<li><code>islandflow-zxh.3</code> - Smart-flow phase 03: hypothesis scoring and abstention</li>
+<li>PR split: <code>islandflow-zxh.3.1</code> - Split smart-flow phase 03a: hypothesis score vectors</li>
+<li>PR split: <code>islandflow-zxh.3.2</code> - Split smart-flow phase 03b: abstention and insight projection</li>
+</ul>
+        </div>
+      </article>
+
+      <article class="doc-section" id="04-replay-evaluation-golden-tests">
+        <header class="doc-head">
+          <div class="doc-title-row">
+            <span class="phase-label">Phase 04</span>
+            <span class="status-chip">smart-flow</span>
+          </div>
+          <h2>Smart-Flow Phase 04: Replay Evaluation and Golden Tests</h2>
+          <div class="doc-source">Source Markdown: <a href="04-replay-evaluation-golden-tests.md">04-replay-evaluation-golden-tests.md</a></div>
+        </header>
+        <div class="doc-body">
+<h3 id="04-replay-evaluation-golden-tests-purpose">Purpose</h3>
+<p>Make deterministic replay and golden output comparison the acceptance gate for smart-flow behavior changes.</p>
+<h3 id="04-replay-evaluation-golden-tests-why-this-phase-comes-now">Why this phase comes now</h3>
+<p>Replay evaluation should come after synthetic replay can select stable runs and after hypothesis scoring has outputs worth validating. This phase turns architecture discipline into a repeatable test path.</p>
+<h3 id="04-replay-evaluation-golden-tests-source-documents">Source documents</h3>
+<ul>
+<li>Architecture plan: <a href="../../plans/smart-flow-architecture-review.md">docs/plans/smart-flow-architecture-review.md</a></li>
+<li>Research report: <a href="../../research-docs/smart-flow-market-mechanics.md">docs/research-docs/smart-flow-market-mechanics.md</a></li>
+<li>Research architecture review copy: <a href="../../research-docs/smart-flow-architecture-review.md">docs/research-docs/smart-flow-architecture-review.md</a></li>
+<li>Synthetic research report: <a href="../../research-docs/synthetic-market-data-generation.md">docs/research-docs/synthetic-market-data-generation.md</a></li>
+</ul>
+<p>These documents are rationale, not added scope. This phase implements only deterministic replay evaluation and compact golden tests.</p>
+<h3 id="04-replay-evaluation-golden-tests-research-basis">Research basis</h3>
+<ul>
+<li>Replay is the acceptance gate for derived smart-flow outputs because evidence and hypotheses must be reproducible.</li>
+<li>Validation must include positive cases, false positives, noisy contexts, and abstentions.</li>
+<li>Tests should avoid lookahead bias and compare stable signatures instead of brittle full-payload dumps.</li>
+</ul>
+<h3 id="04-replay-evaluation-golden-tests-deferred-research-ideas">Deferred research ideas</h3>
+<ul>
+<li>Historical backtesting windows, empirical calibration datasets, and broad benchmark reports belong in later calibration work.</li>
+</ul>
+<h3 id="04-replay-evaluation-golden-tests-dependencies-on-earlier-phases">Dependencies on earlier phases</h3>
+<ul>
+<li><code>islandflow-zxh.1</code> - Smart-flow contracts and vocabulary</li>
+<li><code>islandflow-zxh.2</code> - Evidence clustering and features</li>
+<li><code>islandflow-zxh.3</code> - Hypothesis scoring and abstention</li>
+<li><code>islandflow-259.4</code> - Synthetic replay integration</li>
+</ul>
+<h3 id="04-replay-evaluation-golden-tests-likely-files-modules-touched">Likely files/modules touched</h3>
+<ul>
+<li><code>services/replay/src/</code></li>
+<li><code>services/compute/tests/</code></li>
+<li>Synthetic fixture and manifest comparison helpers</li>
+<li>Golden fixture directories</li>
+<li>Optional service-container integration config if added later</li>
+</ul>
+<h3 id="04-replay-evaluation-golden-tests-in-scope-work">In-scope work</h3>
+<ul>
+<li>Recompute derived evidence/hypothesis outputs from raw synthetic streams.</li>
+<li>Compare stable output signatures with expected manifests.</li>
+<li>Include positive, abstention, false-positive, and noisy scenarios.</li>
+<li>Make replay/golden tests deterministic and infra-free by default.</li>
+<li>Gate optional ClickHouse/NATS/Redis tests outside the default path.</li>
+</ul>
+<h3 id="04-replay-evaluation-golden-tests-explicitly-out-of-scope-work">Explicitly out-of-scope work</h3>
+<ul>
+<li>New scoring policy beyond fixes needed for deterministic evaluation.</li>
+<li>UI explainability.</li>
+<li>Historical calibration.</li>
+<li>Large generated fixture dumps.</li>
+<li>Making Docker-backed tests mandatory.</li>
+</ul>
+<h3 id="04-replay-evaluation-golden-tests-acceptance-criteria">Acceptance criteria</h3>
+<ul>
+<li>Replay recomputes derived smart-flow outputs from raw fixtures.</li>
+<li>Golden signatures cover positive, abstain, false-positive, and noisy scenarios.</li>
+<li>Default tests are deterministic and infra-free.</li>
+<li>Optional service-backed tests are clearly gated.</li>
+<li>Failures show concise, reviewable diffs or signature mismatches.</li>
+</ul>
+<h3 id="04-replay-evaluation-golden-tests-test-strategy">Test strategy</h3>
+<p>Use fixture-backed replay and compact golden signatures first. Add a small number of representative scenarios rather than broad generated dumps. If service-backed tests are added, mark them optional and document their dependencies.</p>
+<h3 id="04-replay-evaluation-golden-tests-risks-design-traps">Risks / design traps</h3>
+<ul>
+<li>Golden files that are too large will become rubber-stamped.</li>
+<li>Full payload comparisons may break on harmless metadata changes.</li>
+<li>Optional infra tests can accidentally become required in CI.</li>
+<li>Replay that starts from derived events instead of raw fixtures will miss pipeline regressions.</li>
+</ul>
+<h3 id="04-replay-evaluation-golden-tests-suggested-future-codex-implementation-prompt">Suggested future Codex implementation prompt</h3>
+<pre><code class="language-text">Implement docs/implementation/smart-money/04-replay-evaluation-golden-tests.md for Beads issue islandflow-zxh.4. Build deterministic replay/golden validation from raw synthetic fixtures. Keep default tests infra-free, compare stable signatures, and do not add UI explainability or historical calibration.</code></pre>
+<h3 id="04-replay-evaluation-golden-tests-matching-beads-issue-title-id">Matching Beads issue title/id</h3>
+<ul>
+<li><code>islandflow-zxh.4</code> - Smart-flow phase 04: replay evaluation and golden tests</li>
+</ul>
+        </div>
+      </article>
+
+      <article class="doc-section" id="05-api-ui-explainability">
+        <header class="doc-head">
+          <div class="doc-title-row">
+            <span class="phase-label">Phase 05</span>
+            <span class="status-chip">smart-flow</span>
+          </div>
+          <h2>Smart-Flow Phase 05: API/UI Explainability</h2>
+          <div class="doc-source">Source Markdown: <a href="05-api-ui-explainability.md">05-api-ui-explainability.md</a></div>
+        </header>
+        <div class="doc-body">
+<h3 id="05-api-ui-explainability-purpose">Purpose</h3>
+<p>Expose evidence-backed smart-flow outputs through API, websocket, and UI surfaces that make evidence quality, confidence, conviction, alternatives, and abstention understandable.</p>
+<h3 id="05-api-ui-explainability-why-this-phase-comes-now">Why this phase comes now</h3>
+<p>The presentation layer should wait until contracts, evidence, scoring, and replay evaluation are stable. Otherwise the UI will harden old overconfident language or teach users to trust unvalidated outputs.</p>
+<h3 id="05-api-ui-explainability-source-documents">Source documents</h3>
+<ul>
+<li>Architecture plan: <a href="../../plans/smart-flow-architecture-review.md">docs/plans/smart-flow-architecture-review.md</a></li>
+<li>Research report: <a href="../../research-docs/smart-flow-market-mechanics.md">docs/research-docs/smart-flow-market-mechanics.md</a></li>
+<li>Research architecture review copy: <a href="../../research-docs/smart-flow-architecture-review.md">docs/research-docs/smart-flow-architecture-review.md</a></li>
+</ul>
+<p>These documents are rationale, not added scope. This phase implements only API, websocket, and UI explainability surfaces for validated outputs.</p>
+<h3 id="05-api-ui-explainability-research-basis">Research basis</h3>
+<ul>
+<li>Users need to see evidence quality, confidence versus conviction, alternatives, and abstention instead of a single certainty label.</li>
+<li>The research supports cautious smart-flow insight projections, not canonical &quot;smart money&quot; facts.</li>
+<li>Why-not and penalty context are part of the product surface because false positives are central to the domain.</li>
+</ul>
+<h3 id="05-api-ui-explainability-deferred-research-ideas">Deferred research ideas</h3>
+<ul>
+<li>Advanced explanatory analytics, learned confidence calibration, and broad catalyst intelligence should wait for future scoped work.</li>
+</ul>
+<h3 id="05-api-ui-explainability-dependencies-on-earlier-phases">Dependencies on earlier phases</h3>
+<ul>
+<li><code>islandflow-zxh.1</code> - Smart-flow contracts and vocabulary</li>
+<li><code>islandflow-zxh.2</code> - Evidence clustering and features</li>
+<li><code>islandflow-zxh.3</code> - Hypothesis scoring and abstention</li>
+<li><code>islandflow-zxh.4</code> - Replay evaluation and golden tests</li>
+<li><code>islandflow-259.5</code> - Synthetic demo and load profiles</li>
+</ul>
+<h3 id="05-api-ui-explainability-likely-files-modules-touched">Likely files/modules touched</h3>
+<ul>
+<li><code>services/api/src/</code></li>
+<li>Websocket payload types and channel names</li>
+<li><code>apps/web/</code></li>
+<li>Shared UI/domain types in <code>packages/types/</code></li>
+<li>API and UI tests</li>
+</ul>
+<h3 id="05-api-ui-explainability-in-scope-work">In-scope work</h3>
+<ul>
+<li>Add or alias API/WS surfaces for evidence, hypotheses, insights, alternatives, and abstention.</li>
+<li>Keep legacy smart-money endpoints as aliases where needed, not canonical contracts.</li>
+<li>Rework UI surfaces around evidence quality, confidence versus conviction, alternatives, abstention, and why-not context.</li>
+<li>Ensure named deterministic demos can display stable explainability examples.</li>
+<li>Keep replay/golden validation tied to changed projections.</li>
+</ul>
+<h3 id="05-api-ui-explainability-explicitly-out-of-scope-work">Explicitly out-of-scope work</h3>
+<ul>
+<li>Rewriting scoring policy.</li>
+<li>Adding new synthetic foundations.</li>
+<li>Historical calibration.</li>
+<li>Claiming participant identity.</li>
+<li>UI copy that implies certainty where the model only has evidence-backed hypotheses.</li>
+</ul>
+<h3 id="05-api-ui-explainability-acceptance-criteria">Acceptance criteria</h3>
+<ul>
+<li>API/WS payloads expose evidence refs, hypotheses, insights, alternatives, abstention reasons, and version fields.</li>
+<li>UI distinguishes evidence quality, confidence, conviction, and why-not signals.</li>
+<li>Legacy smart-money surfaces remain compatibility aliases where required.</li>
+<li>Replay/golden checks support changed projection behavior.</li>
+<li>Explainability copy avoids overconfident certainty claims.</li>
+</ul>
+<h3 id="05-api-ui-explainability-test-strategy">Test strategy</h3>
+<p>Use API contract tests, websocket payload tests, and focused UI tests for evidence/abstention rendering. Validate with deterministic demo runs from synthetic phase 05. Manual visual review should supplement, not replace, replay/golden validation.</p>
+<h3 id="05-api-ui-explainability-risks-design-traps">Risks / design traps</h3>
+<ul>
+<li>UI can accidentally reintroduce &quot;smart money&quot; certainty.</li>
+<li>API aliases can become de facto canonical if not documented.</li>
+<li>Too many fields without hierarchy will make explainability harder to scan.</li>
+<li>Building UI before replay validation can make demos persuasive but untrustworthy.</li>
+</ul>
+<h3 id="05-api-ui-explainability-suggested-future-codex-implementation-prompt">Suggested future Codex implementation prompt</h3>
+<pre><code class="language-text">Implement docs/implementation/smart-money/05-api-ui-explainability.md for Beads issue islandflow-zxh.5. Use split issues islandflow-zxh.5.1 and islandflow-zxh.5.2 for PR-sized work. Expose evidence-backed API/WS/UI explainability after replay/golden validation. Do not change core scoring or add calibration.</code></pre>
+<h3 id="05-api-ui-explainability-matching-beads-issue-title-id">Matching Beads issue title/id</h3>
+<ul>
+<li><code>islandflow-zxh.5</code> - Smart-flow phase 05: API/UI explainability</li>
+<li>PR split: <code>islandflow-zxh.5.1</code> - Split smart-flow phase 05a: evidence API and websocket surfaces</li>
+<li>PR split: <code>islandflow-zxh.5.2</code> - Split smart-flow phase 05b: UI explainability surfaces</li>
+</ul>
+        </div>
+      </article>
+
+      <article class="doc-section" id="99-future-calibration">
+        <header class="doc-head">
+          <div class="doc-title-row">
+            <span class="phase-label">Future</span>
+            <span class="status-chip">smart-flow</span>
+          </div>
+          <h2>Smart-Flow Phase 99: Future Calibration</h2>
+          <div class="doc-source">Source Markdown: <a href="99-future-calibration.md">99-future-calibration.md</a></div>
+        </header>
+        <div class="doc-body">
+<h3 id="99-future-calibration-purpose">Purpose</h3>
+<p>Plan future calibration of smart-flow confidence, policy thresholds, penalties, and abstention behavior after the MVP evidence/hypothesis pipeline is working and replay-validated.</p>
+<h3 id="99-future-calibration-why-this-phase-comes-now">Why this phase comes now</h3>
+<p>The architecture should leave room for calibration, but calibration should not block the MVP. The system first needs clean facts, evidence, hypotheses, and replayable evaluation before tuning can be meaningful.</p>
+<h3 id="99-future-calibration-source-documents">Source documents</h3>
+<ul>
+<li>Architecture plan: <a href="../../plans/smart-flow-architecture-review.md">docs/plans/smart-flow-architecture-review.md</a></li>
+<li>Research report: <a href="../../research-docs/smart-flow-market-mechanics.md">docs/research-docs/smart-flow-market-mechanics.md</a></li>
+<li>Research architecture review copy: <a href="../../research-docs/smart-flow-architecture-review.md">docs/research-docs/smart-flow-architecture-review.md</a></li>
+</ul>
+<p>These documents are rationale, not added scope. This future phase is the place to turn research ideas into scoped calibration work after MVP.</p>
+<h3 id="99-future-calibration-research-basis">Research basis</h3>
+<ul>
+<li>Historical validation should be time-of-day aware and avoid lookahead bias.</li>
+<li>Baselines for &quot;unusual&quot; should account for ticker, tenor bucket, regime, and event-day exclusions.</li>
+<li>Confidence, penalties, abstention, and alternatives need versioned policy outputs so calibration stays auditable.</li>
+</ul>
+<h3 id="99-future-calibration-deferred-research-ideas">Deferred research ideas</h3>
+<ul>
+<li>ML scoring, learned calibration, richer catalyst feeds, and large historical benchmark suites require separate future Beads scope.</li>
+</ul>
+<h3 id="99-future-calibration-dependencies-on-earlier-phases">Dependencies on earlier phases</h3>
+<ul>
+<li><code>islandflow-zxh.5</code> - Smart-flow API/UI explainability</li>
+<li><code>islandflow-259.6</code> - Future synthetic historical calibration</li>
+</ul>
+<h3 id="99-future-calibration-likely-files-modules-touched">Likely files/modules touched</h3>
+<ul>
+<li>Future calibration tooling in <code>services/compute/</code> or a research package</li>
+<li>Policy/model version registry</li>
+<li>Evaluation reports or benchmark datasets</li>
+<li>Storage/query helpers for historical derived outputs</li>
+<li>Documentation for metrics and calibration governance</li>
+</ul>
+<h3 id="99-future-calibration-in-scope-work">In-scope work</h3>
+<ul>
+<li>Define calibration datasets and evaluation metrics.</li>
+<li>Specify how confidence, conviction, penalties, abstention, and alternatives are tuned.</li>
+<li>Preserve policy/model versioning and replayability.</li>
+<li>Document what makes a calibration dataset acceptable.</li>
+<li>Keep user-facing confidence semantics auditable.</li>
+</ul>
+<h3 id="99-future-calibration-explicitly-out-of-scope-work">Explicitly out-of-scope work</h3>
+<ul>
+<li>MVP contracts and scoring foundations.</li>
+<li>API/UI explainability for the initial pipeline.</li>
+<li>Treating historical calibration as proof of participant identity.</li>
+<li>Using private or licensed data in committed fixtures without approval.</li>
+</ul>
+<h3 id="99-future-calibration-acceptance-criteria">Acceptance criteria</h3>
+<ul>
+<li>Calibration remains outside the MVP blocker chain.</li>
+<li>Dataset provenance, metrics, and policy versioning are documented before implementation.</li>
+<li>Confidence and abstention semantics remain explainable after tuning.</li>
+<li>Replay can compare calibrated policy versions without losing auditability.</li>
+</ul>
+<h3 id="99-future-calibration-test-strategy">Test strategy</h3>
+<p>When implemented, use replayed benchmark datasets with versioned policy outputs. Track false positives, abstentions, precision-like metrics, and scenario-specific regressions. Keep calibration tests separate from the early deterministic fixture tests.</p>
+<h3 id="99-future-calibration-risks-design-traps">Risks / design traps</h3>
+<ul>
+<li>Treating calibrated confidence as objective truth.</li>
+<li>Tuning to demos instead of representative market regimes.</li>
+<li>Losing policy version lineage.</li>
+<li>Committing restricted data or large generated benchmark artifacts.</li>
+</ul>
+<h3 id="99-future-calibration-suggested-future-codex-implementation-prompt">Suggested future Codex implementation prompt</h3>
+<pre><code class="language-text">Implement docs/implementation/smart-money/99-future-calibration.md for Beads issue islandflow-zxh.6 only after the MVP smart-flow phases are complete. Define calibration datasets, metrics, policy versioning, and replay comparison. Do not make calibration a prerequisite for earlier evidence, scoring, or UI work.</code></pre>
+<h3 id="99-future-calibration-matching-beads-issue-title-id">Matching Beads issue title/id</h3>
+<ul>
+<li><code>islandflow-zxh.6</code> - Future smart-flow phase 99: calibration</li>
+</ul>
+        </div>
+      </article>
+      </div>
+
+      <footer class="footer">
+        Generated from Markdown in docs/implementation/smart-money. Edit the Markdown source first, then regenerate this readable HTML companion.
+      </footer>
+    </main>
+  </div>
+</body>
+</html>
