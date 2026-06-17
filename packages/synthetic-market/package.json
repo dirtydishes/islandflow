@@ -3,7 +3,13 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./cli": "./src/cli.ts",
+    "./fixtures": "./src/fixtures.ts",
+    "./manifest": "./src/manifest.ts"
+  },
+  "scripts": {
+    "generate-fixture": "bun run src/cli.ts"
   },
   "dependencies": {
     "@islandflow/types": "workspace:*"
