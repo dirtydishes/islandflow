@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Implementation Phase Plans</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --surface: #0b1016;
+        --panel: #111820;
+        --panel-2: #0d141b;
+        --ink: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --line: rgba(255, 255, 255, 0.12);
+        --line-strong: rgba(245, 166, 35, 0.36);
+        --amber: #f5a623;
+        --amber-soft: rgba(245, 166, 35, 0.13);
+        --blue: #4da3ff;
+        --blue-soft: rgba(77, 163, 255, 0.12);
+        --green-soft: rgba(37, 193, 122, 0.12);
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at 16% 0%, rgba(245, 166, 35, 0.08), transparent 26rem),
+          radial-gradient(circle at 96% 8%, rgba(77, 163, 255, 0.07), transparent 28rem),
+          linear-gradient(180deg, rgba(17, 24, 32, 0.9), rgba(6, 8, 11, 0.98) 28rem),
+          var(--bg);
+        color: var(--ink);
+        font: 15px/1.6 var(--sans);
+      }
+
+      a {
+        color: inherit;
+      }
+
+      main {
+        width: min(1180px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 340px;
+        gap: 28px;
+        align-items: end;
+        padding-bottom: 28px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .kicker,
+      .label,
+      .chip,
+      th,
+      .toc-title {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .kicker {
+        margin: 0 0 12px;
+        color: var(--amber);
+      }
+
+      h1,
+      h2,
+      h3 {
+        text-wrap: balance;
+      }
+
+      h1 {
+        max-width: 820px;
+        margin: 0;
+        font-size: 2.35rem;
+        line-height: 1.08;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        margin: 0 0 14px;
+        font-family: var(--mono);
+        font-size: 0.92rem;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+      }
+
+      h3 {
+        margin: 0;
+        font-size: 1rem;
+        line-height: 1.25;
+      }
+
+      p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      p + p {
+        margin-top: 10px;
+      }
+
+      strong {
+        color: var(--ink);
+      }
+
+      code {
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        border-radius: 6px;
+        padding: 0.1rem 0.32rem;
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--ink);
+        font-family: var(--mono);
+        font-size: 0.9em;
+      }
+
+      .summary {
+        max-width: 75ch;
+        margin-top: 18px;
+        color: var(--muted);
+        font-size: 1rem;
+        text-wrap: pretty;
+      }
+
+      .meta,
+      .link-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .meta {
+        margin-top: 20px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 5px 10px;
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--muted);
+        white-space: nowrap;
+        text-decoration: none;
+      }
+
+      .chip.good {
+        border-color: rgba(37, 193, 122, 0.34);
+        background: var(--green-soft);
+        color: #a8f1ce;
+      }
+
+      .chip.blue {
+        border-color: rgba(77, 163, 255, 0.34);
+        background: var(--blue-soft);
+        color: #b8dcff;
+      }
+
+      .decision,
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: linear-gradient(180deg, rgba(17, 24, 32, 0.94), rgba(13, 20, 27, 0.94));
+      }
+
+      .decision {
+        border-color: var(--line-strong);
+        padding: 18px;
+        background:
+          linear-gradient(180deg, rgba(245, 166, 35, 0.15), rgba(17, 24, 32, 0.92)),
+          var(--panel);
+      }
+
+      .decision .label {
+        color: var(--amber);
+      }
+
+      .decision strong {
+        display: block;
+        margin-top: 8px;
+        font-size: 1.18rem;
+        line-height: 1.25;
+      }
+
+      .decision p {
+        margin-top: 10px;
+      }
+
+      .toc {
+        margin-top: 28px;
+        padding: 14px 0;
+        border-block: 1px solid var(--line);
+      }
+
+      .toc-title {
+        margin: 0 0 10px;
+        color: var(--faint);
+      }
+
+      .toc nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .toc a {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 7px 10px;
+        background: rgba(255, 255, 255, 0.035);
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 0.75rem;
+        text-decoration: none;
+      }
+
+      section {
+        margin-top: 30px;
+      }
+
+      .panel-body {
+        padding: 18px;
+      }
+
+      .grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .grid.two {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+
+      table {
+        width: 100%;
+        min-width: 860px;
+        border-collapse: collapse;
+        background: rgba(255, 255, 255, 0.025);
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 11px 12px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--faint);
+        background: rgba(255, 255, 255, 0.035);
+      }
+
+      td {
+        color: var(--muted);
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .compact-list {
+        margin: 0;
+        padding-left: 1.1rem;
+      }
+
+      .compact-list li {
+        margin: 7px 0;
+        color: var(--muted);
+      }
+
+      .phase {
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 13px 0 0;
+      }
+
+      .phase + .phase {
+        margin-top: 13px;
+      }
+
+      .phase h3 {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: baseline;
+      }
+
+      footer {
+        margin-top: 36px;
+        border-top: 1px solid var(--line);
+        padding-top: 16px;
+        color: var(--faint);
+        font-family: var(--mono);
+        font-size: 0.78rem;
+      }
+
+      @media (max-width: 900px) {
+        .hero,
+        .grid.two {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 640px) {
+        main {
+          width: min(100% - 24px, 1180px);
+          padding-top: 24px;
+        }
+
+        h1 {
+          font-size: 1.72rem;
+        }
+
+        .panel-body,
+        .decision {
+          padding: 15px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="hero">
+        <div>
+          <p class="kicker">Implementation Map</p>
+          <h1>Implementation Phase Plans</h1>
+          <p class="summary">
+            The active planning layer for synthetic market-data and smart-money/smart-flow architecture work.
+            Architecture reviews and research reports are background; phase documents and Beads issues define execution scope.
+          </p>
+          <div class="meta">
+            <span class="chip">Active scope guide</span>
+            <span class="chip blue">Synthetic market data</span>
+            <span class="chip good">Smart flow</span>
+          </div>
+        </div>
+        <aside class="decision">
+          <span class="label">Precedence</span>
+          <strong>Use Beads and phase docs first. Treat research as rationale.</strong>
+          <p>If a phase document and an older architecture review disagree, pause and update the active scope before writing code.</p>
+        </aside>
+      </header>
+
+      <div class="toc" aria-label="Table of contents">
+        <p class="toc-title">Jump to</p>
+        <nav>
+          <a href="#precedence">Precedence</a>
+          <a href="#source-plans">Source Plans</a>
+          <a href="#rules">Planning Rules</a>
+          <a href="#beads">Beads Map</a>
+          <a href="#dependencies">Dependency Order</a>
+          <a href="#future">Future Work</a>
+        </nav>
+      </div>
+
+      <section id="precedence">
+        <h2>Document Precedence</h2>
+        <div class="panel">
+          <div class="panel-body">
+            <ol class="compact-list">
+              <li>Current Beads issue</li>
+              <li>Referenced phase document under <code>docs/implementation/</code></li>
+              <li>Architecture plan under <code>docs/plans/</code></li>
+              <li>Research report under <code>docs/research-docs/</code></li>
+            </ol>
+            <p>
+              This repository uses <code>docs/research-docs/</code> for research reports; <code>docs/research/</code>
+              is not present. Research reports provide rationale and useful constraints, but they do not add active
+              implementation scope unless that scope is explicitly pulled into a phase document and Beads issue.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="source-plans">
+        <h2>Source Plans</h2>
+        <div class="grid two">
+          <article class="panel">
+            <div class="panel-body">
+              <h3>Synthetic Market Data</h3>
+              <p>Deterministic generation, fixtures, scenarios, replay integration, demos, and future calibration.</p>
+              <div class="link-row">
+                <a class="chip blue" href="synthetic-market-data/00-roadmap.html">Roadmap HTML</a>
+                <a class="chip" href="synthetic-market-data/index.html">Phase dossier</a>
+                <a class="chip" href="../plans/synthetic-market-data-architecture-review.html">Architecture HTML</a>
+                <a class="chip" href="synthetic-market-data/00-roadmap.md">Roadmap MD</a>
+              </div>
+            </div>
+          </article>
+          <article class="panel">
+            <div class="panel-body">
+              <h3>Smart Money / Smart Flow</h3>
+              <p>Contracts, evidence clustering, hypothesis scoring, replay evaluation, explainability, and calibration.</p>
+              <div class="link-row">
+                <a class="chip good" href="smart-money/00-roadmap.html">Roadmap HTML</a>
+                <a class="chip" href="smart-money/index.html">Phase dossier</a>
+                <a class="chip" href="../plans/smart-flow-architecture-review.html">Architecture HTML</a>
+                <a class="chip" href="smart-money/00-roadmap.md">Roadmap MD</a>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="rules">
+        <h2>Planning Rules</h2>
+        <div class="panel">
+          <div class="panel-body">
+            <ul class="compact-list">
+              <li>Prefer small, reviewable PRs.</li>
+              <li>Do not implement an entire architecture plan at once.</li>
+              <li>Use Beads issues for execution tracking and dependency management.</li>
+              <li>Keep durable architecture and phase detail in these docs, not in long Beads descriptions.</li>
+              <li>Synthetic data must emit canonical market event types, not synthetic-only pipeline event types.</li>
+              <li>Synthetic labels must remain separate from emitted market events.</li>
+              <li>Smart-flow logic must distinguish facts, evidence, hypotheses, confidence, and abstention.</li>
+              <li>Historical calibration is future work, not an MVP dependency.</li>
+              <li>Early synthetic tests must not require Docker, ClickHouse, NATS, or Redis.</li>
+              <li>Synthetic foundations should come before demos, UI controls, or live service work.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="beads">
+        <h2>Beads Map</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Stream</th>
+                <th>Epic</th>
+                <th>Roadmap</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Synthetic market data</td>
+                <td><code>islandflow-259</code> - Plan synthetic market-data implementation phases</td>
+                <td><a href="synthetic-market-data/00-roadmap.html">docs/implementation/synthetic-market-data/00-roadmap.html</a></td>
+              </tr>
+              <tr>
+                <td>Smart money / smart flow</td>
+                <td><code>islandflow-zxh</code> - Plan smart-money to smart-flow implementation phases</td>
+                <td><a href="smart-money/00-roadmap.html">docs/implementation/smart-money/00-roadmap.html</a></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="dependencies">
+        <h2>Dependency Order</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Order</th>
+                <th>Phase</th>
+                <th>Beads issue</th>
+                <th>Blocks next because</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>1A</td><td>Synthetic deterministic spine</td><td><code>islandflow-259.1</code></td><td>Establishes seeded raw event generation and provenance assumptions for later synthetic work.</td></tr>
+              <tr><td>1B</td><td>Smart-flow contracts and vocabulary</td><td><code>islandflow-zxh.1</code></td><td>Can safely run in parallel with synthetic phase 01; defines evidence/hypothesis language before scoring work.</td></tr>
+              <tr><td>2</td><td>Synthetic manifests, fixtures, and CLI</td><td><code>islandflow-259.2</code></td><td>Evidence clustering needs deterministic fixtures before broad behavior changes.</td></tr>
+              <tr><td>3</td><td>Smart-flow evidence clustering and features</td><td><code>islandflow-zxh.2</code></td><td>Scenario labels need the evidence vocabulary they are expected to exercise.</td></tr>
+              <tr><td>4</td><td>Synthetic scenarios, labels, and expected outputs</td><td><code>islandflow-259.3</code></td><td>Hypothesis scoring needs labeled positive, negative, and abstention cases.</td></tr>
+              <tr><td>5</td><td>Smart-flow hypothesis scoring and abstention</td><td><code>islandflow-zxh.3</code></td><td>Synthetic replay integration should validate the derived hypothesis pipeline.</td></tr>
+              <tr><td>6</td><td>Synthetic replay integration</td><td><code>islandflow-259.4</code></td><td>Smart-flow golden tests need replayable synthetic runs.</td></tr>
+              <tr><td>7</td><td>Smart-flow replay evaluation and golden tests</td><td><code>islandflow-zxh.4</code></td><td>Demos should wait until replay proves the semantics.</td></tr>
+              <tr><td>8</td><td>Synthetic demo and load profiles</td><td><code>islandflow-259.5</code></td><td>API/UI explainability should show stable, named, deterministic runs.</td></tr>
+              <tr><td>9</td><td>Smart-flow API/UI explainability</td><td><code>islandflow-zxh.5</code></td><td>Final MVP presentation layer after the evidence pipeline is validated.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="future">
+        <h2>Future Work</h2>
+        <div class="grid two">
+          <article class="panel">
+            <div class="panel-body">
+              <h3>Synthetic historical calibration</h3>
+              <p><code>islandflow-259.6</code> depends on synthetic phase 05, but is not required for MVP.</p>
+            </div>
+          </article>
+          <article class="panel">
+            <div class="panel-body">
+              <h3>Smart-flow calibration</h3>
+              <p><code>islandflow-zxh.6</code> depends on smart-flow phase 05 and synthetic future calibration, but is not required for MVP.</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="related">
+        <h2>Existing Related Issue</h2>
+        <div class="panel">
+          <div class="panel-body">
+            <p>
+              <code>islandflow-9dz</code> already tracks tuning synthetic smart-money scenario coverage. It is narrower
+              than these phase plans and was already in progress before this split. Treat it as related context for
+              <code>docs/implementation/synthetic-market-data/03-scenarios-labels-expected-outputs.md</code>, not as the
+              phase-level tracker.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        HTML companion for docs/implementation/README.md. Source Markdown remains the active editable document.
+      </footer>
+    </main>
+  </body>
+</html>
