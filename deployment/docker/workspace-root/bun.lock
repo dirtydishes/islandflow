@@ -67,6 +67,12 @@
         "@islandflow/types": "workspace:*",
       },
     },
+    "packages/synthetic-market": {
+      "name": "@islandflow/synthetic-market",
+      "dependencies": {
+        "@islandflow/types": "workspace:*",
+      },
+    },
     "packages/types": {
       "name": "@islandflow/types",
       "dependencies": {
@@ -358,6 +364,8 @@
     "@islandflow/replay": ["@islandflow/replay@workspace:services/replay"],
 
     "@islandflow/storage": ["@islandflow/storage@workspace:packages/storage"],
+
+    "@islandflow/synthetic-market": ["@islandflow/synthetic-market@workspace:packages/synthetic-market"],
 
     "@islandflow/types": ["@islandflow/types@workspace:packages/types"],
 

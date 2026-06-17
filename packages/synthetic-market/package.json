@@ -1,0 +1,11 @@
+{
+  "name": "@islandflow/synthetic-market",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@islandflow/types": "workspace:*"
+  }
+}
