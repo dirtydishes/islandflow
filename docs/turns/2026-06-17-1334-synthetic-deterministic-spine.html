@@ -87,6 +87,7 @@
         <h2>Summary</h2>
         <p>Added <code>@islandflow/synthetic-market</code>, a Bun workspace package that defines the deterministic generation API for phase 01. Fixed seed/profile inputs now produce stable batches containing <code>EquityQuote</code>, <code>EquityPrint</code>, <code>OptionNBBO</code>, and <code>OptionPrint</code> wrappers, plus trace-id keyed provenance metadata.</p>
         <p>Follow-up review fixes now sort generated batches by event time, ingest time, sequence, and trace id so overlapping symbol lanes remain replay-ordered, and the unrelated smart-flow phase issue was reopened in Beads.</p>
+        <p>CI follow-up on PR 25 synced the deployment Docker workspace lockfile so the generated snapshot includes <code>packages/synthetic-market</code>. The Forgejo workflow's <code>check:docker-workspace</code> step now passes locally.</p>
       </section>
 
       <section>
@@ -96,6 +97,7 @@
           <div class="panel"><strong>Deterministic API</strong><span>Added seed bundles, normalized profile shapes, stable stringification, FNV-1a hashing, and a deterministic PRNG wrapper.</span></div>
           <div class="panel"><strong>Canonical event output</strong><span>Generated event wrappers carry real <code>@islandflow/types</code> market contracts, not synthetic-only pipeline event types.</span></div>
           <div class="panel"><strong>Infra-free tests</strong><span>Added Bun tests for determinism, schema validation, tick and quote invariants, event ordering, provenance separation, and profile normalization.</span></div>
+          <div class="panel"><strong>CI snapshot repair</strong><span>Updated <code>deployment/docker/workspace-root/bun.lock</code> so the Docker build workspace mirrors the new synthetic-market package resolution.</span></div>
         </div>
       </section>
 
@@ -113,6 +115,7 @@
           <li><code>stableStringify</code> sorts object keys before hashing, so parameter snapshots and event batches are stable across object insertion order.</li>
           <li>The generator accepts all timing from the profile. It does not call <code>Date.now()</code> or <code>Math.random()</code> while generating events.</li>
           <li>Generated batches are returned in deterministic replay order using <code>ts</code>, <code>ingest_ts</code>, <code>seq</code>, and <code>trace_id</code> as tie-breakers.</li>
+          <li>The deployment workspace snapshot is checked separately from the root lockfile; adding a workspace package requires syncing <code>deployment/docker/workspace-root/bun.lock</code> as well.</li>
           <li>Hidden labels are not part of the phase 01 profile and are explicitly checked as absent from emitted market events.</li>
         </ul>
       </section>
@@ -273,7 +276,24 @@ diff --git a/bun.lock b/bun.lock
 +      &quot;dependencies&quot;: {
 +        &quot;@islandflow/types&quot;: &quot;workspace:*&quot;,
 +      },
-+    },</code></pre>
++    },
+diff --git a/deployment/docker/workspace-root/bun.lock b/deployment/docker/workspace-root/bun.lock
+--- a/deployment/docker/workspace-root/bun.lock
++++ b/deployment/docker/workspace-root/bun.lock
+@@ -67,6 +67,12 @@
++    &quot;packages/synthetic-market&quot;: {
++      &quot;name&quot;: &quot;@islandflow/synthetic-market&quot;,
++      &quot;dependencies&quot;: {
++        &quot;@islandflow/types&quot;: &quot;workspace:*&quot;,
++      },
++    },
+@@ -359,6 +365,8 @@
+
+     &quot;@islandflow/storage&quot;: [&quot;@islandflow/storage@workspace:packages/storage&quot;],
+
++    &quot;@islandflow/synthetic-market&quot;: [&quot;@islandflow/synthetic-market@workspace:packages/synthetic-market&quot;],
++
+     &quot;@islandflow/types&quot;: [&quot;@islandflow/types@workspace:packages/types&quot;],</code></pre>
       </section>
 
       <section>
@@ -289,7 +309,10 @@ diff --git a/bun.lock b/bun.lock
           <div class="check pass"><code>bunx tsc -p packages/synthetic-market/tsconfig.json --noEmit</code> passed.</div>
           <div class="check pass"><code>bun run typecheck</code> passed across the repo.</div>
           <div class="check pass"><code>bun test --timeout 20000</code> passed: 262 tests.</div>
-          <div class="check warn"><code>bun test</code> with the default timeout failed on existing ingest-options synthetic coverage tests; the same tests passed with a larger timeout. Follow-up filed as <code>islandflow-yet</code>.</div>
+          <div class="check pass">PR 25 CI follow-up: <code>bun install --frozen-lockfile</code> passed with no dependency changes.</div>
+          <div class="check pass">PR 25 CI follow-up: <code>bun run fmt:check</code>, <code>bun run lint</code>, <code>bun run typecheck</code>, <code>bun test</code>, and <code>bun run check:public-api-routes</code> passed locally.</div>
+          <div class="check pass">PR 25 CI follow-up: <code>bun run check:docker-workspace</code> reproduced the failure before the lockfile sync and passed after updating <code>deployment/docker/workspace-root/bun.lock</code>.</div>
+          <div class="check pass">PR 25 CI follow-up: <code>bun --cwd=apps/web run build</code> passed after the Docker workspace snapshot fix.</div>
           <div class="check warn"><code>bun run check</code> failed on existing repo-wide Biome import-order drift outside this phase. Follow-up filed as <code>islandflow-nn7</code>.</div>
         </div>
       </section>
@@ -299,7 +322,7 @@ diff --git a/bun.lock b/bun.lock
         <ul>
           <li>The new package is not wired into ingest, replay, or CLI workflows yet. That is intentional for phase 01 and is covered by later synthetic phases.</li>
           <li>The generator provides optional <code>scenario_id</code> provenance context but does not define scenario catalogs or labels. That avoids leaking ground truth into raw market events.</li>
-          <li>Default full-suite <code>bun test</code> is timeout-sensitive in existing tests. <code>islandflow-yet</code> tracks making the documented test command reliable.</li>
+          <li>The previous default-timeout concern did not reproduce during the PR 25 CI follow-up; the default <code>bun test</code> command passed locally.</li>
           <li>Full Biome check is currently blocked by unrelated import ordering. <code>islandflow-nn7</code> tracks the dedicated formatting cleanup.</li>
         </ul>
       </section>
@@ -310,7 +333,7 @@ diff --git a/bun.lock b/bun.lock
           <thead><tr><th>Issue</th><th>Follow-up</th></tr></thead>
           <tbody>
             <tr><td><code>islandflow-259.2</code></td><td>Build phase 02 manifests, fixtures, and CLI on top of this deterministic package.</td></tr>
-            <tr><td><code>islandflow-yet</code></td><td>Fix full-suite default <code>bun test</code> timeout sensitivity.</td></tr>
+            <tr><td><code>islandflow-yet</code></td><td>Recheck whether the earlier full-suite default <code>bun test</code> timeout sensitivity is still reproducible.</td></tr>
             <tr><td><code>islandflow-nn7</code></td><td>Clean up repo-wide Biome import-order drift so <code>bun run check</code> passes again.</td></tr>
           </tbody>
         </table>
