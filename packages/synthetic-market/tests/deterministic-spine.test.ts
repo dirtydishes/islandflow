@@ -138,7 +138,11 @@ describe("deterministic synthetic market spine", () => {
   it("keeps event ordering, ticks, and quote/trade invariants valid", () => {
     const batch = buildBatch();
     const ordered = [...batch.events].sort(
-      (a, b) => a.event.ts - b.event.ts || a.event.seq - b.event.seq
+      (a, b) =>
+        a.event.ts - b.event.ts ||
+        a.event.ingest_ts - b.event.ingest_ts ||
+        a.event.seq - b.event.seq ||
+        a.event.trace_id.localeCompare(b.event.trace_id)
     );
 
     expect(batch.events).toEqual(ordered);
@@ -173,6 +177,39 @@ describe("deterministic synthetic market spine", () => {
         assertCentTick(generated.event.notional ?? 0);
       }
     }
+  });
+
+  it("keeps output ordered when symbol lanes overlap later steps", () => {
+    const batch = generateSyntheticMarketBatch({
+      seed_bundle: {
+        seed: 7,
+        namespace: "phase-01-test",
+        partition: "overlap-ordering"
+      },
+      profile: {
+        steps: 2,
+        symbols: [
+          { underlying_id: "AAA", base_price: 10 },
+          { underlying_id: "BBB", base_price: 20 }
+        ],
+        liquidity: {
+          arrival_interval_ms: 1
+        },
+        option_chain: {
+          sparse_contract_ratio: 0
+        }
+      }
+    });
+
+    const ordered = [...batch.events].sort(
+      (a, b) =>
+        a.event.ts - b.event.ts ||
+        a.event.ingest_ts - b.event.ingest_ts ||
+        a.event.seq - b.event.seq ||
+        a.event.trace_id.localeCompare(b.event.trace_id)
+    );
+
+    expect(batch.events).toEqual(ordered);
   });
 
   it("normalizes profile inputs without requiring infrastructure", () => {

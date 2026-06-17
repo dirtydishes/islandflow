@@ -365,19 +365,32 @@ export const generateSyntheticMarketBatch = (
     }
   }
 
+  const orderedEvents = orderGeneratedEvents(events);
+
   return {
     run: {
       run_id,
       seed_bundle,
       start_ts: profile.start_ts,
-      event_count: events.length,
+      event_count: orderedEvents.length,
       parameter_snapshot_hash
     },
     parameter_snapshot,
     parameter_snapshot_hash,
-    events,
+    events: orderedEvents,
     provenance_by_trace_id
   };
+};
+
+const orderGeneratedEvents = (events: GeneratedMarketEvent[]): GeneratedMarketEvent[] => {
+  return [...events].sort((a, b) => {
+    return (
+      a.event.ts - b.event.ts ||
+      a.event.ingest_ts - b.event.ingest_ts ||
+      a.event.seq - b.event.seq ||
+      a.event.trace_id.localeCompare(b.event.trace_id)
+    );
+  });
 };
 
 const pushGeneratedEvent = (
