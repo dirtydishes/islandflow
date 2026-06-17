@@ -133,7 +133,16 @@ describe("smart-flow contracts", () => {
       evidence_quality: evidenceQuality,
       eligibility: {
         eligible: true,
-        reasons: ["large_enough_for_review"]
+        status: "accepted",
+        reasons: ["large_enough_for_review"],
+        decisions: [
+          {
+            status: "accepted",
+            reason_code: "large_enough_for_review",
+            reason: "The candidate is large enough for review.",
+            evidence_refs: ["flowpacket:1", "print:1"]
+          }
+        ]
       }
     });
 
@@ -159,6 +168,15 @@ describe("smart-flow contracts", () => {
       baseline_snapshot: candidate.baseline_snapshot,
       feature_summary: {
         total_premium: 75_000
+      },
+      feature_details: {
+        total_premium: {
+          label: "Observed premium",
+          value: 75_000,
+          basis: "measured_fact",
+          fact_ids: ["fact:premium"],
+          evidence_refs: ["packet:1"]
+        }
       },
       start_ts: 10,
       end_ts: 510,

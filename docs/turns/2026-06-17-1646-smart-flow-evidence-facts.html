@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart-Flow Evidence Facts Turn</title>
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #06080b;
+  --panel: #0b1016;
+  --pane: #111820;
+  --pane-2: #0d141b;
+  --line: #ffffff18;
+  --line-strong: #ffb13059;
+  --text: #e6edf4;
+  --muted: #90a0b2;
+  --faint: #6e7b8c;
+  --amber: #f5a623;
+  --amber-soft: #f5a6231f;
+  --green: #25c17a;
+  --green-soft: #25c17a1f;
+  --red: #ff6b5f;
+  --red-soft: #ff6b5f24;
+  --blue: #4da3ff;
+  --blue-soft: #4da3ff24;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "IBM Plex Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.5;
+}
+main {
+  width: min(1180px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 40px 0 56px;
+}
+header {
+  border-top: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line);
+  padding: 20px 0 18px;
+  margin-bottom: 24px;
+}
+.kicker, .meta, code, pre, th, .chip {
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+.kicker {
+  margin: 0 0 10px;
+  color: var(--amber);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+h1 {
+  margin: 0;
+  max-width: 860px;
+  font-size: 2.25rem;
+  line-height: 1.08;
+  letter-spacing: 0;
+}
+.summary-line {
+  max-width: 760px;
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+.status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 9px;
+  background: #ffffff08;
+  color: var(--text);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.chip.green { color: var(--green); background: var(--green-soft); }
+.chip.blue { color: var(--blue); background: var(--blue-soft); }
+.chip.amber { color: var(--amber); background: var(--amber-soft); }
+section {
+  border-top: 1px solid var(--line);
+  padding: 22px 0;
+}
+h2 {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  line-height: 1.2;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+p { max-width: 78ch; margin: 0 0 12px; color: var(--muted); }
+ul { margin: 0; padding-left: 20px; color: var(--muted); }
+li + li { margin-top: 8px; }
+strong { color: var(--text); }
+code {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 1px 5px;
+  background: #ffffff08;
+  color: var(--text);
+  font-size: 0.88em;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.panel {
+  border: 1px solid var(--line);
+  background: var(--pane-2);
+  padding: 14px;
+}
+.panel h3 {
+  margin: 0 0 8px;
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.panel p { margin: 0; }
+.diff-note { color: var(--faint); font-size: 0.9rem; }
+.rendered-diff {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  margin: 12px 0 18px;
+  height: 680px;
+}
+.rendered-diff-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #0a0a0a;
+}
+.diff-block {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  background: #070b10;
+  margin: 12px 0 18px;
+}
+.diff-block pre {
+  margin: 0;
+  padding: 12px 0;
+  min-width: 760px;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+.diff-block span {
+  display: block;
+  padding: 0 14px;
+  white-space: pre;
+}
+.diff-block .file { color: var(--blue); background: var(--blue-soft); }
+.diff-block .hunk { color: var(--amber); background: var(--amber-soft); }
+.diff-block .add { color: #b7f6d6; background: rgba(37, 193, 122, 0.12); }
+.diff-block .del { color: #ffc7c1; background: rgba(255, 107, 95, 0.14); }
+.diff-block .ctx { color: var(--muted); }
+.validation-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  border: 1px solid var(--line);
+}
+.validation-table th, .validation-table td {
+  border-bottom: 1px solid var(--line);
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+.validation-table th {
+  color: var(--text);
+  background: var(--pane);
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.validation-table td { color: var(--muted); }
+a { color: var(--blue); }
+@media (max-width: 720px) {
+  main { width: min(100vw - 20px, 1180px); padding-top: 24px; }
+  h1 { font-size: 1.65rem; }
+  section { padding: 18px 0; }
+}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="kicker">Repository Turn Document</p>
+    <h1>Smart-flow evidence facts and eligibility decisions</h1>
+    <p class="summary-line">Implemented Beads issue <code>islandflow-zxh.2.1</code>, the phase 02a slice for explicit evidence facts, quote context, and eligibility decisions.</p>
+    <div class="status-row">
+      <span class="chip green">Tests passed</span>
+      <span class="chip blue">Phase 02a</span>
+      <span class="chip amber">No scoring changes</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>Summary</h2>
+    <p>This turn adds a pure smart-flow evidence extractor that converts existing <code>FlowPacket</code> inputs into a parsed <code>FlowCandidate</code> plus traceable evidence facts. It keeps the live smart-money compatibility path unchanged while making eligibility and quote quality explicit for the next smart-flow phase.</p>
+  </section>
+
+  <section>
+    <h2>Changes Made</h2>
+    <ul>
+      <li>Extended smart-flow contracts with <code>execution_context</code> and <code>eligibility_decision</code> evidence fact kinds.</li>
+      <li>Strengthened <code>FlowEligibility</code> with <code>accepted</code>, <code>rejected</code>, and <code>down_weighted</code> status plus structured decision records.</li>
+      <li>Added <code>services/compute/src/smart-flow-evidence.ts</code>, a deterministic extractor for packet refs, member refs, quote refs, evidence quality, eligibility, and direct evidence facts.</li>
+      <li>Added infra-free tests for accepted quote-backed evidence, stale quote rejection, and wide/noisy down-weighting without hypothesis language.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Context</h2>
+    <p>The selected issue was <code>islandflow-zxh.2.1</code>, the PR-sized child under smart-flow phase 02. The repository implementation README places smart-flow evidence clustering after synthetic manifests and before synthetic scenario labels. The phase document limits this child to eligibility and evidence facts, so clustering, feature-vector policy, hypothesis scoring, API, and UI work stayed out of scope.</p>
+  </section>
+
+  <section>
+    <h2>Important Implementation Details</h2>
+    <div class="grid">
+      <div class="panel">
+        <h3>Traceability</h3>
+        <p>Every candidate keeps packet IDs, member print IDs, and observation refs. Quote-backed facts include option NBBO and equity quote context refs when the packet contains enough quote data.</p>
+      </div>
+      <div class="panel">
+        <h3>Eligibility</h3>
+        <p>Thin or stale quote coverage can reject evidence. Partial staleness, wide spreads, noisy conditions, and inside-market context down-weight evidence without pretending to identify intent.</p>
+      </div>
+      <div class="panel">
+        <h3>Boundary</h3>
+        <p>The extractor is not wired to NATS, storage, alerts, or hypothesis scoring. It is a testable evidence layer for the next phase to cluster and summarize.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Relevant Diff Snippets</h2>
+    <p class="diff-note">The first excerpt is rendered with <a href="https://diffs.com/docs">Diffs</a> through local <code>@pierre/diffs/ssr</code>. The new-file excerpts are intentionally focused unified diff snippets to keep this document compact while still showing file paths and line-level additions.</p>
+    <div class="rendered-diff"><iframe class="rendered-diff-frame" title="Rendered contract diff" srcdoc="&lt;!doctype html&gt;&lt;html&gt;&lt;head&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;style&gt;html,body{margin:0;background:#0a0a0a;color:#fafafa;}body{font-family:system-ui,-apple-system,&quot;Segoe UI&quot;,sans-serif;}&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;svg data-icon-sprite aria-hidden=&quot;true&quot; width=&quot;0&quot; height=&quot;0&quot;&gt;
+  &lt;symbol id=&quot;diffs-icon-arrow-right-short&quot; viewBox=&quot;0 0 16 16&quot;&gt;
+    &lt;path d=&quot;M8.47 4.22a.75.75 0 0 0 0 1.06l1.97 1.97H3.75a.75.75 0 0 0 0 1.5h6.69l-1.97 1.97a.75.75 0 1 0 1.06 1.06l3.25-3.25a.75.75 0 0 0 0-1.06L9.53 4.22a.75.75 0 0 0-1.06 0&quot;/&gt;
+  &lt;/symbol&gt;
+  &lt;symbol id=&quot;diffs-icon-brand-github&quot; viewBox=&quot;0 0 16 16&quot;&gt;
+    &lt;path d=&quot;M8 0c4.42 0 8 3.58 8 8a8.01 8.01 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27s-1.36.09-2 .27c-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8&quot;/&gt;
+  &lt;/symbol&gt;
+  &lt;symbol id=&quot;diffs-icon-chevron&quot; viewBox=&quot;0 0 16 16&quot;&gt;
+    &lt;path d=&quot;M1.47 4.47a.75.75 0 0 1 1.06 0L8 9.94l5.47-5.47a.75.75 0 1 1 1.06 1.06l-6 6a.75.75 0 0 1-1.06 0l-6-6a.75.75 0 0 1 0-1.06&quot;/&gt;
+  &lt;/symbol&gt;
+  &lt;symbol id=&quot;diffs-icon-chevrons-narrow&quot; viewBox=&quot;0 0 10 16&quot;&gt;
+    &lt;path d=&quot;M4.47 2.22a.75.75 0 0 1 1.06 0l3.25 3.25a.75.75 0 0 1-1.06 1.06L5 3.81 2.28 6.53a.75.75 0 0 1-1.06-1.06zM1.22 9.47a.75.75 0 0 1 1.06 0L5 12.19l2.72-2.72a.75.75 0 0 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0l-3.25-3.25a.75.75 0 0 1 0-1.06&quot;/&gt;
+  &lt;/symbol&gt;
+  &lt;symbol id=&quot;diffs-icon-diff-split&quot; viewBox=&quot;0 0 16 16&quot;&gt;
+    &lt;path d=&quot;M14 0H8.5v16H14a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2m-1.5 6.5v1h1a.5.5 0 0 1 0 1h-1v1a.5.5 0 0 1-1 0v-1h-1a.5.5 0 0 1 0-1h1v-1a.5.5 0 0 1 1 0&quot;/&gt;&lt;path d=&quot;M2 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5.5V0zm.5 7.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1 0-1&quot; opacity=&quot;.3&quot;/&gt;
+  &lt;/symbol&gt;
+  &lt;symbol id=&quot;diffs-icon-diff-unified&quot; viewBox=&quot;0 0 16 16&quot;&gt;
+    &lt;path fill-rule=&quot;evenodd&quot; d=&quot;M16 14a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V8.5h16zm-8-4a.5.5 0 0 0-.5.5v1h-1a.5.5 0 0 0 0 1h1v1a.5.5 0 0 0 1 0v-1h1a.5.5 0 0 0 0-1h-1v-1A.5.5 0 0 0 8 10&quot; clip-rule=&quot;evenodd&quot;/&gt;&lt;path fill-rule=&quot;evenodd&quot; d=&quot;M14 0a2 2 0 0 1 2 2v5.5H0V2a2 2 0 0 1 2-2zM6.5 3.5a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1z&quot; clip-rule=&quot;evenodd&quot; opacity=&quot;.4&quot;/&gt;
+  &lt;/symbol&gt;
+  &lt;symbol id=&quot;diffs-icon-expand&quot; viewBox=&quot;0 0 16 16&quot;&gt;
+    &lt;path d=&quot;M3.47 5.47a.75.75 0 0 1 1.06 0L8 8.94l3.47-3.47a.75.75 0 1 1 1.06 1.06l-4 4a.75.75 0 0 1-1.06 0l-4-4a.75.75 0 0 1 0-1.06&quot;/&gt;
+  &lt;/symbol&gt;
+  &lt;symbol id=&quot;diffs-icon-expand-all&quot; viewBox=&quot;0 0 16 16&quot;&gt;
+    &lt;path d=&quot;M11.47 9.47a.75.75 0 1 1 1.06 1.06l-4 4a.75.75 0 0 1-1.06 0l-4-4a.75.75 0 1 1 1.06-1.06L8 12.94zM7.526 1.418a.75.75 0 0 1 1.004.052l4 4a.75.75 0 1 1-1.06 1.06L8 3.06 4.53 6.53a.75.75 0 1 1-1.06-1.06l4-4z&quot;/&gt;
+  &lt;/symbol&gt;
+  &lt;symbol id=&quot;diffs-icon-file-code&quot; viewBox=&quot;0 0 16 16&quot;&gt;
+    &lt;path d=&quot;M10.75 0c.199 0 .39.08.53.22l3.5 3.5c.14.14.22.331.22.53v9A2.75 2.75 0 0 1 12.25 16h-8.5A2.75 2.75 0 0 1 1 13.25V2.75A2.75 2.75 0 0 1 3.75 0zm-7 1.5c-.69 0-1.25.56-1.25 1.25v10.5c0 .69.56 1.25 1.25 1.25h8.5c.69 0 1.25-.56 1.25-1.25V5h-1.25A2.25 2.25 0 0 1 10 2.75V1.5z&quot;/&gt;&lt;path d=&quot;M7.248 6.19a.75.75 0 0 1 .063 1.058L5.753 9l1.558 1.752a.75.75 0 0 1-1.122.996l-2-2.25a.75.75 0 0 1 0-.996l2-2.25a.75.75 0 0 1 1.06-.063M8.69 7.248a.75.75 0 1 1 1.12-.996l2 2.25a.75.75 0 0 1 0 .996l-2 2.25a.75.75 0 1 1-1.12-.996L10.245 9z&quot;/&gt;
+  &lt;/symbol&gt;
+  &lt;symbol id=&quot;diffs-icon-plus&quot; viewBox=&quot;0 0 16 16&quot;&gt;
+    &lt;path d=&quot;M8 3a.75.75 0 0 1 .75.75v3.5h3.5a.75.75 0 0 1 0 1.5h-3.5v3.5a.75.75 0 0 1-1.5 0v-3.5h-3.5a.75.75 0 0 1 0-1.5h3.5v-3.5A.75.75 0 0 1 8 3&quot;/&gt;
+  &lt;/symbol&gt;
+  &lt;symbol id=&quot;diffs-icon-symbol-added&quot; viewBox=&quot;0 0 16 16&quot;&gt;
+    &lt;path d=&quot;M8 4a.75.75 0 0 1 .75.75v2.5h2.5a.75.75 0 0 1 0 1.5h-2.5v2.5a.75.75 0 0 1-1.5 0v-2.5h-2.5a.75.75 0 0 1 0-1.5h2.5v-2.5A.75.75 0 0 1 8 4&quot;/&gt;&lt;path d=&quot;M1.788 4.296c.196-.88.478-1.381.802-1.706s.826-.606 1.706-.802C5.194 1.588 6.387 1.5 8 1.5s2.806.088 3.704.288c.88.196 1.381.478 1.706.802s.607.826.802 1.706c.2.898.288 2.091.288 3.704s-.088 2.806-.288 3.704c-.195.88-.478 1.381-.802 1.706s-.826.607-1.706.802c-.898.2-2.091.288-3.704.288s-2.806-.088-3.704-.288c-.88-.195-1.381-.478-1.706-.802s-.606-.826-.802-1.706C1.588 10.806 1.5 9.613 1.5 8s.088-2.806.288-3.704M8 0C1.412 0 0 1.412 0 8s1.412 8 8 8 8-1.412 8-8-1.412-8-8-8&quot;/&gt;
+  &lt;/symbol&gt;
+  &lt;symbol id=&quot;diffs-icon-symbol-deleted&quot; viewBox=&quot;0 0 16 16&quot;&gt;
+    &lt;path d=&quot;M4 8a.75.75 0 0 1 .75-.75h6.5a.75.75 0 0 1 0 1.5h-6.5A.75.75 0 0 1 4 8&quot;/&gt;&lt;path d=&quot;M1.788 4.296c.196-.88.478-1.381.802-1.706s.826-.606 1.706-.802C5.194 1.588 6.387 1.5 8 1.5s2.806.088 3.704.288c.88.196 1.381.478 1.706.802s.607.826.802 1.706c.2.898.288 2.091.288 3.704s-.088 2.806-.288 3.704c-.195.88-.478 1.381-.802 1.706s-.826.607-1.706.802c-.898.2-2.091.288-3.704.288s-2.806-.088-3.704-.288c-.88-.195-1.381-.478-1.706-.802s-.606-.826-.802-1.706C1.588 10.806 1.5 9.613 1.5 8s.088-2.806.288-3.704M8 0C1.412 0 0 1.412 0 8s1.412 8 8 8 8-1.412 8-8-1.412-8-8-8&quot;/&gt;
+  &lt;/symbol&gt;
+  &lt;symbol id=&quot;diffs-icon-symbol-diffstat&quot; viewBox=&quot;0 0 16 16&quot;&gt;
+    &lt;path d=&quot;M1.788 4.296c.196-.88.478-1.381.802-1.706s.826-.606 1.706-.802C5.194 1.588 6.387 1.5 8 1.5s2.806.088 3.704.288c.88.196 1.381.478 1.706.802s.607.826.802 1.706c.2.898.288 2.091.288 3.704s-.088 2.806-.288 3.704c-.195.88-.478 1.381-.802 1.706s-.826.607-1.706.802c-.898.2-2.091.288-3.704.288s-2.806-.088-3.704-.288c-.88-.195-1.381-.478-1.706-.802s-.606-.826-.802-1.706C1.588 10.806 1.5 9.613 1.5 8s.088-2.806.288-3.704M8 0C1.412 0 0 1.412 0 8s1.412 8 8 8 8-1.412 8-8-1.412-8-8-8&quot;/&gt;&lt;path d=&quot;M8.75 4.296a.75.75 0 0 0-1.5 0V6.25h-2a.75.75 0 0 0 0 1.5h2v1.5h1.5v-1.5h2a.75.75 0 0 0 0-1.5h-2zM5.25 10a.75.75 0 0 0 0 1.5h5.5a.75.75 0 0 0 0-1.5z&quot;/&gt;
+  &lt;/symbol&gt;
+  &lt;symbol id=&quot;diffs-icon-symbol-ignored&quot; viewBox=&quot;0 0 16 16&quot;&gt;
+    &lt;path d=&quot;M1.5 8c0 1.613.088 2.806.288 3.704.196.88.478 1.381.802 1.706s.826.607 1.706.802c.898.2 2.091.288 3.704.288s2.806-.088 3.704-.288c.88-.195 1.381-.478 1.706-.802s.607-.826.802-1.706c.2-.898.288-2.091.288-3.704s-.088-2.806-.288-3.704c-.195-.88-.478-1.381-.802-1.706s-.826-.606-1.706-.802C10.806 1.588 9.613 1.5 8 1.5s-2.806.088-3.704.288c-.88.196-1.381.478-1.706.802s-.606.826-.802 1.706C1.588 5.194 1.5 6.387 1.5 8M0 8c0-6.588 1.412-8 8-8s8 1.412 8 8-1.412 8-8 8-8-1.412-8-8m11.53-2.47a.75.75 0 0 0-1.06-1.06l-6 6a.75.75 0 1 0 1.06 1.06z&quot;/&gt;
+  &lt;/symbol&gt;
+  &lt;symbol id=&quot;diffs-icon-symbol-modified&quot; viewBox=&quot;0 0 16 16&quot;&gt;
+    &lt;path d=&quot;M1.5 8c0 1.613.088 2.806.288 3.704.196.88.478 1.381.802 1.706s.826.607 1.706.802c.898.2 2.091.288 3.704.288s2.806-.088 3.704-.288c.88-.195 1.381-.478 1.706-.802s.607-.826.802-1.706c.2-.898.288-2.091.288-3.704s-.088-2.806-.288-3.704c-.195-.88-.478-1.381-.802-1.706s-.826-.606-1.706-.802C10.806 1.588 9.613 1.5 8 1.5s-2.806.088-3.704.288c-.88.196-1.381.478-1.706.802s-.606.826-.802 1.706C1.588 5.194 1.5 6.387 1.5 8M0 8c0-6.588 1.412-8 8-8s8 1.412 8 8-1.412 8-8 8-8-1.412-8-8m8 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6&quot;/&gt;
+  &lt;/symbol&gt;
+  &lt;symbol id=&quot;diffs-icon-symbol-moved&quot; viewBox=&quot;0 0 16 16&quot;&gt;
+    &lt;path d=&quot;M1.788 4.296c.196-.88.478-1.381.802-1.706s.826-.606 1.706-.802C5.194 1.588 6.387 1.5 8 1.5s2.806.088 3.704.288c.88.196 1.381.478 1.706.802s.607.826.802 1.706c.2.898.288 2.091.288 3.704s-.088 2.806-.288 3.704c-.195.88-.478 1.381-.802 1.706s-.826.607-1.706.802c-.898.2-2.091.288-3.704.288s-2.806-.088-3.704-.288c-.88-.195-1.381-.478-1.706-.802s-.606-.826-.802-1.706C1.588 10.806 1.5 9.613 1.5 8s.088-2.806.288-3.704M8 0C1.412 0 0 1.412 0 8s1.412 8 8 8 8-1.412 8-8-1.412-8-8-8&quot;/&gt;&lt;path d=&quot;M8.495 4.695a.75.75 0 0 0-.05 1.06L10.486 8l-2.041 2.246a.75.75 0 0 0 1.11 1.008l2.5-2.75a.75.75 0 0 0 0-1.008l-2.5-2.75a.75.75 0 0 0-1.06-.051m-4 0a.75.75 0 0 0-.05 1.06l2.044 2.248-1.796 1.995a.75.75 0 0 0 1.114 1.004l2.25-2.5a.75.75 0 0 0-.002-1.007l-2.5-2.75a.75.75 0 0 0-1.06-.05&quot;/&gt;
+  &lt;/symbol&gt;
+  &lt;symbol id=&quot;diffs-icon-symbol-ref&quot; viewBox=&quot;0 0 16 16&quot;&gt;
+    &lt;path d=&quot;M1.5 8c0 1.613.088 2.806.288 3.704.196.88.478 1.381.802 1.706.286.286.71.54 1.41.73V1.86c-.7.19-1.124.444-1.41.73-.324.325-.606.826-.802 1.706C1.588 5.194 1.5 6.387 1.5 8m4 6.397c.697.07 1.522.103 2.5.103 1.613 0 2.806-.088 3.704-.288.88-.195 1.381-.478 1.706-.802s.607-.826.802-1.706c.2-.898.288-2.091.288-3.704s-.088-2.806-.288-3.704c-.195-.88-.478-1.381-.802-1.706s-.826-.606-1.706-.802C10.806 1.588 9.613 1.5 8 1.5c-.978 0-1.803.033-2.5.103zM0 8c0-6.588 1.412-8 8-8s8 1.412 8 8-1.412 8-8 8-8-1.412-8-8m7-2a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1z&quot;/&gt;
+  &lt;/symbol&gt;
+&lt;/svg&gt;&lt;style data-core-css=&quot;&quot;&gt;@layer base, theme, rendered, unsafe;
+@layer base,theme,rendered,unsafe;@layer base{:host{--diffs-font-fallback:&quot;SF Mono&quot;, Monaco, Consolas, &quot;Ubuntu Mono&quot;, &quot;Liberation Mono&quot;, &quot;Courier New&quot;, monospace;--diffs-header-font-fallback:system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, &quot;Helvetica Neue&quot;, &quot;Noto Sans&quot;, &quot;Liberation Sans&quot;, Arial, sans-serif;--diffs-mixer:light-dark(#000,#fff);--diffs-gap-fallback:8px;--diffs-scrollbar-gutter-fallback:6px;--diffs-scrollbar-gutter:var(--diffs-scrollbar-gutter-override,var(--diffs-scrollbar-gutter-measured,var(--diffs-scrollbar-gutter-fallback)));--diffs-added-light:#0dbe4e;--diffs-added-dark:#5ecc71;--diffs-modified-light:#009fff;--diffs-modified-dark:#69b1ff;--diffs-deleted-light:#ff2e3f;--diffs-deleted-dark:#ff6762;color-scheme:light dark;font-family:var(--diffs-header-font-family,var(--diffs-header-font-fallback));font-size:var(--diffs-font-size,13px);line-height:var(--diffs-line-height,20px);font-feature-settings:var(--diffs-font-features);--diffs-bg:light-dark(var(--diffs-light-bg,#fff),var(--diffs-dark-bg,#000));--diffs-bg-buffer:var(--diffs-bg-buffer-override,light-dark(color-mix(in lab, var(--diffs-bg) 92%, var(--diffs-mixer)),color-mix(in lab, var(--diffs-bg) 92%, var(--diffs-mixer))));--diffs-bg-context:var(--diffs-bg-context-override,light-dark(color-mix(in lab, var(--diffs-bg) 98.5%, var(--diffs-mixer)),color-mix(in lab, var(--diffs-bg) 92.5%, var(--diffs-mixer))));--diffs-bg-context-gutter:var(--diffs-bg-context-gutter-override,light-dark(color-mix(in lab, var(--diffs-bg-context) 90%, var(--diffs-bg)),color-mix(in lab, var(--diffs-bg-context) 45%, var(--diffs-bg))));--diffs-bg-separator:var(--diffs-bg-separator-override,light-dark(color-mix(in lab, var(--diffs-bg) 96%, var(--diffs-mixer)),color-mix(in lab, var(--diffs-bg) 85%, var(--diffs-mixer))));--diffs-fg:light-dark(var(--diffs-light,#000),var(--diffs-dark,#fff));--diffs-fg-number:var(--diffs-fg-number-override,light-dark(color-mix(in lab, var(--diffs-fg) 65%, var(--diffs-bg)),color-mix(in lab, var(--diffs-fg) 65%, var(--diffs-bg))));--diffs-fg-conflict-marker:var(--diffs-fg-conflict-marker-override,var(--diffs-fg-number));--diffs-deletion-base:var(--diffs-deletion-color-override,light-dark(var(--diffs-light-deletion-color,var(--diffs-deletion-color,var(--diffs-deleted-light))),var(--diffs-dark-deletion-color,var(--diffs-deletion-color,var(--diffs-deleted-dark)))));--diffs-addition-base:var(--diffs-addition-color-override,light-dark(var(--diffs-light-addition-color,var(--diffs-addition-color,var(--diffs-added-light))),var(--diffs-dark-addition-color,var(--diffs-addition-color,var(--diffs-added-dark)))));--diffs-modified-base:var(--diffs-modified-color-override,light-dark(var(--diffs-light-modified-color,var(--diffs-modified-color,var(--diffs-modified-light))),var(--diffs-dark-modified-color,var(--diffs-modified-color,var(--diffs-modified-dark)))));--diffs-bg-deletion:var(--diffs-bg-deletion-override,light-dark(color-mix(in lab, var(--diffs-bg) 88%, var(--diffs-deletion-base)),color-mix(in lab, var(--diffs-bg) 80%, var(--diffs-deletion-base))));--diffs-bg-deletion-emphasis:var(--diffs-bg-deletion-emphasis-override,light-dark(rgb(from var(--diffs-deletion-base) r g b / .15),rgb(from var(--diffs-deletion-base) r g b / .2)));--diffs-bg-addition:var(--diffs-bg-addition-override,light-dark(color-mix(in lab, var(--diffs-bg) 88%, var(--diffs-addition-base)),color-mix(in lab, var(--diffs-bg) 80%, var(--diffs-addition-base))));--diffs-bg-addition-emphasis:var(--diffs-bg-addition-emphasis-override,light-dark(rgb(from var(--diffs-addition-base) r g b / .15),rgb(from var(--diffs-addition-base) r g b / .2)));--diffs-selection-base:var(--diffs-modified-base);--diffs-selection-number-fg:light-dark(color-mix(in lab, var(--diffs-selection-base) 65%, var(--diffs-mixer)),color-mix(in lab, var(--diffs-selection-base) 75%, var(--diffs-mixer)));background-color:var(--diffs-bg);color:var(--diffs-fg);display:block}pre,code,[data-error-wrapper]{isolation:isolate;font-family:var(--diffs-font-family,var(--diffs-font-fallback));outline:none;margin:0;padding:0;display:block}pre,code{background-color:var(--diffs-bg)}code{contain:content}*,:before,:after{box-sizing:border-box}[data-icon-sprite]{display:none}[data-diffs-header],[data-separator]{font-family:var(--diffs-header-font-family,var(--diffs-header-font-fallback))}[data-diffs-header][data-sticky]{z-index:1;background-color:var(--diffs-bg);position:sticky;top:0}[data-file-info]{color:var(--fg);background-color:color-mix(in lab, var(--bg) 98%, var(--fg));border-block:1px solid color-mix(in lab, var(--bg) 95%, var(--fg));padding:10px;font-weight:700}[data-diff],[data-file]{--diffs-grid-number-column-width:minmax(min-content, max-content);--diffs-code-grid:var(--diffs-grid-number-column-width) 1fr}[data-dehydrated]:is([data-diff],[data-file]){--diffs-code-grid:var(--diffs-grid-number-column-width) minmax(0, 1fr)}:is([data-diff],[data-file]):hover [data-code]::-webkit-scrollbar-thumb{background-color:var(--diffs-bg-context)}@supports (-webkit-touch-callout:none){:host{--diffs-scrollbar-gutter-fallback:0px}}[data-line] span{color:light-dark(var(--diffs-token-light,var(--diffs-light)),var(--diffs-token-dark,var(--diffs-dark)));background-color:light-dark(var(--diffs-token-light-bg,inherit),var(--diffs-token-dark-bg,inherit));font-weight:light-dark(var(--diffs-token-light-font-weight,inherit),var(--diffs-token-dark-font-weight,inherit));font-style:light-dark(var(--diffs-token-light-font-style,inherit),var(--diffs-token-dark-font-style,inherit));-webkit-text-decoration:light-dark(var(--diffs-token-light-text-decoration,inherit),var(--diffs-token-dark-text-decoration,inherit));text-decoration:light-dark(var(--diffs-token-light-text-decoration,inherit),var(--diffs-token-dark-text-decoration,inherit))}[data-line],[data-gutter-buffer],[data-column-number],[data-line-annotation],[data-no-newline],[data-merge-conflict],[data-merge-conflict-actions]{--diffs-computed-decoration-bg:var(--diffs-bg);--diffs-computed-diff-line-bg:var(--diffs-bg);--diffs-computed-selected-line-bg:var(--diffs-bg);color:var(--diffs-fg);background-color:var(--diffs-line-bg,var(--diffs-bg))}@media (pointer:fine){:is([data-line],[data-gutter-buffer],[data-column-number],[data-line-annotation],[data-no-newline],[data-merge-conflict],[data-merge-conflict-actions]):where([data-hovered]){--diffs-computed-hovered-line-bg:light-dark(color-mix(in lab, var(--diffs-computed-selected-line-bg) 97%, var(--diffs-bg-hover-override,var(--diffs-mixer))),color-mix(in lab, var(--diffs-computed-selected-line-bg) 91%, var(--diffs-bg-hover-override,var(--diffs-mixer))));--diffs-line-bg:var(--diffs-computed-hovered-line-bg,inherit)}}[data-decoration-bg]:is([data-line],[data-no-newline]){--mix-deco-light:92%;--mix-deco-dark:85%}[data-decoration-bg][data-decoration-bg-depth=&quot;2&quot;]:is([data-line],[data-no-newline]){--mix-deco-light:88%;--mix-deco-dark:80%}[data-decoration-bg][data-decoration-bg-depth=&quot;3&quot;]:is([data-line],[data-no-newline]){--mix-deco-light:85%;--mix-deco-dark:78%}@media (pointer:fine){[data-decoration-bg][data-hovered]:is([data-line],[data-no-newline]):not([data-selected-line]){--mix-deco-light:85%;--mix-deco-dark:85%}[data-decoration-bg][data-hovered][data-decoration-bg-depth=&quot;2&quot;]:is([data-line],[data-no-newline]):not([data-selected-line]){--mix-deco-light:83%;--mix-deco-dark:83%}[data-decoration-bg][data-hovered][data-decoration-bg-depth=&quot;3&quot;]:is([data-line],[data-no-newline]):not([data-selected-line]){--mix-deco-light:81%;--mix-deco-dark:81%}}[data-decoration-bg]:is([data-line],[data-no-newline]){--diffs-computed-decoration-bg:light-dark(color-mix(in lab, var(--diffs-bg) var(--mix-deco-light), var(--diffs-decoration-bg)),color-mix(in lab, var(--diffs-bg) var(--mix-deco-dark), var(--diffs-decoration-bg)));--diffs-computed-diff-line-bg:var(--diffs-computed-decoration-bg);--diffs-computed-selected-line-bg:var(--diffs-computed-decoration-bg);--diffs-line-bg:var(--diffs-computed-decoration-bg)}[data-line-annotation],[data-gutter-buffer=annotation]{--diffs-annotation-bg:var(--diffs-bg-context);--diffs-computed-decoration-bg:var(--diffs-annotation-bg);--diffs-computed-diff-line-bg:var(--diffs-annotation-bg);--diffs-computed-selected-line-bg:var(--diffs-annotation-bg);--diffs-line-bg:var(--diffs-annotation-bg)}[data-merge-conflict-actions],[data-gutter-buffer=merge-conflict-action],[data-gutter-buffer=merge-conflict-marker-base],[data-gutter-buffer=merge-conflict-marker-separator],[data-merge-conflict=marker-base],[data-merge-conflict=marker-separator]{--diffs-computed-decoration-bg:var(--diffs-bg-context);--diffs-computed-diff-line-bg:var(--diffs-bg-context);--diffs-computed-selected-line-bg:var(--diffs-bg-context);--diffs-line-bg:var(--diffs-bg-context)}[data-gutter-buffer=merge-conflict-marker-start],[data-merge-conflict=marker-start]{--diffs-computed-decoration-bg:light-dark(color-mix(in lab, var(--diffs-bg) 78%, var(--conflict-bg-current-header-override,var(--diffs-addition-base))),color-mix(in lab, var(--diffs-bg) 68%, var(--conflict-bg-current-header-override,var(--diffs-addition-base))));--diffs-computed-diff-line-bg:var(--diffs-computed-decoration-bg);--diffs-computed-selected-line-bg:var(--diffs-computed-decoration-bg);--diffs-line-bg:var(--diffs-computed-decoration-bg)}[data-gutter-buffer=merge-conflict-marker-end],[data-merge-conflict=marker-end]{--diffs-computed-decoration-bg:light-dark(color-mix(in lab, var(--diffs-bg) 78%, var(--conflict-bg-incoming-header-override,var(--diffs-modified-base))),color-mix(in lab, var(--diffs-bg) 68%, var(--conflict-bg-incoming-header-override,var(--diffs-modified-base))));--diffs-computed-diff-line-bg:var(--diffs-computed-decoration-bg);--diffs-computed-selected-line-bg:var(--diffs-computed-decoration-bg);--diffs-line-bg:var(--diffs-computed-decoration-bg)}[data-has-merge-conflict] [data-line-annotation],[data-has-merge-conflict] [data-gutter-buffer=annotation]{--diffs-computed-decoration-bg:var(--diffs-bg);--diffs-computed-diff-line-bg:var(--diffs-bg);--diffs-computed-selected-line-bg:var(--diffs-bg);--diffs-line-bg:var(--diffs-bg)}:where([data-background]) [data-gutter-buffer],:where([data-background]) [data-column-number]{--mix-light:91%;--mix-dark:85%}:where([data-background]) [data-line],:where([data-background]) [data-no-newline]{--mix-light:88%;--mix-dark:80%}:where([data-background]) [data-gutter-buffer],:where([data-background]) [data-column-number],:where([data-background]) [data-line],:where([data-background]) [data-no-newline]{--diffs-diff-line-mix-target:var(--diffs-bg)}[data-line-type=change-deletion]:is(:where([data-background]) [data-gutter-buffer],:where([data-background]) [data-column-number],:where([data-background]) [data-line],:where([data-background]) [data-no-newline]){--diffs-diff-line-mix-target:var(--diffs-bg-deletion-override,var(--diffs-deletion-base))}@media (pointer:fine){[data-line-type=change-deletion][data-hovered]:is(:where([data-background]) [data-gutter-buffer],:where([data-background]) [data-column-number],:where([data-background]) [data-line],:where([data-background]) [data-no-newline]){--mix-light:80%;--mix-dark:75%}}[data-line-type=change-deletion]:is(:where([data-background]) [data-gutter-buffer],:where([data-background]) [data-column-number],:where([data-background]) [data-line],:where([data-background]) [data-no-newline]):where([data-gutter-buffer],[data-column-number]){color:var(--diffs-fg-number-deletion-override,var(--diffs-deletion-base));--diffs-diff-line-mix-target:var(--diffs-bg-deletion-number-override,var(--diffs-deletion-base))}[data-line-type=change-deletion]:is(:where([data-background]) [data-gutter-buffer],:where([data-background]) [data-column-number],:where([data-background]) [data-line],:where([data-background]) [data-no-newline]){--diffs-computed-diff-line-bg:light-dark(color-mix(in lab, var(--diffs-computed-decoration-bg) var(--mix-light), var(--diffs-diff-line-mix-target)),color-mix(in lab, var(--diffs-computed-decoration-bg) var(--mix-dark), var(--diffs-diff-line-mix-target)));--diffs-computed-selected-line-bg:var(--diffs-computed-diff-line-bg);--diffs-line-bg:var(--diffs-computed-diff-line-bg,inherit)}[data-line-type=change-addition]:is(:where([data-background]) [data-gutter-buffer],:where([data-background]) [data-column-number],:where([data-background]) [data-line],:where([data-background]) [data-no-newline]){--diffs-diff-line-mix-target:var(--diffs-bg-addition-override,var(--diffs-addition-base))}@media (pointer:fine){[data-line-type=change-addition][data-hovered]:is(:where([data-background]) [data-gutter-buffer],:where([data-background]) [data-column-number],:where([data-background]) [data-line],:where([data-background]) [data-no-newline]){--mix-light:80%;--mix-dark:70%}}[data-line-type=change-addition]:is(:where([data-background]) [data-gutter-buffer],:where([data-background]) [data-column-number],:where([data-background]) [data-line],:where([data-background]) [data-no-newline]):where([data-gutter-buffer],[data-column-number]){color:var(--diffs-fg-number-addition-override,var(--diffs-addition-base));--diffs-diff-line-mix-target:var(--diffs-bg-addition-number-override,var(--diffs-addition-base))}[data-line-type=change-addition]:is(:where([data-background]) [data-gutter-buffer],:where([data-background]) [data-column-number],:where([data-background]) [data-line],:where([data-background]) [data-no-newline]){--diffs-computed-diff-line-bg:light-dark(color-mix(in lab, var(--diffs-computed-decoration-bg) var(--mix-light), var(--diffs-diff-line-mix-target)),color-mix(in lab, var(--diffs-computed-decoration-bg) var(--mix-dark), var(--diffs-diff-line-mix-target)));--diffs-computed-selected-line-bg:var(--diffs-computed-diff-line-bg);--diffs-line-bg:var(--diffs-computed-diff-line-bg,inherit)}[data-merge-conflict=current]:is(:where([data-background]) [data-gutter-buffer],:where([data-background]) [data-column-number],:where([data-background]) [data-line],:where([data-background]) [data-no-newline]){--diffs-diff-line-mix-target:var(--conflict-bg-current-override,var(--diffs-addition-base))}[data-merge-conflict=current]:is(:where([data-background]) [data-gutter-buffer],:where([data-background]) [data-column-number],:where([data-background]) [data-line],:where([data-background]) [data-no-newline]):where([data-gutter-buffer],[data-column-number]){color:var(--diffs-fg-number-addition-override,var(--diffs-addition-base));--diffs-diff-line-mix-target:var(--conflict-bg-current-number-override,var(--diffs-addition-base))}@media (pointer:fine){[data-merge-conflict=current][data-hovered]:is(:where([data-background]) [data-gutter-buffer],:where([data-background]) [data-column-number],:where([data-background]) [data-line],:where([data-background]) [data-no-newline]){--mix-light:80%;--mix-dark:70%}}[data-merge-conflict=current]:is(:where([data-background]) [data-gutter-buffer],:where([data-background]) [data-column-number],:where([data-background]) [data-line],:where([data-background]) [data-no-newline]){--diffs-computed-diff-line-bg:light-dark(color-mix(in lab, var(--diffs-computed-decoration-bg) var(--mix-light), var(--diffs-diff-line-mix-target)),color-mix(in lab, var(--diffs-computed-decoration-bg) var(--mix-dark), var(--diffs-diff-line-mix-target)));--diffs-computed-selected-line-bg:var(--diffs-computed-diff-line-bg);--diffs-line-bg:var(--diffs-computed-diff-line-bg,inherit)}[data-merge-conflict=incoming]:is(:where([data-background]) [data-gutter-buffer],:where([data-background]) [data-column-number],:where([data-background]) [data-line],:where([data-background]) [data-no-newline]){--diffs-diff-line-mix-target:var(--conflict-bg-incoming-override,var(--diffs-modified-base))}[data-merge-conflict=incoming]:is(:where([data-background]) [data-gutter-buffer],:where([data-background]) [data-column-number],:where([data-background]) [data-line],:where([data-background]) [data-no-newline]):where([data-gutter-buffer],[data-column-number]){color:var(--diffs-modified-base);--diffs-diff-line-mix-target:var(--conflict-bg-incoming-number-override,var(--diffs-modified-base))}@media (pointer:fine){[data-merge-conflict=incoming][data-hovered]:is(:where([data-background]) [data-gutter-buffer],:where([data-background]) [data-column-number],:where([data-background]) [data-line],:where([data-background]) [data-no-newline]){--mix-light:80%;--mix-dark:70%}}[data-merge-conflict=incoming]:is(:where([data-background]) [data-gutter-buffer],:where([data-background]) [data-column-number],:where([data-background]) [data-line],:where([data-background]) [data-no-newline]){--diffs-computed-diff-line-bg:light-dark(color-mix(in lab, var(--diffs-computed-decoration-bg) var(--mix-light), var(--diffs-diff-line-mix-target)),color-mix(in lab, var(--diffs-computed-decoration-bg) var(--mix-dark), var(--diffs-diff-line-mix-target)));--diffs-computed-selected-line-bg:var(--diffs-computed-diff-line-bg);--diffs-line-bg:var(--diffs-computed-diff-line-bg,inherit)}[data-gutter-buffer],[data-column-number],[data-line],[data-line-annotation],[data-merge-conflict],[data-merge-conflict-actions],[data-no-newline]{--diffs-selection-mix-target:var(--diffs-bg-selection-override,var(--diffs-selection-base))}[data-selected-line]:is([data-gutter-buffer],[data-column-number],[data-line],[data-line-annotation],[data-merge-conflict],[data-merge-conflict-actions],[data-no-newline]):where([data-line],[data-line-annotation],[data-merge-conflict],[data-merge-conflict-actions],[data-no-newline]){--mix-selection-light:82%;--mix-selection-dark:75%}@media (pointer:fine){[data-selected-line][data-hovered]:is([data-gutter-buffer],[data-column-number],[data-line],[data-line-annotation],[data-merge-conflict],[data-merge-conflict-actions],[data-no-newline]):where([data-line],[data-line-annotation],[data-merge-conflict],[data-merge-conflict-actions],[data-no-newline]):not([data-merge-conflict],[data-line-type=change-addition],[data-line-type=change-deletion]){--mix-selection-light:75%;--mix-selection-dark:70%}}[data-selected-line]:is([data-gutter-buffer],[data-column-number],[data-line],[data-line-annotation],[data-merge-conflict],[data-merge-conflict-actions],[data-no-newline]):where([data-gutter-buffer],[data-column-number]){--mix-selection-light:75%;--mix-selection-dark:60%;--diffs-selection-mix-target:var(--diffs-bg-selection-number-override,var(--diffs-selection-base))}@media (pointer:fine){[data-selected-line][data-hovered]:is([data-gutter-buffer],[data-column-number],[data-line],[data-line-annotation],[data-merge-conflict],[data-merge-conflict-actions],[data-no-newline]):where([data-gutter-buffer],[data-column-number]):not([data-merge-conflict],[data-line-type=change-addition],[data-line-type=change-deletion]){--mix-selection-light:70%;--mix-selection-dark:55%}}[data-selected-line]:is([data-gutter-buffer],[data-column-number],[data-line],[data-line-annotation],[data-merge-conflict],[data-merge-conflict-actions],[data-no-newline]){--diffs-computed-selected-line-bg:light-dark(color-mix(in lab, var(--diffs-computed-diff-line-bg) var(--mix-selection-light), var(--diffs-selection-mix-target)),color-mix(in lab, var(--diffs-computed-diff-line-bg) var(--mix-selection-dark), var(--diffs-selection-mix-target)));--diffs-line-bg:var(--diffs-computed-selected-line-bg,inherit)}[data-selected-line]:is([data-gutter-buffer],[data-column-number]){color:var(--diffs-selection-number-fg)}[data-no-newline]{-webkit-user-select:none;user-select:none}[data-no-newline] span{opacity:.6}[data-diff-type=split][data-overflow=scroll]{grid-template-columns:1fr 1fr;display:grid}[data-diff-type=split][data-overflow=scroll] [data-additions]{border-left:1px solid var(--diffs-bg)}[data-diff-type=split][data-overflow=scroll] [data-deletions]{border-right:1px solid var(--diffs-bg)}[data-code]{grid-auto-flow:dense;grid-template-columns:var(--diffs-code-grid);overflow:var(--diffs-overflow-override,scroll) clip;overscroll-behavior-x:none;tab-size:var(--diffs-tab-size,2);padding-top:var(--diffs-gap-block,var(--diffs-gap-fallback));padding-bottom:max(0px, calc(var(--diffs-gap-block,var(--diffs-gap-fallback)) - var(--diffs-scrollbar-gutter)));scrollbar-gutter:stable;align-self:flex-start;display:grid}[data-diffs-scrollbar-measure]{opacity:0;pointer-events:none;scrollbar-gutter:auto;grid-template-columns:none;width:100px;height:100px;padding:0;position:absolute;top:-200px;left:-200px}[data-container-size]{container-type:inline-size}[data-code]::-webkit-scrollbar{width:0;height:var(--diffs-scrollbar-gutter)}[data-code]::-webkit-scrollbar-track{background:0 0}[data-code]::-webkit-scrollbar-thumb{background-color:#0000;background-clip:content-box;border:1px solid #0000;border-radius:3px}[data-code]::-webkit-scrollbar-corner{background-color:#0000}@supports ((-moz-appearance:none)){[data-code]{scrollbar-width:thin;scrollbar-color:var(--diffs-bg-context) transparent;padding-bottom:var(--diffs-gap-block,var(--diffs-gap-fallback))}}:is([data-diffs-header]~[data-diff],[data-diffs-header]~[data-file]) [data-code],[data-overflow=wrap]:is([data-diffs-header]~[data-diff],[data-diffs-header]~[data-file]){padding-top:0}[data-gutter]{grid-template-rows:subgrid;grid-template-columns:subgrid;z-index:3;background-color:var(--diffs-bg);grid-column:1;display:grid;position:relative}[data-gutter] [data-gutter-buffer],[data-gutter] [data-column-number]{border-right:var(--diffs-gap-style,2px solid var(--diffs-bg))}[data-content]{grid-template-rows:subgrid;grid-template-columns:subgrid;background-color:var(--diffs-bg);grid-column:2;min-width:0;display:grid}[data-diff-type=split][data-overflow=wrap]{grid-auto-flow:dense;grid-template-columns:repeat(2, var(--diffs-code-grid));padding-block:var(--diffs-gap-block,var(--diffs-gap-fallback));display:grid}[data-diff-type=split][data-overflow=wrap] [data-deletions]{display:contents}:is([data-diff-type=split][data-overflow=wrap] [data-deletions]) [data-gutter]{grid-column:1}:is([data-diff-type=split][data-overflow=wrap] [data-deletions]) [data-content]{border-right:1px solid var(--diffs-bg);grid-column:2}[data-diff-type=split][data-overflow=wrap] [data-additions]{display:contents}:is([data-diff-type=split][data-overflow=wrap] [data-additions]) [data-gutter]{border-left:1px solid var(--diffs-bg);grid-column:3}:is([data-diff-type=split][data-overflow=wrap] [data-additions]) [data-content]{grid-column:4}[data-overflow=scroll] [data-gutter]{position:sticky;left:0}[data-interactive-lines] [data-line]{cursor:pointer}[data-interactive-line-numbers] [data-column-number]{cursor:pointer;touch-action:none}[data-content-buffer],[data-gutter-buffer]{-webkit-user-select:none;user-select:none;min-height:1lh;position:relative}[data-gutter-buffer]{padding-left:2ch;padding-right:1ch}[data-gutter-buffer]:before{content:&quot;&quot;;min-width:var(--diffs-min-number-column-width,var(--diffs-min-number-column-width-default,3ch));display:block}[data-gutter-buffer=annotation]{--diffs-annotation-bg:var(--diffs-bg-context-gutter);min-height:0}[data-gutter-buffer=buffer]{--diffs-line-bg:var(--diffs-bg-context-gutter)}[data-content-buffer]{background-position:5px 0;background-size:8px 8px;background-origin:border-box;background-image:repeating-linear-gradient(-45deg, transparent, transparent 4.242px, var(--diffs-bg-buffer) 4.242px, var(--diffs-bg-buffer) 5.656px);grid-column:1}[data-separator]{box-sizing:content-box;background-color:var(--diffs-bg)}[data-separator=simple]{min-height:4px}[data-separator=line-info],[data-separator=line-info-basic],[data-separator=metadata],[data-separator=simple]{background-color:var(--diffs-bg-separator)}[data-separator=line-info],[data-separator=line-info-basic],[data-separator=metadata]{height:32px;position:relative}[data-separator-wrapper]{-webkit-user-select:none;user-select:none;fill:currentColor;background-color:var(--diffs-bg);align-items:center;height:100%;display:flex;position:absolute;inset-inline:0}[data-content] [data-separator-wrapper]{display:none}[data-separator=metadata] [data-separator-wrapper]{background-color:var(--diffs-bg-separator);height:100%;color:var(--diffs-fg-number);white-space:nowrap;text-overflow:ellipsis;min-width:min-content;padding-inline:1ch;inset-inline:100% auto;overflow:hidden}[data-separator=line-info]{margin-block:var(--diffs-gap-block,var(--diffs-gap-fallback))}[data-separator=line-info] [data-separator-wrapper]{min-width:16px}[data-separator=line-info-basic],[data-separator=metadata]{margin-block:0}[data-separator=line-info][data-separator-first]{margin-top:0}[data-separator=line-info][data-separator-last]{margin-bottom:0}[data-expand-index] [data-separator-wrapper]{grid-template-columns:32px auto;display:grid}[data-expand-index] [data-separator-wrapper][data-separator-multi-button]{grid-template-columns:32px 32px auto}[data-expand-button],[data-separator-content]{background-color:var(--diffs-bg-separator);flex:none;align-items:center;display:flex}[data-expand-index] [data-separator-content]:hover{cursor:pointer;text-decoration:underline}[data-expand-button]{cursor:pointer;min-width:32px;color:var(--diffs-fg-number);border-right:2px solid var(--diffs-bg);flex-shrink:0;justify-content:center;align-self:stretch}[data-expand-button]:hover{color:var(--diffs-fg)}[data-expand-button][data-expand-all-button]{display:none}[data-expand-down] [data-icon]{transform:scaleY(-1)}[data-separator-content]{height:100%;color:var(--diffs-fg-number);flex:auto;justify-content:flex-start;padding:0 1ch;overflow:hidden}:is([data-separator=line-info],[data-separator=line-info-basic]) [data-separator-content]{-webkit-user-select:none;user-select:none;height:100%;overflow:clip}[data-unmodified-lines]{text-overflow:ellipsis;white-space:nowrap;flex:0 auto;min-width:0;display:block;overflow:hidden}@supports (width:1cqi){[data-unified] [data-separator=line-info] [data-separator-wrapper]{padding-inline:var(--diffs-gap-inline,var(--diffs-gap-fallback));width:100cqi}:is([data-unified] [data-separator=line-info] [data-separator-wrapper]) [data-separator-content]{border-radius:6px}[data-unified] [data-separator=line-info][data-expand-index] [data-separator-wrapper] [data-separator-content]{border-top-left-radius:unset;border-bottom-left-radius:unset}[data-gutter] [data-separator=line-info] [data-separator-wrapper]{padding-left:var(--diffs-gap-inline,var(--diffs-gap-fallback))}[data-gutter] [data-separator=line-info] [data-separator-content]{border-top-left-radius:6px;border-bottom-left-radius:6px}[data-gutter] [data-separator=line-info][data-expand-index] [data-separator-content]{border-top-left-radius:unset;border-bottom-left-radius:unset}[data-additions] [data-content] [data-separator=line-info]{background-color:var(--diffs-bg)}:is([data-additions] [data-content] [data-separator=line-info]) [data-separator-wrapper]{display:none}[data-additions] [data-gutter] [data-separator=line-info] [data-separator-wrapper]{background-color:var(--diffs-bg-separator);border-top-right-radius:6px;border-bottom-right-radius:6px;height:100%;display:block}:is([data-additions] [data-gutter] [data-separator=line-info] [data-separator-wrapper]) [data-separator-content],:is([data-additions] [data-gutter] [data-separator=line-info] [data-separator-wrapper]) [data-expand-button]{display:none}[data-overflow=scroll] [data-additions] [data-gutter] [data-separator=line-info] [data-separator-wrapper]{width:calc(100cqi - var(--diffs-gap-inline,var(--diffs-gap-fallback)))}[data-overflow=wrap] [data-additions] [data-content] [data-separator=line-info] [data-separator-wrapper]{background-color:var(--diffs-bg-separator);height:100%;margin-right:var(--diffs-gap-inline,var(--diffs-gap-fallback));border-top-right-radius:6px;border-bottom-right-radius:6px;display:block}:is([data-overflow=wrap] [data-additions] [data-content] [data-separator=line-info] [data-separator-wrapper]) [data-separator-content],:is([data-overflow=wrap] [data-additions] [data-content] [data-separator=line-info] [data-separator-wrapper]) [data-expand-button]{display:none}:is([data-separator=line-info] [data-separator-wrapper]) [data-expand-both],:is([data-separator=line-info] [data-separator-wrapper]) [data-expand-down],:is([data-separator=line-info] [data-separator-wrapper]) [data-expand-up]{border-top-left-radius:6px;border-bottom-left-radius:6px}@media (pointer:fine){[data-separator-multi-button]:is([data-separator=line-info] [data-separator-wrapper]) [data-expand-up]{border-top-left-radius:6px;border-bottom-left-radius:unset}[data-separator-multi-button]:is([data-separator=line-info] [data-separator-wrapper]) [data-expand-down]{border-bottom-left-radius:6px;border-top-left-radius:unset}}}@media (pointer:coarse){[data-separator=line-info-basic] [data-separator-wrapper][data-separator-multi-button]{grid-template-columns:34px 34px auto}:is([data-separator=line-info-basic] [data-separator-wrapper][data-separator-multi-button]) [data-separator-content]{grid-column:unset;grid-row:unset}@supports (width:1cqi){:is([data-separator=line-info] [data-separator-wrapper]) [data-expand-both],:is([data-separator=line-info] [data-separator-wrapper]) [data-expand-down],:is([data-separator=line-info] [data-separator-wrapper]) [data-expand-up],[data-separator-multi-button]:is([data-separator=line-info] [data-separator-wrapper]) [data-expand-up]{border-top-left-radius:6px;border-bottom-left-radius:6px}[data-separator-multi-button]:is([data-separator=line-info] [data-separator-wrapper]) [data-expand-down]{border-bottom-left-radius:unset;border-top-left-radius:unset}}}@media (pointer:fine){[data-separator-wrapper][data-separator-multi-button]{grid-template-rows:50% 50%;display:grid}[data-separator-wrapper][data-separator-multi-button] [data-separator-content]{grid-area:1/2/-1;min-width:min-content}[data-separator-wrapper][data-separator-multi-button] [data-expand-button]{grid-column:1}[data-separator=line-info] [data-separator-wrapper],[data-separator=line-info] [data-separator-wrapper][data-separator-multi-button]{grid-template-columns:34px auto}[data-separator=line-info-basic][data-expand-index] [data-separator-wrapper]{grid-template-columns:100% auto}:is(:is([data-separator=line-info],[data-separator=line-info-basic]) [data-separator-multi-button]) [data-expand-up]{border-bottom:1px solid var(--diffs-bg);border-right:2px solid var(--diffs-bg)}:is(:is([data-separator=line-info],[data-separator=line-info-basic]) [data-separator-multi-button]) [data-expand-down]{border-top:1px solid var(--diffs-bg);border-right:2px solid var(--diffs-bg)}}[data-additions] [data-gutter] [data-separator-wrapper],[data-additions] [data-separator=line-info-basic] [data-separator-wrapper],[data-content] [data-separator-wrapper]{display:none}[data-line-annotation]{min-height:var(--diffs-annotation-min-height,0);z-index:2}[data-merge-conflict-actions]{z-index:2}[data-separator=custom]{grid-template-columns:subgrid;display:grid}[data-line],[data-column-number],[data-no-newline]{padding-inline:1ch;position:relative}[data-indicators=classic] [data-line]{padding-inline-start:2ch}:is([data-no-newline]:is([data-indicators=classic] [data-line-type=change-addition],[data-indicators=classic] [data-line-type=change-deletion]),[data-line]:is([data-indicators=classic] [data-line-type=change-addition],[data-indicators=classic] [data-line-type=change-deletion])):before{-webkit-user-select:none;user-select:none;width:1ch;height:1lh;display:inline-block;position:absolute;top:0;left:0}:is([data-line]:is([data-indicators=classic] [data-line-type=change-addition]),[data-no-newline]:is([data-indicators=classic] [data-line-type=change-addition])):before{content:&quot;+&quot;;color:var(--diffs-addition-base)}:is([data-line]:is([data-indicators=classic] [data-line-type=change-deletion]),[data-no-newline]:is([data-indicators=classic] [data-line-type=change-deletion])):before{content:&quot;-&quot;;color:var(--diffs-deletion-base)}[data-column-number]:is([data-indicators=bars] [data-line-type=change-deletion],[data-indicators=bars] [data-line-type=change-addition]):before{content:&quot;&quot;;-webkit-user-select:none;user-select:none;contain:strict;width:4px;height:100%;display:block;position:absolute;top:0;left:0}[data-column-number]:is([data-indicators=bars] [data-line-type=change-deletion]):before{background-image:linear-gradient(0deg, var(--diffs-bg-deletion) 50%, var(--diffs-deletion-base) 50%);background-repeat:repeat;background-size:2px 2px;background-size:calc(1lh/round(1lh / 2px)) calc(1lh/round(1lh / 2px))}[data-column-number]:is([data-indicators=bars] [data-line-type=change-addition]):before{background-color:var(--diffs-addition-base)}[data-overflow=wrap] [data-line],[data-overflow=wrap] [data-annotation-content]{white-space:pre-wrap;word-break:break-word}[data-overflow=scroll] [data-line]{white-space:pre;min-height:1lh}[data-column-number]{box-sizing:content-box;text-align:right;-webkit-user-select:none;user-select:none;color:var(--diffs-fg-number);padding-left:2ch}[data-line-number-content]{min-width:var(--diffs-min-number-column-width,var(--diffs-min-number-column-width-default,3ch));z-index:1;display:inline-block;position:relative}[data-disable-line-numbers] [data-gutter-buffer],[data-disable-line-numbers] [data-column-number]{min-width:4px;padding:0}:is([data-disable-line-numbers] [data-gutter-buffer],[data-disable-line-numbers] [data-column-number]):before{min-width:0}[data-disable-line-numbers] [data-line-number-content]{display:none}[data-disable-line-numbers] [data-gutter-utility-slot]{right:unset;justify-content:flex-start;left:0}[data-disable-line-numbers][data-indicators=bars] [data-gutter-utility-slot]{left:6px}[data-file][data-disable-line-numbers] [data-gutter-buffer],[data-file][data-disable-line-numbers] [data-column-number]{border-right:0;min-width:0}[data-diff-span]{-webkit-box-decoration-break:clone;box-decoration-break:clone;border-radius:3px}[data-line-type=change-addition] [data-diff-span]{background-color:var(--diffs-bg-addition-emphasis)}[data-line-type=change-deletion] [data-diff-span]{background-color:var(--diffs-bg-deletion-emphasis)}[data-merge-conflict=marker-start],[data-merge-conflict=marker-base],[data-merge-conflict=marker-separator],[data-merge-conflict=marker-end]{color:var(--diffs-fg);padding-left:1ch}[data-merge-conflict=marker-start],[data-merge-conflict=marker-end]{align-items:center;display:flex}:is([data-merge-conflict=marker-start],[data-merge-conflict=marker-end]):after{color:var(--diffs-fg-conflict-marker);font-size:.75rem;font-style:normal;line-height:1.25rem;font-family:var(--diffs-header-font-family,var(--diffs-header-font-fallback));padding-left:1ch}[data-merge-conflict=marker-start]:after{content:&quot;(Current Change)&quot;}[data-merge-conflict=marker-end]:after{content:&quot;(Incoming Change)&quot;}[data-merge-conflict-actions-content]{min-height:1.75rem;font-family:var(--diffs-header-font-family,var(--diffs-header-font-fallback));color:var(--diffs-fg);align-items:center;gap:.25rem;padding-inline:.5rem;font-size:.75rem;line-height:1.2;display:flex}[data-merge-conflict-action]{appearance:none;color:var(--diffs-fg-number);font:inherit;cursor:pointer;background:0 0;border:0;padding:0;font-style:normal}[data-merge-conflict-action]:hover{color:var(--diffs-fg)}[data-merge-conflict-action=current]:hover{color:var(--diffs-addition-base)}[data-merge-conflict-action=incoming]:hover{color:var(--diffs-modified-base)}[data-merge-conflict-action-separator]{color:var(--diffs-fg-number);opacity:.6;-webkit-user-select:none;user-select:none}[data-diffs-header=default]{background-color:var(--diffs-bg);justify-content:space-between;align-items:center;gap:var(--diffs-gap-inline,var(--diffs-gap-fallback));min-height:calc(1lh + var(--diffs-gap-block,var(--diffs-gap-fallback))*3);z-index:2;flex-direction:row;padding-inline:16px;display:flex;position:relative;top:0}[data-header-content]{align-items:center;gap:var(--diffs-gap-inline,var(--diffs-gap-fallback));white-space:nowrap;flex-direction:row;min-width:0;display:flex}[data-header-content] [data-prev-name],[data-header-content] [data-title]{text-overflow:ellipsis;white-space:nowrap;direction:rtl;min-width:0;overflow:hidden}[data-prev-name]{opacity:.7}[data-rename-icon]{fill:currentColor;flex-grow:0;flex-shrink:0}[data-diffs-header=default] [data-metadata]{white-space:nowrap;align-items:center;gap:1ch;display:flex}[data-diffs-header=default] [data-additions-count]{font-family:var(--diffs-font-family,var(--diffs-font-fallback));color:var(--diffs-addition-base)}[data-diffs-header=default] [data-deletions-count]{font-family:var(--diffs-font-family,var(--diffs-font-fallback));color:var(--diffs-deletion-base)}[data-change-icon]{fill:currentColor;flex-shrink:0}[data-change-icon=change],[data-change-icon=rename-pure],[data-change-icon=rename-changed]{color:var(--diffs-modified-base)}[data-change-icon=new]{color:var(--diffs-addition-base)}[data-change-icon=deleted]{color:var(--diffs-deletion-base)}[data-change-icon=file]{opacity:.6}[data-annotation-content]{z-index:2;isolation:isolate;align-self:flex-start;min-width:0;display:flow-root;position:relative}[data-overflow=scroll] [data-annotation-content],[data-overflow=scroll] [data-merge-conflict-actions-content]{width:var(--diffs-column-content-width,auto);left:var(--diffs-column-number-width,0);position:sticky}[data-annotation-slot]{text-wrap-mode:wrap;word-break:normal;white-space-collapse:collapse}[data-gutter-utility-slot]{touch-action:none;justify-content:flex-end;display:flex;position:absolute;top:0;bottom:0;right:0}[data-utility-button]{appearance:none;cursor:pointer;width:1lh;height:1lh;font-size:var(--diffs-font-size,13px);line-height:var(--diffs-line-height,20px);background-color:var(--diffs-modified-base);color:var(--diffs-bg);fill:currentColor;z-index:4;touch-action:none;border:none;border-radius:4px;justify-content:center;align-items:center;margin-right:calc(1ch - 1lh);padding:0;display:flex;position:relative}[data-utility-button]:before{content:&quot;&quot;;display:block;position:absolute;inset:0 0 0 -4px}[data-decoration-bar-stack]{pointer-events:none;isolation:isolate;z-index:1;background-color:var(--diffs-decoration-bar-color,transparent);box-sizing:content-box;border-left:2px solid var(--diffs-bg);border-right:2px solid var(--diffs-bg);width:6px;position:absolute;top:0;bottom:0;right:-2px}[data-decoration-bar-depth=&quot;1&quot;] [data-decoration-bar-stack]{background-color:color-mix(in lab, var(--diffs-bg) 20%, var(--diffs-decoration-bar-color,transparent))}[data-decoration-bar-depth=&quot;2&quot;] [data-decoration-bar-stack]{background-color:color-mix(in lab, var(--diffs-bg) 45%, var(--diffs-decoration-bar-color,transparent))}[data-decoration-bar-depth=&quot;3&quot;] [data-decoration-bar-stack]{background-color:color-mix(in lab, var(--diffs-bg) 65%, var(--diffs-decoration-bar-color,transparent))}[data-decoration-bar-start] [data-decoration-bar-stack]{border-top-left-radius:5px;border-top-right-radius:5px}[data-decoration-bar-end] [data-decoration-bar-stack]{z-index:3;border-bottom-right-radius:5px;border-bottom-left-radius:5px}[data-placeholder]{contain:strict}[data-error-wrapper]{padding:var(--diffs-gap-block,var(--diffs-gap-fallback)) var(--diffs-gap-inline,var(--diffs-gap-fallback));scrollbar-width:none;max-height:400px;overflow:auto}[data-error-wrapper] [data-error-message]{color:var(--diffs-deletion-base);font-size:18px;font-weight:700}[data-error-wrapper] [data-error-stack]{color:var(--diffs-fg-number)}}@layer theme,rendered,unsafe;
+@layer theme {
+
+}&lt;/style&gt;&lt;style data-theme-css=&quot;&quot;&gt;@layer base, theme, rendered, unsafe;
+@layer rendered {
+  :host {
+  color-scheme: dark;
+  --diffs-scrollbar-gutter-measured: var(--diffs-scrollbar-gutter-fallback);
+  color:#fafafa;background-color:#0a0a0a;--diffs-fg:#fafafa;--diffs-bg:#0a0a0a;--diffs-addition-color:#07c480;--diffs-deletion-color:#ff2e3f;--diffs-modified-color:#009fff;
+  }
+}&lt;/style&gt;&lt;div data-diffs-header=&quot;default&quot; data-change-type=&quot;change&quot;&gt;&lt;div data-header-content=&quot;&quot;&gt;&lt;slot name=&quot;header-prefix&quot;&gt;&lt;/slot&gt;&lt;svg width=&quot;16&quot; height=&quot;16&quot; viewBox=&quot;0 0 16 16&quot; data-change-icon=&quot;change&quot;&gt;&lt;use href=&quot;#diffs-icon-symbol-modified&quot;&gt;&lt;/use&gt;&lt;/svg&gt;&lt;div data-title=&quot;&quot;&gt;&lt;bdi&gt;packages/types/src/smart-flow.ts&lt;/bdi&gt;&lt;/div&gt;&lt;/div&gt;&lt;div data-metadata=&quot;&quot;&gt;&lt;span data-deletions-count=&quot;&quot;&gt;-1&lt;/span&gt;&lt;span data-additions-count=&quot;&quot;&gt;+18&lt;/span&gt;&lt;slot name=&quot;header-metadata&quot;&gt;&lt;/slot&gt;&lt;/div&gt;&lt;/div&gt;&lt;pre data-diff=&quot;&quot; data-diff-type=&quot;split&quot; data-overflow=&quot;scroll&quot; data-background=&quot;&quot; data-indicators=&quot;bars&quot; tabindex=&quot;0&quot; style=&quot;--diffs-min-number-column-width-default:3ch;&quot; data-dehydrated=&quot;&quot;&gt;&lt;code data-code=&quot;&quot; data-container-size=&quot;&quot; data-deletions=&quot;&quot;&gt;&lt;div data-gutter=&quot;&quot; style=&quot;grid-row: span 38&quot;&gt;&lt;div data-separator=&quot;line-info&quot; data-separator-first=&quot;&quot;&gt;&lt;div data-separator-wrapper=&quot;&quot;&gt;&lt;div data-separator-content=&quot;&quot;&gt;&lt;span data-unmodified-lines=&quot;&quot;&gt;45 unmodified lines&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;46&quot; data-line-index=&quot;45,45&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;46&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;47&quot; data-line-index=&quot;46,46&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;47&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;48&quot; data-line-index=&quot;47,47&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;48&lt;/span&gt;&lt;/div&gt;&lt;div data-gutter-buffer=&quot;buffer&quot; data-buffer-size=&quot;1&quot; style=&quot;grid-row: span 1;min-height:calc(1 * 1lh);&quot;&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;49&quot; data-line-index=&quot;49,49&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;49&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;50&quot; data-line-index=&quot;50,50&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;50&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;51&quot; data-line-index=&quot;51,51&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;51&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;52&quot; data-line-index=&quot;52,52&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;52&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;53&quot; data-line-index=&quot;53,53&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;53&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;54&quot; data-line-index=&quot;54,54&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;54&lt;/span&gt;&lt;/div&gt;&lt;div data-gutter-buffer=&quot;buffer&quot; data-buffer-size=&quot;1&quot; style=&quot;grid-row: span 1;min-height:calc(1 * 1lh);&quot;&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;55&quot; data-line-index=&quot;56,56&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;55&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;56&quot; data-line-index=&quot;57,57&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;56&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;57&quot; data-line-index=&quot;58,58&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;57&lt;/span&gt;&lt;/div&gt;&lt;div data-separator=&quot;line-info&quot;&gt;&lt;div data-separator-wrapper=&quot;&quot;&gt;&lt;div data-separator-content=&quot;&quot;&gt;&lt;span data-unmodified-lines=&quot;&quot;&gt;61 unmodified lines&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;119&quot; data-line-index=&quot;120,120&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;119&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;120&quot; data-line-index=&quot;121,121&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;120&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;121&quot; data-line-index=&quot;122,122&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;121&lt;/span&gt;&lt;/div&gt;&lt;div data-gutter-buffer=&quot;buffer&quot; data-buffer-size=&quot;13&quot; style=&quot;grid-row: span 13;min-height:calc(13 * 1lh);&quot;&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;122&quot; data-line-index=&quot;136,136&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;122&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;123&quot; data-line-index=&quot;137,137&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;123&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;change-deletion&quot; data-column-number=&quot;124&quot; data-line-index=&quot;138,138&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;124&lt;/span&gt;&lt;/div&gt;&lt;div data-gutter-buffer=&quot;buffer&quot; data-buffer-size=&quot;2&quot; style=&quot;grid-row: span 2;min-height:calc(2 * 1lh);&quot;&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;125&quot; data-line-index=&quot;142,141&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;125&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;div data-content=&quot;&quot; style=&quot;grid-row: span 38&quot;&gt;&lt;div data-separator=&quot;line-info&quot; data-separator-first=&quot;&quot;&gt;&lt;div data-separator-wrapper=&quot;&quot;&gt;&lt;div data-separator-content=&quot;&quot;&gt;&lt;span data-unmodified-lines=&quot;&quot;&gt;45 unmodified lines&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div data-line=&quot;46&quot; data-alt-line=&quot;46&quot; data-line-type=&quot;context&quot; data-line-index=&quot;45,45&quot;&gt;
+&lt;/div&gt;&lt;div data-line=&quot;47&quot; data-alt-line=&quot;47&quot; data-line-type=&quot;context&quot; data-line-index=&quot;46,46&quot;&gt;&lt;span style=&quot;color:#FF678D&quot;&gt;export&lt;/span&gt;&lt;span style=&quot;color:#D568EA&quot;&gt; const&lt;/span&gt;&lt;span style=&quot;color:#FFAB16&quot;&gt; FlowEvidenceFactKindSchema&lt;/span&gt;&lt;span style=&quot;color:#08C0EF&quot;&gt; =&lt;/span&gt;&lt;span style=&quot;color:#FFA359&quot;&gt; z&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;.&lt;/span&gt;&lt;span style=&quot;color:#9D6AFB&quot;&gt;enum&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;([&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;48&quot; data-alt-line=&quot;48&quot; data-line-type=&quot;context&quot; data-line-index=&quot;47,47&quot;&gt;&lt;span style=&quot;color:#5ECC71&quot;&gt;  &quot;execution_aggression&quot;&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;,&lt;/span&gt;&lt;/div&gt;&lt;div data-content-buffer=&quot;&quot; data-buffer-size=&quot;1&quot; style=&quot;grid-row: span 1;min-height:calc(1 * 1lh)&quot;&gt;&lt;/div&gt;&lt;div data-line=&quot;49&quot; data-alt-line=&quot;50&quot; data-line-type=&quot;context&quot; data-line-index=&quot;49,49&quot;&gt;&lt;span style=&quot;color:#5ECC71&quot;&gt;  &quot;premium_size&quot;&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;,&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;50&quot; data-alt-line=&quot;51&quot; data-line-type=&quot;context&quot; data-line-index=&quot;50,50&quot;&gt;&lt;span style=&quot;color:#5ECC71&quot;&gt;  &quot;structure_shape&quot;&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;,&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;51&quot; data-alt-line=&quot;52&quot; data-line-type=&quot;context&quot; data-line-index=&quot;51,51&quot;&gt;&lt;span style=&quot;color:#5ECC71&quot;&gt;  &quot;quote_quality&quot;&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;,&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;52&quot; data-alt-line=&quot;53&quot; data-line-type=&quot;context&quot; data-line-index=&quot;52,52&quot;&gt;&lt;span style=&quot;color:#5ECC71&quot;&gt;  &quot;timing_context&quot;&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;,&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;53&quot; data-alt-line=&quot;54&quot; data-line-type=&quot;context&quot; data-line-index=&quot;53,53&quot;&gt;&lt;span style=&quot;color:#5ECC71&quot;&gt;  &quot;underlying_context&quot;&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;,&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;54&quot; data-alt-line=&quot;55&quot; data-line-type=&quot;context&quot; data-line-index=&quot;54,54&quot;&gt;&lt;span style=&quot;color:#5ECC71&quot;&gt;  &quot;event_context&quot;&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;,&lt;/span&gt;&lt;/div&gt;&lt;div data-content-buffer=&quot;&quot; data-buffer-size=&quot;1&quot; style=&quot;grid-row: span 1;min-height:calc(1 * 1lh)&quot;&gt;&lt;/div&gt;&lt;div data-line=&quot;55&quot; data-alt-line=&quot;57&quot; data-line-type=&quot;context&quot; data-line-index=&quot;56,56&quot;&gt;&lt;span style=&quot;color:#5ECC71&quot;&gt;  &quot;synthetic_ground_truth&quot;&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;,&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;56&quot; data-alt-line=&quot;58&quot; data-line-type=&quot;context&quot; data-line-index=&quot;57,57&quot;&gt;&lt;span style=&quot;color:#5ECC71&quot;&gt;  &quot;other&quot;&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;57&quot; data-alt-line=&quot;59&quot; data-line-type=&quot;context&quot; data-line-index=&quot;58,58&quot;&gt;&lt;span style=&quot;color:#636363&quot;&gt;]);&lt;/span&gt;&lt;/div&gt;&lt;div data-separator=&quot;line-info&quot;&gt;&lt;div data-separator-wrapper=&quot;&quot;&gt;&lt;div data-separator-content=&quot;&quot;&gt;&lt;span data-unmodified-lines=&quot;&quot;&gt;61 unmodified lines&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div data-line=&quot;119&quot; data-alt-line=&quot;121&quot; data-line-type=&quot;context&quot; data-line-index=&quot;120,120&quot;&gt;
+&lt;/div&gt;&lt;div data-line=&quot;120&quot; data-alt-line=&quot;122&quot; data-line-type=&quot;context&quot; data-line-index=&quot;121,121&quot;&gt;&lt;span style=&quot;color:#FF678D&quot;&gt;export&lt;/span&gt;&lt;span style=&quot;color:#D568EA&quot;&gt; type&lt;/span&gt;&lt;span style=&quot;color:#D568EA&quot;&gt; BaselineSnapshot&lt;/span&gt;&lt;span style=&quot;color:#08C0EF&quot;&gt; =&lt;/span&gt;&lt;span style=&quot;color:#FFAB16&quot;&gt; z&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;.&lt;/span&gt;&lt;span style=&quot;color:#D568EA&quot;&gt;infer&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;&amp;#x3C;&lt;/span&gt;&lt;span style=&quot;color:#FF678D&quot;&gt;typeof&lt;/span&gt;&lt;span style=&quot;color:#FFA359&quot;&gt; BaselineSnapshotSchema&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;&gt;;&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;121&quot; data-alt-line=&quot;123&quot; data-line-type=&quot;context&quot; data-line-index=&quot;122,122&quot;&gt;
+&lt;/div&gt;&lt;div data-content-buffer=&quot;&quot; data-buffer-size=&quot;13&quot; style=&quot;grid-row: span 13;min-height:calc(13 * 1lh)&quot;&gt;&lt;/div&gt;&lt;div data-line=&quot;122&quot; data-alt-line=&quot;137&quot; data-line-type=&quot;context&quot; data-line-index=&quot;136,136&quot;&gt;&lt;span style=&quot;color:#FF678D&quot;&gt;export&lt;/span&gt;&lt;span style=&quot;color:#D568EA&quot;&gt; const&lt;/span&gt;&lt;span style=&quot;color:#FFAB16&quot;&gt; FlowEligibilitySchema&lt;/span&gt;&lt;span style=&quot;color:#08C0EF&quot;&gt; =&lt;/span&gt;&lt;span style=&quot;color:#FFA359&quot;&gt; z&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;.&lt;/span&gt;&lt;span style=&quot;color:#9D6AFB&quot;&gt;object&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;({&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;123&quot; data-alt-line=&quot;138&quot; data-line-type=&quot;context&quot; data-line-index=&quot;137,137&quot;&gt;&lt;span style=&quot;color:#FFA359&quot;&gt;  eligible&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;:&lt;/span&gt;&lt;span style=&quot;color:#FFA359&quot;&gt; z&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;.&lt;/span&gt;&lt;span style=&quot;color:#9D6AFB&quot;&gt;boolean&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;(),&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;124&quot; data-line-type=&quot;change-deletion&quot; data-line-index=&quot;138,138&quot;&gt;&lt;span style=&quot;color:#FFA359&quot;&gt;  &lt;/span&gt;&lt;span data-diff-span=&quot;&quot;&gt;&lt;span style=&quot;color:#FFA359&quot;&gt;reasons&lt;/span&gt;&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;:&lt;/span&gt;&lt;span style=&quot;color:#FFA359&quot;&gt; &lt;/span&gt;&lt;span data-diff-span=&quot;&quot;&gt;&lt;span style=&quot;color:#FFA359&quot;&gt;z&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;.&lt;/span&gt;&lt;span style=&quot;color:#9D6AFB&quot;&gt;array&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;(&lt;/span&gt;&lt;span style=&quot;color:#FFA359&quot;&gt;z&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;.&lt;/span&gt;&lt;span style=&quot;color:#9D6AFB&quot;&gt;string&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;().&lt;/span&gt;&lt;span style=&quot;color:#9D6AFB&quot;&gt;min&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;(&lt;/span&gt;&lt;span style=&quot;color:#68CDF2&quot;&gt;1&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;))&lt;/span&gt;&lt;/span&gt;&lt;/div&gt;&lt;div data-content-buffer=&quot;&quot; data-buffer-size=&quot;2&quot; style=&quot;grid-row: span 2;min-height:calc(2 * 1lh)&quot;&gt;&lt;/div&gt;&lt;div data-line=&quot;125&quot; data-alt-line=&quot;142&quot; data-line-type=&quot;context&quot; data-line-index=&quot;142,141&quot;&gt;&lt;span style=&quot;color:#636363&quot;&gt;});&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/code&gt;&lt;code data-code=&quot;&quot; data-container-size=&quot;&quot; data-additions=&quot;&quot;&gt;&lt;div data-gutter=&quot;&quot; style=&quot;grid-row: span 38&quot;&gt;&lt;div data-separator=&quot;line-info&quot; data-separator-first=&quot;&quot;&gt;&lt;div data-separator-wrapper=&quot;&quot;&gt;&lt;div data-separator-content=&quot;&quot;&gt;&lt;span data-unmodified-lines=&quot;&quot;&gt;45 unmodified lines&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;46&quot; data-line-index=&quot;45,45&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;46&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;47&quot; data-line-index=&quot;46,46&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;47&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;48&quot; data-line-index=&quot;47,47&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;48&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;change-addition&quot; data-column-number=&quot;49&quot; data-line-index=&quot;48,48&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;49&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;50&quot; data-line-index=&quot;49,49&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;50&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;51&quot; data-line-index=&quot;50,50&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;51&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;52&quot; data-line-index=&quot;51,51&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;52&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;53&quot; data-line-index=&quot;52,52&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;53&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;54&quot; data-line-index=&quot;53,53&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;54&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;55&quot; data-line-index=&quot;54,54&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;55&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;change-addition&quot; data-column-number=&quot;56&quot; data-line-index=&quot;55,55&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;56&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;57&quot; data-line-index=&quot;56,56&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;57&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;58&quot; data-line-index=&quot;57,57&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;58&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;59&quot; data-line-index=&quot;58,58&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;59&lt;/span&gt;&lt;/div&gt;&lt;div data-separator=&quot;line-info&quot;&gt;&lt;div data-separator-wrapper=&quot;&quot;&gt;&lt;div data-separator-content=&quot;&quot;&gt;&lt;span data-unmodified-lines=&quot;&quot;&gt;61 unmodified lines&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;121&quot; data-line-index=&quot;120,120&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;121&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;122&quot; data-line-index=&quot;121,121&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;122&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;123&quot; data-line-index=&quot;122,122&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;123&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;change-addition&quot; data-column-number=&quot;124&quot; data-line-index=&quot;123,123&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;124&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;change-addition&quot; data-column-number=&quot;125&quot; data-line-index=&quot;124,124&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;125&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;change-addition&quot; data-column-number=&quot;126&quot; data-line-index=&quot;125,125&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;126&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;change-addition&quot; data-column-number=&quot;127&quot; data-line-index=&quot;126,126&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;127&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;change-addition&quot; data-column-number=&quot;128&quot; data-line-index=&quot;127,127&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;128&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;change-addition&quot; data-column-number=&quot;129&quot; data-line-index=&quot;128,128&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;129&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;change-addition&quot; data-column-number=&quot;130&quot; data-line-index=&quot;129,129&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;130&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;change-addition&quot; data-column-number=&quot;131&quot; data-line-index=&quot;130,130&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;131&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;change-addition&quot; data-column-number=&quot;132&quot; data-line-index=&quot;131,131&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;132&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;change-addition&quot; data-column-number=&quot;133&quot; data-line-index=&quot;132,132&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;133&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;change-addition&quot; data-column-number=&quot;134&quot; data-line-index=&quot;133,133&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;134&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;change-addition&quot; data-column-number=&quot;135&quot; data-line-index=&quot;134,134&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;135&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;change-addition&quot; data-column-number=&quot;136&quot; data-line-index=&quot;135,135&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;136&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;137&quot; data-line-index=&quot;136,136&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;137&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;138&quot; data-line-index=&quot;137,137&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;138&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;change-addition&quot; data-column-number=&quot;139&quot; data-line-index=&quot;139,138&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;139&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;change-addition&quot; data-column-number=&quot;140&quot; data-line-index=&quot;140,139&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;140&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;change-addition&quot; data-column-number=&quot;141&quot; data-line-index=&quot;141,140&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;141&lt;/span&gt;&lt;/div&gt;&lt;div data-line-type=&quot;context&quot; data-column-number=&quot;142&quot; data-line-index=&quot;142,141&quot;&gt;&lt;span data-line-number-content=&quot;&quot;&gt;142&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;div data-content=&quot;&quot; style=&quot;grid-row: span 38&quot;&gt;&lt;div data-separator=&quot;line-info&quot; data-separator-first=&quot;&quot;&gt;&lt;div data-separator-wrapper=&quot;&quot;&gt;&lt;div data-separator-content=&quot;&quot;&gt;&lt;span data-unmodified-lines=&quot;&quot;&gt;45 unmodified lines&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div data-line=&quot;46&quot; data-alt-line=&quot;46&quot; data-line-type=&quot;context&quot; data-line-index=&quot;45,45&quot;&gt;
+&lt;/div&gt;&lt;div data-line=&quot;47&quot; data-alt-line=&quot;47&quot; data-line-type=&quot;context&quot; data-line-index=&quot;46,46&quot;&gt;&lt;span style=&quot;color:#FF678D&quot;&gt;export&lt;/span&gt;&lt;span style=&quot;color:#D568EA&quot;&gt; const&lt;/span&gt;&lt;span style=&quot;color:#FFAB16&quot;&gt; FlowEvidenceFactKindSchema&lt;/span&gt;&lt;span style=&quot;color:#08C0EF&quot;&gt; =&lt;/span&gt;&lt;span style=&quot;color:#FFA359&quot;&gt; z&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;.&lt;/span&gt;&lt;span style=&quot;color:#9D6AFB&quot;&gt;enum&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;([&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;48&quot; data-alt-line=&quot;48&quot; data-line-type=&quot;context&quot; data-line-index=&quot;47,47&quot;&gt;&lt;span style=&quot;color:#5ECC71&quot;&gt;  &quot;execution_aggression&quot;&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;,&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;49&quot; data-line-type=&quot;change-addition&quot; data-line-index=&quot;48,48&quot;&gt;&lt;span style=&quot;color:#5ECC71&quot;&gt;  &quot;execution_context&quot;&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;,&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;50&quot; data-alt-line=&quot;49&quot; data-line-type=&quot;context&quot; data-line-index=&quot;49,49&quot;&gt;&lt;span style=&quot;color:#5ECC71&quot;&gt;  &quot;premium_size&quot;&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;,&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;51&quot; data-alt-line=&quot;50&quot; data-line-type=&quot;context&quot; data-line-index=&quot;50,50&quot;&gt;&lt;span style=&quot;color:#5ECC71&quot;&gt;  &quot;structure_shape&quot;&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;,&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;52&quot; data-alt-line=&quot;51&quot; data-line-type=&quot;context&quot; data-line-index=&quot;51,51&quot;&gt;&lt;span style=&quot;color:#5ECC71&quot;&gt;  &quot;quote_quality&quot;&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;,&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;53&quot; data-alt-line=&quot;52&quot; data-line-type=&quot;context&quot; data-line-index=&quot;52,52&quot;&gt;&lt;span style=&quot;color:#5ECC71&quot;&gt;  &quot;timing_context&quot;&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;,&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;54&quot; data-alt-line=&quot;53&quot; data-line-type=&quot;context&quot; data-line-index=&quot;53,53&quot;&gt;&lt;span style=&quot;color:#5ECC71&quot;&gt;  &quot;underlying_context&quot;&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;,&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;55&quot; data-alt-line=&quot;54&quot; data-line-type=&quot;context&quot; data-line-index=&quot;54,54&quot;&gt;&lt;span style=&quot;color:#5ECC71&quot;&gt;  &quot;event_context&quot;&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;,&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;56&quot; data-line-type=&quot;change-addition&quot; data-line-index=&quot;55,55&quot;&gt;&lt;span style=&quot;color:#5ECC71&quot;&gt;  &quot;eligibility_decision&quot;&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;,&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;57&quot; data-alt-line=&quot;55&quot; data-line-type=&quot;context&quot; data-line-index=&quot;56,56&quot;&gt;&lt;span style=&quot;color:#5ECC71&quot;&gt;  &quot;synthetic_ground_truth&quot;&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;,&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;58&quot; data-alt-line=&quot;56&quot; data-line-type=&quot;context&quot; data-line-index=&quot;57,57&quot;&gt;&lt;span style=&quot;color:#5ECC71&quot;&gt;  &quot;other&quot;&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;59&quot; data-alt-line=&quot;57&quot; data-line-type=&quot;context&quot; data-line-index=&quot;58,58&quot;&gt;&lt;span style=&quot;color:#636363&quot;&gt;]);&lt;/span&gt;&lt;/div&gt;&lt;div data-separator=&quot;line-info&quot;&gt;&lt;div data-separator-wrapper=&quot;&quot;&gt;&lt;div data-separator-content=&quot;&quot;&gt;&lt;span data-unmodified-lines=&quot;&quot;&gt;61 unmodified lines&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div data-line=&quot;121&quot; data-alt-line=&quot;119&quot; data-line-type=&quot;context&quot; data-line-index=&quot;120,120&quot;&gt;
+&lt;/div&gt;&lt;div data-line=&quot;122&quot; data-alt-line=&quot;120&quot; data-line-type=&quot;context&quot; data-line-index=&quot;121,121&quot;&gt;&lt;span style=&quot;color:#FF678D&quot;&gt;export&lt;/span&gt;&lt;span style=&quot;color:#D568EA&quot;&gt; type&lt;/span&gt;&lt;span style=&quot;color:#D568EA&quot;&gt; BaselineSnapshot&lt;/span&gt;&lt;span style=&quot;color:#08C0EF&quot;&gt; =&lt;/span&gt;&lt;span style=&quot;color:#FFAB16&quot;&gt; z&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;.&lt;/span&gt;&lt;span style=&quot;color:#D568EA&quot;&gt;infer&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;&amp;#x3C;&lt;/span&gt;&lt;span style=&quot;color:#FF678D&quot;&gt;typeof&lt;/span&gt;&lt;span style=&quot;color:#FFA359&quot;&gt; BaselineSnapshotSchema&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;&gt;;&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;123&quot; data-alt-line=&quot;121&quot; data-line-type=&quot;context&quot; data-line-index=&quot;122,122&quot;&gt;
+&lt;/div&gt;&lt;div data-line=&quot;124&quot; data-line-type=&quot;change-addition&quot; data-line-index=&quot;123,123&quot;&gt;&lt;span style=&quot;color:#FF678D&quot;&gt;export&lt;/span&gt;&lt;span style=&quot;color:#D568EA&quot;&gt; const&lt;/span&gt;&lt;span style=&quot;color:#FFAB16&quot;&gt; FlowEligibilityStatusSchema&lt;/span&gt;&lt;span style=&quot;color:#08C0EF&quot;&gt; =&lt;/span&gt;&lt;span style=&quot;color:#FFA359&quot;&gt; z&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;.&lt;/span&gt;&lt;span style=&quot;color:#9D6AFB&quot;&gt;enum&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;([&lt;/span&gt;&lt;span style=&quot;color:#5ECC71&quot;&gt;&quot;accepted&quot;&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;,&lt;/span&gt;&lt;span style=&quot;color:#5ECC71&quot;&gt; &quot;rejected&quot;&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;,&lt;/span&gt;&lt;span style=&quot;color:#5ECC71&quot;&gt; &quot;down_weighted&quot;&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;]);&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;125&quot; data-line-type=&quot;change-addition&quot; data-line-index=&quot;124,124&quot;&gt;
+&lt;/div&gt;&lt;div data-line=&quot;126&quot; data-line-type=&quot;change-addition&quot; data-line-index=&quot;125,125&quot;&gt;&lt;span style=&quot;color:#FF678D&quot;&gt;export&lt;/span&gt;&lt;span style=&quot;color:#D568EA&quot;&gt; type&lt;/span&gt;&lt;span style=&quot;color:#D568EA&quot;&gt; FlowEligibilityStatus&lt;/span&gt;&lt;span style=&quot;color:#08C0EF&quot;&gt; =&lt;/span&gt;&lt;span style=&quot;color:#FFAB16&quot;&gt; z&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;.&lt;/span&gt;&lt;span style=&quot;color:#D568EA&quot;&gt;infer&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;&amp;#x3C;&lt;/span&gt;&lt;span style=&quot;color:#FF678D&quot;&gt;typeof&lt;/span&gt;&lt;span style=&quot;color:#FFA359&quot;&gt; FlowEligibilityStatusSchema&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;&gt;;&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;127&quot; data-line-type=&quot;change-addition&quot; data-line-index=&quot;126,126&quot;&gt;
+&lt;/div&gt;&lt;div data-line=&quot;128&quot; data-line-type=&quot;change-addition&quot; data-line-index=&quot;127,127&quot;&gt;&lt;span style=&quot;color:#FF678D&quot;&gt;export&lt;/span&gt;&lt;span style=&quot;color:#D568EA&quot;&gt; const&lt;/span&gt;&lt;span style=&quot;color:#FFAB16&quot;&gt; FlowEligibilityDecisionSchema&lt;/span&gt;&lt;span style=&quot;color:#08C0EF&quot;&gt; =&lt;/span&gt;&lt;span style=&quot;color:#FFA359&quot;&gt; z&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;.&lt;/span&gt;&lt;span style=&quot;color:#9D6AFB&quot;&gt;object&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;({&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;129&quot; data-line-type=&quot;change-addition&quot; data-line-index=&quot;128,128&quot;&gt;&lt;span style=&quot;color:#FFA359&quot;&gt;  status&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;:&lt;/span&gt;&lt;span style=&quot;color:#FFA359&quot;&gt; FlowEligibilityStatusSchema&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;,&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;130&quot; data-line-type=&quot;change-addition&quot; data-line-index=&quot;129,129&quot;&gt;&lt;span style=&quot;color:#FFA359&quot;&gt;  reason_code&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;:&lt;/span&gt;&lt;span style=&quot;color:#FFA359&quot;&gt; z&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;.&lt;/span&gt;&lt;span style=&quot;color:#9D6AFB&quot;&gt;string&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;().&lt;/span&gt;&lt;span style=&quot;color:#9D6AFB&quot;&gt;min&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;(&lt;/span&gt;&lt;span style=&quot;color:#68CDF2&quot;&gt;1&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;),&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;131&quot; data-line-type=&quot;change-addition&quot; data-line-index=&quot;130,130&quot;&gt;&lt;span style=&quot;color:#FFA359&quot;&gt;  reason&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;:&lt;/span&gt;&lt;span style=&quot;color:#FFA359&quot;&gt; z&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;.&lt;/span&gt;&lt;span style=&quot;color:#9D6AFB&quot;&gt;string&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;().&lt;/span&gt;&lt;span style=&quot;color:#9D6AFB&quot;&gt;min&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;(&lt;/span&gt;&lt;span style=&quot;color:#68CDF2&quot;&gt;1&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;),&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;132&quot; data-line-type=&quot;change-addition&quot; data-line-index=&quot;131,131&quot;&gt;&lt;span style=&quot;color:#FFA359&quot;&gt;  evidence_refs&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;:&lt;/span&gt;&lt;span style=&quot;color:#FFA359&quot;&gt; z&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;.&lt;/span&gt;&lt;span style=&quot;color:#9D6AFB&quot;&gt;array&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;(&lt;/span&gt;&lt;span style=&quot;color:#FFA359&quot;&gt;z&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;.&lt;/span&gt;&lt;span style=&quot;color:#9D6AFB&quot;&gt;string&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;().&lt;/span&gt;&lt;span style=&quot;color:#9D6AFB&quot;&gt;min&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;(&lt;/span&gt;&lt;span style=&quot;color:#68CDF2&quot;&gt;1&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;))&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;133&quot; data-line-type=&quot;change-addition&quot; data-line-index=&quot;132,132&quot;&gt;&lt;span style=&quot;color:#636363&quot;&gt;});&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;134&quot; data-line-type=&quot;change-addition&quot; data-line-index=&quot;133,133&quot;&gt;
+&lt;/div&gt;&lt;div data-line=&quot;135&quot; data-line-type=&quot;change-addition&quot; data-line-index=&quot;134,134&quot;&gt;&lt;span style=&quot;color:#FF678D&quot;&gt;export&lt;/span&gt;&lt;span style=&quot;color:#D568EA&quot;&gt; type&lt;/span&gt;&lt;span style=&quot;color:#D568EA&quot;&gt; FlowEligibilityDecision&lt;/span&gt;&lt;span style=&quot;color:#08C0EF&quot;&gt; =&lt;/span&gt;&lt;span style=&quot;color:#FFAB16&quot;&gt; z&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;.&lt;/span&gt;&lt;span style=&quot;color:#D568EA&quot;&gt;infer&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;&amp;#x3C;&lt;/span&gt;&lt;span style=&quot;color:#FF678D&quot;&gt;typeof&lt;/span&gt;&lt;span style=&quot;color:#FFA359&quot;&gt; FlowEligibilityDecisionSchema&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;&gt;;&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;136&quot; data-line-type=&quot;change-addition&quot; data-line-index=&quot;135,135&quot;&gt;
+&lt;/div&gt;&lt;div data-line=&quot;137&quot; data-alt-line=&quot;122&quot; data-line-type=&quot;context&quot; data-line-index=&quot;136,136&quot;&gt;&lt;span style=&quot;color:#FF678D&quot;&gt;export&lt;/span&gt;&lt;span style=&quot;color:#D568EA&quot;&gt; const&lt;/span&gt;&lt;span style=&quot;color:#FFAB16&quot;&gt; FlowEligibilitySchema&lt;/span&gt;&lt;span style=&quot;color:#08C0EF&quot;&gt; =&lt;/span&gt;&lt;span style=&quot;color:#FFA359&quot;&gt; z&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;.&lt;/span&gt;&lt;span style=&quot;color:#9D6AFB&quot;&gt;object&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;({&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;138&quot; data-alt-line=&quot;123&quot; data-line-type=&quot;context&quot; data-line-index=&quot;137,137&quot;&gt;&lt;span style=&quot;color:#FFA359&quot;&gt;  eligible&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;:&lt;/span&gt;&lt;span style=&quot;color:#FFA359&quot;&gt; z&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;.&lt;/span&gt;&lt;span style=&quot;color:#9D6AFB&quot;&gt;boolean&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;(),&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;139&quot; data-line-type=&quot;change-addition&quot; data-line-index=&quot;139,138&quot;&gt;&lt;span style=&quot;color:#FFA359&quot;&gt;  &lt;/span&gt;&lt;span data-diff-span=&quot;&quot;&gt;&lt;span style=&quot;color:#FFA359&quot;&gt;status&lt;/span&gt;&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;:&lt;/span&gt;&lt;span style=&quot;color:#FFA359&quot;&gt; &lt;/span&gt;&lt;span data-diff-span=&quot;&quot;&gt;&lt;span style=&quot;color:#FFA359&quot;&gt;FlowEligibilityStatusSchema&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;,&lt;/span&gt;&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;140&quot; data-line-type=&quot;change-addition&quot; data-line-index=&quot;140,139&quot;&gt;&lt;span style=&quot;color:#FFA359&quot;&gt;  reasons&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;:&lt;/span&gt;&lt;span style=&quot;color:#FFA359&quot;&gt; z&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;.&lt;/span&gt;&lt;span style=&quot;color:#9D6AFB&quot;&gt;array&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;(&lt;/span&gt;&lt;span style=&quot;color:#FFA359&quot;&gt;z&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;.&lt;/span&gt;&lt;span style=&quot;color:#9D6AFB&quot;&gt;string&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;().&lt;/span&gt;&lt;span style=&quot;color:#9D6AFB&quot;&gt;min&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;(&lt;/span&gt;&lt;span style=&quot;color:#68CDF2&quot;&gt;1&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;)),&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;141&quot; data-line-type=&quot;change-addition&quot; data-line-index=&quot;141,140&quot;&gt;&lt;span style=&quot;color:#FFA359&quot;&gt;  decisions&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;:&lt;/span&gt;&lt;span style=&quot;color:#FFA359&quot;&gt; z&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;.&lt;/span&gt;&lt;span style=&quot;color:#9D6AFB&quot;&gt;array&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;(&lt;/span&gt;&lt;span style=&quot;color:#FFA359&quot;&gt;FlowEligibilityDecisionSchema&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;).&lt;/span&gt;&lt;span style=&quot;color:#9D6AFB&quot;&gt;min&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;(&lt;/span&gt;&lt;span style=&quot;color:#68CDF2&quot;&gt;1&lt;/span&gt;&lt;span style=&quot;color:#636363&quot;&gt;)&lt;/span&gt;&lt;/div&gt;&lt;div data-line=&quot;142&quot; data-alt-line=&quot;125&quot; data-line-type=&quot;context&quot; data-line-index=&quot;142,141&quot;&gt;&lt;span style=&quot;color:#636363&quot;&gt;});&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/body&gt;&lt;/html&gt;"></iframe></div>
+    <div class="diff-block"><pre><code><span class="file">diff --git a/services/compute/src/smart-flow-evidence.ts b/services/compute/src/smart-flow-evidence.ts</span>
+<span class="ctx">new file mode 100644</span>
+<span class="file">index 0000000..782e67d</span>
+<span class="file">--- /dev/null</span>
+<span class="file">+++ b/services/compute/src/smart-flow-evidence.ts</span>
+<span class="hunk">@@ -0,0 +1,54 @@</span>
+<span class="add">+import {</span>
+<span class="add">+  type EvidenceQuality,</span>
+<span class="add">+  type EvidenceQualityGrade,</span>
+<span class="add">+  type FlowCandidate,</span>
+<span class="add">+  FlowCandidateSchema,</span>
+<span class="add">+  type FlowEligibility,</span>
+<span class="add">+  type FlowEligibilityDecision,</span>
+<span class="add">+  type FlowEligibilityStatus,</span>
+<span class="add">+  type FlowEvidenceFact,</span>
+<span class="add">+  FlowEvidenceFactSchema,</span>
+<span class="add">+  type FlowFeatureValue,</span>
+<span class="add">+  type FlowObservationRef,</span>
+<span class="add">+  type FlowPacket,</span>
+<span class="add">+  SMART_FLOW_CONTRACT_VERSION</span>
+<span class="add">+} from &quot;@islandflow/types&quot;;</span>
+<span class="add">+import { parseContractId } from &quot;./contracts&quot;;</span>
+<span class="add">+</span>
+<span class="add">+export type FlowEvidenceExtractionConfig = {</span>
+<span class="add">+  minPremium?: number;</span>
+<span class="add">+  minSize?: number;</span>
+<span class="add">+  minNbboCoverageRatio?: number;</span>
+<span class="add">+  maxNbboStaleRatio?: number;</span>
+<span class="add">+  maxOptionSpreadBps?: number;</span>
+<span class="add">+  maxUnderlyingSpreadBps?: number;</span>
+<span class="add">+  maxSpecialPrintRatio?: number;</span>
+<span class="add">+  maxInsideRatioWithoutAggression?: number;</span>
+<span class="add">+  minAggressorRatioForInsideContext?: number;</span>
+<span class="add">+};</span>
+<span class="add">+</span>
+<span class="add">+export type FlowEvidenceCandidateExtraction = {</span>
+<span class="add">+  candidate: FlowCandidate;</span>
+<span class="add">+  evidence_facts: FlowEvidenceFact[];</span>
+<span class="add">+};</span>
+<span class="add">+</span>
+<span class="add">+const DEFAULT_CONFIG = {</span>
+<span class="add">+  minPremium: 10_000,</span>
+<span class="add">+  minSize: 1,</span>
+<span class="add">+  minNbboCoverageRatio: 0.35,</span>
+<span class="add">+  maxNbboStaleRatio: 0.5,</span>
+<span class="add">+  maxOptionSpreadBps: 800,</span>
+<span class="add">+  maxUnderlyingSpreadBps: 150,</span>
+<span class="add">+  maxSpecialPrintRatio: 0.34,</span>
+<span class="add">+  maxInsideRatioWithoutAggression: 0.7,</span>
+<span class="add">+  minAggressorRatioForInsideContext: 0.35</span>
+<span class="add">+} satisfies Required&lt;FlowEvidenceExtractionConfig&gt;;</span>
+<span class="add">+</span>
+<span class="add">+const SPECIAL_PRINT_CONDITIONS = new Set([</span>
+<span class="add">+  &quot;AUCTION&quot;,</span>
+<span class="add">+  &quot;CROSS&quot;,</span>
+<span class="add">+  &quot;OPENING&quot;,</span>
+<span class="hunk">@@ -0,0 +281,102 @@</span>
+<span class="add">+export const buildFlowEvidenceCandidateFromPacket = (</span>
+<span class="add">+  packet: FlowPacket,</span>
+<span class="add">+  config: FlowEvidenceExtractionConfig = {}</span>
+<span class="add">+): FlowEvidenceCandidateExtraction =&gt; {</span>
+<span class="add">+  const resolvedConfig = { ...DEFAULT_CONFIG, ...config };</span>
+<span class="add">+  const contractId = stringFeature(packet, &quot;option_contract_id&quot;);</span>
+<span class="add">+  const parsedContract = parseContractId(contractId);</span>
+<span class="add">+  const underlyingId = stringFeature(packet, &quot;underlying_id&quot;) || parsedContract?.root || &quot;UNKNOWN&quot;;</span>
+<span class="add">+  const sourceTs = numberFeature(packet, &quot;end_ts&quot;) ?? packet.source_ts;</span>
+<span class="add">+  const packetRef = buildPacketRef(packet);</span>
+<span class="add">+  const memberRefs = buildMemberRefs(packet, sourceTs);</span>
+<span class="add">+  const quoteRef = optionalQuoteRef(packet, contractId || packet.id, sourceTs);</span>
+<span class="add">+  const underlyingQuoteRef = optionalUnderlyingQuoteRef(packet, underlyingId, sourceTs);</span>
+<span class="add">+  const observationRefs = [packetRef, ...memberRefs, quoteRef, underlyingQuoteRef].filter(</span>
+<span class="add">+    (ref): ref is FlowObservationRef =&gt; Boolean(ref)</span>
+<span class="add">+  );</span>
+<span class="add">+  const evidenceRefs = [packet.id, ...packet.members];</span>
+<span class="add">+</span>
+<span class="add">+  const printCount = Math.max(</span>
+<span class="add">+    0,</span>
+<span class="add">+    Math.round(numberFeature(packet, &quot;count&quot;) ?? packet.members.length)</span>
+<span class="add">+  );</span>
+<span class="add">+  const totalPremium = numberFeature(packet, &quot;total_premium&quot;) ?? 0;</span>
+<span class="add">+  const totalSize = numberFeature(packet, &quot;total_size&quot;) ?? 0;</span>
+<span class="add">+  const nbboCoverageRatio = clampUnit(numberFeature(packet, &quot;nbbo_coverage_ratio&quot;) ?? 0);</span>
+<span class="add">+  const staleCount = Math.max(0, numberFeature(packet, &quot;nbbo_stale_count&quot;) ?? 0);</span>
+<span class="add">+  const missingCount = Math.max(0, numberFeature(packet, &quot;nbbo_missing_count&quot;) ?? 0);</span>
+<span class="add">+  const staleRatio = printCount &gt; 0 ? clampUnit((staleCount + missingCount) / printCount) : 1;</span>
+<span class="add">+  const insideRatio = clampUnit(numberFeature(packet, &quot;nbbo_inside_ratio&quot;) ?? 0);</span>
+<span class="add">+  const aggressiveRatio = clampUnit(numberFeature(packet, &quot;nbbo_aggressive_ratio&quot;) ?? 0);</span>
+<span class="add">+  const specialPrintCount = Math.max(0, numberFeature(packet, &quot;special_print_count&quot;) ?? 0);</span>
+<span class="add">+  const specialPrintRatio = printCount &gt; 0 ? clampUnit(specialPrintCount / printCount) : 0;</span>
+<span class="add">+  const conditions = splitConditions(stringFeature(packet, &quot;conditions&quot;));</span>
+<span class="add">+  const hasNoisyCondition = conditions.some((condition) =&gt; SPECIAL_PRINT_CONDITIONS.has(condition));</span>
+<span class="add">+  const nbboAgeMs = numericJoinQuality(packet, &quot;nbbo_age_ms&quot;);</span>
+<span class="add">+  const optionSpread = optionSpreadBps(packet);</span>
+<span class="add">+  const underlyingSpread = underlyingSpreadBps(packet);</span>
+<span class="add">+</span>
+<span class="add">+  const decisions: FlowEligibilityDecision[] = [];</span>
+<span class="add">+  const addDecision = (</span>
+<span class="add">+    status: FlowEligibilityDecision[&quot;status&quot;],</span>
+<span class="add">+    reasonCode: string,</span>
+<span class="add">+    reason: string</span>
+<span class="add">+  ): void =&gt; {</span>
+<span class="add">+    decisions.push({</span>
+<span class="add">+      status,</span>
+<span class="add">+      reason_code: reasonCode,</span>
+<span class="add">+      reason,</span>
+<span class="add">+      evidence_refs: evidenceRefs</span>
+<span class="add">+    });</span>
+<span class="add">+  };</span>
+<span class="add">+</span>
+<span class="add">+  if (printCount &lt;= 0 || totalSize &lt; resolvedConfig.minSize) {</span>
+<span class="add">+    addDecision(</span>
+<span class="add">+      &quot;rejected&quot;,</span>
+<span class="add">+      &quot;insufficient_observation_size&quot;,</span>
+<span class="add">+      &quot;The packet does not contain enough observed option size for evidence extraction.&quot;</span>
+<span class="add">+    );</span>
+<span class="add">+  }</span>
+<span class="add">+  if (nbboCoverageRatio &lt; resolvedConfig.minNbboCoverageRatio) {</span>
+<span class="add">+    addDecision(</span>
+<span class="add">+      &quot;rejected&quot;,</span>
+<span class="add">+      missingCount &gt;= staleCount ? &quot;missing_quote_context&quot; : &quot;stale_quote_context&quot;,</span>
+<span class="add">+      &quot;NBBO coverage is too thin to treat the packet as usable quote-backed evidence.&quot;</span>
+<span class="add">+    );</span>
+<span class="add">+  } else if (staleRatio &gt;= resolvedConfig.maxNbboStaleRatio) {</span>
+<span class="add">+    addDecision(</span>
+<span class="add">+      &quot;rejected&quot;,</span>
+<span class="add">+      &quot;stale_quote_context&quot;,</span>
+<span class="add">+      &quot;Too much of the packet depends on stale or missing quote context.&quot;</span>
+<span class="add">+    );</span>
+<span class="add">+  } else if (staleRatio &gt; 0) {</span>
+<span class="add">+    addDecision(</span>
+<span class="add">+      &quot;down_weighted&quot;,</span>
+<span class="add">+      &quot;stale_quote_context&quot;,</span>
+<span class="add">+      &quot;Some prints have stale or missing quote context, so downstream evidence should be discounted.&quot;</span>
+<span class="add">+    );</span>
+<span class="add">+  }</span>
+<span class="add">+  if (optionSpread !== null &amp;&amp; optionSpread &gt; resolvedConfig.maxOptionSpreadBps) {</span>
+<span class="add">+    addDecision(</span>
+<span class="add">+      &quot;down_weighted&quot;,</span>
+<span class="add">+      &quot;wide_quote_context&quot;,</span>
+<span class="add">+      &quot;The option NBBO spread is wide enough to weaken execution-side evidence.&quot;</span>
+<span class="add">+    );</span>
+<span class="add">+  }</span>
+<span class="hunk">@@ -0,0 +543,60 @@</span>
+<span class="add">+  const featureVector: Record&lt;string, FlowFeatureValue&gt; = {</span>
+<span class="add">+    total_premium: roundTo(totalPremium, 2),</span>
+<span class="add">+    total_size: roundTo(totalSize, 2),</span>
+<span class="add">+    print_count: printCount,</span>
+<span class="add">+    nbbo_coverage_ratio: roundTo(nbboCoverageRatio),</span>
+<span class="add">+    nbbo_stale_ratio: roundTo(staleRatio),</span>
+<span class="add">+    nbbo_aggressive_ratio: roundTo(aggressiveRatio),</span>
+<span class="add">+    nbbo_inside_ratio: roundTo(insideRatio),</span>
+<span class="add">+    option_spread_bps: optionSpread,</span>
+<span class="add">+    underlying_spread_bps: underlyingSpread,</span>
+<span class="add">+    special_print_ratio: roundTo(specialPrintRatio),</span>
+<span class="add">+    eligibility_status: eligibility.status,</span>
+<span class="add">+    conditions: conditions.length &gt; 0 ? conditions.join(&quot;,&quot;) : null</span>
+<span class="add">+  };</span>
+<span class="add">+</span>
+<span class="add">+  const candidate = FlowCandidateSchema.parse({</span>
+<span class="add">+    schema_version: SMART_FLOW_CONTRACT_VERSION,</span>
+<span class="add">+    candidate_id: `candidate:${packet.id}`,</span>
+<span class="add">+    underlying_id: underlyingId,</span>
+<span class="add">+    observed_at_ts: sourceTs,</span>
+<span class="add">+    packet_ids: [packet.id],</span>
+<span class="add">+    member_print_ids: packet.members,</span>
+<span class="add">+    observation_refs: observationRefs,</span>
+<span class="add">+    feature_vector: featureVector,</span>
+<span class="add">+    baseline_snapshot: null,</span>
+<span class="add">+    evidence_quality: evidenceQuality,</span>
+<span class="add">+    eligibility</span>
+<span class="add">+  });</span>
+<span class="add">+</span>
+<span class="add">+  return {</span>
+<span class="add">+    candidate,</span>
+<span class="add">+    evidence_facts: facts.map((fact) =&gt; FlowEvidenceFactSchema.parse(fact))</span>
+<span class="add">+  };</span>
+<span class="add">+};</span></code></pre></div>
+    <div class="diff-block"><pre><code><span class="file">diff --git a/services/compute/tests/smart-flow-evidence.test.ts b/services/compute/tests/smart-flow-evidence.test.ts</span>
+<span class="ctx">new file mode 100644</span>
+<span class="file">index 0000000..19d3e18</span>
+<span class="file">--- /dev/null</span>
+<span class="file">+++ b/services/compute/tests/smart-flow-evidence.test.ts</span>
+<span class="hunk">@@ -0,0 +34,90 @@</span>
+<span class="add">+describe(&quot;smart-flow evidence extraction&quot;, () =&gt; {</span>
+<span class="add">+  it(&quot;builds accepted evidence facts with raw refs and quote context&quot;, () =&gt; {</span>
+<span class="add">+    const packet = buildFlowPacket({</span>
+<span class="add">+      id: &quot;flowpacket:evidence-accepted&quot;,</span>
+<span class="add">+      members: [&quot;print:1&quot;, &quot;print:2&quot;],</span>
+<span class="add">+      features: {</span>
+<span class="add">+        option_contract_id: &quot;SPY-2025-02-21-450-C&quot;,</span>
+<span class="add">+        underlying_id: &quot;SPY&quot;,</span>
+<span class="add">+        count: 2,</span>
+<span class="add">+        total_size: 900,</span>
+<span class="add">+        total_premium: 75_000,</span>
+<span class="add">+        nbbo_bid: 1.2,</span>
+<span class="add">+        nbbo_ask: 1.24,</span>
+<span class="add">+        nbbo_mid: 1.22,</span>
+<span class="add">+        nbbo_spread: 0.04,</span>
+<span class="add">+        nbbo_coverage_ratio: 1,</span>
+<span class="add">+        nbbo_aggressive_ratio: 0.8,</span>
+<span class="add">+        nbbo_inside_ratio: 0.1,</span>
+<span class="add">+        underlying_bid: 449.9,</span>
+<span class="add">+        underlying_ask: 450.1,</span>
+<span class="add">+        underlying_mid: 450,</span>
+<span class="add">+        underlying_spread: 0.2</span>
+<span class="add">+      },</span>
+<span class="add">+      join_quality: {</span>
+<span class="add">+        nbbo_age_ms: 25,</span>
+<span class="add">+        underlying_quote_age_ms: 35</span>
+<span class="add">+      }</span>
+<span class="add">+    });</span>
+<span class="add">+</span>
+<span class="add">+    const extraction = buildFlowEvidenceCandidateFromPacket(packet);</span>
+<span class="add">+</span>
+<span class="add">+    expect(extraction.candidate.eligibility.status).toBe(&quot;accepted&quot;);</span>
+<span class="add">+    expect(extraction.candidate.member_print_ids).toEqual([&quot;print:1&quot;, &quot;print:2&quot;]);</span>
+<span class="add">+    expect(extraction.candidate.observation_refs.map((ref) =&gt; ref.kind)).toContain(&quot;option_nbbo&quot;);</span>
+<span class="add">+    expect(extraction.candidate.observation_refs.map((ref) =&gt; ref.kind)).toContain(&quot;equity_quote&quot;);</span>
+<span class="add">+  });</span>
+<span class="add">+</span>
+<span class="add">+  it(&quot;rejects stale quote evidence with explicit reasons&quot;, () =&gt; {</span>
+<span class="add">+    const packet = buildFlowPacket({</span>
+<span class="add">+      id: &quot;flowpacket:evidence-stale&quot;,</span>
+<span class="add">+      members: [&quot;print:stale-1&quot;, &quot;print:stale-2&quot;, &quot;print:stale-3&quot;, &quot;print:stale-4&quot;],</span>
+<span class="add">+      features: {</span>
+<span class="add">+        option_contract_id: &quot;SPY-2025-02-21-450-C&quot;,</span>
+<span class="add">+        underlying_id: &quot;SPY&quot;,</span>
+<span class="add">+        count: 4,</span>
+<span class="add">+        total_size: 1200,</span>
+<span class="add">+        total_premium: 90_000,</span>
+<span class="add">+        nbbo_coverage_ratio: 0.25,</span>
+<span class="add">+        nbbo_stale_count: 3,</span>
+<span class="add">+        nbbo_missing_count: 1</span>
+<span class="add">+      }</span>
+<span class="add">+    });</span>
+<span class="add">+</span>
+<span class="add">+    const extraction = buildFlowEvidenceCandidateFromPacket(packet);</span>
+<span class="add">+</span>
+<span class="add">+    expect(extraction.candidate.eligibility.status).toBe(&quot;rejected&quot;);</span>
+<span class="add">+    expect(extraction.candidate.eligibility.reasons).toContain(&quot;stale_quote_context&quot;);</span>
+<span class="add">+  });</span>
+<span class="add">+</span>
+<span class="add">+  it(&quot;down-weights wide and noisy context without hypothesis language&quot;, () =&gt; {</span>
+<span class="add">+    const extraction = buildFlowEvidenceCandidateFromPacket(packet);</span>
+<span class="add">+</span>
+<span class="add">+    expect(extraction.candidate.eligibility.status).toBe(&quot;down_weighted&quot;);</span>
+<span class="add">+    expect(extraction.candidate.eligibility.reasons).toEqual(</span>
+<span class="add">+      expect.arrayContaining([&quot;wide_quote_context&quot;, &quot;noisy_print_context&quot;, &quot;inside_market_context&quot;])</span>
+<span class="add">+    );</span>
+<span class="add">+</span>
+<span class="add">+    const serializedFacts = JSON.stringify(extraction.evidence_facts);</span>
+<span class="add">+    expect(serializedFacts.toLowerCase()).not.toContain(&quot;smart money&quot;);</span>
+<span class="add">+    expect(serializedFacts.toLowerCase()).not.toContain(&quot;hypothesis&quot;);</span>
+<span class="add">+  });</span>
+<span class="add">+});</span></code></pre></div>
+  </section>
+
+  <section>
+    <h2>Expected Impact for End-Users</h2>
+    <p>There is no direct UI or API change yet. The intended end-user effect is downstream: future smart-flow outputs can explain whether evidence was accepted, rejected, or discounted because of quote freshness, spread width, or noisy trade context.</p>
+  </section>
+
+  <section>
+    <h2>Validation</h2>
+    <table class="validation-table">
+      <thead><tr><th>Gate</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td><code>bun test packages/types/tests services/compute/tests</code></td><td>Passed, 61 tests.</td></tr>
+        <tr><td><code>bunx biome check packages/types/src/smart-flow.ts packages/types/tests/smart-flow.test.ts services/compute/src/smart-flow-evidence.ts services/compute/tests/smart-flow-evidence.test.ts</code></td><td>Passed with no fixes after formatting.</td></tr>
+        <tr><td><code>bun run typecheck</code></td><td>Passed across apps, packages, and services.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Issues, Limitations, and Mitigations</h2>
+    <ul>
+      <li>The extractor uses current packet feature fields and does not add new raw quote trace IDs where upstream packets do not already expose them.</li>
+      <li>Thresholds are deterministic starter policy for eligibility, not historical calibration.</li>
+      <li>The output is not persisted or published yet, which keeps this child issue focused and avoids changing runtime behavior before clustering is scoped.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Follow-up Work</h2>
+    <ul>
+      <li><code>islandflow-zxh.2.2</code>: build deterministic evidence clusters and traceable feature summaries from these candidate facts.</li>
+      <li>Decide in a later scoped issue where evidence candidates should be published or stored.</li>
+      <li>Consider promoting reason codes to a shared enum if multiple services start producing eligibility decisions.</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>
