@@ -133,7 +133,16 @@ describe("smart-flow contracts", () => {
       evidence_quality: evidenceQuality,
       eligibility: {
         eligible: true,
-        reasons: ["large_enough_for_review"]
+        status: "accepted",
+        reasons: ["large_enough_for_review"],
+        decisions: [
+          {
+            status: "accepted",
+            reason_code: "large_enough_for_review",
+            reason: "The candidate is large enough for review.",
+            evidence_refs: ["flowpacket:1", "print:1"]
+          }
+        ]
       }
     });
 

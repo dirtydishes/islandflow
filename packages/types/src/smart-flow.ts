@@ -46,12 +46,14 @@ export type FlowObservationRef = z.infer<typeof FlowObservationRefSchema>;
 
 export const FlowEvidenceFactKindSchema = z.enum([
   "execution_aggression",
+  "execution_context",
   "premium_size",
   "structure_shape",
   "quote_quality",
   "timing_context",
   "underlying_context",
   "event_context",
+  "eligibility_decision",
   "synthetic_ground_truth",
   "other"
 ]);
@@ -119,9 +121,24 @@ export const BaselineSnapshotSchema = z.object({
 
 export type BaselineSnapshot = z.infer<typeof BaselineSnapshotSchema>;
 
+export const FlowEligibilityStatusSchema = z.enum(["accepted", "rejected", "down_weighted"]);
+
+export type FlowEligibilityStatus = z.infer<typeof FlowEligibilityStatusSchema>;
+
+export const FlowEligibilityDecisionSchema = z.object({
+  status: FlowEligibilityStatusSchema,
+  reason_code: z.string().min(1),
+  reason: z.string().min(1),
+  evidence_refs: z.array(z.string().min(1))
+});
+
+export type FlowEligibilityDecision = z.infer<typeof FlowEligibilityDecisionSchema>;
+
 export const FlowEligibilitySchema = z.object({
   eligible: z.boolean(),
-  reasons: z.array(z.string().min(1))
+  status: FlowEligibilityStatusSchema,
+  reasons: z.array(z.string().min(1)),
+  decisions: z.array(FlowEligibilityDecisionSchema).min(1)
 });
 
 export type FlowEligibility = z.infer<typeof FlowEligibilitySchema>;
