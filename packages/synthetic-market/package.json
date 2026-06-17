@@ -6,7 +6,8 @@
     ".": "./src/index.ts",
     "./cli": "./src/cli.ts",
     "./fixtures": "./src/fixtures.ts",
-    "./manifest": "./src/manifest.ts"
+    "./manifest": "./src/manifest.ts",
+    "./scenarios": "./src/scenarios.ts"
   },
   "scripts": {
     "generate-fixture": "bun run src/cli.ts"
