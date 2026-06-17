@@ -27,7 +27,8 @@
     "typecheck": "bun run scripts/typecheck.ts",
     "check:public-api-routes": "bun run scripts/check-public-api-routes.ts",
     "sync:docker-workspace": "bun run scripts/sync-docker-workspace.ts",
-    "check:docker-workspace": "bun run scripts/check-docker-workspace.ts"
+    "check:docker-workspace": "bun run scripts/check-docker-workspace.ts",
+    "synthetic:fixture": "bun --cwd=packages/synthetic-market run generate-fixture"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.16",
