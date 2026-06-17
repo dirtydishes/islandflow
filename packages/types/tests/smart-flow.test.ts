@@ -169,6 +169,15 @@ describe("smart-flow contracts", () => {
       feature_summary: {
         total_premium: 75_000
       },
+      feature_details: {
+        total_premium: {
+          label: "Observed premium",
+          value: 75_000,
+          basis: "measured_fact",
+          fact_ids: ["fact:premium"],
+          evidence_refs: ["packet:1"]
+        }
+      },
       start_ts: 10,
       end_ts: 510,
       window_ms: 500

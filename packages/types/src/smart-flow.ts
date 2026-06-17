@@ -64,6 +64,14 @@ export const FlowFeatureValueSchema = z.union([z.string(), z.number(), z.boolean
 
 export type FlowFeatureValue = z.infer<typeof FlowFeatureValueSchema>;
 
+export const FlowFeatureBasisSchema = z.enum([
+  "measured_fact",
+  "derived_metric",
+  "inferred_structure"
+]);
+
+export type FlowFeatureBasis = z.infer<typeof FlowFeatureBasisSchema>;
+
 export const FlowEvidenceFactSchema = z.object({
   fact_id: z.string().min(1),
   kind: FlowEvidenceFactKindSchema,
@@ -74,6 +82,16 @@ export const FlowEvidenceFactSchema = z.object({
 });
 
 export type FlowEvidenceFact = z.infer<typeof FlowEvidenceFactSchema>;
+
+export const FlowTraceableFeatureSchema = z.object({
+  label: z.string().min(1),
+  value: FlowFeatureValueSchema,
+  basis: FlowFeatureBasisSchema,
+  fact_ids: z.array(z.string().min(1)).min(1),
+  evidence_refs: z.array(z.string().min(1)).min(1)
+});
+
+export type FlowTraceableFeature = z.infer<typeof FlowTraceableFeatureSchema>;
 
 export const EvidenceQualityGradeSchema = z.enum(["poor", "thin", "usable", "strong"]);
 
@@ -171,6 +189,7 @@ export const FlowEvidenceClusterSchema = z.object({
   evidence_quality: EvidenceQualitySchema,
   baseline_snapshot: BaselineSnapshotSchema.nullable(),
   feature_summary: z.record(FlowFeatureValueSchema),
+  feature_details: z.record(FlowTraceableFeatureSchema),
   start_ts: z.number().int().nonnegative(),
   end_ts: z.number().int().nonnegative(),
   window_ms: z.number().int().nonnegative()
