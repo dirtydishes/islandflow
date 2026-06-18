@@ -717,26 +717,31 @@ const run = async () => {
     env.EQUITIES_INGEST_ADAPTER
   );
   const syntheticBackendDisabledReason = getSyntheticBackendDisabledReason(syntheticBackendMode);
-  const syntheticControlKv = await openSyntheticControlKv(js);
-  let syntheticControl = resolveSyntheticProfileControlState(
-    await ensureSyntheticControlState(syntheticControlKv)
-  );
+  let syntheticControl = resolveSyntheticProfileControlState(null);
+  let syntheticControlKv: Awaited<ReturnType<typeof openSyntheticControlKv>> | null = null;
+  let stopSyntheticControlWatch = async () => {};
+  if (syntheticBackendMode === "synthetic") {
+    syntheticControlKv = await openSyntheticControlKv(js);
+    syntheticControl = resolveSyntheticProfileControlState(
+      await ensureSyntheticControlState(syntheticControlKv)
+    );
+    stopSyntheticControlWatch = await watchSyntheticControlState(
+      syntheticControlKv,
+      (nextControl) => {
+        syntheticControl = resolveSyntheticProfileControlState(nextControl);
+      },
+      (error) => {
+        logger.warn("synthetic control watch failed", {
+          error: getErrorMessage(error)
+        });
+      }
+    );
+  }
   const syntheticProfileCatalog = {
     demo_profiles: listDemoProfileSummaries(),
     load_profiles: listLoadProfileSummaries()
   };
   const syntheticProfileHits = createRollingSyntheticProfileHits();
-  const stopSyntheticControlWatch = await watchSyntheticControlState(
-    syntheticControlKv,
-    (nextControl) => {
-      syntheticControl = nextControl;
-    },
-    (error) => {
-      logger.warn("synthetic control watch failed", {
-        error: getErrorMessage(error)
-      });
-    }
-  );
 
   const clickhouse = createClickHouseClient({
     url: env.CLICKHOUSE_URL,
@@ -1416,6 +1421,9 @@ const run = async () => {
           const authError = authenticateSyntheticAdminRequest(req);
           if (authError) {
             return authError;
+          }
+          if (!syntheticControlKv) {
+            return jsonResponse({ error: "synthetic control unavailable" }, 500);
           }
           try {
             const rawControl = (await readJsonBody(req)) as Partial<SyntheticControlState>;

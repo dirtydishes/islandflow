@@ -193,9 +193,9 @@ export const SYNTHETIC_LOAD_PROFILES: readonly LoadProfile[] = [
   }
 ] as const;
 
-export const listDemoProfiles = (): DemoProfile[] => clone(SYNTHETIC_DEMO_PROFILES);
+export const listDemoProfiles = (): DemoProfile[] => clone([...SYNTHETIC_DEMO_PROFILES]);
 
-export const listLoadProfiles = (): LoadProfile[] => clone(SYNTHETIC_LOAD_PROFILES);
+export const listLoadProfiles = (): LoadProfile[] => clone([...SYNTHETIC_LOAD_PROFILES]);
 
 export const listDemoProfileSummaries = (): DemoProfileSummary[] =>
   listDemoProfiles().map(({ control_defaults, ...profile }) => profile);

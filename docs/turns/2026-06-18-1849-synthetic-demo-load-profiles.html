@@ -490,6 +490,35 @@ new file mode 100644
       </section>
 
       <section>
+        <h2>Followup Changes</h2>
+        <p>
+          A PR review pass added two focused fixes after the original implementation was documented.
+        </p>
+        <ul>
+          <li>
+            <code>services/api/src/index.ts</code> now opens, ensures, and watches the synthetic
+            control KV only when both hosted ingest adapters are synthetic. Live and mixed API
+            deployments no longer gain an unnecessary synthetic control KV dependency.
+          </li>
+          <li>
+            <code>packages/synthetic-market/src/profiles.ts</code> now clones mutable array copies
+            from the readonly profile constants so the profile list helpers pass package
+            typechecking cleanly.
+          </li>
+          <li>
+            Rerun validation passed with <code>bun test</code>,
+            <code>bun --cwd=apps/web run build</code>, <code>bun run typecheck</code>, and
+            <code>git diff --check</code>.
+          </li>
+          <li>
+            Residual risk: this review did not manually exercise a live NATS and ClickHouse
+            synthetic control session. Coverage is from code review, unit tests, typecheck, and
+            production web build validation.
+          </li>
+        </ul>
+      </section>
+
+      <section>
         <h2>Validation</h2>
         <div class="validation">
           <div class="check">
