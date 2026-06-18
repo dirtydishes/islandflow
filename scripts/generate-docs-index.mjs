@@ -408,9 +408,16 @@ function renderDocument(items) {
 `;
 }
 
+function stripTrailingWhitespace(value) {
+  return value
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .join("\n");
+}
+
 async function main() {
   const files = await collectDocsFiles(docsDir);
-  const html = renderDocument(files);
+  const html = stripTrailingWhitespace(renderDocument(files));
   await fs.writeFile(outputFile, html, "utf8");
   console.log(`Generated ${outputFile} with ${files.length} entries.`);
 }

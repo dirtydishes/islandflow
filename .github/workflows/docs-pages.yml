@@ -4,10 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - "docs/**"
-      - "scripts/generate-docs-index.mjs"
-      - ".github/workflows/docs-pages.yml"
   workflow_dispatch:
 
 permissions:
@@ -40,6 +36,13 @@ jobs:
           printf '%s\n' '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=https://dirtydishes.github.io/islandflow/docs/"><title>Islandflow Docs</title><a href="https://dirtydishes.github.io/islandflow/docs/">Continue to docs</a>' > site/index.html
           touch site/.nojekyll
 
+      - name: Check docs payload
+        run: |
+          node scripts/check-docs-pages-mirror.mjs \
+            --source docs \
+            --payload site \
+            --expected-docs-url "https://dirtydishes.github.io/${PAGES_PREFIX}/docs/"
+
       - name: Verify Pages publish token
         env:
           DOCS_PAGES_TOKEN: ${{ secrets.DOCS_PAGES_TOKEN }}
@@ -62,10 +65,19 @@ jobs:
       - name: Mirror docs into Pages site
         run: |
           set -euo pipefail
-          rm -rf "pages/${PAGES_PREFIX}"
           mkdir -p "pages/${PAGES_PREFIX}"
-          cp -R site/. "pages/${PAGES_PREFIX}/"
+          rm -rf "pages/${PAGES_PREFIX}/docs"
+          cp -R site/docs "pages/${PAGES_PREFIX}/docs"
+          cp site/index.html "pages/${PAGES_PREFIX}/index.html"
           touch pages/.nojekyll
+
+      - name: Check Pages mirror
+        run: |
+          node scripts/check-docs-pages-mirror.mjs \
+            --source docs \
+            --payload site \
+            --published "pages/${PAGES_PREFIX}" \
+            --expected-docs-url "https://dirtydishes.github.io/${PAGES_PREFIX}/docs/"
 
       - name: Commit and push Pages mirror
         run: |
