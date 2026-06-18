@@ -12,6 +12,7 @@ import {
   SMART_FLOW_POLICY_VERSION,
   SmartFlowInsightSchema,
   SmartMoneyInsightSchema,
+  smartFlowInsightFromHypothesisEvent,
   smartFlowInsightFromLegacySmartMoneyEvent
 } from "../src/smart-flow";
 
@@ -262,6 +263,11 @@ describe("smart-flow contracts", () => {
     expect(parsed.scores.policy_version).toBe(SMART_FLOW_HYPOTHESIS_SCORE_POLICY_VERSION);
     expect(parsed.scores.penalties[0]?.kind).toBe("wide_quote_context");
     expect(parsed.abstention.abstained).toBe(false);
+
+    const insight = smartFlowInsightFromHypothesisEvent(parsed);
+    expect(insight.hypothesis_id).toBe(parsed.hypothesis_id);
+    expect(insight.compatibility).toBeUndefined();
+    expect(insight.summary).toContain("Alternative explanations considered");
   });
 
   it("projects legacy smart-money events into compatibility-only smart-flow insights", () => {
