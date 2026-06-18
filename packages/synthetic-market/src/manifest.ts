@@ -18,6 +18,8 @@ export type SyntheticFixtureArtifactLayout = {
   market_events_path: string;
   provenance_path: string;
   parameter_snapshot_path: string;
+  labels_path?: string;
+  smart_flow_outputs_path?: string;
 };
 
 export type SyntheticFixtureProfileIdentity = {
@@ -40,6 +42,16 @@ export type ExpectedOutputManifestEventHash = {
   kind: GeneratedMarketEventKind;
   trace_id: string;
   hash: string;
+};
+
+export type SyntheticFixtureExpectedOutputContract = {
+  hidden_labels_embedded_in_market_events: false;
+  labels_path: string | null;
+  smart_flow_outputs_path: string | null;
+  labels_hash?: string;
+  smart_flow_outputs_hash?: string;
+  label_count?: number;
+  expected_output_count?: number;
 };
 
 export type ExpectedOutputManifest = {
@@ -65,11 +77,7 @@ export type ExpectedOutputManifest = {
   };
   replay_plan: ReplayPlan;
   artifacts: SyntheticFixtureArtifactLayout;
-  expected_output_contract: {
-    hidden_labels_embedded_in_market_events: false;
-    labels_path: null;
-    smart_flow_outputs_path: null;
-  };
+  expected_output_contract: SyntheticFixtureExpectedOutputContract;
 };
 
 export type BuildExpectedOutputManifestInput = {
@@ -77,6 +85,9 @@ export type BuildExpectedOutputManifestInput = {
   run_name: string;
   profile_source_path?: string;
   artifact_layout?: Partial<SyntheticFixtureArtifactLayout>;
+  expected_output_contract?: Partial<
+    Omit<SyntheticFixtureExpectedOutputContract, "hidden_labels_embedded_in_market_events">
+  >;
 };
 
 export const DEFAULT_SYNTHETIC_FIXTURE_ARTIFACT_LAYOUT: SyntheticFixtureArtifactLayout = {
@@ -141,8 +152,12 @@ export const buildExpectedOutputManifest = (
     artifacts,
     expected_output_contract: {
       hidden_labels_embedded_in_market_events: false,
-      labels_path: null,
-      smart_flow_outputs_path: null
+      labels_path: input.expected_output_contract?.labels_path ?? null,
+      smart_flow_outputs_path: input.expected_output_contract?.smart_flow_outputs_path ?? null,
+      labels_hash: input.expected_output_contract?.labels_hash,
+      smart_flow_outputs_hash: input.expected_output_contract?.smart_flow_outputs_hash,
+      label_count: input.expected_output_contract?.label_count,
+      expected_output_count: input.expected_output_contract?.expected_output_count
     }
   };
 };
@@ -197,6 +212,14 @@ export const parseExpectedOutputManifest = (value: unknown): ExpectedOutputManif
       `Manifest event_count ${parsed.run.event_count} does not match ${parsed.event_hashes.events.length} event hashes.`
     );
   }
+  if (parsed.expected_output_contract?.hidden_labels_embedded_in_market_events !== false) {
+    throw new Error("Synthetic fixture manifest must declare market events label-free.");
+  }
+  assertNullablePath(parsed.expected_output_contract.labels_path, "labels_path");
+  assertNullablePath(
+    parsed.expected_output_contract.smart_flow_outputs_path,
+    "smart_flow_outputs_path"
+  );
 
   return parsed;
 };
@@ -259,4 +282,12 @@ const requireRecord = (value: unknown, fieldName: string): Record<string, unknow
     throw new Error(`Synthetic fixture ${fieldName} must be an object.`);
   }
   return value as Record<string, unknown>;
+};
+
+const assertNullablePath = (value: unknown, fieldName: string) => {
+  if (value !== null && typeof value !== "string") {
+    throw new Error(
+      `Synthetic fixture expected_output_contract.${fieldName} must be a path or null.`
+    );
+  }
 };
