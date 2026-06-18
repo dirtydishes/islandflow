@@ -5,6 +5,13 @@ import { SP500_SYMBOLS } from "./sp500";
 
 const SYNTHETIC_PROFILE_WEIGHT_VALUES = [0.6, 1.0, 1.6] as const;
 const SYNTHETIC_COVERAGE_WINDOW_VALUES = [10, 20, 30] as const;
+const SYNTHETIC_DEMO_PROFILE_IDS = [
+  "market-command",
+  "event-response",
+  "quiet-range",
+  "stress-tape"
+] as const;
+const SYNTHETIC_LOAD_PROFILE_IDS = ["steady", "active", "firehose"] as const;
 const SYNTHETIC_SYMBOLS = ["SPY", ...(SP500_SYMBOLS as readonly string[])];
 const EVENT_SYMBOL_POOL = [
   "AAPL",
@@ -46,6 +53,12 @@ export const SyntheticControlPresetIdSchema = z.enum([
 ]);
 export type SyntheticControlPresetId = z.infer<typeof SyntheticControlPresetIdSchema>;
 
+export const SyntheticDemoProfileIdSchema = z.enum(SYNTHETIC_DEMO_PROFILE_IDS);
+export type SyntheticDemoProfileId = z.infer<typeof SyntheticDemoProfileIdSchema>;
+
+export const SyntheticLoadProfileIdSchema = z.enum(SYNTHETIC_LOAD_PROFILE_IDS);
+export type SyntheticLoadProfileId = z.infer<typeof SyntheticLoadProfileIdSchema>;
+
 export const SyntheticCoverageWindowMinutesSchema = z.union([
   z.literal(10),
   z.literal(20),
@@ -74,6 +87,8 @@ export type SyntheticProfileWeightMap = z.infer<typeof SyntheticProfileWeightMap
 
 export const SyntheticControlStateSchema = z
   .object({
+    demo_profile_id: SyntheticDemoProfileIdSchema,
+    load_profile_id: SyntheticLoadProfileIdSchema,
     preset_id: SyntheticControlPresetIdSchema,
     coverage_assist: z.boolean(),
     coverage_window_minutes: SyntheticCoverageWindowMinutesSchema,
@@ -161,6 +176,8 @@ const DEFAULT_PROFILE_WEIGHTS: SyntheticProfileWeightMap = {
 };
 
 export const DEFAULT_SYNTHETIC_CONTROL_STATE: SyntheticControlState = {
+  demo_profile_id: "market-command",
+  load_profile_id: "steady",
   preset_id: "balanced_demo",
   coverage_assist: true,
   coverage_window_minutes: 20,
@@ -766,6 +783,8 @@ export const getSyntheticBurstPulse = (
 };
 
 export const SYNTHETIC_CONTROL_METADATA = {
+  demoProfileIds: SYNTHETIC_DEMO_PROFILE_IDS,
+  loadProfileIds: SYNTHETIC_LOAD_PROFILE_IDS,
   profileWeightValues: SYNTHETIC_PROFILE_WEIGHT_VALUES,
   coverageWindowValues: SYNTHETIC_COVERAGE_WINDOW_VALUES,
   smartMoneyProfileIds: SMART_MONEY_PROFILE_IDS

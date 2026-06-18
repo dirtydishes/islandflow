@@ -6,6 +6,7 @@ import type {
   OptionType
 } from "@islandflow/types";
 
+export * from "./profiles";
 export * from "./scenarios";
 
 export const SYNTHETIC_MARKET_GENERATOR_VERSION = "synthetic-market-spine-v1";

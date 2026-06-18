@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
-  DEFAULT_SYNTHETIC_CONTROL_STATE,
   buildEmptySyntheticProfileHitCounts,
+  DEFAULT_SYNTHETIC_CONTROL_STATE,
   getSyntheticCoverageBoost,
   getSyntheticScenarioWeights,
   getSyntheticSessionState,
@@ -9,6 +9,11 @@ import {
 } from "../src/synthetic-market";
 
 describe("synthetic market regime engine", () => {
+  it("includes named demo and load profile selectors in the default control state", () => {
+    expect(DEFAULT_SYNTHETIC_CONTROL_STATE.demo_profile_id).toBe("market-command");
+    expect(DEFAULT_SYNTHETIC_CONTROL_STATE.load_profile_id).toBe("steady");
+  });
+
   it("is deterministic for the same timestamp, control, and seed", () => {
     const ts = Date.parse("2026-01-14T15:25:00Z");
     const sessionA = getSyntheticSessionState(ts, DEFAULT_SYNTHETIC_CONTROL_STATE);
