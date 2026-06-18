@@ -492,7 +492,8 @@ new file mode 100644
       <section>
         <h2>Followup Changes</h2>
         <p>
-          A PR review pass added two focused fixes after the original implementation was documented.
+          A PR review pass added three focused fixes after the original implementation was
+          documented.
         </p>
         <ul>
           <li>
@@ -506,9 +507,13 @@ new file mode 100644
             typechecking cleanly.
           </li>
           <li>
+            <code>deployment/docker/workspace-root/bun.lock</code> was synced so Docker builds see
+            the new synthetic-market workspace dependency edges added by this phase.
+          </li>
+          <li>
             Rerun validation passed with <code>bun test</code>,
             <code>bun --cwd=apps/web run build</code>, <code>bun run typecheck</code>, and
-            <code>git diff --check</code>.
+            <code>bun run check:docker-workspace</code>. The focused whitespace checks also passed.
           </li>
           <li>
             Residual risk: this review did not manually exercise a live NATS and ClickHouse
