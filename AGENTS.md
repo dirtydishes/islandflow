@@ -88,6 +88,50 @@ Agent expectations:
 - Use `fj` for Forgejo pull request workflows (create/view/update PRs).
 - When sharing PR links in handoff, use the Forgejo PR URL.
 
+### Forgejo CLI Quick Reference
+
+Use `fj` for Forgejo-hosted PR work and remote issue visibility. Keep Beads
+authoritative for implementation task tracking: use `bd ready`, `bd show`,
+`bd update`, and `bd close` for work state, and use `bd dolt push` before
+publishing completed sessions. Use `fj issue` only to inspect, comment on, or
+open Forgejo-hosted issue context.
+
+Authentication and repo context:
+
+```bash
+fj -H git.dirtydishes.dev auth login
+fj whoami
+```
+
+Most `fj` commands infer the repository from the current git remote. Add
+`-H git.dirtydishes.dev` when host selection is ambiguous or the command is
+being run outside a configured checkout.
+
+Pull request workflow:
+
+```bash
+fj pr search
+fj pr view <number>
+fj pr status <number> --wait
+fj pr create --base main --head <branch> --title "..." --body "..."
+fj pr create --autofill
+fj pr comment <number> --body-file <file>
+fj pr checkout <number>
+fj pr diff <number>
+fj pr merge <number>
+```
+
+Issue visibility:
+
+```bash
+fj issue search
+fj issue search "<query>" --state all
+fj issue view <number>
+fj issue view <number> comments
+fj issue browse <number>
+fj issue comment <number> --body-file <file>
+```
+
 ## Required Turn Documentation
 
 Follow the global turn-documentation rules in `~/.codex/AGENTS.md` for repository implementation tasks, plan documents, and non-repo computer tasks.
