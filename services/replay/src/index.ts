@@ -1,20 +1,21 @@
-import { readEnv } from "@islandflow/config";
-import { createLogger, createMetrics } from "@islandflow/observability";
 import {
-  SUBJECT_EQUITY_PRINTS,
-  SUBJECT_EQUITY_QUOTES,
-  SUBJECT_OPTION_NBBO,
-  SUBJECT_OPTION_PRINTS,
-  SUBJECT_OPTION_SIGNAL_PRINTS,
+  connectJetStreamWithRetry,
+  ensureKnownStreams,
+  type JetStreamConnection,
+  publishJson,
   STREAM_EQUITY_PRINTS,
   STREAM_EQUITY_QUOTES,
   STREAM_OPTION_NBBO,
   STREAM_OPTION_PRINTS,
   STREAM_OPTION_SIGNAL_PRINTS,
-  connectJetStreamWithRetry,
-  ensureKnownStreams,
-  publishJson
+  SUBJECT_EQUITY_PRINTS,
+  SUBJECT_EQUITY_QUOTES,
+  SUBJECT_OPTION_NBBO,
+  SUBJECT_OPTION_PRINTS,
+  SUBJECT_OPTION_SIGNAL_PRINTS
 } from "@islandflow/bus";
+import { readEnv } from "@islandflow/config";
+import { createLogger, createMetrics } from "@islandflow/observability";
 import {
   createClickHouseClient,
   fetchEquityPrintsAfter,
@@ -24,6 +25,10 @@ import {
 } from "@islandflow/storage";
 import type { EquityPrint, EquityQuote, OptionNBBO, OptionPrint } from "@islandflow/types";
 import { z } from "zod";
+import {
+  loadSyntheticFixtureReplayPlan,
+  type SyntheticFixtureReplayEvent
+} from "./synthetic-fixture";
 
 const service = "replay";
 const logger = createLogger({ service });
@@ -33,6 +38,11 @@ const envSchema = z.object({
   NATS_URL: z.string().default("nats://127.0.0.1:4222"),
   CLICKHOUSE_URL: z.string().default("http://127.0.0.1:8123"),
   CLICKHOUSE_DATABASE: z.string().default("default"),
+  REPLAY_SOURCE: z.enum(["clickhouse", "synthetic_fixture"]).default("clickhouse"),
+  REPLAY_SYNTHETIC_FIXTURE_DIR: z.string().default(""),
+  REPLAY_SYNTHETIC_MANIFEST_PATH: z.string().default(""),
+  REPLAY_SYNTHETIC_SOURCE_ID: z.string().default("synthetic_market"),
+  REPLAY_SYNTHETIC_RUN_ID: z.string().default(""),
   REPLAY_STREAMS: z.string().default("options,nbbo,equities,equity-quotes"),
   REPLAY_START_TS: z.coerce.number().int().nonnegative().default(0),
   REPLAY_END_TS: z.coerce.number().int().nonnegative().default(0),
@@ -197,6 +207,8 @@ const getEventIngestTs = (event: ReplayEvent): number =>
 
 const getEventSeq = (event: ReplayEvent): number => (Number.isFinite(event.seq) ? event.seq : 0);
 
+const getEventStableId = (event: ReplayEvent): string => event.trace_id;
+
 const pickNextEvent = (
   streams: ReplayStream[]
 ): { stream: ReplayStream; event: ReplayEvent } | null => {
@@ -246,6 +258,126 @@ const pickNextEvent = (
   }
 
   return choice;
+};
+
+const pickNextSyntheticEvent = (
+  events: SyntheticFixtureReplayEvent[]
+): SyntheticFixtureReplayEvent | null => events.shift() ?? null;
+
+const resolveSyntheticFixtureInput = () => {
+  const manifestPath = env.REPLAY_SYNTHETIC_MANIFEST_PATH.trim();
+  if (manifestPath) {
+    return { manifest_path: manifestPath };
+  }
+
+  const directory = env.REPLAY_SYNTHETIC_FIXTURE_DIR.trim();
+  if (directory) {
+    return { directory };
+  }
+
+  throw new Error(
+    "REPLAY_SOURCE=synthetic_fixture requires REPLAY_SYNTHETIC_FIXTURE_DIR or REPLAY_SYNTHETIC_MANIFEST_PATH."
+  );
+};
+
+const runSyntheticFixtureReplay = async (
+  js: JetStreamConnection["js"],
+  streamKinds: ReplayStreamKind[]
+) => {
+  const selectedStreams = new Set(streamKinds);
+  const plan = await loadSyntheticFixtureReplayPlan(resolveSyntheticFixtureInput(), {
+    source_id: env.REPLAY_SYNTHETIC_SOURCE_ID,
+    run_id: env.REPLAY_SYNTHETIC_RUN_ID
+  });
+  const startCursor = buildStartCursor(env.REPLAY_START_TS);
+  const endTs = env.REPLAY_END_TS > 0 ? env.REPLAY_END_TS : null;
+  const speed = env.REPLAY_SPEED;
+  const events = plan.events
+    .filter((entry) => selectedStreams.has(entry.stream))
+    .filter((entry) => {
+      const eventTs = getEventTs(entry.event);
+      const eventSeq = getEventSeq(entry.event);
+      return eventTs > startCursor.ts || (eventTs === startCursor.ts && eventSeq > startCursor.seq);
+    });
+
+  logger.info("synthetic fixture replay configured", {
+    source_id: plan.source_id,
+    run_id: plan.run_id,
+    streams: streamKinds,
+    start_ts: env.REPLAY_START_TS,
+    end_ts: endTs,
+    speed,
+    event_count: events.length,
+    manifest_event_count: plan.manifest.run.event_count,
+    order_by: plan.order_by
+  });
+
+  let baseEventTs: number | null = null;
+  let startWallMs = 0;
+  let totalEmitted = 0;
+
+  while (true) {
+    const next = pickNextSyntheticEvent(events);
+    if (!next) {
+      break;
+    }
+
+    const eventTs = getEventTs(next.event);
+    if (endTs !== null && eventTs > endTs) {
+      logger.info("synthetic fixture replay reached end timestamp", {
+        end_ts: endTs,
+        last_ts: eventTs
+      });
+      break;
+    }
+
+    if (baseEventTs === null) {
+      baseEventTs = eventTs;
+      startWallMs = Date.now();
+    }
+
+    if (speed > 0 && baseEventTs !== null) {
+      const targetMs = startWallMs + (eventTs - baseEventTs) / speed;
+      const delayMs = Math.max(0, targetMs - Date.now());
+      if (delayMs > 0) {
+        await sleep(delayMs);
+      }
+    }
+
+    const def = STREAM_DEFS[next.stream];
+    try {
+      await publishJson(js, def.subject, next.event);
+      if (next.stream === "options" && (next.event as OptionPrint).signal_pass) {
+        await publishJson(js, SUBJECT_OPTION_SIGNAL_PRINTS, next.event as OptionPrint);
+      }
+    } catch (error) {
+      logger.error("failed to publish synthetic replay event", {
+        error: error instanceof Error ? error.message : String(error),
+        stream: next.stream,
+        ts: eventTs,
+        seq: getEventSeq(next.event),
+        event_id: getEventStableId(next.event)
+      });
+      throw error;
+    }
+
+    totalEmitted += 1;
+    metrics.count("replay.emitted", 1, { stream: next.stream, source: "synthetic_fixture" });
+
+    if (totalEmitted % env.REPLAY_LOG_EVERY === 0) {
+      logger.info("synthetic fixture replay progress", {
+        emitted: totalEmitted,
+        last_ts: eventTs,
+        last_event_id: getEventStableId(next.event)
+      });
+    }
+  }
+
+  logger.info("synthetic fixture replay complete", {
+    emitted: totalEmitted,
+    source_id: plan.source_id,
+    run_id: plan.run_id
+  });
 };
 
 const retry = async <T>(
@@ -298,6 +430,26 @@ const run = async () => {
   }
   if (streamKinds.includes("options")) {
     await ensureKnownStreams(jsm, [STREAM_OPTION_SIGNAL_PRINTS], { logger });
+  }
+
+  if (env.REPLAY_SOURCE === "synthetic_fixture") {
+    let stopping = false;
+    const shutdown = async (signal: string) => {
+      if (stopping) {
+        return;
+      }
+      stopping = true;
+      logger.info("service stopping", { signal });
+      await nc.drain();
+      process.exit(0);
+    };
+
+    process.on("SIGINT", () => void shutdown("SIGINT"));
+    process.on("SIGTERM", () => void shutdown("SIGTERM"));
+
+    await runSyntheticFixtureReplay(js, streamKinds);
+    await nc.drain();
+    process.exit(0);
   }
 
   const clickhouse = createClickHouseClient({
