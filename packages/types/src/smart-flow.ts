@@ -390,6 +390,54 @@ const clampUnit = (value: number): number => {
   return Math.max(0, Math.min(1, value));
 };
 
+const confidenceBandFromConfidence = (
+  confidence: number
+): z.infer<typeof SmartMoneyConfidenceBandSchema> => {
+  if (confidence >= 0.72) {
+    return "high";
+  }
+  if (confidence >= 0.52) {
+    return "medium";
+  }
+  return "low";
+};
+
+export const smartFlowInsightFromHypothesisEvent = (
+  hypothesis: FlowHypothesisEvent,
+  options: { insight_id?: string } = {}
+): SmartFlowInsight => {
+  const label = hypothesisLabels[hypothesis.hypothesis_type];
+  const confidence = hypothesis.abstention.abstained
+    ? 0
+    : hypothesis.scores.confidence.policy_confidence;
+  const competingAlternatives = hypothesis.alternatives
+    .slice(0, 2)
+    .map((alternative) => hypothesisLabels[alternative.hypothesis_type].toLowerCase());
+  const alternativeSummary =
+    competingAlternatives.length > 0
+      ? ` Alternative explanations considered: ${competingAlternatives.join(", ")}.`
+      : "";
+
+  return SmartFlowInsightSchema.parse({
+    schema_version: hypothesis.schema_version,
+    policy_version: hypothesis.policy_version,
+    insight_id: options.insight_id ?? `smartflow:insight:${hypothesis.hypothesis_id}`,
+    hypothesis_id: hypothesis.hypothesis_id,
+    underlying_id: hypothesis.underlying_id,
+    label,
+    summary: hypothesis.abstention.abstained
+      ? `The current evidence abstains from a canonical flow hypothesis: ${hypothesis.abstention.source_reasons.join("; ") || "policy confidence is too low"}.${alternativeSummary}`
+      : `${label} from evidence-backed ${hypothesis.direction} flow.${alternativeSummary}`,
+    direction: hypothesis.direction,
+    confidence_band: confidenceBandFromConfidence(confidence),
+    confidence,
+    evidence_refs: hypothesis.evidence_refs,
+    abstention: hypothesis.abstention,
+    alternatives: hypothesis.alternatives,
+    ...(hypothesis.compatibility ? { compatibility: hypothesis.compatibility } : {})
+  });
+};
+
 const evidenceQualityFromLegacyEvent = (event: SmartMoneyEvent): EvidenceQuality => {
   const coverage = clampUnit(event.features.nbbo_coverage_ratio);
   const stale = clampUnit(event.features.nbbo_stale_ratio);
@@ -534,29 +582,8 @@ export const smartFlowInsightFromLegacySmartMoneyEvent = (
   event: SmartMoneyEvent
 ): SmartFlowInsight => {
   const hypothesis = flowHypothesisEventFromLegacySmartMoneyEvent(event);
-  const primaryScore =
-    event.profile_scores.find((score) => score.profile_id === event.primary_profile_id) ??
-    event.profile_scores[0] ??
-    null;
-  const label = hypothesisLabels[hypothesis.hypothesis_type];
-  const confidence = hypothesis.scores.confidence.policy_confidence;
 
-  return SmartFlowInsightSchema.parse({
-    schema_version: SMART_FLOW_CONTRACT_VERSION,
-    policy_version: hypothesis.policy_version,
-    insight_id: `smartflow:insight:${event.event_id}`,
-    hypothesis_id: hypothesis.hypothesis_id,
-    underlying_id: event.underlying_id,
-    label,
-    summary: event.abstained
-      ? "The current evidence is not strong enough for a flow hypothesis."
-      : `${label} from evidence-backed ${event.primary_direction} flow.`,
-    direction: event.primary_direction,
-    confidence_band: primaryScore?.confidence_band ?? "low",
-    confidence,
-    evidence_refs: hypothesis.evidence_refs,
-    abstention: hypothesis.abstention,
-    alternatives: hypothesis.alternatives,
-    compatibility: hypothesis.compatibility
+  return smartFlowInsightFromHypothesisEvent(hypothesis, {
+    insight_id: `smartflow:insight:${event.event_id}`
   });
 };

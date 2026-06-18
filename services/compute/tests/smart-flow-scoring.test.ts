@@ -6,7 +6,11 @@ import {
 } from "@islandflow/types";
 import { buildFlowEvidenceClusters } from "../src/smart-flow-clusters";
 import { buildFlowEvidenceCandidateFromPacket } from "../src/smart-flow-evidence";
-import { scoreFlowEvidenceCluster } from "../src/smart-flow-scoring";
+import {
+  buildFlowHypothesisEventFromCluster,
+  buildSmartFlowProjectionFromCluster,
+  scoreFlowEvidenceCluster
+} from "../src/smart-flow-scoring";
 import { buildFlowPacket } from "./helpers";
 
 const clusterFromPackets = (
@@ -71,6 +75,23 @@ describe("smart-flow hypothesis scoring", () => {
     expect(JSON.stringify(scoreFlowEvidenceCluster(cluster)).toLowerCase()).not.toContain(
       "institutional"
     );
+
+    const { hypothesis, insight } = buildSmartFlowProjectionFromCluster(cluster);
+    expect(hypothesis.generated_from).toBe("flow_evidence_cluster");
+    expect(hypothesis.hypothesis_type).toBe("directional_accumulation");
+    expect(hypothesis.direction).toBe("bullish");
+    expect(hypothesis.abstention).toEqual({
+      abstained: false,
+      reasons: ["not_abstained"],
+      source_reasons: []
+    });
+    expect(hypothesis.alternatives.map((entry) => entry.hypothesis_type)).toContain(
+      "retail_attention_flow"
+    );
+    expect(hypothesis.compatibility).toBeUndefined();
+    expect(insight.hypothesis_id).toBe(hypothesis.hypothesis_id);
+    expect(insight.alternatives).toEqual(hypothesis.alternatives);
+    expect(insight.compatibility).toBeUndefined();
   });
 
   it("preserves quote, inside-market, and low-premium negative evidence as penalties", () => {
@@ -115,6 +136,24 @@ describe("smart-flow hypothesis scoring", () => {
     expect(penaltyKinds).toContain("complex_or_special_print_context");
     expect(penaltyKinds).toContain("low_premium");
     expect(allPenalties.every((penalty) => penalty.evidence_refs.length > 0)).toBe(true);
+
+    const hypothesis = buildFlowHypothesisEventFromCluster(cluster);
+    expect(hypothesis.hypothesis_type).toBe("unclear");
+    expect(hypothesis.direction).toBe("unknown");
+    expect(hypothesis.abstention.abstained).toBe(true);
+    expect(hypothesis.abstention.reasons).toEqual(
+      expect.arrayContaining([
+        "inside_market_context",
+        "complex_or_special_print_context",
+        "below_policy_threshold"
+      ])
+    );
+    expect(hypothesis.abstention.source_reasons.join(" ")).toContain("inside_market_context");
+    expect(hypothesis.scores.confidence.policy_confidence).toBe(0);
+    expect(hypothesis.alternatives.length).toBeGreaterThan(1);
+    expect(hypothesis.alternatives.map((entry) => entry.hypothesis_type)).toContain(
+      "structure_arbitrage"
+    );
   });
 
   it("keeps structure-led alternatives neutral instead of forcing direction", () => {
