@@ -33,8 +33,8 @@ describe("synthetic fixture replay integration", () => {
 
     expect(replay.source_id).toBe("synthetic_market");
     expect(replay.run_id).toBe(fixture.manifest.run.run_id);
-    expect(replay.order_by).toEqual(["ts", "ingest_ts", "seq", "event_id"]);
-    expect(replay.events.map((entry) => entry.stable_event_id)).toEqual(
+    expect(replay.order_by).toEqual(["ts", "ingest_ts", "seq", "trace_id"]);
+    expect(replay.events.map((entry) => entry.stable_trace_id)).toEqual(
       fixture.manifest.replay_plan.trace_ids
     );
     expect(new Set(replay.events.map((entry) => entry.stream))).toEqual(

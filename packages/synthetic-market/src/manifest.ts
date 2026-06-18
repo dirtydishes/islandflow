@@ -9,7 +9,7 @@ import {
 } from "./index";
 
 export const SYNTHETIC_FIXTURE_MANIFEST_VERSION = "synthetic-market-fixture-v1";
-export const SYNTHETIC_FIXTURE_REPLAY_ORDERING = ["ts", "ingest_ts", "seq", "event_id"] as const;
+export const SYNTHETIC_FIXTURE_REPLAY_ORDERING = ["ts", "ingest_ts", "seq", "trace_id"] as const;
 
 export type ReplayOrderingKey = (typeof SYNTHETIC_FIXTURE_REPLAY_ORDERING)[number];
 

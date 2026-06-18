@@ -80,6 +80,7 @@ describe("synthetic fixture manifests and CLI", () => {
       partition: "fixture-cli"
     });
     expect(fixtureA.manifest.parameter_snapshot_hash).toBe(fixtureA.batch.parameter_snapshot_hash);
+    expect([...SYNTHETIC_FIXTURE_REPLAY_ORDERING]).toEqual(["ts", "ingest_ts", "seq", "trace_id"]);
     expect(fixtureA.manifest.replay_plan.order_by).toEqual([...SYNTHETIC_FIXTURE_REPLAY_ORDERING]);
     expect(fixtureA.manifest.event_hashes.events).toHaveLength(fixtureA.batch.events.length);
     expect(fixtureA.manifest.expected_output_contract).toEqual({

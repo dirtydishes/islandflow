@@ -207,7 +207,7 @@ const getEventIngestTs = (event: ReplayEvent): number =>
 
 const getEventSeq = (event: ReplayEvent): number => (Number.isFinite(event.seq) ? event.seq : 0);
 
-const getEventStableId = (event: ReplayEvent): string => event.trace_id;
+const getEventTraceId = (event: ReplayEvent): string => event.trace_id;
 
 const pickNextEvent = (
   streams: ReplayStream[]
@@ -356,7 +356,7 @@ const runSyntheticFixtureReplay = async (
         stream: next.stream,
         ts: eventTs,
         seq: getEventSeq(next.event),
-        event_id: getEventStableId(next.event)
+        trace_id: getEventTraceId(next.event)
       });
       throw error;
     }
@@ -368,7 +368,7 @@ const runSyntheticFixtureReplay = async (
       logger.info("synthetic fixture replay progress", {
         emitted: totalEmitted,
         last_ts: eventTs,
-        last_event_id: getEventStableId(next.event)
+        last_trace_id: getEventTraceId(next.event)
       });
     }
   }

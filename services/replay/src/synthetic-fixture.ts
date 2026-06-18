@@ -21,14 +21,14 @@ export type SyntheticFixtureReplayEvent = {
   stream: SyntheticReplayStreamKind;
   generated: GeneratedMarketEvent;
   event: OptionPrint | OptionNBBO | EquityPrint | EquityQuote;
-  stable_event_id: string;
+  stable_trace_id: string;
 };
 
 export type SyntheticFixtureReplayPlan = {
   manifest: ExpectedOutputManifest;
   source_id: string;
   run_id: string;
-  order_by: readonly ["ts", "ingest_ts", "seq", "event_id"];
+  order_by: readonly ["ts", "ingest_ts", "seq", "trace_id"];
   events: SyntheticFixtureReplayEvent[];
 };
 
@@ -90,7 +90,7 @@ export const createSyntheticFixtureReplayPlan = (
   }
 
   const ordered = orderSyntheticReplayEvents(fixture.batch.events);
-  const orderedIds = ordered.map((generated) => getStableEventId(generated));
+  const orderedIds = ordered.map((generated) => getStableTraceId(generated));
   if (JSON.stringify(orderedIds) !== JSON.stringify(fixture.manifest.replay_plan.trace_ids)) {
     throw new Error("Synthetic fixture replay ordering does not match manifest trace order.");
   }
@@ -99,12 +99,12 @@ export const createSyntheticFixtureReplayPlan = (
     manifest: fixture.manifest,
     source_id: sourceId,
     run_id: runId,
-    order_by: ["ts", "ingest_ts", "seq", "event_id"],
+    order_by: ["ts", "ingest_ts", "seq", "trace_id"],
     events: ordered.map((generated) => ({
       stream: syntheticReplayStreamForKind(generated.kind),
       generated,
       event: generated.event,
-      stable_event_id: getStableEventId(generated)
+      stable_trace_id: getStableTraceId(generated)
     }))
   };
 };
@@ -124,7 +124,7 @@ export const orderSyntheticReplayEvents = (
       a.event.ts - b.event.ts ||
       a.event.ingest_ts - b.event.ingest_ts ||
       a.event.seq - b.event.seq ||
-      getStableEventId(a).localeCompare(getStableEventId(b))
+      getStableTraceId(a).localeCompare(getStableTraceId(b))
     );
   });
 };
@@ -160,7 +160,7 @@ export const compareSyntheticFixtureExpectedOutputs = async (
   return compareSyntheticDerivedOutputsToManifest(fixture.manifest, JSON.parse(raw));
 };
 
-const getStableEventId = (generated: GeneratedMarketEvent): string => generated.event.trace_id;
+const getStableTraceId = (generated: GeneratedMarketEvent): string => generated.event.trace_id;
 
 const normalizeSelectorValue = (value: string | null | undefined): string | undefined => {
   const normalized = value?.trim();
