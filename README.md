@@ -419,6 +419,11 @@ Default `smart-money` policy rejects lower-information prints and keeps higher-c
 | Variable | Default | What it controls |
 | --- | --- | --- |
 | `REPLAY_ENABLED` | `false` | Starts replay service in `bun run dev` when truthy. |
+| `REPLAY_SOURCE` | `clickhouse` | Replay backing source: `clickhouse` for materialized rows or `synthetic_fixture` for infra-free synthetic fixture replay. |
+| `REPLAY_SYNTHETIC_FIXTURE_DIR` | empty | Synthetic fixture directory containing `manifest.json` and sidecars when `REPLAY_SOURCE=synthetic_fixture`. |
+| `REPLAY_SYNTHETIC_MANIFEST_PATH` | empty | Direct synthetic fixture manifest path; takes precedence over `REPLAY_SYNTHETIC_FIXTURE_DIR`. |
+| `REPLAY_SYNTHETIC_SOURCE_ID` | `synthetic_market` | Synthetic source selector used to verify fixture provenance before replay. |
+| `REPLAY_SYNTHETIC_RUN_ID` | empty | Optional synthetic run selector; when set, the fixture run must match before replay starts. |
 | `REPLAY_STREAMS` | `options,nbbo,equities,equity-quotes` | Replay stream selection. |
 | `REPLAY_START_TS` | `0` | Replay lower-bound timestamp. |
 | `REPLAY_END_TS` | `0` | Replay upper-bound timestamp. |
