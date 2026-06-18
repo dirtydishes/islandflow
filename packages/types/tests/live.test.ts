@@ -1,14 +1,15 @@
 import { describe, expect, it } from "bun:test";
 import {
   CursorSchema,
+  getSubscriptionKey,
   LiveClientMessageSchema,
-  LiveServerMessageSchema,
-  getSubscriptionKey
+  LiveServerMessageSchema
 } from "../src/live";
 
 describe("live protocol types", () => {
   it("builds stable keys for generic and parameterized subscriptions", () => {
     expect(getSubscriptionKey({ channel: "flow" })).toBe("flow|{}");
+    expect(getSubscriptionKey({ channel: "smart-flow" })).toBe("smart-flow");
     expect(getSubscriptionKey({ channel: "news" })).toBe("news");
     expect(
       getSubscriptionKey({
@@ -52,13 +53,14 @@ describe("live protocol types", () => {
       op: "subscribe",
       subscriptions: [
         { channel: "flow", filters: { nbboSides: ["AA", "A"], minNotional: 50000 } },
+        { channel: "smart-flow", snapshot_limit: 25 },
         { channel: "news", snapshot_limit: 100 },
         { channel: "equity-candles", underlying_id: "SPY", interval_ms: 60000 }
       ]
     });
 
     expect(parsed.op).toBe("subscribe");
-    expect(parsed.subscriptions).toHaveLength(3);
+    expect(parsed.subscriptions).toHaveLength(4);
   });
 
   it("validates snapshot and event server messages", () => {
