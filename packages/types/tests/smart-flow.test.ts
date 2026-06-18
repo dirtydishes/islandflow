@@ -6,12 +6,16 @@ import {
   FlowHypothesisEventSchema,
   flowHypothesisEventFromLegacySmartMoneyEvent,
   SMART_FLOW_CONTRACT_VERSION,
+  SMART_FLOW_EXPLAINABILITY_PROJECTION_VERSION,
   SMART_FLOW_HYPOTHESIS_SCORE_MODEL_VERSION,
   SMART_FLOW_HYPOTHESIS_SCORE_POLICY_VERSION,
   SMART_FLOW_MODEL_VERSION,
   SMART_FLOW_POLICY_VERSION,
+  SmartFlowExplainabilityProjectionSchema,
   SmartFlowInsightSchema,
   SmartMoneyInsightSchema,
+  smartFlowExplainabilityFromHypothesisEvent,
+  smartFlowExplainabilityFromLegacySmartMoneyEvent,
   smartFlowInsightFromHypothesisEvent,
   smartFlowInsightFromLegacySmartMoneyEvent
 } from "../src/smart-flow";
@@ -268,18 +272,34 @@ describe("smart-flow contracts", () => {
     expect(insight.hypothesis_id).toBe(parsed.hypothesis_id);
     expect(insight.compatibility).toBeUndefined();
     expect(insight.summary).toContain("Alternative explanations considered");
+
+    const explainability = smartFlowExplainabilityFromHypothesisEvent(parsed);
+    expect(explainability.projection_version).toBe(SMART_FLOW_EXPLAINABILITY_PROJECTION_VERSION);
+    expect(explainability.versions.contract).toBe(SMART_FLOW_CONTRACT_VERSION);
+    expect(explainability.source_channel).toBe("smart-flow");
+    expect(explainability.refs.evidence_refs).toEqual(parsed.evidence_refs);
+    expect(explainability.evidence.penalties[0]?.kind).toBe("wide_quote_context");
+    expect(explainability.alternatives[0]?.hypothesis_type).toBe("hedge_rebalance");
+    expect(explainability.abstention.abstained).toBe(false);
+    expect(SmartFlowExplainabilityProjectionSchema.parse(explainability)).toEqual(explainability);
   });
 
   it("projects legacy smart-money events into compatibility-only smart-flow insights", () => {
     const hypothesis = flowHypothesisEventFromLegacySmartMoneyEvent(legacyEvent);
     const insight = smartFlowInsightFromLegacySmartMoneyEvent(legacyEvent);
+    const explainability = smartFlowExplainabilityFromLegacySmartMoneyEvent(legacyEvent);
 
     expect(hypothesis.hypothesis_type).toBe("directional_accumulation");
     expect(hypothesis.compatibility?.compatibility_only).toBe(true);
     expect(hypothesis.compatibility?.legacy_profile_id).toBe("institutional_directional");
     expect(insight.label).toBe("Directional accumulation hypothesis");
     expect(insight.confidence).toBe(0.74);
+    expect(explainability.source_channel).toBe("smart-money");
+    expect(explainability.refs.legacy_event_id).toBe(legacyEvent.event_id);
+    expect(explainability.hypothesis.generated_from).toBe("legacy_smart_money_event");
+    expect(explainability.compatibility?.legacy_channel).toBe("smart-money");
     expect(SmartFlowInsightSchema.parse(insight)).toEqual(insight);
     expect(SmartMoneyInsightSchema.parse(insight)).toEqual(insight);
+    expect(SmartFlowExplainabilityProjectionSchema.parse(explainability)).toEqual(explainability);
   });
 });

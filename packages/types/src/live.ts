@@ -14,6 +14,7 @@ import {
   SmartMoneyEventSchema
 } from "./events";
 import { OptionFlowFiltersSchema, optionFlowFilterKey } from "./options-flow";
+import { SmartFlowExplainabilityProjectionSchema } from "./smart-flow";
 
 export const CursorSchema = z.object({
   ts: z.number().int().nonnegative(),
@@ -29,6 +30,7 @@ export const LiveGenericChannelSchema = z.enum([
   "equity-quotes",
   "equity-joins",
   "flow",
+  "smart-flow",
   "smart-money",
   "classifier-hits",
   "alerts",
@@ -43,6 +45,7 @@ export const LiveChannelSchema = z.enum([
   "equity-quotes",
   "equity-joins",
   "flow",
+  "smart-flow",
   "smart-money",
   "classifier-hits",
   "alerts",
@@ -91,6 +94,10 @@ export const LiveSubscriptionSchema = z.discriminatedUnion("channel", [
     snapshot_limit: z.number().int().positive().optional()
   }),
   z.object({
+    channel: z.literal("smart-flow"),
+    snapshot_limit: z.number().int().positive().optional()
+  }),
+  z.object({
     channel: z.enum([
       "nbbo",
       "equity-quotes",
@@ -127,6 +134,7 @@ const livePayloadSchemas = {
   "equity-quotes": EquityQuoteSchema,
   "equity-joins": EquityPrintJoinSchema,
   flow: FlowPacketSchema,
+  "smart-flow": SmartFlowExplainabilityProjectionSchema,
   "smart-money": SmartMoneyEventSchema,
   "classifier-hits": ClassifierHitEventSchema,
   alerts: AlertEventSchema,

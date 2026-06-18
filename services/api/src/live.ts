@@ -1,5 +1,7 @@
+import { createMetrics } from "@islandflow/observability";
+import type { EquityPrintQueryFilters, OptionPrintQueryFilters } from "@islandflow/storage";
 import {
-  fetchRecentOptionPrints,
+  type ClickHouseClient,
   fetchRecentAlerts,
   fetchRecentClassifierHits,
   fetchRecentEquityCandles,
@@ -10,23 +12,24 @@ import {
   fetchRecentInferredDark,
   fetchRecentNews,
   fetchRecentOptionNBBO,
-  fetchRecentSmartMoneyEvents,
-  type ClickHouseClient
+  fetchRecentOptionPrints,
+  fetchRecentSmartMoneyEvents
 } from "@islandflow/storage";
-import type { OptionPrintQueryFilters } from "@islandflow/storage";
-import type { EquityPrintQueryFilters } from "@islandflow/storage";
 import {
   AlertEventSchema,
   ClassifierHitEventSchema,
+  type Cursor,
   CursorSchema,
+  type EquityCandle,
   EquityCandleSchema,
+  type EquityPrint,
   EquityPrintJoinSchema,
   EquityPrintSchema,
   EquityQuoteSchema,
   FeedSnapshot,
   FlowPacketSchema,
   InferredDarkEventSchema,
-  NewsStorySchema,
+  type LiveChannel,
   LiveChannelHealth,
   LiveGenericChannel,
   LiveHotChannel,
@@ -34,19 +37,17 @@ import {
   LiveSubscription,
   matchesFlowPacketFilters,
   matchesOptionPrintFilters,
-  OptionNBBOSchema,
-  OptionPrintSchema,
-  SmartMoneyEventSchema,
-  type OptionFlowFilters,
-  type Cursor,
-  type EquityCandle,
-  type EquityPrint,
-  type LiveChannel,
   type NewsStory,
-  type OptionPrint
+  NewsStorySchema,
+  type OptionFlowFilters,
+  OptionNBBOSchema,
+  type OptionPrint,
+  OptionPrintSchema,
+  SmartFlowExplainabilityProjectionSchema,
+  SmartMoneyEventSchema
 } from "@islandflow/types";
-import { createMetrics } from "@islandflow/observability";
 import type { RedisClientType } from "redis";
+import { fetchRecentSmartFlowExplainability, smartFlowCursor } from "./smart-flow";
 
 const CURSOR_HASH_KEY = "live:cursors";
 export const LIVE_FEED_LOOKBACK_MS = 24 * 60 * 60 * 1000;
@@ -63,6 +64,7 @@ const GENERIC_LIMIT_ENV_KEYS: Record<LiveGenericChannel, string> = {
   "equity-quotes": "LIVE_LIMIT_EQUITY_QUOTES",
   "equity-joins": "LIVE_LIMIT_EQUITY_JOINS",
   flow: "LIVE_LIMIT_FLOW",
+  "smart-flow": "LIVE_LIMIT_SMART_FLOW",
   "smart-money": "LIVE_LIMIT_SMART_MONEY",
   "classifier-hits": "LIVE_LIMIT_CLASSIFIER_HITS",
   alerts: "LIVE_LIMIT_ALERTS",
@@ -82,6 +84,7 @@ const DEFAULT_LIVE_LIMITS: GenericLiveLimits = {
   "equity-quotes": 500,
   "equity-joins": 500,
   flow: 500,
+  "smart-flow": 300,
   "smart-money": 300,
   "classifier-hits": 300,
   alerts: 300,
@@ -200,6 +203,11 @@ export const resolveGenericLiveLimits = (
       "flow",
       env.LIVE_LIMIT_DEFAULT ? liveLimitDefault : DEFAULT_LIVE_LIMITS.flow
     ),
+    "smart-flow": parseGenericLimit(
+      env,
+      "smart-flow",
+      env.LIVE_LIMIT_DEFAULT ? liveLimitDefault : DEFAULT_LIVE_LIMITS["smart-flow"]
+    ),
     "smart-money": parseGenericLimit(
       env,
       "smart-money",
@@ -236,6 +244,7 @@ const extractFreshnessTs = (channel: LiveGenericChannel, item: any): number | nu
     case "equity-quotes":
       return typeof item.ts === "number" ? item.ts : null;
     case "flow":
+    case "smart-flow":
     case "classifier-hits":
     case "alerts":
     case "inferred-dark":
@@ -345,6 +354,14 @@ const getGenericConfig = (
     parse: (value) => SmartMoneyEventSchema.parse(value),
     cursor: (item) => ({ ts: item.source_ts, seq: item.seq }),
     fetchRecent: fetchRecentSmartMoneyEvents
+  },
+  "smart-flow": {
+    redisKey: "live:smart-flow",
+    cursorField: "smart-flow",
+    limit: limits["smart-flow"],
+    parse: (value) => SmartFlowExplainabilityProjectionSchema.parse(value),
+    cursor: smartFlowCursor,
+    fetchRecent: fetchRecentSmartFlowExplainability
   },
   "classifier-hits": {
     redisKey: "live:classifier-hits",

@@ -145,6 +145,13 @@ import {
 } from "./live";
 import { parseOptionPrintQuery } from "./option-queries";
 import {
+  fetchRecentSmartFlowExplainability,
+  fetchSmartFlowExplainabilityAfter,
+  fetchSmartFlowExplainabilityBefore,
+  projectSmartFlowExplainability,
+  smartFlowCursor
+} from "./smart-flow";
+import {
   buildSyntheticDerivedStatus,
   createRollingSyntheticProfileHits,
   getSyntheticBackendDisabledReason,
@@ -292,6 +299,7 @@ type Channel =
   | "equity-joins"
   | "inferred-dark"
   | "flow"
+  | "smart-flow"
   | "smart-money"
   | "classifier-hits"
   | "alerts";
@@ -315,6 +323,7 @@ const equityQuoteSockets = new Set<LegacySocket>();
 const equityJoinSockets = new Set<LegacySocket>();
 const inferredDarkSockets = new Set<LegacySocket>();
 const flowSockets = new Set<LegacySocket>();
+const smartFlowSockets = new Set<LegacySocket>();
 const smartMoneySockets = new Set<LegacySocket>();
 const classifierHitSockets = new Set<LegacySocket>();
 const alertSockets = new Set<LegacySocket>();
@@ -1265,8 +1274,13 @@ const run = async () => {
     for await (const msg of smartMoneySubscription.messages) {
       try {
         const payload = SmartMoneyEventSchema.parse(smartMoneySubscription.decode(msg));
+        const smartFlow = projectSmartFlowExplainability([payload])[0];
         recordSyntheticProfileHit(syntheticProfileHits, payload);
         broadcast(smartMoneySockets, { type: "smart-money", payload });
+        if (smartFlow) {
+          broadcast(smartFlowSockets, { type: "smart-flow", payload: smartFlow });
+          await fanoutLive({ channel: "smart-flow" }, smartFlow, "smart-flow");
+        }
         await fanoutLive({ channel: "smart-money" }, payload, "smart-money");
         msg.ack();
       } catch (error) {
@@ -1570,6 +1584,12 @@ const run = async () => {
           return jsonResponse({ data });
         }
 
+        if (req.method === "GET" && url.pathname === "/flow/smart-flow") {
+          const limit = parseLimit(url.searchParams.get("limit"));
+          const data = await fetchRecentSmartFlowExplainability(clickhouse, limit);
+          return jsonResponse({ data });
+        }
+
         if (req.method === "GET" && url.pathname === "/flow/classifier-hits") {
           const limit = parseLimit(url.searchParams.get("limit"));
           const data = await fetchRecentClassifierHits(clickhouse, limit);
@@ -1689,6 +1709,17 @@ const run = async () => {
           );
         }
 
+        if (req.method === "GET" && url.pathname === "/history/smart-flow") {
+          const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
+          const data = await fetchSmartFlowExplainabilityBefore(
+            clickhouse,
+            beforeTs,
+            beforeSeq,
+            limit
+          );
+          return jsonResponse(buildHistoryResponse(data, smartFlowCursor));
+        }
+
         if (req.method === "GET" && url.pathname === "/history/classifier-hits") {
           const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
           const data = await fetchClassifierHitsBefore(clickhouse, beforeTs, beforeSeq, limit);
@@ -1757,6 +1788,7 @@ const run = async () => {
             return jsonResponse({
               packets,
               smart_money: smartMoney,
+              smart_flow: projectSmartFlowExplainability(smartMoney),
               classifier_hits: classifierHits,
               nbbo_by_trace_id: nbboByTraceId
             });
@@ -1887,6 +1919,19 @@ const run = async () => {
           return jsonResponse({ data, next });
         }
 
+        if (req.method === "GET" && url.pathname === "/replay/smart-flow") {
+          const { afterTs, afterSeq, limit } = parseReplayParams(url);
+          const data = await fetchSmartFlowExplainabilityAfter(
+            clickhouse,
+            afterTs,
+            afterSeq,
+            limit
+          );
+          const last = data.at(-1);
+          const next = last ? smartFlowCursor(last) : null;
+          return jsonResponse({ data, next });
+        }
+
         if (req.method === "GET" && url.pathname === "/replay/classifier-hits") {
           const { afterTs, afterSeq, limit } = parseReplayParams(url);
           const data = await fetchClassifierHitsAfter(clickhouse, afterTs, afterSeq, limit);
@@ -1983,6 +2028,14 @@ const run = async () => {
           return jsonResponse({ error: "websocket upgrade failed" }, 400);
         }
 
+        if (req.method === "GET" && url.pathname === "/ws/smart-flow") {
+          if (serverRef.upgrade(req, { data: { channel: "smart-flow" } })) {
+            return new Response(null, { status: 101 });
+          }
+
+          return jsonResponse({ error: "websocket upgrade failed" }, 400);
+        }
+
         if (req.method === "GET" && url.pathname === "/ws/alerts") {
           if (serverRef.upgrade(req, { data: { channel: "alerts" } })) {
             return new Response(null, { status: 101 });
@@ -2033,6 +2086,8 @@ const run = async () => {
           inferredDarkSockets.add(socket);
         } else if (socket.data.channel === "flow") {
           flowSockets.add(socket);
+        } else if (socket.data.channel === "smart-flow") {
+          smartFlowSockets.add(socket);
         } else if (socket.data.channel === "smart-money") {
           smartMoneySockets.add(socket);
         } else if (socket.data.channel === "classifier-hits") {
@@ -2102,6 +2157,8 @@ const run = async () => {
           inferredDarkSockets.delete(socket);
         } else if (socket.data.channel === "flow") {
           flowSockets.delete(socket);
+        } else if (socket.data.channel === "smart-flow") {
+          smartFlowSockets.delete(socket);
         } else if (socket.data.channel === "smart-money") {
           smartMoneySockets.delete(socket);
         } else if (socket.data.channel === "classifier-hits") {

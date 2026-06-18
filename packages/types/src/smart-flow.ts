@@ -13,6 +13,8 @@ export const SMART_FLOW_POLICY_VERSION = "smart-flow.policy.compat.v1";
 export const SMART_FLOW_MODEL_VERSION = "smart-flow.model.unscored.v1";
 export const SMART_FLOW_HYPOTHESIS_SCORE_POLICY_VERSION = "smart-flow.hypothesis-score.policy.v1";
 export const SMART_FLOW_HYPOTHESIS_SCORE_MODEL_VERSION = "smart-flow.hypothesis-score.rules.v1";
+export const SMART_FLOW_EXPLAINABILITY_PROJECTION_VERSION =
+  "smart-flow.explainability-projection.v1";
 
 export const SmartFlowContractVersionSchema = z.literal(SMART_FLOW_CONTRACT_VERSION);
 export const SmartFlowPolicyVersionSchema = z.string().min(1);
@@ -364,6 +366,54 @@ export const SmartMoneyInsightSchema = SmartFlowInsightSchema;
  */
 export type SmartMoneyInsight = SmartFlowInsight;
 
+export const SmartFlowExplainabilityRefsSchema = z.object({
+  trace_id: z.string().min(1),
+  event_id: z.string().min(1),
+  hypothesis_id: z.string().min(1),
+  insight_id: z.string().min(1),
+  cluster_id: z.string().min(1),
+  candidate_ids: z.array(z.string().min(1)),
+  evidence_refs: z.array(z.string().min(1)),
+  legacy_event_id: z.string().min(1).optional()
+});
+
+export type SmartFlowExplainabilityRefs = z.infer<typeof SmartFlowExplainabilityRefsSchema>;
+
+export const SmartFlowExplainabilityEvidenceSchema = z.object({
+  evidence_refs: z.array(z.string().min(1)),
+  evidence_quality: z.number().min(0).max(1),
+  penalties: z.array(FlowScorePenaltySchema)
+});
+
+export type SmartFlowExplainabilityEvidence = z.infer<typeof SmartFlowExplainabilityEvidenceSchema>;
+
+export const SmartFlowExplainabilityProjectionSchema = EventMetaSchema.merge(
+  z.object({
+    schema_version: SmartFlowContractVersionSchema,
+    projection_version: z.literal(SMART_FLOW_EXPLAINABILITY_PROJECTION_VERSION),
+    policy_version: SmartFlowPolicyVersionSchema,
+    model_version: SmartFlowModelVersionSchema,
+    source_channel: z.enum(["smart-flow", "smart-money"]),
+    versions: z.object({
+      contract: SmartFlowContractVersionSchema,
+      projection: z.literal(SMART_FLOW_EXPLAINABILITY_PROJECTION_VERSION),
+      policy: SmartFlowPolicyVersionSchema,
+      model: SmartFlowModelVersionSchema
+    }),
+    refs: SmartFlowExplainabilityRefsSchema,
+    evidence: SmartFlowExplainabilityEvidenceSchema,
+    hypothesis: FlowHypothesisEventSchema,
+    insight: SmartFlowInsightSchema,
+    abstention: FlowAbstentionSchema,
+    alternatives: z.array(FlowAlternativeHypothesisSchema),
+    compatibility: SmartFlowLegacyCompatibilitySchema.optional()
+  })
+);
+
+export type SmartFlowExplainabilityProjection = z.infer<
+  typeof SmartFlowExplainabilityProjectionSchema
+>;
+
 const profileToHypothesisType: Record<SmartMoneyProfileId, FlowHypothesisType> = {
   institutional_directional: "directional_accumulation",
   retail_whale: "retail_attention_flow",
@@ -435,6 +485,54 @@ export const smartFlowInsightFromHypothesisEvent = (
     abstention: hypothesis.abstention,
     alternatives: hypothesis.alternatives,
     ...(hypothesis.compatibility ? { compatibility: hypothesis.compatibility } : {})
+  });
+};
+
+export const smartFlowExplainabilityFromHypothesisEvent = (
+  hypothesis: FlowHypothesisEvent,
+  options: { insight_id?: string; source_channel?: "smart-flow" | "smart-money" } = {}
+): SmartFlowExplainabilityProjection => {
+  const insight = smartFlowInsightFromHypothesisEvent(hypothesis, {
+    insight_id: options.insight_id
+  });
+  const compatibility = hypothesis.compatibility ?? insight.compatibility;
+
+  return SmartFlowExplainabilityProjectionSchema.parse({
+    source_ts: hypothesis.source_ts,
+    ingest_ts: hypothesis.ingest_ts,
+    seq: hypothesis.seq,
+    trace_id: hypothesis.trace_id,
+    schema_version: hypothesis.schema_version,
+    projection_version: SMART_FLOW_EXPLAINABILITY_PROJECTION_VERSION,
+    policy_version: hypothesis.policy_version,
+    model_version: hypothesis.model_version,
+    source_channel: options.source_channel ?? (compatibility ? "smart-money" : "smart-flow"),
+    versions: {
+      contract: hypothesis.schema_version,
+      projection: SMART_FLOW_EXPLAINABILITY_PROJECTION_VERSION,
+      policy: hypothesis.policy_version,
+      model: hypothesis.model_version
+    },
+    refs: {
+      trace_id: hypothesis.trace_id,
+      event_id: hypothesis.event_id,
+      hypothesis_id: hypothesis.hypothesis_id,
+      insight_id: insight.insight_id,
+      cluster_id: hypothesis.cluster_id,
+      candidate_ids: hypothesis.candidate_ids,
+      evidence_refs: hypothesis.evidence_refs,
+      ...(compatibility?.legacy_event_id ? { legacy_event_id: compatibility.legacy_event_id } : {})
+    },
+    evidence: {
+      evidence_refs: hypothesis.evidence_refs,
+      evidence_quality: hypothesis.scores.confidence.evidence_quality,
+      penalties: hypothesis.scores.penalties
+    },
+    hypothesis,
+    insight,
+    abstention: hypothesis.abstention,
+    alternatives: hypothesis.alternatives,
+    ...(compatibility ? { compatibility } : {})
   });
 };
 
@@ -585,5 +683,16 @@ export const smartFlowInsightFromLegacySmartMoneyEvent = (
 
   return smartFlowInsightFromHypothesisEvent(hypothesis, {
     insight_id: `smartflow:insight:${event.event_id}`
+  });
+};
+
+export const smartFlowExplainabilityFromLegacySmartMoneyEvent = (
+  event: SmartMoneyEvent
+): SmartFlowExplainabilityProjection => {
+  const hypothesis = flowHypothesisEventFromLegacySmartMoneyEvent(event);
+
+  return smartFlowExplainabilityFromHypothesisEvent(hypothesis, {
+    insight_id: `smartflow:insight:${event.event_id}`,
+    source_channel: "smart-money"
   });
 };
