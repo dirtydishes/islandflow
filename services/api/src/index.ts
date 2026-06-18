@@ -1,135 +1,148 @@
-import { readEnv } from "@islandflow/config";
-import { createLogger, createMetrics } from "@islandflow/observability";
 import {
-  SUBJECT_ALERTS,
-  SUBJECT_CLASSIFIER_HITS,
-  SUBJECT_EQUITY_CANDLES,
-  SUBJECT_EQUITY_JOINS,
-  SUBJECT_EQUITY_PRINTS,
-  SUBJECT_EQUITY_QUOTES,
-  SUBJECT_INFERRED_DARK,
-  SUBJECT_FLOW_PACKETS,
-  SUBJECT_NEWS,
-  SUBJECT_SMART_MONEY_EVENTS,
-  SUBJECT_OPTION_NBBO,
-  SUBJECT_OPTION_SIGNAL_PRINTS,
+  buildDurableConsumer,
+  connectJetStreamWithRetry,
+  ensureKnownStreams,
+  ensureSyntheticControlState,
+  openSyntheticControlKv,
   STREAM_ALERTS,
   STREAM_CLASSIFIER_HITS,
   STREAM_EQUITY_CANDLES,
   STREAM_EQUITY_JOINS,
   STREAM_EQUITY_PRINTS,
   STREAM_EQUITY_QUOTES,
-  STREAM_INFERRED_DARK,
   STREAM_FLOW_PACKETS,
+  STREAM_INFERRED_DARK,
   STREAM_NEWS,
-  STREAM_SMART_MONEY_EVENTS,
   STREAM_OPTION_NBBO,
   STREAM_OPTION_SIGNAL_PRINTS,
-  buildDurableConsumer,
-  connectJetStreamWithRetry,
-  ensureSyntheticControlState,
-  ensureKnownStreams,
-  openSyntheticControlKv,
+  STREAM_SMART_MONEY_EVENTS,
+  SUBJECT_ALERTS,
+  SUBJECT_CLASSIFIER_HITS,
+  SUBJECT_EQUITY_CANDLES,
+  SUBJECT_EQUITY_JOINS,
+  SUBJECT_EQUITY_PRINTS,
+  SUBJECT_EQUITY_QUOTES,
+  SUBJECT_FLOW_PACKETS,
+  SUBJECT_INFERRED_DARK,
+  SUBJECT_NEWS,
+  SUBJECT_OPTION_NBBO,
+  SUBJECT_OPTION_SIGNAL_PRINTS,
+  SUBJECT_SMART_MONEY_EVENTS,
   subscribeJson,
   watchSyntheticControlState,
   writeSyntheticControlState
 } from "@islandflow/bus";
+import { readEnv } from "@islandflow/config";
+import { createLogger, createMetrics } from "@islandflow/observability";
+import type { EquityPrintQueryFilters } from "@islandflow/storage";
 import {
   createClickHouseClient,
   ensureAlertsTable,
-  ensureNewsTable,
   ensureClassifierHitsTable,
   ensureEquityCandlesTable,
   ensureEquityPrintJoinsTable,
   ensureEquityPrintsTable,
   ensureEquityQuotesTable,
-  ensureInferredDarkTable,
   ensureFlowPacketsTable,
-  ensureSmartMoneyEventsTable,
+  ensureInferredDarkTable,
+  ensureNewsTable,
   ensureOptionNBBOTable,
   ensureOptionPrintsTable,
+  ensureSmartMoneyEventsTable,
+  fetchAlertContextByTraceId,
   fetchAlertsAfter,
   fetchAlertsBefore,
-  fetchAlertContextByTraceId,
-  fetchNewsAfter,
-  fetchNewsBefore,
   fetchClassifierHitsAfter,
   fetchClassifierHitsBefore,
-  fetchSmartMoneyEventsAfter,
-  fetchSmartMoneyEventsBefore,
-  fetchFlowPacketsAfter,
-  fetchFlowPacketById,
-  fetchFlowPacketsByMemberTraceIds,
-  fetchFlowPacketsBefore,
-  fetchRecentAlerts,
-  fetchRecentNews,
-  fetchRecentClassifierHits,
-  fetchRecentSmartMoneyEvents,
-  fetchRecentEquityPrintJoins,
-  fetchRecentFlowPackets,
-  fetchRecentInferredDark,
-  fetchRecentEquityQuotes,
+  fetchClassifierHitsByPacketIds,
   fetchEquityCandlesAfter,
   fetchEquityCandlesRange,
-  fetchEquityPrintJoinsByIds,
+  fetchEquityPrintJoinsAfter,
   fetchEquityPrintJoinsBefore,
-  fetchRecentOptionNBBO,
+  fetchEquityPrintJoinsByIds,
   fetchEquityPrintsAfter,
   fetchEquityPrintsBefore,
   fetchEquityPrintsRange,
-  fetchEquityPrintJoinsAfter,
-  fetchEquityQuotesBefore,
   fetchEquityQuotesAfter,
-  fetchInferredDarkBefore,
+  fetchEquityQuotesBefore,
+  fetchFlowPacketById,
+  fetchFlowPacketsAfter,
+  fetchFlowPacketsBefore,
+  fetchFlowPacketsByMemberTraceIds,
   fetchInferredDarkAfter,
-  fetchRecentEquityPrints,
-  fetchOptionNBBOBefore,
-  fetchOptionNBBOAfter,
-  fetchOptionPrintsBefore,
-  fetchOptionPrintsAfter,
-  fetchOptionPrintsByTraceIds,
+  fetchInferredDarkBefore,
   fetchNearestOptionNBBOForPrints,
-  fetchSmartMoneyEventsByPacketIds,
-  fetchClassifierHitsByPacketIds,
+  fetchNewsAfter,
+  fetchNewsBefore,
+  fetchOptionNBBOAfter,
+  fetchOptionNBBOBefore,
+  fetchOptionPrintsAfter,
+  fetchOptionPrintsBefore,
+  fetchOptionPrintsByTraceIds,
+  fetchRecentAlerts,
+  fetchRecentClassifierHits,
+  fetchRecentEquityPrintJoins,
+  fetchRecentEquityPrints,
+  fetchRecentEquityQuotes,
+  fetchRecentFlowPackets,
+  fetchRecentInferredDark,
+  fetchRecentNews,
+  fetchRecentOptionNBBO,
   fetchRecentOptionPrints,
+  fetchRecentSmartMoneyEvents,
+  fetchSmartMoneyEventsAfter,
+  fetchSmartMoneyEventsBefore,
+  fetchSmartMoneyEventsByPacketIds,
   insertNewsStory
 } from "@islandflow/storage";
-import type { EquityPrintQueryFilters } from "@islandflow/storage";
+import {
+  listDemoProfileSummaries,
+  listLoadProfileSummaries,
+  resolveSyntheticProfileControlState
+} from "@islandflow/synthetic-market/profiles";
 import {
   AlertEventSchema,
   ClassifierHitEventSchema,
   Cursor,
   EquityCandleSchema,
-  EquityPrintSchema,
   EquityPrintJoinSchema,
+  EquityPrintSchema,
   EquityQuoteSchema,
   FeedSnapshot,
+  FlowPacketSchema,
+  getSubscriptionKey,
   InferredDarkEventSchema,
-  NewsStorySchema,
-  LiveClientMessageSchema,
   type LiveChannel,
+  LiveClientMessageSchema,
   LiveServerMessage,
   LiveSubscription,
   LiveSubscriptionSchema,
   matchesFlowPacketFilters,
   matchesOptionPrintFilters,
-  FlowPacketSchema,
-  SyntheticControlStateSchema,
-  SmartMoneyEventSchema,
+  NewsStorySchema,
+  normalizeSyntheticControlState,
   OptionNBBOSchema,
-  OptionPrintSchema,
   type OptionPrint,
-  getSubscriptionKey
+  OptionPrintSchema,
+  SmartMoneyEventSchema,
+  type SyntheticControlState,
+  SyntheticControlStateSchema
 } from "@islandflow/types";
 import { createClient } from "redis";
 import { z } from "zod";
+import { isAlertContextPath, parseAlertContextTraceIdPath } from "./alert-context";
+import {
+  createCorsPreflightResponse,
+  DEFAULT_API_CORS_ORIGINS,
+  parseCorsAllowedOrigins,
+  withCorsHeaders
+} from "./cors";
 import {
   HOT_LIVE_REDIS_KEYS,
   LiveStateManager,
   resolveLiveStateConfig,
   shouldFanoutLiveEvent
 } from "./live";
-import { isAlertContextPath, parseAlertContextTraceIdPath } from "./alert-context";
 import { parseOptionPrintQuery } from "./option-queries";
 import {
   buildSyntheticDerivedStatus,
@@ -138,12 +151,6 @@ import {
   recordSyntheticProfileHit,
   resolveSyntheticBackendMode
 } from "./synthetic-control";
-import {
-  DEFAULT_API_CORS_ORIGINS,
-  createCorsPreflightResponse,
-  parseCorsAllowedOrigins,
-  withCorsHeaders
-} from "./cors";
 
 const service = "api";
 const logger = createLogger({ service });
@@ -711,7 +718,13 @@ const run = async () => {
   );
   const syntheticBackendDisabledReason = getSyntheticBackendDisabledReason(syntheticBackendMode);
   const syntheticControlKv = await openSyntheticControlKv(js);
-  let syntheticControl = await ensureSyntheticControlState(syntheticControlKv);
+  let syntheticControl = resolveSyntheticProfileControlState(
+    await ensureSyntheticControlState(syntheticControlKv)
+  );
+  const syntheticProfileCatalog = {
+    demo_profiles: listDemoProfileSummaries(),
+    load_profiles: listLoadProfileSummaries()
+  };
   const syntheticProfileHits = createRollingSyntheticProfileHits();
   const stopSyntheticControlWatch = await watchSyntheticControlState(
     syntheticControlKv,
@@ -1334,6 +1347,7 @@ const run = async () => {
         equities: env.EQUITIES_INGEST_ADAPTER
       },
       control: syntheticBackendMode === "synthetic" ? syntheticControl : null,
+      profiles: syntheticProfileCatalog,
       derived,
       ...(syntheticBackendDisabledReason ? { disabled_reason: syntheticBackendDisabledReason } : {})
     };
@@ -1404,7 +1418,10 @@ const run = async () => {
             return authError;
           }
           try {
-            const payload = SyntheticControlStateSchema.parse(await readJsonBody(req));
+            const rawControl = (await readJsonBody(req)) as Partial<SyntheticControlState>;
+            const payload = SyntheticControlStateSchema.parse(
+              resolveSyntheticProfileControlState(normalizeSyntheticControlState(rawControl))
+            );
             syntheticControl = await writeSyntheticControlState(syntheticControlKv, payload);
             return jsonResponse({
               control: syntheticControl,

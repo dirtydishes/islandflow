@@ -1,25 +1,5 @@
 "use client";
 
-import Link from "next/link";
-import * as nextNavigation from "next/navigation";
-import {
-  createContext,
-  memo,
-  useCallback,
-  useContext,
-  useEffect,
-  useId,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-  type Dispatch,
-  type MouseEvent as ReactMouseEvent,
-  type ReactNode,
-  type SetStateAction
-} from "react";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import type {
   AlertEvent,
   ClassifierHitEvent,
@@ -30,36 +10,56 @@ import type {
   EquityQuote,
   FlowPacket,
   InferredDarkEvent,
-  LiveServerMessage,
   LiveHotChannelHealthMap,
+  LiveServerMessage,
   LiveSubscription,
   NewsStory,
   OptionFlowFilters,
   OptionFlowView,
+  OptionNBBO,
   OptionNbboSide,
+  OptionPrint,
   OptionSecurityType,
   OptionType,
-  OptionNBBO,
-  OptionPrint,
   SmartMoneyEvent,
   SmartMoneyProfileId,
   SyntheticControlState,
-  SyntheticCoverageWindowMinutes,
+  SyntheticDemoProfileId,
   SyntheticDerivedStatus,
-  SyntheticProfileWeightValue
+  SyntheticLoadProfileId
 } from "@islandflow/types";
 import {
   getSubscriptionKey as getLiveSubscriptionKey,
-  parseOptionContractId,
   matchesFlowPacketFilters,
-  matchesOptionPrintFilters
+  matchesOptionPrintFilters,
+  parseOptionContractId
 } from "@islandflow/types";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   createChart,
   type IChartApi,
   type SeriesMarker,
   type UTCTimestamp
 } from "lightweight-charts";
+import Link from "next/link";
+import * as nextNavigation from "next/navigation";
+import {
+  type CSSProperties,
+  createContext,
+  type Dispatch,
+  memo,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+  type SetStateAction,
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react";
 
 const parseBoundedInt = (
   value: string | undefined,
@@ -1147,6 +1147,7 @@ type SyntheticAdminStatusResponse = {
   };
   control: SyntheticControlState | null;
   derived: SyntheticDerivedStatus | null;
+  profiles?: SyntheticProfileCatalog;
   disabled_reason?: string;
 };
 
@@ -1159,6 +1160,93 @@ const SYNTHETIC_ADMIN_PROXY_PATHS = {
   status: "/api/admin/synthetic/status",
   control: "/api/admin/synthetic/control"
 } as const;
+
+type SyntheticDemoProfileSummary = {
+  id: SyntheticDemoProfileId;
+  title: string;
+  description: string;
+  default_load_profile_id: SyntheticLoadProfileId;
+  runs: Array<{
+    scenario_id: string;
+    run_id: string;
+    run_name: string;
+    title: string;
+    family: string;
+  }>;
+};
+
+type SyntheticLoadProfileSummary = {
+  id: SyntheticLoadProfileId;
+  title: string;
+  description: string;
+  rate_multiplier: number;
+  volume_multiplier: number;
+  mode: string;
+};
+
+type SyntheticProfileCatalog = {
+  demo_profiles: SyntheticDemoProfileSummary[];
+  load_profiles: SyntheticLoadProfileSummary[];
+};
+
+const SYNTHETIC_PROFILE_CATALOG_FALLBACK: SyntheticProfileCatalog = {
+  demo_profiles: [
+    {
+      id: "market-command",
+      title: "Market Command",
+      description: "Balanced deterministic run sequence.",
+      default_load_profile_id: "steady",
+      runs: []
+    },
+    {
+      id: "event-response",
+      title: "Event Response",
+      description: "Event and hedge-response deterministic runs.",
+      default_load_profile_id: "active",
+      runs: []
+    },
+    {
+      id: "quiet-range",
+      title: "Quiet Range",
+      description: "Structure, volatility-supply, and no-alert runs.",
+      default_load_profile_id: "steady",
+      runs: []
+    },
+    {
+      id: "stress-tape",
+      title: "Stress Tape",
+      description: "All named synthetic scenario runs.",
+      default_load_profile_id: "firehose",
+      runs: []
+    }
+  ],
+  load_profiles: [
+    {
+      id: "steady",
+      title: "Steady",
+      description: "One deterministic run per base interval.",
+      rate_multiplier: 1,
+      volume_multiplier: 1,
+      mode: "realistic"
+    },
+    {
+      id: "active",
+      title: "Active",
+      description: "Faster deterministic playback.",
+      rate_multiplier: 2,
+      volume_multiplier: 1,
+      mode: "active"
+    },
+    {
+      id: "firehose",
+      title: "Firehose",
+      description: "Fast deterministic playback with repeated named runs.",
+      rate_multiplier: 4,
+      volume_multiplier: 2,
+      mode: "firehose"
+    }
+  ]
+};
 
 const SYNTHETIC_PROFILE_ORDER: Array<keyof SyntheticControlState["profile_weights"]> = [
   "institutional_directional",
@@ -1178,15 +1266,9 @@ const SYNTHETIC_PROFILE_LABELS: Record<keyof SyntheticControlState["profile_weig
   hedge_reactive: "Hedge Reactive"
 };
 
-const SYNTHETIC_PRESET_LABELS: Record<SyntheticControlState["preset_id"], string> = {
-  balanced_demo: "Balanced Demo",
-  event_day: "Event Day",
-  dealer_day: "Dealer Day",
-  retail_chase: "Retail Chase",
-  quiet_range: "Quiet Range"
-};
-
 const buildDefaultSyntheticControl = (): SyntheticControlState => ({
+  demo_profile_id: "market-command",
+  load_profile_id: "steady",
   preset_id: "balanced_demo",
   coverage_assist: true,
   coverage_window_minutes: 20,
@@ -9840,23 +9922,19 @@ function SyntheticControlDock() {
   const currentControl = draft ?? saved ?? buildDefaultSyntheticControl();
   const disabled = !status?.enabled;
   const derived = status?.derived;
+  const profileCatalog = status?.profiles ?? SYNTHETIC_PROFILE_CATALOG_FALLBACK;
+  const selectedDemoProfile =
+    profileCatalog.demo_profiles.find((profile) => profile.id === currentControl.demo_profile_id) ??
+    profileCatalog.demo_profiles[0];
+  const selectedLoadProfile =
+    profileCatalog.load_profiles.find((profile) => profile.id === currentControl.load_profile_id) ??
+    profileCatalog.load_profiles[0];
 
   const updateControl = (patch: SyntheticControlPatch) => {
     dirtyRef.current = true;
     setDraft((current) =>
       createSyntheticControlDraft(current ?? buildDefaultSyntheticControl(), patch)
     );
-  };
-
-  const updateProfileWeight = (
-    profileId: keyof SyntheticControlState["profile_weights"],
-    value: SyntheticProfileWeightValue
-  ) => {
-    updateControl({
-      profile_weights: {
-        [profileId]: value
-      } as Partial<SyntheticControlState["profile_weights"]>
-    });
   };
 
   return (
@@ -9899,89 +9977,58 @@ function SyntheticControlDock() {
             <>
               <section className="synthetic-control-section">
                 <div className="synthetic-control-section-head">
-                  <span>Preset</span>
+                  <span>Demo Profile</span>
                   <span>{saving ? "Saving…" : "Live"}</span>
                 </div>
                 <label className="synthetic-control-select">
                   <select
                     onChange={(event) =>
                       updateControl({
-                        preset_id: event.target.value as SyntheticControlState["preset_id"]
+                        demo_profile_id: event.target.value as SyntheticDemoProfileId
                       })
                     }
-                    value={currentControl.preset_id}
+                    value={currentControl.demo_profile_id}
                   >
-                    {Object.entries(SYNTHETIC_PRESET_LABELS).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
+                    {profileCatalog.demo_profiles.map((profile) => (
+                      <option key={profile.id} value={profile.id}>
+                        {profile.title}
                       </option>
                     ))}
                   </select>
                 </label>
+                {selectedDemoProfile?.runs.length ? (
+                  <div className="synthetic-hit-list synthetic-run-list">
+                    {selectedDemoProfile.runs.map((run) => (
+                      <div className="synthetic-hit-row" key={run.run_id}>
+                        <span>{run.title}</span>
+                        <strong>{run.run_id}</strong>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </section>
 
               <section className="synthetic-control-section">
                 <div className="synthetic-control-section-head">
-                  <span>Coverage</span>
-                  <span>{currentControl.coverage_window_minutes}m window</span>
+                  <span>Load Profile</span>
+                  <span>
+                    {selectedLoadProfile ? `${selectedLoadProfile.rate_multiplier}x` : "—"}
+                  </span>
                 </div>
-                <label className="synthetic-control-toggle">
-                  <input
-                    checked={currentControl.coverage_assist}
-                    onChange={(event) => updateControl({ coverage_assist: event.target.checked })}
-                    type="checkbox"
-                  />
-                  <span>Coverage assist</span>
-                </label>
                 <div className="synthetic-segment-row">
-                  {[10, 20, 30].map((minutes) => (
+                  {profileCatalog.load_profiles.map((profile) => (
                     <button
-                      className={`synthetic-segment${currentControl.coverage_window_minutes === minutes ? " is-active" : ""}`}
-                      key={minutes}
+                      className={`synthetic-segment${currentControl.load_profile_id === profile.id ? " is-active" : ""}`}
+                      key={profile.id}
                       onClick={() =>
                         updateControl({
-                          coverage_window_minutes: minutes as SyntheticCoverageWindowMinutes
+                          load_profile_id: profile.id
                         })
                       }
                       type="button"
                     >
-                      {minutes}m
+                      {profile.title}
                     </button>
-                  ))}
-                </div>
-              </section>
-
-              <section className="synthetic-control-section">
-                <div className="synthetic-control-section-head">
-                  <span>Profile Bias</span>
-                  <span>Low · Normal · High</span>
-                </div>
-                <div className="synthetic-profile-grid">
-                  {SYNTHETIC_PROFILE_ORDER.map((profileId) => (
-                    <div className="synthetic-profile-row" key={profileId}>
-                      <span>{SYNTHETIC_PROFILE_LABELS[profileId]}</span>
-                      <div className="synthetic-segment-row">
-                        {[
-                          { label: "Low", value: 0.6 },
-                          { label: "Normal", value: 1.0 },
-                          { label: "High", value: 1.6 }
-                        ].map((option) => (
-                          <button
-                            className={`synthetic-segment${currentControl.profile_weights[profileId] === option.value ? " is-active" : ""}`}
-                            key={option.label}
-                            onClick={() =>
-                              updateProfileWeight(
-                                profileId,
-                                option.value as SyntheticProfileWeightValue
-                              )
-                            }
-                            type="button"
-                          >
-                            {option.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
                   ))}
                 </div>
               </section>

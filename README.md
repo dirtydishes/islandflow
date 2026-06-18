@@ -302,9 +302,14 @@ All runtime configuration comes from `.env`.
 | `OPTIONS_INGEST_ADAPTER` | `synthetic` | Options ingest source: `synthetic`, `alpaca`, `ibkr`, or `databento`. |
 | `EQUITIES_INGEST_ADAPTER` | `synthetic` | Equities ingest source: `synthetic` or `alpaca`. |
 | `EMIT_INTERVAL_MS` | `1000` | Emit cadence for synthetic ingest adapters. |
-| `SYNTHETIC_MARKET_MODE` | `realistic` | Shared synthetic profile: `realistic`, `active`, or `firehose`. |
-| `SYNTHETIC_OPTIONS_MODE` | empty | Options-only synthetic profile override. |
-| `SYNTHETIC_EQUITIES_MODE` | empty | Equities-only synthetic profile override. |
+| `SYNTHETIC_MARKET_MODE` | `realistic` | Legacy load alias used before the hosted control is changed: `realistic` -> `steady`, `active` -> `active`, `firehose` -> `firehose`. |
+| `SYNTHETIC_OPTIONS_MODE` | empty | Options-only legacy load alias override. |
+| `SYNTHETIC_EQUITIES_MODE` | empty | Equities-only legacy load alias override. |
+| `SYNTHETIC_CONTROL_ENABLED` | `false` | Enables the protected synthetic admin API when both hosted ingest adapters are synthetic. |
+| `SYNTHETIC_ADMIN_TOKEN` | empty | Bearer token required by the API and web proxy for synthetic admin requests. |
+| `NEXT_PUBLIC_SYNTHETIC_ADMIN` | `0` | Shows the internal synthetic control drawer in the web app when set to `1`. |
+
+Named demo profiles live in `@islandflow/synthetic-market/profiles`. The default `market-command` profile cycles deterministic scenario runs such as `phase03-a`, `phase03-b`, `phase03-f`, and `phase03-g`. Load profiles change playback cadence and repeated run count only: `steady` emits one run per base interval, `active` halves the interval, and `firehose` uses a quarter interval with two named runs per tick.
 
 ### Alpaca and news configuration
 
@@ -454,7 +459,7 @@ OPTIONS_SIGNAL_MODE=smart-money \
 bun run dev
 ```
 
-Active demo:
+Active deterministic demo:
 
 ```bash
 SYNTHETIC_MARKET_MODE=active bun run dev
@@ -467,6 +472,20 @@ SYNTHETIC_MARKET_MODE=firehose \
 NEXT_PUBLIC_LIVE_HOT_WINDOW=2000 \
 bun run dev
 ```
+
+Hosted demo profile controls:
+
+```bash
+SYNTHETIC_CONTROL_ENABLED=true \
+SYNTHETIC_ADMIN_TOKEN=dev-token \
+NEXT_PUBLIC_SYNTHETIC_ADMIN=1 \
+NEXT_PUBLIC_API_URL=http://127.0.0.1:4000 \
+OPTIONS_INGEST_ADAPTER=synthetic \
+EQUITIES_INGEST_ADAPTER=synthetic \
+bun run dev
+```
+
+Open the synthetic control drawer in the terminal UI to select `Market Command`, `Event Response`, `Quiet Range`, or `Stress Tape`, then choose `Steady`, `Active`, or `Firehose` load.
 
 Show raw options flow for debugging:
 

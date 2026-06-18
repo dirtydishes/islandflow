@@ -1,9 +1,16 @@
 import {
-  SP500_SYMBOLS,
-  getSyntheticSessionState,
-  getSyntheticUnderlyingState,
+  createSyntheticDemoProfileFixture,
+  getSyntheticLoadProfileRunCount,
+  loadProfileIdForSyntheticMarketMode,
+  scaleSyntheticEmitIntervalMs
+} from "@islandflow/synthetic-market/profiles";
+import {
+  DEFAULT_SYNTHETIC_CONTROL_STATE,
   type EquityPrint,
   type EquityQuote,
+  getSyntheticSessionState,
+  getSyntheticUnderlyingState,
+  SP500_SYMBOLS,
   type SyntheticControlState,
   type SyntheticMarketMode
 } from "@islandflow/types";
@@ -143,24 +150,61 @@ const pickDarkPlacement = (
   return driftBps >= 0 ? "A" : "B";
 };
 
+type DemoProjectedEvent = {
+  source_ts: number;
+  ingest_ts: number;
+  ts: number;
+  seq: number;
+  trace_id: string;
+};
+
+const projectDemoEvent = <T extends DemoProjectedEvent>(
+  event: T,
+  input: {
+    firstTs: number;
+    baseTs: number;
+    seq: number;
+    runId: string;
+    runSerial: number;
+  }
+): T => {
+  const traceSuffix = event.trace_id.split(":").slice(1).join(":") || event.trace_id;
+  return {
+    ...event,
+    source_ts: input.baseTs + (event.source_ts - input.firstTs),
+    ingest_ts: input.baseTs + (event.ingest_ts - input.firstTs),
+    ts: input.baseTs + (event.ts - input.firstTs),
+    seq: input.seq,
+    trace_id: `${input.runId}:live:${input.runSerial}:${traceSuffix}`
+  };
+};
+
 export const createSyntheticEquitiesAdapter = (
   config: SyntheticEquitiesAdapterConfig
 ): EquityIngestAdapter => {
-  const throughput =
-    config.mode === "firehose"
-      ? { batchSize: 10, litSizeBase: 48, litSizeRange: 1800, darkSizeBase: 2800 }
-      : config.mode === "active"
-        ? { batchSize: 5, litSizeBase: 22, litSizeRange: 980, darkSizeBase: 1800 }
-        : { batchSize: 2, litSizeBase: 12, litSizeRange: 340, darkSizeBase: 900 };
-
   return {
     name: "synthetic",
     start: (handlers: EquityIngestHandlers) => {
       let seq = 0;
       let quoteSeq = 0;
-      let symbolCursor = 0;
-      let timer: ReturnType<typeof setInterval> | null = null;
+      let demoRunOrdinal = 0;
+      let demoRunSerial = 0;
+      let timer: ReturnType<typeof setTimeout> | null = null;
       let stopped = false;
+
+      const getEffectiveControl = (): SyntheticControlState => {
+        const control = config.getControl() ?? DEFAULT_SYNTHETIC_CONTROL_STATE;
+        if (
+          control.updated_at === 0 &&
+          control.load_profile_id === DEFAULT_SYNTHETIC_CONTROL_STATE.load_profile_id
+        ) {
+          return {
+            ...control,
+            load_profile_id: loadProfileIdForSyntheticMarketMode(config.mode)
+          };
+        }
+        return control;
+      };
 
       const emit = () => {
         if (stopped) {
@@ -168,107 +212,71 @@ export const createSyntheticEquitiesAdapter = (
         }
 
         const now = Date.now();
-        const control = config.getControl();
-        const session = getSyntheticSessionState(now, control);
-        const focusSymbols =
-          session.focus_symbols.length > 0 ? session.focus_symbols : SYNTHETIC_SYMBOLS.slice(0, 3);
-        const focusSet = new Set(focusSymbols);
-        const allowDark =
-          config.mode !== "realistic" ||
-          session.regime === "event_ramp" ||
-          session.regime === "dealer_gamma" ||
-          session.regime === "retail_chase";
+        const control = getEffectiveControl();
+        const runCount = getSyntheticLoadProfileRunCount(control.load_profile_id);
 
-        if (allowDark) {
-          const darkSymbol =
-            focusSymbols[seq % focusSymbols.length] ??
-            SYNTHETIC_SYMBOLS[symbolCursor % SYNTHETIC_SYMBOLS.length]!;
-          const darkQuote = buildQuoteContext(darkSymbol, now, control);
-          const darkPlacement = pickDarkPlacement(
-            darkQuote.state.driftBps,
-            session.regime,
-            seq + 1
+        for (let runOffset = 0; runOffset < runCount; runOffset += 1) {
+          const fixture = createSyntheticDemoProfileFixture(
+            control.demo_profile_id,
+            demoRunOrdinal
           );
-          const darkBias = darkQuote.state.offExchangeBias;
-          const darkSize = Math.max(
-            250,
-            Math.round(
-              throughput.darkSizeBase *
-                (0.65 + darkBias * 0.9 + darkQuote.state.sessionVolatility * 0.2)
-            )
-          );
+          const firstTs = fixture.manifest.replay_plan.first_event_ts ?? fixture.batch.run.start_ts;
+          const baseTs = now + runOffset * 10;
 
-          if (handlers.onQuote) {
-            quoteSeq += 1;
-            void handlers.onQuote(
-              buildSyntheticQuote(quoteSeq, now - 2, darkSymbol, darkQuote.bid, darkQuote.ask)
-            );
+          demoRunOrdinal += 1;
+          demoRunSerial += 1;
+
+          for (const generated of fixture.batch.events) {
+            if (generated.kind === "equity_quote" && handlers.onQuote) {
+              quoteSeq += 1;
+              void handlers.onQuote(
+                projectDemoEvent(generated.event, {
+                  firstTs,
+                  baseTs,
+                  seq: quoteSeq,
+                  runId: fixture.manifest.run.run_id,
+                  runSerial: demoRunSerial
+                })
+              );
+            }
+
+            if (generated.kind === "equity_print") {
+              seq += 1;
+              void handlers.onTrade(
+                projectDemoEvent(generated.event, {
+                  firstTs,
+                  baseTs,
+                  seq,
+                  runId: fixture.manifest.run.run_id,
+                  runSerial: demoRunSerial
+                })
+              );
+            }
           }
-
-          seq += 1;
-          void handlers.onTrade(
-            buildSyntheticPrint(
-              seq,
-              now,
-              darkSymbol,
-              priceForPlacement(darkQuote.mid, darkQuote, darkPlacement),
-              darkSize,
-              DARK_EXCHANGE,
-              true
-            )
-          );
         }
-
-        for (let i = 0; i < throughput.batchSize; i += 1) {
-          seq += 1;
-          const symbol =
-            i < focusSymbols.length
-              ? focusSymbols[i]!
-              : SYNTHETIC_SYMBOLS[(symbolCursor + i) % SYNTHETIC_SYMBOLS.length]!;
-          const eventTs = now + i * 4;
-          const quote = buildQuoteContext(symbol, eventTs, control);
-          const clustered = focusSet.has(symbol);
-          const placement = pickPrimaryPlacement(quote.state.driftBps, session.regime, seq + i);
-          const exchange = EXCHANGES[(seq + symbol.charCodeAt(0) + i) % EXCHANGES.length]!;
-          const baseSize =
-            throughput.litSizeBase +
-            ((seq + i) % throughput.litSizeRange) +
-            Math.round(quote.state.sessionVolatility * 140);
-          const size = clustered
-            ? Math.round(baseSize * (1 + quote.state.clusteringScore * 0.35))
-            : baseSize;
-          const offExchangeFlag =
-            ((seq + i * 3) % 10) / 10 < quote.state.offExchangeBias * (clustered ? 1.12 : 0.86);
-
-          if (handlers.onQuote) {
-            quoteSeq += 1;
-            void handlers.onQuote(
-              buildSyntheticQuote(quoteSeq, eventTs - 2, symbol, quote.bid, quote.ask)
-            );
-          }
-
-          void handlers.onTrade(
-            buildSyntheticPrint(
-              seq,
-              eventTs,
-              symbol,
-              priceForPlacement(quote.mid, quote, placement),
-              size,
-              exchange,
-              offExchangeFlag
-            )
-          );
-        }
-
-        symbolCursor = (symbolCursor + throughput.batchSize) % SYNTHETIC_SYMBOLS.length;
       };
 
-      timer = setInterval(emit, config.emitIntervalMs);
+      const schedule = () => {
+        if (stopped) {
+          return;
+        }
+        const control = getEffectiveControl();
+        const intervalMs = scaleSyntheticEmitIntervalMs(
+          config.emitIntervalMs,
+          control.load_profile_id
+        );
+        timer = setTimeout(() => {
+          emit();
+          schedule();
+        }, intervalMs);
+      };
+
+      schedule();
 
       return () => {
         stopped = true;
         if (timer) {
-          clearInterval(timer);
+          clearTimeout(timer);
         }
       };
     }
