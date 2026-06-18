@@ -150,6 +150,7 @@ Then inspect and merge with Forgejo tooling:
 ```bash
 fj pr view <pr-number-or-url>
 fj pr merge <pr-number-or-url>
+fj pr view <pr-number-or-url>
 git pull --rebase forgejo main
 bd dolt pull
 git status
@@ -158,17 +159,22 @@ git status
 If `fj` cannot merge because of conflicts, stale CI, or branch protection, send
 the PR back to a worker thread with the exact blocker.
 
+Do not select or launch the next implementation task while the reviewed PR is
+still open. The PR must be merged, or explicitly closed as rejected, before the
+orchestration loop restarts.
+
 ## Loop Restart
 
-After a merge lands:
+After a merge lands or the reviewed PR is otherwise closed:
 
-1. Confirm `git status` shows `main` up to date with `forgejo/main`.
-2. Confirm Beads state is synced with `bd dolt push` when local Beads state
+1. Confirm the reviewed PR is closed on Forgejo.
+2. Confirm `git status` shows `main` up to date with `forgejo/main`.
+3. Confirm Beads state is synced with `bd dolt push` when local Beads state
    changed.
-3. Run `bd ready`.
-4. Re-read the dependency table in `docs/implementation/README.md`.
-5. Select the next ready phase or PR-sized child issue.
-6. Launch the next implementation thread with model `gpt-5.5`, reasoning
+4. Run `bd ready`.
+5. Re-read the dependency table in `docs/implementation/README.md`.
+6. Select the next ready phase or PR-sized child issue.
+7. Launch the next implementation thread with model `gpt-5.5`, reasoning
    `xhigh`, and the implementation prompt.
 
 Stop the loop when there is no ready MVP phase, when the next ready issue is
