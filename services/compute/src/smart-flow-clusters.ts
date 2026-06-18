@@ -73,6 +73,27 @@ const maxValue = (values: Array<number | null>): number | null => {
   return Math.max(...presentValues);
 };
 
+const minValue = (values: Array<number | null>): number | null => {
+  const presentValues = values.filter((value): value is number => value !== null);
+  if (presentValues.length === 0) {
+    return null;
+  }
+  return Math.min(...presentValues);
+};
+
+const collapsedStringValue = (facts: FlowEvidenceFact[]): string | null => {
+  const values = uniqueSorted(
+    facts.flatMap((fact) => (typeof fact.value === "string" ? [fact.value] : []))
+  );
+  if (values.length === 0) {
+    return null;
+  }
+  if (values.length === 1) {
+    return values[0]!;
+  }
+  return "mixed";
+};
+
 const observationKey = (ref: FlowObservationRef): string =>
   [
     ref.kind,
@@ -188,6 +209,16 @@ const buildFeatureDetails = (inputs: ClusterInput[]): Record<string, FlowTraceab
   const staleFacts = factsBySlug(facts, "stale-quote-ratio");
   const optionSpreadFacts = factsBySlug(facts, "option-spread-bps");
   const underlyingSpreadFacts = factsBySlug(facts, "underlying-spread-bps");
+  const optionTypeFacts = factsBySlug(facts, "option-type");
+  const aggressiveBuyFacts = factsBySlug(facts, "aggressive-buy-ratio");
+  const aggressiveSellFacts = factsBySlug(facts, "aggressive-sell-ratio");
+  const netDirectionalBiasFacts = factsBySlug(facts, "net-directional-bias");
+  const executionIvFacts = factsBySlug(facts, "execution-iv");
+  const underlyingMoveFacts = factsBySlug(facts, "underlying-move-bps");
+  const daysToEventFacts = factsBySlug(facts, "days-to-event");
+  const structureTypeFacts = factsBySlug(facts, "structure-type");
+  const structureLegFacts = factsBySlug(facts, "structure-legs");
+  const structureSymmetryFacts = factsBySlug(facts, "same-size-leg-symmetry");
   const eligibilityFacts = facts.filter((fact) => fact.kind === "eligibility_decision");
   const conditionFacts = factsBySlug(facts, "print-conditions");
   const traceAllFacts = facts.length > 0 ? facts : premiumFacts;
@@ -258,6 +289,22 @@ const buildFeatureDetails = (inputs: ClusterInput[]): Record<string, FlowTraceab
   );
   addFeature(
     features,
+    "nbbo_aggressive_buy_ratio_max",
+    "Maximum NBBO aggressive buy ratio",
+    maxValue(aggressiveBuyFacts.map((fact) => numericFeatureValue(fact.value))),
+    "measured_fact",
+    aggressiveBuyFacts
+  );
+  addFeature(
+    features,
+    "nbbo_aggressive_sell_ratio_max",
+    "Maximum NBBO aggressive sell ratio",
+    maxValue(aggressiveSellFacts.map((fact) => numericFeatureValue(fact.value))),
+    "measured_fact",
+    aggressiveSellFacts
+  );
+  addFeature(
+    features,
     "option_spread_bps_max",
     "Maximum option NBBO spread",
     maxValue(optionSpreadFacts.map((fact) => numericFeatureValue(fact.value))),
@@ -271,6 +318,70 @@ const buildFeatureDetails = (inputs: ClusterInput[]): Record<string, FlowTraceab
     maxValue(underlyingSpreadFacts.map((fact) => numericFeatureValue(fact.value))),
     "measured_fact",
     underlyingSpreadFacts
+  );
+  addFeature(
+    features,
+    "option_type",
+    "Observed option side",
+    collapsedStringValue(optionTypeFacts),
+    "measured_fact",
+    optionTypeFacts
+  );
+  addFeature(
+    features,
+    "net_directional_bias",
+    "Mean net directional bias",
+    average(netDirectionalBiasFacts.map((fact) => numericFeatureValue(fact.value))),
+    "derived_metric",
+    netDirectionalBiasFacts
+  );
+  addFeature(
+    features,
+    "execution_iv",
+    "Maximum execution implied volatility",
+    maxValue(executionIvFacts.map((fact) => numericFeatureValue(fact.value))),
+    "measured_fact",
+    executionIvFacts
+  );
+  addFeature(
+    features,
+    "underlying_move_bps",
+    "Mean underlying movement",
+    average(underlyingMoveFacts.map((fact) => numericFeatureValue(fact.value))),
+    "measured_fact",
+    underlyingMoveFacts
+  );
+  addFeature(
+    features,
+    "days_to_event",
+    "Closest known event timing",
+    minValue(daysToEventFacts.map((fact) => numericFeatureValue(fact.value))),
+    "derived_metric",
+    daysToEventFacts
+  );
+  addFeature(
+    features,
+    "structure_type",
+    "Observed structure type",
+    collapsedStringValue(structureTypeFacts),
+    "measured_fact",
+    structureTypeFacts
+  );
+  addFeature(
+    features,
+    "structure_legs",
+    "Maximum structure leg count",
+    maxValue(structureLegFacts.map((fact) => numericFeatureValue(fact.value))),
+    "measured_fact",
+    structureLegFacts
+  );
+  addFeature(
+    features,
+    "same_size_leg_symmetry",
+    "Maximum same-size leg symmetry",
+    maxValue(structureSymmetryFacts.map((fact) => numericFeatureValue(fact.value))),
+    "measured_fact",
+    structureSymmetryFacts
   );
   addFeature(
     features,

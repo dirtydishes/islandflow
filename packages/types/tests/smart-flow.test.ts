@@ -6,6 +6,8 @@ import {
   FlowHypothesisEventSchema,
   flowHypothesisEventFromLegacySmartMoneyEvent,
   SMART_FLOW_CONTRACT_VERSION,
+  SMART_FLOW_HYPOTHESIS_SCORE_MODEL_VERSION,
+  SMART_FLOW_HYPOTHESIS_SCORE_POLICY_VERSION,
   SMART_FLOW_MODEL_VERSION,
   SMART_FLOW_POLICY_VERSION,
   SmartFlowInsightSchema,
@@ -213,9 +215,24 @@ describe("smart-flow contracts", () => {
       hypothesis_type: "directional_accumulation",
       direction: "bullish",
       scores: {
+        schema_version: SMART_FLOW_CONTRACT_VERSION,
+        policy_version: SMART_FLOW_HYPOTHESIS_SCORE_POLICY_VERSION,
+        model_version: SMART_FLOW_HYPOTHESIS_SCORE_MODEL_VERSION,
+        hypothesis_type: "directional_accumulation",
+        direction: "bullish",
         evidence_strength: 0.8,
         fit_score: 0.7,
         penalty_score: 0.1,
+        penalties: [
+          {
+            penalty_id: "penalty:cluster:1:wide-quote",
+            kind: "wide_quote_context",
+            score: 0.1,
+            reason: "The option quote was wide enough to discount confidence.",
+            evidence_refs: ["flowpacket:1"],
+            feature_key: "option_spread_bps_max"
+          }
+        ],
         confidence: {
           policy_confidence: 0.64,
           evidence_quality: 0.8,
@@ -242,6 +259,8 @@ describe("smart-flow contracts", () => {
     });
 
     expect(parsed.scores.confidence.policy_confidence).toBe(0.64);
+    expect(parsed.scores.policy_version).toBe(SMART_FLOW_HYPOTHESIS_SCORE_POLICY_VERSION);
+    expect(parsed.scores.penalties[0]?.kind).toBe("wide_quote_context");
     expect(parsed.abstention.abstained).toBe(false);
   });
 

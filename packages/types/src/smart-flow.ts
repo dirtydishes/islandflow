@@ -11,6 +11,8 @@ import {
 export const SMART_FLOW_CONTRACT_VERSION = "smart-flow.contracts.v1";
 export const SMART_FLOW_POLICY_VERSION = "smart-flow.policy.compat.v1";
 export const SMART_FLOW_MODEL_VERSION = "smart-flow.model.unscored.v1";
+export const SMART_FLOW_HYPOTHESIS_SCORE_POLICY_VERSION = "smart-flow.hypothesis-score.policy.v1";
+export const SMART_FLOW_HYPOTHESIS_SCORE_MODEL_VERSION = "smart-flow.hypothesis-score.rules.v1";
 
 export const SmartFlowContractVersionSchema = z.literal(SMART_FLOW_CONTRACT_VERSION);
 export const SmartFlowPolicyVersionSchema = z.string().min(1);
@@ -241,10 +243,43 @@ export const FlowConfidenceVectorSchema = z.object({
 
 export type FlowConfidenceVector = z.infer<typeof FlowConfidenceVectorSchema>;
 
+export const FlowScorePenaltyKindSchema = z.enum([
+  "stale_quote_context",
+  "wide_quote_context",
+  "wide_underlying_quote_context",
+  "inside_market_context",
+  "complex_or_special_print_context",
+  "low_premium",
+  "weak_aggression",
+  "missing_context",
+  "conflicting_direction",
+  "structure_context",
+  "other"
+]);
+
+export type FlowScorePenaltyKind = z.infer<typeof FlowScorePenaltyKindSchema>;
+
+export const FlowScorePenaltySchema = z.object({
+  penalty_id: z.string().min(1),
+  kind: FlowScorePenaltyKindSchema,
+  score: z.number().min(0).max(1),
+  reason: z.string().min(1),
+  evidence_refs: z.array(z.string().min(1)),
+  feature_key: z.string().min(1).optional()
+});
+
+export type FlowScorePenalty = z.infer<typeof FlowScorePenaltySchema>;
+
 export const FlowHypothesisScoreVectorSchema = z.object({
+  schema_version: SmartFlowContractVersionSchema,
+  policy_version: SmartFlowPolicyVersionSchema,
+  model_version: SmartFlowModelVersionSchema,
+  hypothesis_type: FlowHypothesisTypeSchema,
+  direction: SmartMoneyDirectionSchema,
   evidence_strength: z.number().min(0).max(1),
   fit_score: z.number().min(0).max(1),
   penalty_score: z.number().min(0).max(1),
+  penalties: z.array(FlowScorePenaltySchema),
   confidence: FlowConfidenceVectorSchema
 });
 
@@ -392,6 +427,19 @@ const mapLegacyAbstentionReason = (reason: string): FlowAbstentionReason => {
   return "other";
 };
 
+const mapLegacyPenaltyKind = (reason: string): FlowScorePenaltyKind => {
+  if (reason === "stale_or_missing_quote_context") {
+    return "stale_quote_context";
+  }
+  if (reason === "inside_market_or_cross_like_execution") {
+    return "inside_market_context";
+  }
+  if (reason === "special_print_or_complex_context") {
+    return "complex_or_special_print_context";
+  }
+  return "other";
+};
+
 const abstentionFromLegacyEvent = (event: SmartMoneyEvent): FlowAbstention => {
   const reasons = event.abstained
     ? event.suppressed_reasons.map(mapLegacyAbstentionReason)
@@ -420,6 +468,7 @@ export const flowHypothesisEventFromLegacySmartMoneyEvent = (
   const evidenceQuality = evidenceQualityFromLegacyEvent(event);
   const policyConfidence = event.abstained ? 0 : clampUnit(primaryScore?.probability ?? 0);
   const hypothesisType = hypothesisTypeFromLegacyProfile(event.primary_profile_id);
+  const evidenceRefs = [...event.packet_ids, ...event.member_print_ids];
 
   return FlowHypothesisEventSchema.parse({
     source_ts: event.source_ts,
@@ -437,9 +486,21 @@ export const flowHypothesisEventFromLegacySmartMoneyEvent = (
     hypothesis_type: hypothesisType,
     direction: event.primary_direction,
     scores: {
+      schema_version: SMART_FLOW_CONTRACT_VERSION,
+      policy_version: SMART_FLOW_POLICY_VERSION,
+      model_version: SMART_FLOW_MODEL_VERSION,
+      hypothesis_type: hypothesisType,
+      direction: event.primary_direction,
       evidence_strength: evidenceQuality.quality_score,
       fit_score: clampUnit(primaryScore?.probability ?? 0),
       penalty_score: event.suppressed_reasons.length > 0 ? 1 : 0,
+      penalties: event.suppressed_reasons.map((reason, index) => ({
+        penalty_id: `penalty:${event.event_id}:legacy:${index}:${reason}`,
+        kind: mapLegacyPenaltyKind(reason),
+        score: 1,
+        reason: `Legacy suppression guard: ${reason}.`,
+        evidence_refs: evidenceRefs
+      })),
       confidence: {
         policy_confidence: policyConfidence,
         evidence_quality: evidenceQuality.quality_score,
@@ -458,7 +519,7 @@ export const flowHypothesisEventFromLegacySmartMoneyEvent = (
         reasons: score.reasons
       })),
     abstention: abstentionFromLegacyEvent(event),
-    evidence_refs: [...event.packet_ids, ...event.member_print_ids],
+    evidence_refs: evidenceRefs,
     generated_from: "legacy_smart_money_event",
     compatibility: {
       compatibility_only: true,
