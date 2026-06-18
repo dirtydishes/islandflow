@@ -35,6 +35,12 @@ Research reports provide rationale and useful constraints. They do not add activ
 - Early synthetic tests must not require Docker, ClickHouse, NATS, or Redis.
 - Synthetic foundations should come before demos, UI controls, or live service work.
 
+## Codex Thread Workflow
+
+Use [`codex-phase-workflow.md`](codex-phase-workflow.md) when one Codex thread
+is orchestrating the phase loop across separate implementation and review
+threads.
+
 ## Beads Map
 
 | Stream | Epic | Roadmap |
