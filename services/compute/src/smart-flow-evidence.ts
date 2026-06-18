@@ -44,6 +44,8 @@ const DEFAULT_CONFIG = {
   minAggressorRatioForInsideContext: 0.35
 } satisfies Required<FlowEvidenceExtractionConfig>;
 
+const MS_PER_DAY = 86_400_000;
+
 const SPECIAL_PRINT_CONDITIONS = new Set([
   "AUCTION",
   "CROSS",
@@ -65,6 +67,13 @@ const clampUnit = (value: number): number => {
     return 0;
   }
   return Math.max(0, Math.min(1, value));
+};
+
+const clampSignedUnit = (value: number): number => {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.max(-1, Math.min(1, value));
 };
 
 const numberFeature = (packet: FlowPacket, key: string): number | null => {
@@ -175,6 +184,26 @@ const spreadBps = (mid: number | null, spread: number | null): number | null => 
     return null;
   }
   return roundTo((Math.max(0, spread) / mid) * 10_000, 2);
+};
+
+const normalizeOptionSide = (
+  optionType: string,
+  parsedRight: "C" | "P" | undefined
+): "call" | "put" | null => {
+  const normalized = optionType.trim().toLowerCase();
+  if (normalized === "call" || normalized === "c") {
+    return "call";
+  }
+  if (normalized === "put" || normalized === "p") {
+    return "put";
+  }
+  if (parsedRight === "C") {
+    return "call";
+  }
+  if (parsedRight === "P") {
+    return "put";
+  }
+  return null;
 };
 
 const optionSpreadBps = (packet: FlowPacket): number | null => {
@@ -300,6 +329,10 @@ export const buildFlowEvidenceCandidateFromPacket = (
   const contractId = stringFeature(packet, "option_contract_id");
   const parsedContract = parseContractId(contractId);
   const underlyingId = stringFeature(packet, "underlying_id") || parsedContract?.root || "UNKNOWN";
+  const optionSide = normalizeOptionSide(
+    stringFeature(packet, "option_type"),
+    parsedContract?.right
+  );
   const sourceTs = numberFeature(packet, "end_ts") ?? packet.source_ts;
   const packetRef = buildPacketRef(packet);
   const memberRefs = buildMemberRefs(packet, sourceTs);
@@ -322,6 +355,11 @@ export const buildFlowEvidenceCandidateFromPacket = (
   const staleRatio = printCount > 0 ? clampUnit((staleCount + missingCount) / printCount) : 1;
   const insideRatio = clampUnit(numberFeature(packet, "nbbo_inside_ratio") ?? 0);
   const aggressiveRatio = clampUnit(numberFeature(packet, "nbbo_aggressive_ratio") ?? 0);
+  const aggressiveBuyRatio = clampUnit(numberFeature(packet, "nbbo_aggressive_buy_ratio") ?? 0);
+  const aggressiveSellRatio = clampUnit(numberFeature(packet, "nbbo_aggressive_sell_ratio") ?? 0);
+  const netDirectionalBias = clampSignedUnit(
+    numberFeature(packet, "net_directional_bias") ?? aggressiveBuyRatio - aggressiveSellRatio
+  );
   const specialPrintCount = Math.max(0, numberFeature(packet, "special_print_count") ?? 0);
   const specialPrintRatio = printCount > 0 ? clampUnit(specialPrintCount / printCount) : 0;
   const conditions = splitConditions(stringFeature(packet, "conditions"));
@@ -329,6 +367,16 @@ export const buildFlowEvidenceCandidateFromPacket = (
   const nbboAgeMs = numericJoinQuality(packet, "nbbo_age_ms");
   const optionSpread = optionSpreadBps(packet);
   const underlyingSpread = underlyingSpreadBps(packet);
+  const executionIv = numberFeature(packet, "execution_iv");
+  const underlyingMoveBps = numberFeature(packet, "underlying_move_bps");
+  const structureType = stringFeature(packet, "structure_type");
+  const structureLegs = numberFeature(packet, "structure_legs");
+  const sameSizeLegSymmetry = numberFeature(packet, "same_size_leg_symmetry");
+  const corporateEventTs = numberFeature(packet, "corporate_event_ts");
+  const daysToEvent =
+    corporateEventTs !== null && corporateEventTs >= sourceTs
+      ? roundTo((corporateEventTs - sourceTs) / MS_PER_DAY)
+      : null;
 
   const decisions: FlowEligibilityDecision[] = [];
   const addDecision = (
@@ -462,6 +510,33 @@ export const buildFlowEvidenceCandidateFromPacket = (
     ),
     buildFact(
       packet,
+      "aggressive-buy-ratio",
+      "execution_aggression",
+      "NBBO aggressive buy ratio",
+      roundTo(aggressiveBuyRatio),
+      "ratio",
+      quoteRef ? [packetRef, quoteRef, ...memberRefs] : [packetRef, ...memberRefs]
+    ),
+    buildFact(
+      packet,
+      "aggressive-sell-ratio",
+      "execution_aggression",
+      "NBBO aggressive sell ratio",
+      roundTo(aggressiveSellRatio),
+      "ratio",
+      quoteRef ? [packetRef, quoteRef, ...memberRefs] : [packetRef, ...memberRefs]
+    ),
+    buildFact(
+      packet,
+      "net-directional-bias",
+      "underlying_context",
+      "Net directional bias",
+      roundTo(netDirectionalBias),
+      "ratio",
+      [packetRef, ...memberRefs]
+    ),
+    buildFact(
+      packet,
       "nbbo-coverage",
       "quote_quality",
       "NBBO coverage ratio",
@@ -527,6 +602,84 @@ export const buildFlowEvidenceCandidateFromPacket = (
       )
     );
   }
+  if (optionSide) {
+    facts.push(
+      buildFact(
+        packet,
+        "option-type",
+        "structure_shape",
+        "Observed option side",
+        optionSide,
+        undefined,
+        [packetRef, ...memberRefs]
+      )
+    );
+  }
+  if (structureType) {
+    facts.push(
+      buildFact(
+        packet,
+        "structure-type",
+        "structure_shape",
+        "Observed structure type",
+        structureType,
+        undefined,
+        [packetRef, ...memberRefs]
+      )
+    );
+  }
+  if (structureLegs !== null) {
+    facts.push(
+      buildFact(
+        packet,
+        "structure-legs",
+        "structure_shape",
+        "Observed structure leg count",
+        Math.max(0, Math.round(structureLegs)),
+        "legs",
+        [packetRef, ...memberRefs]
+      )
+    );
+  }
+  if (sameSizeLegSymmetry !== null) {
+    facts.push(
+      buildFact(
+        packet,
+        "same-size-leg-symmetry",
+        "structure_shape",
+        "Same-size leg symmetry",
+        roundTo(clampUnit(sameSizeLegSymmetry)),
+        "ratio",
+        [packetRef, ...memberRefs]
+      )
+    );
+  }
+  if (executionIv !== null) {
+    facts.push(
+      buildFact(
+        packet,
+        "execution-iv",
+        "execution_context",
+        "Execution implied volatility",
+        roundTo(executionIv),
+        "ratio",
+        [packetRef, ...memberRefs]
+      )
+    );
+  }
+  if (underlyingMoveBps !== null) {
+    facts.push(
+      buildFact(
+        packet,
+        "underlying-move-bps",
+        "underlying_context",
+        "Underlying movement",
+        roundTo(underlyingMoveBps),
+        "bps",
+        [packetRef, ...(underlyingQuoteRef ? [underlyingQuoteRef] : [])]
+      )
+    );
+  }
   if (conditions.length > 0) {
     facts.push(
       buildFact(
@@ -540,7 +693,6 @@ export const buildFlowEvidenceCandidateFromPacket = (
       )
     );
   }
-  const corporateEventTs = numberFeature(packet, "corporate_event_ts");
   if (corporateEventTs !== null) {
     facts.push(
       buildFact(
@@ -550,6 +702,19 @@ export const buildFlowEvidenceCandidateFromPacket = (
         "Known event timestamp",
         corporateEventTs,
         "ms",
+        [packetRef]
+      )
+    );
+  }
+  if (daysToEvent !== null) {
+    facts.push(
+      buildFact(
+        packet,
+        "days-to-event",
+        "event_context",
+        "Days until known event",
+        daysToEvent,
+        "days",
         [packetRef]
       )
     );
@@ -575,9 +740,20 @@ export const buildFlowEvidenceCandidateFromPacket = (
     nbbo_coverage_ratio: roundTo(nbboCoverageRatio),
     nbbo_stale_ratio: roundTo(staleRatio),
     nbbo_aggressive_ratio: roundTo(aggressiveRatio),
+    nbbo_aggressive_buy_ratio: roundTo(aggressiveBuyRatio),
+    nbbo_aggressive_sell_ratio: roundTo(aggressiveSellRatio),
     nbbo_inside_ratio: roundTo(insideRatio),
     option_spread_bps: optionSpread,
     underlying_spread_bps: underlyingSpread,
+    option_type: optionSide,
+    net_directional_bias: roundTo(netDirectionalBias),
+    execution_iv: executionIv === null ? null : roundTo(executionIv),
+    underlying_move_bps: underlyingMoveBps === null ? null : roundTo(underlyingMoveBps),
+    days_to_event: daysToEvent,
+    structure_type: structureType || null,
+    structure_legs: structureLegs === null ? null : Math.max(0, Math.round(structureLegs)),
+    same_size_leg_symmetry:
+      sameSizeLegSymmetry === null ? null : roundTo(clampUnit(sameSizeLegSymmetry)),
     special_print_ratio: roundTo(specialPrintRatio),
     eligibility_status: eligibility.status,
     conditions: conditions.length > 0 ? conditions.join(",") : null
