@@ -217,8 +217,10 @@
         <p>
           Added a pure compute-side replay evaluator that rebuilds smart-flow evidence,
           clusters, hypotheses, and compact signatures from raw synthetic market events.
-          Added infra-free golden tests for positive alert, no-alert abstention,
-          false-positive detection, and noisy event-context replay.
+          Added infra-free golden tests for positive alert, unexpected extra alert,
+          no-alert abstention, false-positive detection, and noisy event-context replay.
+          A review pass then hardened the golden comparator so an expected alert cannot
+          hide additional emitted alert signatures.
         </p>
       </section>
 
@@ -232,8 +234,14 @@
           </li>
           <li>
             Added <strong>services/compute/tests/smart-flow-replay-evaluation.test.ts</strong>
-            with four deterministic golden cases: positive, abstention, false-positive,
-            and noisy event context.
+            with five deterministic golden cases: positive, unexpected extra alert,
+            abstention, false-positive, and noisy event context.
+          </li>
+          <li>
+            Hardened expected-manifest comparison so emitted alerts are consumed against
+            expected class/direction signatures exactly once. Extra signatures are now
+            reported as <code>unexpected_class</code>, <code>unexpected_direction</code>,
+            or <code>false_positive</code> instead of passing beside a valid alert.
           </li>
           <li>
             Added <strong>@islandflow/synthetic-market</strong> as a compute workspace
@@ -265,6 +273,10 @@
             abstention reasons, and penalty kinds.
           </li>
           <li>
+            Positive golden manifests now reject extra emitted alert signatures, including
+            wrong-direction alerts emitted from other raw replay clusters.
+          </li>
+          <li>
             No service containers are required. The tests use generated synthetic fixtures
             in memory and compare expected-output manifests directly.
           </li>
@@ -278,10 +290,9 @@
       <section>
         <h2>Relevant Diff Snippets</h2>
         <p>
-          Excerpted unified diffs are shown as a dark-mode fallback. The public Diffs docs
-          describe <code>FileDiff</code> patch rendering, but the SSR API was not exposed in
-          the available documentation, so a focused fallback kept the turn record small and
-          deterministic.
+          Excerpted unified diffs are shown as a focused dark-mode fallback. The installed
+          Diffs SSR helpers are available, but this review patch is small enough that a
+          compact unified excerpt keeps the record easier to audit.
         </p>
         <pre><code><span class="diff-head">diff --git a/services/compute/src/smart-flow-replay-evaluation.ts b/services/compute/src/smart-flow-replay-evaluation.ts</span>
 <span class="diff-hunk">@@ -0,0 +1,34 @@</span>
@@ -319,6 +330,25 @@
 <span class="diff-add">+  return { ...evaluation, signature_hash: stableHash(signature) };</span>
 <span class="diff-add">+};</span></code></pre>
 
+        <pre><code><span class="diff-head">diff --git a/services/compute/src/smart-flow-replay-evaluation.ts b/services/compute/src/smart-flow-replay-evaluation.ts</span>
+<span class="diff-hunk">@@ -235,6 +235,9 @@ export const compareSmartFlowReplayToExpectedManifest = (</span>
+<span class="diff-add">+  mismatches.push(</span>
+<span class="diff-add">+    ...compareUnexpectedEmittedAlerts(expectedManifest.expectations, evaluation.hypotheses)</span>
+<span class="diff-add">+  );</span>
+<span class="diff-hunk">@@ -247,6 +250,28 @@ export const compareSmartFlowReplayToExpectedManifest = (</span>
+<span class="diff-add">+const compareUnexpectedEmittedAlerts = (</span>
+<span class="diff-add">+  expectations: SmartFlowExpectedOutput[],</span>
+<span class="diff-add">+  hypotheses: FlowHypothesisEvent[]</span>
+<span class="diff-add">+): SmartFlowGoldenMismatch[] =&gt; {</span>
+<span class="diff-add">+  const expectedAlerts = expectations.filter(</span>
+<span class="diff-add">+    (expectation) =&gt; expectation.alert_expectation === "alert"</span>
+<span class="diff-add">+  );</span>
+<span class="diff-add">+  const remainingBySignature = new Map&lt;string, number&gt;();</span>
+<span class="diff-add">+  const expectedSignatures = new Set&lt;string&gt;();</span>
+<span class="diff-add">+  const expectedClasses = new Set&lt;FlowHypothesisEvent["hypothesis_type"]&gt;();</span>
+<span class="diff-add">+  /* emitted alerts consume expected signatures once; extras become mismatches */</span>
+<span class="diff-add">+};</span></code></pre>
+
         <pre><code><span class="diff-head">diff --git a/services/compute/tests/smart-flow-replay-evaluation.test.ts b/services/compute/tests/smart-flow-replay-evaluation.test.ts</span>
 <span class="diff-hunk">@@ -0,0 +231,45 @@</span>
 <span class="diff-add">+describe("smart-flow replay evaluation and golden signatures", () =&gt; {</span>
@@ -344,6 +374,26 @@
 <span class="diff-add">+    expect(report.mismatches.map((mismatch) =&gt; mismatch.kind)).toContain("false_positive");</span>
 <span class="diff-add">+  });</span>
 <span class="diff-add">+});</span></code></pre>
+
+        <pre><code><span class="diff-head">diff --git a/services/compute/tests/smart-flow-replay-evaluation.test.ts b/services/compute/tests/smart-flow-replay-evaluation.test.ts</span>
+<span class="diff-hunk">@@ -306,6 +362,29 @@ describe("smart-flow replay evaluation and golden signatures", () =&gt; {</span>
+<span class="diff-add">+  it("flags unexpected emitted alerts when the expected alert is also present", () =&gt; {</span>
+<span class="diff-add">+    const fixture = fixtureWithUnexpectedBearishAlert();</span>
+<span class="diff-add">+    const expected = expectedManifest(fixture.batch, {</span>
+<span class="diff-add">+      scenario_id: "golden-unexpected-direction-guard",</span>
+<span class="diff-add">+      alert_expectation: "alert",</span>
+<span class="diff-add">+      expected_class: "directional_accumulation",</span>
+<span class="diff-add">+      expected_direction: "bullish",</span>
+<span class="diff-add">+      confidence_range: { min: 0.8, max: 0.84 },</span>
+<span class="diff-add">+      expected_derived_events: PRESENT_DERIVED_EVENTS</span>
+<span class="diff-add">+    });</span>
+<span class="diff-add">+    const report = compareSmartFlowReplayToExpectedManifest(fixture, expected);</span>
+<span class="diff-add">+    expect(report.matches).toBe(false);</span>
+<span class="diff-add">+    expect(report.signature.emitted_hypothesis_count).toBe(2);</span>
+<span class="diff-add">+    expect(report.mismatches).toContainEqual(</span>
+<span class="diff-add">+      expect.objectContaining({ kind: "unexpected_direction" })</span>
+<span class="diff-add">+    );</span>
+<span class="diff-add">+  });</span></code></pre>
 
         <pre><code><span class="diff-head">diff --git a/services/compute/package.json b/services/compute/package.json</span>
 <span class="diff-hunk">@@ -11,6 +11,7 @@</span>
@@ -378,19 +428,19 @@
           <tbody>
             <tr>
               <td><code>bun test services/compute/tests/smart-flow-replay-evaluation.test.ts</code></td>
-              <td><span class="ok">Passed</span> - 4 tests.</td>
+              <td><span class="ok">Passed</span> - 5 tests.</td>
             </tr>
             <tr>
               <td><code>bun test services/compute/tests</code></td>
-              <td><span class="ok">Passed</span> - 56 tests.</td>
+              <td><span class="ok">Passed</span> - 57 tests.</td>
             </tr>
             <tr>
-              <td><code>bun test packages/synthetic-market/tests</code></td>
-              <td><span class="ok">Passed</span> - 18 tests.</td>
+              <td><code>bun test services/replay/tests/synthetic-fixture.test.ts packages/synthetic-market/tests</code></td>
+              <td><span class="ok">Passed</span> - 22 tests.</td>
             </tr>
             <tr>
               <td><code>bun test</code></td>
-              <td><span class="ok">Passed</span> - 295 tests.</td>
+              <td><span class="ok">Passed</span> - 296 tests.</td>
             </tr>
             <tr>
               <td><code>bun run typecheck</code></td>
@@ -398,13 +448,13 @@
             </tr>
             <tr>
               <td><code>bunx biome check touched files</code></td>
-              <td><span class="ok">Passed</span> for the three touched code/package files.</td>
+              <td><span class="ok">Passed</span> for the compute source, test, package, and lock files.</td>
             </tr>
             <tr>
               <td><code>bun run check</code></td>
               <td>
-                <span class="warn">Failed</span> on unrelated pre-existing import-order
-                diagnostics outside this change.
+                <span class="warn">Failed</span> on 48 unrelated pre-existing import-order
+                diagnostics outside the review patch.
               </td>
             </tr>
           </tbody>
@@ -425,6 +475,10 @@
           <li>
             Full repository Biome remains blocked by unrelated import-order diagnostics;
             touched-file Biome and full typecheck both pass.
+          </li>
+          <li>
+            Review found and fixed a comparator gap: an expected positive alert could
+            previously pass while another emitted alert signature remained unreported.
           </li>
         </ul>
       </section>

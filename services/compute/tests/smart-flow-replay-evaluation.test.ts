@@ -125,6 +125,62 @@ const directionalFixture = (): SmartFlowReplayFixture => {
   };
 };
 
+const bearishPutFixture = (): SmartFlowReplayFixture => {
+  const artifacts = createSyntheticFixtureArtifacts({
+    run_name: "phase 04 golden bearish put alert",
+    seed_bundle: {
+      seed: 6,
+      namespace: "smart-flow-phase-04",
+      partition: "put"
+    },
+    profile: {
+      start_ts: Date.parse("2026-01-02T14:30:00Z"),
+      steps: 6,
+      symbols: [{ underlying_id: "QQQ", base_price: 400, exchange: "ARCA" }],
+      liquidity: {
+        equity_spread_bps: 3,
+        equity_quote_size: 1_800,
+        equity_trade_size: 320,
+        option_spread_bps: 40,
+        option_quote_size: 220,
+        option_trade_size: 250,
+        off_exchange_ratio: 0.05,
+        arrival_interval_ms: 80
+      },
+      volatility: {
+        drift_bps_per_step: 6,
+        price_noise_bps: 2,
+        option_iv: 0.5
+      },
+      option_chain: {
+        expiries_days: [14],
+        strike_offsets_bps: [-100, 0],
+        option_types: ["put"],
+        strike_step: 5,
+        sparse_contract_ratio: 0
+      }
+    }
+  });
+
+  return {
+    manifest: artifacts.manifest,
+    batch: artifacts.batch
+  };
+};
+
+const fixtureWithUnexpectedBearishAlert = (): SmartFlowReplayFixture => {
+  const bullish = directionalFixture();
+  const bearish = bearishPutFixture();
+
+  return {
+    manifest: bullish.manifest,
+    batch: {
+      ...bullish.batch,
+      events: [...bullish.batch.events, ...bearish.batch.events]
+    }
+  };
+};
+
 const abstentionFixture = (): SmartFlowReplayFixture => {
   const artifacts = createSyntheticFixtureArtifacts({
     run_name: "phase 04 golden wide-quote abstention",
@@ -304,6 +360,35 @@ describe("smart-flow replay evaluation and golden signatures", () => {
       abstained: false,
       confidence_band: "high"
     });
+  });
+
+  it("flags unexpected emitted alerts when the expected alert is also present", () => {
+    const fixture = fixtureWithUnexpectedBearishAlert();
+    const expected = expectedManifest(fixture.batch, {
+      scenario_id: "golden-unexpected-direction-guard",
+      alert_expectation: "alert",
+      expected_class: "directional_accumulation",
+      expected_direction: "bullish",
+      confidence_range: { min: 0.8, max: 0.84 },
+      abstention_reasons: ["not_abstained"],
+      required_evidence: [],
+      forbidden_evidence: [],
+      expected_derived_events: PRESENT_DERIVED_EVENTS
+    });
+
+    const report = compareSmartFlowReplayToExpectedManifest(fixture, expected);
+
+    expect(report.matches).toBe(false);
+    expect(report.signature.emitted_hypothesis_count).toBe(2);
+    expect(report.mismatches).toContainEqual(
+      expect.objectContaining({
+        kind: "unexpected_direction",
+        actual: expect.objectContaining({
+          hypothesis_type: "directional_accumulation",
+          direction: "bearish"
+        })
+      })
+    );
   });
 
   it("keeps no-alert abstention signatures infra-free and reviewable", () => {

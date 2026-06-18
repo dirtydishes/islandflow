@@ -235,6 +235,9 @@ export const compareSmartFlowReplayToExpectedManifest = (
       })
     );
   }
+  mismatches.push(
+    ...compareUnexpectedEmittedAlerts(expectedManifest.expectations, evaluation.hypotheses)
+  );
 
   return {
     run_id: fixture.manifest.run.run_id,
@@ -246,6 +249,67 @@ export const compareSmartFlowReplayToExpectedManifest = (
     matches: mismatches.length === 0
   };
 };
+
+const compareUnexpectedEmittedAlerts = (
+  expectations: SmartFlowExpectedOutput[],
+  hypotheses: FlowHypothesisEvent[]
+): SmartFlowGoldenMismatch[] => {
+  const expectedAlerts = expectations.filter(
+    (expectation) => expectation.alert_expectation === "alert"
+  );
+  if (expectedAlerts.length === 0) {
+    return [];
+  }
+
+  const remainingBySignature = new Map<string, number>();
+  const expectedSignatures = new Set<string>();
+  const expectedClasses = new Set<FlowHypothesisEvent["hypothesis_type"]>();
+  for (const expectation of expectedAlerts) {
+    const key = alertSignatureKey(expectation.expected_class, expectation.expected_direction);
+    remainingBySignature.set(key, (remainingBySignature.get(key) ?? 0) + 1);
+    expectedSignatures.add(key);
+    expectedClasses.add(expectation.expected_class);
+  }
+
+  return hypotheses
+    .filter((hypothesis) => !hypothesis.abstention.abstained)
+    .flatMap((hypothesis) => {
+      const key = alertSignatureKey(hypothesis.hypothesis_type, hypothesis.direction);
+      const remainingExpectedCount = remainingBySignature.get(key) ?? 0;
+      if (remainingExpectedCount > 0) {
+        remainingBySignature.set(key, remainingExpectedCount - 1);
+        return [];
+      }
+
+      const matchingSignatureExpected = expectedSignatures.has(key);
+      const matchingClassExpected = expectedClasses.has(hypothesis.hypothesis_type);
+      return [
+        {
+          expectation_id: expectedAlerts
+            .map((expectation) => expectation.expected_output_id)
+            .join(","),
+          kind: matchingSignatureExpected
+            ? "false_positive"
+            : matchingClassExpected
+              ? "unexpected_direction"
+              : "unexpected_class",
+          message: matchingSignatureExpected
+            ? "Replay emitted more smart-flow alerts than the golden expectation allowed."
+            : matchingClassExpected
+              ? "Replay emitted a smart-flow alert with an unexpected direction."
+              : "Replay emitted a smart-flow alert with an unexpected class.",
+          expected: expectedAlerts.map((expectation) => ({
+            hypothesis_type: expectation.expected_class,
+            direction: expectation.expected_direction
+          })),
+          actual: hypothesisSignature(hypothesis)
+        } satisfies SmartFlowGoldenMismatch
+      ];
+    });
+};
+
+const alertSignatureKey = (hypothesisType: string, direction: string): string =>
+  `${hypothesisType}:${direction}`;
 
 export const buildFlowPacketsFromRawSyntheticEvents = (
   events: readonly GeneratedMarketEvent[]
