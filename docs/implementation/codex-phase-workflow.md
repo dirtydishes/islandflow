@@ -57,8 +57,9 @@ Recalculate this each time the loop restarts.
 
 ## Implementation Thread
 
-Create a new Codex project worktree thread from the current `main`. Use a branch
-name derived from the Beads issue, for example:
+Create a new Codex project worktree thread from the current `main` with model
+`gpt-5.5` and reasoning `xhigh`. Use a branch name derived from the Beads issue,
+for example:
 
 ```text
 lavender/synthetic-replay-integration
@@ -97,8 +98,9 @@ the PR.
 ## Review Thread
 
 After the implementation thread reports a PR URL, create a second Codex worktree
-thread for review. It should inspect the PR branch and either make required
-changes on that branch or report that the PR is ready to merge.
+thread for review with model `gpt-5.5` and reasoning `xhigh`. It should inspect
+the PR branch and either make required changes on that branch or report that the
+PR is ready to merge.
 
 Use this prompt template:
 
@@ -166,7 +168,8 @@ After a merge lands:
 3. Run `bd ready`.
 4. Re-read the dependency table in `docs/implementation/README.md`.
 5. Select the next ready phase or PR-sized child issue.
-6. Launch the next implementation thread with the implementation prompt.
+6. Launch the next implementation thread with model `gpt-5.5`, reasoning
+   `xhigh`, and the implementation prompt.
 
 Stop the loop when there is no ready MVP phase, when the next ready issue is
 outside the implementation README dependency chain, or when a human decision is
