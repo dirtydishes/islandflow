@@ -163,7 +163,7 @@
     <main>
       <header>
         <h1>Fix GitHub Publish Docs Workflow</h1>
-        <p class="summary">Made the GitHub docs publisher deterministic, regenerated the stale docs index, and prepared the missed documentation payload for the Pages mirror.</p>
+        <p class="summary">Made the GitHub docs publisher deterministic, removed the missing cross-repo secret dependency, regenerated the stale docs index, and prepared the missed documentation payload for Pages.</p>
       </header>
 
       <section class="panel grid" aria-label="docs publish totals">
@@ -182,18 +182,19 @@
       </section>
 
       <h2>Summary</h2>
-      <p>The Publish Docs workflow had a stale generated index and the GitHub source repository was behind Forgejo, so newer documentation never reached the GitHub Pages mirror. This change makes the workflow explicitly install Node, checks out full git history for stable commit dates, and regenerates the index to include all tracked docs.</p>
+      <p>The Publish Docs workflow had a stale generated index and the GitHub source repository was behind Forgejo, so newer documentation never reached GitHub Pages. The first fixed run proved the build path worked but failed because <code>DOCS_PAGES_TOKEN</code> was not configured. This change makes the workflow explicitly install Node, checks out full git history for stable commit dates, publishes with the built-in <code>GITHUB_TOKEN</code>, and regenerates the index to include all tracked docs.</p>
 
       <h2>Changes Made</h2>
       <ul>
         <li>Added full-history checkout and Node 22 setup to <code>.github/workflows/docs-pages.yml</code>.</li>
+        <li>Changed the workflow to publish to the same repository's <code>gh-pages</code> branch with <code>GITHUB_TOKEN</code> instead of requiring a missing cross-repo <code>DOCS_PAGES_TOKEN</code>.</li>
         <li>Changed <code>scripts/generate-docs-index.mjs</code> to read tracked docs from <code>git ls-files docs</code>.</li>
         <li>Changed docs timestamps to use each file's last commit time instead of checkout filesystem mtime.</li>
         <li>Regenerated <code>docs/index.html</code> so it lists 120 docs, including implementation and research docs that were absent from the stale index.</li>
       </ul>
 
       <h2>Context</h2>
-      <p>The local Forgejo checkout was at <code>eb46225</code>, while the GitHub mirror's <code>main</code> ref was still at <code>214283a</code>. The Pages repository had only 66 files under <code>islandflow/docs</code>, while this repo currently has 120 tracked docs excluding the index. That mismatch is the backfill gap.</p>
+      <p>The local Forgejo checkout was at <code>eb46225</code>, while the GitHub mirror's <code>main</code> ref was still at <code>214283a</code>. The existing user-site Pages repository had only 66 files under <code>islandflow/docs</code>, while this repo currently has 120 tracked docs excluding the index. That mismatch is the backfill gap.</p>
 
       <h2>Important Implementation Details</h2>
       <ul>
@@ -221,6 +222,26 @@
 
        - name: Build docs index
          run: node scripts/generate-docs-index.mjs
+
+@@ -13,7 +13,7 @@ permissions:
+<span class="del">-  contents: read</span>
+<span class="add">+  contents: write</span>
+
+@@ -46,38 +46,20 @@ jobs:
+<span class="del">-      - name: Verify Pages publish token</span>
+<span class="del">-        env:</span>
+<span class="del">-          DOCS_PAGES_TOKEN: ${{ secrets.DOCS_PAGES_TOKEN }}</span>
+<span class="add">+      - name: Publish to gh-pages branch</span>
+<span class="add">+        env:</span>
+<span class="add">+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}</span>
+<span class="add">+        run: |</span>
+<span class="add">+          set -euo pipefail</span>
+<span class="add">+          rm -rf .gh-pages-tmp</span>
+<span class="add">+          mkdir .gh-pages-tmp</span>
+<span class="add">+          cp -R site/. .gh-pages-tmp/</span>
+<span class="add">+          cd .gh-pages-tmp</span>
+<span class="add">+          git init -b "${PAGES_BRANCH}"</span>
+<span class="add">+          git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "${PAGES_BRANCH}:${PAGES_BRANCH}"</span>
 
 <span class="path">diff --git a/scripts/generate-docs-index.mjs b/scripts/generate-docs-index.mjs</span>
 @@ -43,40 +46,47 @@ function docsHref(relativePath) {
@@ -268,6 +289,7 @@
         <li>Ran the generator twice to confirm deterministic output behavior.</li>
         <li>Simulated the workflow payload preparation with <code>site/docs</code> and confirmed the expected docs files were copied.</li>
         <li>Parsed <code>.github/workflows/docs-pages.yml</code> with Ruby's built-in YAML parser and confirmed the Node setup step is present.</li>
+        <li>Pushed commit <code>524083c</code> to GitHub <code>main</code>; run <code>27797087815</code> proved the build and payload steps passed, then failed at the missing <code>DOCS_PAGES_TOKEN</code> check.</li>
         <li>Ran <code>git diff --check</code> on the workflow, generator, and regenerated index after fixing generated trailing whitespace.</li>
         <li>Confirmed the GitHub Pages repository currently contained fewer files than the local docs set, proving there was a backfill gap.</li>
       </ul>
@@ -276,8 +298,7 @@
       <ul>
         <li>The local shell did not have <code>gh</code>, <code>node</code>, or <code>bun</code> on PATH, so validation used the bundled Node runtime and git commands.</li>
         <li><code>bd</code> was also unavailable on PATH, so Beads could not be updated with the normal CLI during this run.</li>
-        <li>The workflow still depends on <code>DOCS_PAGES_TOKEN</code> being configured in GitHub secrets.</li>
-        <li>The GitHub source mirror was behind Forgejo at the time of this fix; publishing requires syncing the updated branch to GitHub so the GitHub-only workflow can run.</li>
+        <li>The GitHub source mirror was behind Forgejo at the time of this fix; publishing requires syncing the updated commit to GitHub so the GitHub-only workflow can run.</li>
       </ul>
 
       <h2>Follow-up Work</h2>
