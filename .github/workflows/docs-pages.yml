@@ -45,18 +45,32 @@ jobs:
           printf '%s\n' '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=https://dirtydishes.github.io/islandflow/docs/"><title>Islandflow Docs</title><a href="https://dirtydishes.github.io/islandflow/docs/">Continue to docs</a>' > site/index.html
           touch site/.nojekyll
 
-      - name: Publish to gh-pages branch
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Checkout Pages branch
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ env.PAGES_BRANCH }}
+          path: pages
+          fetch-depth: 0
+
+      - name: Mirror docs into Pages branch
         run: |
           set -euo pipefail
-          rm -rf .gh-pages-tmp
-          mkdir .gh-pages-tmp
-          cp -R site/. .gh-pages-tmp/
-          cd .gh-pages-tmp
-          git init -b "${PAGES_BRANCH}"
+          find pages -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -R site/. pages/
+          touch pages/.nojekyll
+
+      - name: Commit and push Pages branch
+        run: |
+          set -euo pipefail
+          cd pages
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
+
+          if git diff --cached --quiet; then
+            echo "No docs changes to publish."
+            exit 0
+          fi
+
           git commit -m "publish docs from ${GITHUB_SHA}"
-          git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "${PAGES_BRANCH}:${PAGES_BRANCH}"
+          git push origin "HEAD:${PAGES_BRANCH}"

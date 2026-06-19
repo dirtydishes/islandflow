@@ -187,7 +187,7 @@
       <h2>Changes Made</h2>
       <ul>
         <li>Added full-history checkout and Node 22 setup to <code>.github/workflows/docs-pages.yml</code>.</li>
-        <li>Changed the workflow to publish to the same repository's <code>gh-pages</code> branch with <code>GITHUB_TOKEN</code> instead of requiring a missing cross-repo <code>DOCS_PAGES_TOKEN</code>.</li>
+        <li>Changed the workflow to publish to the same repository's <code>gh-pages</code> branch with the built-in checkout token instead of requiring a missing cross-repo <code>DOCS_PAGES_TOKEN</code>.</li>
         <li>Changed <code>scripts/generate-docs-index.mjs</code> to read tracked docs from <code>git ls-files docs</code>.</li>
         <li>Changed docs timestamps to use each file's last commit time instead of checkout filesystem mtime.</li>
         <li>Regenerated <code>docs/index.html</code> so it lists 120 docs, including implementation and research docs that were absent from the stale index.</li>
@@ -231,17 +231,23 @@
 <span class="del">-      - name: Verify Pages publish token</span>
 <span class="del">-        env:</span>
 <span class="del">-          DOCS_PAGES_TOKEN: ${{ secrets.DOCS_PAGES_TOKEN }}</span>
-<span class="add">+      - name: Publish to gh-pages branch</span>
-<span class="add">+        env:</span>
-<span class="add">+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}</span>
+<span class="add">+      - name: Checkout Pages branch</span>
+<span class="add">+        uses: actions/checkout@v5</span>
+<span class="add">+        with:</span>
+<span class="add">+          ref: ${{ env.PAGES_BRANCH }}</span>
+<span class="add">+          path: pages</span>
+<span class="add">+          fetch-depth: 0</span>
+<span class="add">+</span>
+<span class="add">+      - name: Mirror docs into Pages branch</span>
 <span class="add">+        run: |</span>
-<span class="add">+          set -euo pipefail</span>
-<span class="add">+          rm -rf .gh-pages-tmp</span>
-<span class="add">+          mkdir .gh-pages-tmp</span>
-<span class="add">+          cp -R site/. .gh-pages-tmp/</span>
-<span class="add">+          cd .gh-pages-tmp</span>
-<span class="add">+          git init -b "${PAGES_BRANCH}"</span>
-<span class="add">+          git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "${PAGES_BRANCH}:${PAGES_BRANCH}"</span>
+<span class="add">+          find pages -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +</span>
+<span class="add">+          cp -R site/. pages/</span>
+<span class="add">+          touch pages/.nojekyll</span>
+<span class="add">+</span>
+<span class="add">+      - name: Commit and push Pages branch</span>
+<span class="add">+        run: |</span>
+<span class="add">+          git commit -m "publish docs from ${GITHUB_SHA}"</span>
+<span class="add">+          git push origin "HEAD:${PAGES_BRANCH}"</span>
 
 <span class="path">diff --git a/scripts/generate-docs-index.mjs b/scripts/generate-docs-index.mjs</span>
 @@ -43,40 +46,47 @@ function docsHref(relativePath) {
@@ -290,6 +296,7 @@
         <li>Simulated the workflow payload preparation with <code>site/docs</code> and confirmed the expected docs files were copied.</li>
         <li>Parsed <code>.github/workflows/docs-pages.yml</code> with Ruby's built-in YAML parser and confirmed the Node setup step is present.</li>
         <li>Pushed commit <code>524083c</code> to GitHub <code>main</code>; run <code>27797087815</code> proved the build and payload steps passed, then failed at the missing <code>DOCS_PAGES_TOKEN</code> check.</li>
+        <li>Pushed follow-up commit <code>b74a04f</code>; run <code>27797227686</code> proved the secret check was gone, then failed during the forced <code>gh-pages</code> publish step, so the workflow was changed to a normal branch checkout and fast-forward push.</li>
         <li>Ran <code>git diff --check</code> on the workflow, generator, and regenerated index after fixing generated trailing whitespace.</li>
         <li>Confirmed the GitHub Pages repository currently contained fewer files than the local docs set, proving there was a backfill gap.</li>
       </ul>
