@@ -349,12 +349,23 @@
     </section>
 
     <section>
+      <h2>Followup Changes</h2>
+      <ul>
+        <li>Reviewed Forgejo Actions task <code>#133</code> and found the failing CI step was <code>bun run fmt:check</code>.</li>
+        <li>Applied Biome formatting to the PR-owned terminal changes in <code>apps/web/app/terminal.tsx</code>.</li>
+        <li>Applied the same mechanical formatter wrapping to pre-existing base-branch drift in <code>scripts/generate-docs-index.mjs</code>, which also appeared in the failed main push task <code>#132</code>.</li>
+        <li>No smart-flow marker behavior, scoring, calibration, or copy semantics changed in this follow-up.</li>
+      </ul>
+    </section>
+
+    <section>
       <h2>Validation</h2>
       <ul>
         <li><code>bun test apps/web/app/terminal.test.ts</code> passed: 83 tests.</li>
         <li><code>bun --cwd=apps/web run build</code> passed with Next.js 16.2.6 and TypeScript.</li>
         <li><code>bun test</code> passed: 314 tests across 56 files.</li>
         <li><code>git diff --check -- apps/web/app/terminal.tsx apps/web/app/terminal.test.ts .beads/issues.jsonl</code> passed before the turn document was generated.</li>
+        <li>Review follow-up reran Forgejo Validate equivalents: <code>bun run fmt:check</code>, <code>bun run lint</code>, <code>bun run typecheck</code>, <code>bun test</code>, <code>bun run check:public-api-routes</code>, <code>bun run check:docker-workspace</code>, and <code>bun --cwd=apps/web run build</code>.</li>
       </ul>
     </section>
 

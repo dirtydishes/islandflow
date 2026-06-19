@@ -2068,7 +2068,9 @@ export const getChartFlowMarkerItems = (
     inRangeLegacy.length > maxLegacySmartMoneyMarkers
       ? inRangeLegacy.slice(inRangeLegacy.length - maxLegacySmartMoneyMarkers)
       : inRangeLegacy;
-  return cappedLegacy.map((event): ChartFlowMarkerItem => ({ kind: "smart-money-fallback", event }));
+  return cappedLegacy.map(
+    (event): ChartFlowMarkerItem => ({ kind: "smart-money-fallback", event })
+  );
 };
 
 export const getOptionTableSnapshot = (
@@ -10333,7 +10335,8 @@ const FocusPane = memo(({ state }: { state: TerminalState }) => {
                           {smartFlowDirectionLabel(projection)}
                         </span>
                         <span>
-                          {smartFlowEvidenceQualityLabel(projection.evidence.evidence_quality)} evidence
+                          {smartFlowEvidenceQualityLabel(projection.evidence.evidence_quality)}{" "}
+                          evidence
                         </span>
                         {projection.source_channel === "smart-money" ? (
                           <span>Compat projection</span>
