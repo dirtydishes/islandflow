@@ -1,0 +1,758 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Synthetic Market-Data Architecture Review</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --surface: #0b1016;
+        --panel: #111820;
+        --panel-2: #0d141b;
+        --ink: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --line: rgba(255, 255, 255, 0.12);
+        --line-strong: rgba(245, 166, 35, 0.36);
+        --amber: #f5a623;
+        --amber-soft: rgba(245, 166, 35, 0.13);
+        --green: #25c17a;
+        --green-soft: rgba(37, 193, 122, 0.12);
+        --blue: #4da3ff;
+        --blue-soft: rgba(77, 163, 255, 0.12);
+        --red: #ff6b5f;
+        --red-soft: rgba(255, 107, 95, 0.12);
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at 20% 0%, rgba(245, 166, 35, 0.08), transparent 26rem),
+          linear-gradient(180deg, rgba(17, 24, 32, 0.88), rgba(6, 8, 11, 0.98) 26rem),
+          var(--bg);
+        color: var(--ink);
+        font: 15px/1.6 var(--sans);
+      }
+
+      a {
+        color: inherit;
+      }
+
+      main {
+        width: min(1180px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 320px;
+        gap: 28px;
+        align-items: end;
+        padding-bottom: 28px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .kicker,
+      .label,
+      .chip,
+      th,
+      .toc-title {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .kicker {
+        margin: 0 0 12px;
+        color: var(--amber);
+      }
+
+      h1,
+      h2,
+      h3 {
+        text-wrap: balance;
+      }
+
+      h1 {
+        max-width: 780px;
+        margin: 0;
+        font-size: 2.35rem;
+        line-height: 1.08;
+        letter-spacing: 0;
+      }
+
+      .summary {
+        max-width: 74ch;
+        margin: 18px 0 0;
+        color: var(--muted);
+        font-size: 1rem;
+        text-wrap: pretty;
+      }
+
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 20px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 5px 10px;
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      .chip.good {
+        border-color: rgba(37, 193, 122, 0.34);
+        background: var(--green-soft);
+        color: #a8f1ce;
+      }
+
+      .decision {
+        border: 1px solid var(--line-strong);
+        border-radius: 10px;
+        padding: 18px;
+        background:
+          linear-gradient(180deg, rgba(245, 166, 35, 0.15), rgba(17, 24, 32, 0.92)),
+          var(--panel);
+      }
+
+      .decision .label {
+        color: var(--amber);
+      }
+
+      .decision strong {
+        display: block;
+        margin-top: 8px;
+        color: var(--ink);
+        font-size: 1.18rem;
+        line-height: 1.25;
+      }
+
+      .decision p {
+        margin: 10px 0 0;
+        color: var(--muted);
+      }
+
+      .toc {
+        margin-top: 28px;
+        padding: 14px 0;
+        border-block: 1px solid var(--line);
+      }
+
+      .toc-title {
+        margin: 0 0 10px;
+        color: var(--faint);
+      }
+
+      .toc nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .toc a {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 7px 10px;
+        background: rgba(255, 255, 255, 0.035);
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 0.75rem;
+        text-decoration: none;
+      }
+
+      .toc a:hover,
+      .toc a:focus-visible {
+        border-color: var(--line-strong);
+        color: var(--ink);
+        background: var(--amber-soft);
+        outline: none;
+      }
+
+      section {
+        margin-top: 30px;
+      }
+
+      h2 {
+        margin: 0 0 14px;
+        color: var(--ink);
+        font-family: var(--mono);
+        font-size: 0.92rem;
+        line-height: 1.2;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+      }
+
+      h3 {
+        margin: 0;
+        color: var(--ink);
+        font-size: 1rem;
+        line-height: 1.25;
+      }
+
+      p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      strong {
+        color: var(--ink);
+      }
+
+      code {
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        border-radius: 6px;
+        padding: 0.1rem 0.32rem;
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--ink);
+        font-family: var(--mono);
+        font-size: 0.9em;
+      }
+
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: linear-gradient(180deg, rgba(17, 24, 32, 0.94), rgba(13, 20, 27, 0.94));
+      }
+
+      .panel-body {
+        padding: 18px;
+      }
+
+      .grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .grid.two {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .grid.three {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .answer-list {
+        display: grid;
+        gap: 8px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .answer-list li,
+      .detail-row,
+      .test-row {
+        display: grid;
+        grid-template-columns: 44px minmax(0, 1fr);
+        gap: 12px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 11px 0 0;
+      }
+
+      .answer-list li:first-child,
+      .detail-row:first-child,
+      .test-row:first-child {
+        border-top: 0;
+        padding-top: 0;
+      }
+
+      .num {
+        color: var(--amber);
+        font-family: var(--mono);
+        font-size: 0.76rem;
+        font-weight: 700;
+      }
+
+      .answer-list p,
+      .detail-row p,
+      .test-row p {
+        color: var(--muted);
+      }
+
+      .classification {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 10px;
+      }
+
+      .classification article,
+      .object-chip {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px;
+        background: rgba(255, 255, 255, 0.035);
+      }
+
+      .classification h3 {
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        letter-spacing: 0.05em;
+      }
+
+      .classification p {
+        margin-top: 7px;
+      }
+
+      .status {
+        display: inline-flex;
+        margin-top: 10px;
+        border-radius: 999px;
+        padding: 3px 8px;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        font-weight: 700;
+      }
+
+      .status.keep {
+        background: var(--green-soft);
+        color: #a8f1ce;
+      }
+
+      .status.refactor {
+        background: var(--blue-soft);
+        color: #b8dcff;
+      }
+
+      .status.redesign {
+        background: var(--red-soft);
+        color: #ffc2bd;
+      }
+
+      .option {
+        display: grid;
+        grid-template-rows: auto 1fr;
+        min-height: 100%;
+        overflow: hidden;
+      }
+
+      .option header {
+        padding: 16px 16px 14px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.035);
+      }
+
+      .option.recommended {
+        border-color: var(--line-strong);
+      }
+
+      .option.recommended header {
+        background: var(--amber-soft);
+      }
+
+      .option .panel-body {
+        display: grid;
+        align-content: start;
+        gap: 14px;
+      }
+
+      .option p {
+        margin-top: 8px;
+      }
+
+      .facts {
+        display: grid;
+        gap: 8px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .facts li {
+        display: grid;
+        gap: 2px;
+      }
+
+      .facts span {
+        color: var(--faint);
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .facts p {
+        margin: 0;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+
+      table {
+        width: 100%;
+        min-width: 780px;
+        border-collapse: collapse;
+        background: rgba(255, 255, 255, 0.025);
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 11px 12px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--faint);
+        background: rgba(255, 255, 255, 0.035);
+      }
+
+      td {
+        color: var(--muted);
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .object-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .object-chip {
+        color: var(--ink);
+        font-family: var(--mono);
+        font-size: 0.8rem;
+      }
+
+      .callout {
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        padding: 18px;
+        background: linear-gradient(180deg, rgba(245, 166, 35, 0.12), rgba(13, 20, 27, 0.94));
+      }
+
+      .callout p + p {
+        margin-top: 10px;
+      }
+
+      .compact-list {
+        margin: 0;
+        padding-left: 1.1rem;
+      }
+
+      .compact-list li {
+        margin: 7px 0;
+        color: var(--muted);
+      }
+
+      footer {
+        margin-top: 36px;
+        border-top: 1px solid var(--line);
+        padding-top: 16px;
+        color: var(--faint);
+        font-family: var(--mono);
+        font-size: 0.78rem;
+      }
+
+      @media (max-width: 900px) {
+        .hero,
+        .grid.two,
+        .grid.three {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 640px) {
+        main {
+          width: min(100% - 24px, 1180px);
+          padding-top: 24px;
+        }
+
+        h1 {
+          font-size: 1.72rem;
+        }
+
+        .panel-body,
+        .decision,
+        .callout {
+          padding: 15px;
+        }
+
+        .answer-list li,
+        .detail-row,
+        .test-row {
+          grid-template-columns: 34px minmax(0, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="hero">
+        <div>
+          <p class="kicker">Plan Document</p>
+          <h1>Synthetic Market-Data Architecture Review</h1>
+          <p class="summary">
+            A plan-mode architecture review for making synthetic market data deterministic, reusable, and useful across fixtures,
+            replay, tests, demos, and load profiles without replacing the working Islandflow event pipeline.
+          </p>
+          <div class="meta" aria-label="Document metadata">
+            <span class="chip">Source: markdown review</span>
+            <span class="chip">Mode: Plan</span>
+            <span class="chip good">Recommendation: Option B</span>
+            <a class="chip" href="../implementation/synthetic-market-data/00-roadmap.html">Roadmap HTML</a>
+            <a class="chip" href="../implementation/synthetic-market-data/index.html">Phase dossier</a>
+          </div>
+        </div>
+        <aside class="decision" aria-label="Recommended architecture option">
+          <span class="label">Decision</span>
+          <strong>Option B: Refactor</strong>
+          <p>
+            Make synthetic generation first-class through a deterministic package while keeping NATS, ClickHouse, compute,
+            API, and web replay as useful parts of the stack.
+          </p>
+        </aside>
+      </header>
+
+      <div class="toc" aria-label="Document navigation">
+        <p class="toc-title">Review Sections</p>
+        <nav>
+          <a href="#summary">Summary</a>
+          <a href="#direct-answers">Direct Answers</a>
+          <a href="#classification">Area Classification</a>
+          <a href="#options">Options</a>
+          <a href="#recommendation">Recommendation</a>
+          <a href="#test-plan">Test Plan</a>
+          <a href="#assumptions">Assumptions</a>
+        </nav>
+      </div>
+
+      <section id="summary">
+        <h2>Summary</h2>
+        <div class="panel">
+          <div class="panel-body">
+            <ul class="compact-list">
+              <li>Target file: <code>docs/plans/synthetic-market-data-architecture-review.md</code>. No files were changed in the Plan Mode pass.</li>
+              <li><strong>Recommendation:</strong> Option B: Refactor. Conservative work would trap determinism inside ingest adapters; full redesign is premature.</li>
+              <li>Core direction: build a no-history, seeded, manifest-driven synthetic event engine with canonical real event types, separate labels and manifests, deterministic replay, fixture generation, load profiles, and demo scenarios.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="direct-answers">
+        <h2>Direct Answers</h2>
+        <div class="panel">
+          <div class="panel-body">
+            <ol class="answer-list">
+              <li><span class="num">01</span><p>Synthetic generation should be a combination: a reusable <code>@islandflow/synthetic-market</code> package, a CLI for fixture and run generation, replay-source integration, test fixture helpers, and demo presets. A service should be only a thin live or demo emitter.</p></li>
+              <li><span class="num">02</span><p>Synthetic events should map to existing canonical event types: <code>OptionPrint</code>, <code>OptionNBBO</code>, <code>EquityPrint</code>, and <code>EquityQuote</code>. Do not create parallel synthetic-only market event types for the main pipeline.</p></li>
+              <li><span class="num">03</span><p>Use metadata plus isolation, not permanent separate business schemas. Add provenance such as <code>source_kind</code>, <code>run_id</code>, <code>parameter_snapshot_hash</code>, and optional <code>scenario_id</code>; use run-scoped subjects and databases for tests and load runs when isolation matters.</p></li>
+              <li><span class="num">04</span><p>Ground-truth labels should be separate label records keyed by <code>run_id</code>, <code>scenario_id</code>, event IDs or trace IDs, expected class, expected direction, confidence band, required or forbidden evidence, and false-positive penalties. Do not expose hidden labels on emitted market events.</p></li>
+              <li><span class="num">05</span><p>Expected-output manifests should be versioned JSON or YAML artifacts produced by the CLI. They should pin seed bundle, generator version, parameter snapshot hash, generated event hashes, replay ordering, expected derived events, alert or no-alert expectations, and evidence requirements.</p></li>
+              <li><span class="num">06</span><p>Deterministic replay should consume either generated fixture files directly or materialized ClickHouse rows through the same replay ordering: event time, ingest time, sequence, stable event ID. Replay should support a <code>synthetic</code> source and run selector.</p></li>
+              <li><span class="num">07</span><p>Tests should use synthetic data at three levels: pure package invariants, small golden manifests through compute batch logic, and optional infra-backed NATS and ClickHouse integration tests. <code>bun test</code> should not require Docker.</p></li>
+              <li><span class="num">08</span><p>Demos should use named demo runs and scenarios, not ambient live randomness. Keep the hosted synthetic control drawer for live demo tuning, but add deterministic demo run selection and replay.</p></li>
+              <li><span class="num">09</span><p>First-class domain objects: <code>SyntheticRun</code>, <code>SeedBundle</code>, <code>ParameterSnapshot</code>, <code>SymbolProfile</code>, <code>LiquidityProfile</code>, <code>VolatilityRegime</code>, <code>OptionChainProfile</code>, <code>ScenarioInjection</code>, <code>GroundTruthLabel</code>, <code>ExpectedOutputManifest</code>, <code>GeneratedEventBatch</code>, <code>ReplayPlan</code>, <code>LoadProfile</code>, and <code>DemoProfile</code>.</p></li>
+              <li><span class="num">10</span><p>Implementation details include PRNG algorithm internals, sampling formulas, placement heuristics, adapter timers, NATS consumer names, Redis rolling windows, ClickHouse loader mechanics, UI labels, and cache policy.</p></li>
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      <section id="classification">
+        <h2>Area Classification</h2>
+        <div class="classification">
+          <article><h3>Existing replay architecture</h3><span class="status refactor">Refactor</span><p>Keep event-time merge and stream publishing; add generated-stream sources, run IDs, manifests, and deterministic output comparison.</p></article>
+          <article><h3>Event schemas</h3><span class="status refactor">Refactor</span><p>Keep canonical raw and derived event shapes; add provenance metadata and separate label and manifest schemas.</p></article>
+          <article><h3>Service boundaries</h3><span class="status refactor">Refactor</span><p>Move generator logic out of ingest adapters into a package; adapters become thin emitters.</p></article>
+          <article><h3>Test structure</h3><span class="status redesign">Redesign</span><p>Current tests are unit-heavy and adapter-local; add fixture manifests, golden outputs, and batch replay checks.</p></article>
+          <article><h3>ClickHouse fixture strategy</h3><span class="status refactor">Refactor</span><p>Keep storage helpers; add run-scoped fixture loaders and optional run metadata, not permanent synthetic clone tables.</p></article>
+          <article><h3>NATS and JetStream</h3><span class="status keep">Keep and Refactor</span><p>Keep canonical subjects for production behavior; support isolated subject prefixes or disposable streams for tests and load.</p></article>
+          <article><h3>Redis baseline interaction</h3><span class="status refactor">Refactor</span><p>Keep Redis for live rolling state; golden tests should use in-memory or resettable baselines.</p></article>
+          <article><h3>UI and demo needs</h3><span class="status refactor">Refactor</span><p>Keep replay UI and synthetic admin rail; add named deterministic demo modes and scenario selectors.</p></article>
+          <article><h3>CI feasibility</h3><span class="status keep">Keep and Refactor</span><p>Keep fast Bun CI; make synthetic package and golden tests infra-free and defer Docker integration to a separate job.</p></article>
+        </div>
+      </section>
+
+      <section id="options">
+        <h2>Options</h2>
+        <div class="grid three">
+          <article class="panel option">
+            <header>
+              <h3>Option A: Conservative</h3>
+              <p>Wrap current synthetic ingest adapters with minimal metadata, a small fixture CLI, and a few golden tests.</p>
+            </header>
+            <div class="panel-body">
+              <ul class="facts">
+                <li><span>Pros</span><p>Fastest, least migration, preserves current demos.</p></li>
+                <li><span>Cons</span><p>Determinism remains mixed with wall-clock timers and live adapter behavior; labels and manifests stay bolted on.</p></li>
+                <li><span>Complexity</span><p>Low to medium.</p></li>
+                <li><span>Migration Risk</span><p>Low.</p></li>
+                <li><span>PR Sequence</span><p>Add metadata schemas; add CLI wrapper; add fixture files; add basic replay filters; add initial golden tests.</p></li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="panel option recommended">
+            <header>
+              <h3>Option B: Refactor</h3>
+              <p>Create <code>@islandflow/synthetic-market</code> as the deterministic engine; make adapters, CLI, replay, tests, and demos consume it.</p>
+            </header>
+            <div class="panel-body">
+              <ul class="facts">
+                <li><span>Pros</span><p>Deterministic by design, reusable, testable, demo-friendly, preserves the working stack.</p></li>
+                <li><span>Cons</span><p>More up-front movement; current adapter logic must be untangled.</p></li>
+                <li><span>Complexity</span><p>Medium.</p></li>
+                <li><span>Migration Risk</span><p>Medium-low.</p></li>
+                <li><span>PR Sequence</span><p>Add package and schemas; move current generators behind deterministic API; add CLI manifest generation; refactor adapters; add replay synthetic source and run filters; add golden fixture tests; add demo selector.</p></li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="panel option">
+            <header>
+              <h3>Option C: Redesign</h3>
+              <p>Rebuild around a unified deterministic event-log architecture where generation, replay, live demo, storage, and tests all consume run-partitioned event logs.</p>
+            </header>
+            <div class="panel-body">
+              <ul class="facts">
+                <li><span>Pros</span><p>Cleanest long-term model; excellent determinism, provenance, and replay semantics.</p></li>
+                <li><span>Cons</span><p>Too much rebuild for pre-alpha; delays product learning.</p></li>
+                <li><span>Complexity</span><p>High.</p></li>
+                <li><span>Migration Risk</span><p>High.</p></li>
+                <li><span>PR Sequence</span><p>Define event log and envelope; implement generator; rebuild replay; rebuild storage materialization; port compute; port API and UI; retire old ingest paths.</p></li>
+              </ul>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="option-comparison">
+        <h2>What Gets Better Or Worse</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Option</th>
+                <th>Better</th>
+                <th>Worse</th>
+                <th>Kept</th>
+                <th>Rewritten</th>
+                <th>Deleted Or Deferred</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>A: Conservative</strong></td>
+                <td>Quick smoke fixtures, basic provenance, modest replay demos.</td>
+                <td>Long-term generator quality, test reliability, scenario authoring.</td>
+                <td>Current ingest adapters, bus, storage, API, and web mostly unchanged.</td>
+                <td>Small parts of synthetic adapters and tests.</td>
+                <td>Deep replay refactor, new package boundary, batch harness.</td>
+              </tr>
+              <tr>
+                <td><strong>B: Refactor</strong></td>
+                <td>Seeded runs, profiles, labels, manifests, replay, golden tests, load profiles.</td>
+                <td>Short-term churn and some duplicated paths during migration.</td>
+                <td>Canonical event schemas, NATS subjects, ClickHouse helpers, compute classifiers, API replay endpoints, web replay shell.</td>
+                <td>Synthetic options and equities adapters, synthetic control state, replay source abstraction, tests around synthetic scenarios.</td>
+                <td>Adapter-local scenario catalog after migration; full LOB, agent, or ML simulation.</td>
+              </tr>
+              <tr>
+                <td><strong>C: Redesign</strong></td>
+                <td>Architecture purity, reproducible environments, run isolation.</td>
+                <td>Delivery speed, disruption, operational risk.</td>
+                <td>Some compute, classifier, and domain logic plus UI concepts.</td>
+                <td>Replay, ingest, storage partitioning, bus topology, fixture and test harness.</td>
+                <td>Current synthetic adapters, current replay service shape, much of current live and demo plumbing.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="recommendation">
+        <h2>Recommendation</h2>
+        <div class="callout">
+          <p>
+            Choose <strong>Option B</strong>. Option A is a patch, and it will keep producing impressive-looking but
+            untrustworthy demos. Option C is architecture vanity for a pre-alpha product.
+          </p>
+          <p>
+            Option B is the grown-up move: extract the generator into a deterministic package, keep the useful event
+            pipeline, and make replay, tests, and demos consume the same generated runs.
+          </p>
+        </div>
+      </section>
+
+      <section id="domain-objects">
+        <h2>First-Class Domain Objects</h2>
+        <div class="object-list" aria-label="Domain object list">
+          <span class="object-chip">SyntheticRun</span>
+          <span class="object-chip">SeedBundle</span>
+          <span class="object-chip">ParameterSnapshot</span>
+          <span class="object-chip">SymbolProfile</span>
+          <span class="object-chip">LiquidityProfile</span>
+          <span class="object-chip">VolatilityRegime</span>
+          <span class="object-chip">OptionChainProfile</span>
+          <span class="object-chip">ScenarioInjection</span>
+          <span class="object-chip">GroundTruthLabel</span>
+          <span class="object-chip">ExpectedOutputManifest</span>
+          <span class="object-chip">GeneratedEventBatch</span>
+          <span class="object-chip">ReplayPlan</span>
+          <span class="object-chip">LoadProfile</span>
+          <span class="object-chip">DemoProfile</span>
+        </div>
+      </section>
+
+      <section id="test-plan">
+        <h2>Test Plan</h2>
+        <div class="panel">
+          <div class="panel-body">
+            <div class="test-row"><span class="num">Unit</span><p>PRNG determinism, profile normalization, tick validity, quote and trade invariants, option chain sparsity, label and manifest schema parsing.</p></div>
+            <div class="test-row"><span class="num">Golden</span><p>Fixed seed plus manifest produces byte or hash-stable raw events and stable smart-money and alert signatures.</p></div>
+            <div class="test-row"><span class="num">Replay</span><p>Synthetic source ordering matches manifest; derived outputs match expected-output manifest.</p></div>
+            <div class="test-row"><span class="num">Integration</span><p>Optional NATS and ClickHouse run-scoped fixture test behind a non-default CI job.</p></div>
+            <div class="test-row"><span class="num">Demo</span><p>Named demo profiles render in replay UI; load profile scales rates without changing event semantics.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="assumptions">
+        <h2>Assumptions</h2>
+        <div class="grid two">
+          <div class="panel"><div class="panel-body"><p>MVP remains no-history-first.</p></div></div>
+          <div class="panel"><div class="panel-body"><p>Canonical real event schemas remain the pipeline contract.</p></div></div>
+          <div class="panel"><div class="panel-body"><p>Hidden labels are never embedded directly in market events.</p></div></div>
+          <div class="panel"><div class="panel-body"><p>Infra-backed tests are useful, but the first synthetic quality gate must pass in plain <code>bun test</code>.</p></div></div>
+        </div>
+      </section>
+
+      <footer>
+        HTML companion for <code>docs/plans/synthetic-market-data-architecture-review.md</code>.
+      </footer>
+    </main>
+  </body>
+</html>

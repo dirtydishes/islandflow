@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Smart Flow Score Vectors</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #06080b;
+      --panel: #111820;
+      --panel-2: #0b1016;
+      --line: #ffffff14;
+      --line-strong: #f5a6234a;
+      --text: #e6edf4;
+      --muted: #90a0b2;
+      --faint: #6e7b8c;
+      --amber: #f5a623;
+      --green: #25c17a;
+      --red: #ff6b5f;
+      --blue: #4da3ff;
+      --code: #05070a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 15px/1.58 "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main {
+      width: min(1120px, calc(100vw - 40px));
+      margin: 0 auto;
+      padding: 44px 0 68px;
+    }
+    header {
+      border: 1px solid var(--line);
+      border-top: 2px solid var(--line-strong);
+      background: linear-gradient(180deg, #111820, #0b1016);
+      padding: 26px;
+    }
+    section {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      margin-top: 18px;
+      padding: 22px;
+    }
+    h1, h2, h3 {
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      letter-spacing: 0;
+      text-wrap: balance;
+    }
+    h1 {
+      margin: 10px 0 12px;
+      font-size: 2.05rem;
+      line-height: 1.12;
+    }
+    h2 {
+      margin: 0 0 13px;
+      color: var(--amber);
+      font-size: 0.86rem;
+      text-transform: uppercase;
+    }
+    h3 {
+      margin: 18px 0 8px;
+      font-size: 0.82rem;
+      color: var(--text);
+    }
+    p { margin: 0 0 12px; max-width: 76ch; color: var(--muted); }
+    ul { margin: 0; padding-left: 1.2rem; color: var(--muted); }
+    li { margin: 7px 0; }
+    code {
+      color: var(--text);
+      background: #ffffff0a;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 1px 5px;
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.92em;
+    }
+    .label {
+      color: var(--amber);
+      font: 700 0.74rem/1.2 "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    .summary {
+      color: var(--text);
+      font-size: 1rem;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 10px;
+      margin-top: 18px;
+    }
+    .stat {
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      padding: 12px;
+    }
+    .stat strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--faint);
+      font: 700 0.72rem/1.2 "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      text-transform: uppercase;
+    }
+    .pass { color: var(--green); }
+    .info { color: var(--blue); }
+    .note {
+      border: 1px solid var(--line);
+      background: #ffffff08;
+      color: var(--muted);
+      padding: 12px;
+      margin: 10px 0 16px;
+    }
+    pre {
+      margin: 10px 0 0;
+      border: 1px solid var(--line);
+      background: var(--code);
+      color: #d9e3ee;
+      overflow: auto;
+      padding: 13px;
+      font: 12px/1.48 "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    .file { color: #f2c46d; }
+    .add { color: #8ff0b8; }
+    .remove { color: #ff9b92; }
+    .hunk { color: #8bbcff; }
+    @media (max-width: 720px) {
+      main { width: min(100vw - 24px, 1120px); padding-top: 28px; }
+      header, section { padding: 16px; }
+      h1 { font-size: 1.65rem; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="label">Repository Turn Document · Beads islandflow-zxh.3.1</div>
+      <h1>Smart Flow Score Vectors</h1>
+      <p class="summary">Implemented the smart-flow phase 03a child issue: evidence clusters now produce deterministic, versioned hypothesis score vectors with direction, confidence, conviction, penalties, and preserved negative evidence.</p>
+      <div class="grid">
+        <div class="stat"><strong>Branch</strong><code>lavender/smart-flow-score-vectors</code></div>
+        <div class="stat"><strong>Scope</strong>Score vectors only, no API or UI projection</div>
+        <div class="stat"><strong>Validation</strong><span class="pass">Typecheck and full tests passed</span></div>
+      </div>
+    </header>
+
+    <section>
+      <h2>Summary</h2>
+      <p>Added the first canonical scoring step after evidence clustering. The new scorer ranks supported smart-flow hypothesis types from <code>FlowEvidenceCluster</code> inputs and returns typed <code>FlowHypothesisScoreVector</code> records. It does not emit final hypothesis events, abstention outputs, API fields, or UI projections, which remain in the next split issue.</p>
+    </section>
+
+    <section>
+      <h2>Changes Made</h2>
+      <ul>
+        <li>Extended smart-flow contracts with score policy/model version constants, typed penalty kinds, <code>FlowScorePenalty</code>, and self-describing score vectors.</li>
+        <li>Added <code>services/compute/src/smart-flow-scoring.ts</code>, a pure rule-based scorer over <code>FlowEvidenceCluster</code>.</li>
+        <li>Enriched evidence candidates and cluster summaries with traceable option side, buy/sell aggression, net directional bias, execution IV, underlying movement, event timing, and structure facts.</li>
+        <li>Preserved <code>execution_iv</code> on emitted compute flow packets so volatility-supply scoring can use observed IV context later.</li>
+        <li>Added scoring tests for clean directional flow, negative evidence penalties, and neutral structure-led scoring.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Context</h2>
+      <p><code>docs/implementation/README.md</code> places smart-flow hypothesis scoring after synthetic scenarios and labels. The selected ready child issue, <code>islandflow-zxh.3.1</code>, is the phase 03a split for hypothesis score vectors only. The parent phase also includes abstention and insight projection, but those are explicitly left for <code>islandflow-zxh.3.2</code>.</p>
+      <p>The implementation follows the phase document's caution: confidence is policy confidence in observed evidence, not a hidden participant identity claim.</p>
+    </section>
+
+    <section>
+      <h2>Important Implementation Details</h2>
+      <ul>
+        <li><code>scoreFlowEvidenceCluster</code> returns ranked vectors for directional accumulation, retail attention flow, event positioning, volatility supply, structure arbitrage, hedge rebalance, and unclear.</li>
+        <li>Each vector carries <code>schema_version</code>, <code>policy_version</code>, <code>model_version</code>, <code>hypothesis_type</code>, <code>direction</code>, <code>evidence_strength</code>, <code>fit_score</code>, <code>penalty_score</code>, <code>penalties</code>, and a confidence vector.</li>
+        <li>Penalty records include machine-readable kinds, scores, reasons, feature keys, and evidence refs. Wide quotes, stale context, inside-market context, low premium, weak aggression, conflicting direction, and missing context are not flattened away.</li>
+        <li>Legacy smart-money compatibility events now populate the stricter score-vector shape without becoming the canonical scoring model.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Relevant Diff Snippets</h2>
+      <p class="note">Local <code>@pierre/diffs/ssr</code> rendering was verified with <code>preloadPatchFile</code>, but the rendered fragment adds a large embedded CSS and icon payload for a small excerpt. To keep this turn document concise and CI-safe, the section uses focused styled unified diff fallbacks. Each excerpt shows file paths, hunk headers, and line-level additions.</p>
+
+      <h3>Contract Shape</h3>
+      <pre><code><span class="file">diff --git a/packages/types/src/smart-flow.ts b/packages/types/src/smart-flow.ts</span>
+<span class="file">--- a/packages/types/src/smart-flow.ts</span>
+<span class="file">+++ b/packages/types/src/smart-flow.ts</span>
+<span class="hunk">@@ -241,10 +243,43 @@ export type FlowConfidenceVector = z.infer&lt;typeof FlowConfidenceVectorSchema&gt;;</span>
+<span class="add">+export const FlowScorePenaltyKindSchema = z.enum([</span>
+<span class="add">+  "stale_quote_context",</span>
+<span class="add">+  "wide_quote_context",</span>
+<span class="add">+  "wide_underlying_quote_context",</span>
+<span class="add">+  "inside_market_context",</span>
+<span class="add">+  "complex_or_special_print_context",</span>
+<span class="add">+  "low_premium",</span>
+<span class="add">+  "weak_aggression",</span>
+<span class="add">+  "missing_context",</span>
+<span class="add">+  "conflicting_direction",</span>
+<span class="add">+  "structure_context",</span>
+<span class="add">+  "other"</span>
+<span class="add">+]);</span>
+<span class="add">+</span>
+ export const FlowHypothesisScoreVectorSchema = z.object({
+<span class="add">+  schema_version: SmartFlowContractVersionSchema,</span>
+<span class="add">+  policy_version: SmartFlowPolicyVersionSchema,</span>
+<span class="add">+  model_version: SmartFlowModelVersionSchema,</span>
+<span class="add">+  hypothesis_type: FlowHypothesisTypeSchema,</span>
+<span class="add">+  direction: SmartMoneyDirectionSchema,</span>
+   evidence_strength: z.number().min(0).max(1),
+   fit_score: z.number().min(0).max(1),
+   penalty_score: z.number().min(0).max(1),
+<span class="add">+  penalties: z.array(FlowScorePenaltySchema),</span>
+   confidence: FlowConfidenceVectorSchema
+ });</code></pre>
+
+      <h3>Score Vector Builder</h3>
+      <pre><code><span class="file">diff --git a/services/compute/src/smart-flow-scoring.ts b/services/compute/src/smart-flow-scoring.ts</span>
+<span class="file">new file mode 100644</span>
+<span class="file">--- /dev/null</span>
+<span class="file">+++ b/services/compute/src/smart-flow-scoring.ts</span>
+<span class="hunk">@@ -0,0 +13,19 @@</span>
+<span class="add">+export type FlowHypothesisScoringConfig = {</span>
+<span class="add">+  policyVersion?: string;</span>
+<span class="add">+  modelVersion?: string;</span>
+<span class="add">+  calibrationVersion?: string | null;</span>
+<span class="add">+  maxVectors?: number;</span>
+<span class="add">+};</span>
+<span class="add">+</span>
+<span class="add">+type ScoreDraft = {</span>
+<span class="add">+  hypothesisType: FlowHypothesisType;</span>
+<span class="add">+  direction: SmartMoneyDirection;</span>
+<span class="add">+  evidenceStrength: number;</span>
+<span class="add">+  fitScore: number;</span>
+<span class="add">+  penaltyScore: number;</span>
+<span class="add">+  penalties: FlowScorePenalty[];</span>
+<span class="add">+  policyConfidence: number;</span>
+<span class="add">+  conviction: number;</span>
+<span class="add">+};</span>
+<span class="hunk">@@ -0,0 +600,28 @@</span>
+<span class="add">+export const scoreFlowEvidenceCluster = (</span>
+<span class="add">+  cluster: FlowEvidenceCluster,</span>
+<span class="add">+  config: FlowHypothesisScoringConfig = {}</span>
+<span class="add">+): FlowHypothesisScoreVector[] =&gt; {</span>
+<span class="add">+  const resolvedConfig = { ...DEFAULT_CONFIG, ...config };</span>
+<span class="add">+  const sortedDrafts = sortDrafts(scoreHypotheses(buildContext(cluster)));</span>
+<span class="add">+  const maxVectors = Math.max(1, Math.round(resolvedConfig.maxVectors));</span>
+<span class="add">+</span>
+<span class="add">+  return sortedDrafts.slice(0, maxVectors).map((draft, index, drafts) =&gt; {</span>
+<span class="add">+    const nextConfidence = drafts[index + 1]?.policyConfidence ?? 0;</span>
+<span class="add">+    return toScoreVector(draft, resolvedConfig, draft.policyConfidence - nextConfidence);</span>
+<span class="add">+  });</span>
+<span class="add">+};</span></code></pre>
+
+      <h3>Traceable Evidence Features</h3>
+      <pre><code><span class="file">diff --git a/services/compute/src/smart-flow-evidence.ts b/services/compute/src/smart-flow-evidence.ts</span>
+<span class="file">--- a/services/compute/src/smart-flow-evidence.ts</span>
+<span class="file">+++ b/services/compute/src/smart-flow-evidence.ts</span>
+<span class="hunk">@@ -350,12 +367,27 @@ export const buildFlowEvidenceCandidateFromPacket = (</span>
+   const aggressiveRatio = clampUnit(numberFeature(packet, "nbbo_aggressive_ratio") ?? 0);
+<span class="add">+  const aggressiveBuyRatio = clampUnit(numberFeature(packet, "nbbo_aggressive_buy_ratio") ?? 0);</span>
+<span class="add">+  const aggressiveSellRatio = clampUnit(numberFeature(packet, "nbbo_aggressive_sell_ratio") ?? 0);</span>
+<span class="add">+  const netDirectionalBias = clampSignedUnit(</span>
+<span class="add">+    numberFeature(packet, "net_directional_bias") ?? aggressiveBuyRatio - aggressiveSellRatio</span>
+<span class="add">+  );</span>
+   const specialPrintCount = Math.max(0, numberFeature(packet, "special_print_count") ?? 0);
+   const specialPrintRatio = printCount &gt; 0 ? clampUnit(specialPrintCount / printCount) : 0;
+   const conditions = splitConditions(stringFeature(packet, "conditions"));
+<span class="add">+  const executionIv = numberFeature(packet, "execution_iv");</span>
+<span class="add">+  const underlyingMoveBps = numberFeature(packet, "underlying_move_bps");</span>
+<span class="add">+  const structureType = stringFeature(packet, "structure_type");</span>
+<span class="add">+  const corporateEventTs = numberFeature(packet, "corporate_event_ts");</span>
+<span class="add">+  const daysToEvent =</span>
+<span class="add">+    corporateEventTs !== null && corporateEventTs &gt;= sourceTs</span>
+<span class="add">+      ? roundTo((corporateEventTs - sourceTs) / MS_PER_DAY)</span>
+<span class="add">+      : null;</span></code></pre>
+
+      <h3>Scoring Tests</h3>
+      <pre><code><span class="file">diff --git a/services/compute/tests/smart-flow-scoring.test.ts b/services/compute/tests/smart-flow-scoring.test.ts</span>
+<span class="file">new file mode 100644</span>
+<span class="file">--- /dev/null</span>
+<span class="file">+++ b/services/compute/tests/smart-flow-scoring.test.ts</span>
+<span class="hunk">@@ -0,0 +26,18 @@</span>
+<span class="add">+describe("smart-flow hypothesis scoring", () =&gt; {</span>
+<span class="add">+  it("scores clean directional evidence as a versioned bullish score vector", () =&gt; {</span>
+<span class="add">+    const [primary, ...alternatives] = scoreFlowEvidenceCluster(cluster);</span>
+<span class="add">+</span>
+<span class="add">+    expect(primary?.policy_version).toBe(SMART_FLOW_HYPOTHESIS_SCORE_POLICY_VERSION);</span>
+<span class="add">+    expect(primary?.model_version).toBe(SMART_FLOW_HYPOTHESIS_SCORE_MODEL_VERSION);</span>
+<span class="add">+    expect(primary?.hypothesis_type).toBe("directional_accumulation");</span>
+<span class="add">+    expect(primary?.direction).toBe("bullish");</span>
+<span class="add">+    expect(alternatives.map((vector) =&gt; vector.hypothesis_type)).toContain("retail_attention_flow");</span>
+<span class="add">+    expect(JSON.stringify(scoreFlowEvidenceCluster(cluster)).toLowerCase()).not.toContain("institutional");</span>
+<span class="add">+  });</span>
+<span class="add">+});</span></code></pre>
+    </section>
+
+    <section>
+      <h2>Expected Impact for End-Users</h2>
+      <p>This is not directly visible yet. It prepares Islandflow to explain flow as evidence-backed hypotheses instead of old smart-money certainty. Once the next phase projects these vectors into final hypothesis and insight outputs, users should see clearer confidence, conviction, alternatives, and why-not reasoning.</p>
+    </section>
+
+    <section>
+      <h2>Validation</h2>
+      <ul>
+        <li><span class="pass">Passed</span> <code>bunx biome check packages/types/src/smart-flow.ts packages/types/tests/smart-flow.test.ts services/compute/src/smart-flow-evidence.ts services/compute/src/smart-flow-clusters.ts services/compute/src/smart-flow-scoring.ts services/compute/src/index.ts services/compute/tests/smart-flow-scoring.test.ts</code>.</li>
+        <li><span class="pass">Passed</span> <code>bun test services/compute/tests/smart-flow-scoring.test.ts</code>.</li>
+        <li><span class="pass">Passed</span> <code>bun run typecheck</code>.</li>
+        <li><span class="pass">Passed</span> <code>bun test</code> with 287 tests.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Issues, Limitations, and Mitigations</h2>
+      <ul>
+        <li>The scoring policy is rule-based and deterministic. Historical calibration remains explicitly out of scope for this MVP phase.</li>
+        <li>The scorer returns vectors but does not emit final <code>FlowHypothesisEvent</code> records. That keeps this PR inside <code>islandflow-zxh.3.1</code> and leaves abstention/projection to <code>islandflow-zxh.3.2</code>.</li>
+        <li>The Diffs SSR output was not embedded because its generated payload was disproportionate for this small explanatory record. Styled unified fallback snippets preserve actual file and line-level changes.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Follow-up Work</h2>
+      <ul>
+        <li><code>islandflow-zxh.3.2</code>: use score vectors to produce first-class abstention outputs and compatibility insight projections.</li>
+        <li><code>islandflow-259.4</code>: replay integration should consume the completed scoring and abstention pipeline after phase 03b lands.</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

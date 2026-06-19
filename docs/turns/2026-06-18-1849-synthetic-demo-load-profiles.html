@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>synthetic demo load profiles</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #090d12;
+        --panel: #111820;
+        --panel-soft: #16212b;
+        --text: #eef5f4;
+        --muted: #9eb0b5;
+        --line: #2a3945;
+        --accent: #74e0c8;
+        --accent-2: #f3c96a;
+        --add: #173b32;
+        --add-text: #bff9e4;
+        --del: #442129;
+        --del-text: #ffc6d0;
+        --code: #081016;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at top left, rgba(116, 224, 200, 0.14), transparent 34rem),
+          linear-gradient(180deg, #090d12 0%, #0b1017 54%, #080b10 100%);
+        color: var(--text);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        line-height: 1.6;
+      }
+
+      main {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 56px 24px 72px;
+      }
+
+      header {
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 28px;
+        margin-bottom: 30px;
+      }
+
+      .eyebrow {
+        color: var(--accent);
+        font-size: 0.76rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        margin: 0 0 12px;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3 {
+        letter-spacing: 0;
+        line-height: 1.18;
+        margin: 0;
+      }
+
+      h1 {
+        font-size: clamp(2rem, 4vw, 4.25rem);
+        max-width: 820px;
+      }
+
+      h2 {
+        color: var(--accent-2);
+        font-size: 1.15rem;
+        margin-bottom: 12px;
+      }
+
+      h3 {
+        color: var(--text);
+        font-size: 0.98rem;
+        margin: 22px 0 10px;
+      }
+
+      p {
+        margin: 0 0 14px;
+      }
+
+      a {
+        color: var(--accent);
+      }
+
+      section {
+        background: rgba(17, 24, 32, 0.74);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        margin: 18px 0;
+        padding: 22px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 1.25rem;
+      }
+
+      li + li {
+        margin-top: 8px;
+      }
+
+      code {
+        background: rgba(116, 224, 200, 0.09);
+        border: 1px solid rgba(116, 224, 200, 0.16);
+        border-radius: 5px;
+        color: #c9fff0;
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        font-size: 0.92em;
+        padding: 0.08rem 0.32rem;
+      }
+
+      .meta-grid {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        margin-top: 22px;
+      }
+
+      .meta {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px;
+      }
+
+      .meta span {
+        color: var(--muted);
+        display: block;
+        font-size: 0.78rem;
+        margin-bottom: 4px;
+      }
+
+      .meta strong {
+        color: var(--text);
+        display: block;
+        font-size: 0.95rem;
+      }
+
+      .diff-note {
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+
+      pre {
+        background: var(--code);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        margin: 12px 0 22px;
+        overflow-x: auto;
+        padding: 16px;
+        white-space: pre;
+      }
+
+      pre code {
+        background: transparent;
+        border: 0;
+        color: #dbe7ea;
+        display: block;
+        font-size: 0.82rem;
+        line-height: 1.5;
+        padding: 0;
+      }
+
+      .diff .file {
+        color: #8fb7ff;
+      }
+
+      .diff .hunk {
+        color: #b7a6ff;
+      }
+
+      .diff .add {
+        background: var(--add);
+        color: var(--add-text);
+        display: inline-block;
+        min-width: 100%;
+      }
+
+      .diff .del {
+        background: var(--del);
+        color: var(--del-text);
+        display: inline-block;
+        min-width: 100%;
+      }
+
+      .callout {
+        background: linear-gradient(135deg, rgba(116, 224, 200, 0.12), rgba(243, 201, 106, 0.08));
+        border-color: rgba(116, 224, 200, 0.34);
+      }
+
+      .validation {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      }
+
+      .check {
+        background: var(--panel-soft);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px;
+      }
+
+      .check strong {
+        color: var(--accent);
+        display: block;
+        margin-bottom: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">Islandflow implementation turn</p>
+        <h1>Named synthetic demo and load profiles</h1>
+        <div class="meta-grid">
+          <div class="meta">
+            <span>Beads issue</span>
+            <strong>islandflow-259.5</strong>
+          </div>
+          <div class="meta">
+            <span>Branch</span>
+            <strong>lavender/synthetic-demo-load-profiles</strong>
+          </div>
+          <div class="meta">
+            <span>Phase spec</span>
+            <strong>05-demo-load-profiles.md</strong>
+          </div>
+          <div class="meta">
+            <span>Generated</span>
+            <strong>2026-06-18 18:49</strong>
+          </div>
+        </div>
+      </header>
+
+      <section class="callout">
+        <h2>Summary</h2>
+        <p>
+          Added named deterministic synthetic demo profiles and load profiles, wired them into
+          hosted synthetic control, and moved the live options/equities synthetic emitters onto
+          selected scenario fixtures instead of ambient runtime randomness.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>
+            Added the <code>@islandflow/synthetic-market/profiles</code> export with four
+            <code>DemoProfile</code> definitions and three <code>LoadProfile</code> definitions.
+          </li>
+          <li>
+            Extended <code>SyntheticControlState</code> with <code>demo_profile_id</code> and
+            <code>load_profile_id</code>, including defaults and metadata.
+          </li>
+          <li>
+            Updated options and equities synthetic adapters to replay deterministic named scenario
+            fixtures selected by the active demo profile.
+          </li>
+          <li>
+            Exposed profile catalogs from the API synthetic admin status response and replaced raw
+            preset/coverage controls in the internal web drawer with demo/load profile selectors.
+          </li>
+          <li>
+            Documented the new synthetic admin flags and profile behavior in <code>README.md</code>
+            and <code>.env.example</code>.
+          </li>
+          <li>
+            Added focused package, replay, ingest, API, and web coverage around profile defaults,
+            fixture determinism, live adapter playback, and status/control shape.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          Phase 05 called for deterministic named demo profiles and load profiles without changing
+          scenario business semantics. The previous hosted control exposed lower-level knobs that
+          could bias the synthetic scenario engine directly. This turn moves the public control
+          surface up one level: demos choose known scenario runs, and load settings only alter
+          cadence or repeated run count.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <ul>
+          <li>
+            <code>market-command</code>, <code>event-response</code>, <code>quiet-range</code>,
+            and <code>stress-tape</code> map to named deterministic phase-03 scenario runs.
+          </li>
+          <li>
+            <code>steady</code>, <code>active</code>, and <code>firehose</code> adjust playback
+            rate and repeated named-run volume only. They do not modify scenario labels,
+            expectations, or classifier semantics.
+          </li>
+          <li>
+            Legacy <code>SYNTHETIC_MARKET_MODE</code> values still map to a default load profile
+            before hosted control is changed, preserving local startup behavior.
+          </li>
+          <li>
+            KV decode now normalizes partial persisted control payloads so older hosted-control
+            values get the new profile fields without breaking startup.
+          </li>
+          <li>
+            The web UI includes a local fallback catalog so the internal drawer remains stable if
+            an older API response lacks profile metadata.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p class="diff-note">
+          Excerpted unified diffs are shown here instead of the full patch so the document stays
+          readable while still showing file-level and line-level changes.
+        </p>
+
+        <h3>Shared profile catalog</h3>
+        <pre class="diff"><code><span class="file">diff --git a/packages/synthetic-market/src/profiles.ts b/packages/synthetic-market/src/profiles.ts</span>
+new file mode 100644
+<span class="file">--- /dev/null</span>
+<span class="file">+++ b/packages/synthetic-market/src/profiles.ts</span>
+<span class="hunk">@@ -0,0 +1,88 @@</span>
+<span class="add">+export type DemoProfile = {</span>
+<span class="add">+  id: SyntheticDemoProfileId;</span>
+<span class="add">+  title: string;</span>
+<span class="add">+  default_load_profile_id: SyntheticLoadProfileId;</span>
+<span class="add">+  runs: readonly DemoProfileRun[];</span>
+<span class="add">+  control_defaults: DemoProfileControlDefaults;</span>
+<span class="add">+};</span>
+<span class="add">+</span>
+<span class="add">+export const SYNTHETIC_DEMO_PROFILES: readonly DemoProfile[] = [</span>
+<span class="add">+  {</span>
+<span class="add">+    id: "market-command",</span>
+<span class="add">+    title: "Market Command",</span>
+<span class="add">+    runs: [</span>
+<span class="add">+      run("institutional-directional-flow"),</span>
+<span class="add">+      run("retail-attention-call-chase"),</span>
+<span class="add">+      run("structure-arbitrage-calm"),</span>
+<span class="add">+      run("no-alert-wide-quote-chop")</span>
+<span class="add">+    ],</span>
+<span class="add">+    control_defaults: {</span>
+<span class="add">+      preset_id: "balanced_demo",</span>
+<span class="add">+      coverage_assist: true,</span>
+<span class="add">+      coverage_window_minutes: 20,</span>
+<span class="add">+      shared_seed: 11,</span>
+<span class="add">+      profile_weights: balancedWeights()</span>
+<span class="add">+    }</span>
+<span class="add">+  }</span>
+<span class="add">+];</span>
+<span class="add">+</span>
+<span class="add">+export const SYNTHETIC_LOAD_PROFILES: readonly LoadProfile[] = [</span>
+<span class="add">+  {</span>
+<span class="add">+    id: "steady",</span>
+<span class="add">+    title: "Steady",</span>
+<span class="add">+    description: "One deterministic run per base interval.",</span>
+<span class="add">+    rate_multiplier: 1,</span>
+<span class="add">+    volume_multiplier: 1,</span>
+<span class="add">+    mode: "realistic"</span>
+<span class="add">+  }</span>
+<span class="add">+];</span></code></pre>
+
+        <h3>Control state contract</h3>
+        <pre class="diff"><code><span class="file">diff --git a/packages/types/src/synthetic-market.ts b/packages/types/src/synthetic-market.ts</span>
+<span class="file">--- a/packages/types/src/synthetic-market.ts</span>
+<span class="file">+++ b/packages/types/src/synthetic-market.ts</span>
+<span class="hunk">@@ -74,6 +87,8 @@ export type SyntheticProfileWeightMap = z.infer&lt;typeof SyntheticProfileWeightMapSchema&gt;;</span>
+ export const SyntheticControlStateSchema = z
+   .object({
+<span class="add">+    demo_profile_id: SyntheticDemoProfileIdSchema,</span>
+<span class="add">+    load_profile_id: SyntheticLoadProfileIdSchema,</span>
+     preset_id: SyntheticControlPresetIdSchema,
+     coverage_assist: z.boolean(),
+     coverage_window_minutes: SyntheticCoverageWindowMinutesSchema,
+<span class="hunk">@@ -161,6 +176,8 @@ const DEFAULT_PROFILE_WEIGHTS: SyntheticProfileWeightMap = {</span>
+ export const DEFAULT_SYNTHETIC_CONTROL_STATE: SyntheticControlState = {
+<span class="add">+  demo_profile_id: "market-command",</span>
+<span class="add">+  load_profile_id: "steady",</span>
+   preset_id: "balanced_demo",
+   coverage_assist: true,
+   coverage_window_minutes: 20,</code></pre>
+
+        <h3>Thin live emitters</h3>
+        <pre class="diff"><code><span class="file">diff --git a/services/ingest-options/src/adapters/synthetic.ts b/services/ingest-options/src/adapters/synthetic.ts</span>
+<span class="file">--- a/services/ingest-options/src/adapters/synthetic.ts</span>
+<span class="file">+++ b/services/ingest-options/src/adapters/synthetic.ts</span>
+<span class="hunk">@@ -1436,37 +1469,47 @@ export const createSyntheticOptionsAdapter = (</span>
+<span class="del">-        const control = config.getControl?.() ?? {</span>
+<span class="del">-          preset_id: "balanced_demo",</span>
+<span class="del">-          coverage_assist: true,</span>
+<span class="del">-          coverage_window_minutes: 20,</span>
+<span class="del">-          shared_seed: 11,</span>
+<span class="del">-          updated_at: 0,</span>
+<span class="del">-          updated_by: "system"</span>
+<span class="del">-        };</span>
+<span class="del">-        if (!currentBurst || remainingRuns &lt;= 0) {</span>
+<span class="del">-          burstIndex += 1;</span>
+<span class="del">-          currentBurst = buildBurst(burstIndex, now, config.mode, profile, control, coverageState);</span>
+<span class="del">-        }</span>
+<span class="add">+        const control = getEffectiveControl();</span>
+<span class="add">+        const runCount = getSyntheticLoadProfileRunCount(control.load_profile_id);</span>
+
+<span class="del">-        for (let i = 0; i &lt; burst.printCount; i += 1) {</span>
+<span class="del">-          const leg = burst.legs[i % burst.legs.length]!;</span>
+<span class="del">-          const eventTs = now + i * 5;</span>
+<span class="del">-          seq += 1;</span>
+<span class="del">-          void handlers.onTrade(print);</span>
+<span class="del">-        }</span>
+<span class="add">+        for (let runOffset = 0; runOffset &lt; runCount; runOffset += 1) {</span>
+<span class="add">+          const fixture = createSyntheticDemoProfileFixture(</span>
+<span class="add">+            control.demo_profile_id,</span>
+<span class="add">+            demoRunOrdinal</span>
+<span class="add">+          );</span>
+<span class="add">+          const firstTs = fixture.manifest.replay_plan.first_event_ts ?? fixture.batch.run.start_ts;</span>
+<span class="add">+          const baseTs = now + runOffset * 10;</span>
+<span class="add">+</span>
+<span class="add">+          demoRunOrdinal += 1;</span>
+<span class="add">+          demoRunSerial += 1;</span>
+<span class="add">+</span>
+<span class="add">+          for (const generated of fixture.batch.events) {</span>
+<span class="add">+            if (generated.kind === "option_print") {</span>
+<span class="add">+              seq += 1;</span>
+<span class="add">+              void handlers.onTrade(</span>
+<span class="add">+                projectDemoEvent(generated.event, {</span>
+<span class="add">+                  firstTs,</span>
+<span class="add">+                  baseTs,</span>
+<span class="add">+                  seq,</span>
+<span class="add">+                  runId: fixture.manifest.run.run_id,</span>
+<span class="add">+                  runSerial: demoRunSerial</span>
+<span class="add">+                })</span>
+<span class="add">+              );</span>
+<span class="add">+            }</span>
+<span class="add">+          }</span>
+         }
+<span class="del">-        remainingRuns -= 1;</span>
+<span class="add">+      };</span>
+<span class="add">+</span>
+<span class="add">+      const schedule = () =&gt; {</span>
+<span class="add">+        const control = getEffectiveControl();</span>
+<span class="add">+        const intervalMs = scaleSyntheticEmitIntervalMs(</span>
+<span class="add">+          config.emitIntervalMs,</span>
+<span class="add">+          control.load_profile_id</span>
+<span class="add">+        );</span>
+<span class="add">+        timer = setTimeout(() =&gt; {</span>
+<span class="add">+          emit();</span>
+<span class="add">+          schedule();</span>
+<span class="add">+        }, intervalMs);</span>
+<span class="add">+      };</span></code></pre>
+
+        <h3>API and web profile controls</h3>
+        <pre class="diff"><code><span class="file">diff --git a/services/api/src/index.ts b/services/api/src/index.ts</span>
+<span class="file">--- a/services/api/src/index.ts</span>
+<span class="file">+++ b/services/api/src/index.ts</span>
+<span class="hunk">@@ -721,6 +725,10 @@ const run = async () =&gt; {</span>
+   let syntheticControl = resolveSyntheticProfileControlState(
+     await ensureSyntheticControlState(syntheticControlKv)
+   );
+<span class="add">+  const syntheticProfileCatalog = {</span>
+<span class="add">+    demo_profiles: listDemoProfileSummaries(),</span>
+<span class="add">+    load_profiles: listLoadProfileSummaries()</span>
+<span class="add">+  };</span>
+<span class="hunk">@@ -1346,6 +1354,7 @@ const buildSyntheticStatusBody = () =&gt; {</span>
+       },
+       control: syntheticBackendMode === "synthetic" ? syntheticControl : null,
+<span class="add">+      profiles: syntheticProfileCatalog,</span>
+       derived,
+       ...(syntheticBackendDisabledReason ? { disabled_reason: syntheticBackendDisabledReason } : {})
+     };</code></pre>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <p>
+          Internal demo operators can now pick recognizable demo profiles and load levels from the
+          synthetic control drawer. The tape remains deterministic across runs, making demos and
+          replay comparisons easier to explain, reproduce, and review.
+        </p>
+      </section>
+
+      <section>
+        <h2>Followup Changes</h2>
+        <p>
+          A PR review pass added three focused fixes after the original implementation was
+          documented.
+        </p>
+        <ul>
+          <li>
+            <code>services/api/src/index.ts</code> now opens, ensures, and watches the synthetic
+            control KV only when both hosted ingest adapters are synthetic. Live and mixed API
+            deployments no longer gain an unnecessary synthetic control KV dependency.
+          </li>
+          <li>
+            <code>packages/synthetic-market/src/profiles.ts</code> now clones mutable array copies
+            from the readonly profile constants so the profile list helpers pass package
+            typechecking cleanly.
+          </li>
+          <li>
+            <code>deployment/docker/workspace-root/bun.lock</code> was synced so Docker builds see
+            the new synthetic-market workspace dependency edges added by this phase.
+          </li>
+          <li>
+            Rerun validation passed with <code>bun test</code>,
+            <code>bun --cwd=apps/web run build</code>, <code>bun run typecheck</code>, and
+            <code>bun run check:docker-workspace</code>. The focused whitespace checks also passed.
+          </li>
+          <li>
+            Residual risk: this review did not manually exercise a live NATS and ClickHouse
+            synthetic control session. Coverage is from code review, unit tests, typecheck, and
+            production web build validation.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <div class="validation">
+          <div class="check">
+            <strong>Passed</strong>
+            <code>~/.bun/bin/bun test</code>
+            <p>304 tests passed across 55 files with 1,738 expectations.</p>
+          </div>
+          <div class="check">
+            <strong>Passed</strong>
+            <code>~/.bun/bin/bun --cwd=apps/web run build</code>
+            <p>Next.js production build completed after the UI control changes.</p>
+          </div>
+          <div class="check">
+            <strong>Passed</strong>
+            <code>git diff --check</code>
+            <p>No whitespace errors in the implementation diff.</p>
+          </div>
+          <div class="check">
+            <strong>Known baseline failure</strong>
+            <code>~/.bun/bin/bun run check</code>
+            <p>
+              Fails on existing Biome import-order diagnostics in unrelated baseline files. The
+              touched feature files were formatted with targeted Biome checks.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>
+            The repo-wide Biome check still reports pre-existing import-order diagnostics outside
+            this phase. This PR avoids broad formatting churn and documents the skipped gate.
+          </li>
+          <li>
+            The legacy synthetic burst generator remains in the options adapter for existing unit
+            tests and helper coverage. The live adapter path now consumes named profile fixtures.
+          </li>
+          <li>
+            Historical calibration, new smart-flow policy, provider policy changes, and broader
+            explainability UI/API work were intentionally left out of scope.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <p>
+          No follow-up Beads issue was created from this turn. The remaining lint baseline is
+          repository-wide maintenance work, not a blocker specific to synthetic demo/load profiles.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>
