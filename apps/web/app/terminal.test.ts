@@ -55,6 +55,9 @@ const {
   getOptionScope,
   getLiveFeedStatus,
   getLiveManifest,
+  getSmartFlowEvidenceRefs,
+  getSmartFlowOptionPrintRefs,
+  getSmartFlowPacketRefs,
   getTerminalNavCurrentHref,
   getRouteFeatures,
   getTapeVirtualConfig,
@@ -75,6 +78,9 @@ const {
   shouldClearOptionFocusSeed,
   smartMoneyProfileLabel,
   smartMoneyToneForProfile,
+  smartFlowEvidenceQualityLabel,
+  smartFlowHypothesisLabel,
+  smartFlowWhyNotLabel,
   getAlertFlowPacketRefs,
   normalizeTerminalPathname,
   resolveAlertFlowPacket,
@@ -304,6 +310,7 @@ describe("live manifest", () => {
 
     expect(channels).toEqual([
       "alerts",
+      "smart-flow",
       "smart-money",
       "classifier-hits",
       "inferred-dark",
@@ -330,6 +337,7 @@ describe("live manifest", () => {
     );
 
     expect(channels).toEqual([
+      "smart-flow",
       "smart-money",
       "inferred-dark",
       "equity-joins",
@@ -1030,6 +1038,103 @@ describe("smart-money profile helpers", () => {
     expect(smartMoneyProfileLabel(null)).toBe("Abstained");
     expect(smartMoneyToneForProfile("event_driven")).toBe("blue");
     expect(smartMoneyToneForProfile(null)).toBe("neutral");
+  });
+});
+
+describe("smart-flow explainability helpers", () => {
+  const makeProjection = (overrides: Record<string, unknown> = {}) =>
+    ({
+      refs: {
+        evidence_refs: ["flowpacket:1", "print:1"],
+        ...((overrides.refs as Record<string, unknown> | undefined) ?? {})
+      },
+      evidence: {
+        evidence_refs: ["print:1", "print:2"],
+        evidence_quality: 0.64,
+        penalties: [],
+        ...((overrides.evidence as Record<string, unknown> | undefined) ?? {})
+      },
+      hypothesis: {
+        hypothesis_type: "directional_accumulation",
+        evidence_refs: ["flowpacket:1", "print:2"],
+        ...((overrides.hypothesis as Record<string, unknown> | undefined) ?? {})
+      },
+      abstention: {
+        abstained: false,
+        reasons: ["not_abstained"],
+        source_reasons: [],
+        ...((overrides.abstention as Record<string, unknown> | undefined) ?? {})
+      },
+      alternatives: [],
+      ...overrides
+    }) as any;
+
+  it("labels hypotheses and evidence quality without certainty language", () => {
+    expect(smartFlowHypothesisLabel("directional_accumulation")).toBe(
+      "Directional accumulation"
+    );
+    expect(smartFlowHypothesisLabel("unclear")).toBe("No clear flow hypothesis");
+    expect(smartFlowEvidenceQualityLabel(0.9)).toBe("strong");
+    expect(smartFlowEvidenceQualityLabel(0.6)).toBe("usable");
+    expect(smartFlowEvidenceQualityLabel(0.1)).toBe("thin");
+    expect(smartFlowEvidenceQualityLabel(0)).toBe("poor");
+  });
+
+  it("merges smart-flow evidence refs into inspectable packet and print groups", () => {
+    const projection = makeProjection();
+
+    expect(getSmartFlowEvidenceRefs(projection)).toEqual(["flowpacket:1", "print:1", "print:2"]);
+    expect(getSmartFlowPacketRefs(projection)).toEqual(["flowpacket:1"]);
+    expect(getSmartFlowOptionPrintRefs(projection)).toEqual(["print:1", "print:2"]);
+  });
+
+  it("summarizes abstention, penalties, and alternatives as why-not context", () => {
+    expect(
+      smartFlowWhyNotLabel(
+        makeProjection({
+          abstention: {
+            abstained: true,
+            reasons: ["stale_quote_context"],
+            source_reasons: ["stale_or_missing_quote_context"]
+          }
+        })
+      )
+    ).toBe("Abstained: Stale Or Missing Quote Context");
+
+    expect(
+      smartFlowWhyNotLabel(
+        makeProjection({
+          evidence: {
+            evidence_refs: ["print:1"],
+            evidence_quality: 0.4,
+            penalties: [
+              {
+                penalty_id: "penalty:1",
+                kind: "wide_quote_context",
+                score: 0.8,
+                reason: "Wide quote context reduced fit.",
+                evidence_refs: ["print:1"]
+              }
+            ]
+          }
+        })
+      )
+    ).toBe("Watch: Wide quote context reduced fit.");
+
+    expect(
+      smartFlowWhyNotLabel(
+        makeProjection({
+          alternatives: [
+            {
+              hypothesis_type: "hedge_rebalance",
+              direction: "neutral",
+              score: 0.44,
+              reasons: ["Similar timing context."]
+            }
+          ]
+        })
+      )
+    ).toBe("Alternative considered: Hedge rebalance");
   });
 });
 

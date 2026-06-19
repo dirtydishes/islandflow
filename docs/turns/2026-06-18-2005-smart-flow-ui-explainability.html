@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Smart-Flow UI Explainability</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #090b10;
+        --panel: #101722;
+        --panel-2: #151e2b;
+        --text: #edf5ff;
+        --muted: #a9b8c9;
+        --soft: #728399;
+        --line: #26364a;
+        --accent: #7dd3fc;
+        --accent-2: #c4b5fd;
+        --green: #7ee2a8;
+        --red: #ff9c9c;
+        --amber: #ffd38a;
+        --code: #0c121b;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at top left, rgba(125, 211, 252, 0.16), transparent 32rem),
+          radial-gradient(circle at 80% 0, rgba(196, 181, 253, 0.13), transparent 34rem),
+          var(--bg);
+        color: var(--text);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.62;
+      }
+
+      main {
+        width: min(1120px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 56px 0 72px;
+      }
+
+      header {
+        padding: 28px;
+        border: 1px solid rgba(125, 211, 252, 0.25);
+        background: linear-gradient(135deg, rgba(16, 23, 34, 0.94), rgba(21, 30, 43, 0.9));
+        border-radius: 8px;
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
+      }
+
+      .eyebrow {
+        margin: 0 0 8px;
+        color: var(--accent);
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        letter-spacing: 0;
+        line-height: 1.12;
+      }
+
+      h1 {
+        max-width: 840px;
+        font-size: clamp(2.2rem, 5vw, 4.6rem);
+      }
+
+      h2 {
+        margin-bottom: 12px;
+        font-size: 1.35rem;
+      }
+
+      h3 {
+        margin-top: 20px;
+        margin-bottom: 8px;
+        color: var(--accent-2);
+        font-size: 1rem;
+      }
+
+      p {
+        margin: 0 0 12px;
+        color: var(--muted);
+      }
+
+      a {
+        color: var(--accent);
+      }
+
+      code,
+      pre {
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      }
+
+      code {
+        color: #d7ecff;
+      }
+
+      section {
+        margin-top: 18px;
+        padding: 24px;
+        border: 1px solid rgba(114, 131, 153, 0.22);
+        background: rgba(16, 23, 34, 0.78);
+        border-radius: 8px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 1.1rem;
+        color: var(--muted);
+      }
+
+      li + li {
+        margin-top: 8px;
+      }
+
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 22px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        padding: 4px 10px;
+        border: 1px solid rgba(125, 211, 252, 0.22);
+        border-radius: 999px;
+        background: rgba(125, 211, 252, 0.08);
+        color: #dff5ff;
+        font-size: 0.82rem;
+        font-weight: 700;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 12px;
+      }
+
+      .tile {
+        padding: 16px;
+        border: 1px solid rgba(125, 211, 252, 0.18);
+        background: rgba(9, 13, 20, 0.55);
+        border-radius: 8px;
+      }
+
+      .tile strong {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--text);
+      }
+
+      .callout {
+        border-color: rgba(255, 211, 138, 0.28);
+        background: rgba(255, 211, 138, 0.08);
+      }
+
+      .diff-note {
+        color: var(--soft);
+        font-size: 0.92rem;
+      }
+
+      .diff {
+        overflow-x: auto;
+        margin: 14px 0 0;
+        padding: 0;
+        border: 1px solid rgba(114, 131, 153, 0.3);
+        background: var(--code);
+        border-radius: 8px;
+      }
+
+      .diff code {
+        display: block;
+        min-width: 920px;
+        padding: 16px 0;
+        color: #d8e7f5;
+        font-size: 0.82rem;
+        line-height: 1.45;
+        white-space: pre;
+      }
+
+      .diff .line {
+        display: block;
+        padding: 0 18px;
+      }
+
+      .diff .file {
+        color: var(--accent);
+        font-weight: 700;
+      }
+
+      .diff .hunk {
+        color: var(--accent-2);
+      }
+
+      .diff .add {
+        background: rgba(126, 226, 168, 0.11);
+        color: var(--green);
+      }
+
+      .diff .del {
+        background: rgba(255, 156, 156, 0.11);
+        color: var(--red);
+      }
+
+      .diff .ctx {
+        color: #b8c7d9;
+      }
+
+      .validation {
+        display: grid;
+        gap: 10px;
+      }
+
+      .validation code {
+        display: inline-block;
+        padding: 3px 7px;
+        border: 1px solid rgba(125, 211, 252, 0.16);
+        border-radius: 6px;
+        background: rgba(9, 13, 20, 0.65);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">Islandflow phase 05b</p>
+        <h1>Smart-flow explainability in the terminal UI</h1>
+        <p>
+          Implemented the UI side of the smart-flow explainability phase: hypotheses now foreground
+          evidence quality, confidence versus conviction, why-not context, abstention, alternatives,
+          and inspectable references without claiming participant identity.
+        </p>
+        <div class="meta" aria-label="Turn metadata">
+          <span class="pill">Issue islandflow-zxh.5.2</span>
+          <span class="pill">Branch lavender/smart-flow-ui-explainability</span>
+          <span class="pill">UI bounded</span>
+          <span class="pill">Infra-free validation</span>
+        </div>
+      </header>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          The terminal signals surface now consumes the canonical smart-flow explainability projection
+          feed from the phase 05a API/WS work and presents it as cautious, evidence-backed flow
+          hypotheses. The old smart-money stream remains as a compatibility fallback, but the primary
+          table, drawer, command ticker context, and priority rows now prefer smart-flow projections.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <div class="grid">
+          <div class="tile">
+            <strong>Smart-flow live feed</strong>
+            <p>
+              Added <code>smart-flow</code> to the terminal live manifest, history loading, hot-window
+              state, replay tape, and older-window loading path.
+            </p>
+          </div>
+          <div class="tile">
+            <strong>Explainability table</strong>
+            <p>
+              Reworked the former classifier pane into a Flow Hypotheses table with hypothesis,
+              direction, confidence, conviction, evidence quality, and why-not columns.
+            </p>
+          </div>
+          <div class="tile">
+            <strong>Inspectable drawer</strong>
+            <p>
+              Added a smart-flow drawer that shows the hypothesis read, confidence versus conviction,
+              abstention, alternatives, evidence refs, hydrated packet/print evidence, and version trace.
+            </p>
+          </div>
+          <div class="tile">
+            <strong>Cautious copy</strong>
+            <p>
+              Rephrased visible labels away from overconfident smart-money language and kept legacy
+              profile UI framed as compatibility context.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          This child issue is the PR-sized UI portion of phase 05. It intentionally builds on the
+          API and websocket contracts shipped by PR 40 instead of reimplementing those surfaces. The
+          scope was also constrained to explainability presentation; scoring policy, calibration,
+          participant identity, and synthetic foundations were left alone.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <ul>
+          <li>
+            Smart-flow projections are subscribed before legacy smart-money events when smart-money
+            features are enabled, so the UI can prefer canonical projections while keeping existing
+            compatibility consumers alive.
+          </li>
+          <li>
+            Evidence refs are merged from projection refs, evidence refs, and hypothesis refs, then
+            split into <code>flowpacket:</code> references and option-print references for hydration
+            through existing fetchers.
+          </li>
+          <li>
+            Why-not copy is deterministic: abstention reasons win, then evidence penalties, then the
+            strongest alternative hypothesis, then a neutral "no active guard" state.
+          </li>
+          <li>
+            Dashboard command context uses smart-flow rows first and falls back to legacy smart-money
+            rows only when no smart-flow projections are present.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p class="diff-note">
+          Focused excerpts are shown here. Local <code>@pierre/diffs/ssr</code> rendering was exercised
+          for the excerpt, but the generated HTML was over 600 KB, so this checked-in document keeps a
+          compact styled unified diff fallback for CI readability.
+        </p>
+        <pre class="diff"><code><span class="line file">diff --git a/apps/web/app/terminal.tsx b/apps/web/app/terminal.tsx</span>
+<span class="line hunk">@@ -3392,6 +3450,7 @@ export const getLiveManifest = (</span>
+<span class="line ctx">     subscriptions.push({ channel: "alerts", snapshot_limit: LIVE_HOT_WINDOW });</span>
+<span class="line ctx">   }</span>
+<span class="line ctx">   if (features.smartMoney) {</span>
+<span class="line add">+    subscriptions.push({ channel: "smart-flow", snapshot_limit: LIVE_HOT_WINDOW });</span>
+<span class="line ctx">     subscriptions.push({ channel: "smart-money", snapshot_limit: LIVE_HOT_WINDOW });</span>
+<span class="line ctx">   }</span>
+<span class="line hunk">@@ -5000,6 +5084,25 @@ export const getAlertFlowPacketRefs = (alert: Pick&lt;AlertEvent, "evidence_refs"&gt;)</span>
+<span class="line add">+export const getSmartFlowEvidenceRefs = (</span>
+<span class="line add">+  projection: Pick&lt;SmartFlowExplainabilityProjection, "refs" | "evidence" | "hypothesis"&gt;</span>
+<span class="line add">+): string[] =&gt;</span>
+<span class="line add">+  uniqueNonEmpty([</span>
+<span class="line add">+    ...projection.refs.evidence_refs,</span>
+<span class="line add">+    ...projection.evidence.evidence_refs,</span>
+<span class="line add">+    ...projection.hypothesis.evidence_refs</span>
+<span class="line add">+  ]);</span>
+<span class="line add">+</span>
+<span class="line add">+export const getSmartFlowPacketRefs = (</span>
+<span class="line add">+  projection: Pick&lt;SmartFlowExplainabilityProjection, "refs" | "evidence" | "hypothesis"&gt;</span>
+<span class="line add">+): string[] =&gt; getSmartFlowEvidenceRefs(projection).filter(isSmartFlowPacketRef);</span>
+<span class="line hunk">@@ -5398,6 +5501,226 @@ type SmartMoneyDrawerProps = {</span>
+<span class="line add">+type SmartFlowDrawerProps = {</span>
+<span class="line add">+  projection: SmartFlowExplainabilityProjection;</span>
+<span class="line add">+  evidence: EvidenceItem[];</span>
+<span class="line add">+  onClose: () =&gt; void;</span>
+<span class="line add">+};</span>
+<span class="line add">+</span>
+<span class="line add">+const SmartFlowDrawer = ({ projection, evidence, onClose }: SmartFlowDrawerProps) =&gt; {</span>
+<span class="line add">+  const hypothesis = projection.hypothesis;</span>
+<span class="line add">+  const confidence = hypothesis.scores.confidence;</span>
+<span class="line add">+  const evidenceQuality = smartFlowEvidenceQualityLabel(projection.evidence.evidence_quality);</span>
+<span class="line add">+  const evidenceRefs = getSmartFlowEvidenceRefs(projection);</span>
+<span class="line file">diff --git a/apps/web/app/globals.css b/apps/web/app/globals.css</span>
+<span class="line hunk">@@ -2019,6 +2019,10 @@ h3 {</span>
+<span class="line ctx">   min-width: 760px;</span>
+<span class="line ctx"> }</span>
+<span class="line add">+.data-table-smart-flow {</span>
+<span class="line add">+  min-width: 1080px;</span>
+<span class="line add">+}</span>
+<span class="line hunk">@@ -2202,6 +2207,14 @@ h3 {</span>
+<span class="line add">+.data-table-smart-flow .data-table-head,</span>
+<span class="line add">+.data-table-smart-flow .data-table-row {</span>
+<span class="line add">+  grid-template-columns: minmax(76px, 0.65fr) minmax(190px, 1.35fr) minmax(68px, 0.5fr) minmax(64px, 0.45fr) minmax(64px, 0.45fr) minmax(116px, 0.8fr) minmax(320px, 2.1fr);</span>
+<span class="line add">+}</span>
+<span class="line file">diff --git a/apps/web/app/terminal.test.ts b/apps/web/app/terminal.test.ts</span>
+<span class="line hunk">@@ -304,6 +310,7 @@ describe("live manifest", () =&gt; {</span>
+<span class="line ctx">     expect(channels).toEqual([</span>
+<span class="line ctx">       "alerts",</span>
+<span class="line add">+      "smart-flow",</span>
+<span class="line ctx">       "smart-money",</span>
+<span class="line hunk">@@ -1033,6 +1041,103 @@ describe("smart-money profile helpers", () =&gt; {</span>
+<span class="line add">+describe("smart-flow explainability helpers", () =&gt; {</span>
+<span class="line add">+  it("labels hypotheses and evidence quality without certainty language", () =&gt; {</span>
+<span class="line add">+    expect(smartFlowHypothesisLabel("unclear")).toBe("No clear flow hypothesis");</span>
+<span class="line add">+    expect(smartFlowEvidenceQualityLabel(0.6)).toBe("usable");</span>
+<span class="line add">+  });</span>
+<span class="line add">+</span>
+<span class="line add">+  it("merges smart-flow evidence refs into inspectable packet and print groups", () =&gt; {</span>
+<span class="line add">+    expect(getSmartFlowPacketRefs(projection)).toEqual(["flowpacket:1"]);</span>
+<span class="line add">+    expect(getSmartFlowOptionPrintRefs(projection)).toEqual(["print:1", "print:2"]);</span>
+<span class="line add">+  });</span>
+<span class="line add">+});</span></code></pre>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <p>
+          A user looking at the terminal should see smart-flow as an explainable hypothesis stream
+          instead of a black-box or overconfident "smart money" call. They can inspect why a read
+          exists, why it may be weak, what alternatives were considered, and which packets or prints
+          support the displayed hypothesis.
+        </p>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <div class="validation">
+          <p><code>bun test apps/web/app/terminal.test.ts</code> passed with 79 tests.</p>
+          <p><code>bun --cwd=apps/web run build</code> passed.</p>
+          <p><code>bun test</code> passed with 310 tests.</p>
+          <p><code>git diff --check</code> passed before turn-document creation.</p>
+        </div>
+      </section>
+
+      <section class="callout">
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>
+            Manual browser screenshot review was not run in this turn. The build and helper/unit tests
+            cover the data path and rendering helpers, but visual polish should still get a human pass
+            in PR review.
+          </li>
+          <li>
+            Chart marker rendering still has legacy smart-money compatibility wiring. The main
+            explainability surfaces prefer smart-flow projections, and follow-up issue
+            <code>islandflow-zxh.5.3</code> tracks finishing the marker migration.
+          </li>
+          <li>
+            No scoring policy, calibration behavior, participant-identity inference, or synthetic
+            foundations were changed.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <p>
+          Created <code>islandflow-zxh.5.3</code> to migrate terminal chart and focus markers from the
+          legacy smart-money feed to canonical smart-flow projections, leaving smart-money only as a
+          compatibility fallback.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>
