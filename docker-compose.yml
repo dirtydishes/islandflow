@@ -11,7 +11,7 @@ services:
         soft: 262144
         hard: 262144
   redis:
-    image: redis:7.2
+    image: redis:7.2.14-bookworm@sha256:747f1f4078d700806f83d427550a9d8c4d89dd3bf6491449c748c83ad285036e
     ports:
       - "6379:6379"
     volumes:

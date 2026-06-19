@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fix Forgejo Security Image Issues</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #06080b;
+      --panel: #0d141b;
+      --panel-strong: #111820;
+      --border: #ffffff1a;
+      --border-strong: #f5a62359;
+      --text: #e6edf4;
+      --muted: #9baabd;
+      --faint: #718096;
+      --amber: #f5a623;
+      --amber-soft: #f5a6231f;
+      --green: #25c17a;
+      --green-soft: #25c17a1f;
+      --red: #ff6b5f;
+      --red-soft: #ff6b5f24;
+      --blue: #4da3ff;
+      --blue-soft: #4da3ff24;
+      --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      line-height: 1.55;
+    }
+
+    main {
+      width: min(1080px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 36px 0 56px;
+    }
+
+    header {
+      border: 1px solid var(--border);
+      background: linear-gradient(135deg, var(--panel-strong), var(--panel));
+      padding: 22px;
+    }
+
+    h1,
+    h2,
+    h3 {
+      font-family: var(--mono);
+      line-height: 1.15;
+      letter-spacing: 0;
+      text-wrap: balance;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.65rem;
+    }
+
+    h2 {
+      margin: 28px 0 10px;
+      color: var(--amber);
+      font-size: 1rem;
+    }
+
+    h3 {
+      margin: 18px 0 8px;
+      color: var(--text);
+      font-size: 0.9rem;
+    }
+
+    p {
+      max-width: 75ch;
+      margin: 0 0 12px;
+      text-wrap: pretty;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 22px;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    code,
+    pre {
+      font-family: var(--mono);
+    }
+
+    code {
+      color: var(--text);
+      background: #ffffff0d;
+      padding: 0.12rem 0.28rem;
+      border-radius: 6px;
+    }
+
+    section {
+      border-block-end: 1px solid var(--border);
+      padding: 4px 0 20px;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .chip {
+      border: 1px solid var(--border);
+      background: #ffffff0a;
+      border-radius: 999px;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      padding: 4px 9px;
+    }
+
+    .callout {
+      border: 1px solid var(--border-strong);
+      background: var(--amber-soft);
+      padding: 14px 16px;
+      margin-top: 12px;
+    }
+
+    .diff {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      background: #030507;
+      padding: 14px;
+      font-size: 0.82rem;
+      line-height: 1.45;
+      tab-size: 2;
+      white-space: pre;
+    }
+
+    .diff .file {
+      color: var(--blue);
+      font-weight: 700;
+    }
+
+    .diff .hunk {
+      color: var(--amber);
+    }
+
+    .diff .del {
+      display: block;
+      color: #ffb5ae;
+      background: var(--red-soft);
+    }
+
+    .diff .add {
+      display: block;
+      color: #a9f0cd;
+      background: var(--green-soft);
+    }
+
+    .ok {
+      color: var(--green);
+    }
+
+    .warn {
+      color: var(--amber);
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Fix Forgejo Security Image Issues</h1>
+      <p>Addressed the four open Forgejo security issues by pinning Redis and Bun deployment images to patched immutable manifests.</p>
+      <div class="meta">
+        <span class="chip">Forgejo #19</span>
+        <span class="chip">Forgejo #44</span>
+        <span class="chip">Forgejo #45</span>
+        <span class="chip">Forgejo #46</span>
+        <span class="chip">2026-06-19 12:45</span>
+      </div>
+    </header>
+
+    <section>
+      <h2>Summary</h2>
+      <p>The Redis runtime image now stays on the patched Redis OSS 7.2 line with `redis:7.2.14-bookworm@sha256:747f1f4078d700806f83d427550a9d8c4d89dd3bf6491449c748c83ad285036e`. The Bun-based deployment Dockerfiles now use `oven/bun:1.3.14@sha256:e10577f0db68676a7024391c6e5cb4b879ebd17188ab750cf10024a6d700e5c4` instead of `oven/bun:1.3.11`.</p>
+    </section>
+
+    <section>
+      <h2>Changes Made</h2>
+      <ul>
+        <li>Changed the VPS Redis service in `deployment/docker/docker-compose.yml` from floating `redis:7.2` to the patched digest-pinned Redis image.</li>
+        <li>Changed the local root `docker-compose.yml` Redis service to the same patched image so local infrastructure scans do not keep reporting the old tag.</li>
+        <li>Changed `deployment/docker/Dockerfile.service` to the patched digest-pinned Bun image.</li>
+        <li>Changed both build and runtime stages in `deployment/docker/Dockerfile.web` to the same patched Bun image.</li>
+        <li>Changed `deployment/docker/Dockerfile.ingest-options` to the same patched Bun image.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Context</h2>
+      <p>Forgejo issues #44, #45, and #46 reported Redis CVEs against `redis:7.2` in the deployed runtime image. Forgejo issue #19 reported CVE-2026-45447 against OpenSSL packages inherited from `oven/bun:1.3.11` in the service, web, and ingest-options Docker images.</p>
+      <p>The Redis update stays on the existing 7.2 minor line and pins the patched `7.2.14-bookworm` multi-arch index. The Bun update moves to the latest verified stable 1.3 image available during the task and pins its multi-arch index.</p>
+    </section>
+
+    <section>
+      <h2>Important Implementation Details</h2>
+      <ul>
+        <li>`docker buildx imagetools inspect redis:7.2.14-bookworm` confirmed the Redis multi-arch digest `sha256:747f1f4078d700806f83d427550a9d8c4d89dd3bf6491449c748c83ad285036e`.</li>
+        <li>`docker buildx imagetools inspect oven/bun:1.3.14` confirmed the Bun multi-arch digest `sha256:e10577f0db68676a7024391c6e5cb4b879ebd17188ab750cf10024a6d700e5c4`.</li>
+        <li>The readable tags remain next to the digest pins, which keeps review clarity while preventing future rebuilds from silently floating to a different manifest.</li>
+        <li>The deployment compose file requires `deployment/docker/.env`; validation used either `--no-env-resolution` or a temporary copy of `.env.example`, removed immediately afterward.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Relevant Diff Snippets</h2>
+      <p>`@pierre/diffs/ssr` is present but its `ssr` subpath is not exported in this checkout, so this document uses a focused styled unified diff fallback.</p>
+      <pre class="diff"><code><span class="file">diff --git a/deployment/docker/docker-compose.yml b/deployment/docker/docker-compose.yml</span>
+<span class="hunk">@@ -153,7 +153,7 @@ services:</span>
+       start_period: 20s
+
+   redis:
+<span class="del">-    image: redis:7.2</span>
+<span class="add">+    image: redis:7.2.14-bookworm@sha256:747f1f4078d700806f83d427550a9d8c4d89dd3bf6491449c748c83ad285036e</span>
+     restart: unless-stopped
+
+<span class="file">diff --git a/docker-compose.yml b/docker-compose.yml</span>
+<span class="hunk">@@ -11,7 +11,7 @@ services:</span>
+         soft: 262144
+         hard: 262144
+   redis:
+<span class="del">-    image: redis:7.2</span>
+<span class="add">+    image: redis:7.2.14-bookworm@sha256:747f1f4078d700806f83d427550a9d8c4d89dd3bf6491449c748c83ad285036e</span>
+     ports:
+
+<span class="file">diff --git a/deployment/docker/Dockerfile.service b/deployment/docker/Dockerfile.service</span>
+<span class="hunk">@@ -1,6 +1,6 @@</span>
+ # syntax=docker/dockerfile:1.7
+
+<span class="del">-FROM oven/bun:1.3.11</span>
+<span class="add">+FROM oven/bun:1.3.14@sha256:e10577f0db68676a7024391c6e5cb4b879ebd17188ab750cf10024a6d700e5c4</span>
+
+<span class="file">diff --git a/deployment/docker/Dockerfile.web b/deployment/docker/Dockerfile.web</span>
+<span class="hunk">@@ -1,6 +1,6 @@</span>
+ # syntax=docker/dockerfile:1.7
+
+<span class="del">-FROM oven/bun:1.3.11 AS build</span>
+<span class="add">+FROM oven/bun:1.3.14@sha256:e10577f0db68676a7024391c6e5cb4b879ebd17188ab750cf10024a6d700e5c4 AS build</span>
+
+<span class="hunk">@@ -44,7 +44,7 @@</span>
+ RUN bun run --cwd apps/web build
+
+<span class="del">-FROM oven/bun:1.3.11 AS runtime</span>
+<span class="add">+FROM oven/bun:1.3.14@sha256:e10577f0db68676a7024391c6e5cb4b879ebd17188ab750cf10024a6d700e5c4 AS runtime</span>
+
+<span class="file">diff --git a/deployment/docker/Dockerfile.ingest-options b/deployment/docker/Dockerfile.ingest-options</span>
+<span class="hunk">@@ -1,6 +1,6 @@</span>
+ # syntax=docker/dockerfile:1.7
+
+<span class="del">-FROM oven/bun:1.3.11</span>
+<span class="add">+FROM oven/bun:1.3.14@sha256:e10577f0db68676a7024391c6e5cb4b879ebd17188ab750cf10024a6d700e5c4</span></code></pre>
+    </section>
+
+    <section>
+      <h2>Expected Impact for End-Users</h2>
+      <p>Rebuilt deployment images should stop inheriting the vulnerable Redis and Bun base-image surfaces identified by Forgejo. Runtime behavior is expected to remain unchanged: Redis stays on the same minor release line, and Bun stays on the same 1.3 line while receiving patched base packages.</p>
+    </section>
+
+    <section>
+      <h2>Validation</h2>
+      <ul>
+        <li><span class="ok">Passed:</span> `rg` confirmed the old `oven/bun:1.3.11` and unpinned `image: redis:7.2` references are gone from the deployment files.</li>
+        <li><span class="ok">Passed:</span> `docker buildx imagetools inspect redis:7.2.14-bookworm` confirmed the Redis digest pin.</li>
+        <li><span class="ok">Passed:</span> `docker buildx imagetools inspect oven/bun:1.3.14` confirmed the Bun digest pin.</li>
+        <li><span class="ok">Passed:</span> `docker compose -f docker-compose.yml config --quiet` parsed the root local compose file.</li>
+        <li><span class="ok">Passed:</span> `docker compose -f deployment/docker/docker-compose.yml config --quiet --no-env-resolution` parsed the deployment compose file without requiring a local `.env`.</li>
+        <li><span class="ok">Passed:</span> `git diff --check` reported no whitespace errors.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Issues, Limitations, and Mitigations</h2>
+      <ul>
+        <li><span class="warn">Not run:</span> image pulls, in-container package checks, and vulnerability rescans, because the local Docker API socket was unavailable and `trivy` was not installed.</li>
+        <li><span class="warn">Mitigation:</span> both replacement image manifests were verified through Docker registry metadata, and compose parsing verified the updated references are accepted by Docker Compose.</li>
+        <li><span class="warn">Follow-up validation:</span> after Docker or OrbStack is available, rebuild the deployment images and rescan them with the same scanner that opened the Forgejo issues.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Follow-up Work</h2>
+      <ul>
+        <li>Run `docker compose -f deployment/docker/docker-compose.yml build api web ingest-options` after Docker is available.</li>
+        <li>Run a vulnerability scan against the rebuilt service, web, ingest-options, and Redis images before closing the Forgejo issues.</li>
+        <li>Consider adding an image-tag audit to CI so floating deployment image tags are caught before scanner triage has to open manual issues.</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

@@ -153,7 +153,7 @@ services:
       start_period: 20s
 
   redis:
-    image: redis:7.2
+    image: redis:7.2.14-bookworm@sha256:747f1f4078d700806f83d427550a9d8c4d89dd3bf6491449c748c83ad285036e
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
