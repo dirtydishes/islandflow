@@ -1825,6 +1825,7 @@ const LIVE_SNAPSHOT_HISTORY_CHANNELS = new Set<LiveSubscription["channel"]>([
   "nbbo",
   "equities",
   "flow",
+  "smart-flow",
   "smart-money",
   "classifier-hits"
 ]);
@@ -1985,6 +1986,18 @@ export const smartFlowWhyNotLabel = (
 
   return "No active why-not guard";
 };
+
+export const smartFlowDirectionLabel = (
+  projection: Pick<SmartFlowExplainabilityProjection, "abstention" | "hypothesis">
+): "bullish" | "bearish" | "neutral" | "abstained" =>
+  projection.abstention.abstained
+    ? "abstained"
+    : normalizeDirection(projection.hypothesis.direction);
+
+export const smartFlowDirectionTone = (
+  projection: Pick<SmartFlowExplainabilityProjection, "abstention" | "hypothesis">
+): "bullish" | "bearish" | "neutral" =>
+  projection.abstention.abstained ? "neutral" : normalizeDirection(projection.hypothesis.direction);
 
 const buildClassifierDecor = (hit: ClassifierHitEvent): ClassifierDecor => ({
   hit,
@@ -5103,6 +5116,14 @@ export const getSmartFlowOptionPrintRefs = (
   projection: Pick<SmartFlowExplainabilityProjection, "refs" | "evidence" | "hypothesis">
 ): string[] => getSmartFlowEvidenceRefs(projection).filter((ref) => !isSmartFlowPacketRef(ref));
 
+export const getSmartFlowPinnedFlowKeys = (
+  projection: Pick<SmartFlowExplainabilityProjection, "refs" | "evidence" | "hypothesis"> | null
+): string[] => (projection ? getSmartFlowPacketRefs(projection) : []);
+
+export const getSmartFlowPinnedOptionKeys = (
+  projection: Pick<SmartFlowExplainabilityProjection, "refs" | "evidence" | "hypothesis"> | null
+): string[] => (projection ? getSmartFlowOptionPrintRefs(projection) : []);
+
 export const resolveAlertFlowPacket = (
   alert: Pick<AlertEvent, "evidence_refs">,
   packets: Map<string, FlowPacket>
@@ -5510,7 +5531,8 @@ type SmartFlowDrawerProps = {
 const SmartFlowDrawer = ({ projection, evidence, onClose }: SmartFlowDrawerProps) => {
   const hypothesis = projection.hypothesis;
   const confidence = hypothesis.scores.confidence;
-  const direction = normalizeDirection(hypothesis.direction);
+  const directionLabel = smartFlowDirectionLabel(projection);
+  const directionTone = smartFlowDirectionTone(projection);
   const evidenceQuality = smartFlowEvidenceQualityLabel(projection.evidence.evidence_quality);
   const evidenceRefs = getSmartFlowEvidenceRefs(projection);
   const visibleEvidence = evidence.slice(0, 12);
@@ -5538,7 +5560,7 @@ const SmartFlowDrawer = ({ projection, evidence, onClose }: SmartFlowDrawerProps
       </div>
 
       <div className="drawer-meta">
-        <span className={`pill direction-${direction}`}>{direction}</span>
+        <span className={`pill direction-${directionTone}`}>{directionLabel}</span>
         <span className="drawer-chip">
           Confidence {formatConfidence(confidence.policy_confidence)}
         </span>
@@ -6727,6 +6749,7 @@ const useTerminalState = () => {
     }
     setSelectedDarkEvent(null);
     setSelectedClassifierHit(null);
+    setSelectedSmartFlowProjection(null);
     setSelectedSmartMoneyEvent(null);
   }, [mode]);
 
@@ -7573,13 +7596,22 @@ const useTerminalState = () => {
     for (const packetId of selectedSmartMoneyEvent?.packet_ids ?? []) {
       keys.add(packetId);
     }
+    for (const packetId of getSmartFlowPinnedFlowKeys(selectedSmartFlowProjection)) {
+      keys.add(packetId);
+    }
     for (const alert of visibleAlerts) {
       for (const packetId of getAlertFlowPacketRefs(alert)) {
         keys.add(packetId);
       }
     }
     return keys;
-  }, [selectedAlert, selectedClassifierPacketId, selectedSmartMoneyEvent, visibleAlerts]);
+  }, [
+    selectedAlert,
+    selectedClassifierPacketId,
+    selectedSmartFlowProjection,
+    selectedSmartMoneyEvent,
+    visibleAlerts
+  ]);
 
   const activePinnedOptionKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -7596,6 +7628,9 @@ const useTerminalState = () => {
     for (const id of selectedSmartMoneyEvent?.member_print_ids ?? []) {
       keys.add(id);
     }
+    for (const id of getSmartFlowPinnedOptionKeys(selectedSmartFlowProjection)) {
+      keys.add(id);
+    }
     for (const id of visibleAlertEvidenceRefs) {
       keys.add(id);
     }
@@ -7603,6 +7638,7 @@ const useTerminalState = () => {
   }, [
     selectedAlert,
     selectedClassifierFlowPacket,
+    selectedSmartFlowProjection,
     selectedSmartMoneyEvent,
     visibleAlertEvidenceRefs
   ]);
@@ -9227,8 +9263,8 @@ const ClassifierPane = memo(({ state, limit, className }: ClassifierPaneProps) =
                         const projection = item as SmartFlowExplainabilityProjection;
                         const hypothesis = projection.hypothesis;
                         const scores = hypothesis.scores.confidence;
-                        const direction = normalizeDirection(hypothesis.direction);
-                        const rowDirection = projection.abstention.abstained ? "neutral" : direction;
+                        const direction = smartFlowDirectionLabel(projection);
+                        const rowDirection = smartFlowDirectionTone(projection);
                         const evidenceQuality = smartFlowEvidenceQualityLabel(
                           projection.evidence.evidence_quality
                         );

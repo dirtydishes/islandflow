@@ -411,12 +411,28 @@
       </section>
 
       <section>
+        <h2>Followup Changes</h2>
+        <p>
+          Review follow-up tightened the live smart-flow path without expanding phase scope. Empty
+          reconnect snapshots now retain existing smart-flow rows like the other history-backed live
+          channels, selected smart-flow drawers are cleared when switching live/replay mode, and
+          selected smart-flow packet/print refs are protected from pinned-evidence pruning while the
+          drawer is open.
+        </p>
+        <p>
+          Abstained projections now render their row and drawer direction as neutral
+          <code>abstained</code> language instead of showing the underlying bullish/bearish direction
+          as if the system had made a directional call.
+        </p>
+      </section>
+
+      <section>
         <h2>Validation</h2>
         <div class="validation">
-          <p><code>bun test apps/web/app/terminal.test.ts</code> passed with 79 tests.</p>
+          <p><code>bun test apps/web/app/terminal.test.ts</code> passed with 80 tests after review follow-up.</p>
           <p><code>bun --cwd=apps/web run build</code> passed.</p>
-          <p><code>bun test</code> passed with 310 tests.</p>
-          <p><code>git diff --check</code> passed before turn-document creation.</p>
+          <p><code>bun test</code> passed with 311 tests.</p>
+          <p><code>git diff --check</code> and <code>git diff --check -- docs/turns/</code> passed after review follow-up.</p>
         </div>
       </section>
 
