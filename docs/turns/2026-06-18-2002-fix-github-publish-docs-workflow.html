@@ -297,6 +297,8 @@
         <li>Parsed <code>.github/workflows/docs-pages.yml</code> with Ruby's built-in YAML parser and confirmed the Node setup step is present.</li>
         <li>Pushed commit <code>524083c</code> to GitHub <code>main</code>; run <code>27797087815</code> proved the build and payload steps passed, then failed at the missing <code>DOCS_PAGES_TOKEN</code> check.</li>
         <li>Pushed follow-up commit <code>b74a04f</code>; run <code>27797227686</code> proved the secret check was gone, then failed during the forced <code>gh-pages</code> publish step, so the workflow was changed to a normal branch checkout and fast-forward push.</li>
+        <li>Pushed follow-up commit <code>c3880f7</code>; run <code>27797288088</code> completed successfully and updated the project <code>gh-pages</code> branch.</li>
+        <li>Backfilled <code>dirtydishes/dirtydishes.github.io</code> commit <code>1e528d9</code> with the same Islandflow docs payload.</li>
         <li>Ran <code>git diff --check</code> on the workflow, generator, and regenerated index after fixing generated trailing whitespace.</li>
         <li>Confirmed the GitHub Pages repository currently contained fewer files than the local docs set, proving there was a backfill gap.</li>
       </ul>
@@ -305,7 +307,7 @@
       <ul>
         <li>The local shell did not have <code>gh</code>, <code>node</code>, or <code>bun</code> on PATH, so validation used the bundled Node runtime and git commands.</li>
         <li><code>bd</code> was also unavailable on PATH, so Beads could not be updated with the normal CLI during this run.</li>
-        <li>The GitHub source mirror was behind Forgejo at the time of this fix; publishing requires syncing the updated commit to GitHub so the GitHub-only workflow can run.</li>
+        <li>The GitHub source mirror was behind Forgejo at the start of this fix; final handoff should confirm both remotes have the completed docs-publish commits.</li>
       </ul>
 
       <h2>Follow-up Work</h2>
