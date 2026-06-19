@@ -65,7 +65,13 @@ async function getTrackedDocsFiles() {
 }
 
 async function getLastCommitDate(relativePath, fallbackDate) {
-  const stdout = await gitOutput(["log", "-1", "--format=%cI", "--", path.posix.join("docs", relativePath)]);
+  const stdout = await gitOutput([
+    "log",
+    "-1",
+    "--format=%cI",
+    "--",
+    path.posix.join("docs", relativePath)
+  ]);
   const trimmed = stdout.trim();
   return trimmed.length > 0 ? new Date(trimmed) : fallbackDate;
 }
