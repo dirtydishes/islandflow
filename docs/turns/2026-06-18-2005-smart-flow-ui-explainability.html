@@ -430,8 +430,10 @@
         <h2>Validation</h2>
         <div class="validation">
           <p><code>bun test apps/web/app/terminal.test.ts</code> passed with 80 tests after review follow-up.</p>
+          <p><code>bun run fmt:check</code>, <code>bun run lint</code>, and <code>bun run typecheck</code> passed after formatting the touched UI files.</p>
           <p><code>bun --cwd=apps/web run build</code> passed.</p>
           <p><code>bun test</code> passed with 311 tests.</p>
+          <p><code>bun run check:public-api-routes</code> and <code>bun run check:docker-workspace</code> passed.</p>
           <p><code>git diff --check</code> and <code>git diff --check -- docs/turns/</code> passed after review follow-up.</p>
         </div>
       </section>

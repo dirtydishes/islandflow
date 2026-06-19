@@ -5608,7 +5608,9 @@ const SmartFlowDrawer = ({ projection, evidence, onClose }: SmartFlowDrawerProps
               <span>{formatConfidence(confidence.evidence_quality)}</span>
               <span>{confidence.calibration_version ?? "calibration unavailable"}</span>
             </div>
-            <p className="drawer-note">Evidence quality is an input, not a participant identity claim.</p>
+            <p className="drawer-note">
+              Evidence quality is an input, not a participant identity claim.
+            </p>
           </div>
         </div>
       </div>
@@ -5734,8 +5736,8 @@ const SmartFlowDrawer = ({ projection, evidence, onClose }: SmartFlowDrawerProps
             <span>{projection.versions.model}</span>
           </div>
           <p className="drawer-note">
-            Cluster {projection.refs.cluster_id} / {projection.refs.candidate_ids.length} candidates /{" "}
-            {evidenceRefs.length} refs
+            Cluster {projection.refs.cluster_id} / {projection.refs.candidate_ids.length} candidates
+            / {evidenceRefs.length} refs
           </p>
         </div>
       </div>
@@ -6468,12 +6470,7 @@ const useTerminalState = () => {
 
   useLayoutEffect(() => {
     classifierAnchor.apply();
-  }, [
-    smartFlowFeed.items,
-    smartMoneyFeed.items,
-    classifierHitsFeed.items,
-    classifierAnchor.apply
-  ]);
+  }, [smartFlowFeed.items, smartMoneyFeed.items, classifierHitsFeed.items, classifierAnchor.apply]);
 
   useLayoutEffect(() => {
     newsAnchor.apply();
@@ -7050,7 +7047,8 @@ const useTerminalState = () => {
   ]);
 
   const selectedSmartFlowRefs = useMemo(
-    () => (selectedSmartFlowProjection ? getSmartFlowEvidenceRefs(selectedSmartFlowProjection) : []),
+    () =>
+      selectedSmartFlowProjection ? getSmartFlowEvidenceRefs(selectedSmartFlowProjection) : [],
     [selectedSmartFlowProjection]
   );
   const selectedSmartFlowPacketRefs = useMemo(
@@ -7058,7 +7056,8 @@ const useTerminalState = () => {
     [selectedSmartFlowProjection]
   );
   const selectedSmartFlowPrintRefs = useMemo(
-    () => (selectedSmartFlowProjection ? getSmartFlowOptionPrintRefs(selectedSmartFlowProjection) : []),
+    () =>
+      selectedSmartFlowProjection ? getSmartFlowOptionPrintRefs(selectedSmartFlowProjection) : [],
     [selectedSmartFlowProjection]
   );
   const selectedSmartFlowEvidence = useMemo((): EvidenceItem[] => {
@@ -9294,9 +9293,12 @@ const ClassifierPane = memo(({ state, limit, className }: ClassifierPaneProps) =
                               {formatConfidence(scores.conviction)}
                             </span>
                             <span className="data-table-cell">
-                              {evidenceQuality} / {formatConfidence(projection.evidence.evidence_quality)}
+                              {evidenceQuality} /{" "}
+                              {formatConfidence(projection.evidence.evidence_quality)}
                             </span>
-                            <span className="data-table-cell">{smartFlowWhyNotLabel(projection)}</span>
+                            <span className="data-table-cell">
+                              {smartFlowWhyNotLabel(projection)}
+                            </span>
                           </button>
                         );
                       })
@@ -9304,71 +9306,73 @@ const ClassifierPane = memo(({ state, limit, className }: ClassifierPaneProps) =
                       ? virtual.virtualItems.map(({ item, key, index, start, size }) => {
                           const event = item as SmartMoneyEvent;
                           const primaryScore =
-                          event.profile_scores.find(
-                            (score) => score.profile_id === event.primary_profile_id
-                          ) ?? event.profile_scores[0];
-                        const direction = normalizeDirection(event.primary_direction);
-                        return (
-                          <button
-                            className={`data-table-row data-table-row-button data-table-row-classifier data-table-virtual-row${index % 2 === 1 ? " is-even" : ""} data-table-row-direction-${direction}`}
-                            key={key}
-                            type="button"
-                            data-index={index}
-                            data-row-start={String(start)}
-                            data-row-size={String(size)}
-                            data-tape-key={key}
-                            style={{ transform: `translateY(${start}px)` }}
-                            onClick={() => state.openFromSmartMoneyEvent(event)}
-                          >
-                            <span className="data-table-cell data-table-cell-number">
-                              {formatTime(event.source_ts)}
-                            </span>
-                            <span className="data-table-cell">
-                              {smartMoneyProfileLabel(event.primary_profile_id)}
-                            </span>
-                            <span className="data-table-cell">{direction}</span>
-                            <span className="data-table-cell data-table-cell-number">
-                              {primaryScore ? formatConfidence(primaryScore.probability) : "--"}
-                            </span>
-                            <span className="data-table-cell">
-                              {event.abstained
-                                ? (event.suppressed_reasons[0] ?? "abstained")
-                                : (primaryScore?.reasons[0] ??
-                                  primaryScore?.confidence_band ??
-                                  "--")}
-                            </span>
-                          </button>
-                        );
-                      })
-                    : virtual.virtualItems.map(({ item, key, index, start, size }) => {
-                        const hit = item as ClassifierHitEvent;
-                        const direction = normalizeDirection(hit.direction);
-                        return (
-                          <button
-                            className={`data-table-row data-table-row-button data-table-row-classifier data-table-virtual-row${index % 2 === 1 ? " is-even" : ""} data-table-row-direction-${direction}`}
-                            key={key}
-                            type="button"
-                            data-index={index}
-                            data-row-start={String(start)}
-                            data-row-size={String(size)}
-                            data-tape-key={key}
-                            style={{ transform: `translateY(${start}px)` }}
-                            onClick={() => state.openFromClassifierHit(hit)}
-                          >
-                            <span className="data-table-cell data-table-cell-number">
-                              {formatTime(hit.source_ts)}
-                            </span>
-                            <span className="data-table-cell">
-                              {humanizeClassifierId(hit.classifier_id)}
-                            </span>
-                            <span className="data-table-cell">{direction}</span>
-                            <span className="data-table-cell data-table-cell-number">
-                              {formatConfidence(hit.confidence)}
-                            </span>
-                            <span className="data-table-cell">{hit.explanations?.[0] ?? "--"}</span>
-                          </button>
-                        );
-                      })}
+                            event.profile_scores.find(
+                              (score) => score.profile_id === event.primary_profile_id
+                            ) ?? event.profile_scores[0];
+                          const direction = normalizeDirection(event.primary_direction);
+                          return (
+                            <button
+                              className={`data-table-row data-table-row-button data-table-row-classifier data-table-virtual-row${index % 2 === 1 ? " is-even" : ""} data-table-row-direction-${direction}`}
+                              key={key}
+                              type="button"
+                              data-index={index}
+                              data-row-start={String(start)}
+                              data-row-size={String(size)}
+                              data-tape-key={key}
+                              style={{ transform: `translateY(${start}px)` }}
+                              onClick={() => state.openFromSmartMoneyEvent(event)}
+                            >
+                              <span className="data-table-cell data-table-cell-number">
+                                {formatTime(event.source_ts)}
+                              </span>
+                              <span className="data-table-cell">
+                                {smartMoneyProfileLabel(event.primary_profile_id)}
+                              </span>
+                              <span className="data-table-cell">{direction}</span>
+                              <span className="data-table-cell data-table-cell-number">
+                                {primaryScore ? formatConfidence(primaryScore.probability) : "--"}
+                              </span>
+                              <span className="data-table-cell">
+                                {event.abstained
+                                  ? (event.suppressed_reasons[0] ?? "abstained")
+                                  : (primaryScore?.reasons[0] ??
+                                    primaryScore?.confidence_band ??
+                                    "--")}
+                              </span>
+                            </button>
+                          );
+                        })
+                      : virtual.virtualItems.map(({ item, key, index, start, size }) => {
+                          const hit = item as ClassifierHitEvent;
+                          const direction = normalizeDirection(hit.direction);
+                          return (
+                            <button
+                              className={`data-table-row data-table-row-button data-table-row-classifier data-table-virtual-row${index % 2 === 1 ? " is-even" : ""} data-table-row-direction-${direction}`}
+                              key={key}
+                              type="button"
+                              data-index={index}
+                              data-row-start={String(start)}
+                              data-row-size={String(size)}
+                              data-tape-key={key}
+                              style={{ transform: `translateY(${start}px)` }}
+                              onClick={() => state.openFromClassifierHit(hit)}
+                            >
+                              <span className="data-table-cell data-table-cell-number">
+                                {formatTime(hit.source_ts)}
+                              </span>
+                              <span className="data-table-cell">
+                                {humanizeClassifierId(hit.classifier_id)}
+                              </span>
+                              <span className="data-table-cell">{direction}</span>
+                              <span className="data-table-cell data-table-cell-number">
+                                {formatConfidence(hit.confidence)}
+                              </span>
+                              <span className="data-table-cell">
+                                {hit.explanations?.[0] ?? "--"}
+                              </span>
+                            </button>
+                          );
+                        })}
                 </div>
               </div>
             </div>
@@ -9767,7 +9771,9 @@ const buildCommandPriorityRows = (state: TerminalState): CommandPriorityRow[] =>
 
 const CommandMetricsStrip = ({ state }: { state: TerminalState }) => {
   const priorityCount =
-    state.filteredSmartFlowProjections.length + state.filteredAlerts.length + state.filteredFlow.length;
+    state.filteredSmartFlowProjections.length +
+    state.filteredAlerts.length +
+    state.filteredFlow.length;
   const focus = state.activeTickers.length > 0 ? state.activeTickers.join(", ") : "All symbols";
   const decision =
     state.selectedInstrument?.kind === "option-contract"

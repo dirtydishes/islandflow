@@ -1075,9 +1075,7 @@ describe("smart-flow explainability helpers", () => {
     }) as any;
 
   it("labels hypotheses and evidence quality without certainty language", () => {
-    expect(smartFlowHypothesisLabel("directional_accumulation")).toBe(
-      "Directional accumulation"
-    );
+    expect(smartFlowHypothesisLabel("directional_accumulation")).toBe("Directional accumulation");
     expect(smartFlowHypothesisLabel("unclear")).toBe("No clear flow hypothesis");
     expect(smartFlowEvidenceQualityLabel(0.9)).toBe("strong");
     expect(smartFlowEvidenceQualityLabel(0.6)).toBe("usable");
