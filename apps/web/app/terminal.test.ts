@@ -49,6 +49,7 @@ const {
   flushPausableTapeData,
   getEffectiveOptionPrintFilters,
   getAlertWindowAnchorTs,
+  getChartFlowMarkerItems,
   getHotChannelFeedStatus,
   getLiveHistoryRetentionCap,
   getOptionTableSnapshot,
@@ -1049,8 +1050,14 @@ describe("smart-money profile helpers", () => {
 describe("smart-flow explainability helpers", () => {
   const makeProjection = (overrides: Record<string, unknown> = {}) =>
     ({
+      source_ts: 1_000,
+      ingest_ts: 1_001,
+      seq: 1,
+      trace_id: "smart-flow:1",
+      source_channel: "smart-flow",
       refs: {
         evidence_refs: ["flowpacket:1", "print:1"],
+        hypothesis_id: "hypothesis:1",
         ...((overrides.refs as Record<string, unknown> | undefined) ?? {})
       },
       evidence: {
@@ -1061,6 +1068,8 @@ describe("smart-flow explainability helpers", () => {
       },
       hypothesis: {
         hypothesis_type: "directional_accumulation",
+        underlying_id: "SPY",
+        direction: "bullish",
         evidence_refs: ["flowpacket:1", "print:2"],
         ...((overrides.hypothesis as Record<string, unknown> | undefined) ?? {})
       },
@@ -1071,6 +1080,20 @@ describe("smart-flow explainability helpers", () => {
         ...((overrides.abstention as Record<string, unknown> | undefined) ?? {})
       },
       alternatives: [],
+      ...overrides
+    }) as any;
+
+  const makeLegacySmartMoneyEvent = (overrides: Record<string, unknown> = {}) =>
+    ({
+      source_ts: 1_000,
+      ingest_ts: 1_001,
+      seq: 1,
+      trace_id: "smart-money:1",
+      underlying_id: "SPY",
+      primary_direction: "bullish",
+      primary_profile_id: "institutional_directional",
+      abstained: false,
+      profile_scores: [],
       ...overrides
     }) as any;
 
@@ -1158,6 +1181,53 @@ describe("smart-flow explainability helpers", () => {
         })
       )
     ).toBe("Alternative considered: Hedge rebalance");
+  });
+
+  it("prefers smart-flow projections for chart marker source rows", () => {
+    const projection = makeProjection({
+      source_ts: 2_000,
+      seq: 2,
+      refs: { hypothesis_id: "hypothesis:2" }
+    });
+    const legacy = makeLegacySmartMoneyEvent({ source_ts: 2_000, seq: 1 });
+
+    const items = getChartFlowMarkerItems([projection], [legacy], { from: 1_000, to: 3_000 });
+
+    expect(items).toEqual([{ kind: "smart-flow", projection }]);
+  });
+
+  it("uses legacy smart-money events only when no smart-flow projection is available", () => {
+    const outOfRangeProjection = makeProjection({
+      source_ts: 8_000,
+      refs: { hypothesis_id: "hypothesis:outside" }
+    });
+    const legacy = makeLegacySmartMoneyEvent({ source_ts: 2_000, seq: 4 });
+
+    const items = getChartFlowMarkerItems([outOfRangeProjection], [legacy], {
+      from: 1_000,
+      to: 3_000
+    });
+
+    expect(items).toEqual([{ kind: "smart-money-fallback", event: legacy }]);
+  });
+
+  it("sorts smart-flow chart marker rows by source time and sequence", () => {
+    const later = makeProjection({
+      source_ts: 2_000,
+      seq: 2,
+      refs: { hypothesis_id: "hypothesis:later" }
+    });
+    const earlier = makeProjection({
+      source_ts: 1_500,
+      seq: 9,
+      refs: { hypothesis_id: "hypothesis:earlier" }
+    });
+
+    const items = getChartFlowMarkerItems([later, earlier], [], { from: 1_000, to: 3_000 });
+
+    expect(
+      items.map((item) => item.kind === "smart-flow" && item.projection.refs.hypothesis_id)
+    ).toEqual(["hypothesis:earlier", "hypothesis:later"]);
   });
 });
 

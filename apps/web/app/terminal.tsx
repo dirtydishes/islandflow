@@ -2018,6 +2018,59 @@ const buildSmartMoneyDecor = (event: SmartMoneyEvent): ClassifierDecor => {
   };
 };
 
+export type ChartFlowMarkerItem =
+  | { kind: "smart-flow"; projection: SmartFlowExplainabilityProjection }
+  | { kind: "smart-money-fallback"; event: SmartMoneyEvent };
+
+const sortBySourceTime = <T extends { source_ts: number; seq: number }>(items: readonly T[]): T[] =>
+  [...items].sort((a, b) => {
+    const delta = a.source_ts - b.source_ts;
+    if (delta !== 0) {
+      return delta;
+    }
+    return a.seq - b.seq;
+  });
+
+export const getChartFlowMarkerItems = (
+  smartFlowProjections: readonly SmartFlowExplainabilityProjection[],
+  legacySmartMoneyEvents: readonly SmartMoneyEvent[],
+  visibleRangeMs: { from: number; to: number } | null,
+  maxSmartFlowMarkers = 220,
+  maxLegacySmartMoneyMarkers = 220
+): ChartFlowMarkerItem[] => {
+  if (!visibleRangeMs) {
+    return [];
+  }
+
+  const inRangeSmartFlow = sortBySourceTime(
+    smartFlowProjections.filter(
+      (projection) =>
+        projection.source_ts >= visibleRangeMs.from && projection.source_ts <= visibleRangeMs.to
+    )
+  );
+
+  if (inRangeSmartFlow.length > 0) {
+    const cappedSmartFlow =
+      inRangeSmartFlow.length > maxSmartFlowMarkers
+        ? inRangeSmartFlow.slice(inRangeSmartFlow.length - maxSmartFlowMarkers)
+        : inRangeSmartFlow;
+    return cappedSmartFlow.map(
+      (projection): ChartFlowMarkerItem => ({ kind: "smart-flow", projection })
+    );
+  }
+
+  const inRangeLegacy = sortBySourceTime(
+    legacySmartMoneyEvents.filter(
+      (event) => event.source_ts >= visibleRangeMs.from && event.source_ts <= visibleRangeMs.to
+    )
+  );
+  const cappedLegacy =
+    inRangeLegacy.length > maxLegacySmartMoneyMarkers
+      ? inRangeLegacy.slice(inRangeLegacy.length - maxLegacySmartMoneyMarkers)
+      : inRangeLegacy;
+  return cappedLegacy.map((event): ChartFlowMarkerItem => ({ kind: "smart-money-fallback", event }));
+};
+
 export const getOptionTableSnapshot = (
   print: Pick<
     OptionPrint,
@@ -4277,13 +4330,16 @@ type CandleChartProps = {
   replayTime?: number | null;
   liveCandles?: EquityCandle[];
   liveOverlayPrints?: EquityPrint[];
+  smartFlowProjections: SmartFlowExplainabilityProjection[];
   smartMoneyEvents: SmartMoneyEvent[];
   inferredDark: InferredDarkEvent[];
+  onSmartFlowClick: (projection: SmartFlowExplainabilityProjection) => void;
   onSmartMoneyClick: (event: SmartMoneyEvent) => void;
   onInferredDarkClick: (event: InferredDarkEvent) => void;
 };
 
 type MarkerAction =
+  | { kind: "smart-flow"; projection: SmartFlowExplainabilityProjection }
   | { kind: "smart-money"; event: SmartMoneyEvent }
   | { kind: "dark"; event: InferredDarkEvent };
 
@@ -4294,8 +4350,10 @@ const CandleChart = ({
   replayTime = null,
   liveCandles = [],
   liveOverlayPrints = [],
+  smartFlowProjections,
   smartMoneyEvents,
   inferredDark,
+  onSmartFlowClick,
   onSmartMoneyClick,
   onInferredDarkClick
 }: CandleChartProps) => {
@@ -4310,6 +4368,7 @@ const CandleChart = ({
 
   const markerLookupRef = useRef<Map<string, MarkerAction>>(new Map());
   const [visibleRangeMs, setVisibleRangeMs] = useState<{ from: number; to: number } | null>(null);
+  const onSmartFlowClickRef = useRef(onSmartFlowClick);
   const onSmartMoneyClickRef = useRef(onSmartMoneyClick);
   const onDarkClickRef = useRef(onInferredDarkClick);
 
@@ -4388,6 +4447,10 @@ const CandleChart = ({
   }, [drawOverlay, ticker, intervalMs, mode]);
 
   useEffect(() => {
+    onSmartFlowClickRef.current = onSmartFlowClick;
+  }, [onSmartFlowClick]);
+
+  useEffect(() => {
     onSmartMoneyClickRef.current = onSmartMoneyClick;
   }, [onSmartMoneyClick]);
 
@@ -4403,16 +4466,12 @@ const CandleChart = ({
       return { markers, lookup };
     }
 
+    const flowMarkerItems = getChartFlowMarkerItems(
+      smartFlowProjections,
+      smartMoneyEvents,
+      visibleRangeMs
+    );
     const { from, to } = visibleRangeMs;
-    const inRangeSmartMoney = smartMoneyEvents
-      .filter((event) => event.source_ts >= from && event.source_ts <= to)
-      .sort((a, b) => {
-        const delta = a.source_ts - b.source_ts;
-        if (delta !== 0) {
-          return delta;
-        }
-        return a.seq - b.seq;
-      });
     const inRangeDark = inferredDark
       .filter((event) => event.source_ts >= from && event.source_ts <= to)
       .sort((a, b) => {
@@ -4423,20 +4482,39 @@ const CandleChart = ({
         return a.seq - b.seq;
       });
 
-    const MAX_SMART_MONEY_MARKERS = 220;
     const MAX_DARK_MARKERS = 120;
     const MAX_TOTAL_MARKERS = 320;
 
-    const cappedSmartMoney =
-      inRangeSmartMoney.length > MAX_SMART_MONEY_MARKERS
-        ? inRangeSmartMoney.slice(inRangeSmartMoney.length - MAX_SMART_MONEY_MARKERS)
-        : inRangeSmartMoney;
     const cappedDark =
       inRangeDark.length > MAX_DARK_MARKERS
         ? inRangeDark.slice(inRangeDark.length - MAX_DARK_MARKERS)
         : inRangeDark;
 
-    for (const event of cappedSmartMoney) {
+    for (const item of flowMarkerItems) {
+      if (item.kind === "smart-flow") {
+        const { projection } = item;
+        const direction = smartFlowDirectionTone(projection);
+        const markerId = `smart-flow:${projection.refs.hypothesis_id}:${projection.seq}`;
+        lookup.set(markerId, { kind: "smart-flow", projection });
+
+        markers.push({
+          id: markerId,
+          time: toChartTime(projection.source_ts),
+          position: direction === "bullish" ? "belowBar" : "aboveBar",
+          color:
+            direction === "bullish"
+              ? "#25c17a"
+              : direction === "bearish"
+                ? "#ff6b5f"
+                : "rgba(144, 160, 178, 0.9)",
+          shape:
+            direction === "bullish" ? "arrowUp" : direction === "bearish" ? "arrowDown" : "circle",
+          text: projection.abstention.abstained ? "ABS" : "HYP"
+        });
+        continue;
+      }
+
+      const { event } = item;
       const direction = normalizeDirection(event.primary_direction);
       const markerId = `smart-money:${event.trace_id}:${event.seq}`;
       lookup.set(markerId, { kind: "smart-money", event });
@@ -4503,7 +4581,7 @@ const CandleChart = ({
     }
 
     return { markers: cappedMarkers, lookup };
-  }, [smartMoneyEvents, inferredDark, visibleRangeMs]);
+  }, [smartFlowProjections, smartMoneyEvents, inferredDark, visibleRangeMs]);
 
   useEffect(() => {
     if (!seriesRef.current) {
@@ -4619,7 +4697,9 @@ const CandleChart = ({
       if (!action) {
         return;
       }
-      if (action.kind === "smart-money") {
+      if (action.kind === "smart-flow") {
+        onSmartFlowClickRef.current(action.projection);
+      } else if (action.kind === "smart-money") {
         onSmartMoneyClickRef.current(action.event);
       } else {
         onDarkClickRef.current(action.event);
@@ -7739,6 +7819,18 @@ const useTerminalState = () => {
       });
   }, [chartTicker, smartMoneyFeed.items, routeFeatures.showChartPane, routeFeatures.showFocusPane]);
 
+  const chartSmartFlowProjections = useMemo(() => {
+    if (!routeFeatures.showChartPane && !routeFeatures.showFocusPane) {
+      return EMPTY_SMART_FLOW_EXPLAINABILITY;
+    }
+    const desired = chartTicker.toUpperCase();
+    return sortBySourceTime(
+      smartFlowFeed.items.filter(
+        (projection) => projection.hypothesis.underlying_id.toUpperCase() === desired
+      )
+    );
+  }, [chartTicker, smartFlowFeed.items, routeFeatures.showChartPane, routeFeatures.showFocusPane]);
+
   const chartInferredDark = useMemo(() => {
     if (!routeFeatures.showChartPane && !routeFeatures.showFocusPane) {
       return EMPTY_INFERRED_DARK_EVENTS;
@@ -7828,6 +7920,13 @@ const useTerminalState = () => {
       openFromSmartMoneyEvent(event);
     },
     [openFromSmartMoneyEvent]
+  );
+
+  const handleSmartFlowMarkerClick = useCallback(
+    (projection: SmartFlowExplainabilityProjection) => {
+      openFromSmartFlowProjection(projection);
+    },
+    [openFromSmartFlowProjection]
   );
 
   const handleDarkMarkerClick = useCallback((event: InferredDarkEvent) => {
@@ -7983,6 +8082,7 @@ const useTerminalState = () => {
     filteredSmartFlowProjections,
     filteredSmartMoneyEvents,
     filteredClassifierHits,
+    chartSmartFlowProjections,
     chartSmartMoneyEvents,
     chartInferredDark,
     focusOptionContract,
@@ -7990,6 +8090,7 @@ const useTerminalState = () => {
     openFromSmartFlowProjection,
     openFromSmartMoneyEvent,
     openFromClassifierHit,
+    handleSmartFlowMarkerClick,
     handleSmartMoneyMarkerClick,
     handleDarkMarkerClick,
     lastSeen,
@@ -9531,8 +9632,10 @@ const ChartPane = memo(({ state, title = "Chart" }: ChartPaneProps) => {
         replayTime={state.equities.replayTime}
         liveCandles={state.liveSession.chartCandles}
         liveOverlayPrints={state.liveSession.chartOverlay}
+        smartFlowProjections={state.chartSmartFlowProjections}
         smartMoneyEvents={state.chartSmartMoneyEvents}
         inferredDark={state.chartInferredDark}
+        onSmartFlowClick={state.handleSmartFlowMarkerClick}
         onSmartMoneyClick={state.handleSmartMoneyMarkerClick}
         onInferredDarkClick={state.handleDarkMarkerClick}
       />
@@ -10192,7 +10295,9 @@ const HomeReplayRail = ({ state }: { state: TerminalState }) => {
 };
 
 const FocusPane = memo(({ state }: { state: TerminalState }) => {
-  const hits = state.chartSmartMoneyEvents.slice(-10).reverse();
+  const smartFlowHits = state.chartSmartFlowProjections.slice(-10).reverse();
+  const legacyHits =
+    smartFlowHits.length === 0 ? state.chartSmartMoneyEvents.slice(-10).reverse() : [];
   const dark = state.chartInferredDark.slice(-10).reverse();
 
   return (
@@ -10203,12 +10308,46 @@ const FocusPane = memo(({ state }: { state: TerminalState }) => {
           <div className="focus-value">{state.chartTicker}</div>
         </div>
         <div className="focus-block">
-          <div className="focus-label">Flow markers</div>
-          {hits.length === 0 ? (
-            <div className="empty">No flow markers for {state.chartTicker}.</div>
+          <div className="focus-label">
+            {smartFlowHits.length > 0 ? "Flow hypotheses" : "Flow markers"}
+          </div>
+          {smartFlowHits.length === 0 && legacyHits.length === 0 ? (
+            <div className="empty">No smart-flow hypotheses for {state.chartTicker}.</div>
+          ) : smartFlowHits.length > 0 ? (
+            <div className="list terminal-list terminal-list-compact">
+              {smartFlowHits.map((projection) => {
+                const tone = smartFlowDirectionTone(projection);
+                return (
+                  <button
+                    className="row row-button"
+                    key={`${projection.refs.hypothesis_id}-${projection.seq}`}
+                    type="button"
+                    onClick={() => state.openFromSmartFlowProjection(projection)}
+                  >
+                    <div>
+                      <div className="contract">
+                        {smartFlowHypothesisLabel(projection.hypothesis.hypothesis_type)}
+                      </div>
+                      <div className="meta">
+                        <span className={`pill direction-${tone}`}>
+                          {smartFlowDirectionLabel(projection)}
+                        </span>
+                        <span>
+                          {smartFlowEvidenceQualityLabel(projection.evidence.evidence_quality)} evidence
+                        </span>
+                        {projection.source_channel === "smart-money" ? (
+                          <span>Compat projection</span>
+                        ) : null}
+                        <span>{formatTime(projection.source_ts)}</span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           ) : (
             <div className="list terminal-list terminal-list-compact">
-              {hits.map((hit) => (
+              {legacyHits.map((hit) => (
                 <button
                   className="row row-button"
                   key={`${hit.trace_id}-${hit.seq}`}
@@ -10216,7 +10355,9 @@ const FocusPane = memo(({ state }: { state: TerminalState }) => {
                   onClick={() => state.openFromSmartMoneyEvent(hit)}
                 >
                   <div>
-                    <div className="contract">{smartMoneyProfileLabel(hit.primary_profile_id)}</div>
+                    <div className="contract">
+                      Compatibility: {smartMoneyProfileLabel(hit.primary_profile_id)}
+                    </div>
                     <div className="meta">
                       <span
                         className={`pill direction-${normalizeDirection(hit.primary_direction)}`}
