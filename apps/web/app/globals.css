@@ -2019,6 +2019,10 @@ h3 {
   min-width: 760px;
 }
 
+.data-table-smart-flow {
+  min-width: 1080px;
+}
+
 .data-table-dark {
   min-width: 820px;
 }
@@ -2101,6 +2105,7 @@ h3 {
 .data-table-flow .data-table-body,
 .data-table-alerts .data-table-body,
 .data-table-classifier .data-table-body,
+.data-table-smart-flow .data-table-body,
 .data-table-dark .data-table-body {
   --tape-row-height: 44px;
   --tape-row-double-height: 88px;
@@ -2200,6 +2205,14 @@ h3 {
       74px,
       0.65fr
     ) minmax(300px, 2.2fr);
+}
+
+.data-table-smart-flow .data-table-head,
+.data-table-smart-flow .data-table-row {
+  grid-template-columns: minmax(76px, 0.65fr) minmax(190px, 1.35fr) minmax(68px, 0.5fr) minmax(
+      64px,
+      0.45fr
+    ) minmax(64px, 0.45fr) minmax(116px, 0.8fr) minmax(320px, 2.1fr);
 }
 
 .data-table-dark .data-table-head,

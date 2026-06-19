@@ -55,6 +55,11 @@ const {
   getOptionScope,
   getLiveFeedStatus,
   getLiveManifest,
+  getSmartFlowEvidenceRefs,
+  getSmartFlowOptionPrintRefs,
+  getSmartFlowPacketRefs,
+  getSmartFlowPinnedFlowKeys,
+  getSmartFlowPinnedOptionKeys,
   getTerminalNavCurrentHref,
   getRouteFeatures,
   getTapeVirtualConfig,
@@ -75,6 +80,11 @@ const {
   shouldClearOptionFocusSeed,
   smartMoneyProfileLabel,
   smartMoneyToneForProfile,
+  smartFlowDirectionLabel,
+  smartFlowDirectionTone,
+  smartFlowEvidenceQualityLabel,
+  smartFlowHypothesisLabel,
+  smartFlowWhyNotLabel,
   getAlertFlowPacketRefs,
   normalizeTerminalPathname,
   resolveAlertFlowPacket,
@@ -304,6 +314,7 @@ describe("live manifest", () => {
 
     expect(channels).toEqual([
       "alerts",
+      "smart-flow",
       "smart-money",
       "classifier-hits",
       "inferred-dark",
@@ -330,6 +341,7 @@ describe("live manifest", () => {
     );
 
     expect(channels).toEqual([
+      "smart-flow",
       "smart-money",
       "inferred-dark",
       "equity-joins",
@@ -721,6 +733,7 @@ describe("live tape pausable helpers", () => {
   it("retains live history when freshness-gated snapshots are empty", () => {
     expect(shouldRetainLiveSnapshotHistory("options", true, 0, 3)).toBe(true);
     expect(shouldRetainLiveSnapshotHistory("equities", true, 0, 2)).toBe(true);
+    expect(shouldRetainLiveSnapshotHistory("smart-flow", true, 0, 2)).toBe(true);
     expect(shouldRetainLiveSnapshotHistory("alerts", true, 0, 3)).toBe(false);
     expect(shouldRetainLiveSnapshotHistory("options", true, 1, 3)).toBe(false);
     expect(shouldRetainLiveSnapshotHistory("options", false, 0, 3)).toBe(false);
@@ -1030,6 +1043,121 @@ describe("smart-money profile helpers", () => {
     expect(smartMoneyProfileLabel(null)).toBe("Abstained");
     expect(smartMoneyToneForProfile("event_driven")).toBe("blue");
     expect(smartMoneyToneForProfile(null)).toBe("neutral");
+  });
+});
+
+describe("smart-flow explainability helpers", () => {
+  const makeProjection = (overrides: Record<string, unknown> = {}) =>
+    ({
+      refs: {
+        evidence_refs: ["flowpacket:1", "print:1"],
+        ...((overrides.refs as Record<string, unknown> | undefined) ?? {})
+      },
+      evidence: {
+        evidence_refs: ["print:1", "print:2"],
+        evidence_quality: 0.64,
+        penalties: [],
+        ...((overrides.evidence as Record<string, unknown> | undefined) ?? {})
+      },
+      hypothesis: {
+        hypothesis_type: "directional_accumulation",
+        evidence_refs: ["flowpacket:1", "print:2"],
+        ...((overrides.hypothesis as Record<string, unknown> | undefined) ?? {})
+      },
+      abstention: {
+        abstained: false,
+        reasons: ["not_abstained"],
+        source_reasons: [],
+        ...((overrides.abstention as Record<string, unknown> | undefined) ?? {})
+      },
+      alternatives: [],
+      ...overrides
+    }) as any;
+
+  it("labels hypotheses and evidence quality without certainty language", () => {
+    expect(smartFlowHypothesisLabel("directional_accumulation")).toBe("Directional accumulation");
+    expect(smartFlowHypothesisLabel("unclear")).toBe("No clear flow hypothesis");
+    expect(smartFlowEvidenceQualityLabel(0.9)).toBe("strong");
+    expect(smartFlowEvidenceQualityLabel(0.6)).toBe("usable");
+    expect(smartFlowEvidenceQualityLabel(0.1)).toBe("thin");
+    expect(smartFlowEvidenceQualityLabel(0)).toBe("poor");
+  });
+
+  it("uses neutral direction language when a projection abstains", () => {
+    const projection = makeProjection({
+      hypothesis: {
+        hypothesis_type: "directional_accumulation",
+        direction: "bullish",
+        evidence_refs: ["flowpacket:1"]
+      },
+      abstention: {
+        abstained: true,
+        reasons: ["below_policy_threshold"],
+        source_reasons: ["policy confidence below threshold"]
+      }
+    });
+
+    expect(smartFlowDirectionLabel(projection)).toBe("abstained");
+    expect(smartFlowDirectionTone(projection)).toBe("neutral");
+  });
+
+  it("merges smart-flow evidence refs into inspectable packet and print groups", () => {
+    const projection = makeProjection();
+
+    expect(getSmartFlowEvidenceRefs(projection)).toEqual(["flowpacket:1", "print:1", "print:2"]);
+    expect(getSmartFlowPacketRefs(projection)).toEqual(["flowpacket:1"]);
+    expect(getSmartFlowOptionPrintRefs(projection)).toEqual(["print:1", "print:2"]);
+    expect(getSmartFlowPinnedFlowKeys(projection)).toEqual(["flowpacket:1"]);
+    expect(getSmartFlowPinnedOptionKeys(projection)).toEqual(["print:1", "print:2"]);
+  });
+
+  it("summarizes abstention, penalties, and alternatives as why-not context", () => {
+    expect(
+      smartFlowWhyNotLabel(
+        makeProjection({
+          abstention: {
+            abstained: true,
+            reasons: ["stale_quote_context"],
+            source_reasons: ["stale_or_missing_quote_context"]
+          }
+        })
+      )
+    ).toBe("Abstained: Stale Or Missing Quote Context");
+
+    expect(
+      smartFlowWhyNotLabel(
+        makeProjection({
+          evidence: {
+            evidence_refs: ["print:1"],
+            evidence_quality: 0.4,
+            penalties: [
+              {
+                penalty_id: "penalty:1",
+                kind: "wide_quote_context",
+                score: 0.8,
+                reason: "Wide quote context reduced fit.",
+                evidence_refs: ["print:1"]
+              }
+            ]
+          }
+        })
+      )
+    ).toBe("Watch: Wide quote context reduced fit.");
+
+    expect(
+      smartFlowWhyNotLabel(
+        makeProjection({
+          alternatives: [
+            {
+              hypothesis_type: "hedge_rebalance",
+              direction: "neutral",
+              score: 0.44,
+              reasons: ["Similar timing context."]
+            }
+          ]
+        })
+      )
+    ).toBe("Alternative considered: Hedge rebalance");
   });
 });
 

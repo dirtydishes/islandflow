@@ -21,6 +21,8 @@ import type {
   OptionPrint,
   OptionSecurityType,
   OptionType,
+  SmartFlowExplainabilityProjection,
+  FlowHypothesisType,
   SmartMoneyEvent,
   SmartMoneyProfileId,
   SyntheticControlState,
@@ -393,6 +395,7 @@ export const getTerminalNavCurrentHref = (pathname: string): string => {
 
 const EMPTY_ALERT_EVENTS: AlertEvent[] = [];
 const EMPTY_CLASSIFIER_HIT_EVENTS: ClassifierHitEvent[] = [];
+const EMPTY_SMART_FLOW_EXPLAINABILITY: SmartFlowExplainabilityProjection[] = [];
 const EMPTY_SMART_MONEY_EVENTS: SmartMoneyEvent[] = [];
 const EMPTY_INFERRED_DARK_EVENTS: InferredDarkEvent[] = [];
 const EMPTY_NEWS_STORIES: NewsStory[] = [];
@@ -634,6 +637,7 @@ type MessageType =
   | "equity-candle"
   | "equity-join"
   | "flow-packet"
+  | "smart-flow"
   | "smart-money"
   | "inferred-dark"
   | "classifier-hit"
@@ -1821,6 +1825,7 @@ const LIVE_SNAPSHOT_HISTORY_CHANNELS = new Set<LiveSubscription["channel"]>([
   "nbbo",
   "equities",
   "flow",
+  "smart-flow",
   "smart-money",
   "classifier-hits"
 ]);
@@ -1930,6 +1935,69 @@ export const smartMoneyToneForProfile = (profileId: SmartMoneyProfileId | null):
 
 export const smartMoneyProfileLabel = (profileId: SmartMoneyProfileId | null): string =>
   profileId ? humanizeClassifierId(profileId) : "Abstained";
+
+const SMART_FLOW_HYPOTHESIS_LABELS: Record<FlowHypothesisType, string> = {
+  directional_accumulation: "Directional accumulation",
+  retail_attention_flow: "Retail attention flow",
+  event_positioning: "Event positioning",
+  volatility_supply: "Volatility supply",
+  structure_arbitrage: "Structure arbitrage",
+  hedge_rebalance: "Hedge rebalance",
+  unclear: "No clear flow hypothesis"
+};
+
+export const smartFlowHypothesisLabel = (value: FlowHypothesisType): string =>
+  SMART_FLOW_HYPOTHESIS_LABELS[value] ?? humanizeClassifierId(value);
+
+const smartFlowReasonLabel = (value: string): string => humanizeClassifierId(value);
+
+export const smartFlowEvidenceQualityLabel = (value: number): string => {
+  if (value >= 0.82) {
+    return "strong";
+  }
+  if (value >= 0.55) {
+    return "usable";
+  }
+  if (value > 0) {
+    return "thin";
+  }
+  return "poor";
+};
+
+export const smartFlowWhyNotLabel = (
+  projection: Pick<SmartFlowExplainabilityProjection, "abstention" | "evidence" | "alternatives">
+): string => {
+  if (projection.abstention.abstained) {
+    const reason =
+      projection.abstention.source_reasons[0] ??
+      projection.abstention.reasons.find((item) => item !== "not_abstained");
+    return reason ? `Abstained: ${smartFlowReasonLabel(reason)}` : "Abstained by policy";
+  }
+
+  const penalty = projection.evidence.penalties[0];
+  if (penalty) {
+    return `Watch: ${penalty.reason}`;
+  }
+
+  const alternative = projection.alternatives[0];
+  if (alternative) {
+    return `Alternative considered: ${smartFlowHypothesisLabel(alternative.hypothesis_type)}`;
+  }
+
+  return "No active why-not guard";
+};
+
+export const smartFlowDirectionLabel = (
+  projection: Pick<SmartFlowExplainabilityProjection, "abstention" | "hypothesis">
+): "bullish" | "bearish" | "neutral" | "abstained" =>
+  projection.abstention.abstained
+    ? "abstained"
+    : normalizeDirection(projection.hypothesis.direction);
+
+export const smartFlowDirectionTone = (
+  projection: Pick<SmartFlowExplainabilityProjection, "abstention" | "hypothesis">
+): "bullish" | "bearish" | "neutral" =>
+  projection.abstention.abstained ? "neutral" : normalizeDirection(projection.hypothesis.direction);
 
 const buildClassifierDecor = (hit: ClassifierHitEvent): ClassifierDecor => ({
   hit,
@@ -3171,6 +3239,7 @@ type LiveSessionState = {
   equitiesHistory: EquityPrint[];
   equityJoinsHistory: EquityPrintJoin[];
   flowHistory: FlowPacket[];
+  smartFlowHistory: SmartFlowExplainabilityProjection[];
   smartMoneyHistory: SmartMoneyEvent[];
   classifierHitsHistory: ClassifierHitEvent[];
   alertsHistory: AlertEvent[];
@@ -3182,6 +3251,7 @@ type LiveSessionState = {
   equityQuotes: EquityQuote[];
   equityJoins: EquityPrintJoin[];
   flow: FlowPacket[];
+  smartFlow: SmartFlowExplainabilityProjection[];
   smartMoney: SmartMoneyEvent[];
   classifierHits: ClassifierHitEvent[];
   alerts: AlertEvent[];
@@ -3203,6 +3273,7 @@ const LIVE_HISTORY_ENDPOINTS: Partial<Record<LiveSubscription["channel"], string
   "equity-quotes": "/history/equity-quotes",
   "equity-joins": "/history/equity-joins",
   flow: "/history/flow",
+  "smart-flow": "/history/smart-flow",
   "smart-money": "/history/smart-money",
   "classifier-hits": "/history/classifier-hits",
   alerts: "/history/alerts",
@@ -3392,6 +3463,7 @@ export const getLiveManifest = (
     subscriptions.push({ channel: "alerts", snapshot_limit: LIVE_HOT_WINDOW });
   }
   if (features.smartMoney) {
+    subscriptions.push({ channel: "smart-flow", snapshot_limit: LIVE_HOT_WINDOW });
     subscriptions.push({ channel: "smart-money", snapshot_limit: LIVE_HOT_WINDOW });
   }
   if (features.classifierHits) {
@@ -3446,6 +3518,7 @@ const useLiveSession = (
   const [equityQuotes, setEquityQuotes] = useState<EquityQuote[]>([]);
   const [equityJoins, setEquityJoins] = useState<EquityPrintJoin[]>([]);
   const [flow, setFlow] = useState<FlowPacket[]>([]);
+  const [smartFlow, setSmartFlow] = useState<SmartFlowExplainabilityProjection[]>([]);
   const [smartMoney, setSmartMoney] = useState<SmartMoneyEvent[]>([]);
   const [classifierHits, setClassifierHits] = useState<ClassifierHitEvent[]>([]);
   const [alerts, setAlerts] = useState<AlertEvent[]>([]);
@@ -3456,6 +3529,7 @@ const useLiveSession = (
   const [equitiesHistory, setEquitiesHistory] = useState<EquityPrint[]>([]);
   const [equityJoinsHistory, setEquityJoinsHistory] = useState<EquityPrintJoin[]>([]);
   const [flowHistory, setFlowHistory] = useState<FlowPacket[]>([]);
+  const [smartFlowHistory, setSmartFlowHistory] = useState<SmartFlowExplainabilityProjection[]>([]);
   const [smartMoneyHistory, setSmartMoneyHistory] = useState<SmartMoneyEvent[]>([]);
   const [classifierHitsHistory, setClassifierHitsHistory] = useState<ClassifierHitEvent[]>([]);
   const [alertsHistory, setAlertsHistory] = useState<AlertEvent[]>([]);
@@ -3469,6 +3543,7 @@ const useLiveSession = (
   const equityQuotesRef = useRef<EquityQuote[]>([]);
   const equityJoinsRef = useRef<EquityPrintJoin[]>([]);
   const flowRef = useRef<FlowPacket[]>([]);
+  const smartFlowRef = useRef<SmartFlowExplainabilityProjection[]>([]);
   const smartMoneyRef = useRef<SmartMoneyEvent[]>([]);
   const classifierHitsRef = useRef<ClassifierHitEvent[]>([]);
   const alertsRef = useRef<AlertEvent[]>([]);
@@ -3481,6 +3556,7 @@ const useLiveSession = (
   const equitiesHistoryRef = useRef<EquityPrint[]>([]);
   const equityJoinsHistoryRef = useRef<EquityPrintJoin[]>([]);
   const flowHistoryRef = useRef<FlowPacket[]>([]);
+  const smartFlowHistoryRef = useRef<SmartFlowExplainabilityProjection[]>([]);
   const smartMoneyHistoryRef = useRef<SmartMoneyEvent[]>([]);
   const classifierHitsHistoryRef = useRef<ClassifierHitEvent[]>([]);
   const alertsHistoryRef = useRef<AlertEvent[]>([]);
@@ -3535,6 +3611,7 @@ const useLiveSession = (
       setEquityQuotes([]);
       setEquityJoins([]);
       setFlow([]);
+      setSmartFlow([]);
       setSmartMoney([]);
       setClassifierHits([]);
       setAlerts([]);
@@ -3545,6 +3622,7 @@ const useLiveSession = (
       setEquitiesHistory([]);
       setEquityJoinsHistory([]);
       setFlowHistory([]);
+      setSmartFlowHistory([]);
       setSmartMoneyHistory([]);
       setClassifierHitsHistory([]);
       setAlertsHistory([]);
@@ -3558,6 +3636,7 @@ const useLiveSession = (
       equityQuotesRef.current = [];
       equityJoinsRef.current = [];
       flowRef.current = [];
+      smartFlowRef.current = [];
       smartMoneyRef.current = [];
       classifierHitsRef.current = [];
       alertsRef.current = [];
@@ -3570,6 +3649,7 @@ const useLiveSession = (
       equitiesHistoryRef.current = [];
       equityJoinsHistoryRef.current = [];
       flowHistoryRef.current = [];
+      smartFlowHistoryRef.current = [];
       smartMoneyHistoryRef.current = [];
       classifierHitsHistoryRef.current = [];
       alertsHistoryRef.current = [];
@@ -3703,6 +3783,18 @@ const useLiveSession = (
             setter: setFlowHistory,
             ref: flowHistoryRef
           });
+          break;
+        case "smart-flow":
+          mergeItems(
+            setSmartFlow,
+            smartFlowRef,
+            items as SmartFlowExplainabilityProjection[],
+            LIVE_HOT_WINDOW,
+            {
+              setter: setSmartFlowHistory,
+              ref: smartFlowHistoryRef
+            }
+          );
           break;
         case "smart-money":
           mergeItems(setSmartMoney, smartMoneyRef, items as SmartMoneyEvent[], LIVE_HOT_WINDOW, {
@@ -4018,6 +4110,9 @@ const useLiveSession = (
           case "flow":
             mergeOlder(setFlowHistory, flowHistoryRef, flowRef.current);
             break;
+          case "smart-flow":
+            mergeOlder(setSmartFlowHistory, smartFlowHistoryRef, smartFlowRef.current);
+            break;
           case "smart-money":
             mergeOlder(setSmartMoneyHistory, smartMoneyHistoryRef, smartMoneyRef.current);
             break;
@@ -4072,6 +4167,7 @@ const useLiveSession = (
     equitiesHistory,
     equityJoinsHistory,
     flowHistory,
+    smartFlowHistory,
     smartMoneyHistory,
     classifierHitsHistory,
     alertsHistory,
@@ -4083,6 +4179,7 @@ const useLiveSession = (
     equityQuotes,
     equityJoins,
     flow,
+    smartFlow,
     smartMoney,
     classifierHits,
     alerts,
@@ -5000,6 +5097,33 @@ export const getAlertFlowPacketRefs = (alert: Pick<AlertEvent, "evidence_refs">)
   return alert.evidence_refs.filter((ref) => ref.startsWith("flowpacket:"));
 };
 
+export const getSmartFlowEvidenceRefs = (
+  projection: Pick<SmartFlowExplainabilityProjection, "refs" | "evidence" | "hypothesis">
+): string[] =>
+  uniqueNonEmpty([
+    ...projection.refs.evidence_refs,
+    ...projection.evidence.evidence_refs,
+    ...projection.hypothesis.evidence_refs
+  ]);
+
+export const isSmartFlowPacketRef = (ref: string): boolean => ref.startsWith("flowpacket:");
+
+export const getSmartFlowPacketRefs = (
+  projection: Pick<SmartFlowExplainabilityProjection, "refs" | "evidence" | "hypothesis">
+): string[] => getSmartFlowEvidenceRefs(projection).filter(isSmartFlowPacketRef);
+
+export const getSmartFlowOptionPrintRefs = (
+  projection: Pick<SmartFlowExplainabilityProjection, "refs" | "evidence" | "hypothesis">
+): string[] => getSmartFlowEvidenceRefs(projection).filter((ref) => !isSmartFlowPacketRef(ref));
+
+export const getSmartFlowPinnedFlowKeys = (
+  projection: Pick<SmartFlowExplainabilityProjection, "refs" | "evidence" | "hypothesis"> | null
+): string[] => (projection ? getSmartFlowPacketRefs(projection) : []);
+
+export const getSmartFlowPinnedOptionKeys = (
+  projection: Pick<SmartFlowExplainabilityProjection, "refs" | "evidence" | "hypothesis"> | null
+): string[] => (projection ? getSmartFlowOptionPrintRefs(projection) : []);
+
 export const resolveAlertFlowPacket = (
   alert: Pick<AlertEvent, "evidence_refs">,
   packets: Map<string, FlowPacket>
@@ -5398,6 +5522,229 @@ type SmartMoneyDrawerProps = {
   onClose: () => void;
 };
 
+type SmartFlowDrawerProps = {
+  projection: SmartFlowExplainabilityProjection;
+  evidence: EvidenceItem[];
+  onClose: () => void;
+};
+
+const SmartFlowDrawer = ({ projection, evidence, onClose }: SmartFlowDrawerProps) => {
+  const hypothesis = projection.hypothesis;
+  const confidence = hypothesis.scores.confidence;
+  const directionLabel = smartFlowDirectionLabel(projection);
+  const directionTone = smartFlowDirectionTone(projection);
+  const evidenceQuality = smartFlowEvidenceQualityLabel(projection.evidence.evidence_quality);
+  const evidenceRefs = getSmartFlowEvidenceRefs(projection);
+  const visibleEvidence = evidence.slice(0, 12);
+  const hiddenEvidenceCount = Math.max(0, evidence.length - visibleEvidence.length);
+  const sourceReasons =
+    projection.abstention.source_reasons.length > 0
+      ? projection.abstention.source_reasons
+      : projection.abstention.reasons
+          .filter((reason) => reason !== "not_abstained")
+          .map(smartFlowReasonLabel);
+
+  return (
+    <aside className="drawer">
+      <div className="drawer-header">
+        <div>
+          <p className="drawer-eyebrow">Smart-flow hypothesis</p>
+          <h3>{smartFlowHypothesisLabel(hypothesis.hypothesis_type)}</h3>
+          <p className="drawer-subtitle">
+            {hypothesis.underlying_id} / {formatDateTime(projection.source_ts)}
+          </p>
+        </div>
+        <button className="drawer-close" type="button" onClick={onClose}>
+          Close
+        </button>
+      </div>
+
+      <div className="drawer-meta">
+        <span className={`pill direction-${directionTone}`}>{directionLabel}</span>
+        <span className="drawer-chip">
+          Confidence {formatConfidence(confidence.policy_confidence)}
+        </span>
+        <span className="drawer-chip">Conviction {formatConfidence(confidence.conviction)}</span>
+        <span className="drawer-chip">
+          Evidence {evidenceQuality} {formatConfidence(projection.evidence.evidence_quality)}
+        </span>
+        {projection.abstention.abstained ? <span className="drawer-chip">Abstained</span> : null}
+      </div>
+
+      <div className="drawer-section">
+        <h4>Hypothesis read</h4>
+        <div className="drawer-row">
+          <div className="drawer-row-title">{projection.insight.label}</div>
+          <p className="drawer-note">{projection.insight.summary}</p>
+          {projection.compatibility?.compatibility_only ? (
+            <p className="drawer-note">Compatibility projection from the legacy feed.</p>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="drawer-section">
+        <h4>Confidence versus conviction</h4>
+        <div className="drawer-list">
+          <div className="drawer-row">
+            <div className="drawer-row-title">Policy confidence</div>
+            <div className="drawer-row-meta">
+              <span>{formatConfidence(confidence.policy_confidence)}</span>
+              <span>{projection.insight.confidence_band}</span>
+            </div>
+            <p className="drawer-note">How strongly the current policy supports this hypothesis.</p>
+          </div>
+          <div className="drawer-row">
+            <div className="drawer-row-title">Conviction</div>
+            <div className="drawer-row-meta">
+              <span>{formatConfidence(confidence.conviction)}</span>
+              <span>margin {formatConfidence(confidence.hypothesis_margin)}</span>
+            </div>
+            <p className="drawer-note">Separated from confidence so weak margin stays visible.</p>
+          </div>
+          <div className="drawer-row">
+            <div className="drawer-row-title">Evidence quality</div>
+            <div className="drawer-row-meta">
+              <span>{evidenceQuality}</span>
+              <span>{formatConfidence(confidence.evidence_quality)}</span>
+              <span>{confidence.calibration_version ?? "calibration unavailable"}</span>
+            </div>
+            <p className="drawer-note">
+              Evidence quality is an input, not a participant identity claim.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="drawer-section">
+        <h4>Why-not context</h4>
+        {sourceReasons.length > 0 ? (
+          <div className="drawer-list">
+            {sourceReasons.map((reason) => (
+              <div className="drawer-row" key={`reason-${reason}`}>
+                <div className="drawer-row-title">
+                  {projection.abstention.abstained ? "Abstention reason" : "Policy check"}
+                </div>
+                <p className="drawer-note">{smartFlowReasonLabel(reason)}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="drawer-empty">No abstention reason was reported.</p>
+        )}
+        {projection.evidence.penalties.length > 0 ? (
+          <div className="drawer-list">
+            {projection.evidence.penalties.map((penalty) => (
+              <div className="drawer-row" key={penalty.penalty_id}>
+                <div className="drawer-row-title">{smartFlowReasonLabel(penalty.kind)}</div>
+                <div className="drawer-row-meta">
+                  <span>Penalty {formatConfidence(penalty.score)}</span>
+                  <span>{penalty.evidence_refs.length} refs</span>
+                </div>
+                <p className="drawer-note">{penalty.reason}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="drawer-empty">No active score penalties.</p>
+        )}
+      </div>
+
+      <div className="drawer-section">
+        <h4>Alternatives considered</h4>
+        {projection.alternatives.length === 0 ? (
+          <p className="drawer-empty">No close alternative was reported by this projection.</p>
+        ) : (
+          <div className="drawer-list">
+            {projection.alternatives.map((alternative) => (
+              <div
+                className="drawer-row"
+                key={`${projection.refs.hypothesis_id}-${alternative.hypothesis_type}`}
+              >
+                <div className="drawer-row-title">
+                  {smartFlowHypothesisLabel(alternative.hypothesis_type)}
+                </div>
+                <div className="drawer-row-meta">
+                  <span className={`pill direction-${normalizeDirection(alternative.direction)}`}>
+                    {normalizeDirection(alternative.direction)}
+                  </span>
+                  <span>{formatConfidence(alternative.score)}</span>
+                </div>
+                {alternative.reasons[0] ? (
+                  <p className="drawer-note">{alternative.reasons[0]}</p>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="drawer-section">
+        <h4>Evidence refs</h4>
+        {visibleEvidence.length === 0 ? (
+          <p className="drawer-empty">No evidence refs attached.</p>
+        ) : (
+          <div className="drawer-list">
+            {visibleEvidence.map((item) => {
+              if (item.kind === "flow") {
+                return (
+                  <div className="drawer-row" key={item.id}>
+                    <div className="drawer-row-title">{item.id}</div>
+                    <div className="drawer-row-meta">
+                      <span>Flow packet</span>
+                      <span>{item.packet.members.length} prints</span>
+                    </div>
+                    <p className="drawer-note">
+                      {String(item.packet.features.option_contract_id ?? item.packet.id)}
+                    </p>
+                  </div>
+                );
+              }
+              if (item.kind === "print") {
+                return (
+                  <div className="drawer-row" key={item.id}>
+                    <div className="drawer-row-title">{item.id}</div>
+                    <div className="drawer-row-meta">
+                      <span>Option print</span>
+                      <span>${formatPrice(item.print.price)}</span>
+                      <span>{formatSize(item.print.size)}x</span>
+                    </div>
+                    <p className="drawer-note">{item.print.option_contract_id}</p>
+                  </div>
+                );
+              }
+              return (
+                <div className="drawer-row" key={item.id}>
+                  <div className="drawer-row-title">{item.id}</div>
+                  <p className="drawer-note">Not in the current evidence cache.</p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {hiddenEvidenceCount > 0 ? (
+          <p className="drawer-empty">+{hiddenEvidenceCount} more evidence refs.</p>
+        ) : null}
+      </div>
+
+      <div className="drawer-section">
+        <h4>Version trace</h4>
+        <div className="drawer-row">
+          <div className="drawer-row-title">{projection.refs.trace_id}</div>
+          <div className="drawer-row-meta">
+            <span>{projection.projection_version}</span>
+            <span>{projection.versions.policy}</span>
+            <span>{projection.versions.model}</span>
+          </div>
+          <p className="drawer-note">
+            Cluster {projection.refs.cluster_id} / {projection.refs.candidate_ids.length} candidates
+            / {evidenceRefs.length} refs
+          </p>
+        </div>
+      </div>
+    </aside>
+  );
+};
+
 const SmartMoneyDrawer = ({ event, flowPacket, evidence, onClose }: SmartMoneyDrawerProps) => {
   const primaryScore =
     event.profile_scores.find((score) => score.profile_id === event.primary_profile_id) ??
@@ -5410,7 +5757,7 @@ const SmartMoneyDrawer = ({ event, flowPacket, evidence, onClose }: SmartMoneyDr
     <aside className="drawer">
       <div className="drawer-header">
         <div>
-          <p className="drawer-eyebrow">Smart money profile</p>
+          <p className="drawer-eyebrow">Compatibility flow profile</p>
           <h3>{smartMoneyProfileLabel(event.primary_profile_id)}</h3>
           <p className="drawer-subtitle">{formatDateTime(event.source_ts)}</p>
         </div>
@@ -5422,13 +5769,13 @@ const SmartMoneyDrawer = ({ event, flowPacket, evidence, onClose }: SmartMoneyDr
       <div className="drawer-meta">
         <span className={`pill direction-${direction}`}>{direction}</span>
         <span className="drawer-chip">
-          Probability {primaryScore ? formatConfidence(primaryScore.probability) : "--"}
+          Legacy probability {primaryScore ? formatConfidence(primaryScore.probability) : "--"}
         </span>
         {event.abstained ? <span className="drawer-chip">Abstained</span> : null}
       </div>
 
       <div className="drawer-section">
-        <h4>Profile ladder</h4>
+        <h4>Compatibility ladder</h4>
         <div className="drawer-list">
           {event.profile_scores.slice(0, 6).map((score) => (
             <div className="drawer-row" key={`${event.event_id}-${score.profile_id}`}>
@@ -5645,6 +5992,8 @@ const useTerminalState = () => {
   const [selectedSmartMoneyEvent, setSelectedSmartMoneyEvent] = useState<SmartMoneyEvent | null>(
     null
   );
+  const [selectedSmartFlowProjection, setSelectedSmartFlowProjection] =
+    useState<SmartFlowExplainabilityProjection | null>(null);
   const [selectedInstrument, setSelectedInstrument] = useState<SelectedInstrument>(null);
   const [optionFocusSeed, setOptionFocusSeed] = useState<TapeFocusSeed<OptionPrint> | null>(null);
   const [equityFocusSeed, setEquityFocusSeed] = useState<TapeFocusSeed<EquityPrint> | null>(null);
@@ -5751,6 +6100,7 @@ const useTerminalState = () => {
       !selectedNewsStory &&
       !selectedClassifierHit &&
       !selectedDarkEvent &&
+      !selectedSmartFlowProjection &&
       !selectedSmartMoneyEvent
     ) {
       return;
@@ -5760,6 +6110,7 @@ const useTerminalState = () => {
       setSelectedAlert(null);
       setSelectedNewsStory(null);
       setSelectedClassifierHit(null);
+      setSelectedSmartFlowProjection(null);
       setSelectedSmartMoneyEvent(null);
       setSelectedDarkEvent(null);
     };
@@ -5789,6 +6140,7 @@ const useTerminalState = () => {
     selectedNewsStory,
     selectedClassifierHit,
     selectedDarkEvent,
+    selectedSmartFlowProjection,
     selectedSmartMoneyEvent
   ]);
 
@@ -5928,6 +6280,19 @@ const useTerminalState = () => {
     onNewItems: classifierScroll.onNewItems,
     getReplayKey: disableReplayGrouping
   });
+  const smartFlow = useTape<SmartFlowExplainabilityProjection>({
+    mode,
+    liveEnabled: false,
+    wsPath: "/ws/smart-flow",
+    replayPath: "/replay/smart-flow",
+    latestPath: "/flow/smart-flow",
+    expectedType: "smart-flow",
+    batchSize: mode === "replay" ? 120 : undefined,
+    pollMs: mode === "replay" ? 200 : undefined,
+    captureScroll: classifierAnchor.capture,
+    onNewItems: classifierScroll.onNewItems,
+    getReplayKey: disableReplayGrouping
+  });
   const smartMoney = useTape<SmartMoneyEvent>({
     mode,
     liveEnabled: false,
@@ -6058,6 +6423,14 @@ const useTerminalState = () => {
           liveSession.lastUpdate
         )
       : classifierHits;
+  const smartFlowFeed =
+    mode === "live"
+      ? toStaticTapeState(
+          liveSession.status,
+          composeTapeItems([], liveSession.smartFlow, liveSession.smartFlowHistory),
+          liveSession.lastUpdate
+        )
+      : smartFlow;
   const smartMoneyFeed =
     mode === "live"
       ? toStaticTapeState(
@@ -6097,7 +6470,7 @@ const useTerminalState = () => {
 
   useLayoutEffect(() => {
     classifierAnchor.apply();
-  }, [smartMoneyFeed.items, classifierHitsFeed.items, classifierAnchor.apply]);
+  }, [smartFlowFeed.items, smartMoneyFeed.items, classifierHitsFeed.items, classifierAnchor.apply]);
 
   useLayoutEffect(() => {
     newsAnchor.apply();
@@ -6373,6 +6746,7 @@ const useTerminalState = () => {
     }
     setSelectedDarkEvent(null);
     setSelectedClassifierHit(null);
+    setSelectedSmartFlowProjection(null);
     setSelectedSmartMoneyEvent(null);
   }, [mode]);
 
@@ -6670,6 +7044,98 @@ const useTerminalState = () => {
     resolvedOptionPrintMap,
     selectedClassifierHit,
     selectedClassifierPacketId
+  ]);
+
+  const selectedSmartFlowRefs = useMemo(
+    () =>
+      selectedSmartFlowProjection ? getSmartFlowEvidenceRefs(selectedSmartFlowProjection) : [],
+    [selectedSmartFlowProjection]
+  );
+  const selectedSmartFlowPacketRefs = useMemo(
+    () => (selectedSmartFlowProjection ? getSmartFlowPacketRefs(selectedSmartFlowProjection) : []),
+    [selectedSmartFlowProjection]
+  );
+  const selectedSmartFlowPrintRefs = useMemo(
+    () =>
+      selectedSmartFlowProjection ? getSmartFlowOptionPrintRefs(selectedSmartFlowProjection) : [],
+    [selectedSmartFlowProjection]
+  );
+  const selectedSmartFlowEvidence = useMemo((): EvidenceItem[] => {
+    return selectedSmartFlowRefs.map((id) => {
+      const packet = resolvedFlowPacketMap.get(id);
+      if (packet) {
+        return { kind: "flow", id, packet };
+      }
+      const print = resolvedOptionPrintMap.get(id);
+      if (print) {
+        return { kind: "print", id, print };
+      }
+      return { kind: "unknown", id };
+    });
+  }, [resolvedFlowPacketMap, resolvedOptionPrintMap, selectedSmartFlowRefs]);
+
+  useEffect(() => {
+    if (!selectedSmartFlowProjection || mode !== "live") {
+      return;
+    }
+
+    const abort = new AbortController();
+    const missingPacketIds = selectedSmartFlowPacketRefs.filter(
+      (id) => !resolvedFlowPacketMap.has(id)
+    );
+    if (missingPacketIds.length > 0) {
+      incrementRetentionMetric("pinnedFetchMisses", missingPacketIds.length);
+      void fetchFlowPacketsByIds(missingPacketIds, abort.signal)
+        .then((packets) => {
+          const next = new Map<string, FlowPacket>();
+          for (const packet of packets) {
+            next.set(packet.id, packet);
+          }
+          if (next.size > 0) {
+            setPinnedFlowPacketMap((prev) => upsertPinnedEntries(prev, next, Date.now()));
+          }
+        })
+        .catch((error) => {
+          if (abort.signal.aborted || isAbortLikeError(error)) {
+            return;
+          }
+          incrementRetentionMetric("pinnedFetchFailures", 1);
+          console.warn("Failed to fetch smart-flow flow packets", error);
+        });
+    }
+
+    const missingPrintIds = selectedSmartFlowPrintRefs.filter(
+      (id) => !resolvedOptionPrintMap.has(id)
+    );
+    if (missingPrintIds.length > 0) {
+      incrementRetentionMetric("pinnedFetchMisses", missingPrintIds.length);
+      void fetchOptionPrintsByTraceIds(missingPrintIds, abort.signal)
+        .then((prints) => {
+          const next = new Map<string, OptionPrint>();
+          for (const item of prints) {
+            next.set(item.trace_id, item);
+          }
+          if (next.size > 0) {
+            setPinnedOptionPrintMap((prev) => upsertPinnedEntries(prev, next, Date.now()));
+          }
+        })
+        .catch((error) => {
+          if (abort.signal.aborted || isAbortLikeError(error)) {
+            return;
+          }
+          incrementRetentionMetric("pinnedFetchFailures", 1);
+          console.warn("Failed to fetch smart-flow option prints", error);
+        });
+    }
+
+    return () => abort.abort();
+  }, [
+    mode,
+    resolvedFlowPacketMap,
+    resolvedOptionPrintMap,
+    selectedSmartFlowPacketRefs,
+    selectedSmartFlowPrintRefs,
+    selectedSmartFlowProjection
   ]);
 
   const selectedSmartMoneyFlowPacket = useMemo(() => {
@@ -7129,13 +7595,22 @@ const useTerminalState = () => {
     for (const packetId of selectedSmartMoneyEvent?.packet_ids ?? []) {
       keys.add(packetId);
     }
+    for (const packetId of getSmartFlowPinnedFlowKeys(selectedSmartFlowProjection)) {
+      keys.add(packetId);
+    }
     for (const alert of visibleAlerts) {
       for (const packetId of getAlertFlowPacketRefs(alert)) {
         keys.add(packetId);
       }
     }
     return keys;
-  }, [selectedAlert, selectedClassifierPacketId, selectedSmartMoneyEvent, visibleAlerts]);
+  }, [
+    selectedAlert,
+    selectedClassifierPacketId,
+    selectedSmartFlowProjection,
+    selectedSmartMoneyEvent,
+    visibleAlerts
+  ]);
 
   const activePinnedOptionKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -7152,6 +7627,9 @@ const useTerminalState = () => {
     for (const id of selectedSmartMoneyEvent?.member_print_ids ?? []) {
       keys.add(id);
     }
+    for (const id of getSmartFlowPinnedOptionKeys(selectedSmartFlowProjection)) {
+      keys.add(id);
+    }
     for (const id of visibleAlertEvidenceRefs) {
       keys.add(id);
     }
@@ -7159,6 +7637,7 @@ const useTerminalState = () => {
   }, [
     selectedAlert,
     selectedClassifierFlowPacket,
+    selectedSmartFlowProjection,
     selectedSmartMoneyEvent,
     visibleAlertEvidenceRefs
   ]);
@@ -7221,6 +7700,18 @@ const useTerminalState = () => {
     tickerSet,
     routeFeatures.classifierHits
   ]);
+
+  const filteredSmartFlowProjections = useMemo(() => {
+    if (!routeFeatures.smartMoney) {
+      return EMPTY_SMART_FLOW_EXPLAINABILITY;
+    }
+    if (tickerSet.size === 0) {
+      return smartFlowFeed.items;
+    }
+    return smartFlowFeed.items.filter((projection) =>
+      matchesTicker(projection.hypothesis.underlying_id)
+    );
+  }, [matchesTicker, smartFlowFeed.items, tickerSet, routeFeatures.smartMoney]);
 
   const filteredSmartMoneyEvents = useMemo(() => {
     if (!routeFeatures.smartMoney) {
@@ -7295,6 +7786,7 @@ const useTerminalState = () => {
         setSelectedNewsStory(null);
         setSelectedClassifierHit(null);
         setSelectedDarkEvent(null);
+        setSelectedSmartFlowProjection(null);
         setSelectedSmartMoneyEvent(null);
         setSelectedAlert(alert);
         return;
@@ -7303,10 +7795,23 @@ const useTerminalState = () => {
       setSelectedNewsStory(null);
       setSelectedAlert(null);
       setSelectedDarkEvent(null);
+      setSelectedSmartFlowProjection(null);
       setSelectedSmartMoneyEvent(null);
       setSelectedClassifierHit(hit);
     },
     [findAlertForClassifierHit]
+  );
+
+  const openFromSmartFlowProjection = useCallback(
+    (projection: SmartFlowExplainabilityProjection) => {
+      setSelectedNewsStory(null);
+      setSelectedAlert(null);
+      setSelectedClassifierHit(null);
+      setSelectedDarkEvent(null);
+      setSelectedSmartMoneyEvent(null);
+      setSelectedSmartFlowProjection(projection);
+    },
+    []
   );
 
   const openFromSmartMoneyEvent = useCallback((event: SmartMoneyEvent) => {
@@ -7314,6 +7819,7 @@ const useTerminalState = () => {
     setSelectedAlert(null);
     setSelectedClassifierHit(null);
     setSelectedDarkEvent(null);
+    setSelectedSmartFlowProjection(null);
     setSelectedSmartMoneyEvent(event);
   }, []);
 
@@ -7328,6 +7834,7 @@ const useTerminalState = () => {
     setSelectedNewsStory(null);
     setSelectedAlert(null);
     setSelectedClassifierHit(null);
+    setSelectedSmartFlowProjection(null);
     setSelectedSmartMoneyEvent(null);
     setSelectedDarkEvent(event);
   }, []);
@@ -7358,6 +7865,7 @@ const useTerminalState = () => {
       routeFeatures.showChartPane ||
       routeFeatures.showFocusPane
     ) {
+      updates.push(smartFlowFeed.lastUpdate);
       updates.push(smartMoneyFeed.lastUpdate);
     }
     if (routeFeatures.classifierHits || routeFeatures.showClassifierPane) {
@@ -7391,6 +7899,7 @@ const useTerminalState = () => {
     newsFeed.lastUpdate,
     alertsFeed.lastUpdate,
     smartMoneyFeed.lastUpdate,
+    smartFlowFeed.lastUpdate,
     classifierHitsFeed.lastUpdate
   ]);
 
@@ -7407,6 +7916,8 @@ const useTerminalState = () => {
     setSelectedDarkEvent,
     selectedClassifierHit,
     setSelectedClassifierHit,
+    selectedSmartFlowProjection,
+    setSelectedSmartFlowProjection,
     selectedSmartMoneyEvent,
     setSelectedSmartMoneyEvent,
     selectedInstrument,
@@ -7433,6 +7944,7 @@ const useTerminalState = () => {
     news: newsFeed,
     flow: flowFeed,
     alerts: alertsFeed,
+    smartFlow: smartFlowFeed,
     smartMoney: smartMoneyFeed,
     classifierHits: classifierHitsFeed,
     liveSession,
@@ -7456,6 +7968,7 @@ const useTerminalState = () => {
     selectedClassifierPacketId,
     selectedClassifierFlowPacket,
     selectedClassifierEvidence,
+    selectedSmartFlowEvidence,
     selectedSmartMoneyFlowPacket,
     selectedSmartMoneyEvidence,
     filteredOptions,
@@ -7467,12 +7980,14 @@ const useTerminalState = () => {
     filteredNews,
     filteredFlow,
     filteredAlerts,
+    filteredSmartFlowProjections,
     filteredSmartMoneyEvents,
     filteredClassifierHits,
     chartSmartMoneyEvents,
     chartInferredDark,
     focusOptionContract,
     focusEquityTicker,
+    openFromSmartFlowProjection,
     openFromSmartMoneyEvent,
     openFromClassifierHit,
     handleSmartMoneyMarkerClick,
@@ -8423,6 +8938,7 @@ const AlertsPane = memo(({ state, limit, withStrip = false, className }: AlertsP
                           state.setSelectedNewsStory(null);
                           state.setSelectedDarkEvent(null);
                           state.setSelectedClassifierHit(null);
+                          state.setSelectedSmartFlowProjection(null);
                           state.setSelectedSmartMoneyEvent(null);
                           state.setSelectedAlert(alert);
                         }}
@@ -8483,6 +8999,7 @@ const openNewsStory = (state: TerminalState, story: NewsStory): void => {
   state.setSelectedNewsStory(null);
   state.setSelectedAlert(null);
   state.setSelectedClassifierHit(null);
+  state.setSelectedSmartFlowProjection(null);
   state.setSelectedSmartMoneyEvent(null);
   state.setSelectedDarkEvent(null);
   state.setSelectedNewsStory(story);
@@ -8624,17 +9141,27 @@ type ClassifierPaneProps = {
 };
 
 const ClassifierPane = memo(({ state, limit, className }: ClassifierPaneProps) => {
-  const smartMoneyItems = limit
-    ? state.filteredSmartMoneyEvents.slice(0, limit)
-    : state.filteredSmartMoneyEvents;
+  const smartFlowItems = limit
+    ? state.filteredSmartFlowProjections.slice(0, limit)
+    : state.filteredSmartFlowProjections;
+  const legacySmartMoneyItems =
+    smartFlowItems.length === 0
+      ? limit
+        ? state.filteredSmartMoneyEvents.slice(0, limit)
+        : state.filteredSmartMoneyEvents
+      : [];
   const legacyItems =
-    smartMoneyItems.length === 0
+    smartFlowItems.length === 0 && legacySmartMoneyItems.length === 0
       ? limit
         ? state.filteredClassifierHits.slice(0, limit)
         : state.filteredClassifierHits
       : [];
-  const items: Array<SmartMoneyEvent | ClassifierHitEvent> =
-    smartMoneyItems.length > 0 ? smartMoneyItems : legacyItems;
+  const items: Array<SmartFlowExplainabilityProjection | SmartMoneyEvent | ClassifierHitEvent> =
+    smartFlowItems.length > 0
+      ? smartFlowItems
+      : legacySmartMoneyItems.length > 0
+        ? legacySmartMoneyItems
+        : legacyItems;
   const virtual = useTapeVirtualList(
     items,
     state.classifierScroll.listRef,
@@ -8645,32 +9172,46 @@ const ClassifierPane = memo(({ state, limit, className }: ClassifierPaneProps) =
     items.length,
     virtual.virtualItems.at(-1)?.index ?? -1,
     () => {
+      void state.liveSession.loadOlder("smart-flow");
       void state.liveSession.loadOlder("smart-money");
       void state.liveSession.loadOlder("classifier-hits");
     }
   );
-  const showingSmartMoney = smartMoneyItems.length > 0;
+  const showingSmartFlow = smartFlowItems.length > 0;
+  const showingSmartMoney = !showingSmartFlow && legacySmartMoneyItems.length > 0;
 
   return (
     <Pane
       className={className}
-      title="Rules"
+      title="Flow Hypotheses"
       status={
         <TapeStatus
-          status={state.smartMoney.status}
-          lastUpdate={state.smartMoney.lastUpdate ?? state.classifierHits.lastUpdate}
-          replayTime={state.smartMoney.replayTime ?? state.classifierHits.replayTime}
-          replayComplete={state.smartMoney.replayComplete || state.classifierHits.replayComplete}
-          paused={state.smartMoney.paused}
-          dropped={state.smartMoney.dropped}
+          status={state.smartFlow.status}
+          lastUpdate={
+            state.smartFlow.lastUpdate ??
+            state.smartMoney.lastUpdate ??
+            state.classifierHits.lastUpdate
+          }
+          replayTime={
+            state.smartFlow.replayTime ??
+            state.smartMoney.replayTime ??
+            state.classifierHits.replayTime
+          }
+          replayComplete={
+            state.smartFlow.replayComplete ||
+            state.smartMoney.replayComplete ||
+            state.classifierHits.replayComplete
+          }
+          paused={state.smartFlow.paused}
+          dropped={state.smartFlow.dropped}
           mode={state.mode}
         />
       }
       actions={
         <TapeControls
           mode={state.mode}
-          paused={state.smartMoney.paused}
-          onTogglePause={state.smartMoney.togglePause}
+          paused={state.smartFlow.paused}
+          onTogglePause={state.smartFlow.togglePause}
           isAtTop={state.classifierScroll.isAtTop}
           missed={state.classifierScroll.missed}
           onJump={state.classifierScroll.jumpToTop}
@@ -8681,38 +9222,54 @@ const ClassifierPane = memo(({ state, limit, className }: ClassifierPaneProps) =
         {items.length === 0 ? (
           <div className="empty">
             {state.tickerSet.size > 0
-              ? "No classifier hits match the current filter."
+              ? "No smart-flow hypotheses match the current filter."
               : state.mode === "live"
-                ? "No smart-money profiles yet. Start compute."
+                ? "No smart-flow hypotheses yet. Start compute."
                 : "Replay queue empty. Ensure ClickHouse has data."}
           </div>
         ) : (
           <div className="data-table-wrap">
             <div
-              className="data-table data-table-classifier"
+              className={`data-table ${
+                showingSmartFlow ? "data-table-smart-flow" : "data-table-classifier"
+              }`}
               role="table"
-              aria-label="Smart money profiles"
+              aria-label={showingSmartFlow ? "Smart-flow hypotheses" : "Compatibility classifiers"}
             >
-              <div className="data-table-head" role="row">
-                <span className="data-table-cell">TIME</span>
-                <span className="data-table-cell">PROFILE</span>
-                <span className="data-table-cell">DIR</span>
-                <span className="data-table-cell">PROB</span>
-                <span className="data-table-cell">NOTE</span>
-              </div>
+              {showingSmartFlow ? (
+                <div className="data-table-head" role="row">
+                  <span className="data-table-cell">TIME</span>
+                  <span className="data-table-cell">HYPOTHESIS</span>
+                  <span className="data-table-cell">DIR</span>
+                  <span className="data-table-cell">CONF</span>
+                  <span className="data-table-cell">CONV</span>
+                  <span className="data-table-cell">EVIDENCE</span>
+                  <span className="data-table-cell">WHY-NOT</span>
+                </div>
+              ) : (
+                <div className="data-table-head" role="row">
+                  <span className="data-table-cell">TIME</span>
+                  <span className="data-table-cell">PROFILE</span>
+                  <span className="data-table-cell">DIR</span>
+                  <span className="data-table-cell">PROB</span>
+                  <span className="data-table-cell">NOTE</span>
+                </div>
+              )}
               <div className="data-table-scroll" ref={state.classifierScroll.setListRef}>
                 <div className="data-table-body" style={{ height: `${virtual.totalSize}px` }}>
-                  {showingSmartMoney
+                  {showingSmartFlow
                     ? virtual.virtualItems.map(({ item, key, index, start, size }) => {
-                        const event = item as SmartMoneyEvent;
-                        const primaryScore =
-                          event.profile_scores.find(
-                            (score) => score.profile_id === event.primary_profile_id
-                          ) ?? event.profile_scores[0];
-                        const direction = normalizeDirection(event.primary_direction);
+                        const projection = item as SmartFlowExplainabilityProjection;
+                        const hypothesis = projection.hypothesis;
+                        const scores = hypothesis.scores.confidence;
+                        const direction = smartFlowDirectionLabel(projection);
+                        const rowDirection = smartFlowDirectionTone(projection);
+                        const evidenceQuality = smartFlowEvidenceQualityLabel(
+                          projection.evidence.evidence_quality
+                        );
                         return (
                           <button
-                            className={`data-table-row data-table-row-button data-table-row-classifier data-table-virtual-row${index % 2 === 1 ? " is-even" : ""} data-table-row-direction-${direction}`}
+                            className={`data-table-row data-table-row-button data-table-row-classifier data-table-virtual-row${index % 2 === 1 ? " is-even" : ""} data-table-row-direction-${rowDirection}`}
                             key={key}
                             type="button"
                             data-index={index}
@@ -8720,57 +9277,102 @@ const ClassifierPane = memo(({ state, limit, className }: ClassifierPaneProps) =
                             data-row-size={String(size)}
                             data-tape-key={key}
                             style={{ transform: `translateY(${start}px)` }}
-                            onClick={() => state.openFromSmartMoneyEvent(event)}
+                            onClick={() => state.openFromSmartFlowProjection(projection)}
                           >
                             <span className="data-table-cell data-table-cell-number">
-                              {formatTime(event.source_ts)}
+                              {formatTime(projection.source_ts)}
                             </span>
                             <span className="data-table-cell">
-                              {smartMoneyProfileLabel(event.primary_profile_id)}
+                              {smartFlowHypothesisLabel(hypothesis.hypothesis_type)}
                             </span>
                             <span className="data-table-cell">{direction}</span>
                             <span className="data-table-cell data-table-cell-number">
-                              {primaryScore ? formatConfidence(primaryScore.probability) : "--"}
+                              {formatConfidence(scores.policy_confidence)}
+                            </span>
+                            <span className="data-table-cell data-table-cell-number">
+                              {formatConfidence(scores.conviction)}
                             </span>
                             <span className="data-table-cell">
-                              {event.abstained
-                                ? (event.suppressed_reasons[0] ?? "abstained")
-                                : (primaryScore?.reasons[0] ??
-                                  primaryScore?.confidence_band ??
-                                  "--")}
+                              {evidenceQuality} /{" "}
+                              {formatConfidence(projection.evidence.evidence_quality)}
+                            </span>
+                            <span className="data-table-cell">
+                              {smartFlowWhyNotLabel(projection)}
                             </span>
                           </button>
                         );
                       })
-                    : virtual.virtualItems.map(({ item, key, index, start, size }) => {
-                        const hit = item as ClassifierHitEvent;
-                        const direction = normalizeDirection(hit.direction);
-                        return (
-                          <button
-                            className={`data-table-row data-table-row-button data-table-row-classifier data-table-virtual-row${index % 2 === 1 ? " is-even" : ""} data-table-row-direction-${direction}`}
-                            key={key}
-                            type="button"
-                            data-index={index}
-                            data-row-start={String(start)}
-                            data-row-size={String(size)}
-                            data-tape-key={key}
-                            style={{ transform: `translateY(${start}px)` }}
-                            onClick={() => state.openFromClassifierHit(hit)}
-                          >
-                            <span className="data-table-cell data-table-cell-number">
-                              {formatTime(hit.source_ts)}
-                            </span>
-                            <span className="data-table-cell">
-                              {humanizeClassifierId(hit.classifier_id)}
-                            </span>
-                            <span className="data-table-cell">{direction}</span>
-                            <span className="data-table-cell data-table-cell-number">
-                              {formatConfidence(hit.confidence)}
-                            </span>
-                            <span className="data-table-cell">{hit.explanations?.[0] ?? "--"}</span>
-                          </button>
-                        );
-                      })}
+                    : showingSmartMoney
+                      ? virtual.virtualItems.map(({ item, key, index, start, size }) => {
+                          const event = item as SmartMoneyEvent;
+                          const primaryScore =
+                            event.profile_scores.find(
+                              (score) => score.profile_id === event.primary_profile_id
+                            ) ?? event.profile_scores[0];
+                          const direction = normalizeDirection(event.primary_direction);
+                          return (
+                            <button
+                              className={`data-table-row data-table-row-button data-table-row-classifier data-table-virtual-row${index % 2 === 1 ? " is-even" : ""} data-table-row-direction-${direction}`}
+                              key={key}
+                              type="button"
+                              data-index={index}
+                              data-row-start={String(start)}
+                              data-row-size={String(size)}
+                              data-tape-key={key}
+                              style={{ transform: `translateY(${start}px)` }}
+                              onClick={() => state.openFromSmartMoneyEvent(event)}
+                            >
+                              <span className="data-table-cell data-table-cell-number">
+                                {formatTime(event.source_ts)}
+                              </span>
+                              <span className="data-table-cell">
+                                {smartMoneyProfileLabel(event.primary_profile_id)}
+                              </span>
+                              <span className="data-table-cell">{direction}</span>
+                              <span className="data-table-cell data-table-cell-number">
+                                {primaryScore ? formatConfidence(primaryScore.probability) : "--"}
+                              </span>
+                              <span className="data-table-cell">
+                                {event.abstained
+                                  ? (event.suppressed_reasons[0] ?? "abstained")
+                                  : (primaryScore?.reasons[0] ??
+                                    primaryScore?.confidence_band ??
+                                    "--")}
+                              </span>
+                            </button>
+                          );
+                        })
+                      : virtual.virtualItems.map(({ item, key, index, start, size }) => {
+                          const hit = item as ClassifierHitEvent;
+                          const direction = normalizeDirection(hit.direction);
+                          return (
+                            <button
+                              className={`data-table-row data-table-row-button data-table-row-classifier data-table-virtual-row${index % 2 === 1 ? " is-even" : ""} data-table-row-direction-${direction}`}
+                              key={key}
+                              type="button"
+                              data-index={index}
+                              data-row-start={String(start)}
+                              data-row-size={String(size)}
+                              data-tape-key={key}
+                              style={{ transform: `translateY(${start}px)` }}
+                              onClick={() => state.openFromClassifierHit(hit)}
+                            >
+                              <span className="data-table-cell data-table-cell-number">
+                                {formatTime(hit.source_ts)}
+                              </span>
+                              <span className="data-table-cell">
+                                {humanizeClassifierId(hit.classifier_id)}
+                              </span>
+                              <span className="data-table-cell">{direction}</span>
+                              <span className="data-table-cell data-table-cell-number">
+                                {formatConfidence(hit.confidence)}
+                              </span>
+                              <span className="data-table-cell">
+                                {hit.explanations?.[0] ?? "--"}
+                              </span>
+                            </button>
+                          );
+                        })}
                 </div>
               </div>
             </div>
@@ -8863,6 +9465,7 @@ const DarkPane = memo(({ state, limit, className }: DarkPaneProps) => {
                           state.setSelectedNewsStory(null);
                           state.setSelectedAlert(null);
                           state.setSelectedClassifierHit(null);
+                          state.setSelectedSmartFlowProjection(null);
                           state.setSelectedSmartMoneyEvent(null);
                           state.setSelectedDarkEvent(event);
                         }}
@@ -8964,8 +9567,13 @@ const buildCommandDeckTickers = (state: TerminalState): CommandDeckTicker[] => {
       symbols.add(symbol);
     }
   }
-  for (const event of state.filteredSmartMoneyEvents.slice(0, 30)) {
-    symbols.add(event.underlying_id.toUpperCase());
+  for (const projection of state.filteredSmartFlowProjections.slice(0, 30)) {
+    symbols.add(projection.hypothesis.underlying_id.toUpperCase());
+  }
+  if (state.filteredSmartFlowProjections.length === 0) {
+    for (const event of state.filteredSmartMoneyEvents.slice(0, 30)) {
+      symbols.add(event.underlying_id.toUpperCase());
+    }
   }
   for (const story of state.filteredNews.slice(0, 20)) {
     for (const symbol of story.resolved_symbols) {
@@ -9047,29 +9655,52 @@ const inferCommandSymbolFromTrace = (traceId: string): string | null => {
 const buildCommandPriorityRows = (state: TerminalState): CommandPriorityRow[] => {
   const rows: CommandPriorityRow[] = [];
 
-  for (const event of state.filteredSmartMoneyEvents.slice(0, 8)) {
-    const primaryScore =
-      event.profile_scores.find((score) => score.profile_id === event.primary_profile_id) ??
-      event.profile_scores[0];
-    const read =
-      primaryScore?.reasons[0] ??
-      (event.primary_profile_id
-        ? smartMoneyProfileLabel(event.primary_profile_id)
-        : event.event_kind);
+  for (const projection of state.filteredSmartFlowProjections.slice(0, 8)) {
+    const hypothesis = projection.hypothesis;
+    const confidence = hypothesis.scores.confidence;
+    const evidenceRefs = getSmartFlowEvidenceRefs(projection);
     rows.push({
-      key: `smart-${event.event_id}-${event.seq}`,
-      ts: event.source_ts,
-      symbol: event.underlying_id.toUpperCase(),
-      packet: event.packet_ids[0] ?? event.event_id,
-      read,
-      score: clampCommandScore((primaryScore?.probability ?? 0) * 100),
-      invalidation:
-        event.packet_ids.length > 0
-          ? `${event.packet_ids.length} packet${event.packet_ids.length === 1 ? "" : "s"}`
-          : `${formatFlowMetric(event.features.print_count)} prints`,
-      state: event.abstained ? "hold" : commandStateFromDirection(event.primary_direction),
-      onOpen: () => state.openFromSmartMoneyEvent(event)
+      key: `smart-flow-${projection.refs.hypothesis_id}-${projection.seq}`,
+      ts: projection.source_ts,
+      symbol: hypothesis.underlying_id.toUpperCase(),
+      packet: projection.refs.cluster_id,
+      read: smartFlowHypothesisLabel(hypothesis.hypothesis_type),
+      score: clampCommandScore(confidence.policy_confidence * 100),
+      invalidation: projection.abstention.abstained
+        ? smartFlowWhyNotLabel(projection)
+        : `${evidenceRefs.length} refs / ${smartFlowEvidenceQualityLabel(projection.evidence.evidence_quality)}`,
+      state: projection.abstention.abstained
+        ? "hold"
+        : commandStateFromDirection(hypothesis.direction),
+      onOpen: () => state.openFromSmartFlowProjection(projection)
     });
+  }
+
+  if (state.filteredSmartFlowProjections.length === 0) {
+    for (const event of state.filteredSmartMoneyEvents.slice(0, 8)) {
+      const primaryScore =
+        event.profile_scores.find((score) => score.profile_id === event.primary_profile_id) ??
+        event.profile_scores[0];
+      const read =
+        primaryScore?.reasons[0] ??
+        (event.primary_profile_id
+          ? smartMoneyProfileLabel(event.primary_profile_id)
+          : event.event_kind);
+      rows.push({
+        key: `smart-${event.event_id}-${event.seq}`,
+        ts: event.source_ts,
+        symbol: event.underlying_id.toUpperCase(),
+        packet: event.packet_ids[0] ?? event.event_id,
+        read,
+        score: clampCommandScore((primaryScore?.probability ?? 0) * 100),
+        invalidation:
+          event.packet_ids.length > 0
+            ? `${event.packet_ids.length} packet${event.packet_ids.length === 1 ? "" : "s"}`
+            : `${formatFlowMetric(event.features.print_count)} prints`,
+        state: event.abstained ? "hold" : commandStateFromDirection(event.primary_direction),
+        onOpen: () => state.openFromSmartMoneyEvent(event)
+      });
+    }
   }
 
   for (const alert of state.filteredAlerts.slice(0, 8)) {
@@ -9094,6 +9725,7 @@ const buildCommandPriorityRows = (state: TerminalState): CommandPriorityRow[] =>
         state.setSelectedNewsStory(null);
         state.setSelectedDarkEvent(null);
         state.setSelectedClassifierHit(null);
+        state.setSelectedSmartFlowProjection(null);
         state.setSelectedSmartMoneyEvent(null);
         state.setSelectedAlert(alert);
       }
@@ -9139,7 +9771,9 @@ const buildCommandPriorityRows = (state: TerminalState): CommandPriorityRow[] =>
 
 const CommandMetricsStrip = ({ state }: { state: TerminalState }) => {
   const priorityCount =
-    state.filteredSmartMoneyEvents.length + state.filteredAlerts.length + state.filteredFlow.length;
+    state.filteredSmartFlowProjections.length +
+    state.filteredAlerts.length +
+    state.filteredFlow.length;
   const focus = state.activeTickers.length > 0 ? state.activeTickers.join(", ") : "All symbols";
   const decision =
     state.selectedInstrument?.kind === "option-contract"
@@ -9415,15 +10049,18 @@ const EventContextPane = ({ state }: { state: TerminalState }) => {
       label: "Alert",
       title: alert.hits[0] ? humanizeClassifierId(alert.hits[0].classifier_id) : "Classifier alert",
       detail: alert.hits[0]?.explanations?.[0] ?? `${alert.hits.length} linked hits`,
-      action: () => state.setSelectedAlert(alert)
+      action: () => {
+        state.setSelectedSmartFlowProjection(null);
+        state.setSelectedAlert(alert);
+      }
     })),
-    ...state.filteredSmartMoneyEvents.slice(0, 3).map((event) => ({
-      key: `smart-${event.event_id}-${event.seq}`,
-      ts: event.source_ts,
-      label: "Smart",
-      title: smartMoneyProfileLabel(event.primary_profile_id),
-      detail: `${event.underlying_id} ${normalizeDirection(event.primary_direction)} / ${event.packet_ids.length} packets`,
-      action: () => state.openFromSmartMoneyEvent(event)
+    ...state.filteredSmartFlowProjections.slice(0, 3).map((projection) => ({
+      key: `smart-flow-${projection.refs.hypothesis_id}-${projection.seq}`,
+      ts: projection.source_ts,
+      label: "Hypothesis",
+      title: smartFlowHypothesisLabel(projection.hypothesis.hypothesis_type),
+      detail: `${projection.hypothesis.underlying_id} ${normalizeDirection(projection.hypothesis.direction)} / ${formatConfidence(projection.hypothesis.scores.confidence.policy_confidence)} confidence`,
+      action: () => state.openFromSmartFlowProjection(projection)
     })),
     ...state.filteredInferredDark.slice(0, 3).map((event) => ({
       key: `dark-${event.trace_id}-${event.seq}`,
@@ -9431,7 +10068,10 @@ const EventContextPane = ({ state }: { state: TerminalState }) => {
       label: "Dark",
       title: humanizeClassifierId(event.type),
       detail: `${event.evidence_refs.length} evidence refs / confidence ${formatConfidence(event.confidence)}`,
-      action: () => state.setSelectedDarkEvent(event)
+      action: () => {
+        state.setSelectedSmartFlowProjection(null);
+        state.setSelectedDarkEvent(event);
+      }
     })),
     ...state.filteredNews.slice(0, 2).map((story) => ({
       key: `news-${story.trace_id}-${story.seq}`,
@@ -9439,7 +10079,7 @@ const EventContextPane = ({ state }: { state: TerminalState }) => {
       label: "News",
       title: decodeNewsText(story.headline),
       detail: story.resolved_symbols.length > 0 ? story.resolved_symbols.join(", ") : story.source,
-      action: () => state.setSelectedNewsStory(story)
+      action: () => openNewsStory(state, story)
     }))
   ]
     .sort((a, b) => b.ts - a.ts)
@@ -9563,9 +10203,9 @@ const FocusPane = memo(({ state }: { state: TerminalState }) => {
           <div className="focus-value">{state.chartTicker}</div>
         </div>
         <div className="focus-block">
-          <div className="focus-label">Rules</div>
+          <div className="focus-label">Flow markers</div>
           {hits.length === 0 ? (
-            <div className="empty">No rule hits for {state.chartTicker}.</div>
+            <div className="empty">No flow markers for {state.chartTicker}.</div>
           ) : (
             <div className="list terminal-list terminal-list-compact">
               {hits.map((hit) => (
@@ -10289,6 +10929,14 @@ function TerminalChrome({ children }: { children: ReactNode }) {
             flowPacket={state.selectedClassifierFlowPacket}
             evidence={state.selectedClassifierEvidence}
             onClose={() => state.setSelectedClassifierHit(null)}
+          />
+        ) : null}
+
+        {state.selectedSmartFlowProjection ? (
+          <SmartFlowDrawer
+            projection={state.selectedSmartFlowProjection}
+            evidence={state.selectedSmartFlowEvidence}
+            onClose={() => state.setSelectedSmartFlowProjection(null)}
           />
         ) : null}
 
