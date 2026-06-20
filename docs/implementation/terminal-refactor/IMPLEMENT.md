@@ -4,6 +4,8 @@ This directory is the active implementation guide for the staged `apps/web/app/t
 
 Start with the full plan: [`00-roadmap.md`](./00-roadmap.md).
 
+Readable status board: [`IMPLEMENT.html`](./IMPLEMENT.html).
+
 ## Beads Workflow
 
 Use Beads as the source of truth for execution order.
