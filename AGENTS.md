@@ -140,9 +140,56 @@ For this repository, the repo-specific requirements are:
 
 - Save repository implementation turn documents in `docs/turns/`.
 - Use the `impeccable` skill to structure and style repository implementation turn documents when available.
-- Render "Relevant Diff Snippets" with `@pierre/diffs/ssr`; use https://diffs.com/docs as the SSR reference.
 - For minor updates to a previous change, update the existing turn document instead of creating a new one.
 - The minor/trivial exemptions below override the general documentation requirement for this repository.
+
+### Repository Diff Rendering
+
+Render **Relevant Diff Snippets** with the default browser-side `@pierre/diffs`
+package, following https://diffs.com/docs. Do not use `@pierre/diffs/ssr`,
+`preloadFileDiff`, `preloadPatchDiff`, `preloadMultiFileDiff`,
+`preloadPatchFile`, or any other SSR/preload export path for turn documents.
+
+If the package must be added, use the current project's package manager:
+
+```bash
+npm install @pierre/diffs
+bun add @pierre/diffs
+pnpm add @pierre/diffs
+yarn add @pierre/diffs
+```
+
+This repo is Bun-first, so use `bun add @pierre/diffs` here when installation
+is actually needed.
+
+Use the Diffs renderer that matches the diff source:
+
+```ts
+import { PatchDiff } from '@pierre/diffs/react';
+```
+
+Use `PatchDiff` for unified diff or patch strings from `git diff`, `git show`,
+GitHub, or Forgejo.
+
+```ts
+import { MultiFileDiff } from '@pierre/diffs/react';
+```
+
+Use `MultiFileDiff` when comparing old and new file contents directly.
+
+```ts
+import { FileDiff, parseDiffFromFile, parsePatchFiles } from '@pierre/diffs/react';
+```
+
+Use `FileDiff` when rendering already parsed `FileDiffMetadata`; generate that
+metadata with `parseDiffFromFile` for two file versions or `parsePatchFiles`
+for patch text.
+
+Always include a readable standard HTML unified diff fallback in the turn
+document. Hide or replace the fallback only after the `@pierre/diffs` view
+successfully renders. Users without `@pierre/diffs` available should see the
+standard HTML fallback. If `@pierre/diffs` cannot generate or render the diff,
+show only the plain HTML fallback and document that the rich renderer failed.
 
 ### No turn document for minor/trivial checklist matches
 
