@@ -11,15 +11,12 @@ import {
   CommandSymbolRail,
   EventContextPane,
   FeedHealthPane,
-  FocusPane,
-  HomeReplayRail,
-  ReplayConsole
+  HomeReplayRail
 } from "../features/terminal/components/charts";
 import { renderTerminalDrawers } from "../features/terminal/components/drawers";
 import { NewsControlRails, NewsPane } from "../features/terminal/components/news";
 import { FlowPane, OpraIntakeRail, OptionsPane } from "../features/terminal/components/opra";
 import { FlowFilterPopover, PageFrame } from "../features/terminal/components/primitives";
-import { AlertsPane, ClassifierPane, DarkPane } from "../features/terminal/components/signals";
 import { TerminalAppShell as TerminalFeatureAppShell } from "../features/terminal/shell";
 import { useTerminal } from "../features/terminal/state";
 
@@ -156,45 +153,6 @@ export function OptionsRoute() {
           <OptionsPane state={state} title="OPRA Tape" className="opra-options-pane" />
           <FlowPane state={state} title="Packet Fit" className="opra-flow-pane" />
         </div>
-      </div>
-    </PageFrame>
-  );
-}
-
-export function SignalsRoute() {
-  const state = useTerminal();
-  return (
-    <PageFrame title="Signals">
-      <div className="page-grid page-grid-signals">
-        <AlertsPane state={state} withStrip className="signals-pane-alerts" />
-        <ClassifierPane state={state} className="signals-pane-rules" />
-        <DarkPane state={state} className="signals-pane-dark" />
-      </div>
-    </PageFrame>
-  );
-}
-
-export function ChartsRoute() {
-  const state = useTerminal();
-  return (
-    <PageFrame title="Charts">
-      <div className="page-grid page-grid-charts">
-        <ChartPane state={state} title="Price" />
-        <FocusPane state={state} />
-      </div>
-    </PageFrame>
-  );
-}
-
-export function ReplayRoute() {
-  const state = useTerminal();
-  return (
-    <PageFrame title="Replay">
-      <div className="page-grid page-grid-replay">
-        <ReplayConsole state={state} />
-        <AlertsPane state={state} limit={10} withStrip />
-        <FlowPane state={state} limit={12} />
-        <OptionsPane state={state} limit={12} />
       </div>
     </PageFrame>
   );

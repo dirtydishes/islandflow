@@ -308,21 +308,6 @@ describe("live manifest", () => {
     expect(flowSubscription?.filters).toBe(filters);
   });
 
-  it("scopes /signals subscriptions to signals channels only", () => {
-    const channels = getLiveManifest("/signals", "SPY", 60000, buildDefaultFlowFilters()).map(
-      (subscription) => subscription.channel
-    );
-
-    expect(channels).toEqual([
-      "alerts",
-      "smart-flow",
-      "smart-money",
-      "classifier-hits",
-      "inferred-dark",
-      "equity-joins"
-    ]);
-  });
-
   it("includes news subscriptions on home and /news", () => {
     expect(
       getLiveManifest("/", "SPY", 60000, buildDefaultFlowFilters()).map(
@@ -336,19 +321,12 @@ describe("live manifest", () => {
     ).toEqual(["news"]);
   });
 
-  it("scopes /charts subscriptions to chart channels only", () => {
-    const channels = getLiveManifest("/charts", "SPY", 60000, buildDefaultFlowFilters()).map(
-      (subscription) => subscription.channel
-    );
+  it("normalizes retired route subscriptions to the home manifest", () => {
+    const home = getLiveManifest("/", "SPY", 60000, buildDefaultFlowFilters());
 
-    expect(channels).toEqual([
-      "smart-flow",
-      "smart-money",
-      "inferred-dark",
-      "equity-joins",
-      "equity-candles",
-      "equity-overlay"
-    ]);
+    expect(getLiveManifest("/signals", "SPY", 60000, buildDefaultFlowFilters())).toEqual(home);
+    expect(getLiveManifest("/charts", "SPY", 60000, buildDefaultFlowFilters())).toEqual(home);
+    expect(getLiveManifest("/replay", "SPY", 60000, buildDefaultFlowFilters())).toEqual(home);
   });
 });
 
@@ -510,22 +488,13 @@ describe("route feature map", () => {
     expect(getRouteFeatures("/tape")).toEqual(getRouteFeatures("/options"));
   });
 
-  it("maps /signals to signal panes and dependencies", () => {
-    const features = getRouteFeatures("/signals");
-    expect(features.showAlertsPane).toBe(true);
-    expect(features.showClassifierPane).toBe(true);
-    expect(features.showDarkPane).toBe(true);
-    expect(features.options).toBe(false);
-    expect(features.equityJoins).toBe(true);
-  });
-
-  it("maps /charts to chart panes and dependencies", () => {
-    const features = getRouteFeatures("/charts");
-    expect(features.showChartPane).toBe(true);
-    expect(features.showFocusPane).toBe(true);
-    expect(features.equityCandles).toBe(true);
-    expect(features.equityOverlay).toBe(true);
-    expect(features.alerts).toBe(false);
+  it("normalizes retired terminal routes to the home feature surface", () => {
+    expect(normalizeTerminalPathname("/signals")).toBe("/");
+    expect(normalizeTerminalPathname("/charts")).toBe("/");
+    expect(normalizeTerminalPathname("/replay")).toBe("/");
+    expect(getRouteFeatures("/signals")).toEqual(getRouteFeatures("/"));
+    expect(getRouteFeatures("/charts")).toEqual(getRouteFeatures("/"));
+    expect(getRouteFeatures("/replay")).toEqual(getRouteFeatures("/"));
   });
 
   it("maps /news to the dedicated news pane", () => {
@@ -543,30 +512,10 @@ describe("fixed tape virtualization config", () => {
       overscan: 44,
       debugLabel: "options"
     });
-    expect(getTapeVirtualConfig("equities")).toEqual({
-      rowHeight: 36,
-      overscan: 36,
-      debugLabel: "equities"
-    });
     expect(getTapeVirtualConfig("flow")).toEqual({
       rowHeight: 44,
       overscan: 24,
       debugLabel: "flow"
-    });
-    expect(getTapeVirtualConfig("alerts")).toEqual({
-      rowHeight: 44,
-      overscan: 24,
-      debugLabel: "alerts"
-    });
-    expect(getTapeVirtualConfig("classifier")).toEqual({
-      rowHeight: 44,
-      overscan: 24,
-      debugLabel: "classifier"
-    });
-    expect(getTapeVirtualConfig("dark")).toEqual({
-      rowHeight: 44,
-      overscan: 24,
-      debugLabel: "dark"
     });
     expect(getTapeVirtualConfig("news")).toEqual({
       rowHeight: 52,
@@ -591,15 +540,15 @@ describe("news text formatting", () => {
 });
 
 describe("dark underlying route dependency helper", () => {
-  it("does not keep extra equities subscriptions when joins+trace fallback are sufficient", () => {
+  it("does not keep extra equities subscriptions for options-only surfaces", () => {
     expect(shouldIncludeEquitiesForDarkUnderlyingFallback()).toBe(false);
     expect(
-      getLiveManifest("/signals", "SPY", 60000, buildDefaultFlowFilters()).some(
+      getLiveManifest("/options", "SPY", 60000, buildDefaultFlowFilters()).some(
         (subscription) => subscription.channel === "equities"
       )
     ).toBe(false);
     expect(
-      getLiveManifest("/charts", "SPY", 60000, buildDefaultFlowFilters()).some(
+      getLiveManifest("/news", "SPY", 60000, buildDefaultFlowFilters()).some(
         (subscription) => subscription.channel === "equities"
       )
     ).toBe(false);

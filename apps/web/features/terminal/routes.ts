@@ -1,22 +1,11 @@
 import type { LiveSubscription, OptionFlowFilters } from "@islandflow/types";
 import { getSubscriptionKey as getLiveSubscriptionKey } from "@islandflow/types";
-import {
-  LIVE_HOT_WINDOW,
-  LIVE_OPTIONS_HEAD_LIMIT,
-  shouldIncludeEquitiesForDarkUnderlyingFallback
-} from "./config";
+import { LIVE_HOT_WINDOW, LIVE_OPTIONS_HEAD_LIMIT } from "./config";
 import type { EquityScope, OptionScope, RouteFeatures } from "./types";
 
 const CANONICAL_OPTIONS_PATH = "/options";
 const TAPE_COMPAT_PATH = "/tape";
-const KNOWN_TERMINAL_PATHS = new Set([
-  CANONICAL_OPTIONS_PATH,
-  TAPE_COMPAT_PATH,
-  "/news",
-  "/signals",
-  "/charts",
-  "/replay"
-]);
+const KNOWN_TERMINAL_PATHS = new Set([CANONICAL_OPTIONS_PATH, TAPE_COMPAT_PATH, "/news"]);
 
 export const normalizeTerminalPathname = (pathname: string): string => {
   if (pathname === TAPE_COMPAT_PATH) {
@@ -26,7 +15,6 @@ export const normalizeTerminalPathname = (pathname: string): string => {
 };
 
 export const getRouteFeatures = (pathname: string): RouteFeatures => {
-  const includeEquitiesFallback = shouldIncludeEquitiesForDarkUnderlyingFallback();
   const normalizedPath = normalizeTerminalPathname(pathname);
 
   switch (normalizedPath) {
@@ -49,11 +37,8 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         showFlowPane: true,
         showNewsPane: false,
         showAlertsPane: false,
-        showClassifierPane: false,
         showDarkPane: false,
         showChartPane: false,
-        showFocusPane: false,
-        showReplayConsole: false,
         needsClassifierDecor: true,
         needsAlertEvidencePrefetch: false,
         needsDarkUnderlying: false
@@ -77,97 +62,10 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         showFlowPane: false,
         showNewsPane: true,
         showAlertsPane: false,
-        showClassifierPane: false,
         showDarkPane: false,
         showChartPane: false,
-        showFocusPane: false,
-        showReplayConsole: false,
         needsClassifierDecor: false,
         needsAlertEvidencePrefetch: false,
-        needsDarkUnderlying: false
-      };
-    case "/signals":
-      return {
-        options: false,
-        nbbo: false,
-        equities: includeEquitiesFallback,
-        flow: false,
-        news: false,
-        alerts: true,
-        smartMoney: true,
-        classifierHits: true,
-        inferredDark: true,
-        equityJoins: true,
-        equityCandles: false,
-        equityOverlay: false,
-        showOptionsPane: false,
-        showEquitiesPane: false,
-        showFlowPane: false,
-        showNewsPane: false,
-        showAlertsPane: true,
-        showClassifierPane: true,
-        showDarkPane: true,
-        showChartPane: false,
-        showFocusPane: false,
-        showReplayConsole: false,
-        needsClassifierDecor: false,
-        needsAlertEvidencePrefetch: true,
-        needsDarkUnderlying: true
-      };
-    case "/charts":
-      return {
-        options: false,
-        nbbo: false,
-        equities: includeEquitiesFallback,
-        flow: false,
-        news: false,
-        alerts: false,
-        smartMoney: true,
-        classifierHits: false,
-        inferredDark: true,
-        equityJoins: true,
-        equityCandles: true,
-        equityOverlay: true,
-        showOptionsPane: false,
-        showEquitiesPane: false,
-        showFlowPane: false,
-        showNewsPane: false,
-        showAlertsPane: false,
-        showClassifierPane: false,
-        showDarkPane: false,
-        showChartPane: true,
-        showFocusPane: true,
-        showReplayConsole: false,
-        needsClassifierDecor: false,
-        needsAlertEvidencePrefetch: false,
-        needsDarkUnderlying: true
-      };
-    case "/replay":
-      return {
-        options: false,
-        nbbo: false,
-        equities: false,
-        flow: false,
-        news: false,
-        alerts: false,
-        smartMoney: false,
-        classifierHits: false,
-        inferredDark: false,
-        equityJoins: false,
-        equityCandles: false,
-        equityOverlay: false,
-        showOptionsPane: true,
-        showEquitiesPane: false,
-        showFlowPane: true,
-        showNewsPane: false,
-        showAlertsPane: true,
-        showClassifierPane: false,
-        showDarkPane: false,
-        showChartPane: false,
-        showFocusPane: false,
-        showReplayConsole: true,
-        needsClassifierDecor: true,
-        needsAlertEvidencePrefetch: true,
         needsDarkUnderlying: false
       };
     case "/":
@@ -190,11 +88,8 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         showFlowPane: true,
         showNewsPane: true,
         showAlertsPane: true,
-        showClassifierPane: false,
         showDarkPane: true,
         showChartPane: true,
-        showFocusPane: false,
-        showReplayConsole: false,
         needsClassifierDecor: true,
         needsAlertEvidencePrefetch: true,
         needsDarkUnderlying: true

@@ -86,11 +86,7 @@ export const LIVE_SESSION_HOT_CHANNELS = new Set<LiveSubscription["channel"]>([
 
 const TAPE_VIRTUAL_CONFIG: Record<TapeVirtualPane, TapeVirtualListConfig> = {
   options: { rowHeight: 36, overscan: 44, debugLabel: "options" },
-  equities: { rowHeight: 36, overscan: 36, debugLabel: "equities" },
   flow: { rowHeight: 44, overscan: 24, debugLabel: "flow" },
-  alerts: { rowHeight: 44, overscan: 24, debugLabel: "alerts" },
-  classifier: { rowHeight: 44, overscan: 24, debugLabel: "classifier" },
-  dark: { rowHeight: 44, overscan: 24, debugLabel: "dark" },
   news: { rowHeight: 52, overscan: 28, debugLabel: "news" }
 };
 
