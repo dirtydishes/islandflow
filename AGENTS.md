@@ -88,6 +88,20 @@ Agent expectations:
 - Use `fj` for Forgejo pull request workflows (create/view/update PRs).
 - When sharing PR links in handoff, use the Forgejo PR URL.
 
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked with Beads (`bd`) in this repo. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The default five triage roles are used as-is. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This repo uses a multi-context domain documentation layout. See `docs/agents/domain.md`.
+
 ### Forgejo CLI Quick Reference
 
 Use `fj` for Forgejo-hosted PR work and remote issue visibility. Keep Beads
