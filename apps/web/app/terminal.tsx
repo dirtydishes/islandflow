@@ -33,7 +33,6 @@ import type {
 import {
   getSubscriptionKey as getLiveSubscriptionKey,
   matchesFlowPacketFilters,
-  matchesOptionPrintFilters,
   parseOptionContractId
 } from "@islandflow/types";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -62,336 +61,191 @@ import {
   useRef,
   useState
 } from "react";
+import {
+  getChartFlowMarkerItems,
+  sortBySourceTime,
+  type ChartFlowMarkerItem
+} from "../features/terminal/charts/markers";
+import {
+  CANDLE_INTERVALS,
+  LIVE_EQUITIES_STALE_MS,
+  LIVE_FEED_BEHIND_DELAY_MS,
+  LIVE_FLOW_STALE_MS,
+  LIVE_HISTORY_BATCH,
+  LIVE_HISTORY_SOFT_CAP,
+  LIVE_HOT_WINDOW,
+  LIVE_HOT_WINDOW_OPTIONS,
+  LIVE_NBBO_STALE_MS,
+  LIVE_OPTIONS_HEAD_LIMIT,
+  LIVE_OPTIONS_STALE_MS,
+  LIVE_SESSION_HOT_CHANNELS,
+  LIVE_SESSION_IDLE_CHECK_MS,
+  LIVE_SESSION_IDLE_RECONNECT_MS,
+  LOCAL_HOSTS,
+  NBBO_MAX_AGE_MS_SAFE,
+  PINNED_EVIDENCE_MAX_ITEMS,
+  getTapeVirtualConfig,
+  isSyntheticAdminVisible,
+  shouldIncludeEquitiesForDarkUnderlyingFallback
+} from "../features/terminal/config";
+import {
+  buildAlertContextPath,
+  collectAlertContextEvidence,
+  getAlertFlowPacketRefs,
+  getSmartFlowEvidenceRefs,
+  getSmartFlowOptionPrintRefs,
+  getSmartFlowPacketRefs,
+  getSmartFlowPinnedFlowKeys,
+  getSmartFlowPinnedOptionKeys,
+  isSmartFlowPacketRef,
+  prunePinnedEntries,
+  resolveAlertFlowPacket
+} from "../features/terminal/evidence";
+import {
+  DEFAULT_FLOW_SECURITY_TYPES,
+  TICKER_FILTER_INPUT_MAX_LENGTH,
+  appendOptionFlowFilters,
+  buildDefaultFlowFilters,
+  buildOptionTapeQueryParams,
+  countActiveFlowFilterGroups,
+  filterOptionTapeItems,
+  getEffectiveOptionPrintFilters,
+  getOptionScope,
+  nextFlowFilterPopoverState,
+  normalizeTickerFilterInput,
+  parseTickerFilterInput,
+  shouldClearOptionFocusSeed,
+  shouldRetainLiveSnapshotHistory,
+  shouldShowEquitiesSilentFeedWarning,
+  toggleFilterValue
+} from "../features/terminal/filters";
+import {
+  classifierToneForFamily,
+  decodeNewsText,
+  deriveAlertDirection,
+  formatCompactUsd,
+  formatNewsTimestamp,
+  formatOptionContractLabel,
+  getAlertWindowAnchorTs,
+  getOptionTableSnapshot,
+  normalizeAlertSeverity,
+  selectPrimaryClassifierHit,
+  smartFlowDirectionLabel,
+  smartFlowDirectionTone,
+  smartFlowEvidenceQualityLabel,
+  smartFlowHypothesisLabel,
+  smartFlowWhyNotLabel,
+  smartMoneyProfileLabel,
+  smartMoneyToneForProfile,
+  statusLabel
+} from "../features/terminal/format";
+import {
+  EMPTY_PAUSABLE_TAPE,
+  appendHistoryTail,
+  composeTapeItems,
+  extractSortTs,
+  findAnchorRestoreIndex,
+  flushPausableTapeData,
+  frontendRetentionMetrics,
+  getHotChannelFeedStatus,
+  getLiveFeedStatus,
+  getLiveHistoryRetentionCap,
+  getTapeItemKey,
+  incrementRetentionMetric,
+  mergeHeldTapeHistory,
+  mergeNewest,
+  mergeNewestWithOverflow,
+  projectPausableTapeState,
+  reducePausableTapeData,
+  setRetentionMetric
+} from "../features/terminal/tape";
+import {
+  NAV_ITEMS,
+  appendLiveScopeParams,
+  getLiveManifest,
+  getRouteFeatures,
+  getTerminalNavCurrentHref,
+  normalizeTerminalPathname
+} from "../features/terminal/routes";
+import type {
+  EquityScope,
+  LiveHistoryBuffer,
+  OptionContractDisplay,
+  OptionScope,
+  PausableTapeData,
+  PinnedEntry,
+  SelectedInstrument,
+  SortableItem,
+  TapeFocusSeed,
+  TapeMode,
+  TapeVirtualListConfig,
+  WsStatus
+} from "../features/terminal/types";
 
-const parseBoundedInt = (
-  value: string | undefined,
-  fallback: number,
-  min: number,
-  max: number
-): number => {
-  if (!value || value.trim().length === 0) {
-    return fallback;
-  }
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) {
-    return fallback;
-  }
-  return Math.max(min, Math.min(max, Math.floor(parsed)));
+export {
+  NAV_ITEMS,
+  appendHistoryTail,
+  buildAlertContextPath,
+  buildDefaultFlowFilters,
+  buildOptionTapeQueryParams,
+  classifierToneForFamily,
+  collectAlertContextEvidence,
+  composeTapeItems,
+  countActiveFlowFilterGroups,
+  decodeNewsText,
+  deriveAlertDirection,
+  filterOptionTapeItems,
+  findAnchorRestoreIndex,
+  flushPausableTapeData,
+  formatCompactUsd,
+  formatNewsTimestamp,
+  formatOptionContractLabel,
+  getAlertFlowPacketRefs,
+  getAlertWindowAnchorTs,
+  getChartFlowMarkerItems,
+  getEffectiveOptionPrintFilters,
+  getHotChannelFeedStatus,
+  getLiveFeedStatus,
+  getLiveHistoryRetentionCap,
+  getLiveManifest,
+  getOptionScope,
+  getOptionTableSnapshot,
+  getRouteFeatures,
+  getSmartFlowEvidenceRefs,
+  getSmartFlowOptionPrintRefs,
+  getSmartFlowPacketRefs,
+  getSmartFlowPinnedFlowKeys,
+  getSmartFlowPinnedOptionKeys,
+  getTapeVirtualConfig,
+  getTerminalNavCurrentHref,
+  isSyntheticAdminVisible,
+  mergeHeldTapeHistory,
+  mergeNewestWithOverflow,
+  nextFlowFilterPopoverState,
+  normalizeAlertSeverity,
+  normalizeTerminalPathname,
+  normalizeTickerFilterInput,
+  parseTickerFilterInput,
+  projectPausableTapeState,
+  prunePinnedEntries,
+  reducePausableTapeData,
+  resolveAlertFlowPacket,
+  selectPrimaryClassifierHit,
+  shouldClearOptionFocusSeed,
+  shouldIncludeEquitiesForDarkUnderlyingFallback,
+  shouldRetainLiveSnapshotHistory,
+  shouldShowEquitiesSilentFeedWarning,
+  smartFlowDirectionLabel,
+  smartFlowDirectionTone,
+  smartFlowEvidenceQualityLabel,
+  smartFlowHypothesisLabel,
+  smartFlowWhyNotLabel,
+  smartMoneyProfileLabel,
+  smartMoneyToneForProfile,
+  statusLabel,
+  toggleFilterValue
 };
-
-const LIVE_HOT_WINDOW = parseBoundedInt(process.env.NEXT_PUBLIC_LIVE_HOT_WINDOW, 600, 1, 100000);
-const LIVE_HOT_WINDOW_OPTIONS = parseBoundedInt(
-  process.env.NEXT_PUBLIC_LIVE_HOT_WINDOW_OPTIONS,
-  1200,
-  1,
-  100000
-);
-const LIVE_OPTIONS_HEAD_LIMIT = 100;
-const LIVE_HISTORY_SOFT_CAP = parseBoundedInt(
-  process.env.NEXT_PUBLIC_LIVE_HISTORY_SOFT_CAP,
-  5000,
-  100,
-  50000
-);
-const LIVE_HISTORY_BATCH = parseBoundedInt(
-  process.env.NEXT_PUBLIC_LIVE_HISTORY_BATCH,
-  500,
-  1,
-  1000
-);
-const LIVE_OPTIONS_STALE_MS = 15_000;
-const LIVE_NBBO_STALE_MS = 15_000;
-const LIVE_EQUITIES_STALE_MS = 15_000;
-const LIVE_FEED_BEHIND_DELAY_MS = 15_000;
-const LIVE_EQUITIES_SILENT_WARNING_MS = parseBoundedInt(
-  process.env.NEXT_PUBLIC_LIVE_EQUITIES_SILENT_WARNING_MS,
-  25_000,
-  5_000,
-  5 * 60 * 1000
-);
-const LIVE_FLOW_STALE_MS = 30_000;
-const PINNED_EVIDENCE_TTL_MS = parseBoundedInt(
-  process.env.NEXT_PUBLIC_PINNED_EVIDENCE_TTL_MS,
-  20 * 60 * 1000,
-  60 * 1000,
-  2 * 60 * 60 * 1000
-);
-const PINNED_EVIDENCE_MAX_ITEMS = parseBoundedInt(
-  process.env.NEXT_PUBLIC_PINNED_EVIDENCE_MAX_ITEMS,
-  4000,
-  100,
-  50000
-);
-const NBBO_MAX_AGE_MS = Number(process.env.NEXT_PUBLIC_NBBO_MAX_AGE_MS);
-const NBBO_MAX_AGE_MS_SAFE =
-  Number.isFinite(NBBO_MAX_AGE_MS) && NBBO_MAX_AGE_MS > 0 ? NBBO_MAX_AGE_MS : 1000;
-const FLOW_FILTER_PRESET = process.env.NEXT_PUBLIC_FLOW_FILTER_PRESET ?? "smart-money";
-const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"]);
-const CANDLE_INTERVALS = [
-  { label: "1m", ms: 60000 },
-  { label: "5m", ms: 300000 }
-];
-const LIVE_SESSION_IDLE_RECONNECT_MS = 12_000;
-const LIVE_SESSION_IDLE_CHECK_MS = 3_000;
-const LIVE_SESSION_HOT_CHANNELS = new Set<LiveSubscription["channel"]>([
-  "options",
-  "nbbo",
-  "equities",
-  "flow",
-  "equity-overlay"
-]);
-
-type TapeVirtualPane = "options" | "equities" | "flow" | "alerts" | "classifier" | "dark" | "news";
-
-type TapeVirtualListConfig = {
-  rowHeight: number;
-  overscan: number;
-  debugLabel: TapeVirtualPane;
-};
-
-const TAPE_VIRTUAL_CONFIG: Record<TapeVirtualPane, TapeVirtualListConfig> = {
-  options: { rowHeight: 36, overscan: 44, debugLabel: "options" },
-  equities: { rowHeight: 36, overscan: 36, debugLabel: "equities" },
-  flow: { rowHeight: 44, overscan: 24, debugLabel: "flow" },
-  alerts: { rowHeight: 44, overscan: 24, debugLabel: "alerts" },
-  classifier: { rowHeight: 44, overscan: 24, debugLabel: "classifier" },
-  dark: { rowHeight: 44, overscan: 24, debugLabel: "dark" },
-  news: { rowHeight: 52, overscan: 28, debugLabel: "news" }
-};
-
-export const getTapeVirtualConfig = (pane: TapeVirtualPane): TapeVirtualListConfig =>
-  TAPE_VIRTUAL_CONFIG[pane];
-
-type RouteFeatures = {
-  options: boolean;
-  nbbo: boolean;
-  equities: boolean;
-  flow: boolean;
-  news: boolean;
-  alerts: boolean;
-  smartMoney: boolean;
-  classifierHits: boolean;
-  inferredDark: boolean;
-  equityJoins: boolean;
-  equityCandles: boolean;
-  equityOverlay: boolean;
-  showOptionsPane: boolean;
-  showEquitiesPane: boolean;
-  showFlowPane: boolean;
-  showNewsPane: boolean;
-  showAlertsPane: boolean;
-  showClassifierPane: boolean;
-  showDarkPane: boolean;
-  showChartPane: boolean;
-  showFocusPane: boolean;
-  showReplayConsole: boolean;
-  needsClassifierDecor: boolean;
-  needsAlertEvidencePrefetch: boolean;
-  needsDarkUnderlying: boolean;
-};
-
-export const shouldIncludeEquitiesForDarkUnderlyingFallback = (): boolean => {
-  return false;
-};
-
-const CANONICAL_OPTIONS_PATH = "/options";
-const TAPE_COMPAT_PATH = "/tape";
-const KNOWN_TERMINAL_PATHS = new Set([
-  CANONICAL_OPTIONS_PATH,
-  TAPE_COMPAT_PATH,
-  "/news",
-  "/signals",
-  "/charts",
-  "/replay"
-]);
-
-export const normalizeTerminalPathname = (pathname: string): string => {
-  if (pathname === TAPE_COMPAT_PATH) {
-    return CANONICAL_OPTIONS_PATH;
-  }
-  return KNOWN_TERMINAL_PATHS.has(pathname) ? pathname : "/";
-};
-
-export const getRouteFeatures = (pathname: string): RouteFeatures => {
-  const includeEquitiesFallback = shouldIncludeEquitiesForDarkUnderlyingFallback();
-  const normalizedPath = normalizeTerminalPathname(pathname);
-
-  switch (normalizedPath) {
-    case "/options":
-      return {
-        options: true,
-        nbbo: true,
-        equities: false,
-        flow: true,
-        news: false,
-        alerts: false,
-        smartMoney: false,
-        classifierHits: false,
-        inferredDark: false,
-        equityJoins: false,
-        equityCandles: false,
-        equityOverlay: false,
-        showOptionsPane: true,
-        showEquitiesPane: false,
-        showFlowPane: true,
-        showNewsPane: false,
-        showAlertsPane: false,
-        showClassifierPane: false,
-        showDarkPane: false,
-        showChartPane: false,
-        showFocusPane: false,
-        showReplayConsole: false,
-        needsClassifierDecor: true,
-        needsAlertEvidencePrefetch: false,
-        needsDarkUnderlying: false
-      };
-    case "/news":
-      return {
-        options: false,
-        nbbo: false,
-        equities: false,
-        flow: false,
-        news: true,
-        alerts: false,
-        smartMoney: false,
-        classifierHits: false,
-        inferredDark: false,
-        equityJoins: false,
-        equityCandles: false,
-        equityOverlay: false,
-        showOptionsPane: false,
-        showEquitiesPane: false,
-        showFlowPane: false,
-        showNewsPane: true,
-        showAlertsPane: false,
-        showClassifierPane: false,
-        showDarkPane: false,
-        showChartPane: false,
-        showFocusPane: false,
-        showReplayConsole: false,
-        needsClassifierDecor: false,
-        needsAlertEvidencePrefetch: false,
-        needsDarkUnderlying: false
-      };
-    case "/signals":
-      return {
-        options: false,
-        nbbo: false,
-        equities: includeEquitiesFallback,
-        flow: false,
-        news: false,
-        alerts: true,
-        smartMoney: true,
-        classifierHits: true,
-        inferredDark: true,
-        equityJoins: true,
-        equityCandles: false,
-        equityOverlay: false,
-        showOptionsPane: false,
-        showEquitiesPane: false,
-        showFlowPane: false,
-        showNewsPane: false,
-        showAlertsPane: true,
-        showClassifierPane: true,
-        showDarkPane: true,
-        showChartPane: false,
-        showFocusPane: false,
-        showReplayConsole: false,
-        needsClassifierDecor: false,
-        needsAlertEvidencePrefetch: true,
-        needsDarkUnderlying: true
-      };
-    case "/charts":
-      return {
-        options: false,
-        nbbo: false,
-        equities: includeEquitiesFallback,
-        flow: false,
-        news: false,
-        alerts: false,
-        smartMoney: true,
-        classifierHits: false,
-        inferredDark: true,
-        equityJoins: true,
-        equityCandles: true,
-        equityOverlay: true,
-        showOptionsPane: false,
-        showEquitiesPane: false,
-        showFlowPane: false,
-        showNewsPane: false,
-        showAlertsPane: false,
-        showClassifierPane: false,
-        showDarkPane: false,
-        showChartPane: true,
-        showFocusPane: true,
-        showReplayConsole: false,
-        needsClassifierDecor: false,
-        needsAlertEvidencePrefetch: false,
-        needsDarkUnderlying: true
-      };
-    case "/replay":
-      return {
-        options: false,
-        nbbo: false,
-        equities: false,
-        flow: false,
-        news: false,
-        alerts: false,
-        smartMoney: false,
-        classifierHits: false,
-        inferredDark: false,
-        equityJoins: false,
-        equityCandles: false,
-        equityOverlay: false,
-        showOptionsPane: true,
-        showEquitiesPane: false,
-        showFlowPane: true,
-        showNewsPane: false,
-        showAlertsPane: true,
-        showClassifierPane: false,
-        showDarkPane: false,
-        showChartPane: false,
-        showFocusPane: false,
-        showReplayConsole: true,
-        needsClassifierDecor: true,
-        needsAlertEvidencePrefetch: true,
-        needsDarkUnderlying: false
-      };
-    case "/":
-    default:
-      return {
-        options: true,
-        nbbo: false,
-        equities: true,
-        flow: true,
-        news: true,
-        alerts: true,
-        smartMoney: true,
-        classifierHits: false,
-        inferredDark: true,
-        equityJoins: true,
-        equityCandles: true,
-        equityOverlay: true,
-        showOptionsPane: true,
-        showEquitiesPane: true,
-        showFlowPane: true,
-        showNewsPane: true,
-        showAlertsPane: true,
-        showClassifierPane: false,
-        showDarkPane: true,
-        showChartPane: true,
-        showFocusPane: false,
-        showReplayConsole: false,
-        needsClassifierDecor: true,
-        needsAlertEvidencePrefetch: true,
-        needsDarkUnderlying: true
-      };
-  }
-};
-
-export const getTerminalNavCurrentHref = (pathname: string): string => {
-  return normalizeTerminalPathname(pathname);
-};
+export type { ChartFlowMarkerItem };
 
 const EMPTY_ALERT_EVENTS: AlertEvent[] = [];
 const EMPTY_CLASSIFIER_HIT_EVENTS: ClassifierHitEvent[] = [];
@@ -416,24 +270,6 @@ type ChartCandle = {
   low: number;
   close: number;
 };
-
-type SelectedInstrument =
-  | null
-  | { kind: "equity"; underlyingId: string }
-  | { kind: "option-contract"; contractId: string; underlyingId: string };
-
-type TapeFocusSeed<T> = {
-  scopeKey: string;
-  subscriptionKey?: string;
-  items: T[];
-};
-
-type OptionScope = Pick<
-  Extract<LiveSubscription, { channel: "options" }>,
-  "underlying_ids" | "option_contract_id"
->;
-
-type EquityScope = Pick<Extract<LiveSubscription, { channel: "equities" }>, "underlying_ids">;
 
 const formatIntervalLabel = (intervalMs: number): string => {
   const match = CANDLE_INTERVALS.find((interval) => interval.ms === intervalMs);
@@ -626,10 +462,6 @@ const fetchOptionPrintsByTraceIds = async (
   return prints;
 };
 
-type WsStatus = "connecting" | "connected" | "disconnected" | "stale";
-
-type TapeMode = "live" | "replay";
-
 type MessageType =
   | "option-print"
   | "option-nbbo"
@@ -694,39 +526,6 @@ const extractReplaySource = <T,>(item: T): string | null => {
   return prefix;
 };
 
-type SortableItem = {
-  ts?: number;
-  source_ts?: number;
-  ingest_ts?: number;
-  seq?: number;
-  trace_id?: string;
-  id?: string;
-};
-
-type PinnedEntry<T> = {
-  value: T;
-  updatedAt: number;
-};
-
-type OptionContractDisplay = {
-  ticker: string;
-  strike: string;
-  expiration: string;
-};
-
-type RetentionMetricKey =
-  | "hotWindowEvictions"
-  | "pinnedFetchMisses"
-  | "pinnedFetchFailures"
-  | "pinnedStoreSize";
-
-const frontendRetentionMetrics: Record<RetentionMetricKey, number> = {
-  hotWindowEvictions: 0,
-  pinnedFetchMisses: 0,
-  pinnedFetchFailures: 0,
-  pinnedStoreSize: 0
-};
-
 const DEV_TAPE_DEBUG = process.env.NODE_ENV !== "production";
 
 type TapeDebugMetricKey =
@@ -762,327 +561,6 @@ const logTapeDebug = (message: string, payload?: Record<string, unknown>): void 
     return;
   }
   console.debug(`[tape] ${message}`);
-};
-
-const incrementRetentionMetric = (key: RetentionMetricKey, count = 1): void => {
-  frontendRetentionMetrics[key] += count;
-};
-
-const setRetentionMetric = (key: RetentionMetricKey, value: number): void => {
-  frontendRetentionMetrics[key] = value;
-};
-
-const extractSortTs = (item: SortableItem): number =>
-  item.ts ?? item.source_ts ?? item.ingest_ts ?? 0;
-
-const extractSortSeq = (item: SortableItem): number => item.seq ?? 0;
-
-const buildItemKey = (item: SortableItem): string | null => {
-  if (item.trace_id) {
-    return `${item.trace_id}:${item.seq ?? ""}`;
-  }
-
-  if (item.id) {
-    return `id:${item.id}`;
-  }
-
-  return null;
-};
-
-export const mergeNewestWithOverflow = <T extends SortableItem>(
-  incoming: T[],
-  existing: T[],
-  limit = LIVE_HOT_WINDOW,
-  onTrim?: (evicted: number) => void
-): { kept: T[]; evicted: T[] } => {
-  const combined = [...incoming, ...existing];
-  if (combined.length === 0) {
-    return { kept: combined, evicted: [] };
-  }
-
-  const seen = new Set<string>();
-  const deduped: T[] = [];
-
-  for (const item of combined) {
-    const key = buildItemKey(item);
-    if (key) {
-      if (seen.has(key)) {
-        continue;
-      }
-      seen.add(key);
-    }
-    deduped.push(item);
-  }
-
-  deduped.sort((a, b) => {
-    const delta = extractSortTs(b) - extractSortTs(a);
-    if (delta !== 0) {
-      return delta;
-    }
-    return extractSortSeq(b) - extractSortSeq(a);
-  });
-
-  const safeLimit = Math.max(1, Math.floor(limit));
-  const evicted = deduped.slice(safeLimit);
-  if (evicted.length > 0) {
-    onTrim?.(evicted.length);
-  }
-
-  return {
-    kept: deduped.slice(0, safeLimit),
-    evicted
-  };
-};
-
-const mergeNewest = <T extends SortableItem>(
-  incoming: T[],
-  existing: T[],
-  limit = LIVE_HOT_WINDOW,
-  onTrim?: (evicted: number) => void
-): T[] => {
-  return mergeNewestWithOverflow(incoming, existing, limit, onTrim).kept;
-};
-
-const getTapeItemKey = (item: SortableItem): string => {
-  return buildItemKey(item) ?? `${extractSortTs(item)}:${extractSortSeq(item)}`;
-};
-
-export const composeTapeItems = <T extends SortableItem>(
-  seedItems: T[],
-  liveItems: T[],
-  historyItems: T[]
-): T[] => {
-  const deduped = new Map<string, T>();
-  for (const item of [...seedItems, ...liveItems, ...historyItems]) {
-    deduped.set(getTapeItemKey(item), item);
-  }
-  return Array.from(deduped.values()).sort((a, b) => {
-    const delta = extractSortTs(b) - extractSortTs(a);
-    if (delta !== 0) {
-      return delta;
-    }
-    return extractSortSeq(b) - extractSortSeq(a);
-  });
-};
-
-type PausableTapeData<T> = {
-  visible: T[];
-  queued: T[];
-  seenKeys: Set<string>;
-  dropped: number;
-};
-
-type LiveHistoryBuffer<T> = {
-  liveHead: T[];
-  queuedLive: T[];
-  historyTail: T[];
-  nextBefore: Cursor | null;
-  historyLoading: boolean;
-  historyExhausted: boolean;
-  autoHydrating: boolean;
-};
-
-export const reducePausableTapeData = <T extends SortableItem>(
-  current: PausableTapeData<T>,
-  incoming: T[],
-  paused: boolean,
-  retentionLimit = LIVE_HOT_WINDOW
-): PausableTapeData<T> => {
-  if (incoming.length === 0) {
-    return current;
-  }
-
-  const seenKeys = current.seenKeys;
-  let nextSeenKeys: Set<string> | null = null;
-  const unseen: T[] = [];
-
-  // Incoming items are maintained newest-first by mergeNewest.
-  // Once we hit a previously seen key, the remainder is older history.
-  for (const item of incoming) {
-    const key = getTapeItemKey(item);
-    if (seenKeys.has(key)) {
-      break;
-    }
-    if (!nextSeenKeys) {
-      nextSeenKeys = new Set(seenKeys);
-    }
-    nextSeenKeys.add(key);
-    unseen.push(item);
-  }
-
-  if (unseen.length === 0) {
-    return current;
-  }
-
-  if (paused) {
-    return {
-      visible: current.visible,
-      queued: mergeNewest(unseen, current.queued, retentionLimit, (evicted) =>
-        incrementRetentionMetric("hotWindowEvictions", evicted)
-      ),
-      seenKeys: nextSeenKeys ?? seenKeys,
-      dropped: current.dropped + unseen.length
-    };
-  }
-
-  const nextBatch = current.queued.length > 0 ? [...current.queued, ...unseen] : unseen;
-  return {
-    visible: mergeNewest(nextBatch, current.visible, retentionLimit, (evicted) =>
-      incrementRetentionMetric("hotWindowEvictions", evicted)
-    ),
-    queued: [],
-    seenKeys: nextSeenKeys ?? seenKeys,
-    dropped: 0
-  };
-};
-
-export const flushPausableTapeData = <T extends SortableItem>(
-  current: PausableTapeData<T>,
-  retentionLimit = LIVE_HOT_WINDOW
-): PausableTapeData<T> => {
-  if (current.queued.length === 0) {
-    return current.dropped === 0 ? current : { ...current, dropped: 0 };
-  }
-
-  return {
-    visible: mergeNewest(current.queued, current.visible, retentionLimit, (evicted) =>
-      incrementRetentionMetric("hotWindowEvictions", evicted)
-    ),
-    queued: [],
-    seenKeys: current.seenKeys,
-    dropped: 0
-  };
-};
-
-const EMPTY_PAUSABLE_TAPE = {
-  visible: [],
-  queued: [],
-  seenKeys: new Set<string>(),
-  dropped: 0
-};
-
-export const appendHistoryTail = <T extends SortableItem>(
-  current: T[],
-  incoming: T[],
-  liveHead: T[],
-  cap = LIVE_HISTORY_SOFT_CAP
-): T[] => {
-  if (incoming.length === 0) {
-    return current;
-  }
-
-  const seen = new Set<string>(liveHead.map((item) => getTapeItemKey(item)));
-  const combined: T[] = [];
-
-  for (const item of [...current, ...incoming]) {
-    const key = getTapeItemKey(item);
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    combined.push(item);
-  }
-
-  combined.sort((a, b) => {
-    const delta = extractSortTs(b) - extractSortTs(a);
-    if (delta !== 0) {
-      return delta;
-    }
-    return extractSortSeq(b) - extractSortSeq(a);
-  });
-
-  return cap > 0 ? combined.slice(0, cap) : combined;
-};
-
-export const mergeHeldTapeHistory = <T extends SortableItem>(
-  displayedHistory: T[],
-  incomingHistory: T[],
-  frozenLiveHead: T[]
-): T[] => {
-  if (displayedHistory.length === 0) {
-    return appendHistoryTail([], incomingHistory, frozenLiveHead, 0);
-  }
-
-  const sortedDisplayed = appendHistoryTail([], displayedHistory, frozenLiveHead, 0);
-  const tail = sortedDisplayed.at(-1);
-  const tailTs = tail ? extractSortTs(tail) : Number.POSITIVE_INFINITY;
-  const tailSeq = tail ? extractSortSeq(tail) : Number.POSITIVE_INFINITY;
-  const olderIncoming = incomingHistory.filter((item) => {
-    const itemTs = extractSortTs(item);
-    if (itemTs < tailTs) {
-      return true;
-    }
-    return itemTs === tailTs && extractSortSeq(item) < tailSeq;
-  });
-
-  return appendHistoryTail(sortedDisplayed, olderIncoming, frozenLiveHead, 0);
-};
-
-export const getLiveHistoryRetentionCap = (subscription: LiveSubscription): number => {
-  switch (subscription.channel) {
-    case "options":
-    case "equities":
-      return 0;
-    default:
-      return LIVE_HISTORY_SOFT_CAP;
-  }
-};
-
-export const getLiveFeedStatus = (
-  sourceStatus: WsStatus,
-  freshestTs: number | null,
-  thresholdMs: number,
-  now = Date.now(),
-  behindDelayMs = 0
-): WsStatus => {
-  if (sourceStatus !== "connected") {
-    return sourceStatus;
-  }
-  if (freshestTs === null) {
-    return "connected";
-  }
-
-  const ageMs = now - freshestTs;
-  if (ageMs <= thresholdMs) {
-    return "connected";
-  }
-
-  const behindMs = ageMs - thresholdMs;
-  return behindMs > behindDelayMs ? "stale" : "connected";
-};
-
-export const getHotChannelFeedStatus = (
-  sourceStatus: WsStatus,
-  health: { healthy: boolean } | null | undefined
-): WsStatus => {
-  if (sourceStatus !== "connected") {
-    return sourceStatus;
-  }
-  if (!health) {
-    return "connected";
-  }
-  return health.healthy ? "connected" : "stale";
-};
-
-export const findAnchorRestoreIndex = (
-  keys: string[],
-  anchorKey: string,
-  fallbackKeys: string[]
-): number => {
-  const directIndex = keys.indexOf(anchorKey);
-  if (directIndex >= 0) {
-    return directIndex;
-  }
-
-  const indexByKey = new Map(keys.map((key, index) => [key, index]));
-  for (const key of fallbackKeys) {
-    const index = indexByKey.get(key);
-    if (typeof index === "number") {
-      return index;
-    }
-  }
-
-  return -1;
 };
 
 type TapeState<T> = {
@@ -1138,9 +616,6 @@ const buildApiUrl = (path: string): string => {
 
   return `${httpProtocol}://${host}${path}`;
 };
-
-export const isSyntheticAdminVisible = (value = process.env.NEXT_PUBLIC_SYNTHETIC_ADMIN): boolean =>
-  value === "1";
 
 type SyntheticAdminStatusResponse = {
   enabled: boolean;
@@ -1339,25 +814,6 @@ const formatUsd = (value: number): string => {
   });
 };
 
-export const formatCompactUsd = (value: number): string => {
-  if (!Number.isFinite(value)) {
-    return "0.00";
-  }
-
-  const abs = Math.abs(value);
-  const sign = value < 0 ? "-" : "";
-  if (abs < 1_000) {
-    return formatUsd(value);
-  }
-  if (abs < 1_000_000) {
-    return `${sign}${(abs / 1_000).toFixed(1)}K`;
-  }
-  if (abs < 1_000_000_000) {
-    return `${sign}${(abs / 1_000_000).toFixed(1)}M`;
-  }
-  return `${sign}${(abs / 1_000_000_000).toFixed(1)}B`;
-};
-
 const normalizeContractId = (value: string): string => value.trim();
 
 const formatStrike = (value: number): string => {
@@ -1379,29 +835,6 @@ const formatExpiryShort = (value: string): string | null => {
   return `${month}-${day}-${year.slice(2)}`;
 };
 
-export const formatOptionContractLabel = (value: string): OptionContractDisplay | null => {
-  const normalized = normalizeContractId(value);
-  if (!normalized) {
-    return null;
-  }
-
-  const parsed = parseOptionContractId(normalized);
-  if (!parsed) {
-    return null;
-  }
-
-  const expiration = formatExpiryShort(parsed.expiry);
-  if (!expiration) {
-    return null;
-  }
-
-  return {
-    ticker: parsed.root.toUpperCase(),
-    strike: `${formatStrike(parsed.strike)}${parsed.right}`,
-    expiration
-  };
-};
-
 const formatContractLabel = (value: string): string => {
   const parsed = formatOptionContractLabel(value);
   if (parsed) {
@@ -1421,56 +854,6 @@ const formatDateTime = (ts: number): string => {
   const date = new Date(ts);
   return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
 };
-
-const isSameLocalDay = (left: number, right: number): boolean => {
-  const a = new Date(left);
-  const b = new Date(right);
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
-};
-
-export const formatNewsTimestamp = (ts: number, now = Date.now()): string => {
-  const date = new Date(ts);
-  return isSameLocalDay(ts, now)
-    ? date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
-    : date.toLocaleString([], {
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit"
-      });
-};
-
-const NEWS_TEXT_ENTITIES: Record<string, string> = {
-  amp: "&",
-  apos: "'",
-  gt: ">",
-  lt: "<",
-  nbsp: " ",
-  quot: '"'
-};
-
-export const decodeNewsText = (value: string): string =>
-  value.replace(/&(#\d+|#x[\da-f]+|[a-z][\da-z]+);/gi, (match, entity: string) => {
-    if (entity[0] === "#") {
-      const radix = entity[1]?.toLowerCase() === "x" ? 16 : 10;
-      const rawCodePoint = radix === 16 ? entity.slice(2) : entity.slice(1);
-      const codePoint = Number.parseInt(rawCodePoint, radix);
-      if (!Number.isFinite(codePoint)) {
-        return match;
-      }
-      try {
-        return String.fromCodePoint(codePoint);
-      } catch {
-        return match;
-      }
-    }
-
-    return NEWS_TEXT_ENTITIES[entity.toLowerCase()] ?? match;
-  });
 
 const sanitizeNewsHtml = (
   value: string
@@ -1517,71 +900,6 @@ const normalizeDirection = (value: string): "bullish" | "bearish" | "neutral" =>
     return normalized;
   }
   return "neutral";
-};
-
-const normalizeAlertSeverityValue = (value: string): "high" | "medium" | "low" | null => {
-  const normalized = value.trim().toLowerCase();
-  if (["high", "critical", "severe", "sev1", "p0", "p1"].includes(normalized)) {
-    return "high";
-  }
-  if (["medium", "med", "moderate", "sev2", "p2"].includes(normalized)) {
-    return "medium";
-  }
-  if (["low", "minor", "info", "informational", "sev3", "p3", "p4"].includes(normalized)) {
-    return "low";
-  }
-  return null;
-};
-
-export const normalizeAlertSeverity = (alert: AlertEvent): "high" | "medium" | "low" => {
-  const normalized = normalizeAlertSeverityValue(alert.severity);
-  if (normalized) {
-    return normalized;
-  }
-  if (alert.score >= 80) {
-    return "high";
-  }
-  if (alert.score >= 45) {
-    return "medium";
-  }
-  return "low";
-};
-
-export const deriveAlertDirection = (alert: AlertEvent): "bullish" | "bearish" | "neutral" => {
-  const totals = {
-    bullish: { count: 0, confidence: 0 },
-    bearish: { count: 0, confidence: 0 },
-    neutral: { count: 0, confidence: 0 }
-  };
-
-  for (const hit of alert.hits) {
-    const direction = normalizeDirection(hit.direction);
-    totals[direction].count += 1;
-    totals[direction].confidence += Number.isFinite(hit.confidence) ? hit.confidence : 0;
-  }
-
-  const ranked = (
-    Object.entries(totals) as Array<
-      ["bullish" | "bearish" | "neutral", { count: number; confidence: number }]
-    >
-  ).sort((a, b) => {
-    if (b[1].count !== a[1].count) {
-      return b[1].count - a[1].count;
-    }
-    return b[1].confidence - a[1].confidence;
-  });
-
-  return ranked[0] && ranked[0][1].count > 0 ? ranked[0][0] : "neutral";
-};
-
-export const getAlertWindowAnchorTs = (alerts: AlertEvent[], fallbackNow = Date.now()): number => {
-  if (alerts.length === 0) {
-    return fallbackNow;
-  }
-  return alerts.reduce(
-    (max, alert) => Math.max(max, alert.source_ts),
-    alerts[0]?.source_ts ?? fallbackNow
-  );
 };
 
 const extractUnderlying = (contractId: string): string => {
@@ -1715,132 +1033,6 @@ const getJoinBoolean = (join: EquityPrintJoin, key: string): boolean => {
 
 type NbboSide = "AA" | "A" | "B" | "BB";
 
-const DEFAULT_FLOW_SIDES: OptionNbboSide[] = ["AA", "A", "MID"];
-const DEFAULT_FLOW_OPTION_TYPES: OptionType[] = ["call", "put"];
-const DEFAULT_FLOW_SECURITY_TYPES: OptionSecurityType[] = ["stock"];
-
-export const buildDefaultFlowFilters = (): OptionFlowFilters => ({
-  view: "signal",
-  securityTypes: DEFAULT_FLOW_SECURITY_TYPES,
-  nbboSides: DEFAULT_FLOW_SIDES,
-  optionTypes: DEFAULT_FLOW_OPTION_TYPES,
-  minNotional:
-    FLOW_FILTER_PRESET === "all" ? undefined : FLOW_FILTER_PRESET === "balanced" ? 5_000 : undefined
-});
-
-const sameFilterValues = <T extends string>(
-  left: T[] | undefined,
-  right: T[] | undefined
-): boolean => {
-  const leftValues = [...(left ?? [])].sort();
-  const rightValues = [...(right ?? [])].sort();
-  if (leftValues.length !== rightValues.length) {
-    return false;
-  }
-  return leftValues.every((value, index) => value === rightValues[index]);
-};
-
-export const countActiveFlowFilterGroups = (filters: OptionFlowFilters): number => {
-  const defaults = buildDefaultFlowFilters();
-  let count = 0;
-
-  if (!sameFilterValues(filters.securityTypes, defaults.securityTypes)) {
-    count += 1;
-  }
-  if (!sameFilterValues(filters.nbboSides, defaults.nbboSides)) {
-    count += 1;
-  }
-  if (!sameFilterValues(filters.optionTypes, defaults.optionTypes)) {
-    count += 1;
-  }
-  if ((filters.minNotional ?? undefined) !== (defaults.minNotional ?? undefined)) {
-    count += 1;
-  }
-  if ((filters.view ?? defaults.view) !== defaults.view) {
-    count += 1;
-  }
-
-  return count;
-};
-
-export const toggleFilterValue = <T extends string>(
-  values: T[] | undefined,
-  value: T,
-  enabled: boolean
-): T[] => {
-  const current = new Set(values ?? []);
-  if (enabled) {
-    current.add(value);
-  } else {
-    current.delete(value);
-  }
-  return [...current].sort();
-};
-
-export const nextFlowFilterPopoverState = (
-  current: boolean,
-  action: "toggle" | "dismiss"
-): boolean => {
-  return action === "toggle" ? !current : false;
-};
-
-export const projectPausableTapeState = <T extends SortableItem>(
-  visible: T[],
-  status: WsStatus,
-  lastUpdate: number | null
-): { items: T[]; lastUpdate: number | null } => ({
-  items: visible,
-  lastUpdate: status === "stale" ? null : lastUpdate
-});
-
-type EquitiesSilentFeedWarningInput = {
-  wsStatus: WsStatus;
-  equitiesSubscribed: boolean;
-  connectedAt: number | null;
-  lastEquitiesEventAt: number | null;
-  now?: number;
-  thresholdMs?: number;
-};
-
-export const shouldShowEquitiesSilentFeedWarning = ({
-  wsStatus,
-  equitiesSubscribed,
-  connectedAt,
-  lastEquitiesEventAt,
-  now = Date.now(),
-  thresholdMs = LIVE_EQUITIES_SILENT_WARNING_MS
-}: EquitiesSilentFeedWarningInput): boolean => {
-  if (wsStatus !== "connected" || !equitiesSubscribed) {
-    return false;
-  }
-  const baselineTs = lastEquitiesEventAt ?? connectedAt;
-  if (baselineTs === null) {
-    return false;
-  }
-  return now - baselineTs >= thresholdMs;
-};
-
-const LIVE_SNAPSHOT_HISTORY_CHANNELS = new Set<LiveSubscription["channel"]>([
-  "options",
-  "nbbo",
-  "equities",
-  "flow",
-  "smart-flow",
-  "smart-money",
-  "classifier-hits"
-]);
-
-export const shouldRetainLiveSnapshotHistory = (
-  channel: LiveSubscription["channel"],
-  isSnapshot: boolean,
-  snapshotItemCount: number,
-  currentItemCount: number
-): boolean =>
-  isSnapshot &&
-  snapshotItemCount === 0 &&
-  currentItemCount > 0 &&
-  LIVE_SNAPSHOT_HISTORY_CHANNELS.has(channel);
-
 const classifyNbboSide = (price: number, quote: OptionNBBO | null | undefined): NbboSide | null => {
   if (!quote || !Number.isFinite(price)) {
     return null;
@@ -1884,120 +1076,7 @@ const EMPTY_CLASSIFIER_HITS_BY_PACKET_ID = new Map<string, ClassifierHitEvent[]>
 const EMPTY_PACKET_ID_BY_OPTION_TRACE_ID = new Map<string, string>();
 const EMPTY_CLASSIFIER_DECOR_BY_OPTION_TRACE_ID = new Map<string, ClassifierDecor>();
 
-const SMART_MONEY_PROFILE_TONES: Record<SmartMoneyProfileId, string> = {
-  institutional_directional: "green",
-  retail_whale: "amber",
-  event_driven: "blue",
-  vol_seller: "copper",
-  arbitrage: "teal",
-  hedge_reactive: "magenta"
-};
-
-const CLASSIFIER_FAMILY_TONES: Record<string, string> = {
-  large_bullish_call_sweep: "green",
-  large_bearish_put_sweep: "red",
-  unusual_contract_spike: "amber",
-  large_call_sell_overwrite: "copper",
-  large_put_sell_write: "copper",
-  straddle: "blue",
-  strangle: "blue",
-  vertical_spread: "teal",
-  ladder_accumulation: "yellowgreen",
-  roll_up_down_out: "violet",
-  far_dated_conviction: "cyan",
-  zero_dte_gamma_punch: "magenta"
-};
-
-export const selectPrimaryClassifierHit = (
-  hits: readonly ClassifierHitEvent[]
-): ClassifierHitEvent | null => {
-  if (hits.length === 0) {
-    return null;
-  }
-  return [...hits].sort((a, b) => {
-    const confidenceDelta = b.confidence - a.confidence;
-    if (confidenceDelta !== 0) {
-      return confidenceDelta;
-    }
-    const tsDelta = b.source_ts - a.source_ts;
-    if (tsDelta !== 0) {
-      return tsDelta;
-    }
-    return b.seq - a.seq;
-  })[0];
-};
-
-export const classifierToneForFamily = (classifierId: string): string =>
-  CLASSIFIER_FAMILY_TONES[classifierId] ?? "neutral";
-
-export const smartMoneyToneForProfile = (profileId: SmartMoneyProfileId | null): string =>
-  profileId ? (SMART_MONEY_PROFILE_TONES[profileId] ?? "neutral") : "neutral";
-
-export const smartMoneyProfileLabel = (profileId: SmartMoneyProfileId | null): string =>
-  profileId ? humanizeClassifierId(profileId) : "Abstained";
-
-const SMART_FLOW_HYPOTHESIS_LABELS: Record<FlowHypothesisType, string> = {
-  directional_accumulation: "Directional accumulation",
-  retail_attention_flow: "Retail attention flow",
-  event_positioning: "Event positioning",
-  volatility_supply: "Volatility supply",
-  structure_arbitrage: "Structure arbitrage",
-  hedge_rebalance: "Hedge rebalance",
-  unclear: "No clear flow hypothesis"
-};
-
-export const smartFlowHypothesisLabel = (value: FlowHypothesisType): string =>
-  SMART_FLOW_HYPOTHESIS_LABELS[value] ?? humanizeClassifierId(value);
-
 const smartFlowReasonLabel = (value: string): string => humanizeClassifierId(value);
-
-export const smartFlowEvidenceQualityLabel = (value: number): string => {
-  if (value >= 0.82) {
-    return "strong";
-  }
-  if (value >= 0.55) {
-    return "usable";
-  }
-  if (value > 0) {
-    return "thin";
-  }
-  return "poor";
-};
-
-export const smartFlowWhyNotLabel = (
-  projection: Pick<SmartFlowExplainabilityProjection, "abstention" | "evidence" | "alternatives">
-): string => {
-  if (projection.abstention.abstained) {
-    const reason =
-      projection.abstention.source_reasons[0] ??
-      projection.abstention.reasons.find((item) => item !== "not_abstained");
-    return reason ? `Abstained: ${smartFlowReasonLabel(reason)}` : "Abstained by policy";
-  }
-
-  const penalty = projection.evidence.penalties[0];
-  if (penalty) {
-    return `Watch: ${penalty.reason}`;
-  }
-
-  const alternative = projection.alternatives[0];
-  if (alternative) {
-    return `Alternative considered: ${smartFlowHypothesisLabel(alternative.hypothesis_type)}`;
-  }
-
-  return "No active why-not guard";
-};
-
-export const smartFlowDirectionLabel = (
-  projection: Pick<SmartFlowExplainabilityProjection, "abstention" | "hypothesis">
-): "bullish" | "bearish" | "neutral" | "abstained" =>
-  projection.abstention.abstained
-    ? "abstained"
-    : normalizeDirection(projection.hypothesis.direction);
-
-export const smartFlowDirectionTone = (
-  projection: Pick<SmartFlowExplainabilityProjection, "abstention" | "hypothesis">
-): "bullish" | "bearish" | "neutral" =>
-  projection.abstention.abstained ? "neutral" : normalizeDirection(projection.hypothesis.direction);
 
 const buildClassifierDecor = (hit: ClassifierHitEvent): ClassifierDecor => ({
   hit,
@@ -2015,87 +1094,6 @@ const buildSmartMoneyDecor = (event: SmartMoneyEvent): ClassifierDecor => {
     family: event.primary_profile_id ?? primaryScore?.profile_id ?? "abstained",
     tone: event.abstained ? "neutral" : smartMoneyToneForProfile(event.primary_profile_id),
     intensity: clamp(primaryScore?.probability ?? 0.25, 0.25, 1)
-  };
-};
-
-export type ChartFlowMarkerItem =
-  | { kind: "smart-flow"; projection: SmartFlowExplainabilityProjection }
-  | { kind: "smart-money-fallback"; event: SmartMoneyEvent };
-
-const sortBySourceTime = <T extends { source_ts: number; seq: number }>(items: readonly T[]): T[] =>
-  [...items].sort((a, b) => {
-    const delta = a.source_ts - b.source_ts;
-    if (delta !== 0) {
-      return delta;
-    }
-    return a.seq - b.seq;
-  });
-
-export const getChartFlowMarkerItems = (
-  smartFlowProjections: readonly SmartFlowExplainabilityProjection[],
-  legacySmartMoneyEvents: readonly SmartMoneyEvent[],
-  visibleRangeMs: { from: number; to: number } | null,
-  maxSmartFlowMarkers = 220,
-  maxLegacySmartMoneyMarkers = 220
-): ChartFlowMarkerItem[] => {
-  if (!visibleRangeMs) {
-    return [];
-  }
-
-  const inRangeSmartFlow = sortBySourceTime(
-    smartFlowProjections.filter(
-      (projection) =>
-        projection.source_ts >= visibleRangeMs.from && projection.source_ts <= visibleRangeMs.to
-    )
-  );
-
-  if (inRangeSmartFlow.length > 0) {
-    const cappedSmartFlow =
-      inRangeSmartFlow.length > maxSmartFlowMarkers
-        ? inRangeSmartFlow.slice(inRangeSmartFlow.length - maxSmartFlowMarkers)
-        : inRangeSmartFlow;
-    return cappedSmartFlow.map(
-      (projection): ChartFlowMarkerItem => ({ kind: "smart-flow", projection })
-    );
-  }
-
-  const inRangeLegacy = sortBySourceTime(
-    legacySmartMoneyEvents.filter(
-      (event) => event.source_ts >= visibleRangeMs.from && event.source_ts <= visibleRangeMs.to
-    )
-  );
-  const cappedLegacy =
-    inRangeLegacy.length > maxLegacySmartMoneyMarkers
-      ? inRangeLegacy.slice(inRangeLegacy.length - maxLegacySmartMoneyMarkers)
-      : inRangeLegacy;
-  return cappedLegacy.map(
-    (event): ChartFlowMarkerItem => ({ kind: "smart-money-fallback", event })
-  );
-};
-
-export const getOptionTableSnapshot = (
-  print: Pick<
-    OptionPrint,
-    | "price"
-    | "size"
-    | "notional"
-    | "nbbo_side"
-    | "execution_nbbo_side"
-    | "execution_underlying_spot"
-    | "execution_iv"
-  >,
-  fallbackSide: OptionNbboSide | null = null
-): { spot: string; iv: string; side: string; details: string; value: string } => {
-  const side = print.execution_nbbo_side ?? print.nbbo_side ?? fallbackSide ?? "--";
-  return {
-    spot:
-      typeof print.execution_underlying_spot === "number"
-        ? formatPrice(print.execution_underlying_spot)
-        : "--",
-    iv: typeof print.execution_iv === "number" ? formatPct(print.execution_iv) : "--",
-    side,
-    details: `${formatSize(print.size)}@${formatPrice(print.price)}_${side}`,
-    value: formatCompactUsd(print.notional ?? print.price * print.size * 100)
   };
 };
 
@@ -2420,67 +1418,6 @@ const upsertPinnedEntries = <T,>(
     next.set(key, { value, updatedAt: now });
   }
   return next;
-};
-
-export const prunePinnedEntries = <T,>(
-  current: Map<string, PinnedEntry<T>>,
-  activeKeys: Set<string>,
-  now: number
-): Map<string, PinnedEntry<T>> => {
-  const surviving: Array<[string, PinnedEntry<T>]> = [];
-
-  for (const [key, entry] of current) {
-    if (activeKeys.has(key) || now - entry.updatedAt <= PINNED_EVIDENCE_TTL_MS) {
-      surviving.push([key, entry]);
-    }
-  }
-
-  surviving.sort((a, b) => b[1].updatedAt - a[1].updatedAt);
-  const trimmed = surviving.slice(0, PINNED_EVIDENCE_MAX_ITEMS);
-
-  if (trimmed.length === current.size) {
-    let unchanged = true;
-    let index = 0;
-    for (const entry of current) {
-      const next = trimmed[index];
-      if (!next || next[0] !== entry[0] || next[1] !== entry[1]) {
-        unchanged = false;
-        break;
-      }
-      index += 1;
-    }
-
-    if (unchanged) {
-      return current;
-    }
-  }
-
-  return new Map(trimmed);
-};
-
-export const statusLabel = (status: WsStatus, paused: boolean, mode: TapeMode): string => {
-  if (paused) {
-    if (mode === "replay") {
-      return "Paused";
-    }
-    return status === "connected" ? "Held" : statusLabel(status, false, mode);
-  }
-
-  if (mode === "replay") {
-    return status === "disconnected" ? "Replay Down" : "Replay";
-  }
-
-  switch (status) {
-    case "connected":
-      return "Connected";
-    case "stale":
-      return "Feed behind";
-    case "connecting":
-      return "Connecting";
-    case "disconnected":
-    default:
-      return "Disconnected";
-  }
 };
 
 type TapeConfig<T> = {
@@ -3334,217 +2271,6 @@ const LIVE_HISTORY_ENDPOINTS: Partial<Record<LiveSubscription["channel"], string
   alerts: "/history/alerts",
   news: "/history/news",
   "inferred-dark": "/history/inferred-dark"
-};
-
-const appendOptionFlowFilters = (
-  params: URLSearchParams,
-  filters: OptionFlowFilters | undefined
-): void => {
-  if (!filters) {
-    return;
-  }
-  if (filters.view) {
-    params.set("view", filters.view);
-  }
-  if (filters.securityTypes?.length === 1) {
-    params.set("security", filters.securityTypes[0]);
-  } else if (filters.securityTypes && filters.securityTypes.length > 1) {
-    params.set("security", "all");
-  }
-  if (filters.nbboSides?.length) {
-    params.set("side", filters.nbboSides.join(","));
-  }
-  if (filters.optionTypes?.length) {
-    params.set("type", filters.optionTypes.join(","));
-  }
-  if (typeof filters.minNotional === "number") {
-    params.set("min_notional", String(filters.minNotional));
-  }
-};
-
-const appendOptionScopeParams = (
-  params: URLSearchParams,
-  optionScope: OptionScope | undefined
-): void => {
-  if (optionScope?.underlying_ids?.length) {
-    params.set("underlying_ids", optionScope.underlying_ids.join(","));
-  }
-  if (optionScope?.option_contract_id) {
-    params.set("option_contract_id", optionScope.option_contract_id);
-  }
-};
-
-export const getEffectiveOptionPrintFilters = (
-  flowFilters: OptionFlowFilters,
-  isOptionContractFocused: boolean
-): OptionFlowFilters | undefined => {
-  return isOptionContractFocused ? undefined : flowFilters;
-};
-
-export const getOptionScope = (
-  activeTickers: string[],
-  instrumentUnderlying: string | null,
-  selectedInstrument: SelectedInstrument
-): OptionScope => ({
-  underlying_ids:
-    selectedInstrument?.kind === "option-contract"
-      ? instrumentUnderlying
-        ? [instrumentUnderlying]
-        : undefined
-      : activeTickers.length > 0
-        ? activeTickers
-        : instrumentUnderlying
-          ? [instrumentUnderlying]
-          : undefined,
-  option_contract_id:
-    selectedInstrument?.kind === "option-contract" ? selectedInstrument.contractId : undefined
-});
-
-export const buildOptionTapeQueryParams = (
-  filters: OptionFlowFilters | undefined,
-  optionScope: OptionScope | undefined
-): Record<string, string | undefined> => {
-  const params = new URLSearchParams();
-  appendOptionFlowFilters(params, filters);
-  appendOptionScopeParams(params, optionScope);
-  return Object.fromEntries(params.entries());
-};
-
-export const filterOptionTapeItems = (
-  items: OptionPrint[],
-  filters: OptionFlowFilters | undefined,
-  selectedInstrument: SelectedInstrument,
-  tickerSet: Set<string>,
-  instrumentUnderlying: string | null
-): OptionPrint[] => {
-  return items.filter((print) => {
-    const contractId = normalizeContractId(print.option_contract_id);
-    if (selectedInstrument?.kind === "option-contract") {
-      return contractId === selectedInstrument.contractId;
-    }
-    if (!matchesOptionPrintFilters(print, filters)) {
-      return false;
-    }
-    const underlying = extractUnderlying(contractId);
-    if (tickerSet.size === 0) {
-      return !instrumentUnderlying || underlying === instrumentUnderlying;
-    }
-    return Boolean(underlying) && tickerSet.has(underlying.toUpperCase());
-  });
-};
-
-export const shouldClearOptionFocusSeed = (
-  seed: TapeFocusSeed<OptionPrint> | null,
-  optionFocusScopeKey: string | null,
-  currentOptionSubscriptionKey: string | null,
-  liveItems: OptionPrint[],
-  historyItems: OptionPrint[]
-): boolean => {
-  if (!seed) {
-    return false;
-  }
-  if (seed.scopeKey !== optionFocusScopeKey) {
-    return true;
-  }
-  if (seed.subscriptionKey && seed.subscriptionKey !== currentOptionSubscriptionKey) {
-    return false;
-  }
-  const liveKeys = new Set(
-    composeTapeItems([], liveItems, historyItems).map((item) => getTapeItemKey(item))
-  );
-  return seed.items.every((item) => liveKeys.has(getTapeItemKey(item)));
-};
-
-const appendLiveScopeParams = (params: URLSearchParams, subscription: LiveSubscription): void => {
-  if (
-    (subscription.channel === "options" || subscription.channel === "equities") &&
-    subscription.underlying_ids?.length
-  ) {
-    params.set("underlying_ids", subscription.underlying_ids.join(","));
-  }
-  if (subscription.channel === "options" && subscription.option_contract_id) {
-    params.set("option_contract_id", subscription.option_contract_id);
-  }
-};
-
-const dedupeLiveSubscriptions = (subscriptions: LiveSubscription[]): LiveSubscription[] => {
-  const seen = new Set<string>();
-  return subscriptions.filter((subscription) => {
-    const key = getLiveSubscriptionKey(subscription);
-    if (seen.has(key)) {
-      return false;
-    }
-    seen.add(key);
-    return true;
-  });
-};
-
-export const getLiveManifest = (
-  pathname: string,
-  chartTicker: string,
-  chartIntervalMs: number,
-  flowFilters: OptionFlowFilters,
-  optionScope?: OptionScope,
-  equityScope?: EquityScope,
-  optionPrintFilters?: OptionFlowFilters
-): LiveSubscription[] => {
-  const features = getRouteFeatures(pathname);
-  const subscriptions: LiveSubscription[] = [];
-
-  if (features.options) {
-    subscriptions.push({
-      channel: "options",
-      filters:
-        optionScope?.option_contract_id && optionPrintFilters === undefined
-          ? undefined
-          : (optionPrintFilters ?? flowFilters),
-      ...optionScope,
-      snapshot_limit: LIVE_OPTIONS_HEAD_LIMIT
-    });
-  }
-  if (features.nbbo) {
-    subscriptions.push({ channel: "nbbo", snapshot_limit: LIVE_HOT_WINDOW });
-  }
-  if (features.equities) {
-    subscriptions.push({ channel: "equities", ...equityScope, snapshot_limit: LIVE_HOT_WINDOW });
-  }
-  if (features.flow) {
-    subscriptions.push({ channel: "flow", filters: flowFilters, snapshot_limit: LIVE_HOT_WINDOW });
-  }
-  if (features.news) {
-    subscriptions.push({ channel: "news", snapshot_limit: LIVE_OPTIONS_HEAD_LIMIT });
-  }
-  if (features.alerts) {
-    subscriptions.push({ channel: "alerts", snapshot_limit: LIVE_HOT_WINDOW });
-  }
-  if (features.smartMoney) {
-    subscriptions.push({ channel: "smart-flow", snapshot_limit: LIVE_HOT_WINDOW });
-    subscriptions.push({ channel: "smart-money", snapshot_limit: LIVE_HOT_WINDOW });
-  }
-  if (features.classifierHits) {
-    subscriptions.push({ channel: "classifier-hits", snapshot_limit: LIVE_HOT_WINDOW });
-  }
-  if (features.inferredDark) {
-    subscriptions.push({ channel: "inferred-dark", snapshot_limit: LIVE_HOT_WINDOW });
-  }
-  if (features.equityJoins) {
-    subscriptions.push({ channel: "equity-joins", snapshot_limit: LIVE_HOT_WINDOW });
-  }
-  if (features.equityCandles) {
-    subscriptions.push({
-      channel: "equity-candles",
-      underlying_id: chartTicker,
-      interval_ms: chartIntervalMs
-    });
-  }
-  if (features.equityOverlay) {
-    subscriptions.push({
-      channel: "equity-overlay",
-      underlying_id: chartTicker
-    });
-  }
-
-  return dedupeLiveSubscriptions(subscriptions);
 };
 
 const useLiveSession = (
@@ -5146,80 +3872,6 @@ type AlertContextStatus = {
   error: string | null;
 };
 
-export const buildAlertContextPath = (traceId: string): string =>
-  `/flow/alerts/${encodeURIComponent(traceId)}/context`;
-
-export const collectAlertContextEvidence = (
-  bundle: AlertContextBundle
-): {
-  packets: Map<string, FlowPacket>;
-  prints: Map<string, OptionPrint>;
-} => {
-  const packets = new Map<string, FlowPacket>();
-  const prints = new Map<string, OptionPrint>();
-
-  for (const packet of bundle.flow_packets) {
-    if (packet.id) {
-      packets.set(packet.id, packet);
-    }
-    if (packet.trace_id) {
-      packets.set(packet.trace_id, packet);
-    }
-  }
-  for (const print of bundle.option_prints) {
-    if (print.trace_id) {
-      prints.set(print.trace_id, print);
-    }
-  }
-
-  return { packets, prints };
-};
-
-export const getAlertFlowPacketRefs = (alert: Pick<AlertEvent, "evidence_refs">): string[] => {
-  return alert.evidence_refs.filter((ref) => ref.startsWith("flowpacket:"));
-};
-
-export const getSmartFlowEvidenceRefs = (
-  projection: Pick<SmartFlowExplainabilityProjection, "refs" | "evidence" | "hypothesis">
-): string[] =>
-  uniqueNonEmpty([
-    ...projection.refs.evidence_refs,
-    ...projection.evidence.evidence_refs,
-    ...projection.hypothesis.evidence_refs
-  ]);
-
-export const isSmartFlowPacketRef = (ref: string): boolean => ref.startsWith("flowpacket:");
-
-export const getSmartFlowPacketRefs = (
-  projection: Pick<SmartFlowExplainabilityProjection, "refs" | "evidence" | "hypothesis">
-): string[] => getSmartFlowEvidenceRefs(projection).filter(isSmartFlowPacketRef);
-
-export const getSmartFlowOptionPrintRefs = (
-  projection: Pick<SmartFlowExplainabilityProjection, "refs" | "evidence" | "hypothesis">
-): string[] => getSmartFlowEvidenceRefs(projection).filter((ref) => !isSmartFlowPacketRef(ref));
-
-export const getSmartFlowPinnedFlowKeys = (
-  projection: Pick<SmartFlowExplainabilityProjection, "refs" | "evidence" | "hypothesis"> | null
-): string[] => (projection ? getSmartFlowPacketRefs(projection) : []);
-
-export const getSmartFlowPinnedOptionKeys = (
-  projection: Pick<SmartFlowExplainabilityProjection, "refs" | "evidence" | "hypothesis"> | null
-): string[] => (projection ? getSmartFlowOptionPrintRefs(projection) : []);
-
-export const resolveAlertFlowPacket = (
-  alert: Pick<AlertEvent, "evidence_refs">,
-  packets: Map<string, FlowPacket>
-): FlowPacket | null => {
-  for (const ref of getAlertFlowPacketRefs(alert)) {
-    const packet = packets.get(ref);
-    if (packet) {
-      return packet;
-    }
-  }
-
-  return null;
-};
-
 type DarkEvidenceItem =
   | { kind: "join"; id: string; join: EquityPrintJoin }
   | { kind: "unknown"; id: string };
@@ -6039,25 +4691,6 @@ const formatFlowMetric = (value: number, suffix?: string): string => {
   }
 
   return value.toLocaleString();
-};
-
-const TICKER_FILTER_INPUT_MAX_LENGTH = 120;
-
-export const normalizeTickerFilterInput = (value: string): string =>
-  value
-    .normalize("NFKC")
-    .replace(/[\u0000-\u001f\u007f]+/g, " ")
-    .replace(/，/g, ",")
-    .replace(/\s+/g, " ")
-    .toUpperCase()
-    .slice(0, TICKER_FILTER_INPUT_MAX_LENGTH);
-
-export const parseTickerFilterInput = (value: string): string[] => {
-  const parts = normalizeTickerFilterInput(value)
-    .split(/[,\s]+/)
-    .map((part) => part.trim())
-    .filter(Boolean);
-  return Array.from(new Set(parts));
 };
 
 const useTerminalState = () => {
@@ -8113,12 +6746,6 @@ const useTerminal = (): TerminalState => {
   }
   return value;
 };
-
-export const NAV_ITEMS = [
-  { href: "/", label: "Dashboard" },
-  { href: "/options", label: "Options" },
-  { href: "/news", label: "News" }
-] as const;
 
 type PageFrameVariant = "default" | "dashboard" | "options" | "news";
 
