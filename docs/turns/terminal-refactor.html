@@ -1,0 +1,928 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Terminal Refactor Closeout</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #05070a;
+        --panel: #0b1118;
+        --panel-2: #101820;
+        --panel-3: #151f29;
+        --border: rgba(230, 237, 244, 0.14);
+        --border-strong: rgba(245, 166, 35, 0.38);
+        --text: #e6edf4;
+        --muted: #94a3b5;
+        --faint: #6f7d8f;
+        --accent: #f5a623;
+        --green: #23c17a;
+        --blue: #56a8ff;
+        --red: #ff6b5f;
+        --code: #091018;
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        background: var(--bg);
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--text);
+        background:
+          linear-gradient(180deg, rgba(16, 24, 32, 0.96), rgba(5, 7, 10, 0.99) 38rem),
+          var(--bg);
+        font-family: var(--sans);
+        line-height: 1.5;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .page {
+        width: min(1220px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 34px 0 64px;
+      }
+
+      .hero {
+        display: grid;
+        gap: 20px;
+        padding-bottom: 28px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .kicker,
+      .label,
+      .status,
+      th,
+      .issue {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .kicker {
+        color: var(--accent);
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 16ch;
+        font-size: clamp(2rem, 6vw, 4.8rem);
+        line-height: 0.98;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        font-size: 1.22rem;
+        line-height: 1.2;
+      }
+
+      h3 {
+        font-size: 1rem;
+        line-height: 1.2;
+      }
+
+      code,
+      pre {
+        font-family: var(--mono);
+      }
+
+      code {
+        color: #f7c879;
+      }
+
+      .lede {
+        max-width: 78ch;
+        color: var(--muted);
+        font-size: 1rem;
+      }
+
+      .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 1px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        background: var(--border);
+      }
+
+      .meta-cell {
+        min-width: 0;
+        padding: 13px;
+        background: rgba(11, 17, 24, 0.96);
+      }
+
+      .meta-cell strong {
+        display: block;
+        margin-top: 4px;
+        font-family: var(--mono);
+        font-size: 0.88rem;
+        overflow-wrap: anywhere;
+      }
+
+      .section {
+        margin-top: 30px;
+      }
+
+      .section-head {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 16px;
+        padding-bottom: 11px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .section-head p {
+        max-width: 62ch;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1px;
+        margin-top: 16px;
+        border: 1px solid var(--border);
+        background: var(--border);
+      }
+
+      .summary-card {
+        min-width: 0;
+        padding: 16px;
+        background: rgba(16, 24, 32, 0.94);
+      }
+
+      .summary-card .number {
+        display: block;
+        margin-bottom: 6px;
+        font-family: var(--mono);
+        font-size: 1.5rem;
+        color: var(--accent);
+      }
+
+      .summary-card p,
+      .muted {
+        color: var(--muted);
+      }
+
+      .phase-table {
+        width: 100%;
+        margin-top: 16px;
+        border-collapse: collapse;
+        border: 1px solid var(--border);
+        background: rgba(11, 17, 24, 0.94);
+      }
+
+      th,
+      td {
+        padding: 12px;
+        vertical-align: top;
+        border-bottom: 1px solid var(--border);
+      }
+
+      th {
+        color: var(--faint);
+        text-align: left;
+        background: rgba(5, 7, 10, 0.5);
+      }
+
+      td {
+        color: var(--text);
+        font-size: 0.91rem;
+      }
+
+      .issue {
+        color: var(--faint);
+        letter-spacing: 0.08em;
+      }
+
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 5px 8px;
+        border: 1px solid rgba(35, 193, 122, 0.38);
+        border-radius: 999px;
+        color: var(--green);
+        background: rgba(35, 193, 122, 0.1);
+      }
+
+      .status::before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        background: currentColor;
+      }
+
+      .phase-card-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 16px;
+      }
+
+      .phase-card {
+        min-width: 0;
+        border: 1px solid var(--border);
+        background: rgba(16, 24, 32, 0.9);
+      }
+
+      .phase-card header {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 14px 15px 12px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .phase-card .body {
+        display: grid;
+        gap: 12px;
+        padding: 14px 15px 15px;
+      }
+
+      .mini-list {
+        display: grid;
+        gap: 7px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .mini-list li {
+        padding-left: 13px;
+        border-left: 2px solid rgba(245, 166, 35, 0.44);
+      }
+
+      .gate-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1px;
+        margin-top: 16px;
+        border: 1px solid var(--border);
+        background: var(--border);
+      }
+
+      .gate {
+        min-width: 0;
+        padding: 13px;
+        background: rgba(16, 24, 32, 0.94);
+      }
+
+      .gate strong {
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      .gate p {
+        color: var(--muted);
+        font-size: 0.88rem;
+      }
+
+      .diff-stat {
+        display: grid;
+        gap: 6px;
+        margin: 16px 0 12px;
+        padding: 14px;
+        border: 1px solid var(--border);
+        background: rgba(16, 24, 32, 0.92);
+      }
+
+      .diff-stat pre,
+      .diff-fallback pre {
+        margin: 0;
+        overflow: auto;
+        white-space: pre;
+        tab-size: 2;
+      }
+
+      .diff-fallback {
+        border: 1px solid var(--border);
+        background: var(--code);
+      }
+
+      .diff-fallback header {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--border);
+        background: rgba(16, 24, 32, 0.94);
+      }
+
+      .diff-fallback pre {
+        padding: 14px;
+        color: #c6d3e1;
+        font-size: 0.78rem;
+        line-height: 1.45;
+      }
+
+      .renderer-note {
+        margin-top: 10px;
+        color: var(--faint);
+        font-size: 0.84rem;
+      }
+
+      .timeline {
+        display: grid;
+        gap: 1px;
+        margin-top: 16px;
+        border: 1px solid var(--border);
+        background: var(--border);
+      }
+
+      .timeline-row {
+        display: grid;
+        grid-template-columns: minmax(160px, 0.72fr) minmax(220px, 1fr) minmax(180px, 0.7fr) minmax(160px, 0.7fr);
+        gap: 1px;
+      }
+
+      .timeline-row > * {
+        min-width: 0;
+        padding: 11px 12px;
+        background: rgba(16, 24, 32, 0.94);
+        font-size: 0.89rem;
+      }
+
+      .timeline-row.header > * {
+        color: var(--faint);
+        background: rgba(5, 7, 10, 0.5);
+      }
+
+      .foot {
+        margin-top: 30px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      @media (max-width: 880px) {
+        .meta-grid,
+        .summary-grid,
+        .phase-card-grid,
+        .gate-grid,
+        .timeline-row {
+          grid-template-columns: 1fr;
+        }
+
+        h1 {
+          font-size: 2.35rem;
+        }
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "@pierre/diffs/react": "../../node_modules/@pierre/diffs/dist/react/index.js",
+          "react": "../../node_modules/react/index.js",
+          "react-dom/client": "../../node_modules/react-dom/client.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <p class="kicker">Islandflow Terminal</p>
+        <h1>Terminal refactor closeout</h1>
+        <p class="lede">
+          The terminal refactor moved the former single-file terminal implementation into a phase-bounded feature module set while preserving the public facade used by tests, routes, and shell integration. All six Beads phase issues are closed, all Forgejo PRs are merged, and the final Beads/implementation board snapshot is committed on <code>main</code>.
+        </p>
+        <div class="meta-grid" aria-label="Closeout metadata">
+          <div class="meta-cell">
+            <span class="label">Date</span>
+            <strong>2026-06-20</strong>
+          </div>
+          <div class="meta-cell">
+            <span class="label">Range</span>
+            <strong>5b5afff..e4a2076</strong>
+          </div>
+          <div class="meta-cell">
+            <span class="label">Beads</span>
+            <strong>islandflow-e30y.1 through .6 closed</strong>
+          </div>
+          <div class="meta-cell">
+            <span class="label">Current phase</span>
+            <strong>all closed</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <p class="kicker">Outcome</p>
+            <h2>What changed</h2>
+          </div>
+          <p>The refactor replaced a large route-and-terminal file with a facade backed by focused terminal modules.</p>
+        </div>
+        <div class="summary-grid">
+          <div class="summary-card">
+            <span class="number">11,107 -> 159</span>
+            <strong><code>apps/web/app/terminal.tsx</code></strong>
+            <p>The route file now exports the compatibility facade and route entry points instead of owning all terminal logic.</p>
+          </div>
+          <div class="summary-card">
+            <span class="number">21</span>
+            <strong>Feature modules</strong>
+            <p>Pure helpers, transport, live hooks, scroll hooks, state, shell, charts, panes, drawers, and primitives now live under <code>apps/web/features/terminal</code>.</p>
+          </div>
+          <div class="summary-card">
+            <span class="number">6 / 6</span>
+            <strong>Phase issues closed</strong>
+            <p>Each phase landed through a Forgejo PR with Beads notes, local gates, CI validation, and an orchestration closeout commit.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <p class="kicker">Phase Ledger</p>
+            <h2>Beads and PR status</h2>
+          </div>
+          <p>Statuses use Beads language. Implementation threads did not create turn docs; this file is the single final turn document.</p>
+        </div>
+        <table class="phase-table">
+          <thead>
+            <tr>
+              <th>Phase</th>
+              <th>Issue</th>
+              <th>PR</th>
+              <th>Status</th>
+              <th>CI</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>01 - Scaffold and pure utilities</strong><br /><span class="muted">Config, route, filter, format, evidence, chart marker, and tape helpers.</span></td>
+              <td><span class="issue">islandflow-e30y.1</span></td>
+              <td><a href="https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/49">Forgejo PR #49</a></td>
+              <td><span class="status">closed</span></td>
+              <td>Validate #150 passed on <code>110450baa2</code>; main closeout Validate #152 passed.</td>
+            </tr>
+            <tr>
+              <td><strong>02 - Data hooks</strong><br /><span class="muted">Scroll, virtual list, tape, live stream, session, and transport hooks.</span></td>
+              <td><span class="issue">islandflow-e30y.2</span></td>
+              <td><a href="https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/50">Forgejo PR #50</a></td>
+              <td><span class="status">closed</span></td>
+              <td>Validate #153 passed on <code>b81abf9b36</code>; main closeout Validate #155 passed.</td>
+            </tr>
+            <tr>
+              <td><strong>03 - State and shell</strong><br /><span class="muted">Terminal context/state helpers, app shell, nav, topbar, metrics, and synthetic controls.</span></td>
+              <td><span class="issue">islandflow-e30y.3</span></td>
+              <td><a href="https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/51">Forgejo PR #51</a></td>
+              <td><span class="status">closed</span></td>
+              <td>Validate #157 passed on <code>828f5fd25b</code>; main closeout Validate #159 passed.</td>
+            </tr>
+            <tr>
+              <td><strong>04 - UI components</strong><br /><span class="muted">Terminal primitives, OPRA, news, chart/dashboard surfaces, drawers, and UI helpers.</span></td>
+              <td><span class="issue">islandflow-e30y.4</span></td>
+              <td><a href="https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/52">Forgejo PR #52</a></td>
+              <td><span class="status">closed</span></td>
+              <td>Validate #161 passed on <code>4a0ccb9b2d</code>; main closeout Validate #163 passed.</td>
+            </tr>
+            <tr>
+              <td><strong>05 - Cleanup retired code</strong><br /><span class="muted">Removed retired route exports, unreachable panes, route branches, styles, and table config.</span></td>
+              <td><span class="issue">islandflow-e30y.5</span></td>
+              <td><a href="https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/53">Forgejo PR #53</a></td>
+              <td><span class="status">closed</span></td>
+              <td>Validate #164 passed on <code>5caee02fa1</code>; main closeout Validate #166 passed.</td>
+            </tr>
+            <tr>
+              <td><strong>06 - Final verification and publish</strong><br /><span class="muted">Full gate sweep, final board sync, Beads closeout, and pushed main state.</span></td>
+              <td><span class="issue">islandflow-e30y.6</span></td>
+              <td><a href="https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/54">Forgejo PR #54</a></td>
+              <td><span class="status">closed</span></td>
+              <td>Validate #167 passed on <code>3e3ff887a0</code>; main closeout Validate #169 passed.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <p class="kicker">Task Detail</p>
+            <h2>Phase summaries</h2>
+          </div>
+          <p>Each phase stayed inside the staged refactor boundary from <code>docs/implementation/terminal-refactor/IMPLEMENT.md</code>.</p>
+        </div>
+        <div class="phase-card-grid">
+          <article class="phase-card">
+            <header><h3>01 - Scaffold and pure utilities</h3><span class="status">closed</span></header>
+            <div class="body">
+              <ul class="mini-list">
+                <li>Created the feature folder and moved route/config/format/filter/evidence/chart-marker/tape helpers behind compatibility exports.</li>
+                <li>Review fixed the initial formatting CI failure, normalized <code>IMPLEMENT.html</code> statuses, and removed the child-created turn note.</li>
+                <li>Gates included format, lint, typecheck, terminal tests, route tests, public API route check, docker workspace check, web build, and Forgejo Validate.</li>
+              </ul>
+            </div>
+          </article>
+          <article class="phase-card">
+            <header><h3>02 - Data hooks</h3><span class="status">closed</span></header>
+            <div class="body">
+              <ul class="mini-list">
+                <li>Extracted scroll and virtual-list hooks into <code>scroll.ts</code>.</li>
+                <li>Extracted tape, pausable tape, live stream, and live session hooks into <code>live.ts</code>.</li>
+                <li>Moved URL, error, replay transport, debug counter, and transport helpers into focused modules.</li>
+              </ul>
+            </div>
+          </article>
+          <article class="phase-card">
+            <header><h3>03 - State and shell</h3><span class="status">closed</span></header>
+            <div class="body">
+              <ul class="mini-list">
+                <li>Moved <code>useTerminalState</code>, <code>TerminalContext</code>, and <code>useTerminal</code> into <code>state.tsx</code>.</li>
+                <li>Moved shell/chrome/nav/topbar/ticker controls/mode switch/metrics/synthetic dock into <code>shell.tsx</code>.</li>
+                <li>Review corrected stale implementation-board status metadata before merge.</li>
+              </ul>
+            </div>
+          </article>
+          <article class="phase-card">
+            <header><h3>04 - UI components</h3><span class="status">closed</span></header>
+            <div class="body">
+              <ul class="mini-list">
+                <li>Extracted terminal primitives, flow filters, OPRA/news panes and rails, chart/dashboard components, drawer rendering, and UI helpers.</li>
+                <li>Kept <code>apps/web/app/terminal.tsx</code> as the route/facade compatibility layer.</li>
+                <li>Review narrowed accidental public facade export widening so internals did not become compatibility surface.</li>
+              </ul>
+            </div>
+          </article>
+          <article class="phase-card">
+            <header><h3>05 - Cleanup retired code</h3><span class="status">closed</span></header>
+            <div class="body">
+              <ul class="mini-list">
+                <li>Removed retired <code>SignalsRoute</code>, <code>ChartsRoute</code>, and <code>ReplayRoute</code> exports.</li>
+                <li>Deleted pane/components reachable only through retired routes, including alerts/classifier/dark/focus/replay/equities surfaces.</li>
+                <li>Retained <code>/tape</code> compatibility, replay data mode, <code>/replay/*</code> data endpoints, smart-money fallback behavior, and <code>/mock*</code> bypass.</li>
+              </ul>
+            </div>
+          </article>
+          <article class="phase-card">
+            <header><h3>06 - Final verification and publish</h3><span class="status">closed</span></header>
+            <div class="body">
+              <ul class="mini-list">
+                <li>Ran the full final gate sweep and confirmed PR CI through Forgejo Actions tasks because <code>fj pr status</code> still has a response-shape parsing issue.</li>
+                <li>Closed <code>islandflow-e30y.6</code>, updated <code>IMPLEMENT.html</code> to all closed, exported Beads, pushed main, and confirmed Validate #169.</li>
+                <li>This document completes the orchestration-owned turn documentation step.</li>
+              </ul>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <p class="kicker">Gates</p>
+            <h2>Verification evidence</h2>
+          </div>
+          <p>Each PR had phase-local gates. Phase 06 performed the full final sweep before merge.</p>
+        </div>
+        <div class="gate-grid">
+          <div class="gate">
+            <strong><code>bun test</code></strong>
+            <p>Passed in phase 06 after dependency setup; earlier phases ran focused terminal and route test gates.</p>
+          </div>
+          <div class="gate">
+            <strong><code>bun --cwd=apps/web run build</code></strong>
+            <p>Passed for every UI-touching phase and in the final verification PR.</p>
+          </div>
+          <div class="gate">
+            <strong><code>bun run fmt:check</code> and <code>bun run lint</code></strong>
+            <p>Passed after the phase 01 review fixed the initial format failure; all later phases reported clean format/lint gates.</p>
+          </div>
+          <div class="gate">
+            <strong><code>bun run typecheck</code></strong>
+            <p>Passed in phase 06 as part of the final verification sweep.</p>
+          </div>
+          <div class="gate">
+            <strong><code>bun run check:public-api-routes</code></strong>
+            <p>Passed in phase 01 review follow-up and phase 06 final verification.</p>
+          </div>
+          <div class="gate">
+            <strong><code>bun run check:docker-workspace</code></strong>
+            <p>Passed in phase 01 review follow-up and phase 06 final verification.</p>
+          </div>
+          <div class="gate">
+            <strong><code>git diff --check</code></strong>
+            <p>Passed on phase branches and final verification.</p>
+          </div>
+          <div class="gate">
+            <strong>Forgejo Actions Validate</strong>
+            <p>PR and main closeout validation passed for each phase. The final main closeout was Validate #169 on <code>e4a207624f</code>.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <p class="kicker">CI Timeline</p>
+            <h2>Forgejo Actions</h2>
+          </div>
+          <p>Cancelled merge-commit validations were superseded by explicit phase closeout commits that passed.</p>
+        </div>
+        <div class="timeline" aria-label="Forgejo validation timeline">
+          <div class="timeline-row header">
+            <div>Run</div>
+            <div>Commit</div>
+            <div>Trigger</div>
+            <div>Status</div>
+          </div>
+          <div class="timeline-row"><div>#150</div><div><code>110450baa2</code> phase 01 final PR head</div><div>pull_request</div><div>success</div></div>
+          <div class="timeline-row"><div>#152</div><div><code>be74073ca8</code> close phase 01</div><div>push</div><div>success</div></div>
+          <div class="timeline-row"><div>#153</div><div><code>b81abf9b36</code> phase 02 PR head</div><div>pull_request</div><div>success</div></div>
+          <div class="timeline-row"><div>#155</div><div><code>6265e62949</code> close phase 02</div><div>push</div><div>success</div></div>
+          <div class="timeline-row"><div>#157</div><div><code>828f5fd25b</code> phase 03 review fix</div><div>pull_request</div><div>success</div></div>
+          <div class="timeline-row"><div>#159</div><div><code>f17f30db3a</code> close phase 03</div><div>push</div><div>success</div></div>
+          <div class="timeline-row"><div>#161</div><div><code>4a0ccb9b2d</code> phase 04 review fix</div><div>pull_request</div><div>success</div></div>
+          <div class="timeline-row"><div>#163</div><div><code>89c46b4b89</code> close phase 04</div><div>push</div><div>success</div></div>
+          <div class="timeline-row"><div>#164</div><div><code>5caee02fa1</code> phase 05 PR head</div><div>pull_request</div><div>success</div></div>
+          <div class="timeline-row"><div>#166</div><div><code>6cf8d0cea0</code> close phase 05</div><div>push</div><div>success</div></div>
+          <div class="timeline-row"><div>#167</div><div><code>3e3ff887a0</code> phase 06 PR head</div><div>pull_request</div><div>success</div></div>
+          <div class="timeline-row"><div>#169</div><div><code>e4a207624f</code> close phase 06</div><div>push</div><div>success</div></div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <p class="kicker">Relevant Diff Snippets</p>
+            <h2>Refactor shape</h2>
+          </div>
+          <p>The full patch is large; this section records the shape and a focused excerpt. The readable HTML fallback remains visible if the browser cannot load the local rich diff renderer.</p>
+        </div>
+        <div class="diff-stat">
+          <strong>Focused diffstat from <code>5b5afff..HEAD</code></strong>
+          <pre><code>apps/web/app/terminal.tsx                          | 11235 +------------------
+apps/web/features/terminal/charts/markers.ts       |    58 +
+apps/web/features/terminal/components/charts.tsx   |  1483 +++
+apps/web/features/terminal/components/drawers.tsx  |   930 ++
+apps/web/features/terminal/components/news.tsx     |   258 +
+apps/web/features/terminal/components/opra.tsx     |   502 +
+apps/web/features/terminal/components/primitives.tsx | 377 +
+apps/web/features/terminal/config.ts               |   101 +
+apps/web/features/terminal/live.ts                 |  1624 +++
+apps/web/features/terminal/state.tsx               |  2233 ++++
+apps/web/features/terminal/shell.tsx               |   700 ++
+docs/implementation/terminal-refactor/IMPLEMENT.html | 616 +
+24 files changed, 11408 insertions(+), 11138 deletions(-)</code></pre>
+        </div>
+        <div id="rich-diff-root" hidden></div>
+        <div class="diff-fallback" id="diff-fallback">
+          <header>
+            <strong>HTML fallback excerpt</strong>
+            <span class="muted">unified diff excerpt</span>
+          </header>
+          <pre><code>diff --git a/apps/web/app/terminal.tsx b/apps/web/app/terminal.tsx
+index 592f68c..1fa03bf 100644
+--- a/apps/web/app/terminal.tsx
++++ b/apps/web/app/terminal.tsx
+@@ -1,11107 +1,105 @@
+ &quot;use client&quot;;
+
+-import type {
+-  AlertEvent,
+-  ClassifierHitEvent,
+-  Cursor,
+-  EquityCandle,
+-  EquityPrint,
+-  FlowPacket,
+-  LiveServerMessage,
+-  NewsStory,
+-  OptionFlowFilters,
+-  SmartMoneyEvent,
+-  SyntheticControlState
+-} from &quot;@islandflow/types&quot;;
+-import { useVirtualizer } from &quot;@tanstack/react-virtual&quot;;
+-import { createChart } from &quot;lightweight-charts&quot;;
+-import Link from &quot;next/link&quot;;
+-import * as nextNavigation from &quot;next/navigation&quot;;
+-import {
+-  createContext,
+-  memo,
+-  useCallback,
+-  useContext,
+-  useEffect,
+-  useMemo,
+-  useRef,
+-  useState
+-} from &quot;react&quot;;
++import type { ReactNode } from &quot;react&quot;;
++
++import {
++  ChartPane,
++  CommandDecisionLevels,
++  CommandDeckHeader,
++  CommandMetricsStrip,
++  CommandPriorityBoard,
++  CommandSymbolRail,
++  EventContextPane,
++  FeedHealthPane,
++  HomeReplayRail
++} from &quot;../features/terminal/components/charts&quot;;
++import { renderTerminalDrawers } from &quot;../features/terminal/components/drawers&quot;;
++import { NewsControlRails, NewsPane } from &quot;../features/terminal/components/news&quot;;
++import { FlowPane, OpraIntakeRail, OptionsPane } from &quot;../features/terminal/components/opra&quot;;
++import { FlowFilterPopover, PageFrame } from &quot;../features/terminal/components/primitives&quot;;
++import { TerminalAppShell as TerminalFeatureAppShell } from &quot;../features/terminal/shell&quot;;
++import { useTerminal } from &quot;../features/terminal/state&quot;;
+
+-const LIVE_HOT_WINDOW = parseBoundedInt(process.env.NEXT_PUBLIC_LIVE_HOT_WINDOW, 600, 1, 100000);
+-const TAPE_VIRTUAL_CONFIG = {
+-  options: { rowHeight: 36, overscan: 44, debugLabel: &quot;options&quot; },
+-  equities: { rowHeight: 36, overscan: 36, debugLabel: &quot;equities&quot; },
+-  flow: { rowHeight: 44, overscan: 24, debugLabel: &quot;flow&quot; },
+-  alerts: { rowHeight: 44, overscan: 24, debugLabel: &quot;alerts&quot; },
+-  classifier: { rowHeight: 44, overscan: 24, debugLabel: &quot;classifier&quot; },
+-  dark: { rowHeight: 44, overscan: 24, debugLabel: &quot;dark&quot; },
+-  news: { rowHeight: 52, overscan: 28, debugLabel: &quot;news&quot; }
+-};
++export { getChartFlowMarkerItems } from &quot;../features/terminal/charts/markers&quot;;
++export {
++  getTapeVirtualConfig,
++  isSyntheticAdminVisible,
++  shouldIncludeEquitiesForDarkUnderlyingFallback
++} from &quot;../features/terminal/config&quot;;
++export { getRouteFeatures, normalizeTerminalPathname } from &quot;../features/terminal/routes&quot;;
+
+@@ -11070,91 +74,13 @@
+-        {state.selectedSmartMoneyEvent ? (
+-          &lt;SmartMoneyDrawer
+-            event={state.selectedSmartMoneyEvent}
+-            flowPacket={state.selectedSmartMoneyFlowPacket}
+-            evidence={state.selectedSmartMoneyEvidence}
+-            onClose={() =&gt; state.setSelectedSmartMoneyEvent(null)}
+-          /&gt;
+-        ) : null}
+-      &lt;/div&gt;
+-    &lt;/TerminalContext.Provider&gt;
++    &lt;TerminalFeatureAppShell renderDrawers={renderTerminalDrawers}&gt;
++      {children}
++    &lt;/TerminalFeatureAppShell&gt;
+   );
+ }
+
+@@ -11160,41 +158,2 @@ export function OptionsRoute() {
+   );
+ }
+-
+-export function SignalsRoute() { ... }
+-export function ChartsRoute() { ... }
+-export function ReplayRoute() { ... }
+
+diff --git a/docs/implementation/terminal-refactor/IMPLEMENT.html b/docs/implementation/terminal-refactor/IMPLEMENT.html
+index caf7244..40c1fb4 100644
+--- a/docs/implementation/terminal-refactor/IMPLEMENT.html
++++ b/docs/implementation/terminal-refactor/IMPLEMENT.html
+@@ -401,7 +401,7 @@
+-            &lt;strong&gt;06 in_progress&lt;/strong&gt;
++            &lt;strong&gt;all closed&lt;/strong&gt;
+@@ -489,12 +489,12 @@
+-        &lt;div class=&quot;status-row&quot; role=&quot;row&quot; data-issue=&quot;islandflow-e30y.6&quot; data-status=&quot;in_progress&quot;&gt;
++        &lt;div class=&quot;status-row&quot; role=&quot;row&quot; data-issue=&quot;islandflow-e30y.6&quot; data-status=&quot;closed&quot;&gt;
+-          &lt;div&gt;&lt;span class=&quot;status in_progress&quot;&gt;in_progress&lt;/span&gt;&lt;/div&gt;
+-          &lt;div class=&quot;muted&quot;&gt;&lt;code&gt;islandflow-e30y.5&lt;/code&gt; is closed.&lt;/div&gt;
+-          &lt;div class=&quot;muted&quot;&gt;&lt;code&gt;bun test&lt;/code&gt;, web build, &lt;code&gt;git diff --check&lt;/code&gt;, &lt;code&gt;bd dolt push&lt;/code&gt;, Forgejo push&lt;/div&gt;
++          &lt;div&gt;&lt;span class=&quot;status closed&quot;&gt;closed&lt;/span&gt;&lt;/div&gt;
++          &lt;div class=&quot;muted&quot;&gt;Merged PR #54 and closed in Beads.&lt;/div&gt;
++          &lt;div class=&quot;muted&quot;&gt;&lt;code&gt;bun test&lt;/code&gt;, web build, format, lint, typecheck, public API route check, docker workspace check, diff check, and Forgejo Validate passed.&lt;/div&gt;</code></pre>
+        </div>
+        <p class="renderer-note" id="diff-renderer-status">
+          The document attempts browser-side <code>@pierre/diffs/react</code> <code>PatchDiff</code> rendering and keeps this standard HTML fallback available if the local React renderer cannot load from a standalone file. No SSR or preload diff exports are used.
+        </p>
+        <script type="text/plain" id="diff-source">diff --git a/apps/web/app/terminal.tsx b/apps/web/app/terminal.tsx
+index 592f68c..1fa03bf 100644
+--- a/apps/web/app/terminal.tsx
++++ b/apps/web/app/terminal.tsx
+@@ -1,11107 +1,105 @@
+ "use client";
+
+-import type {
+-  AlertEvent,
+-  ClassifierHitEvent,
+-  Cursor,
+-  EquityCandle,
+-  EquityPrint,
+-  FlowPacket,
+-  LiveServerMessage,
+-  NewsStory,
+-  OptionFlowFilters,
+-  SmartMoneyEvent,
+-  SyntheticControlState
+-} from "@islandflow/types";
++import type { ReactNode } from "react";
++
++import { ChartPane, CommandDeckHeader } from "../features/terminal/components/charts";
++import { renderTerminalDrawers } from "../features/terminal/components/drawers";
++import { TerminalAppShell as TerminalFeatureAppShell } from "../features/terminal/shell";
++import { useTerminal } from "../features/terminal/state";
+
+@@ -11070,91 +74,13 @@
+-      </div>
+-    </TerminalContext.Provider>
++    <TerminalFeatureAppShell renderDrawers={renderTerminalDrawers}>
++      {children}
++    </TerminalFeatureAppShell>
+   );
+ }
+
+@@ -11160,41 +158,2 @@ export function OptionsRoute() {
+   );
+ }
+-
+-export function SignalsRoute() { ... }
+-export function ChartsRoute() { ... }
+-export function ReplayRoute() { ... }
+</script>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <p class="kicker">Repository State</p>
+            <h2>Closeout state</h2>
+          </div>
+          <p>Main contains the merged refactor, the Beads export, the all-closed implementation board, and this turn document.</p>
+        </div>
+        <div class="gate-grid">
+          <div class="gate">
+            <strong>Beads</strong>
+            <p><code>islandflow-e30y.1</code> through <code>islandflow-e30y.6</code> are <code>closed</code>. The final close reason for phase 06 is the merged final verification PR.</p>
+          </div>
+          <div class="gate">
+            <strong>Implementation board</strong>
+            <p><code>docs/implementation/terminal-refactor/IMPLEMENT.html</code> reports <code>all closed</code> and lists phase 06 as <code>closed</code>.</p>
+          </div>
+          <div class="gate">
+            <strong>Forgejo</strong>
+            <p>PRs #49 through #54 are merged. The canonical remote is <code>forgejo</code>.</p>
+          </div>
+          <div class="gate">
+            <strong>Turn docs</strong>
+            <p>No child implementation or review thread created turn docs. This orchestration-owned file is the final consolidated record.</p>
+          </div>
+        </div>
+      </section>
+
+      <p class="foot">
+        Generated by the terminal-refactor orchestration thread after phase 06 closeout and main Validate #169 success. Known tooling note: <code>fj pr status</code> returned a Forgejo response-shape parsing error during this workflow, so CI was verified with <code>fj actions tasks</code>.
+      </p>
+    </main>
+
+    <script type="module">
+      const source = document.getElementById("diff-source")?.textContent?.trim() ?? "";
+      const root = document.getElementById("rich-diff-root");
+      const fallback = document.getElementById("diff-fallback");
+      const status = document.getElementById("diff-renderer-status");
+
+      if (source && root && fallback && status) {
+        try {
+          const React = await import("react");
+          const { createRoot } = await import("react-dom/client");
+          const { PatchDiff } = await import("@pierre/diffs/react");
+          createRoot(root).render(
+            React.createElement(PatchDiff, {
+              patch: source,
+              diffStyle: "unified"
+            })
+          );
+          root.hidden = false;
+          fallback.hidden = true;
+          status.textContent = "Rendered with browser-side @pierre/diffs/react PatchDiff.";
+        } catch (error) {
+          root.hidden = true;
+          fallback.hidden = false;
+          status.textContent =
+            "Standard HTML fallback shown because the local React diff renderer could not load in this standalone document. No SSR or preload diff exports are used.";
+        }
+      }
+    </script>
+  </body>
+</html>
