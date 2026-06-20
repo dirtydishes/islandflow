@@ -48,7 +48,10 @@ export type OptionScope = Pick<
   "underlying_ids" | "option_contract_id"
 >;
 
-export type EquityScope = Pick<Extract<LiveSubscription, { channel: "equities" }>, "underlying_ids">;
+export type EquityScope = Pick<
+  Extract<LiveSubscription, { channel: "equities" }>,
+  "underlying_ids"
+>;
 
 export type SelectedInstrument =
   | null

@@ -1,4 +1,9 @@
-import type { AlertEvent, FlowPacket, OptionPrint, SmartFlowExplainabilityProjection } from "@islandflow/types";
+import type {
+  AlertEvent,
+  FlowPacket,
+  OptionPrint,
+  SmartFlowExplainabilityProjection
+} from "@islandflow/types";
 import { PINNED_EVIDENCE_MAX_ITEMS, PINNED_EVIDENCE_TTL_MS } from "./config";
 import type { PinnedEntry } from "./types";
 
@@ -87,7 +92,7 @@ export const resolveAlertFlowPacket = (
   return null;
 };
 
-export const prunePinnedEntries = <T,>(
+export const prunePinnedEntries = <T>(
   current: Map<string, PinnedEntry<T>>,
   activeKeys: Set<string>,
   now: number

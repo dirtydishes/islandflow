@@ -9,7 +9,13 @@ import type {
 import { matchesOptionPrintFilters } from "@islandflow/types";
 import { FLOW_FILTER_PRESET, LIVE_EQUITIES_SILENT_WARNING_MS } from "./config";
 import { composeTapeItems, getTapeItemKey } from "./tape";
-import type { OptionScope, SelectedInstrument, SortableItem, TapeFocusSeed, WsStatus } from "./types";
+import type {
+  OptionScope,
+  SelectedInstrument,
+  SortableItem,
+  TapeFocusSeed,
+  WsStatus
+} from "./types";
 
 export const DEFAULT_FLOW_SIDES: OptionNbboSide[] = ["AA", "A", "MID"];
 export const DEFAULT_FLOW_OPTION_TYPES: OptionType[] = ["call", "put"];

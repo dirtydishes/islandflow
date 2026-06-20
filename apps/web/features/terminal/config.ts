@@ -17,7 +17,12 @@ const parseBoundedInt = (
   return Math.max(min, Math.min(max, Math.floor(parsed)));
 };
 
-export const LIVE_HOT_WINDOW = parseBoundedInt(process.env.NEXT_PUBLIC_LIVE_HOT_WINDOW, 600, 1, 100000);
+export const LIVE_HOT_WINDOW = parseBoundedInt(
+  process.env.NEXT_PUBLIC_LIVE_HOT_WINDOW,
+  600,
+  1,
+  100000
+);
 export const LIVE_HOT_WINDOW_OPTIONS = parseBoundedInt(
   process.env.NEXT_PUBLIC_LIVE_HOT_WINDOW_OPTIONS,
   1200,

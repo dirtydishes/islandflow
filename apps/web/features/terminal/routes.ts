@@ -227,9 +227,7 @@ export const appendLiveScopeParams = (
   }
 };
 
-export const dedupeLiveSubscriptions = (
-  subscriptions: LiveSubscription[]
-): LiveSubscription[] => {
+export const dedupeLiveSubscriptions = (subscriptions: LiveSubscription[]): LiveSubscription[] => {
   const seen = new Set<string>();
   return subscriptions.filter((subscription) => {
     const key = getLiveSubscriptionKey(subscription);

@@ -1,0 +1,616 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Terminal Refactor Implementation Board</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --bg-elevated: #0b1016;
+        --bg-pane: #111820;
+        --bg-pane-2: #0d141b;
+        --border: rgba(230, 237, 244, 0.14);
+        --border-strong: rgba(245, 166, 35, 0.36);
+        --text: #e6edf4;
+        --text-dim: #90a0b2;
+        --text-faint: #6e7b8c;
+        --accent: #f5a623;
+        --accent-soft: rgba(245, 166, 35, 0.14);
+        --green: #25c17a;
+        --green-soft: rgba(37, 193, 122, 0.13);
+        --red: #ff6b5f;
+        --red-soft: rgba(255, 107, 95, 0.14);
+        --blue: #4da3ff;
+        --blue-soft: rgba(77, 163, 255, 0.14);
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        background: var(--bg);
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--text);
+        background:
+          linear-gradient(180deg, rgba(17, 24, 32, 0.92), rgba(6, 8, 11, 0.98) 42rem),
+          var(--bg);
+        font-family: var(--sans);
+        line-height: 1.5;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .page {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 32px 0 56px;
+      }
+
+      .hero {
+        display: grid;
+        gap: 18px;
+        padding: 22px 0 24px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .kicker,
+      .label,
+      th,
+      .status,
+      .issue {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .kicker {
+        color: var(--accent);
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 15ch;
+        font-size: 2.4rem;
+        line-height: 1.05;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        font-size: 1.12rem;
+        line-height: 1.2;
+      }
+
+      h3 {
+        font-size: 0.98rem;
+        line-height: 1.2;
+      }
+
+      .lede {
+        max-width: 76ch;
+        color: var(--text-dim);
+        font-size: 0.98rem;
+      }
+
+      .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 1px;
+        margin-top: 8px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        background: var(--border);
+      }
+
+      .meta-cell {
+        min-width: 0;
+        padding: 12px;
+        background: rgba(13, 20, 27, 0.96);
+      }
+
+      .meta-cell strong {
+        display: block;
+        margin-top: 4px;
+        font-family: var(--mono);
+        font-size: 0.86rem;
+        overflow-wrap: anywhere;
+      }
+
+      .section {
+        margin-top: 28px;
+      }
+
+      .section-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 16px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .section-head p {
+        color: var(--text-dim);
+        font-size: 0.88rem;
+      }
+
+      .status-row {
+        display: grid;
+        grid-template-columns: minmax(180px, 0.8fr) minmax(180px, 1fr) minmax(120px, 0.55fr) minmax(170px, 0.8fr) minmax(260px, 1.25fr);
+        gap: 1px;
+        margin-top: 1px;
+        background: var(--border);
+      }
+
+      .status-row.header {
+        margin-top: 14px;
+      }
+
+      .status-row > * {
+        min-width: 0;
+        padding: 11px 12px;
+        background: rgba(17, 24, 32, 0.94);
+      }
+
+      .status-row.header > * {
+        background: rgba(11, 16, 22, 0.98);
+        color: var(--text-faint);
+      }
+
+      .phase-title {
+        display: grid;
+        gap: 4px;
+      }
+
+      .issue {
+        color: var(--text-faint);
+        letter-spacing: 0.08em;
+      }
+
+      .status {
+        display: inline-flex;
+        width: fit-content;
+        align-items: center;
+        gap: 7px;
+        padding: 5px 8px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        letter-spacing: 0.08em;
+      }
+
+      .status::before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        background: currentColor;
+      }
+
+      .status.in-progress {
+        color: var(--accent);
+        border-color: var(--border-strong);
+        background: var(--accent-soft);
+      }
+
+      .status.blocked {
+        color: var(--red);
+        border-color: rgba(255, 107, 95, 0.34);
+        background: var(--red-soft);
+      }
+
+      .status.ready {
+        color: var(--blue);
+        border-color: rgba(77, 163, 255, 0.34);
+        background: var(--blue-soft);
+      }
+
+      .status.complete {
+        color: var(--green);
+        border-color: rgba(37, 193, 122, 0.34);
+        background: var(--green-soft);
+      }
+
+      .status.open {
+        color: var(--text-dim);
+        background: rgba(230, 237, 244, 0.05);
+      }
+
+      .muted {
+        color: var(--text-dim);
+      }
+
+      .faint {
+        color: var(--text-faint);
+      }
+
+      .grid-2 {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 1px;
+        margin-top: 14px;
+        border: 1px solid var(--border);
+        background: var(--border);
+      }
+
+      .panel {
+        min-width: 0;
+        padding: 16px;
+        background: rgba(17, 24, 32, 0.94);
+      }
+
+      .panel h3 {
+        margin-bottom: 10px;
+      }
+
+      ul,
+      ol {
+        margin: 0;
+        padding-left: 1.2rem;
+      }
+
+      li + li {
+        margin-top: 7px;
+      }
+
+      code,
+      pre {
+        font-family: var(--mono);
+      }
+
+      code {
+        color: #ffcf85;
+        overflow-wrap: anywhere;
+      }
+
+      pre {
+        margin: 12px 0 0;
+        padding: 12px;
+        overflow-x: auto;
+        border: 1px solid var(--border);
+        background: rgba(6, 8, 11, 0.88);
+        color: var(--text);
+      }
+
+      .timeline {
+        display: grid;
+        gap: 1px;
+        margin-top: 14px;
+        border: 1px solid var(--border);
+        background: var(--border);
+      }
+
+      .timeline-item {
+        display: grid;
+        grid-template-columns: 88px minmax(0, 1fr);
+        gap: 14px;
+        padding: 14px;
+        background: rgba(17, 24, 32, 0.94);
+      }
+
+      .phase-number {
+        font-family: var(--mono);
+        color: var(--accent);
+      }
+
+      .phase-body {
+        display: grid;
+        gap: 7px;
+      }
+
+      .links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .link-chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 32px;
+        padding: 6px 9px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--text-dim);
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        text-decoration: none;
+      }
+
+      .link-chip:hover,
+      .link-chip:focus-visible {
+        border-color: var(--border-strong);
+        color: var(--text);
+        outline: none;
+      }
+
+      .footer {
+        margin-top: 28px;
+        padding-top: 14px;
+        border-top: 1px solid var(--border);
+        color: var(--text-faint);
+        font-size: 0.84rem;
+      }
+
+      @media (max-width: 960px) {
+        .meta-grid,
+        .grid-2 {
+          grid-template-columns: 1fr 1fr;
+        }
+
+        .status-row,
+        .status-row.header {
+          grid-template-columns: 1fr;
+        }
+
+        .status-row.header {
+          display: none;
+        }
+      }
+
+      @media (max-width: 620px) {
+        .page {
+          width: min(100% - 20px, 1180px);
+          padding-top: 18px;
+        }
+
+        h1 {
+          font-size: 1.85rem;
+        }
+
+        .meta-grid,
+        .grid-2,
+        .timeline-item {
+          grid-template-columns: 1fr;
+        }
+
+        .section-head {
+          display: grid;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero" aria-labelledby="page-title">
+        <p class="kicker">islandflow terminal</p>
+        <h1 id="page-title">Refactor Implementation Board</h1>
+        <p class="lede">
+          A living execution board for breaking <code>apps/web/app/terminal.tsx</code> into focused terminal modules. Beads remains the source of truth; this page mirrors the current phase state and links every step back to the consolidated roadmap.
+        </p>
+        <div class="meta-grid" aria-label="Plan metadata">
+          <div class="meta-cell">
+            <span class="label">Epic</span>
+            <strong>islandflow-e30y</strong>
+          </div>
+          <div class="meta-cell">
+            <span class="label">Current Phase</span>
+            <strong>01 in progress</strong>
+          </div>
+          <div class="meta-cell">
+            <span class="label">Source Plan</span>
+            <strong><a href="./00-roadmap.md">00-roadmap.md</a></strong>
+          </div>
+          <div class="meta-cell">
+            <span class="label">Last Sync</span>
+            <strong>2026-06-20</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="pickup-title">
+        <div class="section-head">
+          <h2 id="pickup-title">Agent Pickup</h2>
+          <p>Use Beads first, then this page and the phase docs.</p>
+        </div>
+        <div class="grid-2">
+          <div class="panel">
+            <h3>Start Here</h3>
+            <ol>
+              <li>Run <code>bd ready</code>.</li>
+              <li>Pick the next ready <code>islandflow-e30y.*</code> issue.</li>
+              <li>Run <code>bd show &lt;issue-id&gt;</code> and read its <code>spec_id</code>.</li>
+              <li>Read <a href="./00-roadmap.md">the roadmap</a>, then the phase document.</li>
+              <li>Claim with <code>bd update &lt;issue-id&gt; --claim</code>.</li>
+              <li>Implement only that phase unless Beads explicitly unblocks a parallel lane.</li>
+            </ol>
+          </div>
+          <div class="panel">
+            <h3>Core Commands</h3>
+            <pre><code>bd ready
+bd show &lt;issue-id&gt;
+bd update &lt;issue-id&gt; --claim
+bun test apps/web/app/terminal.test.ts
+bun --cwd=apps/web run build</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="status-title">
+        <div class="section-head">
+          <h2 id="status-title">Phase Status</h2>
+          <p>Update these badges when Beads status changes.</p>
+        </div>
+        <div class="status-row header" role="row">
+          <div>Phase</div>
+          <div>Issue</div>
+          <div>Status</div>
+          <div>Dependency</div>
+          <div>Gate</div>
+        </div>
+        <div class="status-row" role="row" data-issue="islandflow-e30y.1" data-status="in-progress">
+          <div class="phase-title"><strong>01 - Scaffold and pure utilities</strong><span class="faint">Pure helpers and feature folder</span></div>
+          <div><span class="issue">islandflow-e30y.1</span></div>
+          <div><span class="status in-progress">in progress</span></div>
+          <div class="muted">None</div>
+          <div class="muted"><code>bun test apps/web/app/terminal.test.ts</code></div>
+        </div>
+        <div class="status-row" role="row" data-issue="islandflow-e30y.2" data-status="blocked">
+          <div class="phase-title"><strong>02 - Data hooks</strong><span class="faint">Streaming, history, scroll, live session</span></div>
+          <div><span class="issue">islandflow-e30y.2</span></div>
+          <div><span class="status blocked">blocked</span></div>
+          <div class="muted">Blocked by <code>islandflow-e30y.1</code></div>
+          <div class="muted"><code>bun test apps/web/app/terminal.test.ts</code> and web build</div>
+        </div>
+        <div class="status-row" role="row" data-issue="islandflow-e30y.3" data-status="blocked">
+          <div class="phase-title"><strong>03 - State and shell</strong><span class="faint">Terminal context, shell, topbar</span></div>
+          <div><span class="issue">islandflow-e30y.3</span></div>
+          <div><span class="status blocked">blocked</span></div>
+          <div class="muted">Blocked by <code>islandflow-e30y.2</code></div>
+          <div class="muted">Terminal tests, route tests, and web build</div>
+        </div>
+        <div class="status-row" role="row" data-issue="islandflow-e30y.4" data-status="blocked">
+          <div class="phase-title"><strong>04 - UI components</strong><span class="faint">Primitives, panes, routes, drawers</span></div>
+          <div><span class="issue">islandflow-e30y.4</span></div>
+          <div><span class="status blocked">blocked</span></div>
+          <div class="muted">Blocked by <code>islandflow-e30y.3</code></div>
+          <div class="muted">Terminal tests and web build</div>
+        </div>
+        <div class="status-row" role="row" data-issue="islandflow-e30y.5" data-status="blocked">
+          <div class="phase-title"><strong>05 - Cleanup retired code</strong><span class="faint">Remove proven-dead routes, panes, CSS</span></div>
+          <div><span class="issue">islandflow-e30y.5</span></div>
+          <div><span class="status blocked">blocked</span></div>
+          <div class="muted">Blocked by <code>islandflow-e30y.4</code></div>
+          <div class="muted">Terminal tests, route tests, and web build</div>
+        </div>
+        <div class="status-row" role="row" data-issue="islandflow-e30y.6" data-status="blocked">
+          <div class="phase-title"><strong>06 - Final verification and publish</strong><span class="faint">Final gates, Beads sync, push</span></div>
+          <div><span class="issue">islandflow-e30y.6</span></div>
+          <div><span class="status blocked">blocked</span></div>
+          <div class="muted">Blocked by <code>islandflow-e30y.5</code></div>
+          <div class="muted"><code>bun test</code>, web build, <code>bd dolt push</code>, Forgejo push</div>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="timeline-title">
+        <div class="section-head">
+          <h2 id="timeline-title">Implementation Steps</h2>
+          <p>Phase docs remain the decision-complete specs.</p>
+        </div>
+        <div class="timeline">
+          <article class="timeline-item">
+            <div class="phase-number">01</div>
+            <div class="phase-body">
+              <h3>Scaffold and pure utilities</h3>
+              <p class="muted">Create <code>apps/web/features/terminal/</code> and extract pure config, routes, formatters, filters, tape reducers, evidence helpers, and chart markers while preserving the facade.</p>
+              <div class="links"><a class="link-chip" href="./01-scaffold-pure-utilities.md">phase doc</a><a class="link-chip" href="./00-roadmap.md">full plan</a></div>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <div class="phase-number">02</div>
+            <div class="phase-body">
+              <h3>Data hooks</h3>
+              <p class="muted">Extract scroll, virtualization, tape, pausable view, live stream, flow stream, manifest, and live-session hooks behind shared non-UI config.</p>
+              <div class="links"><a class="link-chip" href="./02-data-hooks.md">phase doc</a><a class="link-chip" href="./00-roadmap.md">full plan</a></div>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <div class="phase-number">03</div>
+            <div class="phase-body">
+              <h3>State and shell</h3>
+              <p class="muted">Move terminal state/context, app shell, nav drawer, topbar controls, shell metrics, and synthetic dock after data hooks are stable.</p>
+              <div class="links"><a class="link-chip" href="./03-state-shell.md">phase doc</a><a class="link-chip" href="./00-roadmap.md">full plan</a></div>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <div class="phase-number">04</div>
+            <div class="phase-body">
+              <h3>UI components</h3>
+              <p class="muted">Extract primitives, OPRA, News, Dashboard/Chart, and Drawer groups. Split parallel PRs only after phase 03 lands and child Beads issues exist.</p>
+              <div class="links"><a class="link-chip" href="./04-ui-components.md">phase doc</a><a class="link-chip" href="./00-roadmap.md">full plan</a></div>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <div class="phase-number">05</div>
+            <div class="phase-body">
+              <h3>Cleanup retired code</h3>
+              <p class="muted">Remove stale route UI, unreferenced panes, retired feature branches, and unused CSS only when reachability evidence and tests prove the removal safe.</p>
+              <div class="links"><a class="link-chip" href="./05-cleanup-retired-code.md">phase doc</a><a class="link-chip" href="./00-roadmap.md">full plan</a></div>
+            </div>
+          </article>
+          <article class="timeline-item">
+            <div class="phase-number">06</div>
+            <div class="phase-body">
+              <h3>Final verification and publish</h3>
+              <p class="muted">Run final quality gates, handle required turn docs, close/update Beads, sync Dolt, commit, push Forgejo, and verify branch status.</p>
+              <div class="links"><a class="link-chip" href="./06-final-verification.md">phase doc</a><a class="link-chip" href="./00-roadmap.md">full plan</a></div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="parallel-title">
+        <div class="section-head">
+          <h2 id="parallel-title">Parallelization Rules</h2>
+          <p>Parallel lanes are explicit, not inferred.</p>
+        </div>
+        <div class="grid-2">
+          <div class="panel">
+            <h3>Safe To Split</h3>
+            <ul>
+              <li>Phase 01: route/config, formatting, tape reducers, evidence helpers.</li>
+              <li>Phase 02: scroll/virtualization and live/session hooks.</li>
+              <li>Phase 04: OPRA, News, Dashboard/Chart, Drawers after phase 03.</li>
+              <li>Phase 05: cleanup by candidate after reachability is clear.</li>
+            </ul>
+          </div>
+          <div class="panel">
+            <h3>Keep Serial</h3>
+            <ul>
+              <li>Phase 03 owns the shared state and shell seam.</li>
+              <li>Phase 06 owns final verification and publishing.</li>
+              <li>No phase starts until <code>bd ready</code> shows it unblocked.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="scope-title">
+        <div class="section-head">
+          <h2 id="scope-title">Scope Discipline</h2>
+          <p>These constraints prevent accidental behavior changes.</p>
+        </div>
+        <div class="grid-2">
+          <div class="panel">
+            <h3>Preserve</h3>
+            <ul>
+              <li><code>apps/web/app/terminal.tsx</code> remains a compatibility facade until cleanup.</li>
+              <li>Supported routes: <code>/</code>, <code>/options</code>, <code>/news</code>, and <code>/tape -> /options</code>.</li>
+              <li>Replay data mode remains available.</li>
+              <li>Smart-money fallback remains unless a separate decision removes it.</li>
+            </ul>
+          </div>
+          <div class="panel">
+            <h3>When Updating Status</h3>
+            <ul>
+              <li>Update Beads first.</li>
+              <li>Mirror the visible status badge in this file.</li>
+              <li>Use <span class="status ready">ready</span>, <span class="status in-progress">in progress</span>, <span class="status blocked">blocked</span>, or <span class="status complete">complete</span>.</li>
+              <li>Keep the phase document and roadmap linked from any child issue.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <p class="footer">
+        This HTML file is a readable companion to <a href="./IMPLEMENT.md">IMPLEMENT.md</a>. Beads is still the authoritative status source.
+      </p>
+    </main>
+  </body>
+</html>

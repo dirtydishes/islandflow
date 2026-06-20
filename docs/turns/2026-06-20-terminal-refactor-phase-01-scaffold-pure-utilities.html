@@ -188,10 +188,21 @@
     <section>
       <h2>Quality Gates</h2>
       <ul class="gate-list">
+        <li class="gate"><strong>Passed</strong><code>bun run fmt:check</code></li>
+        <li class="gate"><strong>Passed</strong><code>bun run lint</code></li>
+        <li class="gate"><strong>Passed</strong><code>bun run typecheck</code></li>
+        <li class="gate"><strong>Passed</strong><code>bun test</code></li>
         <li class="gate"><strong>Passed</strong><code>bun test apps/web/app/terminal.test.ts</code></li>
         <li class="gate"><strong>Passed</strong><code>bun test apps/web/app/routes.test.ts</code></li>
+        <li class="gate"><strong>Passed</strong><code>bun run check:public-api-routes</code></li>
+        <li class="gate"><strong>Passed</strong><code>bun run check:docker-workspace</code></li>
         <li class="gate"><strong>Passed</strong><code>bun --cwd=apps/web run build</code></li>
       </ul>
+    </section>
+
+    <section>
+      <h2>Review Follow-Up</h2>
+      <p>Forgejo Validate run 144 for PR 49 failed at <code>bun run fmt:check</code>. The review pass applied the Biome formatter to the extracted terminal helper files and added the missing readable phase status board at <code>docs/implementation/terminal-refactor/IMPLEMENT.html</code>.</p>
     </section>
 
     <section>
