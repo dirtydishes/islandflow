@@ -87,6 +87,12 @@ Agent expectations:
 - Treat GitHub as a mirror unless explicitly instructed otherwise.
 - Use `fj` for Forgejo pull request workflows (create/view/update PRs).
 - When sharing PR links in handoff, use the Forgejo PR URL.
+- Do not create a new git branch automatically. When already on `main`, stay
+  on `main` unless the user explicitly asks for a branch or has already
+  created/switched to one. The `lavender/` branch prefix applies only when a
+  branch is explicitly requested.
+- Never run `git switch -c`, `git checkout -b`, or otherwise create a branch
+  unless branch creation was explicitly requested in the current conversation.
 
 ## Agent skills
 
