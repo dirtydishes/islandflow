@@ -26,11 +26,6 @@ import { useTerminal } from "../features/terminal/state";
 export { getChartFlowMarkerItems } from "../features/terminal/charts/markers";
 export type { ChartFlowMarkerItem } from "../features/terminal/charts/markers";
 export {
-  CANDLE_INTERVALS,
-  LIVE_HOT_WINDOW_OPTIONS,
-  LIVE_OPTIONS_HEAD_LIMIT,
-  NBBO_MAX_AGE_MS_SAFE,
-  PINNED_EVIDENCE_MAX_ITEMS,
   getTapeVirtualConfig,
   isSyntheticAdminVisible,
   shouldIncludeEquitiesForDarkUnderlyingFallback
@@ -83,12 +78,6 @@ export {
   statusLabel
 } from "../features/terminal/format";
 export {
-  toStaticTapeState,
-  useLiveSession,
-  usePausableTapeView,
-  useTape
-} from "../features/terminal/live";
-export {
   NAV_ITEMS,
   getLiveManifest,
   getRouteFeatures,
@@ -96,28 +85,17 @@ export {
   normalizeTerminalPathname
 } from "../features/terminal/routes";
 export {
-  useListScroll,
-  useScrollAnchor,
-  useTapeVirtualList,
-  useVirtualHistoryGate
-} from "../features/terminal/scroll";
-export {
   appendHistoryTail,
   composeTapeItems,
   findAnchorRestoreIndex,
   flushPausableTapeData,
-  frontendRetentionMetrics,
   getHotChannelFeedStatus,
   getLiveFeedStatus,
   getLiveHistoryRetentionCap,
-  getTapeItemKey,
-  incrementRetentionMetric,
   mergeHeldTapeHistory,
-  mergeNewest,
   mergeNewestWithOverflow,
   projectPausableTapeState,
-  reducePausableTapeData,
-  setRetentionMetric
+  reducePausableTapeData
 } from "../features/terminal/tape";
 export { FlowFilterPopover };
 
