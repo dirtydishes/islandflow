@@ -1937,7 +1937,7 @@ export const useTerminalState = () => {
   }, [matchesTicker, smartMoneyFeed.items, tickerSet, routeFeatures.smartMoney]);
 
   const chartSmartMoneyEvents = useMemo(() => {
-    if (!routeFeatures.showChartPane && !routeFeatures.showFocusPane) {
+    if (!routeFeatures.showChartPane) {
       return EMPTY_SMART_MONEY_EVENTS;
     }
     const desired = chartTicker.toUpperCase();
@@ -1950,10 +1950,10 @@ export const useTerminalState = () => {
         }
         return a.seq - b.seq;
       });
-  }, [chartTicker, smartMoneyFeed.items, routeFeatures.showChartPane, routeFeatures.showFocusPane]);
+  }, [chartTicker, smartMoneyFeed.items, routeFeatures.showChartPane]);
 
   const chartSmartFlowProjections = useMemo(() => {
-    if (!routeFeatures.showChartPane && !routeFeatures.showFocusPane) {
+    if (!routeFeatures.showChartPane) {
       return EMPTY_SMART_FLOW_EXPLAINABILITY;
     }
     const desired = chartTicker.toUpperCase();
@@ -1962,10 +1962,10 @@ export const useTerminalState = () => {
         (projection) => projection.hypothesis.underlying_id.toUpperCase() === desired
       )
     );
-  }, [chartTicker, smartFlowFeed.items, routeFeatures.showChartPane, routeFeatures.showFocusPane]);
+  }, [chartTicker, smartFlowFeed.items, routeFeatures.showChartPane]);
 
   const chartInferredDark = useMemo(() => {
-    if (!routeFeatures.showChartPane && !routeFeatures.showFocusPane) {
+    if (!routeFeatures.showChartPane) {
       return EMPTY_INFERRED_DARK_EVENTS;
     }
     const desired = chartTicker.toUpperCase();
@@ -1978,13 +1978,7 @@ export const useTerminalState = () => {
         }
         return a.seq - b.seq;
       });
-  }, [
-    chartTicker,
-    inferredDarkFeed.items,
-    resolvedEquityJoinMap,
-    routeFeatures.showChartPane,
-    routeFeatures.showFocusPane
-  ]);
+  }, [chartTicker, inferredDarkFeed.items, resolvedEquityJoinMap, routeFeatures.showChartPane]);
 
   const findAlertForClassifierHit = useCallback(
     (hit: ClassifierHitEvent): AlertEvent | null => {
@@ -2079,7 +2073,7 @@ export const useTerminalState = () => {
     if (routeFeatures.equities || routeFeatures.showEquitiesPane) {
       updates.push(equitiesFeed.lastUpdate);
     }
-    if (routeFeatures.inferredDark || routeFeatures.showDarkPane || routeFeatures.showFocusPane) {
+    if (routeFeatures.inferredDark || routeFeatures.showDarkPane) {
       updates.push(inferredDarkFeed.lastUpdate);
     }
     if (routeFeatures.flow || routeFeatures.showFlowPane) {
@@ -2091,16 +2085,11 @@ export const useTerminalState = () => {
     if (routeFeatures.alerts || routeFeatures.showAlertsPane) {
       updates.push(alertsFeed.lastUpdate);
     }
-    if (
-      routeFeatures.smartMoney ||
-      routeFeatures.showClassifierPane ||
-      routeFeatures.showChartPane ||
-      routeFeatures.showFocusPane
-    ) {
+    if (routeFeatures.smartMoney || routeFeatures.showChartPane) {
       updates.push(smartFlowFeed.lastUpdate);
       updates.push(smartMoneyFeed.lastUpdate);
     }
-    if (routeFeatures.classifierHits || routeFeatures.showClassifierPane) {
+    if (routeFeatures.classifierHits) {
       updates.push(classifierHitsFeed.lastUpdate);
     }
     return (
@@ -2113,7 +2102,6 @@ export const useTerminalState = () => {
     routeFeatures.showEquitiesPane,
     routeFeatures.inferredDark,
     routeFeatures.showDarkPane,
-    routeFeatures.showFocusPane,
     routeFeatures.flow,
     routeFeatures.showFlowPane,
     routeFeatures.news,
@@ -2121,7 +2109,6 @@ export const useTerminalState = () => {
     routeFeatures.alerts,
     routeFeatures.showAlertsPane,
     routeFeatures.smartMoney,
-    routeFeatures.showClassifierPane,
     routeFeatures.showChartPane,
     routeFeatures.classifierHits,
     optionsFeed.lastUpdate,

@@ -1,13 +1,6 @@
 import type { LiveSubscription } from "@islandflow/types";
 
-export type TapeVirtualPane =
-  | "options"
-  | "equities"
-  | "flow"
-  | "alerts"
-  | "classifier"
-  | "dark"
-  | "news";
+export type TapeVirtualPane = "options" | "flow" | "news";
 
 export type TapeVirtualListConfig = {
   rowHeight: number;
@@ -33,11 +26,8 @@ export type RouteFeatures = {
   showFlowPane: boolean;
   showNewsPane: boolean;
   showAlertsPane: boolean;
-  showClassifierPane: boolean;
   showDarkPane: boolean;
   showChartPane: boolean;
-  showFocusPane: boolean;
-  showReplayConsole: boolean;
   needsClassifierDecor: boolean;
   needsAlertEvidencePrefetch: boolean;
   needsDarkUnderlying: boolean;
