@@ -203,7 +203,7 @@
         background: currentColor;
       }
 
-      .status.in-progress {
+      .status.in_progress {
         color: var(--accent);
         border-color: var(--border-strong);
         background: var(--accent-soft);
@@ -215,13 +215,13 @@
         background: var(--red-soft);
       }
 
-      .status.ready {
+      .status.deferred {
         color: var(--blue);
         border-color: rgba(77, 163, 255, 0.34);
         background: var(--blue-soft);
       }
 
-      .status.complete {
+      .status.closed {
         color: var(--green);
         border-color: rgba(37, 193, 122, 0.34);
         background: var(--green-soft);
@@ -401,7 +401,7 @@
           </div>
           <div class="meta-cell">
             <span class="label">Current Phase</span>
-            <strong>01 in progress</strong>
+            <strong>01 in_progress</strong>
           </div>
           <div class="meta-cell">
             <span class="label">Source Plan</span>
@@ -454,45 +454,45 @@ bun --cwd=apps/web run build</code></pre>
           <div>Dependency</div>
           <div>Gate</div>
         </div>
-        <div class="status-row" role="row" data-issue="islandflow-e30y.1" data-status="in-progress">
+        <div class="status-row" role="row" data-issue="islandflow-e30y.1" data-status="in_progress">
           <div class="phase-title"><strong>01 - Scaffold and pure utilities</strong><span class="faint">Pure helpers and feature folder</span></div>
           <div><span class="issue">islandflow-e30y.1</span></div>
-          <div><span class="status in-progress">in progress</span></div>
-          <div class="muted">None</div>
+          <div><span class="status in_progress">in_progress</span></div>
+          <div class="muted">None; awaiting merge after review.</div>
           <div class="muted"><code>bun test apps/web/app/terminal.test.ts</code></div>
         </div>
-        <div class="status-row" role="row" data-issue="islandflow-e30y.2" data-status="blocked">
+        <div class="status-row" role="row" data-issue="islandflow-e30y.2" data-status="open">
           <div class="phase-title"><strong>02 - Data hooks</strong><span class="faint">Streaming, history, scroll, live session</span></div>
           <div><span class="issue">islandflow-e30y.2</span></div>
-          <div><span class="status blocked">blocked</span></div>
+          <div><span class="status open">open</span></div>
           <div class="muted">Blocked by <code>islandflow-e30y.1</code></div>
           <div class="muted"><code>bun test apps/web/app/terminal.test.ts</code> and web build</div>
         </div>
-        <div class="status-row" role="row" data-issue="islandflow-e30y.3" data-status="blocked">
+        <div class="status-row" role="row" data-issue="islandflow-e30y.3" data-status="open">
           <div class="phase-title"><strong>03 - State and shell</strong><span class="faint">Terminal context, shell, topbar</span></div>
           <div><span class="issue">islandflow-e30y.3</span></div>
-          <div><span class="status blocked">blocked</span></div>
+          <div><span class="status open">open</span></div>
           <div class="muted">Blocked by <code>islandflow-e30y.2</code></div>
           <div class="muted">Terminal tests, route tests, and web build</div>
         </div>
-        <div class="status-row" role="row" data-issue="islandflow-e30y.4" data-status="blocked">
+        <div class="status-row" role="row" data-issue="islandflow-e30y.4" data-status="open">
           <div class="phase-title"><strong>04 - UI components</strong><span class="faint">Primitives, panes, routes, drawers</span></div>
           <div><span class="issue">islandflow-e30y.4</span></div>
-          <div><span class="status blocked">blocked</span></div>
+          <div><span class="status open">open</span></div>
           <div class="muted">Blocked by <code>islandflow-e30y.3</code></div>
           <div class="muted">Terminal tests and web build</div>
         </div>
-        <div class="status-row" role="row" data-issue="islandflow-e30y.5" data-status="blocked">
+        <div class="status-row" role="row" data-issue="islandflow-e30y.5" data-status="open">
           <div class="phase-title"><strong>05 - Cleanup retired code</strong><span class="faint">Remove proven-dead routes, panes, CSS</span></div>
           <div><span class="issue">islandflow-e30y.5</span></div>
-          <div><span class="status blocked">blocked</span></div>
+          <div><span class="status open">open</span></div>
           <div class="muted">Blocked by <code>islandflow-e30y.4</code></div>
           <div class="muted">Terminal tests, route tests, and web build</div>
         </div>
-        <div class="status-row" role="row" data-issue="islandflow-e30y.6" data-status="blocked">
+        <div class="status-row" role="row" data-issue="islandflow-e30y.6" data-status="open">
           <div class="phase-title"><strong>06 - Final verification and publish</strong><span class="faint">Final gates, Beads sync, push</span></div>
           <div><span class="issue">islandflow-e30y.6</span></div>
-          <div><span class="status blocked">blocked</span></div>
+          <div><span class="status open">open</span></div>
           <div class="muted">Blocked by <code>islandflow-e30y.5</code></div>
           <div class="muted"><code>bun test</code>, web build, <code>bd dolt push</code>, Forgejo push</div>
         </div>
@@ -601,7 +601,7 @@ bun --cwd=apps/web run build</code></pre>
             <ul>
               <li>Update Beads first.</li>
               <li>Mirror the visible status badge in this file.</li>
-              <li>Use <span class="status ready">ready</span>, <span class="status in-progress">in progress</span>, <span class="status blocked">blocked</span>, or <span class="status complete">complete</span>.</li>
+              <li>Use exact Beads status language: <span class="status open">open</span>, <span class="status in_progress">in_progress</span>, <span class="status blocked">blocked</span>, <span class="status closed">closed</span>, or <span class="status deferred">deferred</span>.</li>
               <li>Keep the phase document and roadmap linked from any child issue.</li>
             </ul>
           </div>
