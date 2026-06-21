@@ -235,7 +235,11 @@ export const writeTimeframeFavorites = (
     favoriteIds: normalizeTimeframeFavoriteIds(state.favoriteIds, supportedIntervalMs)
   };
 
-  storage.setItem(TIMEFRAME_FAVORITES_STORAGE_KEY, JSON.stringify(payload));
+  try {
+    storage.setItem(TIMEFRAME_FAVORITES_STORAGE_KEY, JSON.stringify(payload));
+  } catch {
+    // Storage can be blocked or quota-limited; favorite changes should remain usable in memory.
+  }
 };
 
 export const buildTimeframeToolbarModel = ({

@@ -38,6 +38,12 @@ class MemoryStorage implements Storage {
   }
 }
 
+class FailingWriteStorage extends MemoryStorage {
+  setItem(_key: string, _value: string) {
+    throw new Error("storage unavailable");
+  }
+}
+
 describe("market chart timeframe registry", () => {
   it("uses 1m, 5m, and 15m as default favorite intervals", () => {
     expect(DEFAULT_MARKET_CHART_INTERVALS).toEqual([
@@ -118,6 +124,16 @@ describe("market chart timeframe registry", () => {
       JSON.stringify({ version: 1, favoriteIds: ["1m", "15m"] })
     );
     expect(readTimeframeFavorites(storage)).toEqual({ favoriteIds: ["1m", "15m"] });
+  });
+
+  it("keeps favorite changes in memory when browser storage rejects writes", () => {
+    const storage = new FailingWriteStorage();
+    const state = reduceTimeframeFavorites(createDefaultTimeframeFavorites(), {
+      type: "unfavorite",
+      id: "5m"
+    });
+
+    expect(() => writeTimeframeFavorites(storage, state)).not.toThrow();
   });
 
   it("clamps malformed storage data back to defaults", () => {

@@ -65,6 +65,7 @@ describe("market chart candle transforms", () => {
     expect(formatIntervalLabel(60_000)).toBe("1m");
     expect(formatIntervalLabel(300_000)).toBe("5m");
     expect(formatIntervalLabel(900_000)).toBe("15m");
+    expect(formatIntervalLabel(3_600_000)).toBe("1h");
     expect(formatIntervalLabel(15_000)).toBe("15s");
     expect(formatIntervalLabel(250)).toBe("250ms");
   });

@@ -171,7 +171,8 @@
         <p class="summary">
           Implemented the reusable timeframe registry, favorite interval reducer and persistence,
           conservative terminal toolbar integration, 15m candle defaults, and manifest coverage
-          for <code>islandflow-mloi.2</code>.
+          for <code>islandflow-mloi.2</code>. Reviewer repair added registry-backed interval
+          labels, storage-write resilience, and selected-interval normalization.
         </p>
       </header>
 
@@ -197,12 +198,22 @@
       </section>
 
       <section>
+        <h2>Reviewer Repair</h2>
+        <ul>
+          <li>Changed interval label formatting to use the full timeframe registry, so enabled <code>1h</code> support displays as <code>1h</code> instead of falling back to <code>60m</code>.</li>
+          <li>Made blocked or quota-limited browser storage writes non-fatal; favorite changes remain active in memory even when persistence fails.</li>
+          <li>Normalized the mounted chart interval before toolbar active state and chart fetching, keeping UI controls, REST candle fetches, and live subscription manifests aligned if state drifts outside supported intervals.</li>
+          <li>Tracked the repair in Beads issue <code>islandflow-w1dn</code> for Forgejo PR <code>#57</code>.</li>
+        </ul>
+      </section>
+
+      <section>
         <h2>Verification</h2>
         <div class="grid">
           <div class="check">
             <strong>Pass</strong>
             <code>bun test apps/web/features/market-chart/transforms/timeframes.test.ts apps/web/features/market-chart/transforms/candles.test.ts</code>
-            <p>12 pass, 0 fail.</p>
+            <p>13 pass, 0 fail.</p>
           </div>
           <div class="check">
             <strong>Pass</strong>
@@ -226,7 +237,7 @@
           </div>
           <div class="check">
             <strong>Pass</strong>
-            <p>Browser visual check at 1280x800 and 390x844: no horizontal overflow, compact toolbar layout, disabled 30m and 1h dropdown states, and working favorite toggle.</p>
+            <p>Browser visual check at 1280x800 and 390x844: no horizontal overflow, compact toolbar layout, disabled 30m and 1h dropdown states, working favorite toggle, and controls separated above the chart surface.</p>
           </div>
         </div>
       </section>

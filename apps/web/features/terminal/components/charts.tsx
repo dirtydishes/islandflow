@@ -810,7 +810,16 @@ type ChartPaneProps = {
   title?: string;
 };
 
-const getTimeframeStorage = () => (typeof window === "undefined" ? null : window.localStorage);
+const getTimeframeStorage = () => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+};
 
 export const ChartPane = memo(({ state, title = "Chart" }: ChartPaneProps) => {
   const [favoritesHydrated, setFavoritesHydrated] = useState(false);
@@ -827,6 +836,7 @@ export const ChartPane = memo(({ state, title = "Chart" }: ChartPaneProps) => {
     [state.chartIntervalMs, timeframeFavorites.favoriteIds]
   );
   const selectedTimeframe = timeframeModel.selected;
+  const normalizedChartIntervalMs = selectedTimeframe.ms;
 
   useEffect(() => {
     setTimeframeFavorites(
@@ -845,6 +855,12 @@ export const ChartPane = memo(({ state, title = "Chart" }: ChartPaneProps) => {
       SUPPORTED_CANDLE_INTERVAL_MS
     );
   }, [favoritesHydrated, timeframeFavorites]);
+
+  useEffect(() => {
+    if (state.chartIntervalMs !== normalizedChartIntervalMs) {
+      state.setChartIntervalMs(normalizedChartIntervalMs);
+    }
+  }, [state.chartIntervalMs, state.setChartIntervalMs, normalizedChartIntervalMs]);
 
   const updateFavorite = useCallback((action: { type: "toggle"; id: MarketChartTimeframeId }) => {
     setTimeframeFavorites((current) =>
@@ -875,10 +891,10 @@ export const ChartPane = memo(({ state, title = "Chart" }: ChartPaneProps) => {
             {timeframeModel.toolbarItems.map((interval) => (
               <button
                 key={interval.ms}
-                className={`interval-button${interval.ms === state.chartIntervalMs ? " active" : ""}`}
+                className={`interval-button${interval.ms === normalizedChartIntervalMs ? " active" : ""}`}
                 type="button"
                 onClick={() => state.setChartIntervalMs(interval.ms)}
-                aria-pressed={interval.ms === state.chartIntervalMs}
+                aria-pressed={interval.ms === normalizedChartIntervalMs}
               >
                 {interval.label}
               </button>
@@ -915,7 +931,7 @@ export const ChartPane = memo(({ state, title = "Chart" }: ChartPaneProps) => {
     >
       <CandleChart
         ticker={state.chartTicker}
-        intervalMs={state.chartIntervalMs}
+        intervalMs={normalizedChartIntervalMs}
         mode={state.mode}
         replayTime={state.equities.replayTime}
         liveCandles={state.liveSession.chartCandles}
