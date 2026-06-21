@@ -1,7 +1,11 @@
 import {
   createSyntheticDemoProfileFixture,
+  getLoadProfile,
   getSyntheticLoadProfileRunCount,
   loadProfileIdForSyntheticMarketMode,
+  projectSyntheticDemoLiveEvent as projectDemoEvent,
+  scaleSyntheticDemoRunIntervalMs,
+  SYNTHETIC_DEMO_RUN_INTERVAL_MS,
   scaleSyntheticEmitIntervalMs
 } from "@islandflow/synthetic-market/profiles";
 import {
@@ -27,6 +31,19 @@ const DARK_EXCHANGE = "OTC";
 const SYNTHETIC_SYMBOLS = ["SPY", ...(SP500_SYMBOLS as readonly string[])];
 
 type PricePlacement = "MID" | "A" | "AA" | "B" | "BB";
+
+type EquitiesThroughput = {
+  batchSize: number;
+  litSizeBase: number;
+  litSizeRange: number;
+  darkSizeBase: number;
+};
+
+const THROUGHPUT_BY_MODE: Record<SyntheticMarketMode, EquitiesThroughput> = {
+  realistic: { batchSize: 2, litSizeBase: 12, litSizeRange: 340, darkSizeBase: 900 },
+  active: { batchSize: 5, litSizeBase: 22, litSizeRange: 980, darkSizeBase: 1800 },
+  firehose: { batchSize: 10, litSizeBase: 48, litSizeRange: 1800, darkSizeBase: 2800 }
+};
 
 const buildSyntheticPrint = (
   seq: number,
@@ -110,6 +127,36 @@ const buildQuoteContext = (symbol: string, now: number, control: SyntheticContro
   };
 };
 
+const uniqueSymbols = (symbols: readonly string[]): string[] => {
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const symbol of symbols) {
+    const normalized = symbol.trim().toUpperCase();
+    if (normalized && !seen.has(normalized)) {
+      seen.add(normalized);
+      unique.push(normalized);
+    }
+  }
+  return unique;
+};
+
+const getBackgroundSymbols = (
+  session: ReturnType<typeof getSyntheticSessionState>,
+  minimumCount: number,
+  symbolCursor: number
+): string[] => {
+  const symbols = uniqueSymbols(["SPY", ...session.focus_symbols]);
+  let fillOffset = 0;
+  while (symbols.length < minimumCount && fillOffset < SYNTHETIC_SYMBOLS.length * 2) {
+    const candidate = SYNTHETIC_SYMBOLS[(symbolCursor + fillOffset) % SYNTHETIC_SYMBOLS.length]!;
+    if (!symbols.includes(candidate)) {
+      symbols.push(candidate);
+    }
+    fillOffset += 1;
+  }
+  return symbols;
+};
+
 const pickPrimaryPlacement = (
   driftBps: number,
   regime: ReturnType<typeof getSyntheticSessionState>["regime"],
@@ -150,33 +197,24 @@ const pickDarkPlacement = (
   return driftBps >= 0 ? "A" : "B";
 };
 
-type DemoProjectedEvent = {
-  source_ts: number;
-  ingest_ts: number;
-  ts: number;
-  seq: number;
-  trace_id: string;
-};
-
-const projectDemoEvent = <T extends DemoProjectedEvent>(
-  event: T,
-  input: {
-    firstTs: number;
-    baseTs: number;
-    seq: number;
-    runId: string;
-    runSerial: number;
+const pickBackgroundPlacement = (
+  symbol: string,
+  driftBps: number,
+  regime: ReturnType<typeof getSyntheticSessionState>["regime"],
+  seq: number,
+  tick: number
+): PricePlacement => {
+  if (symbol === "SPY") {
+    const cycle = tick % 3;
+    if (cycle === 0) {
+      return driftBps >= 0 ? "A" : "B";
+    }
+    if (cycle === 2) {
+      return driftBps >= 0 ? "B" : "A";
+    }
+    return "MID";
   }
-): T => {
-  const traceSuffix = event.trace_id.split(":").slice(1).join(":") || event.trace_id;
-  return {
-    ...event,
-    source_ts: input.baseTs + (event.source_ts - input.firstTs),
-    ingest_ts: input.baseTs + (event.ingest_ts - input.firstTs),
-    ts: input.baseTs + (event.ts - input.firstTs),
-    seq: input.seq,
-    trace_id: `${input.runId}:live:${input.runSerial}:${traceSuffix}`
-  };
+  return pickPrimaryPlacement(driftBps, regime, seq);
 };
 
 export const createSyntheticEquitiesAdapter = (
@@ -187,9 +225,12 @@ export const createSyntheticEquitiesAdapter = (
     start: (handlers: EquityIngestHandlers) => {
       let seq = 0;
       let quoteSeq = 0;
+      let symbolCursor = 0;
+      let backgroundTick = 0;
       let demoRunOrdinal = 0;
       let demoRunSerial = 0;
-      let timer: ReturnType<typeof setTimeout> | null = null;
+      let regularTimer: ReturnType<typeof setTimeout> | null = null;
+      let demoTimer: ReturnType<typeof setTimeout> | null = null;
       let stopped = false;
 
       const getEffectiveControl = (): SyntheticControlState => {
@@ -206,7 +247,115 @@ export const createSyntheticEquitiesAdapter = (
         return control;
       };
 
-      const emit = () => {
+      const emitBackground = () => {
+        if (stopped) {
+          return;
+        }
+
+        const now = Date.now();
+        const control = getEffectiveControl();
+        const mode = getLoadProfile(control.load_profile_id).mode;
+        const throughput = THROUGHPUT_BY_MODE[mode];
+        const session = getSyntheticSessionState(now, control);
+        const tick = backgroundTick;
+        const backgroundSymbols = getBackgroundSymbols(session, throughput.batchSize, symbolCursor);
+        const focusSet = new Set(["SPY", ...session.focus_symbols]);
+        const allowDark =
+          mode !== "realistic" ||
+          session.regime === "event_ramp" ||
+          session.regime === "dealer_gamma" ||
+          session.regime === "retail_chase";
+
+        if (allowDark) {
+          const darkSymbol =
+            session.focus_symbols[seq % Math.max(1, session.focus_symbols.length)] ?? "SPY";
+          const darkQuote = buildQuoteContext(darkSymbol, now, control);
+          const darkPlacement = pickDarkPlacement(
+            darkQuote.state.driftBps,
+            session.regime,
+            seq + 1
+          );
+          const darkBias = darkQuote.state.offExchangeBias;
+          const darkSize = Math.max(
+            250,
+            Math.round(
+              throughput.darkSizeBase *
+                (0.65 + darkBias * 0.9 + darkQuote.state.sessionVolatility * 0.2)
+            )
+          );
+
+          if (handlers.onQuote) {
+            quoteSeq += 1;
+            void handlers.onQuote(
+              buildSyntheticQuote(quoteSeq, now - 2, darkSymbol, darkQuote.bid, darkQuote.ask)
+            );
+          }
+
+          seq += 1;
+          void handlers.onTrade(
+            buildSyntheticPrint(
+              seq,
+              now,
+              darkSymbol,
+              priceForPlacement(darkQuote.mid, darkQuote, darkPlacement),
+              darkSize,
+              DARK_EXCHANGE,
+              true
+            )
+          );
+        }
+
+        for (let i = 0; i < backgroundSymbols.length; i += 1) {
+          const symbol = backgroundSymbols[i]!;
+          const eventTs = now + i * 4;
+          const quote = buildQuoteContext(symbol, eventTs, control);
+          const clustered = focusSet.has(symbol);
+          const eventSeq = seq + 1;
+          const placement = pickBackgroundPlacement(
+            symbol,
+            quote.state.driftBps,
+            session.regime,
+            eventSeq,
+            tick + i
+          );
+          const exchange = EXCHANGES[(eventSeq + symbol.charCodeAt(0) + i) % EXCHANGES.length]!;
+          const baseSize =
+            throughput.litSizeBase +
+            ((eventSeq + i) % throughput.litSizeRange) +
+            Math.round(quote.state.sessionVolatility * 140);
+          const size = clustered
+            ? Math.round(baseSize * (1 + quote.state.clusteringScore * 0.35))
+            : baseSize;
+          const offExchangeFlag =
+            ((eventSeq + i * 3) % 10) / 10 <
+            quote.state.offExchangeBias * (clustered ? 1.12 : 0.86);
+
+          if (handlers.onQuote) {
+            quoteSeq += 1;
+            void handlers.onQuote(
+              buildSyntheticQuote(quoteSeq, eventTs - 2, symbol, quote.bid, quote.ask)
+            );
+          }
+
+          seq = eventSeq;
+          void handlers.onTrade(
+            buildSyntheticPrint(
+              seq,
+              eventTs,
+              symbol,
+              priceForPlacement(quote.mid, quote, placement),
+              size,
+              exchange,
+              offExchangeFlag
+            )
+          );
+        }
+
+        symbolCursor = (symbolCursor + backgroundSymbols.length) % SYNTHETIC_SYMBOLS.length;
+        backgroundTick += 1;
+      };
+
+      const emitDemoRuns = () => {
         if (stopped) {
           return;
         }
@@ -256,7 +405,7 @@ export const createSyntheticEquitiesAdapter = (
         }
       };
 
-      const schedule = () => {
+      const scheduleRegular = () => {
         if (stopped) {
           return;
         }
@@ -265,18 +414,39 @@ export const createSyntheticEquitiesAdapter = (
           config.emitIntervalMs,
           control.load_profile_id
         );
-        timer = setTimeout(() => {
-          emit();
-          schedule();
+        regularTimer = setTimeout(() => {
+          emitBackground();
+          scheduleRegular();
         }, intervalMs);
       };
 
-      schedule();
+      const scheduleDemoRuns = () => {
+        if (stopped) {
+          return;
+        }
+        const control = getEffectiveControl();
+        const intervalMs = scaleSyntheticDemoRunIntervalMs(
+          SYNTHETIC_DEMO_RUN_INTERVAL_MS,
+          control.load_profile_id
+        );
+        demoTimer = setTimeout(() => {
+          emitDemoRuns();
+          scheduleDemoRuns();
+        }, intervalMs);
+      };
+
+      emitBackground();
+      emitDemoRuns();
+      scheduleRegular();
+      scheduleDemoRuns();
 
       return () => {
         stopped = true;
-        if (timer) {
-          clearTimeout(timer);
+        if (regularTimer) {
+          clearTimeout(regularTimer);
+        }
+        if (demoTimer) {
+          clearTimeout(demoTimer);
         }
       };
     }

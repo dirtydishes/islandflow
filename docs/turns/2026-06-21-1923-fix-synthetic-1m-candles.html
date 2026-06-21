@@ -1,0 +1,591 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fix Synthetic 1m Candle Playback</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #06080b;
+      --panel: #0d141b;
+      --panel-2: #111820;
+      --line: rgba(230, 237, 244, 0.14);
+      --line-strong: rgba(245, 166, 35, 0.36);
+      --text: #e6edf4;
+      --muted: #90a0b2;
+      --faint: #6e7b8c;
+      --accent: #f5a623;
+      --green: #25c17a;
+      --red: #ff6b5f;
+      --blue: #4da3ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font: 15px/1.55 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main {
+      width: min(1120px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 44px 0 64px;
+    }
+    header {
+      border-bottom: 1px solid var(--line-strong);
+      padding-bottom: 22px;
+      margin-bottom: 22px;
+    }
+    .eyebrow,
+    h2,
+    .meta-label,
+    code,
+    pre,
+    .status {
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    .eyebrow {
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      font-size: 0.74rem;
+      margin-bottom: 10px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 2.6rem;
+      line-height: 1.05;
+      letter-spacing: 0;
+      text-wrap: balance;
+    }
+    .subtitle {
+      max-width: 76ch;
+      margin: 14px 0 0;
+      color: var(--muted);
+      font-size: 1rem;
+    }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 10px;
+      margin: 24px 0 0;
+    }
+    .meta-card {
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.035);
+      padding: 11px 12px;
+      border-radius: 8px;
+    }
+    .meta-label {
+      display: block;
+      color: var(--faint);
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      margin-bottom: 4px;
+    }
+    section {
+      padding: 22px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    h2 {
+      margin: 0 0 12px;
+      font-size: 1rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+    p { max-width: 82ch; margin: 0 0 12px; color: var(--text); }
+    ul { margin: 0; padding-left: 20px; color: var(--text); }
+    li + li { margin-top: 8px; }
+    code {
+      color: #ffe0a3;
+      background: rgba(245, 166, 35, 0.1);
+      border: 1px solid rgba(245, 166, 35, 0.18);
+      border-radius: 5px;
+      padding: 0.08rem 0.28rem;
+      font-size: 0.9em;
+    }
+    .status {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 8px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.035);
+      font-size: 0.72rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .status.pass { color: var(--green); border-color: rgba(37, 193, 122, 0.32); }
+    .status.note { color: var(--blue); border-color: rgba(77, 163, 255, 0.32); }
+    .status.blocked { color: var(--red); border-color: rgba(255, 107, 95, 0.34); }
+    .checks {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 10px;
+    }
+    .check {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .check strong { display: block; margin: 8px 0 4px; }
+    .check span:last-child { color: var(--muted); }
+    .diff-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--panel);
+      margin-top: 14px;
+    }
+    .diff-card h3 {
+      margin: 0;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel-2);
+      font-size: 0.94rem;
+    }
+    .rich-diff {
+      display: none;
+      overflow: auto;
+      background: #0b1016;
+    }
+    .diff-card.rendered .rich-diff { display: block; }
+    .diff-card.rendered .diff-fallback { display: none; }
+    .diff-fallback {
+      margin: 0;
+      overflow: auto;
+      padding: 12px 14px;
+      color: #d6dee8;
+      background: #0b1016;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .patch-source { display: none; }
+    a { color: #8cc7ff; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="eyebrow">Repository turn note</div>
+      <h1>Fix Synthetic 1m Candle Playback</h1>
+      <p class="subtitle">Changed synthetic live playback so deterministic phase-03 fixtures inject on a slower demo cadence while SPY and focus symbols continue producing regular quote and print background data for normal 1m candle aggregation.</p>
+      <div class="meta-grid" aria-label="Turn metadata">
+        <div class="meta-card"><span class="meta-label">Branch</span>lavender/fix-1m-candles</div>
+        <div class="meta-card"><span class="meta-label">Beads</span>islandflow-aay8</div>
+        <div class="meta-card"><span class="meta-label">Scope</span>Synthetic playback, live chart state guard</div>
+      </div>
+    </header>
+
+    <section>
+      <h2>Summary</h2>
+      <p>The chart renderer was left alone. The fix separates continuous synthetic market background traffic from deterministic demo fixture injection, so repeated full SPY fixture paths no longer get packed into every short live tick. Fixture events still keep their <code>phase03-x:live:&lt;serial&gt;:</code> trace prefixes and the shared projection helper strips label-only fields before events leave the adapter boundary.</p>
+    </section>
+
+    <section>
+      <h2>Changes Made</h2>
+      <ul>
+        <li>Added <code>SYNTHETIC_DEMO_RUN_INTERVAL_MS</code>, <code>scaleSyntheticDemoRunIntervalMs</code>, and <code>projectSyntheticDemoLiveEvent</code> in <code>packages/synthetic-market</code>.</li>
+        <li>Restored continuous equity background quotes and prints on the regular emit cadence, always including <code>SPY</code> plus current focus symbols.</li>
+        <li>Restored continuous dynamic option bursts on the regular emit cadence.</li>
+        <li>Moved deterministic phase-03 fixture injection to an immediate startup injection plus the slower demo-run cadence, with load profile volume controlling runs per injection.</li>
+        <li>Added a live-session reset guard for <code>equity-candles</code> and <code>equity-overlay</code> subscription-key changes.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Verification</h2>
+      <div class="checks">
+        <div class="check"><span class="status pass">Passed</span><strong><code>bun test packages/synthetic-market/tests/demo-load-profiles.test.ts</code></strong><span>Cadence scaling and live projection label stripping.</span></div>
+        <div class="check"><span class="status pass">Passed</span><strong><code>bun test services/ingest-equities/tests/synthetic.test.ts</code></strong><span>Startup fixture serials, label stripping, SPY background prints, and 1m candle geometry.</span></div>
+        <div class="check"><span class="status pass">Passed</span><strong><code>bun test services/ingest-options/tests/synthetic.test.ts</code></strong><span>Dynamic option bursts plus slower deterministic fixture injection.</span></div>
+        <div class="check"><span class="status pass">Passed</span><strong><code>bun test apps/web/app/terminal.test.ts</code></strong><span>Chart stream reset helper for candle and overlay subscription changes.</span></div>
+        <div class="check"><span class="status pass">Passed</span><strong><code>bun test</code></strong><span>Full repository test suite, 355 tests.</span></div>
+        <div class="check"><span class="status pass">Passed</span><strong><code>bun --cwd=apps/web run build</code></strong><span>Next.js production build and TypeScript pass.</span></div>
+        <div class="check"><span class="status blocked">Not runnable</span><strong><code>/candles/equities?underlying_id=SPY&amp;interval_ms=60000&amp;limit=300&amp;cache=1</code></strong><span>No local API was listening on ports 3000, 3001, or 4000, and repo-root <code>docker compose</code> has no compose file in this checkout.</span></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Relevant Diff Snippets</h2>
+      <p>Each snippet has a standard unified diff fallback. When browser module loading succeeds, the fallback is replaced by <code>PatchDiff</code> from the browser-side <code>@pierre/diffs/react</code> package.</p>
+
+      <article class="diff-card">
+        <h3>Shared synthetic playback contract</h3>
+        <div class="rich-diff" aria-label="Rendered diff"></div>
+        <pre class="diff-fallback"><code>diff --git a/packages/synthetic-market/src/profiles.ts b/packages/synthetic-market/src/profiles.ts
+@@
+ export type LoadProfileSummary = LoadProfile;
+
++export type SyntheticDemoLiveEvent = {
++  source_ts: number;
++  ingest_ts: number;
++  ts: number;
++  seq: number;
++  trace_id: string;
++};
++
++export const SYNTHETIC_DEMO_RUN_INTERVAL_MS = 60_000;
++
+@@
+ export const createSyntheticDemoProfileFixture = (
+   profileId: SyntheticDemoProfileId | string | null | undefined,
+   ordinal: number
+ ): SyntheticScenarioFixtureArtifacts =&gt; {
+@@
+ };
+
++export const projectSyntheticDemoLiveEvent = &lt;T extends SyntheticDemoLiveEvent&gt;(
++  event: T,
++  input: { firstTs: number; baseTs: number; seq: number; runId: string; runSerial: number }
++): T =&gt; {
++  const cleanEvent = { ...(event as T &amp; Record&lt;string, unknown&gt;) };
++  delete cleanEvent.scenario_id;
++  delete cleanEvent.label;
++  delete cleanEvent.hiddenLabel;
++  delete cleanEvent.labels;
++  delete cleanEvent.source_kind;
++  const traceSuffix = event.trace_id.split(":").slice(1).join(":") || event.trace_id;
++  return {
++    ...(cleanEvent as T),
++    source_ts: input.baseTs + (event.source_ts - input.firstTs),
++    ingest_ts: input.baseTs + (event.ingest_ts - input.firstTs),
++    ts: input.baseTs + (event.ts - input.firstTs),
++    seq: input.seq,
++    trace_id: `${input.runId}:live:${input.runSerial}:${traceSuffix}`
++  };
++};
++
+ export const scaleSyntheticEmitIntervalMs = (
+@@
+ };
+
++export const scaleSyntheticDemoRunIntervalMs = (
++  baseIntervalMs: number = SYNTHETIC_DEMO_RUN_INTERVAL_MS,
++  profileId: SyntheticLoadProfileId | string | null | undefined
++): number =&gt; scaleSyntheticEmitIntervalMs(baseIntervalMs, profileId);</code></pre>
+        <script type="text/plain" class="patch-source">diff --git a/packages/synthetic-market/src/profiles.ts b/packages/synthetic-market/src/profiles.ts
+@@
+ export type LoadProfileSummary = LoadProfile;
+
++export type SyntheticDemoLiveEvent = {
++  source_ts: number;
++  ingest_ts: number;
++  ts: number;
++  seq: number;
++  trace_id: string;
++};
++
++export const SYNTHETIC_DEMO_RUN_INTERVAL_MS = 60_000;
++
+@@
+ export const createSyntheticDemoProfileFixture = (
+   profileId: SyntheticDemoProfileId | string | null | undefined,
+   ordinal: number
+ ): SyntheticScenarioFixtureArtifacts => {
+@@
+ };
+
++export const projectSyntheticDemoLiveEvent = <T extends SyntheticDemoLiveEvent>(
++  event: T,
++  input: { firstTs: number; baseTs: number; seq: number; runId: string; runSerial: number }
++): T => {
++  const cleanEvent = { ...(event as T & Record<string, unknown>) };
++  delete cleanEvent.scenario_id;
++  delete cleanEvent.label;
++  delete cleanEvent.hiddenLabel;
++  delete cleanEvent.labels;
++  delete cleanEvent.source_kind;
++  const traceSuffix = event.trace_id.split(":").slice(1).join(":") || event.trace_id;
++  return {
++    ...(cleanEvent as T),
++    source_ts: input.baseTs + (event.source_ts - input.firstTs),
++    ingest_ts: input.baseTs + (event.ingest_ts - input.firstTs),
++    ts: input.baseTs + (event.ts - input.firstTs),
++    seq: input.seq,
++    trace_id: `${input.runId}:live:${input.runSerial}:${traceSuffix}`
++  };
++};
++
+ export const scaleSyntheticEmitIntervalMs = (
+@@
+ };
+
++export const scaleSyntheticDemoRunIntervalMs = (
++  baseIntervalMs: number = SYNTHETIC_DEMO_RUN_INTERVAL_MS,
++  profileId: SyntheticLoadProfileId | string | null | undefined
++): number => scaleSyntheticEmitIntervalMs(baseIntervalMs, profileId);</script>
+      </article>
+
+      <article class="diff-card">
+        <h3>Equity adapter playback split</h3>
+        <div class="rich-diff" aria-label="Rendered diff"></div>
+        <pre class="diff-fallback"><code>diff --git a/services/ingest-equities/src/adapters/synthetic.ts b/services/ingest-equities/src/adapters/synthetic.ts
+@@
+ import {
+   createSyntheticDemoProfileFixture,
++  getLoadProfile,
+   getSyntheticLoadProfileRunCount,
+   loadProfileIdForSyntheticMarketMode,
++  projectSyntheticDemoLiveEvent as projectDemoEvent,
++  scaleSyntheticDemoRunIntervalMs,
++  SYNTHETIC_DEMO_RUN_INTERVAL_MS,
+   scaleSyntheticEmitIntervalMs
+ } from "@islandflow/synthetic-market/profiles";
+@@
++const getBackgroundSymbols = (
++  session: ReturnType&lt;typeof getSyntheticSessionState&gt;,
++  minimumCount: number,
++  symbolCursor: number
++): string[] =&gt; {
++  const symbols = uniqueSymbols(["SPY", ...session.focus_symbols]);
++  let fillOffset = 0;
++  while (symbols.length &lt; minimumCount &amp;&amp; fillOffset &lt; SYNTHETIC_SYMBOLS.length * 2) {
++    const candidate = SYNTHETIC_SYMBOLS[(symbolCursor + fillOffset) % SYNTHETIC_SYMBOLS.length]!;
++    if (!symbols.includes(candidate)) symbols.push(candidate);
++    fillOffset += 1;
++  }
++  return symbols;
++};
+@@
+-      const emit = () =&gt; {
++      const emitBackground = () =&gt; {
++        const control = getEffectiveControl();
++        const mode = getLoadProfile(control.load_profile_id).mode;
++        const throughput = THROUGHPUT_BY_MODE[mode];
++        const session = getSyntheticSessionState(now, control);
++        const backgroundSymbols = getBackgroundSymbols(session, throughput.batchSize, symbolCursor);
++        for (const symbol of backgroundSymbols) {
++          // Emits live-like quotes and prints, always including SPY plus focus symbols.
++        }
++      };
++
++      const emitDemoRuns = () =&gt; {
+         const now = Date.now();
+         const control = getEffectiveControl();
+         const runCount = getSyntheticLoadProfileRunCount(control.load_profile_id);
+@@
+-      const schedule = () =&gt; {
++      const scheduleRegular = () =&gt; {
+         const intervalMs = scaleSyntheticEmitIntervalMs(config.emitIntervalMs, control.load_profile_id);
+         regularTimer = setTimeout(() =&gt; {
+-          emit();
+-          schedule();
++          emitBackground();
++          scheduleRegular();
+         }, intervalMs);
+       };
+
++      const scheduleDemoRuns = () =&gt; {
++        const intervalMs = scaleSyntheticDemoRunIntervalMs(
++          SYNTHETIC_DEMO_RUN_INTERVAL_MS,
++          control.load_profile_id
++        );
++        demoTimer = setTimeout(() =&gt; {
++          emitDemoRuns();
++          scheduleDemoRuns();
++        }, intervalMs);
++      };
++
++      emitBackground();
++      emitDemoRuns();
++      scheduleRegular();
++      scheduleDemoRuns();</code></pre>
+        <script type="text/plain" class="patch-source">diff --git a/services/ingest-equities/src/adapters/synthetic.ts b/services/ingest-equities/src/adapters/synthetic.ts
+@@
+ import {
+   createSyntheticDemoProfileFixture,
++  getLoadProfile,
+   getSyntheticLoadProfileRunCount,
+   loadProfileIdForSyntheticMarketMode,
++  projectSyntheticDemoLiveEvent as projectDemoEvent,
++  scaleSyntheticDemoRunIntervalMs,
++  SYNTHETIC_DEMO_RUN_INTERVAL_MS,
+   scaleSyntheticEmitIntervalMs
+ } from "@islandflow/synthetic-market/profiles";
+@@
++const getBackgroundSymbols = (
++  session: ReturnType<typeof getSyntheticSessionState>,
++  minimumCount: number,
++  symbolCursor: number
++): string[] => {
++  const symbols = uniqueSymbols(["SPY", ...session.focus_symbols]);
++  let fillOffset = 0;
++  while (symbols.length < minimumCount && fillOffset < SYNTHETIC_SYMBOLS.length * 2) {
++    const candidate = SYNTHETIC_SYMBOLS[(symbolCursor + fillOffset) % SYNTHETIC_SYMBOLS.length]!;
++    if (!symbols.includes(candidate)) symbols.push(candidate);
++    fillOffset += 1;
++  }
++  return symbols;
++};
+@@
+-      const emit = () => {
++      const emitBackground = () => {
++        const control = getEffectiveControl();
++        const mode = getLoadProfile(control.load_profile_id).mode;
++        const throughput = THROUGHPUT_BY_MODE[mode];
++        const session = getSyntheticSessionState(now, control);
++        const backgroundSymbols = getBackgroundSymbols(session, throughput.batchSize, symbolCursor);
++        for (const symbol of backgroundSymbols) {
++          // Emits live-like quotes and prints, always including SPY plus focus symbols.
++        }
++      };
++
++      const emitDemoRuns = () => {
+         const now = Date.now();
+         const control = getEffectiveControl();
+         const runCount = getSyntheticLoadProfileRunCount(control.load_profile_id);
+@@
+-      const schedule = () => {
++      const scheduleRegular = () => {
+         const intervalMs = scaleSyntheticEmitIntervalMs(config.emitIntervalMs, control.load_profile_id);
+         regularTimer = setTimeout(() => {
+-          emit();
+-          schedule();
++          emitBackground();
++          scheduleRegular();
+         }, intervalMs);
+       };
+
++      const scheduleDemoRuns = () => {
++        const intervalMs = scaleSyntheticDemoRunIntervalMs(
++          SYNTHETIC_DEMO_RUN_INTERVAL_MS,
++          control.load_profile_id
++        );
++        demoTimer = setTimeout(() => {
++          emitDemoRuns();
++          scheduleDemoRuns();
++        }, intervalMs);
++      };
++
++      emitBackground();
++      emitDemoRuns();
++      scheduleRegular();
++      scheduleDemoRuns();</script>
+      </article>
+
+      <article class="diff-card">
+        <h3>Terminal chart subscription reset</h3>
+        <div class="rich-diff" aria-label="Rendered diff"></div>
+        <pre class="diff-fallback"><code>diff --git a/apps/web/features/terminal/live.ts b/apps/web/features/terminal/live.ts
+@@
++type LiveSubscriptionResetChannel =
++  | "options"
++  | "equities"
++  | "equity-candles"
++  | "equity-overlay";
++
++export const getLiveSubscriptionResetChannels = (
++  currentSubscriptions: Iterable&lt;LiveSubscription&gt;,
++  nextSubscriptions: LiveSubscription[]
++): Set&lt;LiveSubscriptionResetChannel&gt; =&gt; {
++  const currentMap = new Map(
++    Array.from(currentSubscriptions, (subscription) =&gt; [getLiveSubscriptionKey(subscription), subscription])
++  );
++  const nextMap = new Map(
++    nextSubscriptions.map((subscription) =&gt; [getLiveSubscriptionKey(subscription), subscription])
++  );
++  const resetChannels = new Set&lt;LiveSubscriptionResetChannel&gt;();
++  for (const subscription of changedSubscriptions) {
++    if (
++      subscription.channel === "options" ||
++      subscription.channel === "equities" ||
++      subscription.channel === "equity-candles" ||
++      subscription.channel === "equity-overlay"
++    ) {
++      resetChannels.add(subscription.channel);
++    }
++  }
++  return resetChannels;
++};
+@@
+     if (resetScopedChannels.has("equities")) {
+       equitiesRef.current = [];
+       equitiesHistoryRef.current = [];
+       setEquities([]);
+       setEquitiesHistory([]);
+     }
++    if (resetScopedChannels.has("equity-candles")) {
++      chartCandlesRef.current = [];
++      setChartCandles([]);
++    }
++    if (resetScopedChannels.has("equity-overlay")) {
++      chartOverlayRef.current = [];
++      setChartOverlay([]);
++    }</code></pre>
+        <script type="text/plain" class="patch-source">diff --git a/apps/web/features/terminal/live.ts b/apps/web/features/terminal/live.ts
+@@
++type LiveSubscriptionResetChannel =
++  | "options"
++  | "equities"
++  | "equity-candles"
++  | "equity-overlay";
++
++export const getLiveSubscriptionResetChannels = (
++  currentSubscriptions: Iterable<LiveSubscription>,
++  nextSubscriptions: LiveSubscription[]
++): Set<LiveSubscriptionResetChannel> => {
++  const currentMap = new Map(
++    Array.from(currentSubscriptions, (subscription) => [getLiveSubscriptionKey(subscription), subscription])
++  );
++  const nextMap = new Map(
++    nextSubscriptions.map((subscription) => [getLiveSubscriptionKey(subscription), subscription])
++  );
++  const resetChannels = new Set<LiveSubscriptionResetChannel>();
++  for (const subscription of changedSubscriptions) {
++    if (
++      subscription.channel === "options" ||
++      subscription.channel === "equities" ||
++      subscription.channel === "equity-candles" ||
++      subscription.channel === "equity-overlay"
++    ) {
++      resetChannels.add(subscription.channel);
++    }
++  }
++  return resetChannels;
++};
+@@
+     if (resetScopedChannels.has("equities")) {
+       equitiesRef.current = [];
+       equitiesHistoryRef.current = [];
+       setEquities([]);
+       setEquitiesHistory([]);
+     }
++    if (resetScopedChannels.has("equity-candles")) {
++      chartCandlesRef.current = [];
++      setChartCandles([]);
++    }
++    if (resetScopedChannels.has("equity-overlay")) {
++      chartOverlayRef.current = [];
++      setChartOverlay([]);
++    }</script>
+      </article>
+    </section>
+  </main>
+
+  <script type="module">
+    import React from "https://esm.sh/react@19";
+    import { createRoot } from "https://esm.sh/react-dom@19/client";
+    import { PatchDiff } from "https://esm.sh/@pierre/diffs@1.2.2/react?deps=react@19,react-dom@19";
+
+    for (const card of document.querySelectorAll(".diff-card")) {
+      const target = card.querySelector(".rich-diff");
+      const source = card.querySelector(".patch-source");
+      if (!target || !source) continue;
+      try {
+        createRoot(target).render(React.createElement(PatchDiff, { patch: source.textContent || "" }));
+        card.classList.add("rendered");
+      } catch (error) {
+        console.warn("Rich diff renderer failed; keeping HTML fallback.", error);
+      }
+    }
+  </script>
+</body>
+</html>

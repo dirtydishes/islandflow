@@ -13,6 +13,8 @@ import {
   updateSyntheticIvForTest
 } from "../src/adapters/synthetic";
 
+const FORBIDDEN_LABEL_FIELDS = ["scenario_id", "label", "hiddenLabel", "labels", "source_kind"];
+
 const totalBurstNotional = (burst: {
   legs: Array<{
     basePrice: number;
@@ -228,13 +230,15 @@ describe("synthetic smart-money scenarios", () => {
     stop();
 
     expect(trades.length).toBeGreaterThan(0);
+    expect(trades.some((trade) => trade.trace_id.startsWith("synthetic-options-"))).toBe(true);
     for (const trade of trades) {
-      expect("hiddenLabel" in trade).toBe(false);
-      expect("label" in trade).toBe(false);
+      for (const field of FORBIDDEN_LABEL_FIELDS) {
+        expect(field in trade).toBe(false);
+      }
     }
   });
 
-  it("emits selected deterministic demo profile runs through the live adapter", async () => {
+  it("emits selected deterministic demo runs once while regular ticks produce dynamic bursts", async () => {
     const adapter = createSyntheticOptionsAdapter({
       emitIntervalMs: 1,
       mode: "realistic",
@@ -255,17 +259,24 @@ describe("synthetic smart-money scenarios", () => {
       }
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 12));
+    await new Promise((resolve) => setTimeout(resolve, 25));
     stop();
 
     expect(trades.length).toBeGreaterThan(0);
     expect(nbbo.length).toBeGreaterThan(0);
-    const runIds = new Set(trades.map((trade) => trade.trace_id.split(":live:")[0]));
+    expect(trades.some((trade) => trade.trace_id.startsWith("synthetic-options-"))).toBe(true);
+    const demoTrades = trades.filter((trade) => trade.trace_id.includes(":live:"));
+    const runIds = new Set(demoTrades.map((trade) => trade.trace_id.split(":live:")[0]));
+    const runSerials = new Set(
+      demoTrades.map((trade) => trade.trace_id.match(/:live:(\d+):/)?.[1])
+    );
     expect(runIds.has("phase03-f")).toBe(true);
     expect(runIds.has("phase03-d")).toBe(true);
-    for (const trade of trades) {
-      expect("scenario_id" in trade).toBe(false);
-      expect("hiddenLabel" in trade).toBe(false);
+    expect(runSerials).toEqual(new Set(["1", "2"]));
+    for (const event of [...trades, ...nbbo]) {
+      for (const field of FORBIDDEN_LABEL_FIELDS) {
+        expect(field in event).toBe(false);
+      }
     }
   });
 });

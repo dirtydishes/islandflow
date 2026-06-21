@@ -6,8 +6,11 @@ import {
   listDemoProfiles,
   listLoadProfiles,
   loadProfileIdForSyntheticMarketMode,
+  projectSyntheticDemoLiveEvent,
   resolveSyntheticProfileControlState,
+  scaleSyntheticDemoRunIntervalMs,
   scaleSyntheticEmitIntervalMs,
+  SYNTHETIC_DEMO_RUN_INTERVAL_MS,
   selectDemoProfileRun
 } from "../src/profiles";
 
@@ -43,10 +46,47 @@ describe("synthetic demo profiles", () => {
       false
     );
   });
+
+  it("projects fixture events into live traces without leaking labels", () => {
+    const projected = projectSyntheticDemoLiveEvent(
+      {
+        source_ts: 1_000,
+        ingest_ts: 1_001,
+        ts: 1_002,
+        seq: 7,
+        trace_id: "fixture:equity:1",
+        scenario_id: "hidden-scenario",
+        label: "hidden-label",
+        hiddenLabel: "also-hidden",
+        labels: ["hidden"],
+        source_kind: "fixture"
+      } as any,
+      {
+        firstTs: 1_000,
+        baseTs: 10_000,
+        seq: 42,
+        runId: "phase03-x",
+        runSerial: 3
+      }
+    );
+
+    expect(projected).toMatchObject({
+      source_ts: 10_000,
+      ingest_ts: 10_001,
+      ts: 10_002,
+      seq: 42,
+      trace_id: "phase03-x:live:3:equity:1"
+    });
+    expect("scenario_id" in projected).toBe(false);
+    expect("label" in projected).toBe(false);
+    expect("hiddenLabel" in projected).toBe(false);
+    expect("labels" in projected).toBe(false);
+    expect("source_kind" in projected).toBe(false);
+  });
 });
 
 describe("synthetic load profiles", () => {
-  it("scales playback cadence and run count without changing selected run semantics", () => {
+  it("scales regular emit cadence without changing selected run semantics", () => {
     const steady = getLoadProfile("steady");
     const firehose = getLoadProfile("firehose");
     const steadyFixture = createSyntheticDemoProfileFixture("market-command", 0);
@@ -60,8 +100,6 @@ describe("synthetic load profiles", () => {
     expect(scaleSyntheticEmitIntervalMs(1000, "steady")).toBe(1000);
     expect(scaleSyntheticEmitIntervalMs(1000, "active")).toBe(500);
     expect(scaleSyntheticEmitIntervalMs(1000, "firehose")).toBe(250);
-    expect(getSyntheticLoadProfileRunCount("steady")).toBe(1);
-    expect(getSyntheticLoadProfileRunCount("firehose")).toBe(2);
     expect(loadProfileIdForSyntheticMarketMode("realistic")).toBe("steady");
     expect(loadProfileIdForSyntheticMarketMode("active")).toBe("active");
     expect(loadProfileIdForSyntheticMarketMode("firehose")).toBe("firehose");
@@ -71,6 +109,30 @@ describe("synthetic load profiles", () => {
     expect(firehoseFixture.batch.parameter_snapshot.profile).toEqual(
       steadyFixture.batch.parameter_snapshot.profile
     );
+  });
+
+  it("scales demo-run injection cadence and run count separately from regular emits", () => {
+    expect(SYNTHETIC_DEMO_RUN_INTERVAL_MS).toBe(60_000);
+    expect(scaleSyntheticDemoRunIntervalMs(SYNTHETIC_DEMO_RUN_INTERVAL_MS, "steady")).toBe(
+      60_000
+    );
+    expect(scaleSyntheticDemoRunIntervalMs(SYNTHETIC_DEMO_RUN_INTERVAL_MS, "active")).toBe(
+      30_000
+    );
+    expect(scaleSyntheticDemoRunIntervalMs(SYNTHETIC_DEMO_RUN_INTERVAL_MS, "firehose")).toBe(
+      15_000
+    );
+    expect(getSyntheticLoadProfileRunCount("steady")).toBe(1);
+    expect(getSyntheticLoadProfileRunCount("active")).toBe(1);
+    expect(getSyntheticLoadProfileRunCount("firehose")).toBe(2);
+    expect(selectDemoProfileRun("quiet-range", 0)).toMatchObject({
+      scenario_id: "structure-arbitrage-calm",
+      run_id: "phase03-f"
+    });
+    expect(selectDemoProfileRun("quiet-range", 1)).toMatchObject({
+      scenario_id: "volatility-seller-supply",
+      run_id: "phase03-d"
+    });
   });
 
   it("maps demo profile selection to deterministic control defaults", () => {

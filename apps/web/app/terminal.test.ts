@@ -60,6 +60,7 @@ const {
   getOptionScope,
   getLiveFeedStatus,
   getLiveManifest,
+  getLiveSubscriptionResetChannels,
   getSmartFlowEvidenceRefs,
   getSmartFlowOptionPrintRefs,
   getSmartFlowPacketRefs,
@@ -360,6 +361,21 @@ describe("live manifest", () => {
       underlying_id: "SPY",
       interval_ms: 60_000
     });
+  });
+
+  it("resets live chart streams when candle or overlay subscription keys change", () => {
+    const current = getLiveManifest("/", "SPY", 60_000, buildDefaultFlowFilters());
+    const nextTicker = getLiveManifest("/", "NVDA", 60_000, buildDefaultFlowFilters());
+    const nextInterval = getLiveManifest("/", "SPY", 900_000, buildDefaultFlowFilters());
+
+    expect(Array.from(getLiveSubscriptionResetChannels(current, nextTicker)).sort()).toEqual([
+      "equity-candles",
+      "equity-overlay"
+    ]);
+    expect(Array.from(getLiveSubscriptionResetChannels(current, nextInterval)).sort()).toEqual([
+      "equity-candles"
+    ]);
+    expect(Array.from(getLiveSubscriptionResetChannels(current, current))).toEqual([]);
   });
 });
 

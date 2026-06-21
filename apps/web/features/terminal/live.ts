@@ -925,6 +925,50 @@ export const LIVE_HISTORY_ENDPOINTS: Partial<Record<LiveSubscription["channel"],
   "inferred-dark": "/history/inferred-dark"
 };
 
+type LiveSubscriptionResetChannel =
+  | "options"
+  | "equities"
+  | "equity-candles"
+  | "equity-overlay";
+
+export const getLiveSubscriptionResetChannels = (
+  currentSubscriptions: Iterable<LiveSubscription>,
+  nextSubscriptions: LiveSubscription[]
+): Set<LiveSubscriptionResetChannel> => {
+  const currentMap = new Map(
+    Array.from(currentSubscriptions, (subscription) => [
+      getLiveSubscriptionKey(subscription),
+      subscription
+    ])
+  );
+  const nextMap = new Map(
+    nextSubscriptions.map((subscription) => [getLiveSubscriptionKey(subscription), subscription])
+  );
+  const nextKeys = new Set(nextMap.keys());
+  const currentKeys = new Set(currentMap.keys());
+  const changedSubscriptions = [
+    ...Array.from(currentKeys)
+      .filter((key) => !nextKeys.has(key))
+      .map((key) => currentMap.get(key) ?? null),
+    ...Array.from(nextKeys)
+      .filter((key) => !currentKeys.has(key))
+      .map((key) => nextMap.get(key) ?? null)
+  ].filter((subscription): subscription is LiveSubscription => subscription !== null);
+
+  const resetChannels = new Set<LiveSubscriptionResetChannel>();
+  for (const subscription of changedSubscriptions) {
+    if (
+      subscription.channel === "options" ||
+      subscription.channel === "equities" ||
+      subscription.channel === "equity-candles" ||
+      subscription.channel === "equity-overlay"
+    ) {
+      resetChannels.add(subscription.channel);
+    }
+  }
+  return resetChannels;
+};
+
 export const useLiveSession = (
   enabled: boolean,
   _pathname: string,
@@ -1409,12 +1453,9 @@ export const useLiveSession = (
     const currentKeys = subscribedKeysRef.current;
     const toSubscribe = manifest.filter((sub) => !currentKeys.has(getLiveSubscriptionKey(sub)));
     const removedKeys = Array.from(currentKeys).filter((key) => !nextKeys.has(key));
-    const resetScopedChannels = new Set(
-      [...removedKeys, ...toSubscribe.map(getLiveSubscriptionKey)]
-        .map((key) => subscribedMapRef.current.get(key) ?? nextMap.get(key) ?? null)
-        .filter((sub): sub is LiveSubscription => sub !== null)
-        .map((sub) => sub.channel)
-        .filter((channel) => channel === "options" || channel === "equities")
+    const resetScopedChannels = getLiveSubscriptionResetChannels(
+      subscribedMapRef.current.values(),
+      manifest
     );
     if (resetScopedChannels.has("options")) {
       optionsRef.current = [];
@@ -1427,6 +1468,14 @@ export const useLiveSession = (
       equitiesHistoryRef.current = [];
       setEquities([]);
       setEquitiesHistory([]);
+    }
+    if (resetScopedChannels.has("equity-candles")) {
+      chartCandlesRef.current = [];
+      setChartCandles([]);
+    }
+    if (resetScopedChannels.has("equity-overlay")) {
+      chartOverlayRef.current = [];
+      setChartOverlay([]);
     }
     if (resetScopedChannels.size > 0) {
       setHistoryCursors((current) => {
