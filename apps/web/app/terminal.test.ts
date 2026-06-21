@@ -35,6 +35,8 @@ const {
   appendHistoryTail,
   buildAlertContextPath,
   buildDefaultFlowFilters,
+  buildTerminalEquityOverlays,
+  buildTerminalMarketChartMarkers,
   buildOptionTapeQueryParams,
   classifierToneForFamily,
   collectAlertContextEvidence,
@@ -62,12 +64,15 @@ const {
   getSmartFlowPinnedFlowKeys,
   getSmartFlowPinnedOptionKeys,
   getTerminalNavCurrentHref,
+  getTerminalChartReplayEndTs,
   getRouteFeatures,
   getTapeVirtualConfig,
   mergeHeldTapeHistory,
   mergeNewestWithOverflow,
+  mapTerminalChartStatus,
   normalizeAlertSeverity,
   normalizeTickerFilterInput,
+  normalizeTerminalChartCandles,
   nextFlowFilterPopoverState,
   isSyntheticAdminVisible,
   parseTickerFilterInput,
@@ -1072,6 +1077,18 @@ describe("smart-flow explainability helpers", () => {
       ...overrides
     }) as any;
 
+  const makeDarkEvent = (overrides: Record<string, unknown> = {}) =>
+    ({
+      source_ts: 1_500,
+      ingest_ts: 1_501,
+      seq: 1,
+      trace_id: "dark:1",
+      type: "off_exchange_cluster",
+      confidence: 0.72,
+      evidence_refs: ["equity:1"],
+      ...overrides
+    }) as any;
+
   it("labels hypotheses and evidence quality without certainty language", () => {
     expect(smartFlowHypothesisLabel("directional_accumulation")).toBe("Directional accumulation");
     expect(smartFlowHypothesisLabel("unclear")).toBe("No clear flow hypothesis");
@@ -1203,6 +1220,130 @@ describe("smart-flow explainability helpers", () => {
     expect(
       items.map((item) => item.kind === "smart-flow" && item.projection.refs.hypothesis_id)
     ).toEqual(["hypothesis:earlier", "hypothesis:later"]);
+  });
+
+  it("maps terminal chart candles and off-exchange overlays into reusable chart inputs", () => {
+    const candles = normalizeTerminalChartCandles([
+      {
+        trace_id: "candle:2",
+        source_ts: 2_000,
+        ingest_ts: 2_100,
+        seq: 2,
+        ts: 2_000,
+        interval_ms: 60_000,
+        underlying_id: "SPY",
+        open: 102,
+        high: 104,
+        low: 101,
+        close: 101,
+        volume: 20,
+        trade_count: 4
+      },
+      {
+        trace_id: "candle:1",
+        source_ts: 1_000,
+        ingest_ts: 1_100,
+        seq: 1,
+        ts: 1_000,
+        interval_ms: 60_000,
+        underlying_id: "SPY",
+        open: 100,
+        high: 103,
+        low: 99,
+        close: 102,
+        volume: 10,
+        trade_count: 2
+      }
+    ] as any);
+
+    expect(candles.map((candle) => candle.timestampMs)).toEqual([1_000, 2_000]);
+    expect(candles.map((candle) => candle.direction)).toEqual(["bullish", "bearish"]);
+
+    const overlays = buildTerminalEquityOverlays([
+      {
+        trace_id: "print:1",
+        source_ts: 1_000,
+        ingest_ts: 1_001,
+        seq: 1,
+        ts: 1_000,
+        underlying_id: "SPY",
+        price: 101,
+        size: 100,
+        exchange: "D",
+        offExchangeFlag: true
+      },
+      {
+        trace_id: "print:2",
+        source_ts: 2_000,
+        ingest_ts: 2_001,
+        seq: 2,
+        ts: 2_000,
+        underlying_id: "SPY",
+        price: 102,
+        size: 50,
+        exchange: "N",
+        offExchangeFlag: false
+      }
+    ] as any);
+
+    expect(overlays).toHaveLength(1);
+    expect(overlays[0].points).toHaveLength(1);
+    expect(overlays[0].points[0]).toMatchObject({ timestampMs: 1_000, price: 101, value: 100 });
+  });
+
+  it("maps smart-flow, legacy fallback, and inferred dark events into clickable chart markers", () => {
+    const projection = makeProjection({
+      source_ts: 2_000,
+      seq: 2,
+      refs: { hypothesis_id: "hypothesis:2" }
+    });
+    const legacy = makeLegacySmartMoneyEvent({ source_ts: 2_000, seq: 1 });
+    const dark = makeDarkEvent({ source_ts: 2_500, seq: 3 });
+
+    const smartFlowMarkers = buildTerminalMarketChartMarkers({
+      smartFlowProjections: [projection],
+      smartMoneyEvents: [legacy],
+      inferredDark: [dark],
+      visibleRangeMs: { from: 1_000, to: 3_000 }
+    });
+
+    expect(smartFlowMarkers.map((marker) => marker.payload?.kind).sort()).toEqual([
+      "inferred-dark",
+      "smart-flow"
+    ]);
+    expect(smartFlowMarkers.find((marker) => marker.payload?.kind === "smart-flow")).toMatchObject({
+      id: "smart-flow:hypothesis:2:2",
+      label: "HYP",
+      position: "belowBar"
+    });
+
+    const fallbackMarkers = buildTerminalMarketChartMarkers({
+      smartFlowProjections: [],
+      smartMoneyEvents: [legacy],
+      inferredDark: [],
+      visibleRangeMs: { from: 1_000, to: 3_000 }
+    });
+
+    expect(fallbackMarkers).toHaveLength(1);
+    expect(fallbackMarkers[0]).toMatchObject({
+      id: "smart-money:smart-money:1:1",
+      label: "INS"
+    });
+    expect(fallbackMarkers[0].payload?.kind).toBe("smart-money");
+  });
+
+  it("maps terminal feed status into reusable chart status metadata", () => {
+    expect(mapTerminalChartStatus("connected", "live", null)).toBe("live");
+    expect(mapTerminalChartStatus("stale", "live", null)).toBe("stale");
+    expect(mapTerminalChartStatus("connected", "replay", null)).toBe("replay");
+    expect(mapTerminalChartStatus("connected", "live", "failed")).toBe("error");
+  });
+
+  it("keeps replay candle fetches pinned to the active replay interval bucket", () => {
+    expect(getTerminalChartReplayEndTs("replay", 125_000, 60_000)).toBe(179_999);
+    expect(getTerminalChartReplayEndTs("replay", 900_000, 300_000)).toBe(1_199_999);
+    expect(getTerminalChartReplayEndTs("live", 125_000, 60_000)).toBeNull();
+    expect(getTerminalChartReplayEndTs("replay", null, 60_000)).toBeNull();
   });
 });
 

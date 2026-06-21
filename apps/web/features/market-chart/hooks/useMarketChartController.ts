@@ -62,6 +62,9 @@ const toSeriesMarker = (marker: MarketChartMarker): SeriesMarker<Time> => ({
   text: marker.label
 });
 
+const clampRadius = (value: number, min: number, max: number): number =>
+  Math.max(min, Math.min(max, value));
+
 export const useMarketChartController = ({
   symbol,
   intervalMs,
@@ -83,9 +86,22 @@ export const useMarketChartController = ({
   const lowerSeriesRef = useRef<Map<string, MarketChartLowerPaneSeries>>(new Map());
   const markerPluginRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const markerLookupRef = useRef<Map<string, MarketChartMarker>>(new Map());
+  const overlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const overlayCtxRef = useRef<CanvasRenderingContext2D | null>(null);
+  const overlayStateRef = useRef({
+    overlays,
+    showOverlays: settings.display.showOverlays,
+    theme
+  });
+  const drawOverlaysRef = useRef<() => void>(() => {});
   const visibleRangeRef = useRef(onVisibleRangeChange);
   const markerClickRef = useRef(onMarkerClick);
   const fittedScopeRef = useRef<string | null>(null);
+  overlayStateRef.current = {
+    overlays,
+    showOverlays: settings.display.showOverlays,
+    theme
+  };
   visibleRangeRef.current = onVisibleRangeChange;
   markerClickRef.current = onMarkerClick;
 
@@ -135,9 +151,78 @@ export const useMarketChartController = ({
       0
     );
     const markerPlugin = createSeriesMarkers(priceSeries, []);
+    const overlayCanvas = document.createElement("canvas");
+    overlayCanvas.width = width;
+    overlayCanvas.height = height;
+    overlayCanvas.style.position = "absolute";
+    overlayCanvas.style.inset = "0";
+    overlayCanvas.style.pointerEvents = "none";
+    overlayCanvas.style.zIndex = "2";
+    overlayCanvas.style.opacity = "0";
+    container.style.position = "relative";
+    container.appendChild(overlayCanvas);
     chartRef.current = chart;
     priceSeriesRef.current = priceSeries;
     markerPluginRef.current = markerPlugin;
+    overlayCanvasRef.current = overlayCanvas;
+    overlayCtxRef.current = overlayCanvas.getContext("2d");
+
+    drawOverlaysRef.current = () => {
+      const canvas = overlayCanvasRef.current;
+      const ctx = overlayCtxRef.current;
+      const activeChart = chartRef.current;
+      const activePriceSeries = priceSeriesRef.current;
+      if (!canvas || !ctx || !activeChart || !activePriceSeries) {
+        return;
+      }
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const { overlays: activeOverlays, showOverlays, theme: activeTheme } = overlayStateRef.current;
+      if (!showOverlays || !activeOverlays?.length) {
+        canvas.style.opacity = "0";
+        return;
+      }
+
+      const points = activeOverlays
+        .filter((overlay) => overlay.visible !== false)
+        .flatMap((overlay) => overlay.points)
+        .filter((point) => typeof point.price === "number" && Number.isFinite(point.price));
+      if (points.length === 0) {
+        canvas.style.opacity = "0";
+        return;
+      }
+
+      const sampled = points.length > 1400 ? points.slice(points.length - 1400) : points;
+      const maxValue = Math.max(1, ...sampled.map((point) => Math.abs(point.value ?? 1)));
+      let drawn = false;
+
+      for (const point of sampled) {
+        const x = activeChart.timeScale().timeToCoordinate(point.time);
+        const y = activePriceSeries.priceToCoordinate(point.price ?? 0);
+        if (x === null || y === null) {
+          continue;
+        }
+
+        const radius = clampRadius(
+          2 + (Math.sqrt(Math.abs(point.value ?? 1)) / Math.sqrt(maxValue)) * 8,
+          2,
+          10
+        );
+        const color = point.color ?? activeTheme.tokens.active;
+        ctx.globalAlpha = 0.88;
+        ctx.fillStyle = color;
+        ctx.strokeStyle = color;
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        drawn = true;
+      }
+
+      ctx.globalAlpha = 1;
+      canvas.style.opacity = drawn ? "1" : "0";
+    };
 
     const updateVisibleRange = () => {
       const range = chart.timeScale().getVisibleRange();
@@ -152,6 +237,7 @@ export const useMarketChartController = ({
         return;
       }
       visibleRangeRef.current?.({ from: Math.min(from, to), to: Math.max(from, to) });
+      drawOverlaysRef.current();
     };
 
     const clickHandler = (param: {
@@ -181,6 +267,11 @@ export const useMarketChartController = ({
       const nextWidth = Math.max(1, Math.floor(entry.contentRect.width));
       const nextHeight = Math.max(1, Math.floor(entry.contentRect.height));
       chart.resize(nextWidth, nextHeight);
+      if (overlayCanvasRef.current) {
+        overlayCanvasRef.current.width = nextWidth;
+        overlayCanvasRef.current.height = nextHeight;
+      }
+      drawOverlaysRef.current();
     });
     resizeObserver.observe(container);
 
@@ -194,6 +285,10 @@ export const useMarketChartController = ({
       chartRef.current = null;
       priceSeriesRef.current = null;
       markerPluginRef.current = null;
+      overlayCanvasRef.current?.remove();
+      overlayCanvasRef.current = null;
+      overlayCtxRef.current = null;
+      drawOverlaysRef.current = () => {};
       lowerSeriesRef.current.clear();
     };
   }, [crosshairHandler]);
@@ -206,10 +301,12 @@ export const useMarketChartController = ({
       return;
     }
     if (fittedScopeRef.current === scopeKey) {
+      drawOverlaysRef.current();
       return;
     }
     chartRef.current?.timeScale().fitContent();
     fittedScopeRef.current = scopeKey;
+    drawOverlaysRef.current();
   }, [candles, intervalMs, symbol]);
 
   useEffect(() => {
@@ -229,6 +326,7 @@ export const useMarketChartController = ({
       }
     });
     priceSeriesRef.current?.applyOptions(createMarketCandlestickSeriesOptions(theme));
+    drawOverlaysRef.current();
   }, [intervalMs, settings.display.showGrid, theme]);
 
   useEffect(() => {
@@ -276,7 +374,12 @@ export const useMarketChartController = ({
     const panes = chart.panes();
     panes[0]?.setStretchFactor(Math.max(1, 1 - preset.lowerPaneRatio));
     panes[1]?.setStretchFactor(Math.max(0.05, preset.lowerPaneRatio));
+    drawOverlaysRef.current();
   }, [lowerSeries, preset.lowerPaneRatio, settings.lowerPane.visible, theme]);
+
+  useEffect(() => {
+    drawOverlaysRef.current();
+  }, [overlays, settings.display.showOverlays, theme]);
 
   const refs: MarketChartApiRefs = {
     chart: chartRef.current,
