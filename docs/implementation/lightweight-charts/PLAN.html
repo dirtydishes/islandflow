@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Reusable Lightweight Charts Plan</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg-core: #06080b;
+        --bg-elevated: #0b1016;
+        --bg-pane: #111820;
+        --bg-pane-2: #0d141b;
+        --bg-soft: #ffffff08;
+        --border: #ffffff14;
+        --border-strong: #ffffff24;
+        --text: #e6edf4;
+        --text-dim: #90a0b2;
+        --text-faint: #6e7b8c;
+        --amber: #f5a623;
+        --amber-soft: #f5a6231f;
+        --green: #25c17a;
+        --green-soft: #25c17a1f;
+        --red: #ff6b5f;
+        --red-soft: #ff6b5f24;
+        --blue: #4da3ff;
+        --blue-soft: #4da3ff24;
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        background: var(--bg-core);
+        color: var(--text);
+        font-family: var(--sans);
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg-core);
+      }
+
+      a {
+        color: var(--amber);
+        text-decoration-color: #f5a62366;
+        text-underline-offset: 3px;
+      }
+
+      a:hover {
+        text-decoration-color: var(--amber);
+      }
+
+      .shell {
+        width: min(1440px, 100%);
+        margin: 0 auto;
+        padding: 22px;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 0 0 18px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .eyebrow,
+      .label,
+      th,
+      .chip,
+      .phase-id {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .eyebrow {
+        display: block;
+        color: var(--amber);
+        margin-bottom: 6px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 760px;
+        font-size: 2rem;
+        line-height: 1.08;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        font-size: 1.06rem;
+        line-height: 1.2;
+      }
+
+      h3 {
+        font-size: 0.9rem;
+        line-height: 1.25;
+      }
+
+      p {
+        color: var(--text-dim);
+        font-size: 0.92rem;
+        line-height: 1.55;
+      }
+
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: flex-end;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        padding: 5px 9px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: var(--bg-soft);
+        color: var(--text-dim);
+        white-space: nowrap;
+      }
+
+      .chip.is-active {
+        border-color: #f5a62359;
+        background: var(--amber-soft);
+        color: var(--text);
+      }
+
+      .grid {
+        display: grid;
+        gap: 10px;
+      }
+
+      .main-grid {
+        grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+        align-items: start;
+        margin-top: 16px;
+      }
+
+      .section {
+        padding: 14px 0;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .section:first-child {
+        border-top: 1px solid var(--border);
+      }
+
+      .section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 10px;
+      }
+
+      .pane {
+        background: var(--bg-pane-2);
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+        padding: 12px;
+      }
+
+      .summary {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1px;
+        background: var(--border);
+        border: 1px solid var(--border);
+      }
+
+      .summary div {
+        min-height: 86px;
+        padding: 12px;
+        background: var(--bg-pane);
+      }
+
+      .summary strong {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--text);
+        font-size: 0.95rem;
+      }
+
+      .summary span {
+        color: var(--text-dim);
+        font-size: 0.82rem;
+        line-height: 1.45;
+      }
+
+      .phase-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .phase {
+        display: grid;
+        grid-template-columns: 86px minmax(0, 1fr) minmax(170px, 0.3fr);
+        gap: 12px;
+        padding: 12px 0;
+        border-top: 1px solid var(--border);
+      }
+
+      .phase:first-child {
+        border-top: 0;
+      }
+
+      .phase-id {
+        color: var(--amber);
+      }
+
+      .phase p {
+        margin-top: 5px;
+      }
+
+      .phase-links {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        align-items: flex-start;
+        font-family: var(--mono);
+        font-size: 0.74rem;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--bg-pane-2);
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+      }
+
+      th,
+      td {
+        padding: 10px;
+        border-bottom: 1px solid var(--border);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--text-faint);
+        background: var(--bg-elevated);
+      }
+
+      td {
+        color: var(--text-dim);
+        font-size: 0.86rem;
+        line-height: 1.45;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .swatches {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .swatch {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        color: var(--text-dim);
+        font-family: var(--mono);
+        font-size: 0.72rem;
+      }
+
+      .dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        border: 1px solid #ffffff33;
+      }
+
+      .dot.green {
+        background: var(--green);
+      }
+
+      .dot.red {
+        background: var(--red);
+      }
+
+      .dot.amber {
+        background: var(--amber);
+      }
+
+      .dot.blue {
+        background: var(--blue);
+      }
+
+      .note {
+        border-top: 1px solid var(--border);
+        padding-top: 10px;
+        color: var(--text-faint);
+        font-size: 0.82rem;
+      }
+
+      code {
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 0.84em;
+      }
+
+      ul {
+        margin: 8px 0 0;
+        padding-left: 18px;
+        color: var(--text-dim);
+        font-size: 0.88rem;
+        line-height: 1.55;
+      }
+
+      @media (max-width: 920px) {
+        .shell {
+          padding: 16px 10px;
+        }
+
+        .topbar,
+        .section-head {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .meta {
+          justify-content: flex-start;
+        }
+
+        .main-grid,
+        .summary {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        .phase {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <span class="eyebrow">Implementation plan</span>
+          <h1>Reusable lightweight-charts market module for Islandflow</h1>
+        </div>
+        <div class="meta" aria-label="Plan metadata">
+          <span class="chip is-active">Epic islandflow-mloi</span>
+          <span class="chip">Updated 2026-06-21</span>
+          <span class="chip">Product register</span>
+        </div>
+      </header>
+
+      <section class="section">
+        <div class="summary">
+          <div>
+            <strong>Module boundary</strong>
+            <span>Move chart rendering into <code>features/market-chart</code>. Keep terminal state, transport, subscriptions, and drawer callbacks in adapters.</span>
+          </div>
+          <div>
+            <strong>Default display</strong>
+            <span>Standard candles above directional smart-flow/smart-money bars below, with dense toolbar controls and no card wrapper.</span>
+          </div>
+          <div>
+            <strong>User control</strong>
+            <span>Favorite timeframes, price chart modes, lower-pane source modes, off-exchange overlay, markers, and display density.</span>
+          </div>
+          <div>
+            <strong>Extensible core</strong>
+            <span>Typed extension points for renderers, panes, overlays, markers, toolbar actions, settings sections, hover rows, and layout presets.</span>
+          </div>
+        </div>
+      </section>
+
+      <div class="main-grid grid">
+        <div>
+          <section class="section">
+            <div class="section-head">
+              <h2>Execution Sequence</h2>
+              <span class="chip">Follow Beads dependencies</span>
+            </div>
+            <div class="phase-list">
+              <article class="phase">
+                <div class="phase-id">Phase 01</div>
+                <div>
+                  <h3>Chart foundation and dependency upgrade</h3>
+                  <p>Create the reusable module, decide the 5.x upgrade path, and separate chart lifecycle code from terminal state.</p>
+                </div>
+                <div class="phase-links">
+                  <a href="./01-chart-foundation.md">phase doc</a>
+                  <span>bead islandflow-mloi.1</span>
+                </div>
+              </article>
+              <article class="phase">
+                <div class="phase-id">Phase 02</div>
+                <div>
+                  <h3>Timeframes and candle support</h3>
+                  <p>Add 1m, 5m, and 15m favorites, dropdown selection, persistence, and 15m candle service support.</p>
+                </div>
+                <div class="phase-links">
+                  <a href="./02-timeframes-candles.md">phase doc</a>
+                  <span>bead islandflow-mloi.2</span>
+                </div>
+              </article>
+              <article class="phase">
+                <div class="phase-id">Phase 03</div>
+                <div>
+                  <h3>Dashboard replacement</h3>
+                  <p>Replace the Market Command chart with the module through a terminal adapter, preserving live/replay behavior.</p>
+                </div>
+                <div class="phase-links">
+                  <a href="./03-dashboard-replacement.md">phase doc</a>
+                  <span>bead islandflow-mloi.3</span>
+                </div>
+              </article>
+              <article class="phase">
+                <div class="phase-id">Phase 04</div>
+                <div>
+                  <h3>Settings and lower-pane modes</h3>
+                  <p>Add settings for price mode and lower-pane source: smart direction, all flow, and plain volume.</p>
+                </div>
+                <div class="phase-links">
+                  <a href="./04-settings-lower-pane.md">phase doc</a>
+                  <span>bead islandflow-mloi.4</span>
+                </div>
+              </article>
+              <article class="phase">
+                <div class="phase-id">Phase 05</div>
+                <div>
+                  <h3>Hover readout and visual hardening</h3>
+                  <p>Add OHLC, volume, option notional, smart-flow context on hover, plus rounded lower-pane bars and responsive QA.</p>
+                </div>
+                <div class="phase-links">
+                  <a href="./05-hover-readout-visual-hardening.md">phase doc</a>
+                  <span>bead islandflow-mloi.5</span>
+                </div>
+              </article>
+              <article class="phase">
+                <div class="phase-id">Phase 06</div>
+                <div>
+                  <h3>Final verification and publishing</h3>
+                  <p>Run full gates, file follow-ups, update Beads, push Beads, and push git to Forgejo.</p>
+                </div>
+                <div class="phase-links">
+                  <a href="./06-final-verification.md">phase doc</a>
+                  <span>bead islandflow-mloi.6</span>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-head">
+              <h2>PR Strategy</h2>
+              <span class="chip">Reviewable slices</span>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Use</th>
+                  <th>When</th>
+                  <th>Examples</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>One at a time</td>
+                  <td>Risky chart lifecycle, dependency upgrade, dashboard replacement, or custom renderer work.</td>
+                  <td>Phase 01, Phase 03, rounded bar renderer in Phase 05.</td>
+                </tr>
+                <tr>
+                  <td>Stack</td>
+                  <td>Base PR is stable but waiting for review and the next work starts in pure transforms or tests.</td>
+                  <td>Phase 02 after Phase 01, Phase 04 transforms after Phase 03, Phase 05 aggregation after Phase 04.</td>
+                </tr>
+                <tr>
+                  <td>Combine</td>
+                  <td>Small docs, tests, or mechanical follow-ups that belong to the behavior being validated.</td>
+                  <td>Timeframe reducer tests with timeframe reducer, route manifest test with interval support.</td>
+                </tr>
+                <tr>
+                  <td>Split</td>
+                  <td>A change crosses backend interval support, dependency churn, settings persistence, or renderer experiments.</td>
+                  <td>15m candle service support, local storage helper, custom lower-pane renderer.</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+        </div>
+
+        <aside>
+          <section class="section">
+            <div class="section-head">
+              <h2>Visual Lane</h2>
+              <span class="chip">Restrained</span>
+            </div>
+            <div class="pane grid">
+              <p>The chart should feel like an instrument panel inside Market Command: compact, flat, stable under live updates, and precise. The module should inherit terminal tones by default and avoid card framing.</p>
+              <div class="swatches" aria-label="Semantic colors">
+                <span class="swatch"><span class="dot green"></span>bullish</span>
+                <span class="swatch"><span class="dot red"></span>bearish</span>
+                <span class="swatch"><span class="dot blue"></span>neutral/info</span>
+                <span class="swatch"><span class="dot amber"></span>active control</span>
+              </div>
+              <p class="note">Red and green are never the only direction signal. Readouts, legends, labels, or position must also carry meaning.</p>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-head">
+              <h2>Extension Points</h2>
+              <span class="chip">No forks</span>
+            </div>
+            <div class="pane">
+              <ul>
+                <li>Price renderers: candles, Heikin Ashi, future bar or line modes.</li>
+                <li>Lower panes: smart direction, all flow, volume, future indicators.</li>
+                <li>Overlays and markers with adapter-owned payloads.</li>
+                <li>Toolbar slots for future actions without dashboard rewrites.</li>
+                <li>Settings sections and hover rows owned by data layers.</li>
+                <li>Layout presets for dashboard, full, compact, and replay embeds.</li>
+              </ul>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-head">
+              <h2>Subagent Use</h2>
+              <span class="chip">Bounded lanes</span>
+            </div>
+            <div class="pane">
+              <ul>
+                <li>Inventory current chart imports and CSS selectors.</li>
+                <li>Compare lightweight-charts v4 and v5 APIs used here.</li>
+                <li>Draft transform fixtures for Heikin Ashi and hover buckets.</li>
+                <li>Run browser visual QA across chart sizes.</li>
+                <li>Audit copy for overconfident smart-money language.</li>
+              </ul>
+              <p class="note">The main agent owns final API decisions, edits, Beads updates, commits, and pushes.</p>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-head">
+              <h2>Non-Goals</h2>
+              <span class="chip">Keep scope clean</span>
+            </div>
+            <div class="pane">
+              <ul>
+                <li>No new scoring policy.</li>
+                <li>No historical calibration.</li>
+                <li>No new synthetic foundations.</li>
+                <li>No claim of hidden participant identity.</li>
+                <li>No dashboard-only chart API.</li>
+                <li>No card wrapper as the default module surface.</li>
+              </ul>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-head">
+              <h2>Quality Gates</h2>
+              <span class="chip">Before closeout</span>
+            </div>
+            <div class="pane">
+              <ul>
+                <li><code>bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code></li>
+                <li><code>bun test</code></li>
+                <li><code>bun --cwd=apps/web run build</code></li>
+                <li>Dashboard desktop and mobile visual checks.</li>
+                <li><code>bd dolt push</code> and <code>git push forgejo &lt;branch&gt;</code>.</li>
+              </ul>
+            </div>
+          </section>
+        </aside>
+      </div>
+    </main>
+  </body>
+</html>
