@@ -3,7 +3,9 @@
 import type {
   EquityCandle,
   EquityPrint,
+  FlowPacket,
   InferredDarkEvent,
+  OptionPrint,
   SmartFlowExplainabilityProjection,
   SmartMoneyEvent
 } from "@islandflow/types";
@@ -11,29 +13,29 @@ import { type ChangeEvent, memo, useCallback, useEffect, useMemo, useRef, useSta
 
 import {
   buildTimeframeToolbarModel,
-  buildVolumeLowerSeries,
-  createDefaultTimeframeFavorites,
+  buildLowerPaneSeries,
   DEFAULT_MARKET_CHART_SETTINGS,
   formatIntervalLabel,
+  getLowerPaneAvailableData,
   MarketChart,
+  MarketChartSettings,
   MarketChartSection,
+  resolveLowerPaneMode,
   type MarketChartCandle,
   type MarketChartDirection,
   type MarketChartMarker,
   type MarketChartOverlay,
   type MarketChartRange,
+  type MarketChartSettingsAction,
   type MarketChartStatus,
-  type MarketChartTimeframeId,
   normalizeMarketChartCandles,
-  readTimeframeFavorites,
-  reduceTimeframeFavorites,
-  type TimeframeFavoritesState,
   toChartTime,
-  writeTimeframeFavorites
+  useMarketChartSettings
 } from "../market-chart";
 import { getChartFlowMarkerItems } from "./charts/markers";
 import { SUPPORTED_CANDLE_INTERVAL_MS } from "./config";
 import { smartFlowDirectionTone, statusLabel } from "./format";
+import { extractUnderlying, normalizeContractId } from "./state-helpers";
 import type { TerminalState } from "./state";
 import { buildApiUrl, readErrorDetail } from "./transport";
 import type { TapeMode, WsStatus } from "./types";
@@ -62,7 +64,7 @@ const MAX_DARK_MARKERS = 120;
 const MAX_TOTAL_MARKERS = 320;
 const OFF_EXCHANGE_OVERLAY_COLOR = "rgba(77, 163, 255, 0.58)";
 
-const getTimeframeStorage = () => {
+const getChartSettingsStorage = () => {
   if (typeof window === "undefined") {
     return null;
   }
@@ -83,6 +85,31 @@ const sortByTsSeq = <T extends { ts?: number; source_ts?: number; seq: number }>
     }
     return a.seq - b.seq;
   });
+
+const matchesChartTicker = (value: string | null | undefined, chartTicker: string): boolean =>
+  value ? value.toUpperCase() === chartTicker.toUpperCase() : false;
+
+const getFlowPacketUnderlying = (packet: FlowPacket): string | null => {
+  const explicitUnderlying = packet.features.underlying_id;
+  if (typeof explicitUnderlying === "string" && explicitUnderlying.trim().length > 0) {
+    return explicitUnderlying.toUpperCase();
+  }
+
+  const featureContract = packet.features.option_contract_id;
+  if (typeof featureContract === "string" && featureContract.trim().length > 0) {
+    return extractUnderlying(normalizeContractId(featureContract));
+  }
+
+  const packetContract = packet.id.match(/^flowpacket:([^:]+):/)?.[1] ?? packet.id;
+  return extractUnderlying(normalizeContractId(packetContract));
+};
+
+const getOptionPrintUnderlying = (print: OptionPrint): string | null => {
+  if (print.underlying_id) {
+    return print.underlying_id.toUpperCase();
+  }
+  return extractUnderlying(normalizeContractId(print.option_contract_id));
+};
 
 const normalizeTerminalDirection = (value: string | null | undefined): MarketChartDirection => {
   if (value === "bullish" || value === "bearish") {
@@ -138,6 +165,32 @@ export const buildTerminalEquityOverlays = (
     }
   ];
 };
+
+export const buildTerminalLowerPaneInput = ({
+  chartTicker,
+  candles,
+  smartFlowProjections,
+  smartMoneyEvents,
+  flowPackets,
+  optionPrints
+}: {
+  chartTicker: string;
+  candles: readonly MarketChartCandle[];
+  smartFlowProjections: readonly SmartFlowExplainabilityProjection[];
+  smartMoneyEvents: readonly SmartMoneyEvent[];
+  flowPackets: readonly FlowPacket[];
+  optionPrints: readonly OptionPrint[];
+}) => ({
+  candles,
+  smartFlowProjections,
+  smartMoneyEvents,
+  flowPackets: flowPackets.filter((packet) =>
+    matchesChartTicker(getFlowPacketUnderlying(packet), chartTicker)
+  ),
+  optionPrints: optionPrints.filter((print) =>
+    matchesChartTicker(getOptionPrintUnderlying(print), chartTicker)
+  )
+});
 
 export const mapTerminalChartStatus = (
   status: WsStatus,
@@ -289,12 +342,31 @@ type TerminalMarketChartSectionProps = {
 
 export const TerminalMarketChartSection = memo(
   ({ state, title = "Chart Context", className }: TerminalMarketChartSectionProps) => {
-    const [favoritesHydrated, setFavoritesHydrated] = useState(false);
-    const [timeframeFavorites, setTimeframeFavorites] = useState<TimeframeFavoritesState>(() =>
-      createDefaultTimeframeFavorites(SUPPORTED_CANDLE_INTERVAL_MS)
+    const settingsStorage = useMemo(() => getChartSettingsStorage(), []);
+    const settingsCapabilities = useMemo(
+      () => ({
+        priceRendererIds: ["candles", "heikin-ashi"],
+        lowerPaneModeIds: ["smart-direction", "all-flow", "volume"],
+        supportedIntervalMs: SUPPORTED_CANDLE_INTERVAL_MS,
+        showOverlaySettings: true,
+        showSmartFlowMarkerSettings: true,
+        showInferredDarkMarkerSettings: true
+      }),
+      []
     );
+    const { settings, dispatch: dispatchSettings } = useMarketChartSettings({
+      storage: settingsStorage,
+      capabilities: settingsCapabilities,
+      supportedIntervalMs: SUPPORTED_CANDLE_INTERVAL_MS,
+      initialSettings: {
+        ...DEFAULT_MARKET_CHART_SETTINGS,
+        timeframes: {
+          ...DEFAULT_MARKET_CHART_SETTINGS.timeframes,
+          intervalMs: state.chartIntervalMs
+        }
+      }
+    });
     const [visibleRangeMs, setVisibleRangeMs] = useState<MarketChartRange | null>(null);
-    const [overlayEnabled, setOverlayEnabled] = useState(true);
     const [overlayRangePrints, setOverlayRangePrints] = useState<EquityPrint[]>([]);
     const [fetchState, setFetchState] = useState<TerminalChartFetchState>({
       ...EMPTY_FETCH_STATE,
@@ -306,31 +378,13 @@ export const TerminalMarketChartSection = memo(
       () =>
         buildTimeframeToolbarModel({
           selectedIntervalMs: state.chartIntervalMs,
-          favoriteIds: timeframeFavorites.favoriteIds,
+          favoriteIds: settings.timeframes.favoriteIds,
           supportedIntervalMs: SUPPORTED_CANDLE_INTERVAL_MS
         }),
-      [state.chartIntervalMs, timeframeFavorites.favoriteIds]
+      [state.chartIntervalMs, settings.timeframes.favoriteIds]
     );
     const selectedTimeframe = timeframeModel.selected;
     const normalizedChartIntervalMs = selectedTimeframe.ms;
-
-    useEffect(() => {
-      setTimeframeFavorites(
-        readTimeframeFavorites(getTimeframeStorage(), SUPPORTED_CANDLE_INTERVAL_MS)
-      );
-      setFavoritesHydrated(true);
-    }, []);
-
-    useEffect(() => {
-      if (!favoritesHydrated) {
-        return;
-      }
-      writeTimeframeFavorites(
-        getTimeframeStorage(),
-        timeframeFavorites,
-        SUPPORTED_CANDLE_INTERVAL_MS
-      );
-    }, [favoritesHydrated, timeframeFavorites]);
 
     useEffect(() => {
       if (state.chartIntervalMs !== normalizedChartIntervalMs) {
@@ -338,11 +392,18 @@ export const TerminalMarketChartSection = memo(
       }
     }, [state, normalizedChartIntervalMs]);
 
-    const updateFavorite = useCallback((action: { type: "toggle"; id: MarketChartTimeframeId }) => {
-      setTimeframeFavorites((current) =>
-        reduceTimeframeFavorites(current, action, SUPPORTED_CANDLE_INTERVAL_MS)
-      );
-    }, []);
+    useEffect(() => {
+      if (settings.timeframes.intervalMs !== normalizedChartIntervalMs) {
+        dispatchSettings({ type: "set-interval", intervalMs: normalizedChartIntervalMs });
+      }
+    }, [dispatchSettings, normalizedChartIntervalMs, settings.timeframes.intervalMs]);
+
+    const handleSettingsAction = useCallback(
+      (action: MarketChartSettingsAction) => {
+        dispatchSettings(action);
+      },
+      [dispatchSettings]
+    );
 
     const handleIntervalSelect = useCallback(
       (event: ChangeEvent<HTMLSelectElement>) => {
@@ -449,7 +510,8 @@ export const TerminalMarketChartSection = memo(
 
     useEffect(() => {
       overlayAbortRef.current?.abort();
-      if (!visibleRangeMs) {
+      if (!visibleRangeMs || !settings.display.showOverlays) {
+        setOverlayRangePrints([]);
         return;
       }
 
@@ -489,7 +551,7 @@ export const TerminalMarketChartSection = memo(
         window.clearTimeout(timer);
         abort.abort();
       };
-    }, [state.chartTicker, visibleRangeMs]);
+    }, [settings.display.showOverlays, state.chartTicker, visibleRangeMs]);
 
     const normalizedCandles = useMemo(
       () => normalizeTerminalChartCandles(fetchState.candles),
@@ -501,41 +563,89 @@ export const TerminalMarketChartSection = memo(
           state.mode === "live"
             ? [...overlayRangePrints, ...state.liveSession.chartOverlay]
             : overlayRangePrints,
-          overlayEnabled
+          settings.display.showOverlays
         ),
-      [overlayEnabled, overlayRangePrints, state.liveSession.chartOverlay, state.mode]
-    );
-    const markers = useMemo(
-      () =>
-        buildTerminalMarketChartMarkers({
-          smartFlowProjections: state.chartSmartFlowProjections,
-          smartMoneyEvents: state.chartSmartMoneyEvents,
-          inferredDark: state.chartInferredDark,
-          visibleRangeMs
-        }),
       [
-        state.chartSmartFlowProjections,
-        state.chartSmartMoneyEvents,
-        state.chartInferredDark,
-        visibleRangeMs
+        overlayRangePrints,
+        settings.display.showOverlays,
+        state.liveSession.chartOverlay,
+        state.mode
       ]
     );
-    const settings = useMemo(
+    const markers = useMemo(() => {
+      const allMarkers = buildTerminalMarketChartMarkers({
+        smartFlowProjections: state.chartSmartFlowProjections,
+        smartMoneyEvents: state.chartSmartMoneyEvents,
+        inferredDark: state.chartInferredDark,
+        visibleRangeMs
+      });
+      return allMarkers.filter((marker) => {
+        const payload = marker.payload as TerminalMarketChartMarkerPayload | undefined;
+        if (payload?.kind === "smart-flow" || payload?.kind === "smart-money") {
+          return settings.display.showSmartFlowMarkers;
+        }
+        if (payload?.kind === "inferred-dark") {
+          return settings.display.showInferredDarkMarkers;
+        }
+        return true;
+      });
+    }, [
+      settings.display.showInferredDarkMarkers,
+      settings.display.showSmartFlowMarkers,
+      state.chartSmartFlowProjections,
+      state.chartSmartMoneyEvents,
+      state.chartInferredDark,
+      visibleRangeMs
+    ]);
+    const lowerPaneInput = useMemo(
+      () =>
+        buildTerminalLowerPaneInput({
+          chartTicker: state.chartTicker,
+          candles: normalizedCandles,
+          smartFlowProjections: state.chartSmartFlowProjections,
+          smartMoneyEvents: state.chartSmartMoneyEvents,
+          flowPackets: state.flow.items as readonly FlowPacket[],
+          optionPrints: state.options.items as readonly OptionPrint[]
+        }),
+      [
+        normalizedCandles,
+        state.chartTicker,
+        state.chartSmartFlowProjections,
+        state.chartSmartMoneyEvents,
+        state.flow.items,
+        state.options.items
+      ]
+    );
+    const lowerPaneAvailableData = useMemo(
+      () => getLowerPaneAvailableData(lowerPaneInput),
+      [lowerPaneInput]
+    );
+    const resolvedLowerPaneMode = useMemo(
+      () => resolveLowerPaneMode(settings, lowerPaneAvailableData),
+      [lowerPaneAvailableData, settings]
+    );
+    const lowerSeries = useMemo(
+      () => buildLowerPaneSeries(resolvedLowerPaneMode, lowerPaneInput),
+      [lowerPaneInput, resolvedLowerPaneMode]
+    );
+    const chartSettings = useMemo(
       () => ({
-        ...DEFAULT_MARKET_CHART_SETTINGS,
-        time: { intervalMs: normalizedChartIntervalMs },
+        ...settings,
+        timeframes: {
+          ...settings.timeframes,
+          intervalMs: normalizedChartIntervalMs
+        },
         display: {
-          ...DEFAULT_MARKET_CHART_SETTINGS.display,
-          showOverlays: overlayEnabled,
+          ...settings.display,
           density: "dense" as const
         },
         lowerPane: {
-          ...DEFAULT_MARKET_CHART_SETTINGS.lowerPane,
-          visible: true,
-          activeLayerId: "volume"
+          ...settings.lowerPane,
+          mode: resolvedLowerPaneMode,
+          activeLayerId: resolvedLowerPaneMode
         }
       }),
-      [normalizedChartIntervalMs, overlayEnabled]
+      [normalizedChartIntervalMs, resolvedLowerPaneMode, settings]
     );
     const status = state.mode === "live" ? state.liveSession.status : fetchState.status;
     const marketChartStatus = mapTerminalChartStatus(status, state.mode, fetchState.error);
@@ -622,19 +732,37 @@ export const TerminalMarketChartSection = memo(
               aria-label={favoriteLabel}
               aria-pressed={selectedTimeframe.favorite}
               title={favoriteLabel}
-              onClick={() => updateFavorite({ type: "toggle", id: selectedTimeframe.id })}
+              onClick={() =>
+                handleSettingsAction({
+                  type: "toggle-timeframe-favorite",
+                  id: selectedTimeframe.id
+                })
+              }
             >
               <span aria-hidden="true">{selectedTimeframe.favorite ? "★" : "☆"}</span>
             </button>
             <button
-              className={`overlay-toggle${overlayEnabled ? " overlay-toggle-on" : ""}`}
+              className={`overlay-toggle${settings.display.showOverlays ? " overlay-toggle-on" : ""}`}
               type="button"
-              aria-pressed={overlayEnabled}
+              aria-pressed={settings.display.showOverlays}
               title="Toggle off-exchange print overlay"
-              onClick={() => setOverlayEnabled((current) => !current)}
+              onClick={() =>
+                handleSettingsAction({
+                  type: "set-display",
+                  key: "showOverlays",
+                  value: !settings.display.showOverlays
+                })
+              }
             >
-              Off-Ex {overlayEnabled ? "On" : "Off"}
+              Off-Ex {settings.display.showOverlays ? "On" : "Off"}
             </button>
+            <MarketChartSettings
+              settings={settings}
+              availableData={lowerPaneAvailableData}
+              timeframeItems={timeframeModel.dropdownItems}
+              capabilities={settingsCapabilities}
+              onAction={handleSettingsAction}
+            />
             <span className="chart-hint">{state.chartTicker}</span>
           </div>
         }
@@ -644,10 +772,10 @@ export const TerminalMarketChartSection = memo(
             symbol={state.chartTicker}
             intervalMs={normalizedChartIntervalMs}
             candles={normalizedCandles}
-            lowerSeries={buildVolumeLowerSeries(normalizedCandles)}
+            lowerSeries={lowerSeries}
             markers={markers}
             overlays={overlays}
-            settings={settings}
+            settings={chartSettings}
             status={marketChartStatus}
             replayTime={state.equities.replayTime}
             layoutPreset="dashboard"

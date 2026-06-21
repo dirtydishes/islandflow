@@ -10,7 +10,10 @@ import type {
   MarketChartThemeOptions,
   MarketChartThemeTokens
 } from "./types";
-import { DEFAULT_MARKET_CHART_INTERVALS } from "./transforms/timeframes";
+import {
+  DEFAULT_MARKET_CHART_INTERVALS,
+  DEFAULT_TIMEFRAME_FAVORITE_IDS
+} from "./transforms/timeframes";
 
 export { DEFAULT_MARKET_CHART_INTERVALS };
 
@@ -41,16 +44,20 @@ export const DEFAULT_MARKET_CHART_SETTINGS: MarketChartSettingsState = {
   },
   lowerPane: {
     visible: true,
-    activeLayerId: "volume"
+    mode: "smart-direction",
+    activeLayerId: "smart-direction"
   },
   display: {
     showGrid: true,
     showMarkers: true,
     showOverlays: true,
+    showSmartFlowMarkers: true,
+    showInferredDarkMarkers: true,
     density: "dense"
   },
-  time: {
-    intervalMs: DEFAULT_MARKET_CHART_INTERVALS[0].ms
+  timeframes: {
+    intervalMs: DEFAULT_MARKET_CHART_INTERVALS[0].ms,
+    favoriteIds: DEFAULT_TIMEFRAME_FAVORITE_IDS
   },
   sections: {}
 };
@@ -109,36 +116,49 @@ export const MARKET_CHART_EXTENSION_REGISTRY: MarketChartExtensionRegistry = {
       id: "candles",
       label: "Candles",
       kind: "candles",
-      description: "Standard OHLC candles with semantic direction labels."
+      description: "Standard OHLC candles with semantic direction labels.",
+      defaultRenderer: { series: "candlestick" }
     },
     {
       id: "heikin-ashi",
       label: "Heikin Ashi",
       kind: "heikin-ashi",
-      description: "Smoothed candle renderer reserved for the timeframe phase."
+      description: "Smoothed candles derived from OHLC bars.",
+      defaultRenderer: { series: "candlestick" }
     }
   ],
   lowerPanes: [
     {
+      id: "smart-direction",
+      label: "Flow Direction",
+      supportedKinds: ["signed-direction"],
+      defaultVisible: true,
+      description: "Directional hypothesis bars from smart-flow, with legacy fallback.",
+      isAvailable: (data) => data.smartDirection,
+      transformId: "buildSmartDirectionBars",
+      formatter: (value) => value.toLocaleString(),
+      defaultRenderer: { series: "histogram", signed: true, priceFormat: "price" }
+    },
+    {
+      id: "all-flow",
+      label: "All Flow",
+      supportedKinds: ["notional"],
+      description: "Aggregate flow packet or option print notional by candle bucket.",
+      isAvailable: (data) => data.allFlow,
+      transformId: "buildAllFlowBars",
+      formatter: (value) => value.toLocaleString(),
+      defaultRenderer: { series: "histogram", signed: false, priceFormat: "price" }
+    },
+    {
       id: "volume",
       label: "Volume",
       supportedKinds: ["volume"],
-      defaultVisible: true
-    },
-    {
-      id: "notional",
-      label: "Notional",
-      supportedKinds: ["notional"]
-    },
-    {
-      id: "signed-direction",
-      label: "Signed Direction",
-      supportedKinds: ["signed-direction"]
-    },
-    {
-      id: "indicator",
-      label: "Indicator",
-      supportedKinds: ["indicator"]
+      defaultVisible: true,
+      description: "Equity candle volume by bucket.",
+      isAvailable: (data) => data.candles,
+      transformId: "buildVolumeBars",
+      formatter: (value) => value.toLocaleString(),
+      defaultRenderer: { series: "histogram", signed: false, priceFormat: "volume" }
     }
   ],
   overlays: [],
@@ -153,7 +173,7 @@ export const MARKET_CHART_EXTENSION_REGISTRY: MarketChartExtensionRegistry = {
     {
       id: "lowerPane",
       label: "Lower Pane",
-      defaults: { enabled: true, values: { activeLayerId: "volume" } }
+      defaults: { enabled: true, values: { mode: "smart-direction" } }
     },
     {
       id: "display",
@@ -163,7 +183,13 @@ export const MARKET_CHART_EXTENSION_REGISTRY: MarketChartExtensionRegistry = {
     {
       id: "time",
       label: "Time",
-      defaults: { enabled: true, values: { intervalMs: DEFAULT_MARKET_CHART_INTERVALS[0].ms } }
+      defaults: {
+        enabled: true,
+        values: {
+          intervalMs: DEFAULT_MARKET_CHART_INTERVALS[0].ms,
+          favoriteIds: DEFAULT_TIMEFRAME_FAVORITE_IDS
+        }
+      }
     }
   ],
   hoverRows: [],
@@ -218,14 +244,15 @@ export const createMarketChartOptions = (
 };
 
 export const createMarketCandlestickSeriesOptions = (
-  theme: MarketChartThemeOptions = DEFAULT_MARKET_CHART_THEME
+  theme: MarketChartThemeOptions = DEFAULT_MARKET_CHART_THEME,
+  showWicks = true
 ): CandlestickSeriesPartialOptions => {
   const { tokens } = theme;
   return {
     upColor: tokens.bullish,
     downColor: tokens.bearish,
     borderVisible: false,
-    wickUpColor: tokens.bullish,
-    wickDownColor: tokens.bearish
+    wickUpColor: showWicks ? tokens.bullish : "transparent",
+    wickDownColor: showWicks ? tokens.bearish : "transparent"
   };
 };

@@ -1,5 +1,6 @@
 export { MarketChart } from "./components/MarketChart";
 export { MarketChartSection } from "./components/MarketChartSection";
+export { MarketChartSettings } from "./components/MarketChartSettings";
 export {
   createMarketCandlestickSeriesOptions,
   createMarketChartOptions,
@@ -13,20 +14,43 @@ export {
 } from "./defaults";
 export { useChartCrosshair } from "./hooks/useChartCrosshair";
 export { useMarketChartController } from "./hooks/useMarketChartController";
+export { useMarketChartSettings } from "./hooks/useMarketChartSettings";
 export {
   deriveCandleDirection,
+  MARKET_CHART_PRICE_MODE_REGISTRY,
   normalizeMarketChartCandle,
   normalizeMarketChartCandles,
+  resolvePriceMode,
   toCandlestickData,
   toCandlestickSeriesData,
-  toChartCandle
+  toChartCandle,
+  toHeikinAshiCandles,
+  type MarketChartPriceModeDefinition
 } from "./transforms/candles";
 export { buildCoreHoverRows, buildHoverSnapshot } from "./transforms/hover";
 export {
+  buildAllFlowBars,
+  buildLowerPaneSeries,
+  buildSmartDirectionBars,
+  buildVolumeBars,
   buildVolumeLowerSeries,
+  getLowerPaneAvailableData,
   lowerPointColor,
+  MARKET_CHART_LOWER_PANE_MODE_REGISTRY,
+  resolveLowerPaneMode,
   toLowerPaneHistogramData
 } from "./transforms/lower-pane";
+export {
+  MARKET_CHART_SETTINGS_STORAGE_KEY,
+  MARKET_CHART_SETTINGS_STORAGE_VERSION,
+  normalizeMarketChartSettings,
+  readMarketChartSettings,
+  reduceMarketChartSettings,
+  writeMarketChartSettings,
+  type MarketChartSettingsAction,
+  type MarketChartSettingsContext,
+  type MarketChartSettingsStorage
+} from "./transforms/settings";
 export {
   buildTimeframeToolbarModel,
   createDefaultTimeframeFavorites,

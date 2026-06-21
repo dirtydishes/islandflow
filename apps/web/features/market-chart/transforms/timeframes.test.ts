@@ -8,7 +8,7 @@ import {
   reduceTimeframeFavorites,
   TIMEFRAME_FAVORITES_STORAGE_KEY,
   writeTimeframeFavorites
-} from "../index";
+} from "./timeframes";
 
 class MemoryStorage implements Storage {
   private readonly values = new Map<string, string>();

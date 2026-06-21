@@ -1,7 +1,9 @@
 import type {
   MarketChartCandle,
   MarketChartCandleInput,
-  MarketChartCandlestickData
+  MarketChartCandlestickData,
+  MarketChartPriceModeId,
+  MarketChartPriceRendererDefinition
 } from "../types";
 import { toChartTime } from "./time";
 
@@ -66,4 +68,58 @@ export const toCandlestickSeriesData = (
 
 export const toChartCandle = (candle: MarketChartCandleInput): MarketChartCandlestickData => {
   return toCandlestickData(normalizeMarketChartCandle(candle));
+};
+
+export const toHeikinAshiCandles = (candles: readonly MarketChartCandle[]): MarketChartCandle[] => {
+  const next: MarketChartCandle[] = [];
+
+  for (const candle of candles) {
+    const close = (candle.open + candle.high + candle.low + candle.close) / 4;
+    const previous = next.at(-1);
+    const open = previous ? (previous.open + previous.close) / 2 : (candle.open + candle.close) / 2;
+    const high = Math.max(candle.high, open, close);
+    const low = Math.min(candle.low, open, close);
+
+    next.push({
+      ...candle,
+      open,
+      high,
+      low,
+      close,
+      direction: deriveCandleDirection(open, close)
+    });
+  }
+
+  return next;
+};
+
+export type MarketChartPriceModeDefinition = MarketChartPriceRendererDefinition & {
+  id: MarketChartPriceModeId;
+  transform: (candles: readonly MarketChartCandle[]) => MarketChartCandle[];
+};
+
+export const MARKET_CHART_PRICE_MODE_REGISTRY = [
+  {
+    id: "candles",
+    label: "Candles",
+    kind: "candles",
+    description: "Standard OHLC candles.",
+    defaultRenderer: { series: "candlestick" },
+    transform: (candles) => [...candles]
+  },
+  {
+    id: "heikin-ashi",
+    label: "Heikin Ashi",
+    kind: "heikin-ashi",
+    description: "Smoothed OHLC candles.",
+    defaultRenderer: { series: "candlestick" },
+    transform: toHeikinAshiCandles
+  }
+] as const satisfies readonly MarketChartPriceModeDefinition[];
+
+export const resolvePriceMode = (rendererId: string): MarketChartPriceModeDefinition => {
+  return (
+    MARKET_CHART_PRICE_MODE_REGISTRY.find((definition) => definition.id === rendererId) ??
+    MARKET_CHART_PRICE_MODE_REGISTRY[0]
+  );
 };

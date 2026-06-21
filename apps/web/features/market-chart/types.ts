@@ -10,6 +10,7 @@ import type {
   Time,
   UTCTimestamp
 } from "lightweight-charts";
+import type { MarketChartTimeframeId } from "./transforms/timeframes";
 
 export type MarketChartDirection = "bullish" | "bearish" | "neutral";
 
@@ -48,15 +49,21 @@ export type MarketChartCandlestickData = CandlestickData<UTCTimestamp>;
 export type MarketChartPriceSeries = ISeriesApi<"Candlestick", Time>;
 export type MarketChartLowerPaneSeries = ISeriesApi<"Histogram", Time>;
 
+export type MarketChartPriceModeId = "candles" | "heikin-ashi";
 export type MarketChartPriceRendererKind = "candles" | "heikin-ashi" | "bar" | "line" | "area";
 
 export type MarketChartPriceRendererDefinition = {
-  id: string;
+  id: MarketChartPriceModeId | string;
   label: string;
   kind: MarketChartPriceRendererKind;
   description?: string;
+  available?: boolean;
+  defaultRenderer?: {
+    series: "candlestick";
+  };
 };
 
+export type MarketChartLowerPaneModeId = "smart-direction" | "all-flow" | "volume";
 export type MarketChartLowerValueKind = "volume" | "notional" | "signed-direction" | "indicator";
 
 export type MarketChartLowerPoint = {
@@ -86,12 +93,26 @@ export type MarketChartLowerSeries = {
   defaultLayerId?: string;
 };
 
+export type MarketChartLowerPaneAvailableData = {
+  candles: boolean;
+  smartDirection: boolean;
+  allFlow: boolean;
+};
+
 export type MarketChartLowerPaneDefinition = {
-  id: string;
+  id: MarketChartLowerPaneModeId | string;
   label: string;
   supportedKinds: MarketChartLowerValueKind[];
   defaultVisible?: boolean;
   description?: string;
+  isAvailable?: (data: MarketChartLowerPaneAvailableData) => boolean;
+  transformId?: string;
+  formatter?: (value: number) => string;
+  defaultRenderer?: {
+    series: "histogram";
+    signed: boolean;
+    priceFormat: "volume" | "price";
+  };
 };
 
 export type MarketChartMarker<TPayload = unknown> = {
@@ -189,25 +210,41 @@ export type MarketChartSettingsSectionState = {
   values: Record<string, unknown>;
 };
 
+export type MarketChartDisplayDensity = "comfortable" | "dense" | "compact";
+
 export type MarketChartSettingsState = {
   price: {
-    rendererId: string;
+    rendererId: MarketChartPriceModeId | string;
     showWicks: boolean;
   };
   lowerPane: {
     visible: boolean;
+    mode: MarketChartLowerPaneModeId | string;
     activeLayerId?: string;
   };
   display: {
     showGrid: boolean;
     showMarkers: boolean;
     showOverlays: boolean;
-    density: "comfortable" | "dense" | "compact";
+    showSmartFlowMarkers: boolean;
+    showInferredDarkMarkers: boolean;
+    density: MarketChartDisplayDensity;
   };
-  time: {
+  timeframes: {
     intervalMs: number;
+    favoriteIds: MarketChartTimeframeId[];
   };
   sections: Record<string, MarketChartSettingsSectionState>;
+};
+
+export type MarketChartSettingsCapabilities = {
+  priceRendererIds?: readonly string[];
+  lowerPaneModeIds?: readonly string[];
+  supportedIntervalMs?: readonly number[];
+  showOverlaySettings?: boolean;
+  showSmartFlowMarkerSettings?: boolean;
+  showInferredDarkMarkerSettings?: boolean;
+  settingsSectionIds?: readonly string[];
 };
 
 export type MarketChartSettingsSectionDefinition = {
