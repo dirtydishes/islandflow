@@ -1,5 +1,5 @@
 import type { BusinessDay, UTCTimestamp } from "lightweight-charts";
-import { DEFAULT_MARKET_CHART_INTERVALS } from "../defaults";
+import { DEFAULT_MARKET_CHART_INTERVALS } from "./timeframes";
 
 export type ChartTimeLike = number | string | BusinessDay;
 

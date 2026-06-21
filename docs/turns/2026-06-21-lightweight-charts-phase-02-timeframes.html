@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lightweight Charts Phase 02 Timeframes</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #111820;
+        --panel-2: #0b1016;
+        --text: #e6edf4;
+        --dim: #90a0b2;
+        --faint: #6e7b8c;
+        --amber: #f5a623;
+        --amber-soft: #f5a6231f;
+        --green: #25c17a;
+        --border: #ffffff14;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.55 IBM Plex Sans, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      main {
+        width: min(1120px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 44px 0 72px;
+      }
+
+      header,
+      section {
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+        background: var(--panel);
+      }
+
+      header {
+        padding: 22px 0;
+      }
+
+      section {
+        margin-top: 18px;
+        padding: 18px 0;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        margin-bottom: 8px;
+        font: 700 1.65rem/1.1 IBM Plex Mono, ui-monospace, monospace;
+        letter-spacing: 0.02em;
+      }
+
+      h2 {
+        margin-bottom: 12px;
+        color: var(--amber);
+        font: 700 0.76rem/1.2 IBM Plex Mono, ui-monospace, monospace;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h3 {
+        margin: 14px 0 8px;
+        font: 700 0.84rem/1.2 IBM Plex Mono, ui-monospace, monospace;
+      }
+
+      p,
+      li {
+        color: var(--dim);
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 1.2rem;
+      }
+
+      li {
+        margin: 6px 0;
+      }
+
+      code {
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 1px 5px;
+        background: #ffffff0a;
+        color: var(--text);
+        font-family: IBM Plex Mono, ui-monospace, monospace;
+      }
+
+      .kicker {
+        margin-bottom: 10px;
+        color: var(--amber);
+        font: 700 0.72rem/1.2 IBM Plex Mono, ui-monospace, monospace;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .summary {
+        max-width: 78ch;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 12px;
+      }
+
+      .check {
+        border: 1px solid var(--border);
+        background: var(--panel-2);
+        padding: 12px;
+      }
+
+      .check strong {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--green);
+        font-family: IBM Plex Mono, ui-monospace, monospace;
+      }
+
+      .diff-note {
+        color: var(--faint);
+      }
+
+      .diff-shell {
+        overflow: auto;
+        border: 1px solid var(--border);
+        background: #05070a;
+      }
+
+      #rich-diff {
+        display: none;
+      }
+
+      .rich-diff-ready #rich-diff {
+        display: block;
+      }
+
+      .rich-diff-ready #fallback-diff {
+        display: none;
+      }
+
+      pre {
+        margin: 0;
+        padding: 14px;
+        overflow: auto;
+        color: var(--text);
+        font: 12px/1.5 IBM Plex Mono, ui-monospace, monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="kicker">Turn documentation · June 21, 2026</div>
+        <h1>Lightweight Charts Phase 02 Timeframes</h1>
+        <p class="summary">
+          Implemented the reusable timeframe registry, favorite interval reducer and persistence,
+          conservative terminal toolbar integration, 15m candle defaults, and manifest coverage
+          for <code>islandflow-mloi.2</code>.
+        </p>
+      </header>
+
+      <section>
+        <h2>Scope</h2>
+        <p>
+          The work stayed inside Phase 02. The mounted change is limited to the existing
+          dashboard chart pane controls; it does not replace the dashboard chart with the reusable
+          module or move transport/fetching into <code>features/market-chart</code>.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changes</h2>
+        <ul>
+          <li>Added <code>transforms/timeframes.ts</code> with the canonical 1m, 5m, 15m, 30m, and 1h registry.</li>
+          <li>Made 1m, 5m, and 15m default favorites, with a pure reducer for favorite, unfavorite, toggle, and reset actions.</li>
+          <li>Added versioned localStorage helpers that fall back to defaults for malformed persisted data.</li>
+          <li>Updated the existing chart toolbar with favorite buttons, a native dropdown, disabled unavailable intervals, and a selected-interval favorite toggle.</li>
+          <li>Normalized live candle subscriptions through the shared registry, so 15m is represented and unregistered intervals clamp to 1m.</li>
+          <li>Changed candle service defaults and local env examples to <code>60000,300000,900000</code>.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Verification</h2>
+        <div class="grid">
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun test apps/web/features/market-chart/transforms/timeframes.test.ts apps/web/features/market-chart/transforms/candles.test.ts</code>
+            <p>12 pass, 0 fail.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code>
+            <p>87 pass, 0 fail.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun test services/candles/tests</code>
+            <p>5 pass, 0 fail.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun run typecheck</code>
+            <p>Monorepo typecheck passed.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun --cwd=apps/web run build</code>
+            <p>Next production build completed successfully.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <p>Browser visual check at 1280x800 and 390x844: no horizontal overflow, compact toolbar layout, disabled 30m and 1h dropdown states, and working favorite toggle.</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Reviewer Focus</h2>
+        <ul>
+          <li>Check the timeframe registry API and whether the optional 30m and 1h support path is explicit enough.</li>
+          <li>Check the localStorage fallback behavior and whether empty user favorites should remain valid.</li>
+          <li>Check the terminal toolbar density and mobile wrapping against the existing Market Command visual system.</li>
+          <li>Confirm the backend change remains limited to default interval configuration.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p class="diff-note">
+          The rich view below attempts to render with browser-side <code>PatchDiff</code> from
+          <code>@pierre/diffs/react</code>. The unified HTML fallback remains visible unless that
+          browser render succeeds.
+        </p>
+        <div class="diff-shell">
+          <div id="rich-diff" aria-label="Rich diff renderer"></div>
+          <pre id="fallback-diff"><code>diff --git a/apps/web/features/market-chart/transforms/timeframes.ts b/apps/web/features/market-chart/transforms/timeframes.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/market-chart/transforms/timeframes.ts
+@@
++export const MARKET_CHART_TIMEFRAME_REGISTRY = [
++  { id: "1m", label: "1m", ms: 60_000, defaultFavorite: true, supportedByDefault: true },
++  { id: "5m", label: "5m", ms: 300_000, defaultFavorite: true, supportedByDefault: true },
++  { id: "15m", label: "15m", ms: 900_000, defaultFavorite: true, supportedByDefault: true },
++  { id: "30m", label: "30m", ms: 1_800_000, defaultFavorite: false, supportedByDefault: false },
++  { id: "1h", label: "1h", ms: 3_600_000, defaultFavorite: false, supportedByDefault: false }
++] as const satisfies readonly MarketChartTimeframe[];
++export const TIMEFRAME_FAVORITES_STORAGE_KEY =
++  "islandflow.market-chart.timeframe-favorites.v1";
++export const reduceTimeframeFavorites = (
++  state: TimeframeFavoritesState,
++  action: TimeframeFavoritesAction,
++  supportedIntervalMs: readonly number[] = DEFAULT_SUPPORTED_CANDLE_INTERVAL_MS
++): TimeframeFavoritesState =&gt; { /* pure favorite reducer */ };
++export const buildTimeframeToolbarModel = ({ selectedIntervalMs, favoriteIds, supportedIntervalMs }) =&gt; {
++  /* favorites feed quick buttons; dropdown keeps current and unavailable intervals visible */
++};
+
+diff --git a/apps/web/features/terminal/components/charts.tsx b/apps/web/features/terminal/components/charts.tsx
+--- a/apps/web/features/terminal/components/charts.tsx
++++ b/apps/web/features/terminal/components/charts.tsx
+@@
+-import { CANDLE_INTERVALS } from "../config";
++import { SUPPORTED_CANDLE_INTERVAL_MS } from "../config";
++import {
++  buildTimeframeToolbarModel,
++  createDefaultTimeframeFavorites,
++  readTimeframeFavorites,
++  reduceTimeframeFavorites,
++  writeTimeframeFavorites
++} from "../../market-chart";
+@@
+-            {CANDLE_INTERVALS.map((interval) =&gt; (
++            {timeframeModel.toolbarItems.map((interval) =&gt; (
+               &lt;button
+                 key={interval.ms}
+                 className={`interval-button${interval.ms === state.chartIntervalMs ? " active" : ""}`}
+                 type="button"
+                 onClick={() =&gt; state.setChartIntervalMs(interval.ms)}
++                aria-pressed={interval.ms === state.chartIntervalMs}
+               &gt;
+                 {interval.label}
+               &lt;/button&gt;
+             ))}
++          &lt;select className="timeframe-dropdown" value={selectedTimeframe.ms}&gt;
++            {timeframeModel.dropdownItems.map((interval) =&gt; (
++              &lt;option key={interval.ms} value={interval.ms} disabled={interval.disabled}&gt;
++                {interval.dropdownLabel}
++              &lt;/option&gt;
++            ))}
++          &lt;/select&gt;
++          &lt;button className={`timeframe-favorite-toggle${selectedTimeframe.favorite ? " is-active" : ""}`}&gt;
++            &lt;span aria-hidden="true"&gt;{selectedTimeframe.favorite ? "★" : "☆"}&lt;/span&gt;
++          &lt;/button&gt;
+
+diff --git a/apps/web/features/terminal/routes.ts b/apps/web/features/terminal/routes.ts
+--- a/apps/web/features/terminal/routes.ts
++++ b/apps/web/features/terminal/routes.ts
+@@
++import { normalizeTimeframeIntervalMs } from "../market-chart";
+@@
+       channel: "equity-candles",
+       underlying_id: chartTicker,
+-      interval_ms: chartIntervalMs
++      interval_ms: normalizeTimeframeIntervalMs(chartIntervalMs, SUPPORTED_CANDLE_INTERVAL_MS)
+     });
+
+diff --git a/services/candles/src/config.ts b/services/candles/src/config.ts
+new file mode 100644
+--- /dev/null
++++ b/services/candles/src/config.ts
+@@
++export const DEFAULT_CANDLE_INTERVALS_MS = [60_000, 300_000, 900_000] as const;
++export const DEFAULT_CANDLE_INTERVALS_ENV = DEFAULT_CANDLE_INTERVALS_MS.join(",");
+</code></pre>
+        </div>
+      </section>
+    </main>
+
+    <script type="text/plain" id="patch-source">diff --git a/apps/web/features/market-chart/transforms/timeframes.ts b/apps/web/features/market-chart/transforms/timeframes.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/market-chart/transforms/timeframes.ts
+@@
++export const MARKET_CHART_TIMEFRAME_REGISTRY = [
++  { id: "1m", label: "1m", ms: 60_000, defaultFavorite: true, supportedByDefault: true },
++  { id: "5m", label: "5m", ms: 300_000, defaultFavorite: true, supportedByDefault: true },
++  { id: "15m", label: "15m", ms: 900_000, defaultFavorite: true, supportedByDefault: true },
++  { id: "30m", label: "30m", ms: 1_800_000, defaultFavorite: false, supportedByDefault: false },
++  { id: "1h", label: "1h", ms: 3_600_000, defaultFavorite: false, supportedByDefault: false }
++];
++export const TIMEFRAME_FAVORITES_STORAGE_KEY =
++  "islandflow.market-chart.timeframe-favorites.v1";
++export const reduceTimeframeFavorites = (
++  state: TimeframeFavoritesState,
++  action: TimeframeFavoritesAction,
++  supportedIntervalMs: readonly number[] = DEFAULT_SUPPORTED_CANDLE_INTERVAL_MS
++): TimeframeFavoritesState => { /* pure favorite reducer */ };
+
+diff --git a/apps/web/features/terminal/components/charts.tsx b/apps/web/features/terminal/components/charts.tsx
+--- a/apps/web/features/terminal/components/charts.tsx
++++ b/apps/web/features/terminal/components/charts.tsx
+@@
+-import { CANDLE_INTERVALS } from "../config";
++import { SUPPORTED_CANDLE_INTERVAL_MS } from "../config";
++import { buildTimeframeToolbarModel, readTimeframeFavorites, writeTimeframeFavorites } from "../../market-chart";
+@@
+-            {CANDLE_INTERVALS.map((interval) => (
++            {timeframeModel.toolbarItems.map((interval) => (
+@@
++          <select className="timeframe-dropdown" value={selectedTimeframe.ms}>
++            {timeframeModel.dropdownItems.map((interval) => (
++              <option key={interval.ms} value={interval.ms} disabled={interval.disabled}>
++                {interval.dropdownLabel}
++              </option>
++            ))}
++          </select>
+
+diff --git a/services/candles/src/config.ts b/services/candles/src/config.ts
+new file mode 100644
+--- /dev/null
++++ b/services/candles/src/config.ts
+@@
++export const DEFAULT_CANDLE_INTERVALS_MS = [60_000, 300_000, 900_000] as const;
++export const DEFAULT_CANDLE_INTERVALS_ENV = DEFAULT_CANDLE_INTERVALS_MS.join(",");
+</script>
+    <script type="module">
+      const source = document.getElementById("patch-source")?.textContent ?? "";
+      const target = document.getElementById("rich-diff");
+      try {
+        const React = await import("react");
+        const { createRoot } = await import("react-dom/client");
+        const { PatchDiff } = await import("@pierre/diffs/react");
+        createRoot(target).render(React.createElement(PatchDiff, { patch: source }));
+        document.documentElement.classList.add("rich-diff-ready");
+      } catch (error) {
+        target.textContent = "Rich diff renderer unavailable in this static context; showing unified fallback.";
+      }
+    </script>
+  </body>
+</html>

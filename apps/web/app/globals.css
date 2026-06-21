@@ -420,6 +420,8 @@ input {
 .jump-button,
 .pause-button,
 .interval-button,
+.timeframe-dropdown,
+.timeframe-favorite-toggle,
 .overlay-toggle,
 .drawer-close {
   min-height: 36px;
@@ -436,18 +438,44 @@ input {
 
 .terminal-button:disabled,
 .filter-clear:disabled,
-.jump-button:disabled {
+.jump-button:disabled,
+.timeframe-dropdown:disabled,
+.timeframe-favorite-toggle:disabled {
   opacity: 0.45;
   cursor: default;
 }
 
 .terminal-button-primary,
 .interval-button.active,
+.timeframe-favorite-toggle.is-active,
 .overlay-toggle.overlay-toggle-on,
 .mode-button {
   border-color: var(--border-strong);
   background: var(--accent-soft);
   color: var(--text);
+}
+
+.interval-button:hover,
+.timeframe-dropdown:hover,
+.timeframe-favorite-toggle:hover,
+.overlay-toggle:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+  background: var(--bg-soft);
+}
+
+.interval-button.active:hover,
+.timeframe-favorite-toggle.is-active:hover,
+.overlay-toggle.overlay-toggle-on:hover {
+  background: var(--accent-soft);
+}
+
+.interval-button:focus-visible,
+.timeframe-dropdown:focus-visible,
+.timeframe-favorite-toggle:focus-visible,
+.overlay-toggle:focus-visible {
+  outline: 2px solid oklch(0.83 0.08 74 / 0.82);
+  outline-offset: 2px;
 }
 
 .instrument-focus-chip {
@@ -1689,6 +1717,11 @@ h3 {
   gap: 12px;
 }
 
+.chart-controls {
+  gap: 6px;
+  min-width: 0;
+}
+
 .chart-meta {
   display: flex;
   align-items: center;
@@ -1784,8 +1817,45 @@ h3 {
 .chart-intervals {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 4px;
+  flex-wrap: nowrap;
+}
+
+.chart-intervals .interval-button {
+  min-width: 42px;
+  padding-right: 8px;
+  padding-left: 8px;
+}
+
+.timeframe-dropdown-label {
+  display: inline-flex;
+  min-width: 78px;
+}
+
+.timeframe-dropdown {
+  width: 100%;
+  min-width: 78px;
+  font-family: var(--font-mono), monospace;
+}
+
+.timeframe-dropdown option {
+  background: var(--bg-pane);
+  color: var(--text);
+}
+
+.timeframe-favorite-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  min-width: 32px;
+  padding: 0;
+  color: var(--text-dim);
+  font-size: 0.82rem;
+}
+
+.timeframe-favorite-toggle.is-active {
+  color: var(--accent);
 }
 
 .status span,
@@ -2962,6 +3032,8 @@ h3 {
   .jump-button,
   .pause-button,
   .interval-button,
+  .timeframe-dropdown,
+  .timeframe-favorite-toggle,
   .overlay-toggle,
   .drawer-close,
   .command-filter-tooltip button,
@@ -3286,6 +3358,8 @@ h3 {
   .jump-button,
   .pause-button,
   .interval-button,
+  .timeframe-dropdown,
+  .timeframe-favorite-toggle,
   .overlay-toggle,
   .drawer-close,
   .contract-filter-button,
@@ -3355,6 +3429,11 @@ h3 {
     width: 100%;
     flex-wrap: wrap;
     justify-content: flex-start;
+  }
+
+  .chart-controls {
+    flex-direction: row;
+    align-items: center;
   }
 
   .tape-controls button {
