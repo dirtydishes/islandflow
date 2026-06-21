@@ -10,7 +10,7 @@
   "dependencies": {
     "@islandflow/types": "workspace:*",
     "@tanstack/react-virtual": "^3.13.24",
-    "lightweight-charts": "^4.2.0",
+    "lightweight-charts": "^5.2.0",
     "next": "^16.2.6",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"

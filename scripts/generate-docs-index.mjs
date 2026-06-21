@@ -1,8 +1,11 @@
 import { promises as fs } from "node:fs";
+import { execFile } from "node:child_process";
 import path from "node:path";
+import { promisify } from "node:util";
 
 const docsDir = path.resolve(process.cwd(), "docs");
 const outputFile = path.join(docsDir, "index.html");
+const execFileAsync = promisify(execFile);
 
 const dateFormatter = new Intl.DateTimeFormat("en-US", {
   dateStyle: "medium",
@@ -43,40 +46,53 @@ function docsHref(relativePath) {
   return `./${encoded}`;
 }
 
-async function collectDocsFiles(rootDir, currentDir = rootDir, acc = []) {
-  const entries = await fs.readdir(currentDir, { withFileTypes: true });
-  const sortedEntries = entries.sort((a, b) => a.name.localeCompare(b.name));
+async function gitOutput(args) {
+  const { stdout } = await execFileAsync("git", args, {
+    cwd: path.dirname(docsDir),
+    maxBuffer: 10 * 1024 * 1024
+  });
+  return stdout;
+}
 
-  for (const entry of sortedEntries) {
-    if (entry.name.startsWith(".")) {
-      continue;
-    }
+async function getTrackedDocsFiles() {
+  const stdout = await gitOutput(["ls-files", "-z", "docs"]);
+  return stdout
+    .split("\0")
+    .filter(Boolean)
+    .map((filePath) => filePath.replace(/^docs\//, ""))
+    .filter((relativePath) => relativePath !== "index.html")
+    .sort((a, b) => a.localeCompare(b));
+}
 
-    const absolutePath = path.join(currentDir, entry.name);
-    const relativePath = path.relative(rootDir, absolutePath).replaceAll(path.sep, "/");
+async function getLastCommitDate(relativePath, fallbackDate) {
+  const stdout = await gitOutput([
+    "log",
+    "-1",
+    "--format=%cI",
+    "--",
+    path.posix.join("docs", relativePath)
+  ]);
+  const trimmed = stdout.trim();
+  return trimmed.length > 0 ? new Date(trimmed) : fallbackDate;
+}
 
-    if (relativePath === "index.html") {
-      continue;
-    }
+async function collectDocsFiles(rootDir) {
+  const files = await getTrackedDocsFiles();
+  const items = [];
 
-    if (entry.isDirectory()) {
-      await collectDocsFiles(rootDir, absolutePath, acc);
-      continue;
-    }
+  for (const relativePath of files) {
+    const absolutePath = path.join(rootDir, ...relativePath.split("/"));
+    const stats = await fs.stat(absolutePath);
 
-    if (entry.isFile()) {
-      const stats = await fs.stat(absolutePath);
-
-      acc.push({
-        relativePath,
-        category: relativePath.includes("/") ? relativePath.split("/")[0] : "root",
-        sizeBytes: stats.size,
-        modifiedAt: stats.mtime
-      });
-    }
+    items.push({
+      relativePath,
+      category: relativePath.includes("/") ? relativePath.split("/")[0] : "root",
+      sizeBytes: stats.size,
+      modifiedAt: await getLastCommitDate(relativePath, stats.mtime)
+    });
   }
 
-  return acc;
+  return items;
 }
 
 function groupByCategory(items) {
@@ -129,8 +145,7 @@ function renderDocument(items) {
         .map((entry) => {
           const extension = path.extname(entry.relativePath).replace(".", "") || "file";
           const searchable = `${entry.relativePath} ${category}`.toLowerCase();
-          return `
-            <li class="doc-item" data-search="${escapeHtml(searchable)}">
+          return `<li class="doc-item" data-search="${escapeHtml(searchable)}">
               <a class="doc-link" href="${docsHref(entry.relativePath)}">${escapeHtml(
                 entry.relativePath
               )}</a>
@@ -139,19 +154,16 @@ function renderDocument(items) {
                 <span>${escapeHtml(formatBytes(entry.sizeBytes))}</span>
                 <span>${escapeHtml(dateFormatter.format(entry.modifiedAt))}</span>
               </div>
-            </li>
-          `;
+            </li>`;
         })
         .join("\n");
 
-      return `
-        <section class="group" id="category-${escapeHtml(category)}">
+      return `<section class="group" id="category-${escapeHtml(category)}">
           <h2>${escapeHtml(category)} <span>${entries.length}</span></h2>
           <ul class="doc-list">
             ${entryMarkup}
           </ul>
-        </section>
-      `;
+        </section>`;
     })
     .join("\n");
 

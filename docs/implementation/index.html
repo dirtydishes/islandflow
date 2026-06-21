@@ -1,0 +1,1591 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Islandflow Implementation Roadmap</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: oklch(0.105 0.012 250);
+        --bg-deep: oklch(0.085 0.012 250);
+        --surface: oklch(0.145 0.014 250);
+        --surface-2: oklch(0.175 0.015 250);
+        --surface-3: oklch(0.205 0.016 250);
+        --ink: oklch(0.94 0.014 250);
+        --muted: oklch(0.77 0.018 250);
+        --faint: oklch(0.64 0.018 250);
+        --line: oklch(0.74 0.012 250 / 0.18);
+        --line-strong: oklch(0.82 0.09 74 / 0.34);
+        --amber: oklch(0.8 0.13 74);
+        --amber-soft: oklch(0.8 0.13 74 / 0.12);
+        --blue: oklch(0.74 0.13 247);
+        --blue-soft: oklch(0.74 0.13 247 / 0.12);
+        --green: oklch(0.76 0.13 151);
+        --green-soft: oklch(0.76 0.13 151 / 0.12);
+        --red: oklch(0.7 0.15 28);
+        --red-soft: oklch(0.7 0.15 28 / 0.12);
+        --violet: oklch(0.74 0.12 302);
+        --violet-soft: oklch(0.74 0.12 302 / 0.12);
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        --sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+        --max: 1180px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          linear-gradient(180deg, oklch(0.15 0.014 250), var(--bg) 380px),
+          var(--bg);
+        color: var(--ink);
+        font: 15px/1.6 var(--sans);
+      }
+
+      a {
+        color: inherit;
+      }
+
+      a:hover {
+        color: var(--amber);
+      }
+
+      :focus-visible {
+        outline: 2px solid var(--amber);
+        outline-offset: 3px;
+      }
+
+      main {
+        width: min(var(--max), calc(100% - 32px));
+        margin: 0 auto;
+        padding: 32px 0 72px;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .brand {
+        display: grid;
+        gap: 3px;
+      }
+
+      .brand small,
+      .status-label,
+      .chip,
+      .toc a,
+      th,
+      .mini-label,
+      .phase-code,
+      .legend-item,
+      .source-link {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .brand small {
+        color: var(--amber);
+      }
+
+      .brand strong {
+        font-family: var(--mono);
+        font-size: 0.9rem;
+        letter-spacing: 0.08em;
+      }
+
+      .topbar nav {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .topbar nav a,
+      .toc a,
+      .source-link {
+        min-height: 32px;
+        display: inline-flex;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 6px 10px;
+        background: oklch(0.98 0.005 250 / 0.035);
+        color: var(--muted);
+        text-decoration: none;
+      }
+
+      .topbar nav a:hover,
+      .toc a:hover,
+      .source-link:hover {
+        border-color: var(--line-strong);
+        background: var(--amber-soft);
+        color: var(--ink);
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+        gap: 28px;
+        align-items: end;
+        padding: 40px 0 30px;
+      }
+
+      h1,
+      h2,
+      h3,
+      h4 {
+        text-wrap: balance;
+      }
+
+      h1 {
+        max-width: 820px;
+        margin: 0;
+        font-size: clamp(2rem, 5vw, 4rem);
+        line-height: 1.02;
+        letter-spacing: -0.02em;
+      }
+
+      h2 {
+        margin: 0 0 14px;
+        font-size: 1.45rem;
+        line-height: 1.15;
+      }
+
+      h3 {
+        margin: 0;
+        font-size: 1.05rem;
+        line-height: 1.25;
+      }
+
+      h4 {
+        margin: 0;
+        font-size: 0.95rem;
+      }
+
+      p {
+        margin: 0;
+        color: var(--muted);
+        text-wrap: pretty;
+      }
+
+      p + p {
+        margin-top: 10px;
+      }
+
+      strong {
+        color: var(--ink);
+      }
+
+      code {
+        border: 1px solid oklch(0.82 0.012 250 / 0.16);
+        border-radius: 6px;
+        padding: 0.08rem 0.3rem;
+        background: oklch(0.98 0.005 250 / 0.05);
+        color: var(--ink);
+        font-family: var(--mono);
+        font-size: 0.92em;
+      }
+
+      pre {
+        margin: 0;
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px;
+        background: var(--bg-deep);
+        color: var(--muted);
+        font: 0.82rem/1.55 var(--mono);
+      }
+
+      pre code {
+        border: 0;
+        padding: 0;
+        background: transparent;
+        color: inherit;
+      }
+
+      .lead {
+        max-width: 72ch;
+        margin-top: 18px;
+        color: var(--muted);
+        font-size: 1.05rem;
+      }
+
+      .hero-panel,
+      .panel,
+      .phase-card,
+      .callout,
+      .term,
+      .source-group,
+      .status-cell {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface);
+      }
+
+      .hero-panel {
+        padding: 18px;
+        border-color: var(--line-strong);
+        background:
+          linear-gradient(180deg, var(--amber-soft), transparent 120px),
+          var(--surface);
+      }
+
+      .status-label {
+        display: inline-flex;
+        color: var(--amber);
+      }
+
+      .hero-panel strong {
+        display: block;
+        margin-top: 8px;
+        font-size: 1.2rem;
+        line-height: 1.25;
+      }
+
+      .hero-panel p {
+        margin-top: 10px;
+      }
+
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 22px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 5px 9px;
+        background: oklch(0.98 0.005 250 / 0.035);
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      .chip.done {
+        border-color: oklch(0.76 0.13 151 / 0.36);
+        background: var(--green-soft);
+        color: oklch(0.9 0.08 151);
+      }
+
+      .chip.next {
+        border-color: var(--line-strong);
+        background: var(--amber-soft);
+        color: oklch(0.91 0.08 74);
+      }
+
+      .chip.blocked {
+        border-color: oklch(0.74 0.13 247 / 0.34);
+        background: var(--blue-soft);
+        color: oklch(0.88 0.07 247);
+      }
+
+      .toc {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin: 0 0 36px;
+        padding: 14px 0;
+        border-block: 1px solid var(--line);
+      }
+
+      .toc strong {
+        margin-right: 6px;
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      section {
+        margin-top: 42px;
+      }
+
+      .section-head {
+        display: grid;
+        gap: 8px;
+        max-width: 78ch;
+        margin-bottom: 16px;
+      }
+
+      .grid {
+        display: grid;
+        gap: 14px;
+      }
+
+      .grid.two {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .grid.three {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .panel {
+        padding: 16px;
+      }
+
+      .panel h3 + p,
+      .term h3 + p {
+        margin-top: 8px;
+      }
+
+      .panel-list {
+        display: grid;
+        gap: 10px;
+        margin: 12px 0 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .panel-list li {
+        display: grid;
+        grid-template-columns: 16px minmax(0, 1fr);
+        gap: 9px;
+        color: var(--muted);
+      }
+
+      .panel-list li::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        margin-top: 0.62em;
+        border-radius: 999px;
+        background: var(--amber);
+      }
+
+      .pipeline {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        overflow: hidden;
+        background: var(--bg-deep);
+      }
+
+      .pipeline-row {
+        display: grid;
+        grid-template-columns: 180px minmax(0, 1fr) minmax(0, 1fr);
+      }
+
+      .pipeline-row + .pipeline-row {
+        border-top: 1px solid var(--line);
+      }
+
+      .pipeline-row > div {
+        padding: 14px;
+      }
+
+      .pipeline-row > div + div {
+        border-left: 1px solid var(--line);
+      }
+
+      .pipeline-head {
+        background: var(--surface-2);
+        color: var(--faint);
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .flow-diagram {
+        display: grid;
+        gap: 10px;
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--bg-deep);
+      }
+
+      .flow-line {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 10px;
+        align-items: stretch;
+      }
+
+      .flow-node {
+        min-height: 86px;
+        display: grid;
+        align-content: start;
+        gap: 7px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 11px;
+        background: var(--surface);
+      }
+
+      .flow-node strong {
+        font-size: 0.9rem;
+      }
+
+      .flow-node span {
+        color: var(--faint);
+        font-size: 0.86rem;
+      }
+
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        color: var(--muted);
+      }
+
+      .legend-item::before {
+        content: "";
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: var(--amber);
+      }
+
+      .legend-item.synthetic::before {
+        background: var(--blue);
+      }
+
+      .legend-item.smart::before {
+        background: var(--green);
+      }
+
+      .legend-item.proof::before {
+        background: var(--amber);
+      }
+
+      .phase-list {
+        display: grid;
+        gap: 12px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .phase-card {
+        display: grid;
+        grid-template-columns: 168px minmax(0, 1fr);
+        overflow: hidden;
+      }
+
+      .phase-side {
+        display: grid;
+        align-content: start;
+        gap: 8px;
+        padding: 16px;
+        background: var(--surface-2);
+        border-right: 1px solid var(--line);
+      }
+
+      .phase-code {
+        color: var(--faint);
+      }
+
+      .phase-body {
+        display: grid;
+        gap: 14px;
+        padding: 16px;
+      }
+
+      .phase-title-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .phase-kv {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .status-cell {
+        padding: 11px;
+        background: var(--bg-deep);
+      }
+
+      .mini-label {
+        display: block;
+        margin-bottom: 5px;
+        color: var(--faint);
+      }
+
+      .status-cell p {
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      .callout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 260px;
+        gap: 18px;
+        padding: 18px;
+        border-color: var(--line-strong);
+        background:
+          linear-gradient(180deg, oklch(0.8 0.13 74 / 0.08), transparent 170px),
+          var(--surface);
+      }
+
+      .callout .actions {
+        display: grid;
+        gap: 8px;
+        align-content: start;
+      }
+
+      .action-link {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        min-height: 44px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px 12px;
+        background: var(--bg-deep);
+        color: var(--ink);
+        text-decoration: none;
+      }
+
+      .action-link span {
+        color: var(--faint);
+        font-family: var(--mono);
+        font-size: 0.75rem;
+      }
+
+      .action-link:hover {
+        border-color: var(--line-strong);
+        background: var(--amber-soft);
+      }
+
+      .rules {
+        display: grid;
+        gap: 10px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .rules li {
+        padding: 13px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface);
+      }
+
+      .rules strong {
+        display: block;
+        margin-bottom: 5px;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--bg-deep);
+      }
+
+      table {
+        width: 100%;
+        min-width: 860px;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 12px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--faint);
+        background: var(--surface-2);
+      }
+
+      td {
+        color: var(--muted);
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .term-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 12px;
+      }
+
+      .term {
+        padding: 14px;
+      }
+
+      details.term {
+        padding: 0;
+      }
+
+      details.term summary {
+        cursor: pointer;
+        padding: 14px;
+        color: var(--ink);
+        font-weight: 700;
+      }
+
+      details.term p {
+        padding: 0 14px 14px;
+      }
+
+      .source-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 12px;
+      }
+
+      .source-group {
+        padding: 14px;
+      }
+
+      .source-group h3 {
+        margin-bottom: 10px;
+      }
+
+      .source-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      footer {
+        margin-top: 46px;
+        padding-top: 16px;
+        border-top: 1px solid var(--line);
+        color: var(--faint);
+        font-family: var(--mono);
+        font-size: 0.78rem;
+      }
+
+      @media (max-width: 960px) {
+        .hero,
+        .grid.two,
+        .grid.three,
+        .callout,
+        .pipeline-row,
+        .phase-card,
+        .phase-kv {
+          grid-template-columns: 1fr;
+        }
+
+        .pipeline-row > div + div,
+        .phase-side {
+          border-left: 0;
+          border-right: 0;
+        }
+
+        .pipeline-row > div + div {
+          border-top: 1px solid var(--line);
+        }
+
+        .flow-line {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 680px) {
+        main {
+          width: min(100% - 24px, var(--max));
+          padding-top: 22px;
+        }
+
+        .topbar,
+        .phase-title-row {
+          align-items: flex-start;
+        }
+
+        .topbar {
+          display: grid;
+        }
+
+        .topbar nav {
+          justify-content: flex-start;
+        }
+
+        h1 {
+          font-size: 2rem;
+        }
+
+        .panel,
+        .hero-panel,
+        .callout,
+        .phase-body,
+        .phase-side {
+          padding: 14px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+
+        *,
+        *::before,
+        *::after {
+          transition-duration: 0.01ms !important;
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="topbar" aria-label="Document header">
+        <div class="brand">
+          <small>Islandflow</small>
+          <strong>Implementation Roadmap</strong>
+        </div>
+        <nav aria-label="Page sections">
+          <a href="#plain-english">Plain English</a>
+          <a href="#phase-map">Phase Map</a>
+          <a href="#next">Next Work</a>
+          <a href="#terms">Terms</a>
+          <a href="#sources">Sources</a>
+        </nav>
+      </header>
+
+      <section class="hero" aria-labelledby="page-title">
+        <div>
+          <h1 id="page-title">Build believable market tape, then prove every smart-flow claim against it.</h1>
+          <p class="lead">
+            This page is the human-readable map for the synthetic market-data and smart-flow implementation plan.
+            It explains what each phase does, what it depends on, what it produces, and why the next open work is replay.
+          </p>
+          <div class="meta" aria-label="Current roadmap status">
+            <span class="chip done">Phases 01-03 closed</span>
+            <span class="chip next">Next: islandflow-259.4</span>
+            <span class="chip blocked">Then: islandflow-zxh.4</span>
+          </div>
+        </div>
+        <aside class="hero-panel" aria-label="Current next issue">
+          <span class="status-label">Current next piece</span>
+          <strong>Synthetic replay integration is the next P1 implementation step.</strong>
+          <p>
+            The repo already has deterministic synthetic runs, manifests, scenarios, evidence clusters, and hypothesis scoring.
+            Now replay has to consume those runs with stable ordering so smart-flow behavior can be evaluated honestly.
+          </p>
+        </aside>
+      </section>
+
+      <div class="toc" aria-label="Table of contents">
+        <strong>Jump to</strong>
+        <a href="#plain-english">What This Is</a>
+        <a href="#tracks">Two Tracks</a>
+        <a href="#state">Current State</a>
+        <a href="#phase-map">All Phases</a>
+        <a href="#next">Next Piece</a>
+        <a href="#research">Research Rules</a>
+        <a href="#terms">Glossary</a>
+        <a href="#sources">Source Docs</a>
+      </div>
+
+      <section id="plain-english">
+        <div class="section-head">
+          <h2>What This Plan Is Really Building</h2>
+          <p>
+            Islandflow needs two capabilities to mature together. First, it needs a controlled market-data world:
+            fake options and equity tape that is realistic enough to test alerts, but deterministic enough to replay.
+            Second, it needs a cautious smart-flow engine that can explain whether a market event is useful evidence,
+            ambiguous noise, or a reason to abstain.
+          </p>
+        </div>
+        <div class="grid three">
+          <article class="panel">
+            <h3>Synthetic market data</h3>
+            <p>
+              This is not random demo filler. It is a seeded generator that emits normal market events like
+              <code>OptionPrint</code>, <code>OptionNBBO</code>, <code>EquityPrint</code>, and <code>EquityQuote</code>.
+              Same seed and profile means same output.
+            </p>
+          </article>
+          <article class="panel">
+            <h3>Smart-flow detection</h3>
+            <p>
+              This replaces overconfident "smart money" claims with evidence-backed hypotheses. It keeps direct facts,
+              evidence quality, signal strength, penalties, alternatives, confidence, conviction, and abstention separate.
+            </p>
+          </article>
+          <article class="panel">
+            <h3>Replay as the proof loop</h3>
+            <p>
+              Replay is the bridge between both tracks. It reruns raw synthetic streams and checks whether the derived
+              evidence and hypotheses match compact expected signatures.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section id="tracks">
+        <div class="section-head">
+          <h2>Two Tracks, One Pipeline</h2>
+          <p>
+            The synthetic track creates the market conditions. The smart-flow track interprets those conditions.
+            The phases alternate because each side needs the other side's vocabulary or artifacts before the next step is useful.
+          </p>
+        </div>
+
+        <div class="flow-diagram" aria-label="Simplified implementation pipeline">
+          <div class="legend">
+            <span class="legend-item synthetic">Synthetic data</span>
+            <span class="legend-item smart">Smart-flow</span>
+            <span class="legend-item proof">Replay proof</span>
+          </div>
+          <div class="flow-line">
+            <div class="flow-node">
+              <strong>Raw events</strong>
+              <span>Canonical prints and quotes with provenance.</span>
+            </div>
+            <div class="flow-node">
+              <strong>Fixtures</strong>
+              <span>Named generated runs pinned by manifests.</span>
+            </div>
+            <div class="flow-node">
+              <strong>Evidence</strong>
+              <span>Eligibility, quote joins, quality, and source refs.</span>
+            </div>
+            <div class="flow-node">
+              <strong>Hypotheses</strong>
+              <span>Scores, alternatives, confidence, and abstention.</span>
+            </div>
+            <div class="flow-node">
+              <strong>Replay gates</strong>
+              <span>Golden signatures before demos and UI polish.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pipeline" aria-label="Synthetic and smart-flow responsibilities">
+          <div class="pipeline-row pipeline-head">
+            <div>Layer</div>
+            <div>Synthetic Track Produces</div>
+            <div>Smart-Flow Track Consumes Or Produces</div>
+          </div>
+          <div class="pipeline-row">
+            <div><strong>Raw tape</strong></div>
+            <div>
+              Seeded market events, valid ticks, quote/trade separation, lumpy sizes, venue flags, late/corrected paths,
+              option-chain sparsity, and provenance.
+            </div>
+            <div>
+              Direct observations and normalized inputs. At this layer the system should not claim intent.
+            </div>
+          </div>
+          <div class="pipeline-row">
+            <div><strong>Scenario meaning</strong></div>
+            <div>
+              Hidden labels and expected-output manifests kept separate from emitted market events.
+            </div>
+            <div>
+              Evidence facts, eligibility decisions, feature vectors, and cluster lineage that can be audited.
+            </div>
+          </div>
+          <div class="pipeline-row">
+            <div><strong>Decision proof</strong></div>
+            <div>
+              Replayable runs with stable event ordering and compact output signatures.
+            </div>
+            <div>
+              Hypotheses, alternatives, abstention reasons, and eventually API/UI explainability.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="state">
+        <div class="section-head">
+          <h2>Current State</h2>
+          <p>
+            Beads was checked on 2026-06-18. The first three phases of both main tracks are closed.
+            The active next milestone is the replay pair: first synthetic replay integration, then smart-flow replay evaluation.
+          </p>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Issue</th>
+                <th>Status</th>
+                <th>Meaning</th>
+                <th>Why It Matters Now</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>islandflow-259.1</code> to <code>islandflow-259.3</code></td>
+                <td><span class="chip done">Closed</span></td>
+                <td>Synthetic generator, manifests/fixtures/CLI, scenarios, labels, and expected outputs exist.</td>
+                <td>The repo can now name exact synthetic runs and expected outcomes instead of inventing ad hoc demo data.</td>
+              </tr>
+              <tr>
+                <td><code>islandflow-zxh.1</code> to <code>islandflow-zxh.3</code></td>
+                <td><span class="chip done">Closed</span></td>
+                <td>Smart-flow contracts, evidence clustering, feature vectors, hypothesis scoring, alternatives, and abstention exist.</td>
+                <td>The system has a cautious vocabulary for evidence and hypotheses before replay turns that behavior into a gate.</td>
+              </tr>
+              <tr>
+                <td><code>islandflow-259.4</code></td>
+                <td><span class="chip next">Open P1</span></td>
+                <td>Integrate synthetic runs into replay with source/run selectors, stable ordering, and manifest comparisons.</td>
+                <td>This is the next piece because smart-flow golden tests need a replay path that starts from raw synthetic fixtures.</td>
+              </tr>
+              <tr>
+                <td><code>islandflow-zxh.4</code></td>
+                <td><span class="chip blocked">Open P1</span></td>
+                <td>Use replay to recompute smart-flow outputs and compare compact golden signatures.</td>
+                <td>This becomes the acceptance gate for scoring changes before demos, load profiles, and UI explainability expand.</td>
+              </tr>
+              <tr>
+                <td><code>islandflow-259.5</code> and <code>islandflow-zxh.5</code></td>
+                <td><span class="chip">Later MVP</span></td>
+                <td>Named deterministic demos/load profiles, then API, websocket, and UI explainability.</td>
+                <td>These should wait until replay proves the evidence and hypothesis semantics are stable.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="phase-map">
+        <div class="section-head">
+          <h2>Phase-By-Phase Map</h2>
+          <p>
+            Each phase has a simple job: make one missing layer reliable enough for the next layer to depend on it.
+            The details stay technical because the implementation needs exact contracts, but the intent should be clear at a glance.
+          </p>
+        </div>
+
+        <ol class="phase-list">
+          <li class="phase-card">
+            <div class="phase-side">
+              <span class="phase-code">1A</span>
+              <span class="chip done">Closed</span>
+              <code>islandflow-259.1</code>
+            </div>
+            <div class="phase-body">
+              <div class="phase-title-row">
+                <h3>Synthetic deterministic spine</h3>
+                <a class="source-link" href="synthetic-market-data/01-deterministic-spine.md">Phase doc</a>
+              </div>
+              <p>
+                Create the reusable seeded generator. It emits canonical market events with provenance so every later run
+                can be traced to a seed, profile, and parameter snapshot.
+              </p>
+              <div class="phase-kv">
+                <div class="status-cell">
+                  <span class="mini-label">Builds On</span>
+                  <p>Nothing. This is the first synthetic foundation.</p>
+                </div>
+                <div class="status-cell">
+                  <span class="mini-label">Creates</span>
+                  <p><code>SyntheticRun</code>, seed bundles, profiles, canonical event batches, and deterministic tests.</p>
+                </div>
+                <div class="status-cell">
+                  <span class="mini-label">Unlocks</span>
+                  <p>Manifests and fixtures that can reference exact generated outputs.</p>
+                </div>
+              </div>
+            </div>
+          </li>
+
+          <li class="phase-card">
+            <div class="phase-side">
+              <span class="phase-code">1B</span>
+              <span class="chip done">Closed</span>
+              <code>islandflow-zxh.1</code>
+            </div>
+            <div class="phase-body">
+              <div class="phase-title-row">
+                <h3>Smart-flow contracts and vocabulary</h3>
+                <a class="source-link" href="smart-money/01-contracts-vocabulary.md">Phase doc</a>
+              </div>
+              <p>
+                Give the system better words before changing behavior: observations are facts, evidence clusters are grouped
+                facts, hypotheses are model outputs, and insights are user-facing projections.
+              </p>
+              <div class="phase-kv">
+                <div class="status-cell">
+                  <span class="mini-label">Builds On</span>
+                  <p>Existing raw market event contracts and compatibility surfaces.</p>
+                </div>
+                <div class="status-cell">
+                  <span class="mini-label">Creates</span>
+                  <p><code>FlowEvidenceCluster</code>, <code>FlowHypothesisEvent</code>, <code>SmartFlowInsight</code>, version fields, and migration notes.</p>
+                </div>
+                <div class="status-cell">
+                  <span class="mini-label">Unlocks</span>
+                  <p>Evidence extraction and manifest expectations that do not repeat old overconfident language.</p>
+                </div>
+              </div>
+            </div>
+          </li>
+
+          <li class="phase-card">
+            <div class="phase-side">
+              <span class="phase-code">2</span>
+              <span class="chip done">Closed</span>
+              <code>islandflow-259.2</code>
+            </div>
+            <div class="phase-body">
+              <div class="phase-title-row">
+                <h3>Synthetic manifests, fixtures, and CLI</h3>
+                <a class="source-link" href="synthetic-market-data/02-manifests-fixtures-cli.md">Phase doc</a>
+              </div>
+              <p>
+                Turn generated data into durable artifacts. A fixture is the generated event set; a manifest explains how it was
+                generated, how it should replay, and which hashes prove it did not drift.
+              </p>
+              <div class="phase-kv">
+                <div class="status-cell">
+                  <span class="mini-label">Builds On</span>
+                  <p>Synthetic phase 01 and smart-flow vocabulary.</p>
+                </div>
+                <div class="status-cell">
+                  <span class="mini-label">Creates</span>
+                  <p>Fixture layouts, run manifests, replay plans, event hashes, and generator CLI paths.</p>
+                </div>
+                <div class="status-cell">
+                  <span class="mini-label">Unlocks</span>
+                  <p>Evidence-clustering tests that load repeatable market conditions without Docker.</p>
+                </div>
+              </div>
+            </div>
+          </li>
+
+          <li class="phase-card">
+            <div class="phase-side">
+              <span class="phase-code">3</span>
+              <span class="chip done">Closed</span>
+              <code>islandflow-zxh.2</code>
+            </div>
+            <div class="phase-body">
+              <div class="phase-title-row">
+                <h3>Smart-flow evidence clustering and features</h3>
+                <a class="source-link" href="smart-money/02-evidence-clustering-features.md">Phase doc</a>
+              </div>
+              <p>
+                Make the evidence layer explicit. The system records quote joins, eligibility decisions, stale/wide/noisy
+                context, cluster windows, and feature values before trying to score a hypothesis.
+              </p>
+              <div class="phase-kv">
+                <div class="status-cell">
+                  <span class="mini-label">Builds On</span>
+                  <p>Smart-flow contracts and deterministic synthetic fixtures.</p>
+                </div>
+                <div class="status-cell">
+                  <span class="mini-label">Creates</span>
+                  <p>Evidence facts, deterministic cluster keys, trace refs, feature vectors, and rejection/down-weight reasons.</p>
+                </div>
+                <div class="status-cell">
+                  <span class="mini-label">Unlocks</span>
+                  <p>Synthetic scenarios whose expected outputs can name required and forbidden evidence.</p>
+                </div>
+              </div>
+            </div>
+          </li>
+
+          <li class="phase-card">
+            <div class="phase-side">
+              <span class="phase-code">4</span>
+              <span class="chip done">Closed</span>
+              <code>islandflow-259.3</code>
+            </div>
+            <div class="phase-body">
+              <div class="phase-title-row">
+                <h3>Synthetic scenarios, labels, and expected outputs</h3>
+                <a class="source-link" href="synthetic-market-data/03-scenarios-labels-expected-outputs.md">Phase doc</a>
+              </div>
+              <p>
+                Add named market situations: aggressive call buying, stale-quote traps, wide-spread false positives,
+                event noise, hedge/reactive flow, no-alert negatives, and explicit abstention cases.
+              </p>
+              <div class="phase-kv">
+                <div class="status-cell">
+                  <span class="mini-label">Builds On</span>
+                  <p>Generator, manifests, and smart-flow evidence vocabulary.</p>
+                </div>
+                <div class="status-cell">
+                  <span class="mini-label">Creates</span>
+                  <p><code>ScenarioInjection</code>, separate <code>GroundTruthLabel</code> records, and expected-output manifests.</p>
+                </div>
+                <div class="status-cell">
+                  <span class="mini-label">Unlocks</span>
+                  <p>Hypothesis scoring against positive, negative, noisy, and abstain examples.</p>
+                </div>
+              </div>
+            </div>
+          </li>
+
+          <li class="phase-card">
+            <div class="phase-side">
+              <span class="phase-code">5</span>
+              <span class="chip done">Closed</span>
+              <code>islandflow-zxh.3</code>
+            </div>
+            <div class="phase-body">
+              <div class="phase-title-row">
+                <h3>Smart-flow hypothesis scoring and abstention</h3>
+                <a class="source-link" href="smart-money/03-hypothesis-scoring-abstention.md">Phase doc</a>
+              </div>
+              <p>
+                Convert evidence clusters into cautious hypotheses. A strong anomaly can still produce low confidence if
+                stale quotes, wide spreads, event noise, or hedge alternatives explain it better.
+              </p>
+              <div class="phase-kv">
+                <div class="status-cell">
+                  <span class="mini-label">Builds On</span>
+                  <p>Evidence clusters and scenario expected outputs.</p>
+                </div>
+                <div class="status-cell">
+                  <span class="mini-label">Creates</span>
+                  <p>Score vectors, penalties, alternatives, confidence, conviction, abstention reasons, and insight projections.</p>
+                </div>
+                <div class="status-cell">
+                  <span class="mini-label">Unlocks</span>
+                  <p>Replay integration that can validate derived hypothesis behavior from raw streams.</p>
+                </div>
+              </div>
+            </div>
+          </li>
+
+          <li class="phase-card" id="phase-replay">
+            <div class="phase-side">
+              <span class="phase-code">6</span>
+              <span class="chip next">Next</span>
+              <code>islandflow-259.4</code>
+            </div>
+            <div class="phase-body">
+              <div class="phase-title-row">
+                <h3>Synthetic replay integration</h3>
+                <a class="source-link" href="synthetic-market-data/04-replay-integration.md">Phase doc</a>
+              </div>
+              <p>
+                Teach replay to select a synthetic source and <code>run_id</code>, consume fixture-backed runs with stable
+                ordering, and compare derived output signatures against manifests.
+              </p>
+              <div class="phase-kv">
+                <div class="status-cell">
+                  <span class="mini-label">Builds On</span>
+                  <p>Closed synthetic scenarios and closed smart-flow hypothesis scoring.</p>
+                </div>
+                <div class="status-cell">
+                  <span class="mini-label">Creates</span>
+                  <p>Run selectors, fixture-backed replay, event-time ordering, and manifest signature checks.</p>
+                </div>
+                <div class="status-cell">
+                  <span class="mini-label">Unlocks</span>
+                  <p>Smart-flow golden tests that recompute evidence and hypotheses from raw fixtures.</p>
+                </div>
+              </div>
+            </div>
+          </li>
+
+          <li class="phase-card">
+            <div class="phase-side">
+              <span class="phase-code">7</span>
+              <span class="chip blocked">Blocked</span>
+              <code>islandflow-zxh.4</code>
+            </div>
+            <div class="phase-body">
+              <div class="phase-title-row">
+                <h3>Smart-flow replay evaluation and golden tests</h3>
+                <a class="source-link" href="smart-money/04-replay-evaluation-golden-tests.md">Phase doc</a>
+              </div>
+              <p>
+                Make replay the acceptance gate. It should recompute derived evidence and hypotheses from raw synthetic
+                streams and compare compact signatures for positive, abstain, false-positive, and noisy cases.
+              </p>
+              <div class="phase-kv">
+                <div class="status-cell">
+                  <span class="mini-label">Builds On</span>
+                  <p>Synthetic replay integration.</p>
+                </div>
+                <div class="status-cell">
+                  <span class="mini-label">Creates</span>
+                  <p>Infra-free golden tests, replay signatures, concise diffs, and optional gated service-backed tests.</p>
+                </div>
+                <div class="status-cell">
+                  <span class="mini-label">Unlocks</span>
+                  <p>Demo and load profiles that are persuasive because their semantics are already tested.</p>
+                </div>
+              </div>
+            </div>
+          </li>
+
+          <li class="phase-card">
+            <div class="phase-side">
+              <span class="phase-code">8</span>
+              <span class="chip">Later MVP</span>
+              <code>islandflow-259.5</code>
+            </div>
+            <div class="phase-body">
+              <div class="phase-title-row">
+                <h3>Synthetic demo and load profiles</h3>
+                <a class="source-link" href="synthetic-market-data/05-demo-load-profiles.md">Phase doc</a>
+              </div>
+              <p>
+                Expose named deterministic runs as demo and load profiles. The important guardrail is that controls select
+                known runs; they should not reintroduce hidden wall-clock randomness.
+              </p>
+              <div class="phase-kv">
+                <div class="status-cell">
+                  <span class="mini-label">Builds On</span>
+                  <p>Replay evaluation and golden tests.</p>
+                </div>
+                <div class="status-cell">
+                  <span class="mini-label">Creates</span>
+                  <p><code>DemoProfile</code>, <code>LoadProfile</code>, thin emitters, run selectors, and local demo documentation.</p>
+                </div>
+                <div class="status-cell">
+                  <span class="mini-label">Unlocks</span>
+                  <p>API, websocket, and UI explainability against stable, named examples.</p>
+                </div>
+              </div>
+            </div>
+          </li>
+
+          <li class="phase-card">
+            <div class="phase-side">
+              <span class="phase-code">9</span>
+              <span class="chip">Later MVP</span>
+              <code>islandflow-zxh.5</code>
+            </div>
+            <div class="phase-body">
+              <div class="phase-title-row">
+                <h3>Smart-flow API/UI explainability</h3>
+                <a class="source-link" href="smart-money/05-api-ui-explainability.md">Phase doc</a>
+              </div>
+              <p>
+                Surface the validated evidence model to users. The UI should show evidence quality, confidence versus
+                conviction, alternatives, abstention, and why-not context without turning hypotheses into certainty.
+              </p>
+              <div class="phase-kv">
+                <div class="status-cell">
+                  <span class="mini-label">Builds On</span>
+                  <p>Named deterministic demos and replay-validated smart-flow outputs.</p>
+                </div>
+                <div class="status-cell">
+                  <span class="mini-label">Creates</span>
+                  <p>Evidence API/WS payloads, explainability surfaces, aliases for legacy routes, and focused UI tests.</p>
+                </div>
+                <div class="status-cell">
+                  <span class="mini-label">Unlocks</span>
+                  <p>The MVP product surface for evidence-backed smart-flow investigation.</p>
+                </div>
+              </div>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <section id="next">
+        <div class="callout">
+          <div>
+            <span class="status-label">Do next</span>
+            <h2>Implement <code>islandflow-259.4</code>: synthetic replay integration.</h2>
+            <p>
+              This is the right next piece because all earlier data-generation and scoring layers are now closed in Beads.
+              Replay integration turns those artifacts into a testable execution path: pick a synthetic run, replay it in
+              deterministic order, and compare derived outputs to manifest signatures.
+            </p>
+            <ul class="panel-list">
+              <li>Start from <code>docs/implementation/synthetic-market-data/04-replay-integration.md</code>.</li>
+              <li>Add synthetic source/run selection without creating a separate synthetic-only ordering model.</li>
+              <li>Keep the fast validation path infra-free; ClickHouse/NATS materialization can stay optional and gated.</li>
+              <li>Stop before demo controls. The next smart-flow phase needs replay proof, not a prettier demo yet.</li>
+            </ul>
+          </div>
+          <div class="actions" aria-label="Next work links">
+            <a class="action-link" href="synthetic-market-data/04-replay-integration.md">
+              Phase 04 doc <span>259.4</span>
+            </a>
+            <a class="action-link" href="smart-money/04-replay-evaluation-golden-tests.md">
+              Follow-up gate <span>zxh.4</span>
+            </a>
+            <a class="action-link" href="../research-docs/synthetic-market-data-generation.md">
+              Research basis <span>synthetic</span>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <section id="research">
+        <div class="section-head">
+          <h2>Research Rules That Shape The Implementation</h2>
+          <p>
+            The research docs are background, but they explain the guardrails behind the phase order.
+            These are the rules the implementation should keep visible.
+          </p>
+        </div>
+        <ul class="rules">
+          <li>
+            <strong>Synthetic data should be messy on purpose, not random.</strong>
+            Real tape has clustered arrivals, lumpy sizes, variable spreads, stale quotes, odd lots, late/corrected prints,
+            off-exchange reports, sparse options chains, 0DTE behavior, IV/skew structure, and regime changes. The generator
+            needs enough of that mess to test false positives.
+          </li>
+          <li>
+            <strong>Background runs should usually fail high-confidence alert logic.</strong>
+            A useful background stream is not empty. It has ambiguous bursts, noisy context, weak confirmations, and ordinary
+            traps. High-confidence alerts should be rare outside deliberate scenarios; abstentions should be common enough to
+            prove the model is not overclaiming.
+          </li>
+          <li>
+            <strong>Labels must stay separate from emitted market events.</strong>
+            Ground truth belongs in label records and expected-output manifests. If labels leak into canonical event payloads,
+            production-like paths can accidentally cheat.
+          </li>
+          <li>
+            <strong>Smart-flow is a hypothesis engine, not a participant-identity engine.</strong>
+            Public data can support evidence-backed directional, volatility, hedge/reactive, or event-flow candidates. It cannot
+            directly prove the hidden trader or parent order. The product should show confidence and alternatives, not certainty theater.
+          </li>
+          <li>
+            <strong>Replay must run in event time and preserve ordering.</strong>
+            Validation should not depend on when the app happened to receive a message. Stable run IDs, event IDs, event-time ordering,
+            and compact output signatures are the backbone of repeatable tests.
+          </li>
+          <li>
+            <strong>Historical calibration is valuable, but not an MVP dependency.</strong>
+            Later calibration can fit arrival curves, spread states, size mixtures, venue shares, option-chain weights, confidence
+            thresholds, and abstention behavior. It should layer onto deterministic foundations, not replace them.
+          </li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="formula-title">
+        <div class="section-head">
+          <h2 id="formula-title">The Smart-Flow Scoring Shape</h2>
+          <p>
+            The research pushes away from one big "smart money score." The implementation should keep the pieces separate so
+            the system can explain why a signal is strong, weak, or not worth calling.
+          </p>
+        </div>
+        <pre><code>evidence_quality
+  = quote freshness
+  + spread and liquidity quality
+  + condition-code eligibility
+  + timestamp and reference-data confidence
+
+signal_strength
+  = contract-relative premium/size anomaly
+  + volume versus prior open interest
+  + sweep or burst persistence
+  + IV/skew and underlying confirmation
+
+false_positive_penalty
+  = stale quote
+  + wide spread
+  + complex spread or hedge likelihood
+  + 0DTE/event noise
+  + late/corrected/off-hours prints
+
+hypothesis
+  = evidence quality + matching signal strength - penalties
+
+if evidence is weak, explanations conflict, or the runner-up hypothesis is too close:
+  emit abstention with reasons instead of a confident insight</code></pre>
+      </section>
+
+      <section id="terms">
+        <div class="section-head">
+          <h2>Terms Worth Keeping Straight</h2>
+          <p>
+            These terms are intentionally not hidden. They are the practical handles someone needs when reading the phase docs
+            or reviewing implementation work.
+          </p>
+        </div>
+        <div class="term-grid">
+          <details class="term" open>
+            <summary>Deterministic</summary>
+            <p>
+              Fixed inputs produce fixed outputs. In this repo that means seeds, profiles, generator version, event ordering,
+              and parameter snapshots are pinned so a test can reproduce the same run later.
+            </p>
+          </details>
+          <details class="term" open>
+            <summary>Canonical market events</summary>
+            <p>
+              Synthetic data should use the same raw pipeline contracts as real data: option prints, option quotes, equity prints,
+              and equity quotes. Do not make a parallel synthetic-only business schema for the main pipeline.
+            </p>
+          </details>
+          <details class="term">
+            <summary>Manifest</summary>
+            <p>
+              A durable description of a generated run: seed bundle, profile identity, generator version, parameter hash, event hashes,
+              replay ordering, and expected derived outputs.
+            </p>
+          </details>
+          <details class="term">
+            <summary>Ground-truth label</summary>
+            <p>
+              A separate record that says what a synthetic scenario is intended to mean. It can name expected class, direction,
+              confidence band, required evidence, forbidden evidence, and penalties. It must not be embedded in the market event.
+            </p>
+          </details>
+          <details class="term">
+            <summary>Evidence cluster</summary>
+            <p>
+              A traceable group of observations and evidence facts. It can include raw refs, quote context, eligibility decisions,
+              feature values, and evidence quality before any final hypothesis is scored.
+            </p>
+          </details>
+          <details class="term">
+            <summary>Hypothesis</summary>
+            <p>
+              A model or policy output over evidence. It is not a direct fact about a hidden participant. It should carry scores,
+              alternatives, policy/model versions, and abstention where needed.
+            </p>
+          </details>
+          <details class="term">
+            <summary>Confidence versus conviction</summary>
+            <p>
+              Conviction is about signal strength. Confidence is about how cleanly the evidence supports one hypothesis over alternatives.
+              A large print can be high-conviction but low-confidence when context is messy.
+            </p>
+          </details>
+          <details class="term">
+            <summary>Abstention</summary>
+            <p>
+              A first-class output that says the system should not make a strong claim. Good abstentions name reasons such as stale quotes,
+              wide spreads, event noise, complex spread likelihood, or conflicting evidence.
+            </p>
+          </details>
+          <details class="term">
+            <summary>Golden test</summary>
+            <p>
+              A compact expected-output check for replayed behavior. It should compare stable signatures and meaningful fields rather
+              than huge payload dumps that reviewers stop reading.
+            </p>
+          </details>
+        </div>
+      </section>
+
+      <section aria-labelledby="dont-title">
+        <div class="section-head">
+          <h2 id="dont-title">What Not To Jump To Yet</h2>
+          <p>
+            These are tempting because they feel product-visible. The plan delays them because they become misleading unless replay
+            and evidence semantics are already solid.
+          </p>
+        </div>
+        <div class="grid three">
+          <article class="panel">
+            <h3>Do not build UI certainty first</h3>
+            <p>
+              API and UI explainability should wait for replay-validated hypotheses. Otherwise the product may teach users to trust
+              old "smart money" certainty with new labels.
+            </p>
+          </article>
+          <article class="panel">
+            <h3>Do not make demos random again</h3>
+            <p>
+              Demo controls should select named deterministic runs. Hidden wall-clock randomness makes impressive demos but weak tests.
+            </p>
+          </article>
+          <article class="panel">
+            <h3>Do not require historical data for MVP</h3>
+            <p>
+              Historical calibration belongs after the deterministic MVP chain. Use it later to improve parameters, not to block the foundation.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section id="sources">
+        <div class="section-head">
+          <h2>Source Documents</h2>
+          <p>
+            The phase docs and Beads issues define active scope. Research docs explain rationale and constraints.
+            If a research idea is not pulled into a phase doc or Beads issue, it is not active implementation scope.
+          </p>
+        </div>
+        <div class="source-grid">
+          <article class="source-group">
+            <h3>Implementation overview</h3>
+            <div class="source-links">
+              <a class="source-link" href="README.md">README</a>
+              <a class="source-link" href="synthetic-market-data/00-roadmap.md">Synthetic roadmap</a>
+              <a class="source-link" href="smart-money/00-roadmap.md">Smart-flow roadmap</a>
+              <a class="source-link" href="synthetic-market-data/index.html">Synthetic dossier</a>
+              <a class="source-link" href="smart-money/index.html">Smart-flow dossier</a>
+            </div>
+          </article>
+          <article class="source-group">
+            <h3>Synthetic market data</h3>
+            <div class="source-links">
+              <a class="source-link" href="synthetic-market-data/01-deterministic-spine.md">01 spine</a>
+              <a class="source-link" href="synthetic-market-data/02-manifests-fixtures-cli.md">02 manifests</a>
+              <a class="source-link" href="synthetic-market-data/03-scenarios-labels-expected-outputs.md">03 scenarios</a>
+              <a class="source-link" href="synthetic-market-data/04-replay-integration.md">04 replay</a>
+              <a class="source-link" href="synthetic-market-data/05-demo-load-profiles.md">05 demos</a>
+              <a class="source-link" href="synthetic-market-data/99-future-historical-calibration.md">99 calibration</a>
+            </div>
+          </article>
+          <article class="source-group">
+            <h3>Smart-flow</h3>
+            <div class="source-links">
+              <a class="source-link" href="smart-money/01-contracts-vocabulary.md">01 contracts</a>
+              <a class="source-link" href="smart-money/01-contracts-vocabulary-migration.md">Migration notes</a>
+              <a class="source-link" href="smart-money/02-evidence-clustering-features.md">02 evidence</a>
+              <a class="source-link" href="smart-money/03-hypothesis-scoring-abstention.md">03 scoring</a>
+              <a class="source-link" href="smart-money/04-replay-evaluation-golden-tests.md">04 golden tests</a>
+              <a class="source-link" href="smart-money/05-api-ui-explainability.md">05 explainability</a>
+              <a class="source-link" href="smart-money/99-future-calibration.md">99 calibration</a>
+            </div>
+          </article>
+          <article class="source-group">
+            <h3>Research basis</h3>
+            <div class="source-links">
+              <a class="source-link" href="../research-docs/synthetic-market-data-generation.md">Synthetic generation</a>
+              <a class="source-link" href="../research-docs/synthetic-data-architecture-review.md">Synthetic architecture</a>
+              <a class="source-link" href="../research-docs/smart-flow-market-mechanics.md">Market mechanics</a>
+              <a class="source-link" href="../research-docs/smart-flow-market-mechanics.html">Market mechanics HTML</a>
+              <a class="source-link" href="../research-docs/smart-flow-architecture-review.md">Smart-flow architecture</a>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <footer>
+        Active scope comes from Beads plus the referenced phase document. Research reports are rationale until a phase doc pulls them into scope.
+      </footer>
+    </main>
+  </body>
+</html>

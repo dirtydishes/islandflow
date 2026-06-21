@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lightweight Charts Phase 04 Settings and Lower Pane</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --pane: #111820;
+        --pane-2: #0b1016;
+        --text: #e6edf4;
+        --dim: #90a0b2;
+        --faint: #6e7b8c;
+        --amber: #f5a623;
+        --green: #25c17a;
+        --red: #ff6b5f;
+        --border: #ffffff14;
+        --border-strong: #ffffff24;
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--sans);
+      }
+
+      main {
+        width: min(1120px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 34px 0 54px;
+      }
+
+      header,
+      section {
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+        background: var(--pane);
+      }
+
+      header {
+        padding: 20px;
+      }
+
+      section {
+        margin-top: 14px;
+        padding: 18px 20px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 760px;
+        font-family: var(--mono);
+        font-size: 1.35rem;
+        line-height: 1.18;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      h2,
+      .kicker {
+        color: var(--amber);
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h2 {
+        margin-bottom: 12px;
+      }
+
+      h3 {
+        margin: 14px 0 8px;
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      p,
+      li {
+        color: var(--dim);
+        font-size: 0.92rem;
+        line-height: 1.55;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+
+      li + li {
+        margin-top: 6px;
+      }
+
+      code {
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 0.85em;
+      }
+
+      .summary {
+        margin-top: 10px;
+        max-width: 82ch;
+      }
+
+      .meta,
+      .check-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 10px;
+      }
+
+      .chip,
+      .check {
+        border: 1px solid var(--border);
+        background: var(--pane-2);
+      }
+
+      .chip {
+        padding: 10px;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        color: var(--dim);
+        text-transform: uppercase;
+      }
+
+      .check {
+        padding: 12px;
+      }
+
+      .check strong {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--green);
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .check p {
+        margin-top: 7px;
+        font-size: 0.82rem;
+      }
+
+      .note {
+        margin-top: 10px;
+        color: var(--faint);
+        font-size: 0.82rem;
+      }
+
+      .diff-shell {
+        border: 1px solid var(--border-strong);
+        background: #05070a;
+        overflow: auto;
+      }
+
+      #rich-diff {
+        display: none;
+      }
+
+      .rich-diff-ready #rich-diff {
+        display: block;
+      }
+
+      .rich-diff-ready #fallback-diff {
+        display: none;
+      }
+
+      pre {
+        margin: 0;
+        padding: 14px;
+        color: var(--dim);
+        font-family: var(--mono);
+        font-size: 0.76rem;
+        line-height: 1.45;
+        white-space: pre-wrap;
+      }
+
+      @media (max-width: 720px) {
+        main {
+          width: min(100% - 20px, 1120px);
+          padding-top: 20px;
+        }
+
+        header,
+        section {
+          padding: 14px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="kicker">Turn documentation · June 21, 2026</div>
+        <h1>Lightweight charts phase 04: settings and lower-pane modes</h1>
+        <p class="summary">
+          Added reusable chart settings state, versioned persistence, price renderer selection,
+          lower-pane mode transforms, and a dashboard settings popover that stays inside viewport
+          bounds on desktop and mobile. Reviewer repair tightened smart-direction fallback semantics
+          and scoped all-flow chart inputs to the active ticker; the final pass also repaired a
+          Forgejo CI formatting failure in the added adapter regression test.
+        </p>
+      </header>
+
+      <section>
+        <h2>Scope</h2>
+        <div class="meta">
+          <div class="chip">Bead islandflow-mloi.4</div>
+          <div class="chip">Repair bead islandflow-5q6w</div>
+          <div class="chip">Branch lavender/lightweight-charts-phase-04-settings-lower-pane</div>
+          <div class="chip">Phase 04 only</div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Added a reusable settings reducer, normalization, and local storage boundary that recovers from malformed storage and drops unknown extension keys unless the owning section is registered.</li>
+          <li>Added price renderer registry support for standard candles and Heikin Ashi, with the chart controller applying the selected transform immediately.</li>
+          <li>Added lower-pane mode registry support for flow direction, all flow, and volume, backed by pure tested transforms.</li>
+          <li>Added <code>MarketChartSettings</code>, a fixed-position settings popover with segmented mode controls, checkbox toggles, timeframe favorite rows, Escape close, outside-click close, and reset.</li>
+          <li>Integrated settings into the terminal chart adapter while keeping terminal data and callbacks outside <code>features/market-chart</code>.</li>
+          <li>Reviewer repair: smart-direction bars now fall back to legacy smart-money per missing bucket, and all-flow lower-pane inputs are scoped to the active chart ticker before entering the reusable module.</li>
+          <li>Reviewer CI repair: formatted the new terminal adapter regression assertion so <code>bun run fmt:check</code> matches Forgejo CI.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Implementation Notes</h2>
+        <ul>
+          <li>The lower-pane smart direction mode prefers smart-flow projections per bucket and falls back to legacy smart-money only for buckets without smart-flow projections.</li>
+          <li>The terminal adapter keeps route-wide option and flow feeds out of a single-symbol chart by filtering all-flow packet and print inputs to <code>state.chartTicker</code>.</li>
+          <li>Directional bars use signed values and explicit labels such as <code>bullish flow direction</code> or <code>bearish flow direction</code>, so red and green are not the only signal.</li>
+          <li>The settings UI uses restrained terminal styling: flat internal sections, compact controls, amber active/focus states, and no card framing around the chart module.</li>
+          <li>The dashboard can pass settings capabilities to hide or disable unsupported extension controls without changing the core settings menu structure.</li>
+          <li>Forgejo CI initially failed at formatting after the reviewer repair commit; the final branch head passes the workflow command sequence locally.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Verification</h2>
+        <div class="check-grid">
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun test apps/web/features/market-chart/transforms/candles.test.ts apps/web/features/market-chart/transforms/lower-pane.test.ts apps/web/features/market-chart/transforms/settings.test.ts apps/web/features/market-chart/transforms/timeframes.test.ts</code>
+            <p>25 pass, 0 fail, 61 assertions.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code>
+            <p>92 pass, 0 fail, 205 assertions.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun --cwd=apps/web run build</code>
+            <p>Next.js production build and TypeScript check completed successfully.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>rg "features/terminal|TerminalState|ChartPane|terminal/" apps/web/features/market-chart -S</code>
+            <p>No matches.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun install --frozen-lockfile</code>
+            <p>Checked 571 installs across 601 packages, no changes.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun run fmt:check</code>
+            <p>Biome checked 260 files with no fixes applied.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun run lint</code>
+            <p>Biome checked 260 files with no fixes applied.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun run typecheck</code>
+            <p>All workspace TypeScript projects passed.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun test</code>
+            <p>345 pass, 0 fail, 1832 assertions.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun run check:public-api-routes</code>
+            <p>All expected public API route checks returned ok.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun run check:docker-workspace</code>
+            <p>Docker workspace snapshot is in sync.</p>
+          </div>
+        </div>
+        <p class="note">
+          Browser visual check used <code>bun run dev:web</code> at <code>http://localhost:3000/</code>.
+          Desktop 1440x900: settings trigger unique, fixed panel within viewport at <code>380x620</code>, no detected control overflow, Candles and Heikin Ashi switched active, Flow Direction and Volume switched active, and Escape closed the panel with focus returned to Settings.
+          Mobile 390x844: panel fixed inside viewport at <code>370x560</code>, settings trigger visible, no detected text overflow in panel controls, Candles and Volume switched active, and Escape closed the panel.
+          All Flow was disabled in this live visual session because no flow packets were available for the active chart scope; transform and adapter tests cover all-flow aggregation and ticker scoping.
+        </p>
+      </section>
+
+      <section>
+        <h2>PR Guidance</h2>
+        <p>
+          This is appropriately scoped as one Phase 04 PR. The reducer, transform tests, settings
+          UI, and dashboard adapter wiring need to be reviewed together because the behavior is
+          applied through one settings state shape. It does not include Phase 05 hover readout,
+          rounded bars, or visual hardening work.
+        </p>
+      </section>
+
+      <section>
+        <h2>Reviewer Focus</h2>
+        <ul>
+          <li>Check settings persistence semantics, especially unknown extension section handling.</li>
+          <li>Review lower-pane bucket aggregation choices for smart-flow, legacy fallback, all-flow packets, and option-print fallback.</li>
+          <li>Verify the fixed-position settings panel behavior in dashboard overflow contexts.</li>
+          <li>Confirm the smart-flow copy remains cautious and does not imply canonical hidden participant identity.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p class="note">
+          The page attempts to render the patch with browser-side <code>@pierre/diffs/react</code>
+          <code>PatchDiff</code>. The readable unified fallback remains visible if the rich renderer
+          is unavailable.
+        </p>
+        <div class="diff-shell">
+          <div id="rich-diff"></div>
+          <pre id="fallback-diff"><code>diff --git a/apps/web/features/market-chart/transforms/settings.ts b/apps/web/features/market-chart/transforms/settings.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/market-chart/transforms/settings.ts
+@@
++export const MARKET_CHART_SETTINGS_STORAGE_VERSION = 1;
++export const MARKET_CHART_SETTINGS_STORAGE_KEY = "islandflow.market-chart.settings.v1";
++
++export const normalizeMarketChartSettings = (input, context = {}) =&gt; {
++  // Normalizes price, lower pane, display, timeframe favorites, and extension sections.
++  // Unknown namespaced keys are ignored, and extension sections survive only when known.
++};
++
++export const reduceMarketChartSettings = (state, action, context = {}) =&gt; {
++  if (action.type === "reset") {
++    return normalizeMarketChartSettings(DEFAULT_MARKET_CHART_SETTINGS, context);
++  }
++  // Handles price renderer, lower-pane mode, display toggles, interval, favorites, sections.
++};
++
++export const readMarketChartSettings = (storage, context = {}) =&gt; {
++  try {
++    const raw = storage?.getItem(MARKET_CHART_SETTINGS_STORAGE_KEY);
++    const parsed = raw ? JSON.parse(raw) : null;
++    return parsed?.version === MARKET_CHART_SETTINGS_STORAGE_VERSION
++      ? normalizeMarketChartSettings(parsed.settings, context)
++      : normalizeMarketChartSettings(DEFAULT_MARKET_CHART_SETTINGS, context);
++  } catch {
++    return normalizeMarketChartSettings(DEFAULT_MARKET_CHART_SETTINGS, context);
++  }
++};
+
+diff --git a/apps/web/features/market-chart/transforms/lower-pane.ts b/apps/web/features/market-chart/transforms/lower-pane.ts
+--- a/apps/web/features/market-chart/transforms/lower-pane.ts
++++ b/apps/web/features/market-chart/transforms/lower-pane.ts
+@@
++export const buildSmartDirectionBars = (projections, smartMoneyEvents, buckets) =&gt; {
++  return {
++    id: "smart-direction",
++    label: "Flow Direction",
++    kind: "signed-direction",
++    points: bucketRanges(toBuckets(buckets, [])).map(({ bucket, start, end }) =&gt; {
++      const bucketProjections = projections.filter((item) =&gt; item.source_ts &gt;= start &amp;&amp; item.source_ts &lt; end);
++      const source = bucketProjections.length
++        ? bucketProjections
++        : smartMoneyEvents.filter((item) =&gt; item.source_ts &gt;= start &amp;&amp; item.source_ts &lt; end);
++      const signed = source.reduce((sum, item) =&gt; sum + magnitude(item) * directionSign(item), 0);
++      return { time: bucket.time, timestampMs: bucket.timestampMs, value: signed, label: "flow direction" };
++    })
++  };
++};
++
++export const MARKET_CHART_LOWER_PANE_MODE_REGISTRY = [
++  { id: "smart-direction", label: "Flow Direction", transformId: "buildSmartDirectionBars" },
++  { id: "all-flow", label: "All Flow", transformId: "buildAllFlowBars" },
++  { id: "volume", label: "Volume", transformId: "buildVolumeBars" }
++];
+
+diff --git a/apps/web/features/market-chart/components/MarketChartSettings.tsx b/apps/web/features/market-chart/components/MarketChartSettings.tsx
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/market-chart/components/MarketChartSettings.tsx
+@@
++export const MarketChartSettings = ({ settings, availableData, timeframeItems, onAction, capabilities }) =&gt; {
++  const [open, setOpen] = useState(false);
++  const [position, setPosition] = useState({ top: 0, left: 0 });
++  // Fixed-position panel escapes chart overflow, closes on Escape and outside pointerdown.
++  return (
++    &lt;div className="market-chart-settings"&gt;
++      &lt;button className={`market-chart-settings-trigger${open ? " is-active" : ""}`}&gt;Settings&lt;/button&gt;
++      {open ? (
++        &lt;div className="market-chart-settings-panel" role="dialog" aria-label="Chart settings" style={position}&gt;
++          &lt;section&gt;Price Chart segmented controls&lt;/section&gt;
++          &lt;section&gt;Lower Chart segmented controls&lt;/section&gt;
++          &lt;section&gt;Timeframe favorite rows&lt;/section&gt;
++          &lt;section&gt;Display checkboxes&lt;/section&gt;
++        &lt;/div&gt;
++      ) : null}
++    &lt;/div&gt;
++  );
++};
+
+diff --git a/apps/web/features/terminal/chart-adapter.tsx b/apps/web/features/terminal/chart-adapter.tsx
+--- a/apps/web/features/terminal/chart-adapter.tsx
++++ b/apps/web/features/terminal/chart-adapter.tsx
+@@
++const { settings, dispatch: dispatchSettings } = useMarketChartSettings({
++  storage: settingsStorage,
++  capabilities: settingsCapabilities,
++  supportedIntervalMs: SUPPORTED_CANDLE_INTERVAL_MS
++});
++
++const lowerPaneInput = buildTerminalLowerPaneInput({
++  chartTicker: state.chartTicker,
++  candles: normalizedCandles,
++  smartFlowProjections: state.chartSmartFlowProjections,
++  smartMoneyEvents: state.chartSmartMoneyEvents,
++  flowPackets: state.flow.items,
++  optionPrints: state.options.items
++});
++const resolvedLowerPaneMode = resolveLowerPaneMode(settings, getLowerPaneAvailableData(lowerPaneInput));
++const lowerSeries = buildLowerPaneSeries(resolvedLowerPaneMode, lowerPaneInput);
++
++&lt;MarketChartSettings
++  settings={settings}
++  availableData={lowerPaneAvailableData}
++  timeframeItems={timeframeModel.dropdownItems}
++  capabilities={settingsCapabilities}
++  onAction={dispatchSettings}
++/&gt;
++&lt;MarketChart
++  candles={normalizedCandles}
++  lowerSeries={lowerSeries}
++  settings={chartSettings}
++/&gt;
+
+diff --git a/apps/web/app/globals.css b/apps/web/app/globals.css
+--- a/apps/web/app/globals.css
++++ b/apps/web/app/globals.css
+@@
++.market-chart-settings-panel {
++  position: fixed;
++  z-index: 80;
++  width: min(380px, calc(100vw - 20px));
++  max-height: min(78vh, 620px);
++  overflow: auto;
++  border: 1px solid var(--border-strong);
++  border-radius: 8px;
++  background: oklch(0.15 0.012 250 / 0.98);
++  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.42);
++}
++@media (max-width: 720px) {
++  .market-chart-settings-trigger { width: 100%; }
++  .market-chart-settings-panel { width: calc(100vw - 20px); max-height: min(72vh, 560px); }
++}</code></pre>
+        </div>
+      </section>
+    </main>
+
+    <script type="text/plain" id="patch-source">diff --git a/apps/web/features/market-chart/transforms/settings.ts b/apps/web/features/market-chart/transforms/settings.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/market-chart/transforms/settings.ts
+@@
++export const MARKET_CHART_SETTINGS_STORAGE_VERSION = 1;
++export const MARKET_CHART_SETTINGS_STORAGE_KEY = "islandflow.market-chart.settings.v1";
++export const normalizeMarketChartSettings = (input, context = {}) =&gt; ({ /* normalized settings */ });
++export const reduceMarketChartSettings = (state, action, context = {}) =&gt; ({ /* reduced settings */ });
++export const readMarketChartSettings = (storage, context = {}) =&gt; ({ /* versioned safe read */ });
+
+diff --git a/apps/web/features/market-chart/transforms/lower-pane.ts b/apps/web/features/market-chart/transforms/lower-pane.ts
+--- a/apps/web/features/market-chart/transforms/lower-pane.ts
++++ b/apps/web/features/market-chart/transforms/lower-pane.ts
+@@
++export const buildSmartDirectionBars = (projections, smartMoneyEvents, buckets) =&gt; {
++  // Smart-flow wins per bucket; legacy smart-money only fills buckets without smart-flow.
++};
++export const buildAllFlowBars = (flowPackets, optionPrints, buckets) =&gt; ({ id: "all-flow", label: "All Flow" });
++export const buildVolumeBars = (candles) =&gt; ({ id: "volume", label: "Volume" });
++export const MARKET_CHART_LOWER_PANE_MODE_REGISTRY = [
++  { id: "smart-direction", label: "Flow Direction" },
++  { id: "all-flow", label: "All Flow" },
++  { id: "volume", label: "Volume" }
++];
+
+diff --git a/apps/web/features/market-chart/components/MarketChartSettings.tsx b/apps/web/features/market-chart/components/MarketChartSettings.tsx
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/market-chart/components/MarketChartSettings.tsx
+@@
++export const MarketChartSettings = ({ settings, availableData, timeframeItems, onAction, capabilities }) =&gt; (
++  &lt;div className="market-chart-settings"&gt;
++    &lt;button className="market-chart-settings-trigger"&gt;Settings&lt;/button&gt;
++    &lt;div className="market-chart-settings-panel" role="dialog" aria-label="Chart settings"&gt;...&lt;/div&gt;
++  &lt;/div&gt;
++);
+
+diff --git a/apps/web/features/terminal/chart-adapter.tsx b/apps/web/features/terminal/chart-adapter.tsx
+--- a/apps/web/features/terminal/chart-adapter.tsx
++++ b/apps/web/features/terminal/chart-adapter.tsx
+@@
++const { settings, dispatch: dispatchSettings } = useMarketChartSettings({ storage: settingsStorage, capabilities: settingsCapabilities });
++const lowerPaneInput = buildTerminalLowerPaneInput({ chartTicker: state.chartTicker, candles: normalizedCandles, flowPackets: state.flow.items, optionPrints: state.options.items });
++const resolvedLowerPaneMode = resolveLowerPaneMode(settings, lowerPaneAvailableData);
++const lowerSeries = buildLowerPaneSeries(resolvedLowerPaneMode, lowerPaneInput);
++&lt;MarketChartSettings settings={settings} onAction={dispatchSettings} /&gt;
++&lt;MarketChart lowerSeries={lowerSeries} settings={chartSettings} /&gt;</script>
+    <script type="module">
+      const source = document.getElementById("patch-source")?.textContent ?? "";
+      const target = document.getElementById("rich-diff");
+      try {
+        const React = await import("react");
+        const { createRoot } = await import("react-dom/client");
+        const { PatchDiff } = await import("@pierre/diffs/react");
+        createRoot(target).render(React.createElement(PatchDiff, { patch: source }));
+        document.documentElement.classList.add("rich-diff-ready");
+      } catch (error) {
+        target.textContent = "Rich diff renderer unavailable in this static context; showing unified fallback.";
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "name": "@islandflow/synthetic-market",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./cli": "./src/cli.ts",
+    "./fixtures": "./src/fixtures.ts",
+    "./manifest": "./src/manifest.ts",
+    "./profiles": "./src/profiles.ts",
+    "./scenarios": "./src/scenarios.ts"
+  },
+  "scripts": {
+    "generate-fixture": "bun run src/cli.ts"
+  },
+  "dependencies": {
+    "@islandflow/types": "workspace:*"
+  }
+}

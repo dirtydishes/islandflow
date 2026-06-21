@@ -27,7 +27,8 @@
     "typecheck": "bun run scripts/typecheck.ts",
     "check:public-api-routes": "bun run scripts/check-public-api-routes.ts",
     "sync:docker-workspace": "bun run scripts/sync-docker-workspace.ts",
-    "check:docker-workspace": "bun run scripts/check-docker-workspace.ts"
+    "check:docker-workspace": "bun run scripts/check-docker-workspace.ts",
+    "synthetic:fixture": "bun --cwd=packages/synthetic-market run generate-fixture"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.16",
@@ -38,8 +39,8 @@
   },
   "overrides": {
     "postcss": "^8.5.15",
-    "tar": "^7.5.15",
-    "tmp": "^0.2.5",
+    "tar": "^7.5.16",
+    "tmp": "^0.2.6",
     "@electron/node-gyp": "^10.2.0-electron.2"
   },
   "dependencies": {

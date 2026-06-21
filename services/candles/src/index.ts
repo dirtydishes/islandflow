@@ -20,6 +20,7 @@ import { EquityCandleSchema, EquityPrintSchema, type EquityCandle } from "@islan
 import { createClient } from "redis";
 import { z } from "zod";
 import { CandleAggregator, parseIntervals } from "./aggregator";
+import { DEFAULT_CANDLE_INTERVALS_ENV, DEFAULT_CANDLE_INTERVALS_MS } from "./config";
 
 const service = "candles";
 const logger = createLogger({ service });
@@ -30,7 +31,7 @@ const envSchema = z.object({
   CLICKHOUSE_URL: z.string().default("http://127.0.0.1:8123"),
   CLICKHOUSE_DATABASE: z.string().default("default"),
   REDIS_URL: z.string().default("redis://127.0.0.1:6379"),
-  CANDLE_INTERVALS_MS: z.string().default("60000,300000"),
+  CANDLE_INTERVALS_MS: z.string().default(DEFAULT_CANDLE_INTERVALS_ENV),
   CANDLE_MAX_LATE_MS: z.coerce.number().int().nonnegative().default(0),
   CANDLE_CACHE_LIMIT: z.coerce.number().int().nonnegative().default(2000),
   CANDLE_DELIVER_POLICY: z.enum(["new", "all", "last", "last_per_subject"]).default("new"),
@@ -220,7 +221,7 @@ const emitCandle = async (
 const run = async () => {
   logger.info("service starting");
 
-  const intervalsMs = parseIntervals(env.CANDLE_INTERVALS_MS, [60000, 300000]);
+  const intervalsMs = parseIntervals(env.CANDLE_INTERVALS_MS, [...DEFAULT_CANDLE_INTERVALS_MS]);
   if (intervalsMs.length === 0) {
     throw new Error("CANDLE_INTERVALS_MS produced no valid intervals");
   }

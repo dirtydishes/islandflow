@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { OptionNbboSideSchema, OptionTypeSchema, OptionsSignalModeSchema } from "./options-flow";
+import { OptionNbboSideSchema, OptionsSignalModeSchema, OptionTypeSchema } from "./options-flow";
 
 export const EventMetaSchema = z.object({
   source_ts: z.number().int().nonnegative(),
@@ -280,6 +280,10 @@ export const SmartMoneyProfileScoreSchema = z.object({
 
 export type SmartMoneyProfileScore = z.infer<typeof SmartMoneyProfileScoreSchema>;
 
+/**
+ * Compatibility event shape for the current smart-money feeds.
+ * Canonical inference language lives in smart-flow contracts.
+ */
 export const SmartMoneyEventSchema = EventMetaSchema.merge(
   z.object({
     event_id: z.string().min(1),

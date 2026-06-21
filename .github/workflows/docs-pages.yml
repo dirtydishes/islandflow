@@ -20,35 +20,57 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    env:
+      PAGES_BRANCH: gh-pages
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
 
       - name: Build docs index
         run: node scripts/generate-docs-index.mjs
 
       - name: Prepare static site payload
         run: |
+          rm -rf site
           mkdir -p site/docs
           cp -R docs/. site/docs/
+          find site -name .DS_Store -delete
           printf '%s\n' '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=https://dirtydishes.github.io/islandflow/docs/"><title>Islandflow Docs</title><a href="https://dirtydishes.github.io/islandflow/docs/">Continue to docs</a>' > site/index.html
           touch site/.nojekyll
 
-      - name: Publish to gh-pages branch
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Checkout Pages branch
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ env.PAGES_BRANCH }}
+          path: pages
+          fetch-depth: 0
+
+      - name: Mirror docs into Pages branch
         run: |
           set -euo pipefail
-          rm -rf .gh-pages-tmp
-          mkdir .gh-pages-tmp
-          cp -R site/. .gh-pages-tmp/
-          cd .gh-pages-tmp
+          find pages -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -R site/. pages/
+          touch pages/.nojekyll
 
-          git init
-          git checkout -b gh-pages
+      - name: Commit and push Pages branch
+        run: |
+          set -euo pipefail
+          cd pages
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "publish docs from ${GITHUB_SHA}"
 
-          git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages:gh-pages
+          if git diff --cached --quiet; then
+            echo "No docs changes to publish."
+            exit 0
+          fi
+
+          git commit -m "publish docs from ${GITHUB_SHA}"
+          git push origin "HEAD:${PAGES_BRANCH}"

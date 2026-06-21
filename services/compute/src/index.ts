@@ -1,102 +1,102 @@
-import { readEnv } from "@islandflow/config";
-import { createLogger } from "@islandflow/observability";
 import {
-  createEmptyEventCalendarProvider,
-  loadEventCalendarProviderFromFile,
-  type EventCalendarProvider
-} from "@islandflow/refdata/event-calendar";
-import {
-  SUBJECT_ALERTS,
-  SUBJECT_CLASSIFIER_HITS,
-  SUBJECT_EQUITY_JOINS,
-  SUBJECT_EQUITY_PRINTS,
-  SUBJECT_EQUITY_QUOTES,
-  SUBJECT_INFERRED_DARK,
-  SUBJECT_FLOW_PACKETS,
-  SUBJECT_SMART_MONEY_EVENTS,
-  SUBJECT_OPTION_NBBO,
-  SUBJECT_OPTION_SIGNAL_PRINTS,
+  buildDurableConsumer,
+  connectJetStreamWithRetry,
+  ensureKnownStreams,
+  publishJson,
   STREAM_ALERTS,
   STREAM_CLASSIFIER_HITS,
   STREAM_EQUITY_JOINS,
   STREAM_EQUITY_PRINTS,
   STREAM_EQUITY_QUOTES,
-  STREAM_INFERRED_DARK,
   STREAM_FLOW_PACKETS,
-  STREAM_SMART_MONEY_EVENTS,
+  STREAM_INFERRED_DARK,
   STREAM_OPTION_NBBO,
   STREAM_OPTION_SIGNAL_PRINTS,
-  buildDurableConsumer,
-  connectJetStreamWithRetry,
-  ensureKnownStreams,
-  publishJson,
+  STREAM_SMART_MONEY_EVENTS,
+  SUBJECT_ALERTS,
+  SUBJECT_CLASSIFIER_HITS,
+  SUBJECT_EQUITY_JOINS,
+  SUBJECT_EQUITY_PRINTS,
+  SUBJECT_EQUITY_QUOTES,
+  SUBJECT_FLOW_PACKETS,
+  SUBJECT_INFERRED_DARK,
+  SUBJECT_OPTION_NBBO,
+  SUBJECT_OPTION_SIGNAL_PRINTS,
+  SUBJECT_SMART_MONEY_EVENTS,
   subscribeJson
 } from "@islandflow/bus";
+import { readEnv } from "@islandflow/config";
+import { createLogger } from "@islandflow/observability";
 import {
-  createClickHouseClient,
-  ensureAlertsTable,
-  ensureClassifierHitsTable,
-  ensureEquityPrintJoinsTable,
-  ensureInferredDarkTable,
-  ensureFlowPacketsTable,
-  ensureSmartMoneyEventsTable,
+  createEmptyEventCalendarProvider,
+  type EventCalendarProvider,
+  loadEventCalendarProviderFromFile
+} from "@islandflow/refdata/event-calendar";
+import {
   ClickHouseBatchWriter,
+  createClickHouseClient,
   enqueueAlertInsert,
   enqueueClassifierHitInsert,
   enqueueEquityPrintJoinInsert,
   enqueueFlowPacketInsert,
   enqueueInferredDarkInsert,
-  enqueueSmartMoneyEventInsert
+  enqueueSmartMoneyEventInsert,
+  ensureAlertsTable,
+  ensureClassifierHitsTable,
+  ensureEquityPrintJoinsTable,
+  ensureFlowPacketsTable,
+  ensureInferredDarkTable,
+  ensureSmartMoneyEventsTable
 } from "@islandflow/storage";
 import {
+  type AlertEvent,
   AlertEventSchema,
+  type ClassifierHitEvent,
   ClassifierHitEventSchema,
+  type EquityPrint,
+  type EquityPrintJoin,
   EquityPrintJoinSchema,
   EquityPrintSchema,
-  EquityQuoteSchema,
-  InferredDarkEventSchema,
-  FlowPacketSchema,
-  SmartMoneyEventSchema,
-  OptionNBBOSchema,
-  OptionPrintSchema,
-  type AlertEvent,
-  type ClassifierHitEvent,
-  type EquityPrint,
   type EquityQuote,
-  type EquityPrintJoin,
-  type InferredDarkEvent,
+  EquityQuoteSchema,
   type FlowPacket,
-  type SmartMoneyEvent,
+  FlowPacketSchema,
+  type InferredDarkEvent,
+  InferredDarkEventSchema,
   type OptionNBBO,
-  type OptionPrint
+  OptionNBBOSchema,
+  type OptionPrint,
+  OptionPrintSchema,
+  type SmartMoneyEvent,
+  SmartMoneyEventSchema
 } from "@islandflow/types";
 import { z } from "zod";
+import { scoreAlert } from "./alert-scoring";
 import type { ClassifierConfig } from "./classifiers";
+import { parseContractId } from "./contracts";
+import {
+  createDarkInferenceState,
+  type DarkInferenceConfig,
+  evaluateDarkInferences
+} from "./dark-inference";
+import { buildEquityPrintJoin, type EquityQuoteJoin } from "./equity-joins";
 import {
   buildSmartMoneyEventFromPacket,
   deriveClassifierHitsFromSmartMoneyEvent
 } from "./parent-events";
-import { parseContractId } from "./contracts";
-import {
-  createDarkInferenceState,
-  evaluateDarkInferences,
-  type DarkInferenceConfig
-} from "./dark-inference";
-import { buildEquityPrintJoin, type EquityQuoteJoin } from "./equity-joins";
 import {
   createRedisClient,
-  RollingWindowStore,
   type RollingStatsConfig,
+  RollingWindowStore,
   type RollingWindowStoreConfig
 } from "./rolling-stats";
-import { summarizeStructure, type ContractLeg } from "./structures";
 import {
   buildStructureFlowPacket,
+  type LegEvidence,
   planStructurePacket,
-  shouldEmitStructurePacket,
-  type LegEvidence
+  shouldEmitStructurePacket
 } from "./structure-packets";
-import { scoreAlert } from "./alert-scoring";
+import { type ContractLeg, summarizeStructure } from "./structures";
 
 const service = "compute";
 const logger = createLogger({ service });
@@ -916,6 +916,9 @@ const flushCluster = async (
   }
   if (cluster.specialPrintCount > 0) {
     features.special_print_count = cluster.specialPrintCount;
+  }
+  if (cluster.lastExecutionIv !== null) {
+    features.execution_iv = roundTo(cluster.lastExecutionIv);
   }
   if (cluster.minExecutionIv !== null && cluster.maxExecutionIv !== null) {
     features.execution_iv_shock = roundTo(

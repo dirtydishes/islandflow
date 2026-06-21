@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Smart Money / Smart Flow Roadmap</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #111820;
+        --panel-2: #0d141b;
+        --ink: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --line: rgba(255, 255, 255, 0.12);
+        --line-strong: rgba(77, 163, 255, 0.34);
+        --blue: #4da3ff;
+        --blue-soft: rgba(77, 163, 255, 0.12);
+        --amber-soft: rgba(245, 166, 35, 0.13);
+        --green-soft: rgba(37, 193, 122, 0.12);
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at 16% 0%, rgba(77, 163, 255, 0.1), transparent 26rem),
+          linear-gradient(180deg, rgba(17, 24, 32, 0.9), rgba(6, 8, 11, 0.98) 28rem),
+          var(--bg);
+        color: var(--ink);
+        font: 15px/1.6 var(--sans);
+      }
+
+      a {
+        color: inherit;
+      }
+
+      main {
+        width: min(1180px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 340px;
+        gap: 28px;
+        align-items: end;
+        padding-bottom: 28px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .kicker,
+      .label,
+      .chip,
+      th,
+      .toc-title,
+      .phase-id {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .kicker,
+      .label,
+      .phase-id {
+        color: var(--blue);
+      }
+
+      h1,
+      h2,
+      h3 {
+        text-wrap: balance;
+      }
+
+      h1 {
+        max-width: 820px;
+        margin: 0;
+        font-size: 2.35rem;
+        line-height: 1.08;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        margin: 0 0 14px;
+        font-family: var(--mono);
+        font-size: 0.92rem;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+      }
+
+      h3 {
+        margin: 0;
+        font-size: 1rem;
+        line-height: 1.25;
+      }
+
+      p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      p + p {
+        margin-top: 10px;
+      }
+
+      strong {
+        color: var(--ink);
+      }
+
+      code {
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        border-radius: 6px;
+        padding: 0.1rem 0.32rem;
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--ink);
+        font-family: var(--mono);
+        font-size: 0.9em;
+      }
+
+      .summary {
+        max-width: 75ch;
+        margin-top: 18px;
+        color: var(--muted);
+        font-size: 1rem;
+        text-wrap: pretty;
+      }
+
+      .meta,
+      .link-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .meta {
+        margin-top: 20px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 5px 10px;
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--muted);
+        white-space: nowrap;
+        text-decoration: none;
+      }
+
+      .chip.primary {
+        border-color: var(--line-strong);
+        background: var(--blue-soft);
+        color: #b8dcff;
+      }
+
+      .chip.good {
+        border-color: rgba(37, 193, 122, 0.34);
+        background: var(--green-soft);
+        color: #a8f1ce;
+      }
+
+      .decision,
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: linear-gradient(180deg, rgba(17, 24, 32, 0.94), rgba(13, 20, 27, 0.94));
+      }
+
+      .decision {
+        border-color: var(--line-strong);
+        padding: 18px;
+        background:
+          linear-gradient(180deg, rgba(77, 163, 255, 0.14), rgba(17, 24, 32, 0.92)),
+          var(--panel);
+      }
+
+      .decision strong {
+        display: block;
+        margin-top: 8px;
+        font-size: 1.18rem;
+        line-height: 1.25;
+      }
+
+      .decision p {
+        margin-top: 10px;
+      }
+
+      .toc {
+        margin-top: 28px;
+        padding: 14px 0;
+        border-block: 1px solid var(--line);
+      }
+
+      .toc-title {
+        margin: 0 0 10px;
+        color: var(--faint);
+      }
+
+      .toc nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .toc a {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 7px 10px;
+        background: rgba(255, 255, 255, 0.035);
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 0.75rem;
+        text-decoration: none;
+      }
+
+      section {
+        margin-top: 30px;
+      }
+
+      .panel-body {
+        padding: 18px;
+      }
+
+      .grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .grid.two {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+
+      table {
+        width: 100%;
+        min-width: 820px;
+        border-collapse: collapse;
+        background: rgba(255, 255, 255, 0.025);
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 11px 12px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--faint);
+        background: rgba(255, 255, 255, 0.035);
+      }
+
+      td {
+        color: var(--muted);
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .compact-list {
+        margin: 0;
+        padding-left: 1.1rem;
+      }
+
+      .compact-list li {
+        margin: 7px 0;
+        color: var(--muted);
+      }
+
+      .phase-stack {
+        display: grid;
+        gap: 10px;
+      }
+
+      .phase {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 13px;
+        background: rgba(255, 255, 255, 0.035);
+      }
+
+      .phase h3 {
+        margin-top: 5px;
+      }
+
+      .phase p {
+        margin-top: 6px;
+      }
+
+      footer {
+        margin-top: 36px;
+        border-top: 1px solid var(--line);
+        padding-top: 16px;
+        color: var(--faint);
+        font-family: var(--mono);
+        font-size: 0.78rem;
+      }
+
+      @media (max-width: 900px) {
+        .hero,
+        .grid.two {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 640px) {
+        main {
+          width: min(100% - 24px, 1180px);
+          padding-top: 24px;
+        }
+
+        h1 {
+          font-size: 1.72rem;
+        }
+
+        .panel-body,
+        .decision {
+          padding: 15px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="hero">
+        <div>
+          <p class="kicker">Smart Flow Roadmap</p>
+          <h1>Smart Money / Smart Flow Roadmap</h1>
+          <p class="summary">
+            Implementation-sized phases for turning smart-money detection into smart-flow inference:
+            observations, evidence clusters, cautious hypotheses, confidence, alternatives, abstention,
+            replay evaluation, and user-facing insight projections.
+          </p>
+          <div class="meta">
+            <span class="chip primary">Beads islandflow-zxh</span>
+            <span class="chip good">Recommended: Option B</span>
+            <span class="chip">MVP before calibration</span>
+          </div>
+        </div>
+        <aside class="decision">
+          <span class="label">Scope Rule</span>
+          <strong>Research is rationale. Beads and phase docs define implementation scope.</strong>
+          <p>Do not treat smart money as a canonical fact emitted by the system.</p>
+        </aside>
+      </header>
+
+      <div class="toc" aria-label="Table of contents">
+        <p class="toc-title">Jump to</p>
+        <nav>
+          <a href="#links">Linked Docs</a>
+          <a href="#constraints">Core Constraints</a>
+          <a href="#sequence">Phase Sequence</a>
+          <a href="#splits">PR Splits</a>
+          <a href="#epic">Matching Epic</a>
+        </nav>
+      </div>
+
+      <section id="links">
+        <h2>Linked Docs</h2>
+        <div class="grid two">
+          <article class="panel">
+            <div class="panel-body">
+              <h3>Active Implementation Set</h3>
+              <p>Use these while planning or implementing smart-flow phase work.</p>
+              <div class="link-row">
+                <a class="chip primary" href="../index.html">Implementation overview</a>
+                <a class="chip" href="index.html">Full phase dossier</a>
+                <a class="chip" href="00-roadmap.md">Roadmap Markdown</a>
+              </div>
+            </div>
+          </article>
+          <article class="panel">
+            <div class="panel-body">
+              <h3>Background Plans</h3>
+              <p>These explain rationale, but do not add scope unless pulled into a phase doc and Beads issue.</p>
+              <div class="link-row">
+                <a class="chip" href="../../plans/smart-flow-architecture-review.html">Architecture HTML</a>
+                <a class="chip" href="../../plans/smart-flow-architecture-review.md">Architecture Markdown</a>
+                <a class="chip" href="../../research-docs/smart-flow-market-mechanics.md">Market mechanics research</a>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="constraints">
+        <h2>Core Constraints</h2>
+        <div class="panel">
+          <div class="panel-body">
+            <ul class="compact-list">
+              <li>Do not treat "smart money" as a canonical fact emitted by the system.</li>
+              <li>Distinguish direct facts, evidence, hypotheses, confidence, alternatives, and abstention.</li>
+              <li>Preserve evidence and uncertainty in storage, API, websocket, and UI surfaces.</li>
+              <li>Keep Redis as hot cache only, not hidden baseline truth.</li>
+              <li>Make replay evaluation the acceptance gate before expanding UI confidence.</li>
+              <li>Keep historical or research-grade calibration as future work, not an MVP dependency.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="sequence">
+        <h2>Phase Sequence</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Phase</th>
+                <th>Beads issue</th>
+                <th>Depends on</th>
+                <th>Purpose</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>01 - Contracts and vocabulary</td><td><code>islandflow-zxh.1</code></td><td>None; safe parallel with <code>islandflow-259.1</code></td><td>Define evidence/hypothesis/insight contracts and retire canonical overconfidence.</td></tr>
+              <tr><td>02 - Evidence clustering and features</td><td><code>islandflow-zxh.2</code></td><td><code>islandflow-259.2</code></td><td>Extract eligibility, evidence facts, clusters, and traceable features.</td></tr>
+              <tr><td>03 - Hypothesis scoring and abstention</td><td><code>islandflow-zxh.3</code></td><td><code>islandflow-259.3</code></td><td>Score cautious hypotheses and represent abstention/alternatives.</td></tr>
+              <tr><td>04 - Replay evaluation and golden tests</td><td><code>islandflow-zxh.4</code></td><td><code>islandflow-259.4</code></td><td>Validate derived outputs through deterministic replay and golden fixtures.</td></tr>
+              <tr><td>05 - API/UI explainability</td><td><code>islandflow-zxh.5</code></td><td><code>islandflow-259.5</code></td><td>Expose evidence-backed insights and uncertainty to API, WS, and UI.</td></tr>
+              <tr><td>99 - Future calibration</td><td><code>islandflow-zxh.6</code></td><td><code>islandflow-zxh.5</code>, <code>islandflow-259.6</code></td><td>Calibrate confidence and policy behavior later with richer datasets.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="splits">
+        <h2>PR Split Notes</h2>
+        <div class="phase-stack">
+          <article class="phase">
+            <span class="phase-id">Phase 02a</span>
+            <h3><code>islandflow-zxh.2.1</code> - Eligibility and evidence facts</h3>
+            <p>Split out the direct fact and eligibility layer before clustering and feature vector work.</p>
+          </article>
+          <article class="phase">
+            <span class="phase-id">Phase 02b</span>
+            <h3><code>islandflow-zxh.2.2</code> - Clustering and feature vectors</h3>
+            <p>Keep clustering and feature vector changes reviewable after the evidence vocabulary exists.</p>
+          </article>
+          <article class="phase">
+            <span class="phase-id">Phase 03a</span>
+            <h3><code>islandflow-zxh.3.1</code> - Hypothesis score vectors</h3>
+            <p>Build scoring as a separate semantic layer, not as UI-ready certainty.</p>
+          </article>
+          <article class="phase">
+            <span class="phase-id">Phase 03b</span>
+            <h3><code>islandflow-zxh.3.2</code> - Abstention and insight projection</h3>
+            <p>Represent alternatives, penalties, and abstention before exposing user-facing insight projections.</p>
+          </article>
+          <article class="phase">
+            <span class="phase-id">Phase 05a</span>
+            <h3><code>islandflow-zxh.5.1</code> - Evidence API and websocket surfaces</h3>
+            <p>Expose evidence-backed contracts through transport before tuning the presentation layer.</p>
+          </article>
+          <article class="phase">
+            <span class="phase-id">Phase 05b</span>
+            <h3><code>islandflow-zxh.5.2</code> - UI explainability surfaces</h3>
+            <p>Show evidence quality, confidence vs conviction, alternatives, abstention, and catalyst/noise context.</p>
+          </article>
+        </div>
+        <p class="summary">
+          If an implementation PR crosses contracts, compute, storage, API, and UI in one change, stop and split it.
+        </p>
+      </section>
+
+      <section id="epic">
+        <h2>Matching Beads Epic</h2>
+        <div class="panel">
+          <div class="panel-body">
+            <p><code>islandflow-zxh</code> - Plan smart-money to smart-flow implementation phases.</p>
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        HTML companion for docs/implementation/smart-money/00-roadmap.md. Source Markdown remains the active editable document.
+      </footer>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Smart-Flow Evidence API And Websocket Surfaces</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #111820;
+        --panel-2: #0d141b;
+        --line: rgba(230, 237, 244, 0.14);
+        --line-strong: rgba(245, 166, 35, 0.34);
+        --text: #e6edf4;
+        --muted: #9baabb;
+        --faint: #718092;
+        --amber: #f5a623;
+        --green: #25c17a;
+        --red: #ff6b5f;
+        --blue: #4da3ff;
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          linear-gradient(180deg, rgba(17, 24, 32, 0.82), rgba(6, 8, 11, 1) 460px),
+          var(--bg);
+        color: var(--text);
+        font-family: var(--sans);
+        line-height: 1.55;
+      }
+
+      main {
+        width: min(1080px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 36px 0 56px;
+      }
+
+      header {
+        padding: 22px 0 20px;
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      .kicker,
+      h2,
+      .meta,
+      th,
+      code,
+      pre {
+        font-family: var(--mono);
+      }
+
+      .kicker {
+        margin: 0 0 8px;
+        color: var(--amber);
+        font-size: 0.76rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        max-width: 900px;
+        font-size: 2.2rem;
+        line-height: 1.12;
+        letter-spacing: 0;
+        text-wrap: balance;
+      }
+
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 18px;
+        color: var(--muted);
+        font-size: 0.78rem;
+      }
+
+      .pill {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 4px 9px;
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      section {
+        padding: 24px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      h2 {
+        margin: 0 0 12px;
+        color: var(--amber);
+        font-size: 0.92rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      p {
+        max-width: 78ch;
+        margin: 0 0 12px;
+        color: var(--muted);
+      }
+
+      strong {
+        color: var(--text);
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+        color: var(--muted);
+      }
+
+      li + li {
+        margin-top: 7px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        border: 1px solid var(--line);
+      }
+
+      th,
+      td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--text);
+        background: var(--panel);
+        font-size: 0.72rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      td {
+        color: var(--muted);
+      }
+
+      .callout {
+        border: 1px solid var(--line-strong);
+        background: rgba(245, 166, 35, 0.08);
+        padding: 14px 16px;
+      }
+
+      .ok {
+        color: var(--green);
+      }
+
+      .warn {
+        color: var(--amber);
+      }
+
+      .risk {
+        color: var(--red);
+      }
+
+      pre {
+        margin: 12px 0 0;
+        padding: 14px;
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        background: #070b10;
+        color: #dce6f0;
+        font-size: 0.78rem;
+        line-height: 1.5;
+      }
+
+      .diff-add {
+        color: #9cf0c2;
+      }
+
+      .diff-del {
+        color: #ff9d96;
+      }
+
+      .diff-head {
+        color: #79bfff;
+      }
+
+      .diff-hunk {
+        color: #f5c56c;
+      }
+
+      a {
+        color: var(--blue);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="kicker">Islandflow Turn Record</p>
+        <h1>Smart-flow explainability is now exposed through API and websocket surfaces.</h1>
+        <div class="meta">
+          <span class="pill">2026-06-18 19:32</span>
+          <span class="pill">Beads: islandflow-zxh.5.1</span>
+          <span class="pill">Branch: lavender/smart-flow-evidence-api-websocket</span>
+        </div>
+      </header>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          Added a canonical smart-flow explainability projection and exposed it through recent,
+          history, replay, one-channel websocket, and <code>/ws/live</code> subscription surfaces.
+          The payload includes version metadata, refs, evidence handles, hypothesis and insight
+          objects, alternatives, and abstention details.
+        </p>
+        <p>
+          Existing raw smart-money routes and websocket feeds remain available for compatibility.
+          They now also feed the new smart-flow projection path, but they were not changed into
+          canonical contracts in this PR.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>
+            Added <strong>SmartFlowExplainabilityProjection</strong> to
+            <code>packages/types/src/smart-flow.ts</code>, including refs, evidence, hypothesis,
+            insight, abstention, alternatives, and version fields.
+          </li>
+          <li>
+            Added <strong>smart-flow</strong> as a typed live channel in
+            <code>packages/types/src/live.ts</code> and the API live-state manager.
+          </li>
+          <li>
+            Added <code>services/api/src/smart-flow.ts</code> to project persisted legacy
+            smart-money events into compatibility-tagged smart-flow explainability payloads.
+          </li>
+          <li>
+            Added REST surfaces at <code>/flow/smart-flow</code>,
+            <code>/history/smart-flow</code>, and <code>/replay/smart-flow</code>, plus
+            <code>/ws/smart-flow</code> and <code>/ws/live</code> support.
+          </li>
+          <li>
+            Added a <code>smart_flow</code> field to the options-support lookup response so
+            existing packet context can carry the new explainability projection alongside the
+            legacy <code>smart_money</code> field.
+          </li>
+          <li>
+            Added focused contract, API projection, and live-state tests for the new surface.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          Phase 05a is intentionally API/WS-only. Earlier smart-flow phases already created the
+          evidence, hypothesis, abstention, and replay-golden foundations. This turn exposes those
+          semantics at the boundary without changing scoring policy, calibration, participant
+          identity, synthetic foundations, or phase 05b UI explainability surfaces.
+        </p>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Area</th>
+              <th>Detail</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Canonical payload</td>
+              <td>
+                <code>SmartFlowExplainabilityProjection</code> duplicates the handles clients need
+                at top level while preserving the nested hypothesis and insight contracts.
+              </td>
+            </tr>
+            <tr>
+              <td>Compatibility</td>
+              <td>
+                New payloads projected from legacy events carry
+                <code>compatibility_only: true</code>, <code>legacy_event_id</code>, and
+                <code>legacy_channel: "smart-money"</code>.
+              </td>
+            </tr>
+            <tr>
+              <td>Live delivery</td>
+              <td>
+                The smart-money NATS pump now broadcasts raw smart-money events to existing
+                subscribers and projected smart-flow explainability payloads to the new channel.
+              </td>
+            </tr>
+            <tr>
+              <td>Replay and history</td>
+              <td>
+                Smart-flow cursor semantics remain tied to the underlying validated event
+                <code>source_ts</code> and <code>seq</code>, matching existing replay/history
+                behavior.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p>
+          Focused excerpts are shown below. They use a local styled unified diff fallback so the
+          turn record remains deterministic and reviewable without remote assets.
+        </p>
+        <pre><code><span class="diff-head">diff --git a/packages/types/src/smart-flow.ts b/packages/types/src/smart-flow.ts</span>
+<span class="diff-hunk">@@ shared smart-flow contracts @@</span>
+<span class="diff-add">+export const SMART_FLOW_EXPLAINABILITY_PROJECTION_VERSION =</span>
+<span class="diff-add">+  "smart-flow.explainability-projection.v1";</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+export const SmartFlowExplainabilityProjectionSchema = EventMetaSchema.merge(</span>
+<span class="diff-add">+  z.object({</span>
+<span class="diff-add">+    schema_version: SmartFlowContractVersionSchema,</span>
+<span class="diff-add">+    projection_version: z.literal(SMART_FLOW_EXPLAINABILITY_PROJECTION_VERSION),</span>
+<span class="diff-add">+    policy_version: SmartFlowPolicyVersionSchema,</span>
+<span class="diff-add">+    model_version: SmartFlowModelVersionSchema,</span>
+<span class="diff-add">+    source_channel: z.enum(["smart-flow", "smart-money"]),</span>
+<span class="diff-add">+    versions: z.object({</span>
+<span class="diff-add">+      contract: SmartFlowContractVersionSchema,</span>
+<span class="diff-add">+      projection: z.literal(SMART_FLOW_EXPLAINABILITY_PROJECTION_VERSION),</span>
+<span class="diff-add">+      policy: SmartFlowPolicyVersionSchema,</span>
+<span class="diff-add">+      model: SmartFlowModelVersionSchema</span>
+<span class="diff-add">+    }),</span>
+<span class="diff-add">+    refs: SmartFlowExplainabilityRefsSchema,</span>
+<span class="diff-add">+    evidence: SmartFlowExplainabilityEvidenceSchema,</span>
+<span class="diff-add">+    hypothesis: FlowHypothesisEventSchema,</span>
+<span class="diff-add">+    insight: SmartFlowInsightSchema,</span>
+<span class="diff-add">+    abstention: FlowAbstentionSchema,</span>
+<span class="diff-add">+    alternatives: z.array(FlowAlternativeHypothesisSchema),</span>
+<span class="diff-add">+    compatibility: SmartFlowLegacyCompatibilitySchema.optional()</span>
+<span class="diff-add">+  })</span>
+<span class="diff-add">+);</span>
+
+<span class="diff-head">diff --git a/services/api/src/smart-flow.ts b/services/api/src/smart-flow.ts</span>
+<span class="diff-hunk">@@ new API projection helper @@</span>
+<span class="diff-add">+export const smartFlowCursor = (item: SmartFlowExplainabilityProjection): Cursor =&gt; ({</span>
+<span class="diff-add">+  ts: item.source_ts,</span>
+<span class="diff-add">+  seq: item.seq</span>
+<span class="diff-add">+});</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+export const projectSmartFlowExplainability = (</span>
+<span class="diff-add">+  events: readonly SmartMoneyEvent[]</span>
+<span class="diff-add">+): SmartFlowExplainabilityProjection[] =&gt;</span>
+<span class="diff-add">+  events.map((event) =&gt; smartFlowExplainabilityFromLegacySmartMoneyEvent(event));</span>
+<span class="diff-add">+</span>
+<span class="diff-add">+export const fetchRecentSmartFlowExplainability = async (</span>
+<span class="diff-add">+  client: ClickHouseClient,</span>
+<span class="diff-add">+  limit: number</span>
+<span class="diff-add">+): Promise&lt;SmartFlowExplainabilityProjection[]&gt; =&gt;</span>
+<span class="diff-add">+  projectSmartFlowExplainability(await fetchRecentSmartMoneyEvents(client, limit));</span>
+
+<span class="diff-head">diff --git a/services/api/src/index.ts b/services/api/src/index.ts</span>
+<span class="diff-hunk">@@ smart-money pump and smart-flow routes @@</span>
+<span class="diff-add">+        const smartFlow = projectSmartFlowExplainability([payload])[0];</span>
+         recordSyntheticProfileHit(syntheticProfileHits, payload);
+         broadcast(smartMoneySockets, { type: "smart-money", payload });
+<span class="diff-add">+        if (smartFlow) {</span>
+<span class="diff-add">+          broadcast(smartFlowSockets, { type: "smart-flow", payload: smartFlow });</span>
+<span class="diff-add">+          await fanoutLive({ channel: "smart-flow" }, smartFlow, "smart-flow");</span>
+<span class="diff-add">+        }</span>
+         await fanoutLive({ channel: "smart-money" }, payload, "smart-money");
+
+<span class="diff-add">+        if (req.method === "GET" &amp;&amp; url.pathname === "/flow/smart-flow") {</span>
+<span class="diff-add">+          const limit = parseLimit(url.searchParams.get("limit"));</span>
+<span class="diff-add">+          const data = await fetchRecentSmartFlowExplainability(clickhouse, limit);</span>
+<span class="diff-add">+          return jsonResponse({ data });</span>
+<span class="diff-add">+        }</span>
+
+<span class="diff-add">+        if (req.method === "GET" &amp;&amp; url.pathname === "/ws/smart-flow") {</span>
+<span class="diff-add">+          if (serverRef.upgrade(req, { data: { channel: "smart-flow" } })) {</span>
+<span class="diff-add">+            return new Response(null, { status: 101 });</span>
+<span class="diff-add">+          }</span>
+<span class="diff-add">+          return jsonResponse({ error: "websocket upgrade failed" }, 400);</span>
+<span class="diff-add">+        }</span></code></pre>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <p>
+          API and websocket clients can now consume smart-flow explanation payloads directly:
+          evidence refs, hypothesis details, insight copy, abstention state, and alternative
+          explanations arrive in a stable versioned contract. Current UI clients that still read
+          raw smart-money feeds should continue to work unchanged.
+        </p>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li><span class="ok">Passed</span>: <code>bun test packages/types/tests/smart-flow.test.ts packages/types/tests/live.test.ts services/api/tests/live.test.ts services/api/tests/smart-flow.test.ts</code></li>
+          <li><span class="ok">Passed</span>: <code>bunx biome check packages/types/src/smart-flow.ts packages/types/src/live.ts packages/types/tests/smart-flow.test.ts packages/types/tests/live.test.ts services/api/src/index.ts services/api/src/live.ts services/api/src/smart-flow.ts services/api/tests/live.test.ts services/api/tests/smart-flow.test.ts</code></li>
+          <li><span class="ok">Passed</span>: <code>bun test services/compute/tests/smart-flow-replay-evaluation.test.ts services/replay/tests/synthetic-fixture.test.ts</code></li>
+          <li><span class="ok">Passed</span>: <code>bun run typecheck</code></li>
+          <li><span class="ok">Passed</span>: <code>bun test</code> after refreshing stale workspace symlinks with <code>bun install</code>; no tracked install files changed.</li>
+          <li><span class="ok">Passed</span>: <code>bun run check:public-api-routes</code></li>
+          <li><span class="warn">Known caveat</span>: repo-wide <code>bun run check</code> still reports unrelated import-order diagnostics outside this change. The changed-file Biome check passes.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <ul>
+          <li>
+            <strong>Projected source:</strong> the API projection currently derives from persisted
+            legacy smart-money events because this phase did not add a canonical hypothesis storage
+            table. Payloads identify this with compatibility metadata.
+          </li>
+          <li>
+            <strong>Startup cost:</strong> live hydration can query the smart-money table once for
+            raw smart-money and once for smart-flow explainability. Limits are small, and this keeps
+            compatibility simple for phase 05a.
+          </li>
+          <li>
+            <strong>UI migration:</strong> no phase 05b UI explainability surface was implemented.
+            The new API/WS contracts are ready for that follow-up.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>
+            Continue with <strong>islandflow-zxh.5.2</strong> to build UI explainability surfaces
+            around the new smart-flow API and websocket contracts.
+          </li>
+          <li>
+            Consider a future canonical storage projection for
+            <code>FlowHypothesisEvent</code>/<code>SmartFlowExplainabilityProjection</code> if
+            clients need smart-flow history without deriving from legacy events.
+          </li>
+          <li>
+            Track repo-wide Biome import-order cleanup in <strong>islandflow-nn7</strong>; it is
+            unrelated to this phase but still visible in <code>bun run check</code>.
+          </li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

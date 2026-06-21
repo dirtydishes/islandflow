@@ -280,7 +280,7 @@ bun run make:desktop
 Desktop-specific environment:
 
 - `ISLANDFLOW_DESKTOP_START_URL` is only used by the Electron shell and is restricted to trusted Islandflow app origins.
-- `NEXT_PUBLIC_API_URL` remains the web app API/WebSocket origin control and usually points at `https://flow.deltaisland.io` when developing local UI inside Electron.
+- `NEXT_PUBLIC_API_URL` remains the web app API/WebSocket origin control and usually points at `https://api.flow.deltaisland.io` when developing local UI inside Electron.
 
 ## Environment Configuration
 
@@ -302,9 +302,14 @@ All runtime configuration comes from `.env`.
 | `OPTIONS_INGEST_ADAPTER` | `synthetic` | Options ingest source: `synthetic`, `alpaca`, `ibkr`, or `databento`. |
 | `EQUITIES_INGEST_ADAPTER` | `synthetic` | Equities ingest source: `synthetic` or `alpaca`. |
 | `EMIT_INTERVAL_MS` | `1000` | Emit cadence for synthetic ingest adapters. |
-| `SYNTHETIC_MARKET_MODE` | `realistic` | Shared synthetic profile: `realistic`, `active`, or `firehose`. |
-| `SYNTHETIC_OPTIONS_MODE` | empty | Options-only synthetic profile override. |
-| `SYNTHETIC_EQUITIES_MODE` | empty | Equities-only synthetic profile override. |
+| `SYNTHETIC_MARKET_MODE` | `realistic` | Legacy load alias used before the hosted control is changed: `realistic` -> `steady`, `active` -> `active`, `firehose` -> `firehose`. |
+| `SYNTHETIC_OPTIONS_MODE` | empty | Options-only legacy load alias override. |
+| `SYNTHETIC_EQUITIES_MODE` | empty | Equities-only legacy load alias override. |
+| `SYNTHETIC_CONTROL_ENABLED` | `false` | Enables the protected synthetic admin API when both hosted ingest adapters are synthetic. |
+| `SYNTHETIC_ADMIN_TOKEN` | empty | Bearer token required by the API and web proxy for synthetic admin requests. |
+| `NEXT_PUBLIC_SYNTHETIC_ADMIN` | `0` | Shows the internal synthetic control drawer in the web app when set to `1`. |
+
+Named demo profiles live in `@islandflow/synthetic-market/profiles`. The default `market-command` profile cycles deterministic scenario runs such as `phase03-a`, `phase03-b`, `phase03-f`, and `phase03-g`. Load profiles change playback cadence and repeated run count only: `steady` emits one run per base interval, `active` halves the interval, and `firehose` uses a quarter interval with two named runs per tick.
 
 ### Alpaca and news configuration
 
@@ -400,23 +405,30 @@ Default `smart-money` policy rejects lower-information prints and keeps higher-c
 | `REST_DEFAULT_LIMIT` | `200` | Default REST record count. |
 | `API_DELIVER_POLICY` | `new` | JetStream consumer start policy used by API live subscribers. |
 | `API_CONSUMER_RESET` | `false` | Resets/recreates API live durable consumers on startup when true. |
+| `API_CORS_ORIGINS` | `https://flow.deltaisland.io,http://127.0.0.1:3000,http://localhost:3000,http://127.0.0.1:3100,http://localhost:3100` | Comma-separated browser origins allowed to call the API directly; local web and desktop-local dev rely on these headers. |
 | `LIVE_LIMIT_DEFAULT` | `1000` | Optional generic live cache depth default. |
 | `LIVE_LIMIT_FLOW` | `500` | Live cache depth for flow packet events unless overridden. |
 | `LIVE_LIMIT_SMART_MONEY` | `300` | Live cache depth for smart-money events unless overridden. |
 | `LIVE_LIMIT_OPTIONS` | `1000` | Live cache depth for options channel unless overridden. |
 | `LIVE_LIMIT_ALERTS` | `300` | Live cache depth for alerts channel unless overridden. |
 | `LIVE_LIMIT_NEWS` | `100` | Live cache depth for news channel unless overridden. |
-| `NEXT_PUBLIC_API_URL` | auto-detected in browser, `http://127.0.0.1:4000` fallback | Explicit base URL for API/WS calls from the web app. |
+| `NEXT_PUBLIC_API_URL` | `https://api.flow.deltaisland.io` for local web dev, auto-detected in browser when unset by other runners | Explicit base URL for API/WS calls from the web app. |
 | `NEXT_PUBLIC_LIVE_HOT_WINDOW` | `600` | Max hot-window items retained for non-options live streams in UI state. |
 | `NEXT_PUBLIC_LIVE_HOT_WINDOW_OPTIONS` | `1200` | Dedicated max hot-window items retained for options prints. |
 | `NEXT_PUBLIC_NBBO_MAX_AGE_MS` | `1000` | Frontend NBBO staleness threshold. |
 | `NEXT_PUBLIC_FLOW_FILTER_PRESET` | `smart-money` | Default flow filter preset: `smart-money`, `balanced`, or `all`. |
+| `NEXT_ALLOWED_DEV_ORIGINS` | empty, plus auto-detected local IPv4 addresses | Optional comma-separated extra hostnames/IPs allowed to load Next.js dev resources when local browser tooling reaches the dev server through a nonstandard local interface. |
 
 ### Replay and testing controls
 
 | Variable | Default | What it controls |
 | --- | --- | --- |
 | `REPLAY_ENABLED` | `false` | Starts replay service in `bun run dev` when truthy. |
+| `REPLAY_SOURCE` | `clickhouse` | Replay backing source: `clickhouse` for materialized rows or `synthetic_fixture` for infra-free synthetic fixture replay. |
+| `REPLAY_SYNTHETIC_FIXTURE_DIR` | empty | Synthetic fixture directory containing `manifest.json` and sidecars when `REPLAY_SOURCE=synthetic_fixture`. |
+| `REPLAY_SYNTHETIC_MANIFEST_PATH` | empty | Direct synthetic fixture manifest path; takes precedence over `REPLAY_SYNTHETIC_FIXTURE_DIR`. |
+| `REPLAY_SYNTHETIC_SOURCE_ID` | `synthetic_market` | Synthetic source selector used to verify fixture provenance before replay. |
+| `REPLAY_SYNTHETIC_RUN_ID` | empty | Optional synthetic run selector; when set, the fixture run must match before replay starts. |
 | `REPLAY_STREAMS` | `options,nbbo,equities,equity-quotes` | Replay stream selection. |
 | `REPLAY_START_TS` | `0` | Replay lower-bound timestamp. |
 | `REPLAY_END_TS` | `0` | Replay upper-bound timestamp. |
@@ -447,7 +459,7 @@ OPTIONS_SIGNAL_MODE=smart-money \
 bun run dev
 ```
 
-Active demo:
+Active deterministic demo:
 
 ```bash
 SYNTHETIC_MARKET_MODE=active bun run dev
@@ -460,6 +472,20 @@ SYNTHETIC_MARKET_MODE=firehose \
 NEXT_PUBLIC_LIVE_HOT_WINDOW=2000 \
 bun run dev
 ```
+
+Hosted demo profile controls:
+
+```bash
+SYNTHETIC_CONTROL_ENABLED=true \
+SYNTHETIC_ADMIN_TOKEN=dev-token \
+NEXT_PUBLIC_SYNTHETIC_ADMIN=1 \
+NEXT_PUBLIC_API_URL=http://127.0.0.1:4000 \
+OPTIONS_INGEST_ADAPTER=synthetic \
+EQUITIES_INGEST_ADAPTER=synthetic \
+bun run dev
+```
+
+Open the synthetic control drawer in the terminal UI to select `Market Command`, `Event Response`, `Quiet Range`, or `Stress Tape`, then choose `Steady`, `Active`, or `Firehose` load.
 
 Show raw options flow for debugging:
 

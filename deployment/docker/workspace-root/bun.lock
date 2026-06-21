@@ -33,7 +33,7 @@
       "dependencies": {
         "@islandflow/types": "workspace:*",
         "@tanstack/react-virtual": "^3.13.24",
-        "lightweight-charts": "^4.2.0",
+        "lightweight-charts": "^5.2.0",
         "next": "^16.2.6",
         "react": "^19.2.0",
         "react-dom": "^19.2.0",
@@ -68,6 +68,12 @@
         "@islandflow/types": "workspace:*",
       },
     },
+    "packages/synthetic-market": {
+      "name": "@islandflow/synthetic-market",
+      "dependencies": {
+        "@islandflow/types": "workspace:*",
+      },
+    },
     "packages/types": {
       "name": "@islandflow/types",
       "dependencies": {
@@ -81,6 +87,7 @@
         "@islandflow/config": "workspace:*",
         "@islandflow/observability": "workspace:*",
         "@islandflow/storage": "workspace:*",
+        "@islandflow/synthetic-market": "workspace:*",
         "@islandflow/types": "workspace:*",
         "redis": "^5.10.0",
         "zod": "^3.23.8",
@@ -106,6 +113,7 @@
         "@islandflow/observability": "workspace:*",
         "@islandflow/refdata": "workspace:*",
         "@islandflow/storage": "workspace:*",
+        "@islandflow/synthetic-market": "workspace:*",
         "@islandflow/types": "workspace:*",
         "redis": "^5.10.0",
         "zod": "^3.23.8",
@@ -125,6 +133,7 @@
         "@islandflow/config": "workspace:*",
         "@islandflow/observability": "workspace:*",
         "@islandflow/storage": "workspace:*",
+        "@islandflow/synthetic-market": "workspace:*",
         "@islandflow/types": "workspace:*",
         "ws": "^8.21.0",
         "zod": "^3.23.8",
@@ -148,6 +157,7 @@
         "@islandflow/config": "workspace:*",
         "@islandflow/observability": "workspace:*",
         "@islandflow/storage": "workspace:*",
+        "@islandflow/synthetic-market": "workspace:*",
         "@islandflow/types": "workspace:*",
         "@msgpack/msgpack": "^3.1.3",
         "ws": "^8.21.0",
@@ -168,6 +178,7 @@
         "@islandflow/config": "workspace:*",
         "@islandflow/observability": "workspace:*",
         "@islandflow/storage": "workspace:*",
+        "@islandflow/synthetic-market": "workspace:*",
         "@islandflow/types": "workspace:*",
         "zod": "^3.23.8",
       },
@@ -176,8 +187,8 @@
   "overrides": {
     "@electron/node-gyp": "^10.2.0-electron.2",
     "postcss": "^8.5.15",
-    "tar": "^7.5.15",
-    "tmp": "^0.2.5",
+    "tar": "^7.5.16",
+    "tmp": "^0.2.6",
   },
   "packages": {
     "@biomejs/biome": ["@biomejs/biome@2.4.16", "", { "optionalDependencies": { "@biomejs/cli-darwin-arm64": "2.4.16", "@biomejs/cli-darwin-x64": "2.4.16", "@biomejs/cli-linux-arm64": "2.4.16", "@biomejs/cli-linux-arm64-musl": "2.4.16", "@biomejs/cli-linux-x64": "2.4.16", "@biomejs/cli-linux-x64-musl": "2.4.16", "@biomejs/cli-win32-arm64": "2.4.16", "@biomejs/cli-win32-x64": "2.4.16" }, "bin": { "biome": "bin/biome" } }, "sha512-x9ajFh1zChVybCiM3TN6OD4phAqLgtPZjFrZF+aTMYCPjwBO+k529TX7PPsAqtGNLeV4UgzwQnowEgS7bGmzcA=="],
@@ -359,6 +370,8 @@
     "@islandflow/replay": ["@islandflow/replay@workspace:services/replay"],
 
     "@islandflow/storage": ["@islandflow/storage@workspace:packages/storage"],
+
+    "@islandflow/synthetic-market": ["@islandflow/synthetic-market@workspace:packages/synthetic-market"],
 
     "@islandflow/types": ["@islandflow/types@workspace:packages/types"],
 
@@ -860,7 +873,7 @@
 
     "keyv": ["keyv@4.5.4", "", { "dependencies": { "json-buffer": "3.0.1" } }, "sha512-oxVHkHR/EJf2CNXnWxRLW6mg7JyCCUcG0DtEGmL2ctUo1PNTin1PUil+r/+4r5MpVgC/fn1kjsx7mjSujKqIpw=="],
 
-    "lightweight-charts": ["lightweight-charts@4.2.3", "", { "dependencies": { "fancy-canvas": "2.1.0" } }, "sha512-5kS/2hY3wNYNzhnS8Gb+GAS07DX8GPF2YVDnd2NMC85gJVQ6RLU6YrXNgNJ6eg0AnWPwCnvaGtYmGky3HiLQEw=="],
+    "lightweight-charts": ["lightweight-charts@5.2.0", "", { "dependencies": { "fancy-canvas": "2.1.0" } }, "sha512-ey3Vas8UhV06ni+LT9TA1nEe4y8So4Mi6CL/oarNHFMyTktz/xy8e8+oh04Q//eO3t6etvFXgayz2fClyFQb5w=="],
 
     "listr2": ["listr2@7.0.2", "", { "dependencies": { "cli-truncate": "^3.1.0", "colorette": "^2.0.20", "eventemitter3": "^5.0.1", "log-update": "^5.0.1", "rfdc": "^1.3.0", "wrap-ansi": "^8.1.0" } }, "sha512-rJysbR9GKIalhTbVL2tYbF2hVyDnrf7pFUZBwjPaMIdadYHmeT+EVi/Bu3qd7ETQPahTotg2WRCatXwRBW554g=="],
 
@@ -1170,13 +1183,13 @@
 
     "tapable": ["tapable@2.3.3", "", {}, "sha512-uxc/zpqFg6x7C8vOE7lh6Lbda8eEL9zmVm/PLeTPBRhh1xCgdWaQ+J1CUieGpIfm2HdtsUpRv+HshiasBMcc6A=="],
 
-    "tar": ["tar@7.5.15", "", { "dependencies": { "@isaacs/fs-minipass": "^4.0.0", "chownr": "^3.0.0", "minipass": "^7.1.2", "minizlib": "^3.1.0", "yallist": "^5.0.0" } }, "sha512-dzGK0boVlC4W5QFuQN1EFSl3bIDYsk7Tj40U6eIBnK2k/8ml7TZ5agbI5j5+qnoVcAA+rNtBml8SEiLxZpNqRQ=="],
+    "tar": ["tar@7.5.16", "", { "dependencies": { "@isaacs/fs-minipass": "^4.0.0", "chownr": "^3.0.0", "minipass": "^7.1.2", "minizlib": "^3.1.0", "yallist": "^5.0.0" } }, "sha512-56adEpPMouktRlBLXiaYFFzZ/3+JXa8P9n7WbR+ibIjtviN55mEaOkiysCnPnWm+7kkui1Dn8J9l+g6zV8731w=="],
 
     "terser": ["terser@5.47.1", "", { "dependencies": { "@jridgewell/source-map": "^0.3.3", "acorn": "^8.15.0", "commander": "^2.20.0", "source-map-support": "~0.5.20" }, "bin": { "terser": "bin/terser" } }, "sha512-tPbLXTI6ohPASb/1YViL428oEHu6/qv1OxqYnfaonVCFHqx4+wCd95pHrQWsL5X4pl90CTyW9piSAsS2L0VoMw=="],
 
     "terser-webpack-plugin": ["terser-webpack-plugin@5.6.0", "", { "dependencies": { "@jridgewell/trace-mapping": "^0.3.25", "jest-worker": "^27.4.5", "schema-utils": "^4.3.0", "terser": "^5.31.1" }, "peerDependencies": { "webpack": "^5.1.0" } }, "sha512-Eum+5ajkaOhf5KbM26osvv21kLD7BaGqQ1UA4Ami4arYwylmGUQTgHFpHDdmJod1q4QXa66p0to/FBKID+J1vA=="],
 
-    "tmp": ["tmp@0.2.5", "", {}, "sha512-voyz6MApa1rQGUxT3E+BK7/ROe8itEx7vD8/HEvt4xwXucvQ5G5oeEiHkmHZJuBO21RpOf+YYm9MOivj709jow=="],
+    "tmp": ["tmp@0.2.7", "", {}, "sha512-e0votIpp4Uo2AJYSzVHV6xCcawuiez3DzqDAbrTc3YxBkplN6e+dM13ZeIcZnDg/QpSuU2zfZ3rzwY8ukEnaXw=="],
 
     "to-regex-range": ["to-regex-range@5.0.1", "", { "dependencies": { "is-number": "^7.0.0" } }, "sha512-65P7iz6X5yEr1cwcgvQxbbIw7Uk3gOy5dIdtZ4rDveLqhrdJP+Li/Hx6tyK0NEb+2GCyneCMJiGqrADCSNk8sQ=="],
 

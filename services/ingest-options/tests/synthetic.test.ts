@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import type { OptionPrint } from "@islandflow/types";
+import {
+  DEFAULT_SYNTHETIC_CONTROL_STATE,
+  type OptionNBBO,
+  type OptionPrint
+} from "@islandflow/types";
 import { buildSmartMoneyEventFromPacket } from "../../compute/src/parent-events";
 import {
   buildSyntheticBurstForTest,
@@ -227,6 +231,41 @@ describe("synthetic smart-money scenarios", () => {
     for (const trade of trades) {
       expect("hiddenLabel" in trade).toBe(false);
       expect("label" in trade).toBe(false);
+    }
+  });
+
+  it("emits selected deterministic demo profile runs through the live adapter", async () => {
+    const adapter = createSyntheticOptionsAdapter({
+      emitIntervalMs: 1,
+      mode: "realistic",
+      getControl: () => ({
+        ...DEFAULT_SYNTHETIC_CONTROL_STATE,
+        demo_profile_id: "quiet-range",
+        load_profile_id: "firehose"
+      })
+    });
+    const trades: OptionPrint[] = [];
+    const nbbo: OptionNBBO[] = [];
+    const stop = adapter.start({
+      onTrade: (trade) => {
+        trades.push(trade);
+      },
+      onNBBO: (quote) => {
+        nbbo.push(quote);
+      }
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 12));
+    stop();
+
+    expect(trades.length).toBeGreaterThan(0);
+    expect(nbbo.length).toBeGreaterThan(0);
+    const runIds = new Set(trades.map((trade) => trade.trace_id.split(":live:")[0]));
+    expect(runIds.has("phase03-f")).toBe(true);
+    expect(runIds.has("phase03-d")).toBe(true);
+    for (const trade of trades) {
+      expect("scenario_id" in trade).toBe(false);
+      expect("hiddenLabel" in trade).toBe(false);
     }
   });
 });

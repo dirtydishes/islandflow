@@ -69,6 +69,10 @@ Working style that avoids common problems here:
 - Keep `.env` aligned with `.env.example`; adapters default to synthetic modes for local development.
 - Dev runners persist child PID state in `.tmp/`; if a previous run crashed, restart via the standard `bun run dev*` commands so stale processes are cleaned up.
 
+## Implementation Phase Plans
+
+Before beginning synthetic market-data or smart-money/smart-flow implementation work, read `docs/implementation/README.md` and the specific phase file linked from the active Beads issue. Treat `docs/plans/*architecture-review.md` files as background guidance only; the current phase document and Beads issue define the active scope. Keep PRs phase-bounded and reviewable, split smaller Beads child issues when a phase is too large, and add/update Beads dependencies when one phase blocks another.
+
 ## Forgejo Is Canonical
 
 This repository's primary home is Forgejo:
@@ -83,6 +87,70 @@ Agent expectations:
 - Treat GitHub as a mirror unless explicitly instructed otherwise.
 - Use `fj` for Forgejo pull request workflows (create/view/update PRs).
 - When sharing PR links in handoff, use the Forgejo PR URL.
+- Do not create a new git branch automatically. When already on `main`, stay
+  on `main` unless the user explicitly asks for a branch or has already
+  created/switched to one. The `lavender/` branch prefix applies only when a
+  branch is explicitly requested.
+- Never run `git switch -c`, `git checkout -b`, or otherwise create a branch
+  unless branch creation was explicitly requested in the current conversation.
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked with Beads (`bd`) in this repo. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The default five triage roles are used as-is. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This repo uses a multi-context domain documentation layout. See `docs/agents/domain.md`.
+
+### Forgejo CLI Quick Reference
+
+Use `fj` for Forgejo-hosted PR work and remote issue visibility. Keep Beads
+authoritative for implementation task tracking: use `bd ready`, `bd show`,
+`bd update`, and `bd close` for work state, and use `bd dolt push` before
+publishing completed sessions. Use `fj issue` only to inspect, comment on, or
+open Forgejo-hosted issue context.
+
+Authentication and repo context:
+
+```bash
+fj -H git.dirtydishes.dev auth login
+fj whoami
+```
+
+Most `fj` commands infer the repository from the current git remote. Add
+`-H git.dirtydishes.dev` when host selection is ambiguous or the command is
+being run outside a configured checkout.
+
+Pull request workflow:
+
+```bash
+fj pr search
+fj pr view <number>
+fj pr status <number> --wait
+fj pr create --base main --head <branch> --title "..." --body "..."
+fj pr create --autofill
+fj pr comment <number> --body-file <file>
+fj pr checkout <number>
+fj pr diff <number>
+fj pr merge <number>
+```
+
+Issue visibility:
+
+```bash
+fj issue search
+fj issue search "<query>" --state all
+fj issue view <number>
+fj issue view <number> comments
+fj issue browse <number>
+fj issue comment <number> --body-file <file>
+```
 
 ## Required Turn Documentation
 
@@ -92,9 +160,56 @@ For this repository, the repo-specific requirements are:
 
 - Save repository implementation turn documents in `docs/turns/`.
 - Use the `impeccable` skill to structure and style repository implementation turn documents when available.
-- Render "Relevant Diff Snippets" with `@pierre/diffs/ssr`; use https://diffs.com/docs as the SSR reference.
 - For minor updates to a previous change, update the existing turn document instead of creating a new one.
 - The minor/trivial exemptions below override the general documentation requirement for this repository.
+
+### Repository Diff Rendering
+
+Render **Relevant Diff Snippets** with the default browser-side `@pierre/diffs`
+package, following https://diffs.com/docs. Do not use `@pierre/diffs/ssr`,
+`preloadFileDiff`, `preloadPatchDiff`, `preloadMultiFileDiff`,
+`preloadPatchFile`, or any other SSR/preload export path for turn documents.
+
+If the package must be added, use the current project's package manager:
+
+```bash
+npm install @pierre/diffs
+bun add @pierre/diffs
+pnpm add @pierre/diffs
+yarn add @pierre/diffs
+```
+
+This repo is Bun-first, so use `bun add @pierre/diffs` here when installation
+is actually needed.
+
+Use the Diffs renderer that matches the diff source:
+
+```ts
+import { PatchDiff } from '@pierre/diffs/react';
+```
+
+Use `PatchDiff` for unified diff or patch strings from `git diff`, `git show`,
+GitHub, or Forgejo.
+
+```ts
+import { MultiFileDiff } from '@pierre/diffs/react';
+```
+
+Use `MultiFileDiff` when comparing old and new file contents directly.
+
+```ts
+import { FileDiff, parseDiffFromFile, parsePatchFiles } from '@pierre/diffs/react';
+```
+
+Use `FileDiff` when rendering already parsed `FileDiffMetadata`; generate that
+metadata with `parseDiffFromFile` for two file versions or `parsePatchFiles`
+for patch text.
+
+Always include a readable standard HTML unified diff fallback in the turn
+document. Hide or replace the fallback only after the `@pierre/diffs` view
+successfully renders. Users without `@pierre/diffs` available should see the
+standard HTML fallback. If `@pierre/diffs` cannot generate or render the diff,
+show only the plain HTML fallback and document that the rich renderer failed.
 
 ### No turn document for minor/trivial checklist matches
 

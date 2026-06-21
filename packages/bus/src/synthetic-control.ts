@@ -1,10 +1,9 @@
 import {
   DEFAULT_SYNTHETIC_CONTROL_STATE,
-  SyntheticControlStateSchema,
   normalizeSyntheticControlState,
   type SyntheticControlState
 } from "@islandflow/types";
-import { JSONCodec, type JetStreamClient, type KV, type KvEntry } from "nats";
+import { type JetStreamClient, JSONCodec, type KV, type KvEntry } from "nats";
 
 export const SYNTHETIC_CONTROL_BUCKET = "synthetic_control";
 export const SYNTHETIC_CONTROL_GLOBAL_KEY = "global";
@@ -15,7 +14,7 @@ const decodeSyntheticControlEntry = (entry: KvEntry | null | undefined): Synthet
   if (!entry || entry.operation !== "PUT") {
     return DEFAULT_SYNTHETIC_CONTROL_STATE;
   }
-  return SyntheticControlStateSchema.parse(entry.json());
+  return normalizeSyntheticControlState(entry.json() as Partial<SyntheticControlState>);
 };
 
 export const openSyntheticControlKv = async (js: JetStreamClient): Promise<KV> => {
@@ -32,7 +31,7 @@ export const readSyntheticControlState = async (kv: KV): Promise<SyntheticContro
 export const ensureSyntheticControlState = async (kv: KV): Promise<SyntheticControlState> => {
   const current = await kv.get(SYNTHETIC_CONTROL_GLOBAL_KEY);
   if (current && current.operation === "PUT") {
-    return SyntheticControlStateSchema.parse(current.json());
+    return normalizeSyntheticControlState(current.json() as Partial<SyntheticControlState>);
   }
 
   await kv.put(SYNTHETIC_CONTROL_GLOBAL_KEY, codec.encode(DEFAULT_SYNTHETIC_CONTROL_STATE));
@@ -64,7 +63,7 @@ export const watchSyntheticControlState = async (
         if (stopped || entry.operation !== "PUT") {
           continue;
         }
-        onUpdate(SyntheticControlStateSchema.parse(entry.json()));
+        onUpdate(normalizeSyntheticControlState(entry.json() as Partial<SyntheticControlState>));
       }
     } catch (error) {
       if (!stopped) {

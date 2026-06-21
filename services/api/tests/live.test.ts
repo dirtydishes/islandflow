@@ -1,10 +1,14 @@
 import { describe, expect, it } from "bun:test";
 import type { ClickHouseClient } from "@islandflow/storage";
 import {
+  type SmartMoneyEvent,
+  smartFlowExplainabilityFromLegacySmartMoneyEvent
+} from "@islandflow/types";
+import {
   buildOptionSnapshotFilters,
   HOT_LIVE_REDIS_KEYS,
-  LiveStateManager,
   isLiveItemFresh,
+  LiveStateManager,
   resolveGenericLiveLimits,
   shouldFanoutLiveEvent
 } from "../src/live";
@@ -54,6 +58,75 @@ const makeRedis = () => {
   };
 };
 
+const makeSmartMoneyEvent = (now = Date.now()): SmartMoneyEvent => ({
+  source_ts: now,
+  ingest_ts: now + 1,
+  seq: 7,
+  trace_id: "smartmoney:flowpacket:7",
+  event_id: "smartmoney:event:7",
+  packet_ids: ["flowpacket:7"],
+  member_print_ids: ["print:7"],
+  underlying_id: "SPY",
+  event_kind: "single_leg_event",
+  event_window_ms: 500,
+  features: {
+    contract_count: 1,
+    print_count: 2,
+    total_size: 500,
+    total_premium: 75_000,
+    total_notional: 7_500_000,
+    start_ts: now,
+    end_ts: now + 100,
+    window_ms: 500,
+    option_contract_id: "SPY-2025-01-17-450-C",
+    option_type: "C",
+    dte_days: 1,
+    moneyness: 1.01,
+    atm_proximity: 0.01,
+    aggressor_buy_ratio: 0.8,
+    aggressor_sell_ratio: 0.1,
+    aggressor_ratio: 0.9,
+    nbbo_coverage_ratio: 0.92,
+    nbbo_inside_ratio: 0.05,
+    nbbo_stale_ratio: 0,
+    quote_age_ms: 20,
+    venue_count: 2,
+    inter_fill_ms_mean: 80,
+    strike_count: 1,
+    strike_concentration: 1,
+    structure_legs: 0,
+    same_size_leg_symmetry: 0,
+    net_directional_bias: 0.7,
+    synthetic_iv_shock: null,
+    spread_widening: null,
+    underlying_move_bps: null,
+    days_to_event: null,
+    expiry_after_event: null,
+    pre_event_concentration: null,
+    special_print_ratio: 0
+  },
+  profile_scores: [
+    {
+      profile_id: "institutional_directional",
+      probability: 0.76,
+      confidence_band: "high",
+      direction: "bullish",
+      reasons: ["large_parent_event"]
+    },
+    {
+      profile_id: "hedge_reactive",
+      probability: 0.31,
+      confidence_band: "low",
+      direction: "neutral",
+      reasons: ["could_be_hedge_rebalance"]
+    }
+  ],
+  primary_profile_id: "institutional_directional",
+  primary_direction: "bullish",
+  abstained: false,
+  suppressed_reasons: []
+});
+
 describe("LiveStateManager", () => {
   it("resolves live limits from env with clamping", () => {
     const limits = resolveGenericLiveLimits({
@@ -65,6 +138,7 @@ describe("LiveStateManager", () => {
     expect(limits.options).toBe(777);
     expect(limits.nbbo).toBe(100000);
     expect(limits.flow).toBe(500);
+    expect(limits["smart-flow"]).toBe(300);
     expect(limits["equity-quotes"]).toBe(500);
     expect(limits.alerts).toBe(300);
     expect(resolveGenericLiveLimits({} as NodeJS.ProcessEnv).options).toBe(100);
@@ -154,6 +228,7 @@ describe("LiveStateManager", () => {
       "equity-quotes": 10000,
       "equity-joins": 10000,
       flow: 2,
+      "smart-flow": 10000,
       "smart-money": 10000,
       "classifier-hits": 10000,
       alerts: 10000,
@@ -210,6 +285,30 @@ describe("LiveStateManager", () => {
     expect(stats.cacheDepthByKey["live:flow"]).toBe(2);
   });
 
+  it("stores smart-flow explainability projections as a canonical live channel", async () => {
+    const now = Date.now();
+    const projection = smartFlowExplainabilityFromLegacySmartMoneyEvent(makeSmartMoneyEvent(now));
+    const manager = new LiveStateManager(makeClickHouse(), null);
+
+    await manager.ingest("smart-flow", projection);
+
+    const snapshot = await manager.getSnapshot({ channel: "smart-flow" });
+
+    expect(snapshot.items).toHaveLength(1);
+    expect(snapshot.watermark).toEqual({ ts: now, seq: 7 });
+    expect(snapshot.next_before).toEqual({ ts: now, seq: 7 });
+    expect((snapshot.items as Array<typeof projection>)[0]?.hypothesis.hypothesis_type).toBe(
+      "directional_accumulation"
+    );
+    expect((snapshot.items as Array<typeof projection>)[0]?.refs.evidence_refs).toEqual([
+      "flowpacket:7",
+      "print:7"
+    ]);
+    expect((snapshot.items as Array<typeof projection>)[0]?.alternatives[0]?.reasons).toEqual([
+      "could_be_hedge_rebalance"
+    ]);
+  });
+
   it("reorders out-of-order live events without dropping newest-first semantics", async () => {
     const now = Date.now();
     const manager = new LiveStateManager(makeClickHouse(), null, {
@@ -220,6 +319,7 @@ describe("LiveStateManager", () => {
         "equity-quotes": 500,
         "equity-joins": 500,
         flow: 3,
+        "smart-flow": 300,
         "smart-money": 300,
         "classifier-hits": 300,
         alerts: 300,

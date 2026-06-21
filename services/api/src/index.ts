@@ -1,136 +1,156 @@
-import { readEnv } from "@islandflow/config";
-import { createLogger, createMetrics } from "@islandflow/observability";
 import {
-  SUBJECT_ALERTS,
-  SUBJECT_CLASSIFIER_HITS,
-  SUBJECT_EQUITY_CANDLES,
-  SUBJECT_EQUITY_JOINS,
-  SUBJECT_EQUITY_PRINTS,
-  SUBJECT_EQUITY_QUOTES,
-  SUBJECT_INFERRED_DARK,
-  SUBJECT_FLOW_PACKETS,
-  SUBJECT_NEWS,
-  SUBJECT_SMART_MONEY_EVENTS,
-  SUBJECT_OPTION_NBBO,
-  SUBJECT_OPTION_SIGNAL_PRINTS,
+  buildDurableConsumer,
+  connectJetStreamWithRetry,
+  ensureKnownStreams,
+  ensureSyntheticControlState,
+  openSyntheticControlKv,
   STREAM_ALERTS,
   STREAM_CLASSIFIER_HITS,
   STREAM_EQUITY_CANDLES,
   STREAM_EQUITY_JOINS,
   STREAM_EQUITY_PRINTS,
   STREAM_EQUITY_QUOTES,
-  STREAM_INFERRED_DARK,
   STREAM_FLOW_PACKETS,
+  STREAM_INFERRED_DARK,
   STREAM_NEWS,
-  STREAM_SMART_MONEY_EVENTS,
   STREAM_OPTION_NBBO,
   STREAM_OPTION_SIGNAL_PRINTS,
-  buildDurableConsumer,
-  connectJetStreamWithRetry,
-  ensureSyntheticControlState,
-  ensureKnownStreams,
-  openSyntheticControlKv,
+  STREAM_SMART_MONEY_EVENTS,
+  SUBJECT_ALERTS,
+  SUBJECT_CLASSIFIER_HITS,
+  SUBJECT_EQUITY_CANDLES,
+  SUBJECT_EQUITY_JOINS,
+  SUBJECT_EQUITY_PRINTS,
+  SUBJECT_EQUITY_QUOTES,
+  SUBJECT_FLOW_PACKETS,
+  SUBJECT_INFERRED_DARK,
+  SUBJECT_NEWS,
+  SUBJECT_OPTION_NBBO,
+  SUBJECT_OPTION_SIGNAL_PRINTS,
+  SUBJECT_SMART_MONEY_EVENTS,
   subscribeJson,
   watchSyntheticControlState,
   writeSyntheticControlState
 } from "@islandflow/bus";
+import { readEnv } from "@islandflow/config";
+import { createLogger, createMetrics } from "@islandflow/observability";
+import type { EquityPrintQueryFilters } from "@islandflow/storage";
 import {
   createClickHouseClient,
   ensureAlertsTable,
-  ensureNewsTable,
   ensureClassifierHitsTable,
   ensureEquityCandlesTable,
   ensureEquityPrintJoinsTable,
   ensureEquityPrintsTable,
   ensureEquityQuotesTable,
-  ensureInferredDarkTable,
   ensureFlowPacketsTable,
-  ensureSmartMoneyEventsTable,
+  ensureInferredDarkTable,
+  ensureNewsTable,
   ensureOptionNBBOTable,
   ensureOptionPrintsTable,
+  ensureSmartMoneyEventsTable,
+  fetchAlertContextByTraceId,
   fetchAlertsAfter,
   fetchAlertsBefore,
-  fetchAlertContextByTraceId,
-  fetchNewsAfter,
-  fetchNewsBefore,
   fetchClassifierHitsAfter,
   fetchClassifierHitsBefore,
-  fetchSmartMoneyEventsAfter,
-  fetchSmartMoneyEventsBefore,
-  fetchFlowPacketsAfter,
-  fetchFlowPacketById,
-  fetchFlowPacketsByMemberTraceIds,
-  fetchFlowPacketsBefore,
-  fetchRecentAlerts,
-  fetchRecentNews,
-  fetchRecentClassifierHits,
-  fetchRecentSmartMoneyEvents,
-  fetchRecentEquityPrintJoins,
-  fetchRecentFlowPackets,
-  fetchRecentInferredDark,
-  fetchRecentEquityQuotes,
+  fetchClassifierHitsByPacketIds,
   fetchEquityCandlesAfter,
   fetchEquityCandlesRange,
-  fetchEquityPrintJoinsByIds,
+  fetchEquityPrintJoinsAfter,
   fetchEquityPrintJoinsBefore,
-  fetchRecentOptionNBBO,
+  fetchEquityPrintJoinsByIds,
   fetchEquityPrintsAfter,
   fetchEquityPrintsBefore,
   fetchEquityPrintsRange,
-  fetchEquityPrintJoinsAfter,
-  fetchEquityQuotesBefore,
   fetchEquityQuotesAfter,
-  fetchInferredDarkBefore,
+  fetchEquityQuotesBefore,
+  fetchFlowPacketById,
+  fetchFlowPacketsAfter,
+  fetchFlowPacketsBefore,
+  fetchFlowPacketsByMemberTraceIds,
   fetchInferredDarkAfter,
-  fetchRecentEquityPrints,
-  fetchOptionNBBOBefore,
-  fetchOptionNBBOAfter,
-  fetchOptionPrintsBefore,
-  fetchOptionPrintsAfter,
-  fetchOptionPrintsByTraceIds,
+  fetchInferredDarkBefore,
   fetchNearestOptionNBBOForPrints,
-  fetchSmartMoneyEventsByPacketIds,
-  fetchClassifierHitsByPacketIds,
+  fetchNewsAfter,
+  fetchNewsBefore,
+  fetchOptionNBBOAfter,
+  fetchOptionNBBOBefore,
+  fetchOptionPrintsAfter,
+  fetchOptionPrintsBefore,
+  fetchOptionPrintsByTraceIds,
+  fetchRecentAlerts,
+  fetchRecentClassifierHits,
+  fetchRecentEquityPrintJoins,
+  fetchRecentEquityPrints,
+  fetchRecentEquityQuotes,
+  fetchRecentFlowPackets,
+  fetchRecentInferredDark,
+  fetchRecentNews,
+  fetchRecentOptionNBBO,
   fetchRecentOptionPrints,
+  fetchRecentSmartMoneyEvents,
+  fetchSmartMoneyEventsAfter,
+  fetchSmartMoneyEventsBefore,
+  fetchSmartMoneyEventsByPacketIds,
   insertNewsStory
 } from "@islandflow/storage";
-import type { EquityPrintQueryFilters } from "@islandflow/storage";
+import {
+  listDemoProfileSummaries,
+  listLoadProfileSummaries,
+  resolveSyntheticProfileControlState
+} from "@islandflow/synthetic-market/profiles";
 import {
   AlertEventSchema,
   ClassifierHitEventSchema,
   Cursor,
   EquityCandleSchema,
-  EquityPrintSchema,
   EquityPrintJoinSchema,
+  EquityPrintSchema,
   EquityQuoteSchema,
   FeedSnapshot,
+  FlowPacketSchema,
+  getSubscriptionKey,
   InferredDarkEventSchema,
-  NewsStorySchema,
-  LiveClientMessageSchema,
   type LiveChannel,
+  LiveClientMessageSchema,
   LiveServerMessage,
   LiveSubscription,
   LiveSubscriptionSchema,
   matchesFlowPacketFilters,
   matchesOptionPrintFilters,
-  FlowPacketSchema,
-  SyntheticControlStateSchema,
-  SmartMoneyEventSchema,
+  NewsStorySchema,
+  normalizeSyntheticControlState,
   OptionNBBOSchema,
-  OptionPrintSchema,
   type OptionPrint,
-  getSubscriptionKey
+  OptionPrintSchema,
+  SmartMoneyEventSchema,
+  type SyntheticControlState,
+  SyntheticControlStateSchema
 } from "@islandflow/types";
 import { createClient } from "redis";
 import { z } from "zod";
+import { isAlertContextPath, parseAlertContextTraceIdPath } from "./alert-context";
+import {
+  createCorsPreflightResponse,
+  DEFAULT_API_CORS_ORIGINS,
+  parseCorsAllowedOrigins,
+  withCorsHeaders
+} from "./cors";
 import {
   HOT_LIVE_REDIS_KEYS,
   LiveStateManager,
   resolveLiveStateConfig,
   shouldFanoutLiveEvent
 } from "./live";
-import { isAlertContextPath, parseAlertContextTraceIdPath } from "./alert-context";
 import { parseOptionPrintQuery } from "./option-queries";
+import {
+  fetchRecentSmartFlowExplainability,
+  fetchSmartFlowExplainabilityAfter,
+  fetchSmartFlowExplainabilityBefore,
+  projectSmartFlowExplainability,
+  smartFlowCursor
+} from "./smart-flow";
 import {
   buildSyntheticDerivedStatus,
   createRollingSyntheticProfileHits,
@@ -172,10 +192,12 @@ const envSchema = z.object({
       return value;
     }, z.boolean())
     .default(false),
-  SYNTHETIC_ADMIN_TOKEN: z.string().default("")
+  SYNTHETIC_ADMIN_TOKEN: z.string().default(""),
+  API_CORS_ORIGINS: z.string().default(DEFAULT_API_CORS_ORIGINS)
 });
 
 const env = readEnv(envSchema);
+const corsAllowedOrigins = parseCorsAllowedOrigins(env.API_CORS_ORIGINS);
 
 const state = {
   shuttingDown: false,
@@ -277,6 +299,7 @@ type Channel =
   | "equity-joins"
   | "inferred-dark"
   | "flow"
+  | "smart-flow"
   | "smart-money"
   | "classifier-hits"
   | "alerts";
@@ -300,6 +323,7 @@ const equityQuoteSockets = new Set<LegacySocket>();
 const equityJoinSockets = new Set<LegacySocket>();
 const inferredDarkSockets = new Set<LegacySocket>();
 const flowSockets = new Set<LegacySocket>();
+const smartFlowSockets = new Set<LegacySocket>();
 const smartMoneySockets = new Set<LegacySocket>();
 const classifierHitSockets = new Set<LegacySocket>();
 const alertSockets = new Set<LegacySocket>();
@@ -702,20 +726,31 @@ const run = async () => {
     env.EQUITIES_INGEST_ADAPTER
   );
   const syntheticBackendDisabledReason = getSyntheticBackendDisabledReason(syntheticBackendMode);
-  const syntheticControlKv = await openSyntheticControlKv(js);
-  let syntheticControl = await ensureSyntheticControlState(syntheticControlKv);
+  let syntheticControl = resolveSyntheticProfileControlState(null);
+  let syntheticControlKv: Awaited<ReturnType<typeof openSyntheticControlKv>> | null = null;
+  let stopSyntheticControlWatch = async () => {};
+  if (syntheticBackendMode === "synthetic") {
+    syntheticControlKv = await openSyntheticControlKv(js);
+    syntheticControl = resolveSyntheticProfileControlState(
+      await ensureSyntheticControlState(syntheticControlKv)
+    );
+    stopSyntheticControlWatch = await watchSyntheticControlState(
+      syntheticControlKv,
+      (nextControl) => {
+        syntheticControl = resolveSyntheticProfileControlState(nextControl);
+      },
+      (error) => {
+        logger.warn("synthetic control watch failed", {
+          error: getErrorMessage(error)
+        });
+      }
+    );
+  }
+  const syntheticProfileCatalog = {
+    demo_profiles: listDemoProfileSummaries(),
+    load_profiles: listLoadProfileSummaries()
+  };
   const syntheticProfileHits = createRollingSyntheticProfileHits();
-  const stopSyntheticControlWatch = await watchSyntheticControlState(
-    syntheticControlKv,
-    (nextControl) => {
-      syntheticControl = nextControl;
-    },
-    (error) => {
-      logger.warn("synthetic control watch failed", {
-        error: getErrorMessage(error)
-      });
-    }
-  );
 
   const clickhouse = createClickHouseClient({
     url: env.CLICKHOUSE_URL,
@@ -1239,8 +1274,13 @@ const run = async () => {
     for await (const msg of smartMoneySubscription.messages) {
       try {
         const payload = SmartMoneyEventSchema.parse(smartMoneySubscription.decode(msg));
+        const smartFlow = projectSmartFlowExplainability([payload])[0];
         recordSyntheticProfileHit(syntheticProfileHits, payload);
         broadcast(smartMoneySockets, { type: "smart-money", payload });
+        if (smartFlow) {
+          broadcast(smartFlowSockets, { type: "smart-flow", payload: smartFlow });
+          await fanoutLive({ channel: "smart-flow" }, smartFlow, "smart-flow");
+        }
         await fanoutLive({ channel: "smart-money" }, payload, "smart-money");
         msg.ack();
       } catch (error) {
@@ -1326,6 +1366,7 @@ const run = async () => {
         equities: env.EQUITIES_INGEST_ADAPTER
       },
       control: syntheticBackendMode === "synthetic" ? syntheticControl : null,
+      profiles: syntheticProfileCatalog,
       derived,
       ...(syntheticBackendDisabledReason ? { disabled_reason: syntheticBackendDisabledReason } : {})
     };
@@ -1363,595 +1404,659 @@ const run = async () => {
     hostname: env.API_HOST,
     port: env.API_PORT,
     fetch: async (req: Request, serverRef: any) => {
-      const url = new URL(req.url);
+      const handleApiRequest = async (): Promise<Response> => {
+        const url = new URL(req.url);
 
-      if (req.method === "GET" && url.pathname === "/health") {
-        return jsonResponse({ status: "ok" });
-      }
-
-      if (req.method === "GET" && url.pathname === "/admin/synthetic/status") {
-        const authError = authenticateSyntheticAdminRequest(req);
-        if (authError) {
-          return authError;
+        if (req.method === "OPTIONS") {
+          return createCorsPreflightResponse(req, corsAllowedOrigins);
         }
-        return jsonResponse(buildSyntheticStatusBody());
-      }
 
-      if (req.method === "GET" && url.pathname === "/admin/synthetic/control") {
-        const authError = authenticateSyntheticAdminRequest(req);
-        if (authError) {
-          return authError;
+        if (req.method === "GET" && url.pathname === "/health") {
+          return jsonResponse({ status: "ok" });
         }
-        return jsonResponse({ control: syntheticControl });
-      }
 
-      if (req.method === "PUT" && url.pathname === "/admin/synthetic/control") {
-        const authError = authenticateSyntheticAdminRequest(req);
-        if (authError) {
-          return authError;
+        if (req.method === "GET" && url.pathname === "/admin/synthetic/status") {
+          const authError = authenticateSyntheticAdminRequest(req);
+          if (authError) {
+            return authError;
+          }
+          return jsonResponse(buildSyntheticStatusBody());
         }
-        try {
-          const payload = SyntheticControlStateSchema.parse(await readJsonBody(req));
-          syntheticControl = await writeSyntheticControlState(syntheticControlKv, payload);
-          return jsonResponse({
-            control: syntheticControl,
-            derived: buildSyntheticDerivedStatus(Date.now(), syntheticControl, syntheticProfileHits)
-          });
-        } catch (error) {
-          return jsonResponse(
-            {
-              error: "invalid synthetic control payload",
-              detail: getErrorMessage(error)
-            },
-            400
-          );
-        }
-      }
 
-      if (req.method === "GET" && url.pathname === "/prints/options") {
-        try {
+        if (req.method === "GET" && url.pathname === "/admin/synthetic/control") {
+          const authError = authenticateSyntheticAdminRequest(req);
+          if (authError) {
+            return authError;
+          }
+          return jsonResponse({ control: syntheticControl });
+        }
+
+        if (req.method === "PUT" && url.pathname === "/admin/synthetic/control") {
+          const authError = authenticateSyntheticAdminRequest(req);
+          if (authError) {
+            return authError;
+          }
+          if (!syntheticControlKv) {
+            return jsonResponse({ error: "synthetic control unavailable" }, 500);
+          }
+          try {
+            const rawControl = (await readJsonBody(req)) as Partial<SyntheticControlState>;
+            const payload = SyntheticControlStateSchema.parse(
+              resolveSyntheticProfileControlState(normalizeSyntheticControlState(rawControl))
+            );
+            syntheticControl = await writeSyntheticControlState(syntheticControlKv, payload);
+            return jsonResponse({
+              control: syntheticControl,
+              derived: buildSyntheticDerivedStatus(
+                Date.now(),
+                syntheticControl,
+                syntheticProfileHits
+              )
+            });
+          } catch (error) {
+            return jsonResponse(
+              {
+                error: "invalid synthetic control payload",
+                detail: getErrorMessage(error)
+              },
+              400
+            );
+          }
+        }
+
+        if (req.method === "GET" && url.pathname === "/prints/options") {
+          try {
+            const limit = parseLimit(url.searchParams.get("limit"));
+            const source = parseReplaySource(url) ?? undefined;
+            const { storageFilters } = parseOptionPrintQuery(url);
+            const data = await fetchRecentOptionPrints(clickhouse, limit, source, storageFilters);
+            return jsonResponse({ data });
+          } catch (error) {
+            return jsonResponse(
+              {
+                error: "invalid options query",
+                detail: error instanceof Error ? error.message : String(error)
+              },
+              400
+            );
+          }
+        }
+
+        if (req.method === "GET" && url.pathname === "/nbbo/options") {
           const limit = parseLimit(url.searchParams.get("limit"));
           const source = parseReplaySource(url) ?? undefined;
-          const { storageFilters } = parseOptionPrintQuery(url);
-          const data = await fetchRecentOptionPrints(clickhouse, limit, source, storageFilters);
+          const data = await fetchRecentOptionNBBO(clickhouse, limit, source);
           return jsonResponse({ data });
-        } catch (error) {
-          return jsonResponse(
-            {
-              error: "invalid options query",
-              detail: error instanceof Error ? error.message : String(error)
-            },
-            400
-          );
         }
-      }
 
-      if (req.method === "GET" && url.pathname === "/nbbo/options") {
-        const limit = parseLimit(url.searchParams.get("limit"));
-        const source = parseReplaySource(url) ?? undefined;
-        const data = await fetchRecentOptionNBBO(clickhouse, limit, source);
-        return jsonResponse({ data });
-      }
-
-      if (req.method === "GET" && url.pathname === "/prints/equities") {
-        const limit = parseLimit(url.searchParams.get("limit"));
-        const data = await fetchRecentEquityPrints(clickhouse, limit);
-        return jsonResponse({ data });
-      }
-
-      if (req.method === "GET" && url.pathname === "/prints/equities/range") {
-        try {
-          const { underlyingId, startTs, endTs, limit } = parseEquityPrintRangeParams(url);
-          const data = await fetchEquityPrintsRange(
-            clickhouse,
-            underlyingId,
-            startTs,
-            endTs,
-            limit
-          );
+        if (req.method === "GET" && url.pathname === "/prints/equities") {
+          const limit = parseLimit(url.searchParams.get("limit"));
+          const data = await fetchRecentEquityPrints(clickhouse, limit);
           return jsonResponse({ data });
-        } catch (error) {
-          return jsonResponse(
-            {
-              error: "invalid equity range query",
-              detail: error instanceof Error ? error.message : String(error)
-            },
-            400
-          );
         }
-      }
 
-      if (req.method === "GET" && url.pathname === "/quotes/equities") {
-        const limit = parseLimit(url.searchParams.get("limit"));
-        const data = await fetchRecentEquityQuotes(clickhouse, limit);
-        return jsonResponse({ data });
-      }
+        if (req.method === "GET" && url.pathname === "/prints/equities/range") {
+          try {
+            const { underlyingId, startTs, endTs, limit } = parseEquityPrintRangeParams(url);
+            const data = await fetchEquityPrintsRange(
+              clickhouse,
+              underlyingId,
+              startTs,
+              endTs,
+              limit
+            );
+            return jsonResponse({ data });
+          } catch (error) {
+            return jsonResponse(
+              {
+                error: "invalid equity range query",
+                detail: error instanceof Error ? error.message : String(error)
+              },
+              400
+            );
+          }
+        }
 
-      if (req.method === "GET" && url.pathname === "/candles/equities") {
-        try {
-          const { underlyingId, intervalMs, startTs, endTs, limit, useCache } =
-            parseCandleParams(url);
-          if (useCache && redis && redis.isOpen) {
-            const cached = await fetchEquityCandlesFromCache(
-              redis,
+        if (req.method === "GET" && url.pathname === "/quotes/equities") {
+          const limit = parseLimit(url.searchParams.get("limit"));
+          const data = await fetchRecentEquityQuotes(clickhouse, limit);
+          return jsonResponse({ data });
+        }
+
+        if (req.method === "GET" && url.pathname === "/candles/equities") {
+          try {
+            const { underlyingId, intervalMs, startTs, endTs, limit, useCache } =
+              parseCandleParams(url);
+            if (useCache && redis && redis.isOpen) {
+              const cached = await fetchEquityCandlesFromCache(
+                redis,
+                underlyingId,
+                intervalMs,
+                startTs,
+                endTs
+              );
+              if (cached.length > 0) {
+                return jsonResponse({ data: cached });
+              }
+            }
+
+            const data = await fetchEquityCandlesRange(
+              clickhouse,
               underlyingId,
               intervalMs,
               startTs,
-              endTs
+              endTs,
+              limit
             );
-            if (cached.length > 0) {
-              return jsonResponse({ data: cached });
-            }
+            return jsonResponse({ data });
+          } catch (error) {
+            return jsonResponse(
+              {
+                error: "invalid candle query",
+                detail: error instanceof Error ? error.message : String(error)
+              },
+              400
+            );
           }
+        }
 
-          const data = await fetchEquityCandlesRange(
-            clickhouse,
-            underlyingId,
-            intervalMs,
-            startTs,
-            endTs,
-            limit
-          );
+        if (req.method === "GET" && url.pathname === "/joins/equities") {
+          const limit = parseLimit(url.searchParams.get("limit"));
+          const data = await fetchRecentEquityPrintJoins(clickhouse, limit);
           return jsonResponse({ data });
-        } catch (error) {
-          return jsonResponse(
-            {
-              error: "invalid candle query",
-              detail: error instanceof Error ? error.message : String(error)
-            },
-            400
-          );
         }
-      }
 
-      if (req.method === "GET" && url.pathname === "/joins/equities") {
-        const limit = parseLimit(url.searchParams.get("limit"));
-        const data = await fetchRecentEquityPrintJoins(clickhouse, limit);
-        return jsonResponse({ data });
-      }
+        if (req.method === "GET" && url.pathname === "/dark/inferred") {
+          const limit = parseLimit(url.searchParams.get("limit"));
+          const data = await fetchRecentInferredDark(clickhouse, limit);
+          return jsonResponse({ data });
+        }
 
-      if (req.method === "GET" && url.pathname === "/dark/inferred") {
-        const limit = parseLimit(url.searchParams.get("limit"));
-        const data = await fetchRecentInferredDark(clickhouse, limit);
-        return jsonResponse({ data });
-      }
+        if (req.method === "GET" && url.pathname === "/flow/packets") {
+          const limit = parseLimit(url.searchParams.get("limit"));
+          const data = await fetchRecentFlowPackets(clickhouse, limit);
+          return jsonResponse({ data });
+        }
 
-      if (req.method === "GET" && url.pathname === "/flow/packets") {
-        const limit = parseLimit(url.searchParams.get("limit"));
-        const data = await fetchRecentFlowPackets(clickhouse, limit);
-        return jsonResponse({ data });
-      }
+        if (req.method === "GET" && url.pathname === "/flow/smart-money") {
+          const limit = parseLimit(url.searchParams.get("limit"));
+          const data = await fetchRecentSmartMoneyEvents(clickhouse, limit);
+          return jsonResponse({ data });
+        }
 
-      if (req.method === "GET" && url.pathname === "/flow/smart-money") {
-        const limit = parseLimit(url.searchParams.get("limit"));
-        const data = await fetchRecentSmartMoneyEvents(clickhouse, limit);
-        return jsonResponse({ data });
-      }
+        if (req.method === "GET" && url.pathname === "/flow/smart-flow") {
+          const limit = parseLimit(url.searchParams.get("limit"));
+          const data = await fetchRecentSmartFlowExplainability(clickhouse, limit);
+          return jsonResponse({ data });
+        }
 
-      if (req.method === "GET" && url.pathname === "/flow/classifier-hits") {
-        const limit = parseLimit(url.searchParams.get("limit"));
-        const data = await fetchRecentClassifierHits(clickhouse, limit);
-        return jsonResponse({ data });
-      }
+        if (req.method === "GET" && url.pathname === "/flow/classifier-hits") {
+          const limit = parseLimit(url.searchParams.get("limit"));
+          const data = await fetchRecentClassifierHits(clickhouse, limit);
+          return jsonResponse({ data });
+        }
 
-      if (req.method === "GET" && url.pathname === "/flow/alerts") {
-        const limit = parseLimit(url.searchParams.get("limit"));
-        const data = await fetchRecentAlerts(clickhouse, limit);
-        return jsonResponse({ data });
-      }
+        if (req.method === "GET" && url.pathname === "/flow/alerts") {
+          const limit = parseLimit(url.searchParams.get("limit"));
+          const data = await fetchRecentAlerts(clickhouse, limit);
+          return jsonResponse({ data });
+        }
 
-      if (req.method === "GET" && url.pathname === "/news") {
-        const limit = parseLimit(url.searchParams.get("limit") ?? "100");
-        const data = await fetchRecentNews(clickhouse, limit);
-        return jsonResponse({ data });
-      }
+        if (req.method === "GET" && url.pathname === "/news") {
+          const limit = parseLimit(url.searchParams.get("limit") ?? "100");
+          const data = await fetchRecentNews(clickhouse, limit);
+          return jsonResponse({ data });
+        }
 
-      if (req.method === "GET" && isAlertContextPath(url.pathname)) {
-        try {
-          const traceId = parseAlertContextTraceIdPath(url.pathname);
-          if (traceId === null) {
-            return jsonResponse({ error: "not found" }, 404);
+        if (req.method === "GET" && isAlertContextPath(url.pathname)) {
+          try {
+            const traceId = parseAlertContextTraceIdPath(url.pathname);
+            if (traceId === null) {
+              return jsonResponse({ error: "not found" }, 404);
+            }
+            const data = await fetchAlertContextByTraceId(clickhouse, traceId);
+            return jsonResponse(data);
+          } catch (error) {
+            return jsonResponse(
+              {
+                error: "invalid alert context query",
+                detail: error instanceof Error ? error.message : String(error)
+              },
+              400
+            );
           }
-          const data = await fetchAlertContextByTraceId(clickhouse, traceId);
-          return jsonResponse(data);
-        } catch (error) {
-          return jsonResponse(
-            {
-              error: "invalid alert context query",
-              detail: error instanceof Error ? error.message : String(error)
-            },
-            400
-          );
         }
-      }
 
-      if (req.method === "GET" && url.pathname === "/history/options") {
-        try {
+        if (req.method === "GET" && url.pathname === "/history/options") {
+          try {
+            const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
+            const source = parseReplaySource(url) ?? undefined;
+            const { storageFilters } = parseOptionPrintQuery(url);
+            const data = await fetchOptionPrintsBefore(
+              clickhouse,
+              beforeTs,
+              beforeSeq,
+              limit,
+              source,
+              storageFilters
+            );
+            return jsonResponse(
+              buildHistoryResponse(data, (item) => ({ ts: item.ts, seq: item.seq }))
+            );
+          } catch (error) {
+            return jsonResponse(
+              {
+                error: "invalid options history query",
+                detail: error instanceof Error ? error.message : String(error)
+              },
+              400
+            );
+          }
+        }
+
+        if (req.method === "GET" && url.pathname === "/history/nbbo") {
           const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
           const source = parseReplaySource(url) ?? undefined;
-          const { storageFilters } = parseOptionPrintQuery(url);
-          const data = await fetchOptionPrintsBefore(
+          const data = await fetchOptionNBBOBefore(clickhouse, beforeTs, beforeSeq, limit, source);
+          return jsonResponse(
+            buildHistoryResponse(data, (item) => ({ ts: item.ts, seq: item.seq }))
+          );
+        }
+
+        if (req.method === "GET" && url.pathname === "/history/equities") {
+          const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
+          const data = await fetchEquityPrintsBefore(
             clickhouse,
             beforeTs,
             beforeSeq,
             limit,
-            source,
-            storageFilters
+            parseLiveEquityPrintFilters(url)
           );
           return jsonResponse(
             buildHistoryResponse(data, (item) => ({ ts: item.ts, seq: item.seq }))
           );
-        } catch (error) {
+        }
+
+        if (req.method === "GET" && url.pathname === "/history/equity-quotes") {
+          const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
+          const data = await fetchEquityQuotesBefore(clickhouse, beforeTs, beforeSeq, limit);
           return jsonResponse(
-            {
-              error: "invalid options history query",
-              detail: error instanceof Error ? error.message : String(error)
-            },
-            400
+            buildHistoryResponse(data, (item) => ({ ts: item.ts, seq: item.seq }))
           );
         }
-      }
 
-      if (req.method === "GET" && url.pathname === "/history/nbbo") {
-        const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
-        const source = parseReplaySource(url) ?? undefined;
-        const data = await fetchOptionNBBOBefore(clickhouse, beforeTs, beforeSeq, limit, source);
-        return jsonResponse(buildHistoryResponse(data, (item) => ({ ts: item.ts, seq: item.seq })));
-      }
-
-      if (req.method === "GET" && url.pathname === "/history/equities") {
-        const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
-        const data = await fetchEquityPrintsBefore(
-          clickhouse,
-          beforeTs,
-          beforeSeq,
-          limit,
-          parseLiveEquityPrintFilters(url)
-        );
-        return jsonResponse(buildHistoryResponse(data, (item) => ({ ts: item.ts, seq: item.seq })));
-      }
-
-      if (req.method === "GET" && url.pathname === "/history/equity-quotes") {
-        const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
-        const data = await fetchEquityQuotesBefore(clickhouse, beforeTs, beforeSeq, limit);
-        return jsonResponse(buildHistoryResponse(data, (item) => ({ ts: item.ts, seq: item.seq })));
-      }
-
-      if (req.method === "GET" && url.pathname === "/history/equity-joins") {
-        const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
-        const data = await fetchEquityPrintJoinsBefore(clickhouse, beforeTs, beforeSeq, limit);
-        return jsonResponse(
-          buildHistoryResponse(data, (item) => ({ ts: item.source_ts, seq: item.seq }))
-        );
-      }
-
-      if (req.method === "GET" && url.pathname === "/history/flow") {
-        const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
-        const data = await fetchFlowPacketsBefore(clickhouse, beforeTs, beforeSeq, limit);
-        return jsonResponse(
-          buildHistoryResponse(data, (item) => ({ ts: item.source_ts, seq: item.seq }))
-        );
-      }
-
-      if (req.method === "GET" && url.pathname === "/history/smart-money") {
-        const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
-        const data = await fetchSmartMoneyEventsBefore(clickhouse, beforeTs, beforeSeq, limit);
-        return jsonResponse(
-          buildHistoryResponse(data, (item) => ({ ts: item.source_ts, seq: item.seq }))
-        );
-      }
-
-      if (req.method === "GET" && url.pathname === "/history/classifier-hits") {
-        const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
-        const data = await fetchClassifierHitsBefore(clickhouse, beforeTs, beforeSeq, limit);
-        return jsonResponse(
-          buildHistoryResponse(data, (item) => ({ ts: item.source_ts, seq: item.seq }))
-        );
-      }
-
-      if (req.method === "GET" && url.pathname === "/history/alerts") {
-        const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
-        const data = await fetchAlertsBefore(clickhouse, beforeTs, beforeSeq, limit);
-        return jsonResponse(
-          buildHistoryResponse(data, (item) => ({ ts: item.source_ts, seq: item.seq }))
-        );
-      }
-
-      if (req.method === "GET" && url.pathname === "/history/inferred-dark") {
-        const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
-        const data = await fetchInferredDarkBefore(clickhouse, beforeTs, beforeSeq, limit);
-        return jsonResponse(
-          buildHistoryResponse(data, (item) => ({ ts: item.source_ts, seq: item.seq }))
-        );
-      }
-
-      if (req.method === "GET" && url.pathname === "/history/news") {
-        const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
-        const data = await fetchNewsBefore(clickhouse, beforeTs, beforeSeq, limit);
-        return jsonResponse(
-          buildHistoryResponse(data, (item) => ({ ts: item.published_ts, seq: item.seq }))
-        );
-      }
-
-      if (req.method === "GET" && /^\/flow\/packets\/[^/]+$/.test(url.pathname)) {
-        const id = decodeURIComponent(url.pathname.slice("/flow/packets/".length));
-        const data = await fetchFlowPacketById(clickhouse, id);
-        return jsonResponse({ data });
-      }
-
-      if (req.method === "GET" && /^\/flow\/alerts\/[^/]+\/context$/.test(url.pathname)) {
-        const traceId = decodeURIComponent(
-          url.pathname.slice("/flow/alerts/".length, -"/context".length)
-        ).trim();
-        if (!traceId || traceId.length > 512) {
-          return jsonResponse({ error: "invalid alert trace id" }, 400);
-        }
-        const data = await fetchAlertContextByTraceId(clickhouse, traceId);
-        return jsonResponse(data);
-      }
-
-      if (req.method === "GET" && url.pathname === "/option-prints/by-trace") {
-        const traceIds = url.searchParams.getAll("trace_id");
-        const data = await fetchOptionPrintsByTraceIds(clickhouse, traceIds);
-        return jsonResponse({ data });
-      }
-
-      if (req.method === "POST" && url.pathname === "/lookup/options-support") {
-        try {
-          const body = optionsSupportLookupSchema.parse(await readJsonBody(req));
-          const packets = await fetchFlowPacketsByMemberTraceIds(clickhouse, body.trace_ids);
-          const packetIds = packets.map((packet) => packet.id);
-          const [smartMoney, classifierHits, nbboByTraceId] = await Promise.all([
-            fetchSmartMoneyEventsByPacketIds(clickhouse, packetIds),
-            fetchClassifierHitsByPacketIds(clickhouse, packetIds),
-            fetchNearestOptionNBBOForPrints(clickhouse, body.nbbo_context)
-          ]);
-          return jsonResponse({
-            packets,
-            smart_money: smartMoney,
-            classifier_hits: classifierHits,
-            nbbo_by_trace_id: nbboByTraceId
-          });
-        } catch (error) {
+        if (req.method === "GET" && url.pathname === "/history/equity-joins") {
+          const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
+          const data = await fetchEquityPrintJoinsBefore(clickhouse, beforeTs, beforeSeq, limit);
           return jsonResponse(
-            {
-              error: "invalid options support lookup",
-              detail: error instanceof Error ? error.message : String(error)
-            },
-            400
+            buildHistoryResponse(data, (item) => ({ ts: item.source_ts, seq: item.seq }))
           );
         }
-      }
 
-      if (req.method === "GET" && url.pathname === "/equity-joins/by-id") {
-        const ids = url.searchParams.getAll("id");
-        const data = await fetchEquityPrintJoinsByIds(clickhouse, ids);
-        return jsonResponse({ data });
-      }
+        if (req.method === "GET" && url.pathname === "/history/flow") {
+          const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
+          const data = await fetchFlowPacketsBefore(clickhouse, beforeTs, beforeSeq, limit);
+          return jsonResponse(
+            buildHistoryResponse(data, (item) => ({ ts: item.source_ts, seq: item.seq }))
+          );
+        }
 
-      if (req.method === "GET" && url.pathname === "/replay/options") {
-        try {
+        if (req.method === "GET" && url.pathname === "/history/smart-money") {
+          const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
+          const data = await fetchSmartMoneyEventsBefore(clickhouse, beforeTs, beforeSeq, limit);
+          return jsonResponse(
+            buildHistoryResponse(data, (item) => ({ ts: item.source_ts, seq: item.seq }))
+          );
+        }
+
+        if (req.method === "GET" && url.pathname === "/history/smart-flow") {
+          const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
+          const data = await fetchSmartFlowExplainabilityBefore(
+            clickhouse,
+            beforeTs,
+            beforeSeq,
+            limit
+          );
+          return jsonResponse(buildHistoryResponse(data, smartFlowCursor));
+        }
+
+        if (req.method === "GET" && url.pathname === "/history/classifier-hits") {
+          const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
+          const data = await fetchClassifierHitsBefore(clickhouse, beforeTs, beforeSeq, limit);
+          return jsonResponse(
+            buildHistoryResponse(data, (item) => ({ ts: item.source_ts, seq: item.seq }))
+          );
+        }
+
+        if (req.method === "GET" && url.pathname === "/history/alerts") {
+          const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
+          const data = await fetchAlertsBefore(clickhouse, beforeTs, beforeSeq, limit);
+          return jsonResponse(
+            buildHistoryResponse(data, (item) => ({ ts: item.source_ts, seq: item.seq }))
+          );
+        }
+
+        if (req.method === "GET" && url.pathname === "/history/inferred-dark") {
+          const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
+          const data = await fetchInferredDarkBefore(clickhouse, beforeTs, beforeSeq, limit);
+          return jsonResponse(
+            buildHistoryResponse(data, (item) => ({ ts: item.source_ts, seq: item.seq }))
+          );
+        }
+
+        if (req.method === "GET" && url.pathname === "/history/news") {
+          const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
+          const data = await fetchNewsBefore(clickhouse, beforeTs, beforeSeq, limit);
+          return jsonResponse(
+            buildHistoryResponse(data, (item) => ({ ts: item.published_ts, seq: item.seq }))
+          );
+        }
+
+        if (req.method === "GET" && /^\/flow\/packets\/[^/]+$/.test(url.pathname)) {
+          const id = decodeURIComponent(url.pathname.slice("/flow/packets/".length));
+          const data = await fetchFlowPacketById(clickhouse, id);
+          return jsonResponse({ data });
+        }
+
+        if (req.method === "GET" && /^\/flow\/alerts\/[^/]+\/context$/.test(url.pathname)) {
+          const traceId = decodeURIComponent(
+            url.pathname.slice("/flow/alerts/".length, -"/context".length)
+          ).trim();
+          if (!traceId || traceId.length > 512) {
+            return jsonResponse({ error: "invalid alert trace id" }, 400);
+          }
+          const data = await fetchAlertContextByTraceId(clickhouse, traceId);
+          return jsonResponse(data);
+        }
+
+        if (req.method === "GET" && url.pathname === "/option-prints/by-trace") {
+          const traceIds = url.searchParams.getAll("trace_id");
+          const data = await fetchOptionPrintsByTraceIds(clickhouse, traceIds);
+          return jsonResponse({ data });
+        }
+
+        if (req.method === "POST" && url.pathname === "/lookup/options-support") {
+          try {
+            const body = optionsSupportLookupSchema.parse(await readJsonBody(req));
+            const packets = await fetchFlowPacketsByMemberTraceIds(clickhouse, body.trace_ids);
+            const packetIds = packets.map((packet) => packet.id);
+            const [smartMoney, classifierHits, nbboByTraceId] = await Promise.all([
+              fetchSmartMoneyEventsByPacketIds(clickhouse, packetIds),
+              fetchClassifierHitsByPacketIds(clickhouse, packetIds),
+              fetchNearestOptionNBBOForPrints(clickhouse, body.nbbo_context)
+            ]);
+            return jsonResponse({
+              packets,
+              smart_money: smartMoney,
+              smart_flow: projectSmartFlowExplainability(smartMoney),
+              classifier_hits: classifierHits,
+              nbbo_by_trace_id: nbboByTraceId
+            });
+          } catch (error) {
+            return jsonResponse(
+              {
+                error: "invalid options support lookup",
+                detail: error instanceof Error ? error.message : String(error)
+              },
+              400
+            );
+          }
+        }
+
+        if (req.method === "GET" && url.pathname === "/equity-joins/by-id") {
+          const ids = url.searchParams.getAll("id");
+          const data = await fetchEquityPrintJoinsByIds(clickhouse, ids);
+          return jsonResponse({ data });
+        }
+
+        if (req.method === "GET" && url.pathname === "/replay/options") {
+          try {
+            const { afterTs, afterSeq, limit } = parseReplayParams(url);
+            const source = parseReplaySource(url) ?? undefined;
+            const { storageFilters } = parseOptionPrintQuery(url);
+            const data = await fetchOptionPrintsAfter(
+              clickhouse,
+              afterTs,
+              afterSeq,
+              limit,
+              source,
+              storageFilters
+            );
+            const last = data.at(-1);
+            const next = last ? { ts: last.ts, seq: last.seq } : null;
+            return jsonResponse({ data, next });
+          } catch (error) {
+            return jsonResponse(
+              {
+                error: "invalid options replay query",
+                detail: error instanceof Error ? error.message : String(error)
+              },
+              400
+            );
+          }
+        }
+
+        if (req.method === "GET" && url.pathname === "/replay/nbbo") {
           const { afterTs, afterSeq, limit } = parseReplayParams(url);
           const source = parseReplaySource(url) ?? undefined;
-          const { storageFilters } = parseOptionPrintQuery(url);
-          const data = await fetchOptionPrintsAfter(
-            clickhouse,
-            afterTs,
-            afterSeq,
-            limit,
-            source,
-            storageFilters
-          );
+          const data = await fetchOptionNBBOAfter(clickhouse, afterTs, afterSeq, limit, source);
           const last = data.at(-1);
           const next = last ? { ts: last.ts, seq: last.seq } : null;
           return jsonResponse({ data, next });
-        } catch (error) {
-          return jsonResponse(
-            {
-              error: "invalid options replay query",
-              detail: error instanceof Error ? error.message : String(error)
-            },
-            400
-          );
         }
-      }
 
-      if (req.method === "GET" && url.pathname === "/replay/nbbo") {
-        const { afterTs, afterSeq, limit } = parseReplayParams(url);
-        const source = parseReplaySource(url) ?? undefined;
-        const data = await fetchOptionNBBOAfter(clickhouse, afterTs, afterSeq, limit, source);
-        const last = data.at(-1);
-        const next = last ? { ts: last.ts, seq: last.seq } : null;
-        return jsonResponse({ data, next });
-      }
+        if (req.method === "GET" && url.pathname === "/replay/equities") {
+          const { afterTs, afterSeq, limit } = parseReplayParams(url);
+          const data = await fetchEquityPrintsAfter(clickhouse, afterTs, afterSeq, limit);
+          const last = data.at(-1);
+          const next = last ? { ts: last.ts, seq: last.seq } : null;
+          return jsonResponse({ data, next });
+        }
 
-      if (req.method === "GET" && url.pathname === "/replay/equities") {
-        const { afterTs, afterSeq, limit } = parseReplayParams(url);
-        const data = await fetchEquityPrintsAfter(clickhouse, afterTs, afterSeq, limit);
-        const last = data.at(-1);
-        const next = last ? { ts: last.ts, seq: last.seq } : null;
-        return jsonResponse({ data, next });
-      }
+        if (req.method === "GET" && url.pathname === "/replay/equity-quotes") {
+          const { afterTs, afterSeq, limit } = parseReplayParams(url);
+          const data = await fetchEquityQuotesAfter(clickhouse, afterTs, afterSeq, limit);
+          const last = data.at(-1);
+          const next = last ? { ts: last.ts, seq: last.seq } : null;
+          return jsonResponse({ data, next });
+        }
 
-      if (req.method === "GET" && url.pathname === "/replay/equity-quotes") {
-        const { afterTs, afterSeq, limit } = parseReplayParams(url);
-        const data = await fetchEquityQuotesAfter(clickhouse, afterTs, afterSeq, limit);
-        const last = data.at(-1);
-        const next = last ? { ts: last.ts, seq: last.seq } : null;
-        return jsonResponse({ data, next });
-      }
+        if (req.method === "GET" && url.pathname === "/replay/equity-candles") {
+          try {
+            const { underlyingId, intervalMs, afterTs, afterSeq, limit } =
+              parseCandleReplayParams(url);
+            const data = await fetchEquityCandlesAfter(
+              clickhouse,
+              underlyingId,
+              intervalMs,
+              afterTs,
+              afterSeq,
+              limit
+            );
+            const last = data.at(-1);
+            const next = last ? { ts: last.ts, seq: last.seq } : null;
+            return jsonResponse({ data, next });
+          } catch (error) {
+            return jsonResponse(
+              {
+                error: "invalid candle replay query",
+                detail: error instanceof Error ? error.message : String(error)
+              },
+              400
+            );
+          }
+        }
 
-      if (req.method === "GET" && url.pathname === "/replay/equity-candles") {
-        try {
-          const { underlyingId, intervalMs, afterTs, afterSeq, limit } =
-            parseCandleReplayParams(url);
-          const data = await fetchEquityCandlesAfter(
+        if (req.method === "GET" && url.pathname === "/replay/equity-joins") {
+          const { afterTs, afterSeq, limit } = parseReplayParams(url);
+          const data = await fetchEquityPrintJoinsAfter(clickhouse, afterTs, afterSeq, limit);
+          const last = data.at(-1);
+          const next = last ? { ts: last.source_ts, seq: last.seq } : null;
+          return jsonResponse({ data, next });
+        }
+
+        if (req.method === "GET" && url.pathname === "/replay/inferred-dark") {
+          const { afterTs, afterSeq, limit } = parseReplayParams(url);
+          const data = await fetchInferredDarkAfter(clickhouse, afterTs, afterSeq, limit);
+          const last = data.at(-1);
+          const next = last ? { ts: last.source_ts, seq: last.seq } : null;
+          return jsonResponse({ data, next });
+        }
+
+        if (req.method === "GET" && url.pathname === "/replay/flow") {
+          const { afterTs, afterSeq, limit } = parseReplayParams(url);
+          const data = await fetchFlowPacketsAfter(clickhouse, afterTs, afterSeq, limit);
+          const last = data.at(-1);
+          const next = last ? { ts: last.source_ts, seq: last.seq } : null;
+          return jsonResponse({ data, next });
+        }
+
+        if (req.method === "GET" && url.pathname === "/replay/smart-money") {
+          const { afterTs, afterSeq, limit } = parseReplayParams(url);
+          const data = await fetchSmartMoneyEventsAfter(clickhouse, afterTs, afterSeq, limit);
+          const last = data.at(-1);
+          const next = last ? { ts: last.source_ts, seq: last.seq } : null;
+          return jsonResponse({ data, next });
+        }
+
+        if (req.method === "GET" && url.pathname === "/replay/smart-flow") {
+          const { afterTs, afterSeq, limit } = parseReplayParams(url);
+          const data = await fetchSmartFlowExplainabilityAfter(
             clickhouse,
-            underlyingId,
-            intervalMs,
             afterTs,
             afterSeq,
             limit
           );
           const last = data.at(-1);
-          const next = last ? { ts: last.ts, seq: last.seq } : null;
+          const next = last ? smartFlowCursor(last) : null;
           return jsonResponse({ data, next });
-        } catch (error) {
-          return jsonResponse(
-            {
-              error: "invalid candle replay query",
-              detail: error instanceof Error ? error.message : String(error)
-            },
-            400
-          );
-        }
-      }
-
-      if (req.method === "GET" && url.pathname === "/replay/equity-joins") {
-        const { afterTs, afterSeq, limit } = parseReplayParams(url);
-        const data = await fetchEquityPrintJoinsAfter(clickhouse, afterTs, afterSeq, limit);
-        const last = data.at(-1);
-        const next = last ? { ts: last.source_ts, seq: last.seq } : null;
-        return jsonResponse({ data, next });
-      }
-
-      if (req.method === "GET" && url.pathname === "/replay/inferred-dark") {
-        const { afterTs, afterSeq, limit } = parseReplayParams(url);
-        const data = await fetchInferredDarkAfter(clickhouse, afterTs, afterSeq, limit);
-        const last = data.at(-1);
-        const next = last ? { ts: last.source_ts, seq: last.seq } : null;
-        return jsonResponse({ data, next });
-      }
-
-      if (req.method === "GET" && url.pathname === "/replay/flow") {
-        const { afterTs, afterSeq, limit } = parseReplayParams(url);
-        const data = await fetchFlowPacketsAfter(clickhouse, afterTs, afterSeq, limit);
-        const last = data.at(-1);
-        const next = last ? { ts: last.source_ts, seq: last.seq } : null;
-        return jsonResponse({ data, next });
-      }
-
-      if (req.method === "GET" && url.pathname === "/replay/smart-money") {
-        const { afterTs, afterSeq, limit } = parseReplayParams(url);
-        const data = await fetchSmartMoneyEventsAfter(clickhouse, afterTs, afterSeq, limit);
-        const last = data.at(-1);
-        const next = last ? { ts: last.source_ts, seq: last.seq } : null;
-        return jsonResponse({ data, next });
-      }
-
-      if (req.method === "GET" && url.pathname === "/replay/classifier-hits") {
-        const { afterTs, afterSeq, limit } = parseReplayParams(url);
-        const data = await fetchClassifierHitsAfter(clickhouse, afterTs, afterSeq, limit);
-        const last = data.at(-1);
-        const next = last ? { ts: last.source_ts, seq: last.seq } : null;
-        return jsonResponse({ data, next });
-      }
-
-      if (req.method === "GET" && url.pathname === "/replay/alerts") {
-        const { afterTs, afterSeq, limit } = parseReplayParams(url);
-        const data = await fetchAlertsAfter(clickhouse, afterTs, afterSeq, limit);
-        const last = data.at(-1);
-        const next = last ? { ts: last.source_ts, seq: last.seq } : null;
-        return jsonResponse({ data, next });
-      }
-
-      if (req.method === "GET" && url.pathname === "/ws/options") {
-        if (serverRef.upgrade(req, { data: { channel: "options" } })) {
-          return new Response(null, { status: 101 });
         }
 
-        return jsonResponse({ error: "websocket upgrade failed" }, 400);
-      }
-
-      if (req.method === "GET" && url.pathname === "/ws/options-nbbo") {
-        if (serverRef.upgrade(req, { data: { channel: "options-nbbo" } })) {
-          return new Response(null, { status: 101 });
+        if (req.method === "GET" && url.pathname === "/replay/classifier-hits") {
+          const { afterTs, afterSeq, limit } = parseReplayParams(url);
+          const data = await fetchClassifierHitsAfter(clickhouse, afterTs, afterSeq, limit);
+          const last = data.at(-1);
+          const next = last ? { ts: last.source_ts, seq: last.seq } : null;
+          return jsonResponse({ data, next });
         }
 
-        return jsonResponse({ error: "websocket upgrade failed" }, 400);
-      }
-
-      if (req.method === "GET" && url.pathname === "/ws/equities") {
-        if (serverRef.upgrade(req, { data: { channel: "equities" } })) {
-          return new Response(null, { status: 101 });
+        if (req.method === "GET" && url.pathname === "/replay/alerts") {
+          const { afterTs, afterSeq, limit } = parseReplayParams(url);
+          const data = await fetchAlertsAfter(clickhouse, afterTs, afterSeq, limit);
+          const last = data.at(-1);
+          const next = last ? { ts: last.source_ts, seq: last.seq } : null;
+          return jsonResponse({ data, next });
         }
 
-        return jsonResponse({ error: "websocket upgrade failed" }, 400);
-      }
+        if (req.method === "GET" && url.pathname === "/ws/options") {
+          if (serverRef.upgrade(req, { data: { channel: "options" } })) {
+            return new Response(null, { status: 101 });
+          }
 
-      if (req.method === "GET" && url.pathname === "/ws/equity-candles") {
-        if (serverRef.upgrade(req, { data: { channel: "equity-candles" } })) {
-          return new Response(null, { status: 101 });
+          return jsonResponse({ error: "websocket upgrade failed" }, 400);
         }
 
-        return jsonResponse({ error: "websocket upgrade failed" }, 400);
-      }
+        if (req.method === "GET" && url.pathname === "/ws/options-nbbo") {
+          if (serverRef.upgrade(req, { data: { channel: "options-nbbo" } })) {
+            return new Response(null, { status: 101 });
+          }
 
-      if (req.method === "GET" && url.pathname === "/ws/equity-quotes") {
-        if (serverRef.upgrade(req, { data: { channel: "equity-quotes" } })) {
-          return new Response(null, { status: 101 });
+          return jsonResponse({ error: "websocket upgrade failed" }, 400);
         }
 
-        return jsonResponse({ error: "websocket upgrade failed" }, 400);
-      }
+        if (req.method === "GET" && url.pathname === "/ws/equities") {
+          if (serverRef.upgrade(req, { data: { channel: "equities" } })) {
+            return new Response(null, { status: 101 });
+          }
 
-      if (req.method === "GET" && url.pathname === "/ws/equity-joins") {
-        if (serverRef.upgrade(req, { data: { channel: "equity-joins" } })) {
-          return new Response(null, { status: 101 });
+          return jsonResponse({ error: "websocket upgrade failed" }, 400);
         }
 
-        return jsonResponse({ error: "websocket upgrade failed" }, 400);
-      }
+        if (req.method === "GET" && url.pathname === "/ws/equity-candles") {
+          if (serverRef.upgrade(req, { data: { channel: "equity-candles" } })) {
+            return new Response(null, { status: 101 });
+          }
 
-      if (req.method === "GET" && url.pathname === "/ws/inferred-dark") {
-        if (serverRef.upgrade(req, { data: { channel: "inferred-dark" } })) {
-          return new Response(null, { status: 101 });
+          return jsonResponse({ error: "websocket upgrade failed" }, 400);
         }
 
-        return jsonResponse({ error: "websocket upgrade failed" }, 400);
-      }
+        if (req.method === "GET" && url.pathname === "/ws/equity-quotes") {
+          if (serverRef.upgrade(req, { data: { channel: "equity-quotes" } })) {
+            return new Response(null, { status: 101 });
+          }
 
-      if (req.method === "GET" && url.pathname === "/ws/flow") {
-        if (serverRef.upgrade(req, { data: { channel: "flow" } })) {
-          return new Response(null, { status: 101 });
+          return jsonResponse({ error: "websocket upgrade failed" }, 400);
         }
 
-        return jsonResponse({ error: "websocket upgrade failed" }, 400);
-      }
+        if (req.method === "GET" && url.pathname === "/ws/equity-joins") {
+          if (serverRef.upgrade(req, { data: { channel: "equity-joins" } })) {
+            return new Response(null, { status: 101 });
+          }
 
-      if (req.method === "GET" && url.pathname === "/ws/classifier-hits") {
-        if (serverRef.upgrade(req, { data: { channel: "classifier-hits" } })) {
-          return new Response(null, { status: 101 });
+          return jsonResponse({ error: "websocket upgrade failed" }, 400);
         }
 
-        return jsonResponse({ error: "websocket upgrade failed" }, 400);
-      }
+        if (req.method === "GET" && url.pathname === "/ws/inferred-dark") {
+          if (serverRef.upgrade(req, { data: { channel: "inferred-dark" } })) {
+            return new Response(null, { status: 101 });
+          }
 
-      if (req.method === "GET" && url.pathname === "/ws/smart-money") {
-        if (serverRef.upgrade(req, { data: { channel: "smart-money" } })) {
-          return new Response(null, { status: 101 });
+          return jsonResponse({ error: "websocket upgrade failed" }, 400);
         }
 
-        return jsonResponse({ error: "websocket upgrade failed" }, 400);
-      }
+        if (req.method === "GET" && url.pathname === "/ws/flow") {
+          if (serverRef.upgrade(req, { data: { channel: "flow" } })) {
+            return new Response(null, { status: 101 });
+          }
 
-      if (req.method === "GET" && url.pathname === "/ws/alerts") {
-        if (serverRef.upgrade(req, { data: { channel: "alerts" } })) {
-          return new Response(null, { status: 101 });
+          return jsonResponse({ error: "websocket upgrade failed" }, 400);
         }
 
-        return jsonResponse({ error: "websocket upgrade failed" }, 400);
-      }
+        if (req.method === "GET" && url.pathname === "/ws/classifier-hits") {
+          if (serverRef.upgrade(req, { data: { channel: "classifier-hits" } })) {
+            return new Response(null, { status: 101 });
+          }
 
-      if (req.method === "GET" && url.pathname === "/ws/live") {
-        if (serverRef.upgrade(req, { data: { channel: "live" } })) {
-          return new Response(null, { status: 101 });
+          return jsonResponse({ error: "websocket upgrade failed" }, 400);
         }
 
-        return jsonResponse({ error: "websocket upgrade failed" }, 400);
-      }
+        if (req.method === "GET" && url.pathname === "/ws/smart-money") {
+          if (serverRef.upgrade(req, { data: { channel: "smart-money" } })) {
+            return new Response(null, { status: 101 });
+          }
 
-      return jsonResponse({ error: "not found" }, 404);
+          return jsonResponse({ error: "websocket upgrade failed" }, 400);
+        }
+
+        if (req.method === "GET" && url.pathname === "/ws/smart-flow") {
+          if (serverRef.upgrade(req, { data: { channel: "smart-flow" } })) {
+            return new Response(null, { status: 101 });
+          }
+
+          return jsonResponse({ error: "websocket upgrade failed" }, 400);
+        }
+
+        if (req.method === "GET" && url.pathname === "/ws/alerts") {
+          if (serverRef.upgrade(req, { data: { channel: "alerts" } })) {
+            return new Response(null, { status: 101 });
+          }
+
+          return jsonResponse({ error: "websocket upgrade failed" }, 400);
+        }
+
+        if (req.method === "GET" && url.pathname === "/ws/live") {
+          if (serverRef.upgrade(req, { data: { channel: "live" } })) {
+            return new Response(null, { status: 101 });
+          }
+
+          return jsonResponse({ error: "websocket upgrade failed" }, 400);
+        }
+
+        return jsonResponse({ error: "not found" }, 404);
+      };
+
+      const response = await handleApiRequest();
+      return withCorsHeaders(req, response, corsAllowedOrigins);
     },
     websocket: {
       open: (socket: any) => {
@@ -1981,6 +2086,8 @@ const run = async () => {
           inferredDarkSockets.add(socket);
         } else if (socket.data.channel === "flow") {
           flowSockets.add(socket);
+        } else if (socket.data.channel === "smart-flow") {
+          smartFlowSockets.add(socket);
         } else if (socket.data.channel === "smart-money") {
           smartMoneySockets.add(socket);
         } else if (socket.data.channel === "classifier-hits") {
@@ -2050,6 +2157,8 @@ const run = async () => {
           inferredDarkSockets.delete(socket);
         } else if (socket.data.channel === "flow") {
           flowSockets.delete(socket);
+        } else if (socket.data.channel === "smart-flow") {
+          smartFlowSockets.delete(socket);
         } else if (socket.data.channel === "smart-money") {
           smartMoneySockets.delete(socket);
         } else if (socket.data.channel === "classifier-hits") {

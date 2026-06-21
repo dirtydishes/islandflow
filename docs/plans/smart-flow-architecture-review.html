@@ -1,0 +1,814 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Smart Flow Architecture Review</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --surface: #0b1016;
+        --panel: #111820;
+        --panel-2: #0d141b;
+        --ink: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --line: rgba(255, 255, 255, 0.12);
+        --line-strong: rgba(245, 166, 35, 0.36);
+        --amber: #f5a623;
+        --amber-soft: rgba(245, 166, 35, 0.13);
+        --green-soft: rgba(37, 193, 122, 0.12);
+        --blue-soft: rgba(77, 163, 255, 0.12);
+        --red-soft: rgba(255, 107, 95, 0.12);
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at 14% 0%, rgba(245, 166, 35, 0.08), transparent 25rem),
+          radial-gradient(circle at 100% 12%, rgba(77, 163, 255, 0.06), transparent 28rem),
+          linear-gradient(180deg, rgba(17, 24, 32, 0.9), rgba(6, 8, 11, 0.98) 27rem),
+          var(--bg);
+        color: var(--ink);
+        font: 15px/1.6 var(--sans);
+      }
+
+      a {
+        color: inherit;
+      }
+
+      main {
+        width: min(1180px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 320px;
+        gap: 28px;
+        align-items: end;
+        padding-bottom: 28px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .kicker,
+      .label,
+      .chip,
+      th,
+      .toc-title {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .kicker {
+        margin: 0 0 12px;
+        color: var(--amber);
+      }
+
+      h1,
+      h2,
+      h3 {
+        text-wrap: balance;
+      }
+
+      h1 {
+        max-width: 820px;
+        margin: 0;
+        font-size: 2.35rem;
+        line-height: 1.08;
+        letter-spacing: 0;
+      }
+
+      .summary {
+        max-width: 75ch;
+        margin: 18px 0 0;
+        color: var(--muted);
+        font-size: 1rem;
+        text-wrap: pretty;
+      }
+
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 20px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 5px 10px;
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      .chip.good {
+        border-color: rgba(37, 193, 122, 0.34);
+        background: var(--green-soft);
+        color: #a8f1ce;
+      }
+
+      .chip.warn {
+        border-color: var(--line-strong);
+        background: var(--amber-soft);
+        color: #ffd58a;
+      }
+
+      .decision {
+        border: 1px solid var(--line-strong);
+        border-radius: 10px;
+        padding: 18px;
+        background:
+          linear-gradient(180deg, rgba(245, 166, 35, 0.15), rgba(17, 24, 32, 0.92)),
+          var(--panel);
+      }
+
+      .decision .label {
+        color: var(--amber);
+      }
+
+      .decision strong {
+        display: block;
+        margin-top: 8px;
+        color: var(--ink);
+        font-size: 1.18rem;
+        line-height: 1.25;
+      }
+
+      .decision p {
+        margin: 10px 0 0;
+        color: var(--muted);
+      }
+
+      .toc {
+        margin-top: 28px;
+        padding: 14px 0;
+        border-block: 1px solid var(--line);
+      }
+
+      .toc-title {
+        margin: 0 0 10px;
+        color: var(--faint);
+      }
+
+      .toc nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .toc a {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 7px 10px;
+        background: rgba(255, 255, 255, 0.035);
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 0.75rem;
+        text-decoration: none;
+      }
+
+      .toc a:hover,
+      .toc a:focus-visible {
+        border-color: var(--line-strong);
+        color: var(--ink);
+        background: var(--amber-soft);
+        outline: none;
+      }
+
+      section {
+        margin-top: 30px;
+      }
+
+      h2 {
+        margin: 0 0 14px;
+        color: var(--ink);
+        font-family: var(--mono);
+        font-size: 0.92rem;
+        line-height: 1.2;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+      }
+
+      h3 {
+        margin: 0;
+        color: var(--ink);
+        font-size: 1rem;
+        line-height: 1.25;
+      }
+
+      p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      p + p {
+        margin-top: 10px;
+      }
+
+      strong {
+        color: var(--ink);
+      }
+
+      code {
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        border-radius: 6px;
+        padding: 0.1rem 0.32rem;
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--ink);
+        font-family: var(--mono);
+        font-size: 0.9em;
+      }
+
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: linear-gradient(180deg, rgba(17, 24, 32, 0.94), rgba(13, 20, 27, 0.94));
+      }
+
+      .panel-body {
+        padding: 18px;
+      }
+
+      .grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .grid.two {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .grid.three {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .compact-list,
+      .steps {
+        margin: 0;
+        padding-left: 1.1rem;
+      }
+
+      .compact-list li,
+      .steps li {
+        margin: 7px 0;
+        color: var(--muted);
+      }
+
+      .source-list {
+        display: grid;
+        gap: 8px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .source-list a {
+        color: var(--ink);
+      }
+
+      .answer-list {
+        display: grid;
+        gap: 8px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .answer-list li,
+      .detail-row {
+        display: grid;
+        grid-template-columns: 44px minmax(0, 1fr);
+        gap: 12px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 11px 0 0;
+      }
+
+      .answer-list li:first-child,
+      .detail-row:first-child {
+        border-top: 0;
+        padding-top: 0;
+      }
+
+      .num {
+        color: var(--amber);
+        font-family: var(--mono);
+        font-size: 0.76rem;
+        font-weight: 700;
+      }
+
+      .answer-list p,
+      .detail-row p {
+        color: var(--muted);
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+
+      table {
+        width: 100%;
+        min-width: 860px;
+        border-collapse: collapse;
+        background: rgba(255, 255, 255, 0.025);
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 11px 12px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--faint);
+        background: rgba(255, 255, 255, 0.035);
+      }
+
+      td {
+        color: var(--muted);
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .status {
+        display: inline-flex;
+        border-radius: 999px;
+        padding: 3px 8px;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .status.refactor {
+        background: var(--blue-soft);
+        color: #b8dcff;
+      }
+
+      .status.redesign {
+        background: var(--red-soft);
+        color: #ffc2bd;
+      }
+
+      .option {
+        display: grid;
+        grid-template-rows: auto 1fr;
+        min-height: 100%;
+        overflow: hidden;
+      }
+
+      .option header {
+        padding: 16px 16px 14px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.035);
+      }
+
+      .option.recommended {
+        border-color: var(--line-strong);
+      }
+
+      .option.recommended header {
+        background: var(--amber-soft);
+      }
+
+      .option .panel-body {
+        display: grid;
+        align-content: start;
+        gap: 14px;
+      }
+
+      .option p {
+        margin-top: 8px;
+      }
+
+      .facts {
+        display: grid;
+        gap: 8px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .facts li {
+        display: grid;
+        gap: 2px;
+      }
+
+      .facts span {
+        color: var(--faint);
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .facts p {
+        margin: 0;
+      }
+
+      .object-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .object-chip {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px 12px;
+        background: rgba(255, 255, 255, 0.035);
+        color: var(--ink);
+        font-family: var(--mono);
+        font-size: 0.8rem;
+      }
+
+      .callout {
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        padding: 18px;
+        background: linear-gradient(180deg, rgba(245, 166, 35, 0.12), rgba(13, 20, 27, 0.94));
+      }
+
+      footer {
+        margin-top: 36px;
+        border-top: 1px solid var(--line);
+        padding-top: 16px;
+        color: var(--faint);
+        font-family: var(--mono);
+        font-size: 0.78rem;
+      }
+
+      @media (max-width: 900px) {
+        .hero,
+        .grid.two,
+        .grid.three {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 640px) {
+        main {
+          width: min(100% - 24px, 1180px);
+          padding-top: 24px;
+        }
+
+        h1 {
+          font-size: 1.72rem;
+        }
+
+        .panel-body,
+        .decision,
+        .callout {
+          padding: 15px;
+        }
+
+        .answer-list li,
+        .detail-row {
+          grid-template-columns: 34px minmax(0, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="hero">
+        <div>
+          <p class="kicker">Plan Document</p>
+          <h1>Evidence-Backed Smart-Flow Detection</h1>
+          <p class="summary">
+            A readable architecture review for reshaping Islandflow's smart-flow system around direct observation,
+            evidence clusters, cautious hypotheses, preserved uncertainty, and replayable validation.
+          </p>
+          <div class="meta" aria-label="Document metadata">
+            <span class="chip">Smart flow</span>
+            <span class="chip">Architecture review</span>
+            <span class="chip warn">Refactor, not rewrite</span>
+            <span class="chip good">Recommended: Option B</span>
+            <a class="chip" href="../implementation/smart-money/00-roadmap.html">Roadmap HTML</a>
+            <a class="chip" href="../implementation/smart-money/index.html">Phase dossier</a>
+          </div>
+        </div>
+        <aside class="decision" aria-label="Recommendation">
+          <span class="label">Recommendation</span>
+          <strong>Choose Option B: refactor the domain pipeline around evidence clusters and hypothesis events.</strong>
+          <p>
+            The current stack is useful. The current domain language is too confident. Keep the infrastructure,
+            replace the epistemic spine.
+          </p>
+        </aside>
+      </header>
+
+      <div class="toc" aria-label="Table of contents">
+        <p class="toc-title">Jump to</p>
+        <nav>
+          <a href="#summary">Summary</a>
+          <a href="#sources">Sources</a>
+          <a href="#classification">Area Classification</a>
+          <a href="#answers">Direct Answers</a>
+          <a href="#objects">Domain Objects</a>
+          <a href="#options">Options</a>
+          <a href="#recommendation">Recommendation</a>
+        </nav>
+      </div>
+
+      <section id="summary">
+        <h2>Summary</h2>
+        <div class="panel">
+          <div class="panel-body">
+            <p>
+              No source code was modified as part of the architecture review. The conclusion is direct:
+              the current architecture is <strong>not suitable as-is</strong>, but it is close enough to refactor.
+              The stack is right; the domain language and pipeline shape are not.
+            </p>
+            <p>
+              The research direction should be direct observation to inference to hypothesis, with preserved
+              evidence and visible uncertainty. The system should stop emitting "smart money" as if it is a
+              fact, and instead emit cautious, explainable smart-flow hypotheses.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="sources">
+        <h2>Source Documents</h2>
+        <div class="grid two">
+          <article class="panel">
+            <div class="panel-body">
+              <h3>Implementation Roadmap</h3>
+              <p>
+                <a href="../implementation/smart-money/00-roadmap.html">docs/implementation/smart-money/00-roadmap.html</a>
+              </p>
+            </div>
+          </article>
+          <article class="panel">
+            <div class="panel-body">
+              <h3>Research Report</h3>
+              <p>
+                <a href="../research-docs/smart-flow-market-mechanics.md">docs/research-docs/smart-flow-market-mechanics.md</a>
+              </p>
+            </div>
+          </article>
+          <article class="panel">
+            <div class="panel-body">
+              <h3>Architecture Review Copy</h3>
+              <p>
+                <a href="../research-docs/smart-flow-architecture-review.md">docs/research-docs/smart-flow-architecture-review.md</a>
+              </p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="classification">
+        <h2>Area Classification</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Area</th>
+                <th>Call</th>
+                <th>Architecture Review</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Domain model</td>
+                <td><span class="status refactor">refactor</span></td>
+                <td>Good bones, wrong center. Make evidence, hypotheses, scores, and alternatives first-class.</td>
+              </tr>
+              <tr>
+                <td>Event taxonomy</td>
+                <td><span class="status refactor">refactor</span></td>
+                <td>Raw/derived split is good; <code>smart_money</code>, <code>dark.inferred</code>, and <code>classifier_hits</code> leak overconfident product language.</td>
+              </tr>
+              <tr>
+                <td>Service boundaries</td>
+                <td><span class="status refactor">refactor</span></td>
+                <td>Ingest does too much signal policy; compute is too broad. Split pipeline stages before adding more intelligence.</td>
+              </tr>
+              <tr>
+                <td><code>FlowPacket</code></td>
+                <td><span class="status refactor">refactor</span></td>
+                <td>Keep concept, rename/reframe as <code>FlowEvidenceCluster</code> or <code>FlowCandidate</code>. Not a product domain object.</td>
+              </tr>
+              <tr>
+                <td><code>SmartMoneyEvent</code></td>
+                <td><span class="status redesign">redesign</span></td>
+                <td>Replace canonical object with <code>FlowHypothesisEvent</code>; use <code>SmartFlowInsight</code> only as UI/API projection.</td>
+              </tr>
+              <tr>
+                <td>Classifier pipeline</td>
+                <td><span class="status redesign">redesign</span></td>
+                <td>Current rules mix evidence extraction, hypothesis scoring, narrative labels, and alerting. Needs staged outputs.</td>
+              </tr>
+              <tr>
+                <td>ClickHouse/storage</td>
+                <td><span class="status refactor">refactor</span></td>
+                <td>Right datastore; raw tables are decent, derived evidence/hypotheses need typed/queryable columns plus JSON sidecars.</td>
+              </tr>
+              <tr>
+                <td>Redis baselines/cache</td>
+                <td><span class="status refactor">refactor</span></td>
+                <td>Right hot-state role; wrong as hidden baseline truth. Baselines need replayable snapshots/versioning.</td>
+              </tr>
+              <tr>
+                <td>NATS/JetStream subjects</td>
+                <td><span class="status refactor">refactor</span></td>
+                <td>Right bus; subjects should express stage/version: observations, evidence, hypotheses, insights.</td>
+              </tr>
+              <tr>
+                <td>Replay determinism</td>
+                <td><span class="status redesign">redesign</span></td>
+                <td>Present but not central enough. Replay must be the acceptance gate for derived outputs.</td>
+              </tr>
+              <tr>
+                <td>API/WebSocket</td>
+                <td><span class="status refactor">refactor</span></td>
+                <td>Mechanics are good; public surface should expose evidence bundles and hypotheses, not internal legacy names.</td>
+              </tr>
+              <tr>
+                <td>UI evidence model</td>
+                <td><span class="status refactor">refactor</span></td>
+                <td>Directionally good, but still foregrounds profile/probability over evidence quality, alternatives, and uncertainty.</td>
+              </tr>
+              <tr>
+                <td>Test strategy</td>
+                <td><span class="status redesign">redesign</span></td>
+                <td>Unit tests are solid scaffolding; needs fixture replay, false-positive suites, calibration, and end-to-end determinism.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="answers">
+        <h2>Direct Answers</h2>
+        <div class="panel">
+          <div class="panel-body">
+            <ol class="answer-list">
+              <li><span class="num">01</span><p><strong>Current suitability:</strong> no. Useful infrastructure, but not yet an evidence-backed smart-flow architecture.</p></li>
+              <li><span class="num">02</span><p><strong><code>SmartMoneyEvent</code>:</strong> not a good canonical domain object. Use <code>FlowHypothesisEvent</code>. <code>ParticipantHypothesisEvent</code> implies participant identity too strongly. <code>SmartFlowInsight</code> should be a user-facing projection.</p></li>
+              <li><span class="num">03</span><p><strong><code>FlowPacket</code>:</strong> not as named. Keep the abstraction as an internal evidence cluster, rename to <code>FlowEvidenceCluster</code> or <code>FlowCandidate</code>.</p></li>
+              <li><span class="num">04</span><p><strong>Service boundaries:</strong> not right. Ingest should normalize only; evidence quality, eligibility, clustering, hypothesis scoring, and insight projection should be separate stages.</p></li>
+              <li><span class="num">05</span><p><strong>ClickHouse/Redis/NATS roles:</strong> yes broadly. ClickHouse is the authoritative event/audit store. Redis is hot cache only. NATS is transport, not truth. All three need cleaner contracts.</p></li>
+              <li><span class="num">06</span><p><strong>Replay central enough:</strong> no. It should be how every detection change proves itself.</p></li>
+              <li><span class="num">07</span><p><strong>UI uncertainty:</strong> partially. It shows evidence refs, profile ladders, abstention, and suppression, but needs confidence vs conviction, alternative explanations, evidence quality, and why-not signals.</p></li>
+              <li><span class="num">08</span><p><strong>First-class domain objects:</strong> raw observations, execution context, quote join, eligibility decision, evidence cluster, structure hypothesis, evidence quality score, baseline snapshot, hypothesis score vector, false-positive penalty, catalyst context, flow hypothesis event, smart-flow insight, replay run.</p></li>
+              <li><span class="num">09</span><p><strong>Implementation details:</strong> Redis list layout, durable consumer names, current classifier thresholds, ClickHouse batch writer, adapter internals, legacy <code>ClassifierHitEvent</code>, alert severity math, UI cache mechanics.</p></li>
+              <li><span class="num">10</span><p><strong>Delete/defer:</strong> canonical smart-money naming, real-time dark-pool certainty, standalone whale-premium alerts, trade-level open/close claims, participant identity claims, simplistic premium alert score, ingest-time signal filtering, <code>retail_whale</code> as a canonical profile unless reframed as attention/lottery flow.</p></li>
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      <section id="objects">
+        <h2>Objects to Make First-Class</h2>
+        <div class="object-list">
+          <span class="object-chip">Raw Observation</span>
+          <span class="object-chip">Execution Context</span>
+          <span class="object-chip">Quote Join</span>
+          <span class="object-chip">Eligibility Decision</span>
+          <span class="object-chip">Flow Evidence Cluster</span>
+          <span class="object-chip">Structure Hypothesis</span>
+          <span class="object-chip">Evidence Quality Score</span>
+          <span class="object-chip">Baseline Snapshot</span>
+          <span class="object-chip">Hypothesis Score Vector</span>
+          <span class="object-chip">False-Positive Penalty</span>
+          <span class="object-chip">Catalyst Context</span>
+          <span class="object-chip">Flow Hypothesis Event</span>
+          <span class="object-chip">Smart-Flow Insight</span>
+          <span class="object-chip">Replay Run</span>
+        </div>
+      </section>
+
+      <section id="options">
+        <h2>Options</h2>
+        <div class="grid three">
+          <article class="panel option">
+            <header>
+              <span class="chip">Option A</span>
+              <h3>Conservative</h3>
+              <p>Keep current objects and services; add evidence-quality fields, UI copy fixes, and replay tests.</p>
+            </header>
+            <div class="panel-body">
+              <ul class="facts">
+                <li><span>Pros</span><p>Fastest, lowest migration risk, preserves current endpoints and UI.</p></li>
+                <li><span>Cons</span><p>Leaves misleading canonical names and keeps inference tangled in compute.</p></li>
+                <li><span>Complexity</span><p>Low.</p></li>
+                <li><span>Migration Risk</span><p>Low.</p></li>
+              </ul>
+              <ol class="steps">
+                <li>Rename UI copy from smart money to smart flow candidate.</li>
+                <li>Add evidence-quality and alternative-explanation fields to existing event.</li>
+                <li>Add replay consistency tests around current outputs.</li>
+                <li>Add typed ClickHouse columns for high-value JSON fields.</li>
+                <li>Deprecate, but do not remove, legacy classifier hit display.</li>
+              </ol>
+            </div>
+          </article>
+
+          <article class="panel option recommended">
+            <header>
+              <span class="chip good">Option B</span>
+              <h3>Refactor</h3>
+              <p>Keep the stack and terminal UI, but rebuild the domain pipeline around evidence clusters and hypothesis events.</p>
+            </header>
+            <div class="panel-body">
+              <ul class="facts">
+                <li><span>Pros</span><p>Fixes the product's epistemic spine without wasting useful infrastructure.</p></li>
+                <li><span>Cons</span><p>Requires breaking contract migration across types, storage, compute, API, UI, and tests.</p></li>
+                <li><span>Complexity</span><p>Medium-high.</p></li>
+                <li><span>Migration Risk</span><p>Medium.</p></li>
+              </ul>
+              <ol class="steps">
+                <li>Introduce <code>FlowEvidenceCluster</code>, <code>FlowHypothesisEvent</code>, <code>SmartFlowInsight</code>, <code>EvidenceQuality</code>, and version fields with compatibility aliases.</li>
+                <li>Move signal eligibility out of ingest.</li>
+                <li>Split compute into evidence join, cluster/structure, hypothesis scoring, and insight/alert projection.</li>
+                <li>Replace derived JSON-only storage with typed query columns.</li>
+                <li>Add replay-run harness that recomputes derived outputs from raw streams.</li>
+                <li>Add <code>/flow/evidence</code>, <code>/flow/hypotheses</code>, <code>/flow/insights</code>, and WS equivalents.</li>
+                <li>Rework UI drawers/tables around evidence quality, confidence vs conviction, alternatives, abstention, and catalyst/noise context.</li>
+                <li>Add fixture suites for stale quotes, complex spreads, 0DTE/event noise, deep ITM, wide spreads, and off-exchange ambiguity.</li>
+              </ol>
+            </div>
+          </article>
+
+          <article class="panel option">
+            <header>
+              <span class="chip">Option C</span>
+              <h3>Redesign</h3>
+              <p>Start over with an event-sourced evidence engine and versioned, replayable policies.</p>
+            </header>
+            <div class="panel-body">
+              <ul class="facts">
+                <li><span>Pros</span><p>Cleanest long-term architecture and strongest research discipline.</p></li>
+                <li><span>Cons</span><p>Slowest, overkill before product fit, and discards too much working infrastructure.</p></li>
+                <li><span>Complexity</span><p>Very high.</p></li>
+                <li><span>Migration Risk</span><p>High.</p></li>
+              </ul>
+              <ol class="steps">
+                <li>Define new canonical event taxonomy and versioned policy registry.</li>
+                <li>Build raw observation lake and deterministic replay runner first.</li>
+                <li>Build evidence extraction and quote/condition eligibility services.</li>
+                <li>Build cluster and structure hypothesis services.</li>
+                <li>Build hypothesis scoring and calibration services.</li>
+                <li>Build insight projection API.</li>
+                <li>Rebuild terminal against new evidence/hypothesis contracts.</li>
+                <li>Backfill or discard old derived data.</li>
+              </ol>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="recommendation">
+        <h2>Recommendation</h2>
+        <div class="callout">
+          <p><strong>Choose Option B.</strong></p>
+          <p>
+            Option A is too timid for a pre-alpha product whose current names already fight the research.
+            Option C is intellectually clean but wastes too much working infrastructure. Option B keeps the
+            stack and terminal momentum while fixing the core mistake: treating smart money as a thing the
+            system emits, instead of treating smart flow as a cautious, evidence-backed hypothesis with alternatives.
+          </p>
+          <p>
+            The first implementation move should be the contract/naming PR: introduce
+            <code>FlowHypothesisEvent</code> and <code>FlowEvidenceCluster</code> with compatibility aliases,
+            then make replay the gate before touching more classifier logic.
+          </p>
+        </div>
+      </section>
+
+      <footer>
+        HTML companion for docs/plans/smart-flow-architecture-review.md. Styled for the Islandflow product register.
+      </footer>
+    </main>
+  </body>
+</html>

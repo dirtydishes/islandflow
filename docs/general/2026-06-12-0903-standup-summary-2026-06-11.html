@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Standup Summary for 2026-06-11</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --bg-top: #0a121b;
+        --panel: rgba(17, 24, 32, 0.94);
+        --panel-2: rgba(12, 18, 25, 0.98);
+        --line: rgba(255, 255, 255, 0.09);
+        --line-strong: rgba(245, 166, 35, 0.26);
+        --text: #e6edf4;
+        --muted: #95a4b8;
+        --faint: #6f7d90;
+        --amber: #f5a623;
+        --amber-soft: rgba(245, 166, 35, 0.14);
+        --blue: #4da3ff;
+        --blue-soft: rgba(77, 163, 255, 0.12);
+        --green: #25c17a;
+        --green-soft: rgba(37, 193, 122, 0.12);
+        --radius: 18px;
+        --shadow: 0 28px 72px rgba(0, 0, 0, 0.36);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+      }
+
+      body {
+        background:
+          radial-gradient(circle at top left, rgba(245, 166, 35, 0.12), transparent 26rem),
+          radial-gradient(circle at top right, rgba(77, 163, 255, 0.1), transparent 22rem),
+          linear-gradient(180deg, var(--bg-top) 0%, var(--bg) 34%, #040609 100%);
+        color: var(--text);
+        font-family: "IBM Plex Sans", "Inter", system-ui, sans-serif;
+        line-height: 1.6;
+      }
+
+      main {
+        width: min(1120px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 30px 0 56px;
+      }
+
+      .hero,
+      section {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      }
+
+      .hero {
+        padding: 30px;
+        box-shadow: var(--shadow);
+      }
+
+      section {
+        margin-top: 18px;
+        padding: 22px;
+      }
+
+      .eyebrow,
+      h2,
+      .chip,
+      code,
+      .meta-label,
+      .meta-value,
+      .commit-hash,
+      .file-pill,
+      .issue-pill {
+        font-family: "IBM Plex Mono", "SFMono-Regular", ui-monospace, monospace;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: var(--amber-soft);
+        color: var(--amber);
+        font-size: 0.76rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h3 {
+        margin: 0;
+        font-family: "Quantico", "IBM Plex Sans", system-ui, sans-serif;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin-top: 16px;
+        font-size: 2.72rem;
+        line-height: 1.04;
+      }
+
+      h2 {
+        margin: 0 0 14px;
+        color: var(--amber);
+        font-size: 0.84rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h3 {
+        font-size: 1rem;
+      }
+
+      p,
+      li {
+        max-width: 84ch;
+        color: var(--muted);
+      }
+
+      .hero p {
+        margin: 16px 0 0;
+        font-size: 1.02rem;
+      }
+
+      .meta,
+      .summary-grid,
+      .commit-grid,
+      .detail-grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .meta {
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        margin-top: 22px;
+      }
+
+      .summary-grid,
+      .detail-grid {
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      }
+
+      .commit-grid {
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      }
+
+      .card,
+      .commit-card,
+      .callout {
+        padding: 16px 18px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.025);
+      }
+
+      .card strong,
+      .commit-card strong,
+      .callout strong {
+        color: var(--text);
+      }
+
+      .meta-label {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--faint);
+        font-size: 0.72rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .meta-value {
+        color: var(--text);
+        font-size: 1rem;
+      }
+
+      .value-strong {
+        color: var(--text);
+        font-size: 1.18rem;
+        font-weight: 600;
+      }
+
+      .chip-row,
+      .file-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chip,
+      .file-pill,
+      .issue-pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--text);
+        font-size: 0.74rem;
+        letter-spacing: 0.04em;
+      }
+
+      .good {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .info {
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .warn {
+        background: var(--amber-soft);
+        color: var(--amber);
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+
+      li + li {
+        margin-top: 8px;
+      }
+
+      code {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 1px 5px;
+      }
+
+      .stack {
+        display: grid;
+        gap: 16px;
+      }
+
+      .commit-hash {
+        color: var(--faint);
+        font-size: 0.78rem;
+      }
+
+      .commit-card p {
+        margin: 10px 0 0;
+      }
+
+      .inline-note {
+        color: var(--faint);
+        font-size: 0.92rem;
+      }
+
+      @media (max-width: 720px) {
+        main {
+          width: min(100% - 20px, 1120px);
+          padding-top: 20px;
+          padding-bottom: 32px;
+        }
+
+        .hero,
+        section,
+        .card,
+        .commit-card,
+        .callout {
+          padding: 18px;
+        }
+
+        h1 {
+          font-size: 2.12rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <article class="hero">
+        <span class="eyebrow">Git Standup Summary</span>
+        <h1>June 11 centered on mock-route expansion and refinement</h1>
+        <p>
+          June 11 included seven commits. Six of them were frontend-facing mock
+          route and styling updates in <code>apps/web/app</code>, moving from
+          initial redesign concepts through twelve mock routes and then replacing
+          the Activity Matrix with an alert-lineage treatment. One commit
+          published the prior day’s standup summary in <code>docs/general</code>.
+        </p>
+        <div class="meta">
+          <div class="card">
+            <span class="meta-label">Date Reviewed</span>
+            <span class="meta-value">2026-06-11</span>
+          </div>
+          <div class="card">
+            <span class="meta-label">Commits</span>
+            <span class="meta-value value-strong">7</span>
+          </div>
+          <div class="card">
+            <span class="meta-label">Primary Surface</span>
+            <span class="meta-value">apps/web mock routes</span>
+          </div>
+          <div class="card">
+            <span class="meta-label">Beads Items Closed</span>
+            <span class="meta-value">3vr, 2x7, q7v, w2y, 5bv, 4j7, ksr</span>
+          </div>
+        </div>
+      </article>
+
+      <section>
+        <h2>Summary</h2>
+        <div class="summary-grid">
+          <div class="card">
+            <strong>Mock coverage widened.</strong>
+            <p>
+              Commits <code>58ff9bb</code> and <code>8b8f124</code> added
+              route files for <code>/mock5</code> through <code>/mock12</code>,
+              while earlier commits reworked the shared mock renderer in
+              <code>apps/web/app/dashboard-mocks.tsx</code>.
+            </p>
+          </div>
+          <div class="card">
+            <strong>Shared terminal styling stayed in motion.</strong>
+            <p>
+              Commits <code>83b0944</code>, <code>e7924c8</code>,
+              <code>58ff9bb</code>, <code>8b8f124</code>, and
+              <code>dad805b</code> all touched
+              <code>apps/web/app/globals.css</code>.
+            </p>
+          </div>
+          <div class="card">
+            <strong>Late-day refinements tightened clarity.</strong>
+            <p>
+              Commit <code>4204320</code> tightened terminal copy, and commit
+              <code>dad805b</code> replaced the abstract Activity Matrix with an
+              alert-lineage mock recorded under Beads issue
+              <code>islandflow-4j7</code>.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <div class="commit-grid">
+          <div class="commit-card">
+            <h3>04:18 - Ground-up redesign mocks</h3>
+            <div class="commit-hash">83b0944 - create ground-up frontend redesign mocks</div>
+            <p>
+              Reworked <code>apps/web/app/dashboard-mocks.tsx</code> and
+              <code>apps/web/app/globals.css</code>, and added the supporting
+              documentation file
+              <code>docs/turns/2026-06-11-0416-ground-up-redesign-mocks.html</code>.
+            </p>
+            <div class="file-list">
+              <span class="file-pill">dashboard-mocks.tsx</span>
+              <span class="file-pill">globals.css</span>
+              <span class="file-pill">docs/turns/...ground-up-redesign-mocks.html</span>
+            </div>
+          </div>
+
+          <div class="commit-card">
+            <h3>05:10 - Route concept redesign</h3>
+            <div class="commit-hash">e7924c8 - redesign mock route concepts</div>
+            <p>
+              Continued the mock-route redesign in the same shared renderer and
+              stylesheet, and also touched
+              <code>apps/web/app/terminal.tsx</code>.
+            </p>
+            <div class="chip-row">
+              <span class="issue-pill info">Beads: islandflow-2x7</span>
+            </div>
+          </div>
+
+          <div class="commit-card">
+            <h3>09:04 - Prior standup published</h3>
+            <div class="commit-hash">5e55b70 - Add June 10 standup git summary</div>
+            <p>
+              Added
+              <code>docs/general/2026-06-11-0902-standup-summary-2026-06-10.html</code>
+              and closed <code>islandflow-ksr</code>.
+            </p>
+          </div>
+
+          <div class="commit-card">
+            <h3>18:29 - /mock5 through /mock8 added</h3>
+            <div class="commit-hash">58ff9bb - add no-card mock redesign routes</div>
+            <p>
+              Added route files for <code>/mock5</code>, <code>/mock6</code>,
+              <code>/mock7</code>, and <code>/mock8</code>, plus large updates
+              to the shared mock renderer, global styles, and a matching turn
+              document.
+            </p>
+            <div class="chip-row">
+              <span class="issue-pill info">Beads: islandflow-q7v</span>
+            </div>
+          </div>
+
+          <div class="commit-card">
+            <h3>19:37 - Copy tightened</h3>
+            <div class="commit-hash">4204320 - tighten mock route terminal copy</div>
+            <p>
+              Refined copy inside <code>apps/web/app/dashboard-mocks.tsx</code>
+              and updated the existing turn document for the no-card mock work.
+            </p>
+            <div class="chip-row">
+              <span class="issue-pill info">Beads: islandflow-w2y</span>
+            </div>
+          </div>
+
+          <div class="commit-card">
+            <h3>19:48 - /mock9 through /mock12 added</h3>
+            <div class="commit-hash">8b8f124 - add dense dashboard mock routes</div>
+            <p>
+              Added route files for <code>/mock9</code>, <code>/mock10</code>,
+              <code>/mock11</code>, and <code>/mock12</code>, expanded
+              <code>dashboard-mocks.tsx</code> and <code>globals.css</code>,
+              and added
+              <code>docs/turns/2026-06-11-1946-add-four-dashboard-mocks.html</code>.
+            </p>
+            <div class="chip-row">
+              <span class="issue-pill info">Beads: islandflow-5bv</span>
+            </div>
+          </div>
+
+          <div class="commit-card">
+            <h3>20:15 - Activity Matrix replaced</h3>
+            <div class="commit-hash">dad805b - make activity matrix legible</div>
+            <p>
+              Updated <code>dashboard-mocks.tsx</code> and
+              <code>globals.css</code>. The paired Beads close reason says issue
+              <code>islandflow-4j7</code> replaced the Activity Matrix with an
+              alert-lineage mock showing evidence, invalidations, and audit
+              context.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Context</h2>
+        <p>
+          The day’s work stayed concentrated in the mock-dashboard surface of
+          the web app. The most repeatedly edited files were
+          <code>apps/web/app/dashboard-mocks.tsx</code> and
+          <code>apps/web/app/globals.css</code>, which appeared in six of the
+          seven commits. The only new runtime entrypoints added on June 11 were
+          the eight route files for <code>/mock5</code> through
+          <code>/mock12</code>.
+        </p>
+        <div class="detail-grid">
+          <div class="card">
+            <span class="meta-label">Route Expansion</span>
+            <p>
+              Route files added:
+              <code>mock5/page.tsx</code> through
+              <code>mock12/page.tsx</code>.
+            </p>
+          </div>
+          <div class="card">
+            <span class="meta-label">Documentation Added</span>
+            <p>
+              New HTML docs landed in both <code>docs/turns</code> and
+              <code>docs/general</code>.
+            </p>
+          </div>
+          <div class="card">
+            <span class="meta-label">Issue Tracking</span>
+            <p>
+              Each mock-route milestone was paired with a closed Beads task:
+              <code>3vr</code>, <code>2x7</code>, <code>q7v</code>,
+              <code>w2y</code>, <code>5bv</code>, and <code>4j7</code>.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Important Implementation Details</h2>
+        <ul>
+          <li>
+            The route additions were incremental rather than a single sweep:
+            <code>58ff9bb</code> introduced <code>/mock5</code> to
+            <code>/mock8</code>, and <code>8b8f124</code> introduced
+            <code>/mock9</code> to <code>/mock12</code>.
+          </li>
+          <li>
+            The terminal shell file <code>apps/web/app/terminal.tsx</code> only
+            appeared in commit <code>e7924c8</code>; the later work stayed in
+            shared mock rendering and global styles.
+          </li>
+          <li>
+            The final commit of the day did not add more routes. It refined how
+            one existing mock communicates alert provenance by replacing the
+            Activity Matrix concept with alert lineage, as recorded in the
+            <code>islandflow-4j7</code> close reason inside
+            <code>.beads/issues.jsonl</code>.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Expected Impact for End-Users</h2>
+        <div class="summary-grid">
+          <div class="card">
+            <strong>More mock surfaces to review.</strong>
+            <p>
+              Users reviewing redesign directions now have twelve mock routes
+              instead of four, with route files explicitly added for
+              <code>/mock5</code> through <code>/mock12</code>.
+            </p>
+          </div>
+          <div class="card">
+            <strong>Sharper trading-terminal tone.</strong>
+            <p>
+              Copy edits in <code>4204320</code> moved the mock route language
+              toward the shorter, denser terminal style described in the Beads
+              task for <code>islandflow-w2y</code>.
+            </p>
+          </div>
+          <div class="card">
+            <strong>Clearer alert inspection story.</strong>
+            <p>
+              The final change of the day replaced an abstract matrix view with
+              lineage-oriented evidence and invalidation framing, based on
+              <code>islandflow-4j7</code>.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li>
+            Beads issue <code>islandflow-2x7</code> was closed with a note that
+            the mock-route redesigns were verified in the in-app browser and
+            passed the web build plus focused route and terminal tests.
+          </li>
+          <li>
+            Beads issue <code>islandflow-q7v</code> was closed with web build
+            validation and browser DOM checks for the <code>/mock5</code> to
+            <code>/mock8</code> additions.
+          </li>
+          <li>
+            Beads issue <code>islandflow-5bv</code> was closed with web build
+            validation plus desktop and mobile overflow checks for the
+            <code>/mock9</code> to <code>/mock12</code> additions.
+          </li>
+          <li>
+            The standup-summary commit <code>5e55b70</code> added documentation
+            only; no additional product validation was recorded in that commit.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Issues, Limitations, and Mitigations</h2>
+        <div class="stack">
+          <div class="callout">
+            <strong>Commit history shows activity, not adoption.</strong>
+            <p>
+              This summary only states what was committed on June 11. It does
+              not claim which mock route is preferred or whether any redesign is
+              scheduled to ship beyond the files and Beads close reasons recorded
+              that day.
+            </p>
+          </div>
+          <div class="callout">
+            <strong>Validation details are only as specific as the recorded artifacts.</strong>
+            <p>
+              Where build or browser checks are mentioned, the source is the
+              close reason added to <code>.beads/issues.jsonl</code> in the same
+              commit stream, not a separately replayed test run for this
+              standup task.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Follow-up Work</h2>
+        <ul>
+          <li>
+            No new follow-up Beads issues were created in the June 11 commit
+            history beyond the work closed that day; the commit stream records
+            completed tasks <code>islandflow-3vr</code>, <code>2x7</code>,
+            <code>q7v</code>, <code>w2y</code>, <code>5bv</code>,
+            <code>4j7</code>, and <code>ksr</code>.
+          </li>
+          <li>
+            The clearest open context adjacent to this work remains existing
+            in-progress repo items outside the June 11 commit set, not a new
+            follow-up issue created yesterday.
+          </li>
+        </ul>
+        <p class="inline-note">
+          Source basis: <code>git log --since="2026-06-11 00:00" --until="2026-06-12 00:00"</code>,
+          commit stats from <code>git show --stat</code>, and the paired Beads
+          entries in <code>.beads/issues.jsonl</code>.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>
