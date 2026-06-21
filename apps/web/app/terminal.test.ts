@@ -1352,7 +1352,10 @@ describe("smart-flow explainability helpers", () => {
     expect(input.smartFlowProjections).toHaveLength(1);
     expect(input.smartMoneyEvents).toHaveLength(1);
     expect(input.flowPackets.map((packet) => packet.seq)).toEqual([1, 3]);
-    expect(input.optionPrints.map((print) => print.trace_id)).toEqual(["print:spy:1", "print:spy:2"]);
+    expect(input.optionPrints.map((print) => print.trace_id)).toEqual([
+      "print:spy:1",
+      "print:spy:2"
+    ]);
   });
 
   it("maps smart-flow, legacy fallback, and inferred dark events into clickable chart markers", () => {

@@ -216,7 +216,8 @@
           Added reusable chart settings state, versioned persistence, price renderer selection,
           lower-pane mode transforms, and a dashboard settings popover that stays inside viewport
           bounds on desktop and mobile. Reviewer repair tightened smart-direction fallback semantics
-          and scoped all-flow chart inputs to the active ticker.
+          and scoped all-flow chart inputs to the active ticker; the final pass also repaired a
+          Forgejo CI formatting failure in the added adapter regression test.
         </p>
       </header>
 
@@ -239,6 +240,7 @@
           <li>Added <code>MarketChartSettings</code>, a fixed-position settings popover with segmented mode controls, checkbox toggles, timeframe favorite rows, Escape close, outside-click close, and reset.</li>
           <li>Integrated settings into the terminal chart adapter while keeping terminal data and callbacks outside <code>features/market-chart</code>.</li>
           <li>Reviewer repair: smart-direction bars now fall back to legacy smart-money per missing bucket, and all-flow lower-pane inputs are scoped to the active chart ticker before entering the reusable module.</li>
+          <li>Reviewer CI repair: formatted the new terminal adapter regression assertion so <code>bun run fmt:check</code> matches Forgejo CI.</li>
         </ul>
       </section>
 
@@ -250,6 +252,7 @@
           <li>Directional bars use signed values and explicit labels such as <code>bullish flow direction</code> or <code>bearish flow direction</code>, so red and green are not the only signal.</li>
           <li>The settings UI uses restrained terminal styling: flat internal sections, compact controls, amber active/focus states, and no card framing around the chart module.</li>
           <li>The dashboard can pass settings capabilities to hide or disable unsupported extension controls without changing the core settings menu structure.</li>
+          <li>Forgejo CI initially failed at formatting after the reviewer repair commit; the final branch head passes the workflow command sequence locally.</li>
         </ul>
       </section>
 
@@ -275,6 +278,41 @@
             <strong>Pass</strong>
             <code>rg "features/terminal|TerminalState|ChartPane|terminal/" apps/web/features/market-chart -S</code>
             <p>No matches.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun install --frozen-lockfile</code>
+            <p>Checked 571 installs across 601 packages, no changes.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun run fmt:check</code>
+            <p>Biome checked 260 files with no fixes applied.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun run lint</code>
+            <p>Biome checked 260 files with no fixes applied.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun run typecheck</code>
+            <p>All workspace TypeScript projects passed.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun test</code>
+            <p>345 pass, 0 fail, 1832 assertions.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun run check:public-api-routes</code>
+            <p>All expected public API route checks returned ok.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun run check:docker-workspace</code>
+            <p>Docker workspace snapshot is in sync.</p>
           </div>
         </div>
         <p class="note">
