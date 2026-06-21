@@ -2,9 +2,11 @@
 
 import { useMarketChartController } from "../hooks/useMarketChartController";
 import type { MarketChartProps } from "../types";
+import { MarketChartTooltip } from "./MarketChartTooltip";
 
 export const MarketChart = (props: MarketChartProps) => {
-  const { containerRef, preset } = useMarketChartController(props);
+  const { containerRef, hoverSnapshot, preset } = useMarketChartController(props);
+  const containerWidth = containerRef.current?.clientWidth ?? 0;
 
   return (
     <div
@@ -13,6 +15,7 @@ export const MarketChart = (props: MarketChartProps) => {
       style={{ minHeight: preset.minHeight }}
     >
       <div className="market-chart-surface" ref={containerRef} />
+      <MarketChartTooltip snapshot={hoverSnapshot} containerWidth={containerWidth} />
     </div>
   );
 };

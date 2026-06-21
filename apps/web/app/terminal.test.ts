@@ -37,6 +37,7 @@ const {
   buildDefaultFlowFilters,
   buildTerminalEquityOverlays,
   buildTerminalLowerPaneInput,
+  buildTerminalMarketChartHoverRowProvider,
   buildTerminalMarketChartMarkers,
   buildOptionTapeQueryParams,
   classifierToneForFamily,
@@ -1355,6 +1356,84 @@ describe("smart-flow explainability helpers", () => {
     expect(input.optionPrints.map((print) => print.trace_id)).toEqual([
       "print:spy:1",
       "print:spy:2"
+    ]);
+  });
+
+  it("maps option hover notional with call/put-aware side direction", () => {
+    const provider = buildTerminalMarketChartHoverRowProvider({
+      smartFlowProjections: [],
+      smartMoneyEvents: [],
+      flowPackets: [
+        {
+          id: "flowpacket:SPY-2025-01-17-460-P:1",
+          trace_id: "flowpacket:spy:put-sell",
+          source_ts: 1_003,
+          ingest_ts: 1_004,
+          seq: 4,
+          members: [],
+          features: {
+            total_notional: 500,
+            option_contract_id: "SPY-2025-01-17-460-P",
+            nbbo_side: "B"
+          },
+          join_quality: {}
+        }
+      ] as any,
+      optionPrints: [
+        makeOptionPrint({
+          trace_id: "print:call-buy",
+          source_ts: 1_001,
+          ts: 1_001,
+          seq: 1,
+          option_contract_id: "SPY-2025-01-17-450-C",
+          underlying_id: "SPY",
+          option_type: "call",
+          execution_nbbo_side: "A",
+          nbbo_side: "A",
+          notional: 100
+        }),
+        makeOptionPrint({
+          trace_id: "print:put-buy",
+          source_ts: 1_002,
+          ts: 1_002,
+          seq: 2,
+          option_contract_id: "SPY-2025-01-17-455-P",
+          underlying_id: "SPY",
+          option_type: "put",
+          execution_nbbo_side: "A",
+          nbbo_side: "A",
+          notional: 200
+        }),
+        makeOptionPrint({
+          trace_id: "print:put-mid",
+          source_ts: 1_003,
+          ts: 1_003,
+          seq: 3,
+          option_contract_id: "SPY-2025-01-17-456-P",
+          underlying_id: "SPY",
+          option_type: "put",
+          execution_nbbo_side: "MID",
+          nbbo_side: "MID",
+          notional: 300
+        })
+      ] as any
+    });
+
+    const rows = provider({
+      symbol: "SPY",
+      intervalMs: 60_000,
+      time: 1 as any,
+      timestampMs: 1_000,
+      bucketStartMs: 1_000,
+      bucketEndMs: 61_000,
+      lowerPoints: [],
+      overlayPoints: []
+    });
+
+    expect(rows.slice(0, 3).map((row) => [row.label, row.value, row.tone])).toEqual([
+      ["Bullish option notional", "$600.00", "bullish"],
+      ["Bearish option notional", "$200.00", "bearish"],
+      ["Neutral/unknown notional", "$300.00", "info"]
     ]);
   });
 

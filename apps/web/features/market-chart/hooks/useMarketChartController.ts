@@ -3,7 +3,6 @@
 import {
   createChart,
   createSeriesMarkers,
-  HistogramSeries,
   type IChartApi,
   type ISeriesMarkersPluginApi,
   CandlestickSeries as LightweightCandlestickSeries,
@@ -11,7 +10,7 @@ import {
   type Time,
   type UTCTimestamp
 } from "lightweight-charts";
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createMarketCandlestickSeriesOptions,
   createMarketChartOptions,
@@ -19,13 +18,15 @@ import {
   getMarketChartLayoutPreset,
   MARKET_CHART_LAYOUT_PRESETS
 } from "../defaults";
+import { createRoundedBarSeriesPaneView, toRoundedBarSeriesData } from "../renderers/rounded-bars";
 import { resolvePriceMode, toCandlestickSeriesData } from "../transforms/candles";
-import { toLowerPaneHistogramData } from "../transforms/lower-pane";
+import { getMarketChartHoverSnapshotSignature } from "../transforms/hover";
 import { chartTimeToMs } from "../transforms/time";
 import type {
   MarketChartApiRefs,
   MarketChartCandle,
   MarketChartExtensionRegistry,
+  MarketChartHoverSnapshot,
   MarketChartLowerPaneSeries,
   MarketChartLowerSeries,
   MarketChartMarker,
@@ -96,7 +97,10 @@ export const useMarketChartController = ({
   const drawOverlaysRef = useRef<() => void>(() => {});
   const visibleRangeRef = useRef(onVisibleRangeChange);
   const markerClickRef = useRef(onMarkerClick);
+  const crosshairChangeRef = useRef(onCrosshairChange);
   const fittedScopeRef = useRef<string | null>(null);
+  const hoverSnapshotSignatureRef = useRef(getMarketChartHoverSnapshotSignature(null));
+  const [hoverSnapshot, setHoverSnapshot] = useState<MarketChartHoverSnapshot | null>(null);
   overlayStateRef.current = {
     overlays,
     showOverlays: settings.display.showOverlays,
@@ -104,6 +108,7 @@ export const useMarketChartController = ({
   };
   visibleRangeRef.current = onVisibleRangeChange;
   markerClickRef.current = onMarkerClick;
+  crosshairChangeRef.current = onCrosshairChange;
 
   const layoutPresets = useMemo(() => {
     if (!registry?.layoutPresets?.length) {
@@ -120,6 +125,15 @@ export const useMarketChartController = ({
     [settings.price.rendererId]
   );
   const priceCandles = useMemo(() => priceMode.transform(candles), [candles, priceMode]);
+  const handleCrosshairChange = useCallback((snapshot: MarketChartHoverSnapshot | null) => {
+    const nextSignature = getMarketChartHoverSnapshotSignature(snapshot);
+    if (nextSignature === hoverSnapshotSignatureRef.current) {
+      return;
+    }
+    hoverSnapshotSignatureRef.current = nextSignature;
+    setHoverSnapshot(snapshot);
+    crosshairChangeRef.current?.(snapshot);
+  }, []);
   const crosshairHandler = useChartCrosshair({
     symbol,
     intervalMs,
@@ -128,7 +142,7 @@ export const useMarketChartController = ({
     overlays,
     markers,
     hoverRows: registry?.hoverRows,
-    onCrosshairChange
+    onCrosshairChange: handleCrosshairChange
   });
 
   // Chart construction is mount-only. Prop changes flow through the data and option effects below.
@@ -373,17 +387,26 @@ export const useMarketChartController = ({
     for (const layer of visibleLayers) {
       let series = lowerSeriesRef.current.get(layer.id);
       if (!series) {
-        series = chart.addSeries(
-          HistogramSeries,
+        series = chart.addCustomSeries(
+          createRoundedBarSeriesPaneView(),
           {
             priceFormat: { type: layer.priceFormat === "volume" ? "volume" : "price" },
-            priceScaleId: ""
+            priceScaleId: "",
+            color: theme.tokens.lowerNeutral,
+            lastValueVisible: false,
+            priceLineVisible: false
           },
           1
         );
         lowerSeriesRef.current.set(layer.id, series);
       }
-      series.setData(toLowerPaneHistogramData(layer, theme));
+      series.applyOptions({
+        priceFormat: { type: layer.priceFormat === "volume" ? "volume" : "price" },
+        color: theme.tokens.lowerNeutral,
+        lastValueVisible: false,
+        priceLineVisible: false
+      });
+      series.setData(toRoundedBarSeriesData(layer, theme));
     }
 
     const panes = chart.panes();
@@ -412,6 +435,7 @@ export const useMarketChartController = ({
   return {
     containerRef,
     refs,
-    preset
+    preset,
+    hoverSnapshot
   };
 };

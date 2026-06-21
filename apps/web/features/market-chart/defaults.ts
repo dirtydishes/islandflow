@@ -137,7 +137,7 @@ export const MARKET_CHART_EXTENSION_REGISTRY: MarketChartExtensionRegistry = {
       isAvailable: (data) => data.smartDirection,
       transformId: "buildSmartDirectionBars",
       formatter: (value) => value.toLocaleString(),
-      defaultRenderer: { series: "histogram", signed: true, priceFormat: "price" }
+      defaultRenderer: { series: "rounded-bars", signed: true, priceFormat: "price" }
     },
     {
       id: "all-flow",
@@ -147,7 +147,7 @@ export const MARKET_CHART_EXTENSION_REGISTRY: MarketChartExtensionRegistry = {
       isAvailable: (data) => data.allFlow,
       transformId: "buildAllFlowBars",
       formatter: (value) => value.toLocaleString(),
-      defaultRenderer: { series: "histogram", signed: false, priceFormat: "price" }
+      defaultRenderer: { series: "rounded-bars", signed: false, priceFormat: "price" }
     },
     {
       id: "volume",
@@ -158,7 +158,7 @@ export const MARKET_CHART_EXTENSION_REGISTRY: MarketChartExtensionRegistry = {
       isAvailable: (data) => data.candles,
       transformId: "buildVolumeBars",
       formatter: (value) => value.toLocaleString(),
-      defaultRenderer: { series: "histogram", signed: false, priceFormat: "volume" }
+      defaultRenderer: { series: "rounded-bars", signed: false, priceFormat: "volume" }
     }
   ],
   overlays: [],

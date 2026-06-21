@@ -1,18 +1,21 @@
 "use client";
 
-import type {
-  EquityCandle,
-  EquityPrint,
-  FlowPacket,
-  InferredDarkEvent,
-  OptionPrint,
-  SmartFlowExplainabilityProjection,
-  SmartMoneyEvent
+import {
+  type EquityCandle,
+  type EquityPrint,
+  type FlowPacket,
+  type InferredDarkEvent,
+  type OptionPrint,
+  parseOptionContractId,
+  type SmartFlowExplainabilityProjection,
+  type SmartMoneyEvent
 } from "@islandflow/types";
 import { type ChangeEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   buildTimeframeToolbarModel,
+  buildDirectionalOptionNotionalRows,
+  buildFlowContextHoverRows,
   buildLowerPaneSeries,
   DEFAULT_MARKET_CHART_SETTINGS,
   formatIntervalLabel,
@@ -23,7 +26,10 @@ import {
   resolveLowerPaneMode,
   type MarketChartCandle,
   type MarketChartDirection,
+  type MarketChartFlowContextInput,
+  type MarketChartHoverRowProvider,
   type MarketChartMarker,
+  type MarketChartOptionFlowInput,
   type MarketChartOverlay,
   type MarketChartRange,
   type MarketChartSettingsAction,
@@ -34,7 +40,15 @@ import {
 } from "../market-chart";
 import { getChartFlowMarkerItems } from "./charts/markers";
 import { SUPPORTED_CANDLE_INTERVAL_MS } from "./config";
-import { smartFlowDirectionTone, statusLabel } from "./format";
+import {
+  smartFlowDirectionLabel,
+  smartFlowDirectionTone,
+  smartFlowEvidenceQualityLabel,
+  smartFlowHypothesisLabel,
+  smartFlowWhyNotLabel,
+  smartMoneyProfileLabel,
+  statusLabel
+} from "./format";
 import { extractUnderlying, normalizeContractId } from "./state-helpers";
 import type { TerminalState } from "./state";
 import { buildApiUrl, readErrorDetail } from "./transport";
@@ -59,6 +73,34 @@ const EMPTY_FETCH_STATE: TerminalChartFetchState = {
   lastUpdate: null,
   error: null
 };
+
+const terminalCandleSignature = (candle: EquityCandle): unknown[] => [
+  candle.trace_id,
+  candle.seq,
+  candle.ts,
+  candle.interval_ms,
+  candle.underlying_id,
+  candle.open,
+  candle.high,
+  candle.low,
+  candle.close,
+  candle.volume,
+  candle.trade_count,
+  candle.ingest_ts
+];
+
+const terminalChartFetchStateSignature = (state: TerminalChartFetchState): string =>
+  JSON.stringify([
+    state.status,
+    state.lastUpdate ?? "",
+    state.error ?? "",
+    state.candles.map(terminalCandleSignature)
+  ]);
+
+const terminalChartFetchStatesEqual = (
+  current: TerminalChartFetchState,
+  next: TerminalChartFetchState
+): boolean => terminalChartFetchStateSignature(current) === terminalChartFetchStateSignature(next);
 
 const MAX_DARK_MARKERS = 120;
 const MAX_TOTAL_MARKERS = 320;
@@ -116,6 +158,197 @@ const normalizeTerminalDirection = (value: string | null | undefined): MarketCha
     return value;
   }
   return "neutral";
+};
+
+type TerminalOptionRight = "call" | "put";
+
+const normalizeOptionRight = (
+  value: string | null | undefined,
+  contractId?: string | null
+): TerminalOptionRight | null => {
+  const normalized = value?.trim().toLowerCase();
+  if (normalized === "call" || normalized === "c") {
+    return "call";
+  }
+  if (normalized === "put" || normalized === "p") {
+    return "put";
+  }
+
+  const parsed = parseOptionContractId(contractId ?? undefined);
+  if (parsed?.right === "C") {
+    return "call";
+  }
+  if (parsed?.right === "P") {
+    return "put";
+  }
+  return null;
+};
+
+const optionSideToHoverDirection = (
+  side: string | null | undefined,
+  optionRight: TerminalOptionRight | null
+): MarketChartOptionFlowInput["direction"] => {
+  const buySide = side === "AA" || side === "A";
+  const sellSide = side === "B" || side === "BB";
+  if (!optionRight || (!buySide && !sellSide)) {
+    return "unknown";
+  }
+  if (optionRight === "call") {
+    return buySide ? "bullish" : "bearish";
+  }
+  return buySide ? "bearish" : "bullish";
+};
+
+const featureNumber = (
+  features: Record<string, string | number | boolean>,
+  keys: readonly string[]
+): number | null => {
+  for (const key of keys) {
+    const value = features[key];
+    if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+      return value;
+    }
+  }
+  return null;
+};
+
+const featureString = (
+  features: Record<string, string | number | boolean>,
+  keys: readonly string[]
+): string | null => {
+  for (const key of keys) {
+    const value = features[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value;
+    }
+  }
+  return null;
+};
+
+const flowPacketHoverDirection = (packet: FlowPacket): MarketChartOptionFlowInput["direction"] => {
+  const explicitDirection = featureString(packet.features, [
+    "direction",
+    "primary_direction",
+    "flow_direction",
+    "smart_flow_direction"
+  ]);
+  if (
+    explicitDirection === "bullish" ||
+    explicitDirection === "bearish" ||
+    explicitDirection === "neutral"
+  ) {
+    return explicitDirection;
+  }
+  return optionSideToHoverDirection(
+    featureString(packet.features, ["execution_nbbo_side", "nbbo_side", "side"]),
+    normalizeOptionRight(
+      featureString(packet.features, ["option_type", "option_right", "right"]),
+      featureString(packet.features, ["option_contract_id", "contract_id"])
+    )
+  );
+};
+
+const flowPacketHoverNotional = (packet: FlowPacket): number | null =>
+  featureNumber(packet.features, ["total_notional", "notional", "total_premium", "premium"]);
+
+const toOptionFlowHoverInputs = (
+  flowPackets: readonly FlowPacket[],
+  optionPrints: readonly OptionPrint[]
+): MarketChartOptionFlowInput[] => [
+  ...flowPackets.map((packet) => ({
+    timestampMs: packet.source_ts,
+    sequence: packet.seq,
+    notional: flowPacketHoverNotional(packet),
+    direction: flowPacketHoverDirection(packet)
+  })),
+  ...optionPrints.map((print) => ({
+    timestampMs: print.source_ts ?? print.ts,
+    sequence: print.seq,
+    notional: print.notional ?? print.price * print.size * 100,
+    price: print.price,
+    size: print.size,
+    direction: optionSideToHoverDirection(
+      print.execution_nbbo_side ?? print.nbbo_side,
+      normalizeOptionRight(print.option_type, print.option_contract_id)
+    )
+  }))
+];
+
+const legacyEvidenceScore = (event: SmartMoneyEvent): number | null => {
+  const coverage = event.features?.nbbo_coverage_ratio;
+  const stale = event.features?.nbbo_stale_ratio;
+  if (typeof coverage !== "number" || typeof stale !== "number") {
+    return null;
+  }
+  return Math.max(0, Math.min(1, coverage - stale));
+};
+
+const legacyConfidence = (event: SmartMoneyEvent): number | null => {
+  const primaryScore =
+    event.profile_scores.find((score) => score.profile_id === event.primary_profile_id) ??
+    event.profile_scores[0];
+  return typeof primaryScore?.probability === "number" ? primaryScore.probability : null;
+};
+
+const toFlowContextHoverInputs = (
+  smartFlowProjections: readonly SmartFlowExplainabilityProjection[],
+  smartMoneyEvents: readonly SmartMoneyEvent[]
+): MarketChartFlowContextInput[] => [
+  ...smartFlowProjections.map((projection) => ({
+    timestampMs: projection.source_ts,
+    sequence: projection.seq,
+    source: "smart-flow",
+    direction: smartFlowDirectionLabel(projection),
+    label: smartFlowHypothesisLabel(projection.hypothesis.hypothesis_type),
+    evidenceQuality: smartFlowEvidenceQualityLabel(projection.evidence.evidence_quality),
+    evidenceScore: projection.evidence.evidence_quality,
+    confidence: projection.hypothesis.scores.confidence.policy_confidence,
+    whyNot: smartFlowWhyNotLabel(projection),
+    compatibility:
+      projection.source_channel === "smart-money" ||
+      projection.compatibility?.compatibility_only === true,
+    abstained: projection.abstention.abstained
+  })),
+  ...smartMoneyEvents.map((event) => {
+    const evidenceScore = legacyEvidenceScore(event);
+    const confidence = legacyConfidence(event);
+    return {
+      timestampMs: event.source_ts,
+      sequence: event.seq,
+      source: "legacy-smart-money",
+      direction: event.abstained
+        ? "abstained"
+        : normalizeTerminalDirection(event.primary_direction),
+      label: smartMoneyProfileLabel(event.primary_profile_id),
+      evidenceScore,
+      confidence,
+      whyNot: event.abstained
+        ? `Abstained: ${event.suppressed_reasons[0] ?? "compatibility policy"}`
+        : (event.suppressed_reasons[0] ?? null),
+      compatibility: true,
+      abstained: event.abstained
+    } satisfies MarketChartFlowContextInput;
+  })
+];
+
+export const buildTerminalMarketChartHoverRowProvider = ({
+  smartFlowProjections,
+  smartMoneyEvents,
+  flowPackets,
+  optionPrints
+}: {
+  smartFlowProjections: readonly SmartFlowExplainabilityProjection[];
+  smartMoneyEvents: readonly SmartMoneyEvent[];
+  flowPackets: readonly FlowPacket[];
+  optionPrints: readonly OptionPrint[];
+}): MarketChartHoverRowProvider => {
+  const optionFlowInputs = toOptionFlowHoverInputs(flowPackets, optionPrints);
+  const flowContextInputs = toFlowContextHoverInputs(smartFlowProjections, smartMoneyEvents);
+
+  return (context) => [
+    ...buildDirectionalOptionNotionalRows(context, optionFlowInputs),
+    ...buildFlowContextHoverRows(context, flowContextInputs)
+  ];
 };
 
 export const normalizeTerminalChartCandles = (
@@ -373,6 +606,9 @@ export const TerminalMarketChartSection = memo(
       status: state.mode === "live" ? "connecting" : "connected"
     });
     const overlayAbortRef = useRef<AbortController | null>(null);
+    const setFetchStateIfChanged = useCallback((next: TerminalChartFetchState) => {
+      setFetchState((current) => (terminalChartFetchStatesEqual(current, next) ? current : next));
+    }, []);
 
     const timeframeModel = useMemo(
       () =>
@@ -428,7 +664,7 @@ export const TerminalMarketChartSection = memo(
     useEffect(() => {
       let active = true;
       const abort = new AbortController();
-      setFetchState({
+      setFetchStateIfChanged({
         candles: [],
         status: state.mode === "live" ? "connecting" : "connected",
         lastUpdate: null,
@@ -459,7 +695,7 @@ export const TerminalMarketChartSection = memo(
           }
           const candles = sortByTsSeq(payload.data ?? []);
           const last = candles.at(-1);
-          setFetchState({
+          setFetchStateIfChanged({
             candles,
             status: "connected",
             lastUpdate: last ? (last.ingest_ts ?? last.ts) : null,
@@ -469,7 +705,7 @@ export const TerminalMarketChartSection = memo(
           if (!active || (error instanceof DOMException && error.name === "AbortError")) {
             return;
           }
-          setFetchState({
+          setFetchStateIfChanged({
             candles: [],
             status: "disconnected",
             lastUpdate: null,
@@ -484,7 +720,13 @@ export const TerminalMarketChartSection = memo(
         active = false;
         abort.abort();
       };
-    }, [state.chartTicker, state.mode, normalizedChartIntervalMs, replayEndTs]);
+    }, [
+      state.chartTicker,
+      state.mode,
+      normalizedChartIntervalMs,
+      replayEndTs,
+      setFetchStateIfChanged
+    ]);
 
     useEffect(() => {
       if (state.mode !== "live") {
@@ -495,7 +737,7 @@ export const TerminalMarketChartSection = memo(
         return;
       }
       const last = candles.at(-1);
-      setFetchState({
+      setFetchStateIfChanged({
         candles,
         status: state.liveSession.status,
         lastUpdate: last ? (last.ingest_ts ?? last.ts) : state.liveSession.lastUpdate,
@@ -505,7 +747,8 @@ export const TerminalMarketChartSection = memo(
       state.liveSession.chartCandles,
       state.liveSession.lastUpdate,
       state.liveSession.status,
-      state.mode
+      state.mode,
+      setFetchStateIfChanged
     ]);
 
     useEffect(() => {
@@ -627,6 +870,16 @@ export const TerminalMarketChartSection = memo(
     const lowerSeries = useMemo(
       () => buildLowerPaneSeries(resolvedLowerPaneMode, lowerPaneInput),
       [lowerPaneInput, resolvedLowerPaneMode]
+    );
+    const chartHoverRows = useMemo(
+      () => [buildTerminalMarketChartHoverRowProvider(lowerPaneInput)],
+      [lowerPaneInput]
+    );
+    const chartRegistry = useMemo(
+      () => ({
+        hoverRows: chartHoverRows
+      }),
+      [chartHoverRows]
     );
     const chartSettings = useMemo(
       () => ({
@@ -779,6 +1032,7 @@ export const TerminalMarketChartSection = memo(
             status={marketChartStatus}
             replayTime={state.equities.replayTime}
             layoutPreset="dashboard"
+            registry={chartRegistry}
             onVisibleRangeChange={setVisibleRangeMs}
             onMarkerClick={handleMarkerClick}
           />
