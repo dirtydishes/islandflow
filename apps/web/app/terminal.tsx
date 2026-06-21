@@ -91,6 +91,7 @@ export {
   getTerminalNavCurrentHref,
   normalizeTerminalPathname
 } from "../features/terminal/routes";
+export { getLiveSubscriptionResetChannels } from "../features/terminal/live";
 export {
   appendHistoryTail,
   composeTapeItems,

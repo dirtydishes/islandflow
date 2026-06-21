@@ -1,7 +1,11 @@
 import {
   createSyntheticDemoProfileFixture,
+  getLoadProfile,
   getSyntheticLoadProfileRunCount,
   loadProfileIdForSyntheticMarketMode,
+  projectSyntheticDemoLiveEvent as projectDemoEvent,
+  scaleSyntheticDemoRunIntervalMs,
+  SYNTHETIC_DEMO_RUN_INTERVAL_MS,
   scaleSyntheticEmitIntervalMs
 } from "@islandflow/synthetic-market/profiles";
 import {
@@ -1404,35 +1408,6 @@ export const buildSyntheticBurstForTest = (
   return cached[burstIndex - 1]!;
 };
 
-type DemoProjectedEvent = {
-  source_ts: number;
-  ingest_ts: number;
-  ts: number;
-  seq: number;
-  trace_id: string;
-};
-
-const projectDemoEvent = <T extends DemoProjectedEvent>(
-  event: T,
-  input: {
-    firstTs: number;
-    baseTs: number;
-    seq: number;
-    runId: string;
-    runSerial: number;
-  }
-): T => {
-  const traceSuffix = event.trace_id.split(":").slice(1).join(":") || event.trace_id;
-  return {
-    ...event,
-    source_ts: input.baseTs + (event.source_ts - input.firstTs),
-    ingest_ts: input.baseTs + (event.ingest_ts - input.firstTs),
-    ts: input.baseTs + (event.ts - input.firstTs),
-    seq: input.seq,
-    trace_id: `${input.runId}:live:${input.runSerial}:${traceSuffix}`
-  };
-};
-
 export const createSyntheticOptionsAdapter = (
   config: SyntheticOptionsAdapterConfig
 ): OptionIngestAdapter => {
@@ -1441,10 +1416,17 @@ export const createSyntheticOptionsAdapter = (
     start: (handlers: OptionIngestHandlers) => {
       let seq = 0;
       let nbboSeq = 0;
+      let burstIndex = 0;
+      let currentBurst: Burst | null = null;
+      let currentBurstMode: SyntheticMarketMode | null = null;
+      let remainingRuns = 0;
       let demoRunOrdinal = 0;
       let demoRunSerial = 0;
-      let timer: ReturnType<typeof setTimeout> | null = null;
+      let regularTimer: ReturnType<typeof setTimeout> | null = null;
+      let demoTimer: ReturnType<typeof setTimeout> | null = null;
       let stopped = false;
+      const ivByContract = new Map<string, SyntheticContractIvState>();
+      const coverageState = createCoverageWindowState();
 
       const getEffectiveControl = (): SyntheticControlState => {
         const control = config.getControl?.() ?? DEFAULT_SYNTHETIC_CONTROL_STATE;
@@ -1460,7 +1442,140 @@ export const createSyntheticOptionsAdapter = (
         return control;
       };
 
-      const emit = () => {
+      const emitBackground = () => {
+        if (stopped) {
+          return;
+        }
+
+        const now = Date.now();
+        const control = getEffectiveControl();
+        const mode = getLoadProfile(control.load_profile_id).mode;
+        const profile = SYNTHETIC_PROFILES[mode];
+        if (!currentBurst || remainingRuns <= 0 || currentBurstMode !== mode) {
+          burstIndex += 1;
+          currentBurst = buildBurst(burstIndex, now, mode, profile, control, coverageState);
+          currentBurstMode = mode;
+          recordCoverageHit(coverageState, currentBurst.label, now);
+          remainingRuns = pickInt(
+            profile.burstRunRange[0],
+            profile.burstRunRange[1],
+            burstIndex * 23
+          );
+        }
+
+        const burst = currentBurst;
+        const session = getSyntheticSessionState(now, control);
+        const underlyingState = getSyntheticUnderlyingState(
+          burst.contractId.split("-")[0]!,
+          now,
+          control,
+          session
+        );
+
+        for (let i = 0; i < burst.printCount; i += 1) {
+          const leg = burst.legs[i % burst.legs.length]!;
+          const legCycle = Math.floor(i / burst.legs.length);
+          const eventTs = now + i * 5;
+          const priceJitter = ((i % 3) - 1) * 0.004;
+          const sizeJitter = ((i % 3) - 1) * 0.08;
+          const priceMultiplier = 1 + burst.priceStep * legCycle + priceJitter;
+          const placement = pickPlacement(burst, i);
+          const size = Math.max(1, Math.round(leg.baseSize * (1 + sizeJitter)));
+          const previousIv = ivByContract.get(leg.contractId);
+          const provisionalNotional = leg.basePrice * size * OPTION_CONTRACT_MULTIPLIER;
+          const ivState = updateSyntheticIvForTest(previousIv, {
+            ts: eventTs,
+            placement,
+            size,
+            notional: provisionalNotional,
+            dteDays: leg.expiryOffsetDays,
+            moneyness: leg.strike / burst.underlying
+          });
+          ivByContract.set(leg.contractId, ivState);
+          const ivDrift = Math.max(
+            0,
+            ivState.iv - initializeSyntheticIv(leg.expiryOffsetDays, leg.strike / burst.underlying)
+          );
+          const mid = Math.max(
+            0.05,
+            Number((leg.basePrice * priceMultiplier * (1 + ivDrift * 1.15)).toFixed(2))
+          );
+          const spread = Math.max(
+            0.02,
+            Number(
+              (
+                mid *
+                (0.018 +
+                  Math.min(0.04, ivState.iv * 0.01) +
+                  underlyingState.sessionVolatility * 0.01 +
+                  (1 - underlyingState.quoteCleanliness) * 0.006)
+              ).toFixed(2)
+            )
+          );
+          const bid = Math.max(0.01, Number((mid - spread / 2).toFixed(2)));
+          const ask = Math.max(bid + 0.01, Number((mid + spread / 2).toFixed(2)));
+          const tick = Math.max(0.01, Number((spread * 0.25).toFixed(2)));
+          const tradePrice =
+            placement === "AA"
+              ? ask + tick
+              : placement === "A"
+                ? ask
+                : placement === "BB"
+                  ? Math.max(0.01, bid - tick)
+                  : placement === "B"
+                    ? bid
+                    : mid;
+
+          seq += 1;
+          const print: OptionPrint = {
+            source_ts: eventTs,
+            ingest_ts: eventTs,
+            seq,
+            trace_id: `synthetic-options-${seq}`,
+            ts: eventTs,
+            option_contract_id: leg.contractId,
+            price: tradePrice,
+            size,
+            exchange: leg.exchange,
+            conditions: burst.conditions,
+            execution_iv: ivState.iv,
+            execution_iv_source: "synthetic_pressure_model",
+            execution_underlying_mid: burst.underlying
+          };
+
+          const quoteSeed = Math.abs(burst.seed + i * 17) % 1000;
+          const missingQuote = quoteSeed / 1000 < burst.missingQuoteProbability;
+          const staleQuote =
+            !missingQuote && ((quoteSeed + 233) % 1000) / 1000 < burst.staleQuoteProbability;
+
+          if (handlers.onNBBO && !missingQuote) {
+            nbboSeq += 1;
+            const sizeBase = Math.max(1, Math.round(leg.baseSize * 0.4));
+            const bidSize = Math.max(1, Math.round(sizeBase * (1 + sizeJitter)));
+            const askSize = Math.max(1, Math.round(sizeBase * (1 - sizeJitter)));
+            const quoteTs = staleQuote ? eventTs - 2_000 : eventTs;
+            const nbbo: OptionNBBO = {
+              source_ts: quoteTs,
+              ingest_ts: quoteTs,
+              seq: nbboSeq,
+              trace_id: `synthetic-nbbo-${nbboSeq}`,
+              ts: quoteTs,
+              option_contract_id: leg.contractId,
+              bid,
+              ask,
+              bidSize,
+              askSize
+            };
+            void handlers.onNBBO(nbbo);
+          }
+
+          void handlers.onTrade(print);
+        }
+
+        remainingRuns -= 1;
+      };
+
+      const emitDemoRuns = () => {
         if (stopped) {
           return;
         }
@@ -1510,7 +1625,7 @@ export const createSyntheticOptionsAdapter = (
         }
       };
 
-      const schedule = () => {
+      const scheduleRegular = () => {
         if (stopped) {
           return;
         }
@@ -1519,18 +1634,39 @@ export const createSyntheticOptionsAdapter = (
           config.emitIntervalMs,
           control.load_profile_id
         );
-        timer = setTimeout(() => {
-          emit();
-          schedule();
+        regularTimer = setTimeout(() => {
+          emitBackground();
+          scheduleRegular();
         }, intervalMs);
       };
 
-      schedule();
+      const scheduleDemoRuns = () => {
+        if (stopped) {
+          return;
+        }
+        const control = getEffectiveControl();
+        const intervalMs = scaleSyntheticDemoRunIntervalMs(
+          SYNTHETIC_DEMO_RUN_INTERVAL_MS,
+          control.load_profile_id
+        );
+        demoTimer = setTimeout(() => {
+          emitDemoRuns();
+          scheduleDemoRuns();
+        }, intervalMs);
+      };
+
+      emitBackground();
+      emitDemoRuns();
+      scheduleRegular();
+      scheduleDemoRuns();
 
       return () => {
         stopped = true;
-        if (timer) {
-          clearTimeout(timer);
+        if (regularTimer) {
+          clearTimeout(regularTimer);
+        }
+        if (demoTimer) {
+          clearTimeout(demoTimer);
         }
       };
     }

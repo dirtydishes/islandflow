@@ -55,6 +55,16 @@ export type DemoProfileSummary = Omit<DemoProfile, "control_defaults">;
 
 export type LoadProfileSummary = LoadProfile;
 
+export type SyntheticDemoLiveEvent = {
+  source_ts: number;
+  ingest_ts: number;
+  ts: number;
+  seq: number;
+  trace_id: string;
+};
+
+export const SYNTHETIC_DEMO_RUN_INTERVAL_MS = 60_000;
+
 const balancedWeights = (): SyntheticProfileWeightMap => ({
   institutional_directional: 1.0,
   retail_whale: 1.0,
@@ -254,6 +264,34 @@ export const createSyntheticDemoProfileFixture = (
   });
 };
 
+export const projectSyntheticDemoLiveEvent = <T extends SyntheticDemoLiveEvent>(
+  event: T,
+  input: {
+    firstTs: number;
+    baseTs: number;
+    seq: number;
+    runId: string;
+    runSerial: number;
+  }
+): T => {
+  const cleanEvent = { ...(event as T & Record<string, unknown>) };
+  delete cleanEvent.scenario_id;
+  delete cleanEvent.label;
+  delete cleanEvent.hiddenLabel;
+  delete cleanEvent.labels;
+  delete cleanEvent.source_kind;
+
+  const traceSuffix = event.trace_id.split(":").slice(1).join(":") || event.trace_id;
+  return {
+    ...(cleanEvent as T),
+    source_ts: input.baseTs + (event.source_ts - input.firstTs),
+    ingest_ts: input.baseTs + (event.ingest_ts - input.firstTs),
+    ts: input.baseTs + (event.ts - input.firstTs),
+    seq: input.seq,
+    trace_id: `${input.runId}:live:${input.runSerial}:${traceSuffix}`
+  };
+};
+
 export const scaleSyntheticEmitIntervalMs = (
   baseIntervalMs: number,
   profileId: SyntheticLoadProfileId | string | null | undefined
@@ -264,6 +302,11 @@ export const scaleSyntheticEmitIntervalMs = (
     : 1;
   return Math.max(1, Math.round(normalizedBase / loadProfile.rate_multiplier));
 };
+
+export const scaleSyntheticDemoRunIntervalMs = (
+  baseIntervalMs: number = SYNTHETIC_DEMO_RUN_INTERVAL_MS,
+  profileId: SyntheticLoadProfileId | string | null | undefined
+): number => scaleSyntheticEmitIntervalMs(baseIntervalMs, profileId);
 
 export const getSyntheticLoadProfileRunCount = (
   profileId: SyntheticLoadProfileId | string | null | undefined
