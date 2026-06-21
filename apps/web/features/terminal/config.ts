@@ -1,4 +1,5 @@
 import type { LiveSubscription } from "@islandflow/types";
+import { DEFAULT_MARKET_CHART_INTERVALS } from "../market-chart";
 import type { TapeVirtualListConfig, TapeVirtualPane } from "./types";
 
 const parseBoundedInt = (
@@ -70,10 +71,7 @@ export const NBBO_MAX_AGE_MS_SAFE =
   Number.isFinite(NBBO_MAX_AGE_MS) && NBBO_MAX_AGE_MS > 0 ? NBBO_MAX_AGE_MS : 1000;
 export const FLOW_FILTER_PRESET = process.env.NEXT_PUBLIC_FLOW_FILTER_PRESET ?? "smart-money";
 export const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"]);
-export const CANDLE_INTERVALS = [
-  { label: "1m", ms: 60000 },
-  { label: "5m", ms: 300000 }
-];
+export const CANDLE_INTERVALS = DEFAULT_MARKET_CHART_INTERVALS;
 export const LIVE_SESSION_IDLE_RECONNECT_MS = 12_000;
 export const LIVE_SESSION_IDLE_CHECK_MS = 3_000;
 export const LIVE_SESSION_HOT_CHANNELS = new Set<LiveSubscription["channel"]>([

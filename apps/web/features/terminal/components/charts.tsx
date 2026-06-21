@@ -12,8 +12,12 @@ import type {
 import { parseOptionContractId } from "@islandflow/types";
 import {
   createChart,
+  createSeriesMarkers,
   type IChartApi,
+  type ISeriesMarkersPluginApi,
+  CandlestickSeries as LightweightCandlestickSeries,
   type SeriesMarker,
+  type Time,
   type UTCTimestamp
 } from "lightweight-charts";
 import Link from "next/link";
@@ -49,8 +53,13 @@ import type { TerminalState } from "../state";
 import { extractUnderlying, normalizeContractId } from "../state-helpers";
 import { buildApiUrl, readErrorDetail } from "../transport";
 import type { TapeMode, WsStatus } from "../types";
+import { getNewsWireStatus, openNewsStory } from "./news";
 import { Pane, TapeStatus } from "./primitives";
 import {
+  type CandlestickSeries,
+  chartTimeToMs,
+  clamp,
+  type EquityOverlayPoint,
   formatConfidence,
   formatContractLabel,
   formatFlowMetric,
@@ -63,14 +72,9 @@ import {
   normalizeDirection,
   parseNumber,
   sampleToLimit,
-  chartTimeToMs,
-  clamp,
   toChartCandle,
-  toChartTime,
-  type CandlestickSeries,
-  type EquityOverlayPoint
+  toChartTime
 } from "./ui-helpers";
-import { getNewsWireStatus, openNewsStory } from "./news";
 
 type CandleChartProps = {
   ticker: string;
@@ -109,6 +113,7 @@ export const CandleChart = ({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<CandlestickSeries | null>(null);
+  const markerPluginRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<number | null>(null);
   const overlaySocketRef = useRef<WebSocket | null>(null);
@@ -337,7 +342,7 @@ export const CandleChart = ({
       return;
     }
     markerLookupRef.current = markerBundle.lookup;
-    seriesRef.current.setMarkers(markerBundle.markers);
+    markerPluginRef.current?.setMarkers(markerBundle.markers);
   }, [markerBundle]);
 
   const replayBucket = useMemo(() => {
@@ -404,16 +409,18 @@ export const CandleChart = ({
     overlayCanvasRef.current = overlayCanvas;
     overlayCtxRef.current = overlayCanvas.getContext("2d");
 
-    const series = chart.addCandlestickSeries({
+    const series = chart.addSeries(LightweightCandlestickSeries, {
       upColor: "#25c17a",
       downColor: "#ff6b5f",
       borderVisible: false,
       wickUpColor: "#25c17a",
       wickDownColor: "#ff6b5f"
     });
+    const markerPlugin = createSeriesMarkers(series, []);
 
     chartRef.current = chart;
     seriesRef.current = series;
+    markerPluginRef.current = markerPlugin;
     setReady(true);
 
     const timeScale = chart.timeScale();
@@ -436,8 +443,11 @@ export const CandleChart = ({
       });
     };
 
-    const clickHandler = (param: { hoveredObjectId?: unknown }) => {
-      const hovered = param.hoveredObjectId;
+    const clickHandler = (param: {
+      hoveredInfo?: { objectId?: unknown };
+      hoveredObjectId?: unknown;
+    }) => {
+      const hovered = param.hoveredInfo?.objectId ?? param.hoveredObjectId;
       if (hovered === null || hovered === undefined) {
         return;
       }
@@ -468,10 +478,7 @@ export const CandleChart = ({
       if (Number.isFinite(nextWidth) && Number.isFinite(nextHeight)) {
         const nextW = Math.max(1, Math.floor(nextWidth));
         const nextH = Math.max(1, Math.floor(nextHeight));
-        chart.applyOptions({
-          width: nextW,
-          height: nextH
-        });
+        chart.resize(nextW, nextH);
 
         const canvas = overlayCanvasRef.current;
         if (canvas) {
@@ -487,9 +494,11 @@ export const CandleChart = ({
       resizeObserver.disconnect();
       timeScale.unsubscribeVisibleTimeRangeChange(updateVisibleRange);
       chart.unsubscribeClick(clickHandler);
+      markerPlugin.detach();
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
+      markerPluginRef.current = null;
       overlayCtxRef.current = null;
       overlayCanvasRef.current?.remove();
       overlayCanvasRef.current = null;
