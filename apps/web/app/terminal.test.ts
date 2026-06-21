@@ -36,6 +36,7 @@ const {
   buildAlertContextPath,
   buildDefaultFlowFilters,
   buildTerminalEquityOverlays,
+  buildTerminalLowerPaneInput,
   buildTerminalMarketChartMarkers,
   buildOptionTapeQueryParams,
   classifierToneForFamily,
@@ -1289,6 +1290,69 @@ describe("smart-flow explainability helpers", () => {
     expect(overlays).toHaveLength(1);
     expect(overlays[0].points).toHaveLength(1);
     expect(overlays[0].points[0]).toMatchObject({ timestampMs: 1_000, price: 101, value: 100 });
+  });
+
+  it("scopes lower-pane all-flow inputs to the active chart ticker", () => {
+    const input = buildTerminalLowerPaneInput({
+      chartTicker: "SPY",
+      candles: [],
+      smartFlowProjections: [makeProjection()],
+      smartMoneyEvents: [makeLegacySmartMoneyEvent()],
+      flowPackets: [
+        {
+          id: "flowpacket:SPY-2025-01-17-450-C:1",
+          trace_id: "flowpacket:spy:1",
+          source_ts: 1_000,
+          ingest_ts: 1_001,
+          seq: 1,
+          members: [],
+          features: { total_notional: 100, option_contract_id: "SPY-2025-01-17-450-C" },
+          join_quality: {}
+        },
+        {
+          id: "flowpacket:aapl:1",
+          trace_id: "flowpacket:aapl:1",
+          source_ts: 1_000,
+          ingest_ts: 1_001,
+          seq: 2,
+          members: [],
+          features: { total_notional: 200, underlying_id: "AAPL" },
+          join_quality: {}
+        },
+        {
+          id: "flowpacket:SPY-2025-01-17-455-P:2",
+          trace_id: "flowpacket:spy:2",
+          source_ts: 2_000,
+          ingest_ts: 2_001,
+          seq: 3,
+          members: [],
+          features: { total_notional: 300 },
+          join_quality: {}
+        }
+      ] as any,
+      optionPrints: [
+        makeOptionPrint({
+          trace_id: "print:spy:1",
+          option_contract_id: "SPY-2025-01-17-450-C",
+          underlying_id: "SPY"
+        }),
+        makeOptionPrint({
+          trace_id: "print:aapl:1",
+          option_contract_id: "AAPL-2025-01-17-200-C",
+          underlying_id: "AAPL"
+        }),
+        makeOptionPrint({
+          trace_id: "print:spy:2",
+          option_contract_id: "SPY-2025-01-17-455-P",
+          underlying_id: undefined
+        })
+      ] as any
+    });
+
+    expect(input.smartFlowProjections).toHaveLength(1);
+    expect(input.smartMoneyEvents).toHaveLength(1);
+    expect(input.flowPackets.map((packet) => packet.seq)).toEqual([1, 3]);
+    expect(input.optionPrints.map((print) => print.trace_id)).toEqual(["print:spy:1", "print:spy:2"]);
   });
 
   it("maps smart-flow, legacy fallback, and inferred dark events into clickable chart markers", () => {

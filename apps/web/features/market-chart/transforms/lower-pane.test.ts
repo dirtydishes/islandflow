@@ -74,6 +74,44 @@ describe("market chart lower-pane transforms", () => {
     expect(layer.points[0].payload).toEqual({ source: "smart-flow" });
   });
 
+  it("falls back to legacy smart-money per bucket when smart-flow is sparse", () => {
+    const buckets = [candle(60_000), candle(120_000), candle(180_000)];
+    const layer = buildSmartDirectionBars(
+      [
+        {
+          source_ts: 65_000,
+          notional: 100,
+          hypothesis: { direction: "bullish" }
+        },
+        {
+          source_ts: 185_000,
+          notional: 50,
+          hypothesis: { direction: "bearish" }
+        }
+      ],
+      [
+        {
+          source_ts: 125_000,
+          primary_direction: "bearish",
+          features: { total_notional: 300 }
+        },
+        {
+          source_ts: 185_000,
+          primary_direction: "bullish",
+          features: { total_notional: 999 }
+        }
+      ],
+      buckets
+    );
+
+    expect(layer.points.map((point) => point.value)).toEqual([100, -300, -50]);
+    expect(layer.points.map((point) => point.payload)).toEqual([
+      { source: "smart-flow" },
+      { source: "legacy-smart-money" },
+      { source: "smart-flow" }
+    ]);
+  });
+
   it("falls back to legacy smart-money events when smart-flow is unavailable", () => {
     const layer = buildSmartDirectionBars(
       [],

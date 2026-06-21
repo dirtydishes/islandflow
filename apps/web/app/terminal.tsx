@@ -24,6 +24,7 @@ export { getChartFlowMarkerItems } from "../features/terminal/charts/markers";
 export type { ChartFlowMarkerItem } from "../features/terminal/charts/markers";
 export {
   buildTerminalEquityOverlays,
+  buildTerminalLowerPaneInput,
   buildTerminalMarketChartMarkers,
   getTerminalChartReplayEndTs,
   mapTerminalChartStatus,

@@ -245,24 +245,27 @@ export const buildSmartDirectionBars = (
   buckets: readonly MarketChartLowerPaneBucket[]
 ): MarketChartLowerLayer => {
   const ranges = bucketRanges(toBuckets(buckets, []));
-  const useSmartFlow = projections.length > 0;
-  const source = useSmartFlow ? projections : smartMoneyEvents;
   const points = ranges.map(({ bucket, start, end }) => {
-    const signed = source
-      .filter((item) => item.source_ts >= start && item.source_ts < end)
-      .reduce((sum, item) => {
-        if (useSmartFlow) {
-          const projection = item as SmartDirectionProjectionInput;
-          const direction = projection.abstention?.abstained
-            ? "neutral"
-            : normalizeDirection(projection.hypothesis?.direction);
-          return sum + projectionMagnitude(projection) * directionSign(direction);
-        }
+    const bucketProjections = projections.filter(
+      (projection) => projection.source_ts >= start && projection.source_ts < end
+    );
+    const useSmartFlow = bucketProjections.length > 0;
+    const source = useSmartFlow
+      ? bucketProjections
+      : smartMoneyEvents.filter((event) => event.source_ts >= start && event.source_ts < end);
+    const signed = source.reduce((sum, item) => {
+      if (useSmartFlow) {
+        const projection = item as SmartDirectionProjectionInput;
+        const direction = projection.abstention?.abstained
+          ? "neutral"
+          : normalizeDirection(projection.hypothesis?.direction);
+        return sum + projectionMagnitude(projection) * directionSign(direction);
+      }
 
-        const event = item as SmartDirectionLegacyEventInput;
-        const direction = event.abstained ? "neutral" : normalizeDirection(event.primary_direction);
-        return sum + legacyMagnitude(event) * directionSign(direction);
-      }, 0);
+      const event = item as SmartDirectionLegacyEventInput;
+      const direction = event.abstained ? "neutral" : normalizeDirection(event.primary_direction);
+      return sum + legacyMagnitude(event) * directionSign(direction);
+    }, 0);
     const direction = directionFromSignedValue(signed);
 
     return {

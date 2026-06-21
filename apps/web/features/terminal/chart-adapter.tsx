@@ -35,6 +35,7 @@ import {
 import { getChartFlowMarkerItems } from "./charts/markers";
 import { SUPPORTED_CANDLE_INTERVAL_MS } from "./config";
 import { smartFlowDirectionTone, statusLabel } from "./format";
+import { extractUnderlying, normalizeContractId } from "./state-helpers";
 import type { TerminalState } from "./state";
 import { buildApiUrl, readErrorDetail } from "./transport";
 import type { TapeMode, WsStatus } from "./types";
@@ -84,6 +85,31 @@ const sortByTsSeq = <T extends { ts?: number; source_ts?: number; seq: number }>
     }
     return a.seq - b.seq;
   });
+
+const matchesChartTicker = (value: string | null | undefined, chartTicker: string): boolean =>
+  value ? value.toUpperCase() === chartTicker.toUpperCase() : false;
+
+const getFlowPacketUnderlying = (packet: FlowPacket): string | null => {
+  const explicitUnderlying = packet.features.underlying_id;
+  if (typeof explicitUnderlying === "string" && explicitUnderlying.trim().length > 0) {
+    return explicitUnderlying.toUpperCase();
+  }
+
+  const featureContract = packet.features.option_contract_id;
+  if (typeof featureContract === "string" && featureContract.trim().length > 0) {
+    return extractUnderlying(normalizeContractId(featureContract));
+  }
+
+  const packetContract = packet.id.match(/^flowpacket:([^:]+):/)?.[1] ?? packet.id;
+  return extractUnderlying(normalizeContractId(packetContract));
+};
+
+const getOptionPrintUnderlying = (print: OptionPrint): string | null => {
+  if (print.underlying_id) {
+    return print.underlying_id.toUpperCase();
+  }
+  return extractUnderlying(normalizeContractId(print.option_contract_id));
+};
 
 const normalizeTerminalDirection = (value: string | null | undefined): MarketChartDirection => {
   if (value === "bullish" || value === "bearish") {
@@ -139,6 +165,32 @@ export const buildTerminalEquityOverlays = (
     }
   ];
 };
+
+export const buildTerminalLowerPaneInput = ({
+  chartTicker,
+  candles,
+  smartFlowProjections,
+  smartMoneyEvents,
+  flowPackets,
+  optionPrints
+}: {
+  chartTicker: string;
+  candles: readonly MarketChartCandle[];
+  smartFlowProjections: readonly SmartFlowExplainabilityProjection[];
+  smartMoneyEvents: readonly SmartMoneyEvent[];
+  flowPackets: readonly FlowPacket[];
+  optionPrints: readonly OptionPrint[];
+}) => ({
+  candles,
+  smartFlowProjections,
+  smartMoneyEvents,
+  flowPackets: flowPackets.filter((packet) =>
+    matchesChartTicker(getFlowPacketUnderlying(packet), chartTicker)
+  ),
+  optionPrints: optionPrints.filter((print) =>
+    matchesChartTicker(getOptionPrintUnderlying(print), chartTicker)
+  )
+});
 
 export const mapTerminalChartStatus = (
   status: WsStatus,
@@ -546,15 +598,18 @@ export const TerminalMarketChartSection = memo(
       visibleRangeMs
     ]);
     const lowerPaneInput = useMemo(
-      () => ({
-        candles: normalizedCandles,
-        smartFlowProjections: state.chartSmartFlowProjections,
-        smartMoneyEvents: state.chartSmartMoneyEvents,
-        flowPackets: state.flow.items as readonly FlowPacket[],
-        optionPrints: state.options.items as readonly OptionPrint[]
-      }),
+      () =>
+        buildTerminalLowerPaneInput({
+          chartTicker: state.chartTicker,
+          candles: normalizedCandles,
+          smartFlowProjections: state.chartSmartFlowProjections,
+          smartMoneyEvents: state.chartSmartMoneyEvents,
+          flowPackets: state.flow.items as readonly FlowPacket[],
+          optionPrints: state.options.items as readonly OptionPrint[]
+        }),
       [
         normalizedCandles,
+        state.chartTicker,
         state.chartSmartFlowProjections,
         state.chartSmartMoneyEvents,
         state.flow.items,
