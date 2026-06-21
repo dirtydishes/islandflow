@@ -13,6 +13,8 @@ import { type ChangeEvent, memo, useCallback, useEffect, useMemo, useRef, useSta
 
 import {
   buildTimeframeToolbarModel,
+  buildDirectionalOptionNotionalRows,
+  buildFlowContextHoverRows,
   buildLowerPaneSeries,
   DEFAULT_MARKET_CHART_SETTINGS,
   formatIntervalLabel,
@@ -23,7 +25,10 @@ import {
   resolveLowerPaneMode,
   type MarketChartCandle,
   type MarketChartDirection,
+  type MarketChartFlowContextInput,
+  type MarketChartHoverRowProvider,
   type MarketChartMarker,
+  type MarketChartOptionFlowInput,
   type MarketChartOverlay,
   type MarketChartRange,
   type MarketChartSettingsAction,
@@ -34,7 +39,15 @@ import {
 } from "../market-chart";
 import { getChartFlowMarkerItems } from "./charts/markers";
 import { SUPPORTED_CANDLE_INTERVAL_MS } from "./config";
-import { smartFlowDirectionTone, statusLabel } from "./format";
+import {
+  smartFlowDirectionLabel,
+  smartFlowDirectionTone,
+  smartFlowEvidenceQualityLabel,
+  smartFlowHypothesisLabel,
+  smartFlowWhyNotLabel,
+  smartMoneyProfileLabel,
+  statusLabel
+} from "./format";
 import { extractUnderlying, normalizeContractId } from "./state-helpers";
 import type { TerminalState } from "./state";
 import { buildApiUrl, readErrorDetail } from "./transport";
@@ -116,6 +129,163 @@ const normalizeTerminalDirection = (value: string | null | undefined): MarketCha
     return value;
   }
   return "neutral";
+};
+
+const optionSideToHoverDirection = (
+  value: string | null | undefined
+): MarketChartOptionFlowInput["direction"] => {
+  if (value === "AA" || value === "A") {
+    return "bullish";
+  }
+  if (value === "B" || value === "BB") {
+    return "bearish";
+  }
+  return "unknown";
+};
+
+const featureNumber = (
+  features: Record<string, string | number | boolean>,
+  keys: readonly string[]
+): number | null => {
+  for (const key of keys) {
+    const value = features[key];
+    if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+      return value;
+    }
+  }
+  return null;
+};
+
+const featureString = (
+  features: Record<string, string | number | boolean>,
+  keys: readonly string[]
+): string | null => {
+  for (const key of keys) {
+    const value = features[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value;
+    }
+  }
+  return null;
+};
+
+const flowPacketHoverDirection = (
+  packet: FlowPacket
+): MarketChartOptionFlowInput["direction"] => {
+  const explicitDirection = featureString(packet.features, [
+    "direction",
+    "primary_direction",
+    "flow_direction",
+    "smart_flow_direction"
+  ]);
+  if (
+    explicitDirection === "bullish" ||
+    explicitDirection === "bearish" ||
+    explicitDirection === "neutral"
+  ) {
+    return explicitDirection;
+  }
+  return optionSideToHoverDirection(
+    featureString(packet.features, ["execution_nbbo_side", "nbbo_side", "side"])
+  );
+};
+
+const flowPacketHoverNotional = (packet: FlowPacket): number | null =>
+  featureNumber(packet.features, ["total_notional", "notional", "total_premium", "premium"]);
+
+const toOptionFlowHoverInputs = (
+  flowPackets: readonly FlowPacket[],
+  optionPrints: readonly OptionPrint[]
+): MarketChartOptionFlowInput[] => [
+  ...flowPackets.map((packet) => ({
+    timestampMs: packet.source_ts,
+    sequence: packet.seq,
+    notional: flowPacketHoverNotional(packet),
+    direction: flowPacketHoverDirection(packet)
+  })),
+  ...optionPrints.map((print) => ({
+    timestampMs: print.source_ts ?? print.ts,
+    sequence: print.seq,
+    notional: print.notional ?? print.price * print.size * 100,
+    price: print.price,
+    size: print.size,
+    direction: optionSideToHoverDirection(print.execution_nbbo_side ?? print.nbbo_side)
+  }))
+];
+
+const legacyEvidenceScore = (event: SmartMoneyEvent): number | null => {
+  const coverage = event.features?.nbbo_coverage_ratio;
+  const stale = event.features?.nbbo_stale_ratio;
+  if (typeof coverage !== "number" || typeof stale !== "number") {
+    return null;
+  }
+  return Math.max(0, Math.min(1, coverage - stale));
+};
+
+const legacyConfidence = (event: SmartMoneyEvent): number | null => {
+  const primaryScore =
+    event.profile_scores.find((score) => score.profile_id === event.primary_profile_id) ??
+    event.profile_scores[0];
+  return typeof primaryScore?.probability === "number" ? primaryScore.probability : null;
+};
+
+const toFlowContextHoverInputs = (
+  smartFlowProjections: readonly SmartFlowExplainabilityProjection[],
+  smartMoneyEvents: readonly SmartMoneyEvent[]
+): MarketChartFlowContextInput[] => [
+  ...smartFlowProjections.map((projection) => ({
+    timestampMs: projection.source_ts,
+    sequence: projection.seq,
+    source: "smart-flow",
+    direction: smartFlowDirectionLabel(projection),
+    label: smartFlowHypothesisLabel(projection.hypothesis.hypothesis_type),
+    evidenceQuality: smartFlowEvidenceQualityLabel(projection.evidence.evidence_quality),
+    evidenceScore: projection.evidence.evidence_quality,
+    confidence: projection.hypothesis.scores.confidence.policy_confidence,
+    whyNot: smartFlowWhyNotLabel(projection),
+    compatibility:
+      projection.source_channel === "smart-money" ||
+      projection.compatibility?.compatibility_only === true,
+    abstained: projection.abstention.abstained
+  })),
+  ...smartMoneyEvents.map((event) => {
+    const evidenceScore = legacyEvidenceScore(event);
+    const confidence = legacyConfidence(event);
+    return {
+      timestampMs: event.source_ts,
+      sequence: event.seq,
+      source: "legacy-smart-money",
+      direction: event.abstained ? "abstained" : normalizeTerminalDirection(event.primary_direction),
+      label: smartMoneyProfileLabel(event.primary_profile_id),
+      evidenceScore,
+      confidence,
+      whyNot: event.abstained
+        ? `Abstained: ${event.suppressed_reasons[0] ?? "compatibility policy"}`
+        : (event.suppressed_reasons[0] ?? null),
+      compatibility: true,
+      abstained: event.abstained
+    } satisfies MarketChartFlowContextInput;
+  })
+];
+
+export const buildTerminalMarketChartHoverRowProvider = ({
+  smartFlowProjections,
+  smartMoneyEvents,
+  flowPackets,
+  optionPrints
+}: {
+  smartFlowProjections: readonly SmartFlowExplainabilityProjection[];
+  smartMoneyEvents: readonly SmartMoneyEvent[];
+  flowPackets: readonly FlowPacket[];
+  optionPrints: readonly OptionPrint[];
+}): MarketChartHoverRowProvider => {
+  const optionFlowInputs = toOptionFlowHoverInputs(flowPackets, optionPrints);
+  const flowContextInputs = toFlowContextHoverInputs(smartFlowProjections, smartMoneyEvents);
+
+  return (context) => [
+    ...buildDirectionalOptionNotionalRows(context, optionFlowInputs),
+    ...buildFlowContextHoverRows(context, flowContextInputs)
+  ];
 };
 
 export const normalizeTerminalChartCandles = (
@@ -628,6 +798,16 @@ export const TerminalMarketChartSection = memo(
       () => buildLowerPaneSeries(resolvedLowerPaneMode, lowerPaneInput),
       [lowerPaneInput, resolvedLowerPaneMode]
     );
+    const chartHoverRows = useMemo(
+      () => [buildTerminalMarketChartHoverRowProvider(lowerPaneInput)],
+      [lowerPaneInput]
+    );
+    const chartRegistry = useMemo(
+      () => ({
+        hoverRows: chartHoverRows
+      }),
+      [chartHoverRows]
+    );
     const chartSettings = useMemo(
       () => ({
         ...settings,
@@ -779,6 +959,7 @@ export const TerminalMarketChartSection = memo(
             status={marketChartStatus}
             replayTime={state.equities.replayTime}
             layoutPreset="dashboard"
+            registry={chartRegistry}
             onVisibleRangeChange={setVisibleRangeMs}
             onMarkerClick={handleMarkerClick}
           />

@@ -80,6 +80,8 @@ export const useChartCrosshair = ({
     const time = Math.floor(timestampMs / 1000) as UTCTimestamp;
     const state = stateRef.current;
     const candle = state.candles.find((item) => item.time === time);
+    const bucketStartMs = candle?.timestampMs ?? timestampMs;
+    const bucketEndMs = bucketStartMs + state.intervalMs;
     const lowerPoints =
       state.lowerSeries?.layers.flatMap((layer) =>
         layer.points.filter((point) => point.time === time)
@@ -93,12 +95,25 @@ export const useChartCrosshair = ({
       intervalMs: state.intervalMs,
       time,
       timestampMs,
+      bucketStartMs,
+      bucketEndMs,
       candle,
       lowerPoints,
       overlayPoints,
       marker
     };
     const extensionRows = state.hoverRows.flatMap((provider) => provider(context));
-    callbackRef.current?.(buildHoverSnapshot(context, extensionRows));
+    const lowerRows =
+      state.lowerSeries?.layers.flatMap((layer) => layer.hoverRows?.(context) ?? []) ?? [];
+    const overlayRows =
+      state.overlays?.flatMap((overlay) => overlay.hoverRows?.(context) ?? []) ?? [];
+    callbackRef.current?.(
+      buildHoverSnapshot(context, {
+        extensionRows,
+        lowerRows,
+        overlayRows,
+        point: param.point ? { x: param.point.x, y: param.point.y } : undefined
+      })
+    );
   }, []);
 };

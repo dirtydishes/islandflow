@@ -367,7 +367,7 @@ export const MARKET_CHART_LOWER_PANE_MODE_REGISTRY = [
     isAvailable: (data) => data.smartDirection,
     transformId: "buildSmartDirectionBars",
     formatter: (value) => value.toLocaleString(),
-    defaultRenderer: { series: "histogram", signed: true, priceFormat: "price" },
+    defaultRenderer: { series: "rounded-bars", signed: true, priceFormat: "price" },
     transform: (input) =>
       buildSmartDirectionBars(
         input.smartFlowProjections ?? [],
@@ -383,7 +383,7 @@ export const MARKET_CHART_LOWER_PANE_MODE_REGISTRY = [
     isAvailable: (data) => data.allFlow,
     transformId: "buildAllFlowBars",
     formatter: (value) => value.toLocaleString(),
-    defaultRenderer: { series: "histogram", signed: false, priceFormat: "price" },
+    defaultRenderer: { series: "rounded-bars", signed: false, priceFormat: "price" },
     transform: (input) =>
       buildAllFlowBars(
         input.flowPackets ?? [],
@@ -400,7 +400,7 @@ export const MARKET_CHART_LOWER_PANE_MODE_REGISTRY = [
     isAvailable: (data) => data.candles,
     transformId: "buildVolumeBars",
     formatter: (value) => value.toLocaleString(),
-    defaultRenderer: { series: "histogram", signed: false, priceFormat: "volume" },
+    defaultRenderer: { series: "rounded-bars", signed: false, priceFormat: "volume" },
     transform: (input) => buildVolumeBars(input.candles)
   }
 ] as const satisfies readonly MarketChartLowerPaneModeDefinition[];

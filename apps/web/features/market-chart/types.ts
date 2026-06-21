@@ -47,7 +47,7 @@ export type MarketChartCandleInput = {
 
 export type MarketChartCandlestickData = CandlestickData<UTCTimestamp>;
 export type MarketChartPriceSeries = ISeriesApi<"Candlestick", Time>;
-export type MarketChartLowerPaneSeries = ISeriesApi<"Histogram", Time>;
+export type MarketChartLowerPaneSeries = ISeriesApi<"Custom", Time>;
 
 export type MarketChartPriceModeId = "candles" | "heikin-ashi";
 export type MarketChartPriceRendererKind = "candles" | "heikin-ashi" | "bar" | "line" | "area";
@@ -109,7 +109,7 @@ export type MarketChartLowerPaneDefinition = {
   transformId?: string;
   formatter?: (value: number) => string;
   defaultRenderer?: {
-    series: "histogram";
+    series: "histogram" | "rounded-bars";
     signed: boolean;
     priceFormat: "volume" | "price";
   };
@@ -174,16 +174,27 @@ export type MarketChartHoverRow = {
   value: string;
   tone?: MarketChartHoverRowTone;
   sourceId?: string;
+  group?: string;
+};
+
+export type MarketChartHoverPoint = {
+  x: number;
+  y: number;
 };
 
 export type MarketChartHoverSnapshot = {
   time: UTCTimestamp;
   timestampMs: number;
+  bucketStartMs: number;
+  bucketEndMs: number;
   symbol: string;
   intervalMs: number;
   price?: number | null;
   candle?: MarketChartCandle;
   marker?: MarketChartMarker;
+  point?: MarketChartHoverPoint;
+  coreRows: MarketChartHoverRow[];
+  extensionRows: MarketChartHoverRow[];
   rows: MarketChartHoverRow[];
   lowerRows: MarketChartHoverRow[];
   overlayRows: MarketChartHoverRow[];
@@ -195,6 +206,8 @@ export type MarketChartHoverContext = {
   intervalMs: number;
   time: UTCTimestamp;
   timestampMs: number;
+  bucketStartMs: number;
+  bucketEndMs: number;
   candle?: MarketChartCandle;
   lowerPoints: MarketChartLowerPoint[];
   overlayPoints: MarketChartOverlayPoint[];

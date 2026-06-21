@@ -27,7 +27,17 @@ export {
   toHeikinAshiCandles,
   type MarketChartPriceModeDefinition
 } from "./transforms/candles";
-export { buildCoreHoverRows, buildHoverSnapshot } from "./transforms/hover";
+export {
+  aggregateOptionNotionalByDirection,
+  buildCoreHoverRows,
+  buildDirectionalOptionNotionalRows,
+  buildFlowContextHoverRows,
+  buildHoverSnapshot,
+  type MarketChartFlowContextInput,
+  type MarketChartOptionFlowDirection,
+  type MarketChartOptionFlowInput,
+  type MarketChartOptionNotionalSummary
+} from "./transforms/hover";
 export {
   buildAllFlowBars,
   buildLowerPaneSeries,

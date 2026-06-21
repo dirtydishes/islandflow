@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lightweight Charts Phase 05 Hover Readout and Visual Hardening</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --pane: #111820;
+        --pane-2: #0b1016;
+        --text: #e6edf4;
+        --dim: #90a0b2;
+        --faint: #6e7b8c;
+        --amber: #f5a623;
+        --green: #25c17a;
+        --red: #ff6b5f;
+        --info: #7fb4ff;
+        --border: #ffffff14;
+        --border-strong: #ffffff24;
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--sans);
+      }
+
+      main {
+        width: min(1120px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 34px 0 54px;
+      }
+
+      header,
+      section {
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+        background: var(--pane);
+      }
+
+      header {
+        padding: 20px;
+      }
+
+      section {
+        margin-top: 14px;
+        padding: 18px 20px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 820px;
+        font-family: var(--mono);
+        font-size: 1.35rem;
+        line-height: 1.18;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      h2,
+      .kicker {
+        color: var(--amber);
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h2 {
+        margin-bottom: 12px;
+      }
+
+      h3 {
+        margin: 14px 0 8px;
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      p,
+      li {
+        color: var(--dim);
+        font-size: 0.92rem;
+        line-height: 1.55;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+
+      li + li {
+        margin-top: 6px;
+      }
+
+      code {
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 0.85em;
+      }
+
+      .summary {
+        margin-top: 10px;
+        max-width: 86ch;
+      }
+
+      .meta,
+      .check-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 10px;
+      }
+
+      .chip,
+      .check {
+        border: 1px solid var(--border);
+        background: var(--pane-2);
+      }
+
+      .chip {
+        padding: 10px;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        color: var(--dim);
+        text-transform: uppercase;
+      }
+
+      .check {
+        padding: 12px;
+      }
+
+      .check strong {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--green);
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .check p {
+        margin-top: 7px;
+        font-size: 0.82rem;
+      }
+
+      .note {
+        margin-top: 10px;
+        color: var(--faint);
+        font-size: 0.82rem;
+      }
+
+      .status-line {
+        color: var(--info);
+      }
+
+      .diff-shell {
+        border: 1px solid var(--border-strong);
+        background: #05070a;
+        overflow: auto;
+      }
+
+      #rich-diff {
+        display: none;
+      }
+
+      .rich-diff-ready #rich-diff {
+        display: block;
+      }
+
+      .rich-diff-ready #fallback-diff {
+        display: none;
+      }
+
+      pre {
+        margin: 0;
+        padding: 14px;
+        color: var(--dim);
+        font-family: var(--mono);
+        font-size: 0.76rem;
+        line-height: 1.45;
+        white-space: pre-wrap;
+      }
+
+      @media (max-width: 720px) {
+        main {
+          width: min(100% - 20px, 1120px);
+          padding-top: 20px;
+        }
+
+        header,
+        section {
+          padding: 14px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="kicker">Turn documentation · June 21, 2026</div>
+        <h1>Lightweight charts phase 05: hover readout and visual hardening</h1>
+        <p class="summary">
+          Added a compact crosshair readout, pure hover aggregation transforms, terminal-owned flow
+          context wiring, rounded directional lower-pane bars, and responsive tooltip hardening. The
+          chart module remains reusable; terminal state, smart-flow copy, and legacy smart-money
+          compatibility stay in the terminal adapter.
+        </p>
+      </header>
+
+      <section>
+        <h2>Scope</h2>
+        <div class="meta">
+          <div class="chip">Bead islandflow-mloi.5</div>
+          <div class="chip">Branch lavender/lightweight-charts-phase-05-hover-readout-visual-hardening</div>
+          <div class="chip">Phase 05 only</div>
+          <div class="chip">Custom rounded bars shipped</div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Added pure hover aggregation helpers for candle OHLC, volume, trade count, directional option notional, smart-flow evidence context, compatibility fallback, abstention, and why-not rows.</li>
+          <li>Added focused fixture coverage for bucket filtering, neutral and unknown notional, smart-flow preference, smart-money fallback, confidence, evidence quality, and row ordering.</li>
+          <li>Added <code>MarketChartTooltip</code>, a dense crosshair readout that renders stable core rows first and extension-owned rows under labelled groups.</li>
+          <li>Added a <code>lightweight-charts</code> custom series renderer for rounded directional lower-pane bars while keeping hover hit testing in the existing bucket model.</li>
+          <li>Wired terminal option prints, flow packets, smart-flow projections, and legacy smart-money context through adapter-owned hover providers without importing terminal code into <code>features/market-chart</code>.</li>
+          <li>Hardened tooltip placement and CSS for desktop dashboard, mobile, and compact embed sizes, with labels and text carrying directional meaning instead of relying on red or green alone.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Implementation Notes</h2>
+        <ul>
+          <li>The reusable chart module exposes generic hover rows and context. The terminal adapter owns option-side mapping, smart-flow labels, and legacy compatibility language.</li>
+          <li>Core readout rows are stable: time with interval, OHLC, volume, and trades. Flow rows append under <code>Flow context</code>; lower-pane and overlay rows append under their own groups.</li>
+          <li>Directional option notional always renders bullish, bearish, and neutral or unknown rows so uncertain flow remains visible.</li>
+          <li>The rounded-bar renderer uses custom-series pane data and signed values. Positive values round the top corners, negative values round the bottom corners, and neutral values use a dim neutral treatment.</li>
+          <li>Tooltip placement flips around the crosshair on wider charts and uses a bounded full-width treatment on narrow charts, avoiding active-candle coverage when practical without layout shift.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Verification</h2>
+        <div class="check-grid">
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun test apps/web/features/market-chart/transforms</code>
+            <p>30 pass, 0 fail.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code>
+            <p>92 pass, 0 fail after installing workspace dependencies in this worktree.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun --cwd=apps/web run build</code>
+            <p>Next.js production build and TypeScript check completed successfully.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun test</code>
+            <p>350 pass, 0 fail, 1964 assertions.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>rg "features/terminal|TerminalState|ChartPane|terminal/" apps/web/features/market-chart -S</code>
+            <p>No matches.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>git diff --check</code>
+            <p>No whitespace errors.</p>
+          </div>
+        </div>
+        <p class="note">
+          Browser visual QA used <code>bun --cwd=apps/web run dev</code> at <code>http://localhost:3000/</code>.
+          Desktop 1440x900: hover readout rendered inside the chart with OHLC, volume, trades,
+          directional option notional, and lower-pane context visible. Mobile 390x844: toolbar and
+          tooltip text had no detected overflow, and all readout rows stayed inside the viewport.
+          Compact 820x620: tooltip stayed inside viewport after placement tuning. The browser session
+          emitted replay polling fetch warnings in local dev; chart rendering and hover QA were not blocked.
+        </p>
+      </section>
+
+      <section>
+        <h2>PR Guidance</h2>
+        <p>
+          This is appropriately scoped as one Phase 05 PR. The hover model, tooltip, renderer, CSS,
+          and terminal adapter wiring need to be reviewed together because the visible readout depends
+          on the same bucket contract as the custom lower-pane renderer. The rounded renderer did not
+          require a separate exploratory PR, so no fallback issue was filed.
+        </p>
+      </section>
+
+      <section>
+        <h2>Reviewer Focus</h2>
+        <ul>
+          <li>Check the hover row contract and whether extension-owned groups are flexible enough for later panes and overlays.</li>
+          <li>Review option-side to bullish, bearish, and unknown mapping in the terminal adapter.</li>
+          <li>Inspect the custom-series rounded-bar geometry for signed values, compact heights, and time-scale alignment.</li>
+          <li>Verify smart-flow and legacy smart-money wording remains hypothesis or compatibility based.</li>
+          <li>Recheck mobile tooltip placement around dense live chart data and long values.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p class="note">
+          The page attempts to render the patch with browser-side <code>@pierre/diffs/react</code>
+          <code>PatchDiff</code>. The readable unified fallback remains visible if the rich renderer
+          is unavailable.
+        </p>
+        <div class="diff-shell">
+          <div id="rich-diff"></div>
+          <pre id="fallback-diff"><code>diff --git a/apps/web/features/market-chart/transforms/hover.ts b/apps/web/features/market-chart/transforms/hover.ts
+--- a/apps/web/features/market-chart/transforms/hover.ts
++++ b/apps/web/features/market-chart/transforms/hover.ts
+@@
++export const aggregateOptionNotionalByDirection = (
++  flows: MarketChartOptionFlowInput[],
++  context: MarketChartHoverContext,
++): MarketChartOptionNotionalSummary =&gt; {
++  return flows
++    .filter((flow) =&gt; flow.timestampMs &gt;= context.bucketStartMs &amp;&amp; flow.timestampMs &lt; context.bucketEndMs)
++    .reduce((summary, flow) =&gt; addNotional(summary, flow), createEmptyOptionSummary());
++};
++
++export const buildCoreHoverRows = (context: MarketChartHoverContext): MarketChartHoverRow[] =&gt; [
++  timeRow(context),
++  ohlcRow(context),
++  volumeRow(context),
++  tradeCountRow(context),
++];
++
++export const buildHoverSnapshot = (context: MarketChartHoverContext): MarketChartHoverSnapshot =&gt; ({
++  ...context,
++  coreRows: buildCoreHoverRows(context),
++  extensionRows: normalizeExtensionRows(context.extensionRows),
++});
+
+diff --git a/apps/web/features/market-chart/components/MarketChartTooltip.tsx b/apps/web/features/market-chart/components/MarketChartTooltip.tsx
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/market-chart/components/MarketChartTooltip.tsx
+@@
++export const MarketChartTooltip = ({ snapshot }: MarketChartTooltipProps) =&gt; {
++  if (!snapshot) return null;
++  const style = calculateTooltipPosition(snapshot.point, snapshot.container);
++  return (
++    &lt;div className="market-chart-tooltip" role="status" aria-label="Chart hover readout" style={style}&gt;
++      &lt;HoverRowGroup rows={snapshot.coreRows} /&gt;
++      &lt;HoverGroupedRows label="Flow context" rows={snapshot.extensionRows} /&gt;
++      &lt;HoverGroupedRows label="Lower pane" rows={snapshot.lowerPaneRows} /&gt;
++    &lt;/div&gt;
++  );
++};
+
+diff --git a/apps/web/features/market-chart/renderers/rounded-bars.ts b/apps/web/features/market-chart/renderers/rounded-bars.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/market-chart/renderers/rounded-bars.ts
+@@
++export const createRoundedBarSeriesPaneView = (): ICustomSeriesPaneView&lt;RoundedBarSeriesData&gt; =&gt; ({
++  priceValueBuilder: (plotRow) =&gt; [plotRow.value],
++  isWhitespace: (data) =&gt; data.value === undefined,
++  renderer: () =&gt; ({
++    draw: (target, priceConverter, isHovered, hitTestData) =&gt; {
++      target.useBitmapCoordinateSpace((scope) =&gt; {
++        renderRoundedBars(scope, priceConverter, hitTestData);
++      });
++    },
++  }),
++  update: (data, seriesOptions) =&gt; updateBars(data, seriesOptions),
++});
++
++export const toRoundedBarSeriesData = (series: MarketChartLowerPaneSeries): RoundedBarSeriesData[] =&gt;
++  series.points.map((point) =&gt; ({
++    time: point.time,
++    value: point.value,
++    color: lowerPointColor(point),
++    direction: point.value &gt; 0 ? "positive" : point.value &lt; 0 ? "negative" : "neutral",
++  }));
+
+diff --git a/apps/web/features/terminal/chart-adapter.tsx b/apps/web/features/terminal/chart-adapter.tsx
+--- a/apps/web/features/terminal/chart-adapter.tsx
++++ b/apps/web/features/terminal/chart-adapter.tsx
+@@
++const buildTerminalMarketChartHoverRowProvider = (state: TerminalState): MarketChartHoverRowProvider =&gt; {
++  const optionFlows = [
++    ...state.options.items.map(optionPrintToHoverFlow),
++    ...state.flow.items.map(flowPacketToHoverFlow),
++  ];
++  const flowContexts = [
++    ...state.chartSmartFlowProjections.map(smartFlowProjectionToHoverContext),
++    ...state.chartSmartMoneyEvents.map(smartMoneyEventToHoverContext),
++  ];
++  return (context) =&gt; [
++    ...buildDirectionalOptionNotionalRows(aggregateOptionNotionalByDirection(optionFlows, context)),
++    ...buildFlowContextHoverRows(flowContexts, context),
++  ];
++};
++
++&lt;MarketChart registry={{ hoverRows: chartHoverRows }} /&gt;
+
+diff --git a/apps/web/app/globals.css b/apps/web/app/globals.css
+--- a/apps/web/app/globals.css
++++ b/apps/web/app/globals.css
+@@
++.market-chart-tooltip {
++  position: absolute;
++  z-index: 70;
++  width: min(292px, calc(100% - 16px));
++  max-height: min(82%, 360px);
++  overflow: auto;
++  border: 1px solid var(--border-strong);
++  border-radius: 8px;
++  background: oklch(0.145 0.012 250 / 0.96);
++  pointer-events: none;
++}
++
++.market-chart-tooltip-row {
++  display: grid;
++  grid-template-columns: minmax(0, 1fr) max-content;
++  gap: 10px;
++}</code></pre>
+        </div>
+      </section>
+    </main>
+
+    <script type="text/plain" id="patch-source">diff --git a/apps/web/features/market-chart/transforms/hover.ts b/apps/web/features/market-chart/transforms/hover.ts
+--- a/apps/web/features/market-chart/transforms/hover.ts
++++ b/apps/web/features/market-chart/transforms/hover.ts
+@@
++export const aggregateOptionNotionalByDirection = (flows, context) =&gt; ({ bullish, bearish, neutralUnknown });
++export const buildCoreHoverRows = (context) =&gt; [timeRow(context), ohlcRow(context), volumeRow(context), tradeCountRow(context)];
++export const buildHoverSnapshot = (context) =&gt; ({ ...context, coreRows: buildCoreHoverRows(context), extensionRows: normalizeExtensionRows(context.extensionRows) });
+
+diff --git a/apps/web/features/market-chart/components/MarketChartTooltip.tsx b/apps/web/features/market-chart/components/MarketChartTooltip.tsx
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/market-chart/components/MarketChartTooltip.tsx
+@@
++export const MarketChartTooltip = ({ snapshot }) =&gt; snapshot ? (
++  &lt;div className="market-chart-tooltip" role="status" aria-label="Chart hover readout"&gt;
++    &lt;HoverRowGroup rows={snapshot.coreRows} /&gt;
++    &lt;HoverGroupedRows label="Flow context" rows={snapshot.extensionRows} /&gt;
++    &lt;HoverGroupedRows label="Lower pane" rows={snapshot.lowerPaneRows} /&gt;
++  &lt;/div&gt;
++) : null;
+
+diff --git a/apps/web/features/market-chart/renderers/rounded-bars.ts b/apps/web/features/market-chart/renderers/rounded-bars.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/market-chart/renderers/rounded-bars.ts
+@@
++export const createRoundedBarSeriesPaneView = () =&gt; ({ priceValueBuilder, isWhitespace, renderer, update });
++export const toRoundedBarSeriesData = (series) =&gt; series.points.map((point) =&gt; ({ time: point.time, value: point.value, color: lowerPointColor(point) }));
+
+diff --git a/apps/web/features/terminal/chart-adapter.tsx b/apps/web/features/terminal/chart-adapter.tsx
+--- a/apps/web/features/terminal/chart-adapter.tsx
++++ b/apps/web/features/terminal/chart-adapter.tsx
+@@
++const chartHoverRows = buildTerminalMarketChartHoverRowProvider(state);
++&lt;MarketChart registry={{ hoverRows: chartHoverRows }} /&gt;</script>
+    <script type="module">
+      const source = document.getElementById("patch-source")?.textContent ?? "";
+      const target = document.getElementById("rich-diff");
+      try {
+        const React = await import("react");
+        const { createRoot } = await import("react-dom/client");
+        const { PatchDiff } = await import("@pierre/diffs/react");
+        createRoot(target).render(React.createElement(PatchDiff, { patch: source }));
+        document.documentElement.classList.add("rich-diff-ready");
+      } catch (error) {
+        target.textContent = "Rich diff renderer unavailable in this static context; showing unified fallback.";
+      }
+    </script>
+  </body>
+</html>
