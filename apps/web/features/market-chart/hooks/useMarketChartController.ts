@@ -178,7 +178,11 @@ export const useMarketChartController = ({
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      const { overlays: activeOverlays, showOverlays, theme: activeTheme } = overlayStateRef.current;
+      const {
+        overlays: activeOverlays,
+        showOverlays,
+        theme: activeTheme
+      } = overlayStateRef.current;
       if (!showOverlays || !activeOverlays?.length) {
         canvas.style.opacity = "0";
         return;

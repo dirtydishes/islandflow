@@ -248,6 +248,15 @@
       </section>
 
       <section>
+        <h2>Reviewer Repair</h2>
+        <ul>
+          <li><code>islandflow-3fe3</code> was opened for PR #58 after Forgejo reported <code>CI / Validate (pull_request)</code> failing on head <code>4b816a2</code>.</li>
+          <li>The local reproduction isolated the CI failure to <code>bun run fmt:check</code> in <code>useMarketChartController.ts</code> and <code>chart-adapter.tsx</code>.</li>
+          <li>The repair is formatter-only. It does not change adapter behavior, marker routing, overlay drawing, dashboard layout, or reusable module boundaries.</li>
+        </ul>
+      </section>
+
+      <section>
         <h2>Verification</h2>
         <div class="check-grid">
           <div class="check">

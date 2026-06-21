@@ -239,8 +239,7 @@ export const buildTerminalMarketChartMarkers = ({
           : direction === "bearish"
             ? "#c46f2a"
             : "rgba(111, 91, 57, 0.9)",
-      shape:
-        direction === "bullish" ? "arrowUp" : direction === "bearish" ? "arrowDown" : "circle",
+      shape: direction === "bullish" ? "arrowUp" : direction === "bearish" ? "arrowDown" : "circle",
       payload: { kind: "smart-money", event }
     });
   }
@@ -543,14 +542,16 @@ export const TerminalMarketChartSection = memo(
     const hasData = normalizedCandles.length > 0;
     const lastUpdate =
       state.mode === "live"
-        ? fetchState.lastUpdate ?? state.liveSession.lastUpdate
+        ? (fetchState.lastUpdate ?? state.liveSession.lastUpdate)
         : fetchState.lastUpdate;
     const favoriteLabel = selectedTimeframe.favorite
       ? `Remove ${selectedTimeframe.label} from favorite intervals`
       : `Add ${selectedTimeframe.label} to favorite intervals`;
     const intervalLabel = formatIntervalLabel(normalizedChartIntervalMs);
     const emptyLabel =
-      state.mode === "live" ? `No ${intervalLabel} candles yet.` : `No ${intervalLabel} replay candles.`;
+      state.mode === "live"
+        ? `No ${intervalLabel} candles yet.`
+        : `No ${intervalLabel} replay candles.`;
 
     const handleMarkerClick = useCallback(
       (marker: MarketChartMarker) => {
