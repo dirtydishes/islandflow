@@ -1728,6 +1728,55 @@ h3 {
   overflow: hidden;
 }
 
+.market-chart {
+  display: grid;
+  min-width: 0;
+  width: 100%;
+  background: var(--bg-pane-2);
+  color: var(--text);
+}
+
+.market-chart-surface {
+  min-width: 0;
+  width: 100%;
+  min-height: inherit;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: oklch(0.105 0.01 250);
+  overflow: hidden;
+}
+
+.market-chart-section {
+  min-width: 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-pane);
+  color: var(--text);
+}
+
+.market-chart-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.market-chart-section-head h2 {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.2;
+}
+
+.market-chart-section-meta,
+.market-chart-section-actions {
+  min-width: 0;
+  color: var(--text-dim);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.72rem;
+}
+
 .chart-empty {
   margin-top: -2px;
 }

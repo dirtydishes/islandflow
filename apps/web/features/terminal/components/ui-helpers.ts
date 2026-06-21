@@ -1,11 +1,14 @@
-import type { EquityCandle, EquityPrintJoin, OptionNBBO } from "@islandflow/types";
-import type { IChartApi, UTCTimestamp } from "lightweight-charts";
-
-import { CANDLE_INTERVALS } from "../config";
+import type { EquityPrintJoin, OptionNBBO } from "@islandflow/types";
+import type {
+  ChartTimeLike,
+  MarketChartCandlestickData,
+  MarketChartPriceSeries
+} from "../../market-chart";
+import { chartTimeToMs, formatIntervalLabel, toChartCandle, toChartTime } from "../../market-chart";
 import { decodeNewsText, formatOptionContractLabel } from "../format";
 import { normalizeContractId } from "../state-helpers";
 
-export type CandlestickSeries = ReturnType<IChartApi["addCandlestickSeries"]>;
+export type CandlestickSeries = MarketChartPriceSeries;
 
 export type EquityOverlayPoint = {
   ts: number;
@@ -14,72 +17,8 @@ export type EquityOverlayPoint = {
   offExchangeFlag: boolean;
 };
 
-export type ChartCandle = {
-  time: UTCTimestamp;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-};
-
-export const formatIntervalLabel = (intervalMs: number): string => {
-  const match = CANDLE_INTERVALS.find((interval) => interval.ms === intervalMs);
-  if (match) {
-    return match.label;
-  }
-  if (intervalMs >= 60000) {
-    return `${Math.round(intervalMs / 60000)}m`;
-  }
-  if (intervalMs >= 1000) {
-    return `${Math.round(intervalMs / 1000)}s`;
-  }
-  return `${intervalMs}ms`;
-};
-
-export const toChartTime = (ts: number): UTCTimestamp => {
-  return Math.floor(ts / 1000) as UTCTimestamp;
-};
-
-export type ChartTimeLike = number | string | { year: number; month: number; day: number };
-
-export const chartTimeToMs = (value: ChartTimeLike): number | null => {
-  if (typeof value === "number") {
-    return Math.floor(value * 1000);
-  }
-
-  if (typeof value === "string") {
-    const parsed = Date.parse(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-
-  if (value && typeof value === "object") {
-    const { year, month, day } = value;
-    if (
-      Number.isFinite(year) &&
-      Number.isFinite(month) &&
-      Number.isFinite(day) &&
-      year >= 1970 &&
-      month >= 1 &&
-      month <= 12 &&
-      day >= 1 &&
-      day <= 31
-    ) {
-      return Date.UTC(year, month - 1, day);
-    }
-  }
-
-  return null;
-};
-
-export const toChartCandle = (candle: EquityCandle): ChartCandle => {
-  return {
-    time: toChartTime(candle.ts),
-    open: candle.open,
-    high: candle.high,
-    low: candle.low,
-    close: candle.close
-  };
-};
+export type ChartCandle = MarketChartCandlestickData;
+export { type ChartTimeLike, chartTimeToMs, formatIntervalLabel, toChartCandle, toChartTime };
 
 export const clamp = (value: number, min: number, max: number): number => {
   if (!Number.isFinite(value)) {
