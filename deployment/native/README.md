@@ -7,6 +7,10 @@ This directory documents the host-native Islandflow rollout path used by:
 ./deploy current-branch --runtime native
 ```
 
+You can also run the repo-root `./deploy` helper with no arguments for a guided
+prompt. It asks for runtime, main/current/another branch, and the pieces to
+roll out; choose `native` at the runtime step for this path.
+
 ## Current operating model
 
 Native runtime is now intended for a phased VPS cutover. Docker remains the supported rollback runtime, but Docker and native app services must not own the same Islandflow scope at the same time because the workers and API use durable JetStream consumers.
@@ -215,6 +219,7 @@ Examples:
 ./deploy main --runtime native --services-only
 ./deploy main --runtime native --web-only
 ./deploy current-branch --runtime native --workers-only --no-build
+./deploy branch lavender/some-branch --runtime native --pieces compute,candles
 ```
 
 Scope behavior:
@@ -224,6 +229,7 @@ Scope behavior:
 - `--api-only`: restart only the API unit
 - `--services-only`: restart API + worker units without touching the web unit
 - `--workers-only`: restart only `compute`, `candles`, `ingest-options`, `ingest-equities`, and `ingest-news`
+- `--pieces`: restart exactly the comma-separated app pieces you choose
 - `--fast`: when no explicit scope flag is provided, native deploys now default to `--workers-only`
 - `--no-build`: skip `bun install --frozen-lockfile` and skip the web build step
 
