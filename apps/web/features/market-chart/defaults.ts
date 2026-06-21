@@ -10,11 +10,9 @@ import type {
   MarketChartThemeOptions,
   MarketChartThemeTokens
 } from "./types";
+import { DEFAULT_MARKET_CHART_INTERVALS } from "./transforms/timeframes";
 
-export const DEFAULT_MARKET_CHART_INTERVALS = [
-  { label: "1m", ms: 60_000 },
-  { label: "5m", ms: 300_000 }
-] as const;
+export { DEFAULT_MARKET_CHART_INTERVALS };
 
 export const MARKET_CHART_THEME_TOKENS: MarketChartThemeTokens = {
   background: "#0d141b",

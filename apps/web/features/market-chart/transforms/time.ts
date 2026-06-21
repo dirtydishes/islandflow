@@ -1,5 +1,5 @@
 import type { BusinessDay, UTCTimestamp } from "lightweight-charts";
-import { DEFAULT_MARKET_CHART_INTERVALS } from "../defaults";
+import { MARKET_CHART_TIMEFRAME_REGISTRY } from "./timeframes";
 
 export type ChartTimeLike = number | string | BusinessDay;
 
@@ -38,7 +38,7 @@ export const chartTimeToMs = (value: ChartTimeLike): number | null => {
 
 export const formatIntervalLabel = (
   intervalMs: number,
-  intervals: readonly { label: string; ms: number }[] = DEFAULT_MARKET_CHART_INTERVALS
+  intervals: readonly { label: string; ms: number }[] = MARKET_CHART_TIMEFRAME_REGISTRY
 ): string => {
   const match = intervals.find((interval) => interval.ms === intervalMs);
   if (match) {

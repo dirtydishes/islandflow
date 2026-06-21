@@ -1,6 +1,7 @@
 import type { LiveSubscription, OptionFlowFilters } from "@islandflow/types";
 import { getSubscriptionKey as getLiveSubscriptionKey } from "@islandflow/types";
-import { LIVE_HOT_WINDOW, LIVE_OPTIONS_HEAD_LIMIT } from "./config";
+import { normalizeTimeframeIntervalMs } from "../market-chart";
+import { LIVE_HOT_WINDOW, LIVE_OPTIONS_HEAD_LIMIT, SUPPORTED_CANDLE_INTERVAL_MS } from "./config";
 import type { EquityScope, OptionScope, RouteFeatures } from "./types";
 
 const CANONICAL_OPTIONS_PATH = "/options";
@@ -189,7 +190,7 @@ export const getLiveManifest = (
     subscriptions.push({
       channel: "equity-candles",
       underlying_id: chartTicker,
-      interval_ms: chartIntervalMs
+      interval_ms: normalizeTimeframeIntervalMs(chartIntervalMs, SUPPORTED_CANDLE_INTERVAL_MS)
     });
   }
   if (features.equityOverlay) {

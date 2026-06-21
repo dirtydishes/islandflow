@@ -22,6 +22,7 @@ import {
 } from "lightweight-charts";
 import Link from "next/link";
 import {
+  type ChangeEvent,
   type CSSProperties,
   memo,
   useCallback,
@@ -33,8 +34,17 @@ import {
 } from "react";
 
 import { getChartFlowMarkerItems } from "../charts/markers";
-import { CANDLE_INTERVALS } from "../config";
+import { SUPPORTED_CANDLE_INTERVAL_MS } from "../config";
 import { getAlertFlowPacketRefs, getSmartFlowEvidenceRefs } from "../evidence";
+import {
+  buildTimeframeToolbarModel,
+  createDefaultTimeframeFavorites,
+  readTimeframeFavorites,
+  reduceTimeframeFavorites,
+  writeTimeframeFavorites,
+  type MarketChartTimeframeId,
+  type TimeframeFavoritesState
+} from "../../market-chart";
 import {
   decodeNewsText,
   deriveAlertDirection,
@@ -800,31 +810,128 @@ type ChartPaneProps = {
   title?: string;
 };
 
+const getTimeframeStorage = () => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+};
+
 export const ChartPane = memo(({ state, title = "Chart" }: ChartPaneProps) => {
+  const [favoritesHydrated, setFavoritesHydrated] = useState(false);
+  const [timeframeFavorites, setTimeframeFavorites] = useState<TimeframeFavoritesState>(() =>
+    createDefaultTimeframeFavorites(SUPPORTED_CANDLE_INTERVAL_MS)
+  );
+  const timeframeModel = useMemo(
+    () =>
+      buildTimeframeToolbarModel({
+        selectedIntervalMs: state.chartIntervalMs,
+        favoriteIds: timeframeFavorites.favoriteIds,
+        supportedIntervalMs: SUPPORTED_CANDLE_INTERVAL_MS
+      }),
+    [state.chartIntervalMs, timeframeFavorites.favoriteIds]
+  );
+  const selectedTimeframe = timeframeModel.selected;
+  const normalizedChartIntervalMs = selectedTimeframe.ms;
+
+  useEffect(() => {
+    setTimeframeFavorites(
+      readTimeframeFavorites(getTimeframeStorage(), SUPPORTED_CANDLE_INTERVAL_MS)
+    );
+    setFavoritesHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!favoritesHydrated) {
+      return;
+    }
+    writeTimeframeFavorites(
+      getTimeframeStorage(),
+      timeframeFavorites,
+      SUPPORTED_CANDLE_INTERVAL_MS
+    );
+  }, [favoritesHydrated, timeframeFavorites]);
+
+  useEffect(() => {
+    if (state.chartIntervalMs !== normalizedChartIntervalMs) {
+      state.setChartIntervalMs(normalizedChartIntervalMs);
+    }
+  }, [state.chartIntervalMs, state.setChartIntervalMs, normalizedChartIntervalMs]);
+
+  const updateFavorite = useCallback((action: { type: "toggle"; id: MarketChartTimeframeId }) => {
+    setTimeframeFavorites((current) =>
+      reduceTimeframeFavorites(current, action, SUPPORTED_CANDLE_INTERVAL_MS)
+    );
+  }, []);
+
+  const handleIntervalSelect = useCallback(
+    (event: ChangeEvent<HTMLSelectElement>) => {
+      const intervalMs = Number(event.currentTarget.value);
+      if (Number.isFinite(intervalMs)) {
+        state.setChartIntervalMs(intervalMs);
+      }
+    },
+    [state]
+  );
+
+  const favoriteLabel = selectedTimeframe.favorite
+    ? `Remove ${selectedTimeframe.label} from favorite intervals`
+    : `Add ${selectedTimeframe.label} to favorite intervals`;
+
   return (
     <Pane
       title={title}
       actions={
         <div className="chart-controls">
-          <div className="chart-intervals">
-            {CANDLE_INTERVALS.map((interval) => (
+          <div className="chart-intervals" aria-label="Favorite chart intervals">
+            {timeframeModel.toolbarItems.map((interval) => (
               <button
                 key={interval.ms}
-                className={`interval-button${interval.ms === state.chartIntervalMs ? " active" : ""}`}
+                className={`interval-button${interval.ms === normalizedChartIntervalMs ? " active" : ""}`}
                 type="button"
                 onClick={() => state.setChartIntervalMs(interval.ms)}
+                aria-pressed={interval.ms === normalizedChartIntervalMs}
               >
                 {interval.label}
               </button>
             ))}
           </div>
+          <label className="timeframe-dropdown-label">
+            <span className="sr-only">Chart interval</span>
+            <select
+              className="timeframe-dropdown"
+              value={selectedTimeframe.ms}
+              onChange={handleIntervalSelect}
+              aria-label="Chart interval"
+            >
+              {timeframeModel.dropdownItems.map((interval) => (
+                <option key={interval.ms} value={interval.ms} disabled={interval.disabled}>
+                  {interval.dropdownLabel}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            className={`timeframe-favorite-toggle${selectedTimeframe.favorite ? " is-active" : ""}`}
+            type="button"
+            aria-label={favoriteLabel}
+            aria-pressed={selectedTimeframe.favorite}
+            title={favoriteLabel}
+            onClick={() => updateFavorite({ type: "toggle", id: selectedTimeframe.id })}
+          >
+            <span aria-hidden="true">{selectedTimeframe.favorite ? "★" : "☆"}</span>
+          </button>
           <span className="chart-hint">{state.chartTicker}</span>
         </div>
       }
     >
       <CandleChart
         ticker={state.chartTicker}
-        intervalMs={state.chartIntervalMs}
+        intervalMs={normalizedChartIntervalMs}
         mode={state.mode}
         replayTime={state.equities.replayTime}
         liveCandles={state.liveSession.chartCandles}

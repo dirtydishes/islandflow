@@ -328,6 +328,32 @@ describe("live manifest", () => {
     expect(getLiveManifest("/charts", "SPY", 60000, buildDefaultFlowFilters())).toEqual(home);
     expect(getLiveManifest("/replay", "SPY", 60000, buildDefaultFlowFilters())).toEqual(home);
   });
+
+  it("uses 15m chart interval selections for dashboard candle subscriptions", () => {
+    const manifest = getLiveManifest("/", "SPY", 900_000, buildDefaultFlowFilters());
+    const candleSubscription = manifest.find(
+      (subscription) => subscription.channel === "equity-candles"
+    );
+
+    expect(candleSubscription).toMatchObject({
+      channel: "equity-candles",
+      underlying_id: "SPY",
+      interval_ms: 900_000
+    });
+  });
+
+  it("clamps unregistered chart intervals through the shared timeframe registry", () => {
+    const manifest = getLiveManifest("/", "SPY", 42_000, buildDefaultFlowFilters());
+    const candleSubscription = manifest.find(
+      (subscription) => subscription.channel === "equity-candles"
+    );
+
+    expect(candleSubscription).toMatchObject({
+      channel: "equity-candles",
+      underlying_id: "SPY",
+      interval_ms: 60_000
+    });
+  });
 });
 
 describe("contract-focused option helpers", () => {
