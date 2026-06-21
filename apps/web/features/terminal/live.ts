@@ -925,11 +925,7 @@ export const LIVE_HISTORY_ENDPOINTS: Partial<Record<LiveSubscription["channel"],
   "inferred-dark": "/history/inferred-dark"
 };
 
-type LiveSubscriptionResetChannel =
-  | "options"
-  | "equities"
-  | "equity-candles"
-  | "equity-overlay";
+type LiveSubscriptionResetChannel = "options" | "equities" | "equity-candles" | "equity-overlay";
 
 export const getLiveSubscriptionResetChannels = (
   currentSubscriptions: Iterable<LiveSubscription>,

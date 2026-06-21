@@ -113,12 +113,8 @@ describe("synthetic load profiles", () => {
 
   it("scales demo-run injection cadence and run count separately from regular emits", () => {
     expect(SYNTHETIC_DEMO_RUN_INTERVAL_MS).toBe(60_000);
-    expect(scaleSyntheticDemoRunIntervalMs(SYNTHETIC_DEMO_RUN_INTERVAL_MS, "steady")).toBe(
-      60_000
-    );
-    expect(scaleSyntheticDemoRunIntervalMs(SYNTHETIC_DEMO_RUN_INTERVAL_MS, "active")).toBe(
-      30_000
-    );
+    expect(scaleSyntheticDemoRunIntervalMs(SYNTHETIC_DEMO_RUN_INTERVAL_MS, "steady")).toBe(60_000);
+    expect(scaleSyntheticDemoRunIntervalMs(SYNTHETIC_DEMO_RUN_INTERVAL_MS, "active")).toBe(30_000);
     expect(scaleSyntheticDemoRunIntervalMs(SYNTHETIC_DEMO_RUN_INTERVAL_MS, "firehose")).toBe(
       15_000
     );
