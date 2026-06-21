@@ -1,0 +1,537 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lightweight Charts Phase 03 Dashboard Replacement</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #111820;
+        --panel-2: #0d141b;
+        --line: #ffffff14;
+        --line-strong: #f5a62359;
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --green: #25c17a;
+        --blue: #4da3ff;
+        --red: #ff6b5f;
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.55 var(--sans);
+      }
+
+      main {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+
+      header {
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      section {
+        padding: 20px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .eyebrow,
+      h2,
+      .meta-label,
+      code,
+      pre {
+        font-family: var(--mono);
+      }
+
+      .eyebrow {
+        margin-bottom: 8px;
+        color: var(--accent);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 860px;
+        font-size: 2rem;
+        line-height: 1.08;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        margin-bottom: 10px;
+        color: var(--accent);
+        font-size: 0.86rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      p {
+        max-width: 82ch;
+        color: var(--muted);
+      }
+
+      p + p {
+        margin-top: 10px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li {
+        color: var(--muted);
+      }
+
+      li + li {
+        margin-top: 7px;
+      }
+
+      code {
+        padding: 0.08rem 0.28rem;
+        border: 1px solid rgba(245, 166, 35, 0.18);
+        border-radius: 5px;
+        background: rgba(245, 166, 35, 0.1);
+        color: #ffe0a3;
+        font-size: 0.9em;
+      }
+
+      .meta-grid,
+      .check-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 1px;
+        border: 1px solid var(--line);
+        background: var(--line);
+      }
+
+      .meta-grid {
+        margin-top: 18px;
+      }
+
+      .meta-cell,
+      .check {
+        min-width: 0;
+        padding: 10px 12px;
+        background: var(--panel);
+      }
+
+      .meta-label {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--faint);
+        font-size: 0.66rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .check strong {
+        display: block;
+        margin-bottom: 5px;
+        color: var(--green);
+        font-family: var(--mono);
+      }
+
+      .check p {
+        margin-top: 6px;
+        font-size: 0.9rem;
+      }
+
+      .note {
+        color: var(--faint);
+      }
+
+      .diff-shell {
+        display: grid;
+        gap: 12px;
+      }
+
+      #rich-diff {
+        min-height: 36px;
+      }
+
+      #fallback-diff {
+        max-height: 560px;
+        overflow: auto;
+        margin: 0;
+        padding: 12px;
+        border: 1px solid var(--line);
+        background: var(--panel-2);
+        color: var(--text);
+        font-size: 0.76rem;
+        line-height: 1.45;
+      }
+
+      .rich-diff-ready #fallback-diff {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="eyebrow">Repository turn document</div>
+        <h1>Lightweight Charts Phase 03 Dashboard Replacement</h1>
+        <p>
+          Replaced the Market Command dashboard chart path with a terminal adapter feeding the
+          reusable market-chart module. Terminal state, live and replay fetching, overlay range
+          fetches, timeframe controls, and drawer callbacks stay in terminal-owned code.
+        </p>
+        <div class="meta-grid" aria-label="Turn metadata">
+          <div class="meta-cell"><span class="meta-label">Branch</span>lavender/lightweight-charts-phase-03-dashboard-replacement</div>
+          <div class="meta-cell"><span class="meta-label">Beads</span>islandflow-mloi.3</div>
+          <div class="meta-cell"><span class="meta-label">Scope</span>Phase 03 dashboard adapter</div>
+          <div class="meta-cell"><span class="meta-label">Register</span>Product, evidence console</div>
+        </div>
+      </header>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          <code>OverviewRoute</code> now renders <code>TerminalMarketChartSection</code> instead
+          of <code>ChartPane</code>. The adapter normalizes candles, off-exchange overlay prints,
+          smart-flow markers, legacy smart-money fallback markers, inferred dark markers, status,
+          last-update metadata, and marker payload callbacks before handing props to
+          <code>MarketChart</code>.
+        </p>
+        <p>
+          The reusable module gained generic overlay drawing for normalized overlay points. The
+          market-chart package still has no terminal imports, and dashboard grid placement now uses
+          <code>.market-command-chart</code> instead of an nth-child selector.
+        </p>
+      </section>
+
+      <section>
+        <h2>Execution Plan Handoff</h2>
+        <ul>
+          <li>Confirmed <code>islandflow-mloi.3</code> was ready, claimed it, and branched from <code>bea7e0e</code> on <code>forgejo/main</code>.</li>
+          <li>Inventoried <code>OverviewRoute</code>, <code>ChartPane</code>, <code>CandleChart</code>, dashboard CSS, and marker/drawer callbacks before editing.</li>
+          <li>Built the adapter boundary first in <code>apps/web/features/terminal/chart-adapter.tsx</code>.</li>
+          <li>Replaced only the dashboard path and preserved live candles, replay candle windows, overlay prints, marker callbacks, status, last update, and interval controls.</li>
+          <li>Kept Phase 04 and 05 out: no settings menu, lower-pane expansion, Heikin Ashi, rounded bars, hover readout polish, or full chart route.</li>
+          <li>Verified with focused tests, production build, boundary scan, desktop browser check, and mobile browser check.</li>
+          <li>PR posture is one integration PR; no backend or broad live infrastructure split was needed.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Implementation Notes</h2>
+        <ul>
+          <li><code>chart-adapter.tsx</code> owns terminal fetches for candles and visible overlay ranges, live-session candle replacement, replay <code>end_ts</code> calculation, timeframe favorites, and marker payload routing.</li>
+          <li><code>buildTerminalMarketChartMarkers</code> keeps smart-flow-first behavior by using the existing chart marker selector, then falls back to legacy smart-money only when no in-range smart-flow projection exists.</li>
+          <li><code>MarketChart</code> renders normalized overlay points with a generic canvas layer using chart time and price coordinates.</li>
+          <li>Flat terminal section styling is preserved: radius <code>0</code>, no decorative shadow, top and bottom rules, dense controls, and <code>bg-pane-2</code> chart surface tone.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Reviewer Repair</h2>
+        <ul>
+          <li><code>islandflow-3fe3</code> was opened for PR #58 after Forgejo reported <code>CI / Validate (pull_request)</code> failing on head <code>4b816a2</code>.</li>
+          <li>The local reproduction isolated the CI failure to <code>bun run fmt:check</code> in <code>useMarketChartController.ts</code> and <code>chart-adapter.tsx</code>.</li>
+          <li>The repair is formatter-only. It does not change adapter behavior, marker routing, overlay drawing, dashboard layout, or reusable module boundaries.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Verification</h2>
+        <div class="check-grid">
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code>
+            <p>91 pass, 0 fail, 201 assertions, including replay candle bucket coverage.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun --cwd=apps/web run build</code>
+            <p>Next.js production build and TypeScript check completed successfully.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>rg "features/terminal|TerminalState|ChartPane|terminal/" apps/web/features/market-chart</code>
+            <p>No terminal imports or terminal state references in <code>features/market-chart</code>.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>rg "ChartPane state=|market-command-grid &gt; :nth-child\\(2\\)|market-command-chart" apps/web</code>
+            <p>No dashboard <code>ChartPane</code> usage and no old nth-child chart placement.</p>
+          </div>
+        </div>
+        <p class="note">
+          Browser visual check used <code>bun --cwd=apps/web run dev</code> at <code>http://localhost:3000/</code>.
+          Desktop 1440x900: live chart, no horizontal overflow, controls overflow false, radius <code>0px</code>, shadow <code>none</code>, surface <code>471x430</code>.
+          Mobile 390x844: live chart, document width stable at 390, controls overflow false, stacked toolbar visible, surface <code>374x360</code>.
+        </p>
+      </section>
+
+      <section>
+        <h2>PR Guidance</h2>
+        <p>
+          This is correctly scoped as one Phase 03 integration PR. It combines the dashboard
+          replacement, terminal adapter, generic overlay renderer, stable chart grid class, and
+          focused adapter tests because those pieces are necessary to review the behavior together.
+          It does not include Phase 04 or Phase 05 work.
+        </p>
+      </section>
+
+      <section>
+        <h2>Reviewer Focus</h2>
+        <ul>
+          <li>Check the adapter fetch lifecycle for live versus replay transitions, especially replay bucket <code>end_ts</code>.</li>
+          <li>Click smart-flow, legacy smart-money fallback, and inferred-dark markers to verify the correct evidence surface opens.</li>
+          <li>Inspect the generic overlay canvas with dense off-exchange prints and resize events.</li>
+          <li>Review the mobile stacked toolbar against the sticky terminal header.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p class="note">
+          The page attempts to render the patch with browser-side <code>@pierre/diffs/react</code>
+          <code>PatchDiff</code>. The readable unified fallback remains visible if the rich renderer
+          is unavailable.
+        </p>
+        <div class="diff-shell">
+          <div id="rich-diff"></div>
+          <pre id="fallback-diff"><code>diff --git a/apps/web/app/terminal.tsx b/apps/web/app/terminal.tsx
+--- a/apps/web/app/terminal.tsx
++++ b/apps/web/app/terminal.tsx
+@@
++import { TerminalMarketChartSection } from "../features/terminal/chart-adapter";
+ import {
+-  ChartPane,
+   CommandDecisionLevels,
+@@
+           &lt;CommandPriorityBoard state={state} /&gt;
+-          &lt;ChartPane state={state} title="Chart Context" /&gt;
++          &lt;TerminalMarketChartSection
++            state={state}
++            title="Chart Context"
++            className="market-command-chart"
++          /&gt;
+           &lt;CommandDecisionLevels state={state} /&gt;
+
+diff --git a/apps/web/features/terminal/chart-adapter.tsx b/apps/web/features/terminal/chart-adapter.tsx
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/terminal/chart-adapter.tsx
+@@
++export const normalizeTerminalChartCandles = (
++  candles: readonly EquityCandle[]
++): MarketChartCandle[] =&gt;
++  normalizeMarketChartCandles(
++    sortByTsSeq([...candles]).map((candle) =&gt; ({
++      ts: candle.ts,
++      open: candle.open,
++      high: candle.high,
++      low: candle.low,
++      close: candle.close,
++      volume: candle.volume,
++      trade_count: candle.trade_count,
++      seq: candle.seq,
++      source: candle.underlying_id,
++      payload: candle
++    }))
++  );
++
++export const buildTerminalEquityOverlays = (
++  prints: readonly EquityPrint[],
++  visible = true
++): MarketChartOverlay[] =&gt; {
++  const points = sortByTsSeq([...prints])
++    .filter((print) =&gt; print.offExchangeFlag)
++    .map((print) =&gt; ({
++      time: toChartTime(print.ts),
++      timestampMs: print.ts,
++      price: print.price,
++      value: print.size,
++      label: `${print.exchange} off-exchange`,
++      color: OFF_EXCHANGE_OVERLAY_COLOR,
++      payload: print
++    }));
++  return points.length === 0 ? [] : [{ id: "equity-off-exchange", label: "Off-exchange prints", points, visible }];
++};
++
++export const buildTerminalMarketChartMarkers = ({ smartFlowProjections, smartMoneyEvents, inferredDark, visibleRangeMs }) =&gt; {
++  const flowMarkerItems = getChartFlowMarkerItems(smartFlowProjections, smartMoneyEvents, visibleRangeMs);
++  // Smart-flow markers carry projection payloads; legacy smart-money and inferred-dark
++  // markers carry their terminal event payloads for drawer callbacks.
++};
++
++export const TerminalMarketChartSection = memo(({ state, title = "Chart Context", className }) =&gt; (
++  &lt;MarketChartSection className={className} title={title} meta={...} actions={...}&gt;
++    &lt;MarketChart
++      symbol={state.chartTicker}
++      intervalMs={normalizedChartIntervalMs}
++      candles={normalizedCandles}
++      lowerSeries={buildVolumeLowerSeries(normalizedCandles)}
++      markers={markers}
++      overlays={overlays}
++      layoutPreset="dashboard"
++      onVisibleRangeChange={setVisibleRangeMs}
++      onMarkerClick={handleMarkerClick}
++    /&gt;
++  &lt;/MarketChartSection&gt;
++));
+
+diff --git a/apps/web/features/market-chart/hooks/useMarketChartController.ts b/apps/web/features/market-chart/hooks/useMarketChartController.ts
+--- a/apps/web/features/market-chart/hooks/useMarketChartController.ts
++++ b/apps/web/features/market-chart/hooks/useMarketChartController.ts
+@@
++  const overlayCanvasRef = useRef&lt;HTMLCanvasElement | null&gt;(null);
++  const overlayCtxRef = useRef&lt;CanvasRenderingContext2D | null&gt;(null);
++  const overlayStateRef = useRef({ overlays, showOverlays: settings.display.showOverlays, theme });
++  const drawOverlaysRef = useRef&lt;() =&gt; void&gt;(() =&gt; {});
+@@
++    const overlayCanvas = document.createElement("canvas");
++    overlayCanvas.style.position = "absolute";
++    overlayCanvas.style.inset = "0";
++    overlayCanvas.style.pointerEvents = "none";
++    container.style.position = "relative";
++    container.appendChild(overlayCanvas);
++    drawOverlaysRef.current = () =&gt; {
++      const points = overlayStateRef.current.overlays
++        ?.filter((overlay) =&gt; overlay.visible !== false)
++        .flatMap((overlay) =&gt; overlay.points)
++        .filter((point) =&gt; typeof point.price === "number" &amp;&amp; Number.isFinite(point.price));
++      // Draw generic price-anchored overlay points with chart time/price coordinates.
++    };
+
+diff --git a/apps/web/app/globals.css b/apps/web/app/globals.css
+--- a/apps/web/app/globals.css
++++ b/apps/web/app/globals.css
+@@
+-.market-command-grid &gt; :nth-child(2) {
++.market-command-chart {
+   grid-area: chart;
+   min-height: 520px;
+ }
+@@
+-.market-command-grid .chart-surface {
++.market-command-grid .market-chart-surface {
+   height: 430px;
+ }
+@@
+ .market-chart-section {
+   min-width: 0;
++  display: flex;
++  flex-direction: column;
+   border-top: 1px solid var(--border);
+   border-bottom: 1px solid var(--border);
+   background: var(--bg-pane);
+ }
+
+diff --git a/apps/web/app/terminal.test.ts b/apps/web/app/terminal.test.ts
+--- a/apps/web/app/terminal.test.ts
++++ b/apps/web/app/terminal.test.ts
+@@
++  it("maps terminal chart candles and off-exchange overlays into reusable chart inputs", () =&gt; {
++    const candles = normalizeTerminalChartCandles([...]);
++    expect(candles.map((candle) =&gt; candle.direction)).toEqual(["bullish", "bearish"]);
++    const overlays = buildTerminalEquityOverlays([...]);
++    expect(overlays[0].points[0]).toMatchObject({ timestampMs: 1_000, price: 101, value: 100 });
++  });
++
++  it("maps smart-flow, legacy fallback, and inferred dark events into clickable chart markers", () =&gt; {
++    const smartFlowMarkers = buildTerminalMarketChartMarkers({ smartFlowProjections: [projection], smartMoneyEvents: [legacy], inferredDark: [dark], visibleRangeMs });
++    expect(smartFlowMarkers.map((marker) =&gt; marker.payload?.kind).sort()).toEqual(["inferred-dark", "smart-flow"]);
++    const fallbackMarkers = buildTerminalMarketChartMarkers({ smartFlowProjections: [], smartMoneyEvents: [legacy], inferredDark: [], visibleRangeMs });
++    expect(fallbackMarkers[0].payload?.kind).toBe("smart-money");
++  });</code></pre>
+        </div>
+      </section>
+    </main>
+
+    <script type="text/plain" id="patch-source">diff --git a/apps/web/app/terminal.tsx b/apps/web/app/terminal.tsx
+--- a/apps/web/app/terminal.tsx
++++ b/apps/web/app/terminal.tsx
+@@
++import { TerminalMarketChartSection } from "../features/terminal/chart-adapter";
+ import {
+-  ChartPane,
+   CommandDecisionLevels,
+@@
+           &lt;CommandPriorityBoard state={state} /&gt;
+-          &lt;ChartPane state={state} title="Chart Context" /&gt;
++          &lt;TerminalMarketChartSection
++            state={state}
++            title="Chart Context"
++            className="market-command-chart"
++          /&gt;
+           &lt;CommandDecisionLevels state={state} /&gt;
+
+diff --git a/apps/web/features/terminal/chart-adapter.tsx b/apps/web/features/terminal/chart-adapter.tsx
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/terminal/chart-adapter.tsx
+@@
++export const normalizeTerminalChartCandles = (candles: readonly EquityCandle[]): MarketChartCandle[] =&gt;
++  normalizeMarketChartCandles(sortByTsSeq([...candles]).map((candle) =&gt; ({ ts: candle.ts, open: candle.open, high: candle.high, low: candle.low, close: candle.close, volume: candle.volume, trade_count: candle.trade_count, seq: candle.seq, source: candle.underlying_id, payload: candle })));
++export const buildTerminalEquityOverlays = (prints: readonly EquityPrint[], visible = true): MarketChartOverlay[] =&gt; { /* off-exchange overlay transform */ };
++export const buildTerminalMarketChartMarkers = ({ smartFlowProjections, smartMoneyEvents, inferredDark, visibleRangeMs }) =&gt; { /* smart-flow first, legacy fallback, inferred dark */ };
++export const TerminalMarketChartSection = memo(({ state, title = "Chart Context", className }) =&gt; &lt;MarketChartSection className={className} title={title}&gt;&lt;MarketChart layoutPreset="dashboard" /&gt;&lt;/MarketChartSection&gt;);
+
+diff --git a/apps/web/features/market-chart/hooks/useMarketChartController.ts b/apps/web/features/market-chart/hooks/useMarketChartController.ts
+--- a/apps/web/features/market-chart/hooks/useMarketChartController.ts
++++ b/apps/web/features/market-chart/hooks/useMarketChartController.ts
+@@
++  const overlayCanvasRef = useRef&lt;HTMLCanvasElement | null&gt;(null);
++  const overlayCtxRef = useRef&lt;CanvasRenderingContext2D | null&gt;(null);
++  const drawOverlaysRef = useRef&lt;() =&gt; void&gt;(() =&gt; {});
+@@
++    const overlayCanvas = document.createElement("canvas");
++    container.appendChild(overlayCanvas);
++    drawOverlaysRef.current = () =&gt; { /* generic price-anchored overlay drawing */ };
+
+diff --git a/apps/web/app/globals.css b/apps/web/app/globals.css
+--- a/apps/web/app/globals.css
++++ b/apps/web/app/globals.css
+@@
+-.market-command-grid &gt; :nth-child(2) {
++.market-command-chart {
+   grid-area: chart;
+   min-height: 520px;
+ }
+@@
+-.market-command-grid .chart-surface {
++.market-command-grid .market-chart-surface {
+   height: 430px;
+ }</script>
+    <script type="module">
+      const source = document.getElementById("patch-source")?.textContent ?? "";
+      const target = document.getElementById("rich-diff");
+      try {
+        const React = await import("react");
+        const { createRoot } = await import("react-dom/client");
+        const { PatchDiff } = await import("@pierre/diffs/react");
+        createRoot(target).render(React.createElement(PatchDiff, { patch: source }));
+        document.documentElement.classList.add("rich-diff-ready");
+      } catch (error) {
+        target.textContent = "Rich diff renderer unavailable in this static context; showing unified fallback.";
+      }
+    </script>
+  </body>
+</html>
