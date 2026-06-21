@@ -196,6 +196,7 @@
         <div class="meta-grid" aria-label="Turn metadata">
           <div class="meta-cell"><span class="meta-label">Branch</span>lavender/lightweight-charts-phase-01-foundation</div>
           <div class="meta-cell"><span class="meta-label">Beads</span>islandflow-mloi.1</div>
+          <div class="meta-cell"><span class="meta-label">Repair</span>islandflow-e025</div>
           <div class="meta-cell"><span class="meta-label">Scope</span>Phase 01 foundation and dependency upgrade</div>
           <div class="meta-cell"><span class="meta-label">Dependency</span>lightweight-charts 5.2.0</div>
         </div>
@@ -205,6 +206,9 @@
         <h2>Summary</h2>
         <p>
           The new <code>apps/web/features/market-chart</code> module owns reusable chart types, defaults, transforms, lower-pane foundations, hover snapshot helpers, and a v5 lifecycle controller. Existing terminal chart behavior still runs through <code>ChartPane</code> and <code>CandleChart</code>, with only the v5 API migration and compatibility re-exports applied there.
+        </p>
+        <p>
+          Reviewer repair resolved the Forgejo CI failures and tightened the reusable lifecycle hook so live data, marker, hover, registry, and lower-pane prop changes do not force a chart teardown or leave stale lower-pane series attached.
         </p>
       </section>
 
@@ -227,6 +231,7 @@
           <li>Upgraded <code>lightweight-charts</code> from <code>^4.2.0</code> to <code>^5.2.0</code>.</li>
           <li>Migrated the current terminal chart to v5 <code>chart.addSeries(CandlestickSeries, ...)</code> and <code>createSeriesMarkers(...)</code>, preserving its live/replay data wiring.</li>
           <li>Added focused Bun tests for the moved pure transform layer.</li>
+          <li>Repaired Phase 01 review findings: aligned the transform test with the branded v5 <code>UTCTimestamp</code> type, synced the Docker workspace package snapshot, made the crosshair handler ref-backed, wired registry hover rows and layout presets, removed stale lower-pane series when layers are hidden, and preserved visible range across same-scope candle updates.</li>
         </ul>
       </section>
 
@@ -244,6 +249,8 @@
         <ul>
           <li><span class="status-ok">Passed:</span> <code>bunx biome check apps/web/features/market-chart apps/web/features/terminal/components/charts.tsx apps/web/features/terminal/components/ui-helpers.ts apps/web/features/terminal/config.ts apps/web/app/globals.css</code>, checked 16 files, no fixes applied.</li>
           <li><span class="status-ok">Passed:</span> <code>bun test apps/web/features/market-chart/transforms/candles.test.ts apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code>, 90 pass, 0 fail, 194 expectations.</li>
+          <li><span class="status-ok">Passed:</span> <code>bun run typecheck</code>, all workspace TypeScript projects passed.</li>
+          <li><span class="status-ok">Passed:</span> <code>bun run check:docker-workspace</code>, Docker workspace snapshot is in sync.</li>
           <li><span class="status-ok">Passed:</span> <code>bun --cwd=apps/web run build</code>, Next.js production build compiled, type checked, generated 2 static pages, and finalized route output.</li>
         </ul>
       </section>

@@ -16,7 +16,8 @@ import {
   createMarketCandlestickSeriesOptions,
   createMarketChartOptions,
   DEFAULT_MARKET_CHART_THEME,
-  getMarketChartLayoutPreset
+  getMarketChartLayoutPreset,
+  MARKET_CHART_LAYOUT_PRESETS
 } from "../defaults";
 import { toCandlestickSeriesData } from "../transforms/candles";
 import { toLowerPaneHistogramData } from "../transforms/lower-pane";
@@ -24,6 +25,7 @@ import { chartTimeToMs } from "../transforms/time";
 import type {
   MarketChartApiRefs,
   MarketChartCandle,
+  MarketChartExtensionRegistry,
   MarketChartLowerPaneSeries,
   MarketChartLowerSeries,
   MarketChartMarker,
@@ -45,6 +47,7 @@ type UseMarketChartControllerInput = {
   settings: MarketChartSettingsState;
   theme?: MarketChartThemeOptions;
   layoutPreset?: string;
+  registry?: Partial<MarketChartExtensionRegistry>;
   onVisibleRangeChange?: (range: MarketChartRange | null) => void;
   onMarkerClick?: (marker: MarketChartMarker) => void;
   onCrosshairChange?: Parameters<typeof useChartCrosshair>[0]["onCrosshairChange"];
@@ -69,6 +72,7 @@ export const useMarketChartController = ({
   settings,
   theme = DEFAULT_MARKET_CHART_THEME,
   layoutPreset,
+  registry,
   onVisibleRangeChange,
   onMarkerClick,
   onCrosshairChange
@@ -81,10 +85,20 @@ export const useMarketChartController = ({
   const markerLookupRef = useRef<Map<string, MarketChartMarker>>(new Map());
   const visibleRangeRef = useRef(onVisibleRangeChange);
   const markerClickRef = useRef(onMarkerClick);
+  const fittedScopeRef = useRef<string | null>(null);
   visibleRangeRef.current = onVisibleRangeChange;
   markerClickRef.current = onMarkerClick;
 
-  const preset = useMemo(() => getMarketChartLayoutPreset(layoutPreset), [layoutPreset]);
+  const layoutPresets = useMemo(() => {
+    if (!registry?.layoutPresets?.length) {
+      return MARKET_CHART_LAYOUT_PRESETS;
+    }
+    return [...registry.layoutPresets, ...MARKET_CHART_LAYOUT_PRESETS];
+  }, [registry?.layoutPresets]);
+  const preset = useMemo(
+    () => getMarketChartLayoutPreset(layoutPreset, layoutPresets),
+    [layoutPreset, layoutPresets]
+  );
   const crosshairHandler = useChartCrosshair({
     symbol,
     intervalMs,
@@ -92,9 +106,11 @@ export const useMarketChartController = ({
     lowerSeries,
     overlays,
     markers,
+    hoverRows: registry?.hoverRows,
     onCrosshairChange
   });
 
+  // Chart construction is mount-only. Prop changes flow through the data and option effects below.
   useEffect(() => {
     const container = containerRef.current;
     if (!container) {
@@ -180,14 +196,21 @@ export const useMarketChartController = ({
       markerPluginRef.current = null;
       lowerSeriesRef.current.clear();
     };
-  }, [crosshairHandler, intervalMs, preset.minHeight, settings.display.showGrid, theme]);
+  }, [crosshairHandler]);
 
   useEffect(() => {
     priceSeriesRef.current?.setData(toCandlestickSeriesData(candles));
-    if (candles.length > 0) {
-      chartRef.current?.timeScale().fitContent();
+    const scopeKey = `${symbol}:${intervalMs}`;
+    if (candles.length === 0) {
+      fittedScopeRef.current = null;
+      return;
     }
-  }, [candles]);
+    if (fittedScopeRef.current === scopeKey) {
+      return;
+    }
+    chartRef.current?.timeScale().fitContent();
+    fittedScopeRef.current = scopeKey;
+  }, [candles, intervalMs, symbol]);
 
   useEffect(() => {
     markerLookupRef.current = new Map(markers.map((marker) => [marker.id, marker]));
@@ -213,7 +236,16 @@ export const useMarketChartController = ({
     if (!chart) {
       return;
     }
-    const activeLayerIds = new Set(lowerSeries?.layers.map((layer) => layer.id) ?? []);
+    if (!settings.lowerPane.visible || !lowerSeries) {
+      for (const [, series] of lowerSeriesRef.current.entries()) {
+        chart.removeSeries(series);
+      }
+      lowerSeriesRef.current.clear();
+      return;
+    }
+
+    const visibleLayers = lowerSeries.layers.filter((layer) => layer.visible !== false);
+    const activeLayerIds = new Set(visibleLayers.map((layer) => layer.id));
     for (const [id, series] of lowerSeriesRef.current.entries()) {
       if (!activeLayerIds.has(id)) {
         chart.removeSeries(series);
@@ -221,14 +253,11 @@ export const useMarketChartController = ({
       }
     }
 
-    if (!settings.lowerPane.visible || !lowerSeries) {
+    if (visibleLayers.length === 0) {
       return;
     }
 
-    for (const layer of lowerSeries.layers) {
-      if (layer.visible === false) {
-        continue;
-      }
+    for (const layer of visibleLayers) {
       let series = lowerSeriesRef.current.get(layer.id);
       if (!series) {
         series = chart.addSeries(
@@ -240,12 +269,13 @@ export const useMarketChartController = ({
           1
         );
         lowerSeriesRef.current.set(layer.id, series);
-        const panes = chart.panes();
-        panes[0]?.setStretchFactor(Math.max(1, 1 - preset.lowerPaneRatio));
-        panes[1]?.setStretchFactor(Math.max(0.05, preset.lowerPaneRatio));
       }
       series.setData(toLowerPaneHistogramData(layer, theme));
     }
+
+    const panes = chart.panes();
+    panes[0]?.setStretchFactor(Math.max(1, 1 - preset.lowerPaneRatio));
+    panes[1]?.setStretchFactor(Math.max(0.05, preset.lowerPaneRatio));
   }, [lowerSeries, preset.lowerPaneRatio, settings.lowerPane.visible, theme]);
 
   const refs: MarketChartApiRefs = {

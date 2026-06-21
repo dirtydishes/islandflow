@@ -173,9 +173,14 @@ export const MARKET_CHART_EXTENSION_REGISTRY: MarketChartExtensionRegistry = {
 };
 
 export const getMarketChartLayoutPreset = (
-  presetId: string | undefined
+  presetId: string | undefined,
+  presets: readonly MarketChartLayoutPreset[] = MARKET_CHART_LAYOUT_PRESETS
 ): MarketChartLayoutPreset => {
+  if (!presetId) {
+    return MARKET_CHART_LAYOUT_PRESETS[0];
+  }
   return (
+    presets.find((preset) => preset.id === presetId) ??
     MARKET_CHART_LAYOUT_PRESETS.find((preset) => preset.id === presetId) ??
     MARKET_CHART_LAYOUT_PRESETS[0]
   );

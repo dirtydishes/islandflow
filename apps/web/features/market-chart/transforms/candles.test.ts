@@ -4,7 +4,8 @@ import {
   deriveCandleDirection,
   formatIntervalLabel,
   normalizeMarketChartCandle,
-  toChartCandle
+  toChartCandle,
+  toChartTime
 } from "../index";
 
 describe("market chart candle transforms", () => {
@@ -46,7 +47,7 @@ describe("market chart candle transforms", () => {
         close: 9.5
       })
     ).toEqual({
-      time: 60,
+      time: toChartTime(60_000),
       open: 10,
       high: 12,
       low: 9,

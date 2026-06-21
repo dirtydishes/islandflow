@@ -24,6 +24,16 @@ type UseChartCrosshairInput = {
   onCrosshairChange?: (snapshot: MarketChartHoverSnapshot | null) => void;
 };
 
+type ChartCrosshairState = {
+  symbol: string;
+  intervalMs: number;
+  candles: MarketChartCandle[];
+  lowerSeries?: MarketChartLowerSeries;
+  overlays?: MarketChartOverlay[];
+  markers?: MarketChartMarker[];
+  hoverRows: MarketChartHoverRowProvider[];
+};
+
 export const useChartCrosshair = ({
   symbol,
   intervalMs,
@@ -31,47 +41,64 @@ export const useChartCrosshair = ({
   lowerSeries,
   overlays,
   markers,
-  hoverRows = [],
+  hoverRows,
   onCrosshairChange
 }: UseChartCrosshairInput) => {
   const callbackRef = useRef(onCrosshairChange);
+  const stateRef = useRef<ChartCrosshairState>({
+    symbol,
+    intervalMs,
+    candles,
+    lowerSeries,
+    overlays,
+    markers,
+    hoverRows: hoverRows ?? []
+  });
   callbackRef.current = onCrosshairChange;
+  stateRef.current = {
+    symbol,
+    intervalMs,
+    candles,
+    lowerSeries,
+    overlays,
+    markers,
+    hoverRows: hoverRows ?? []
+  };
 
-  return useCallback(
-    (param: MouseEventParams<Time>) => {
-      if (!param.time) {
-        callbackRef.current?.(null);
-        return;
-      }
+  return useCallback((param: MouseEventParams<Time>) => {
+    if (!param.time) {
+      callbackRef.current?.(null);
+      return;
+    }
 
-      const timestampMs = chartTimeToMs(param.time);
-      if (timestampMs === null) {
-        callbackRef.current?.(null);
-        return;
-      }
+    const timestampMs = chartTimeToMs(param.time);
+    if (timestampMs === null) {
+      callbackRef.current?.(null);
+      return;
+    }
 
-      const time = Math.floor(timestampMs / 1000) as UTCTimestamp;
-      const candle = candles.find((item) => item.time === time);
-      const lowerPoints =
-        lowerSeries?.layers.flatMap((layer) =>
-          layer.points.filter((point) => point.time === time)
-        ) ?? [];
-      const overlayPoints =
-        overlays?.flatMap((overlay) => overlay.points.filter((point) => point.time === time)) ?? [];
-      const marker = markers?.find((item) => item.time === time);
-      const context = {
-        symbol,
-        intervalMs,
-        time,
-        timestampMs,
-        candle,
-        lowerPoints,
-        overlayPoints,
-        marker
-      };
-      const extensionRows = hoverRows.flatMap((provider) => provider(context));
-      callbackRef.current?.(buildHoverSnapshot(context, extensionRows));
-    },
-    [candles, hoverRows, intervalMs, lowerSeries, markers, overlays, symbol]
-  );
+    const time = Math.floor(timestampMs / 1000) as UTCTimestamp;
+    const state = stateRef.current;
+    const candle = state.candles.find((item) => item.time === time);
+    const lowerPoints =
+      state.lowerSeries?.layers.flatMap((layer) =>
+        layer.points.filter((point) => point.time === time)
+      ) ?? [];
+    const overlayPoints =
+      state.overlays?.flatMap((overlay) => overlay.points.filter((point) => point.time === time)) ??
+      [];
+    const marker = state.markers?.find((item) => item.time === time);
+    const context = {
+      symbol: state.symbol,
+      intervalMs: state.intervalMs,
+      time,
+      timestampMs,
+      candle,
+      lowerPoints,
+      overlayPoints,
+      marker
+    };
+    const extensionRows = state.hoverRows.flatMap((provider) => provider(context));
+    callbackRef.current?.(buildHoverSnapshot(context, extensionRows));
+  }, []);
 };
