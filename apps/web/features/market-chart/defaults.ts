@@ -219,6 +219,7 @@ export const createMarketChartOptions = (
     layout: {
       background: { color: tokens.background },
       textColor: tokens.mutedText,
+      attributionLogo: false,
       panes: {
         separatorColor: tokens.border,
         separatorHoverColor: tokens.active,

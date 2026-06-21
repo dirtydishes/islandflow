@@ -386,7 +386,8 @@ export const CandleChart = ({
       height,
       layout: {
         background: { color: "#0d141b" },
-        textColor: "#90a0b2"
+        textColor: "#90a0b2",
+        attributionLogo: false
       },
       grid: {
         vertLines: { color: "rgba(144, 160, 178, 0.12)" },
