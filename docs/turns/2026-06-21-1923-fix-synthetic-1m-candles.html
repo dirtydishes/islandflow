@@ -194,6 +194,7 @@
       <ul>
         <li>Added <code>SYNTHETIC_DEMO_RUN_INTERVAL_MS</code>, <code>scaleSyntheticDemoRunIntervalMs</code>, and <code>projectSyntheticDemoLiveEvent</code> in <code>packages/synthetic-market</code>.</li>
         <li>Restored continuous equity background quotes and prints on the regular emit cadence, always including <code>SPY</code> plus current focus symbols.</li>
+        <li>Kept the regular equity background loop lit-only; off-exchange synthetic prints now come from the explicit dark path so overlays and dark inference do not receive contradictory venue metadata.</li>
         <li>Restored continuous dynamic option bursts on the regular emit cadence.</li>
         <li>Moved deterministic phase-03 fixture injection to an immediate startup injection plus the slower demo-run cadence, with load profile volume controlling runs per injection.</li>
         <li>Added a live-session reset guard for <code>equity-candles</code> and <code>equity-overlay</code> subscription-key changes.</li>
@@ -204,7 +205,7 @@
       <h2>Verification</h2>
       <div class="checks">
         <div class="check"><span class="status pass">Passed</span><strong><code>bun test packages/synthetic-market/tests/demo-load-profiles.test.ts</code></strong><span>Cadence scaling and live projection label stripping.</span></div>
-        <div class="check"><span class="status pass">Passed</span><strong><code>bun test services/ingest-equities/tests/synthetic.test.ts</code></strong><span>Startup fixture serials, label stripping, SPY background prints, and 1m candle geometry.</span></div>
+        <div class="check"><span class="status pass">Passed</span><strong><code>bun test services/ingest-equities/tests/synthetic.test.ts</code></strong><span>Startup fixture serials, label stripping, SPY background prints, lit/off-exchange consistency, and 1m candle geometry.</span></div>
         <div class="check"><span class="status pass">Passed</span><strong><code>bun test services/ingest-options/tests/synthetic.test.ts</code></strong><span>Dynamic option bursts plus slower deterministic fixture injection.</span></div>
         <div class="check"><span class="status pass">Passed</span><strong><code>bun test apps/web/app/terminal.test.ts</code></strong><span>Chart stream reset helper for candle and overlay subscription changes.</span></div>
         <div class="check"><span class="status pass">Passed</span><strong><code>bun test</code></strong><span>Full repository test suite, 355 tests.</span></div>

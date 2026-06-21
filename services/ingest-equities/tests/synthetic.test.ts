@@ -8,6 +8,7 @@ import { CandleAggregator } from "../../candles/src/aggregator";
 import { createSyntheticEquitiesAdapter } from "../src/adapters/synthetic";
 
 const FORBIDDEN_LABEL_FIELDS = ["scenario_id", "label", "hiddenLabel", "labels", "source_kind"];
+const LIT_EXCHANGES = new Set(["NYSE", "NASDAQ", "ARCA", "BATS", "IEX", "MEMX"]);
 
 describe("synthetic equities demo playback", () => {
   it("emits selected deterministic demo runs once while regular ticks produce varied SPY background prints", async () => {
@@ -31,7 +32,7 @@ describe("synthetic equities demo playback", () => {
       }
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 25));
+    await new Promise((resolve) => setTimeout(resolve, 50));
     stop();
 
     expect(prints.length).toBeGreaterThan(0);
@@ -50,6 +51,9 @@ describe("synthetic equities demo playback", () => {
     );
     expect(backgroundSpyPrints.length).toBeGreaterThan(2);
     expect(new Set(backgroundSpyPrints.map((print) => print.price)).size).toBeGreaterThan(1);
+    expect(
+      prints.filter((print) => print.offExchangeFlag && LIT_EXCHANGES.has(print.exchange))
+    ).toEqual([]);
 
     const aggregator = new CandleAggregator({ intervalsMs: [60_000], maxLateMs: 0 });
     for (const print of backgroundSpyPrints) {

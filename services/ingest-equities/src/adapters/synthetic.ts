@@ -326,10 +326,6 @@ export const createSyntheticEquitiesAdapter = (
           const size = clustered
             ? Math.round(baseSize * (1 + quote.state.clusteringScore * 0.35))
             : baseSize;
-          const offExchangeFlag =
-            ((eventSeq + i * 3) % 10) / 10 <
-            quote.state.offExchangeBias * (clustered ? 1.12 : 0.86);
-
           if (handlers.onQuote) {
             quoteSeq += 1;
             void handlers.onQuote(
@@ -346,7 +342,7 @@ export const createSyntheticEquitiesAdapter = (
               priceForPlacement(quote.mid, quote, placement),
               size,
               exchange,
-              offExchangeFlag
+              false
             )
           );
         }
