@@ -14,7 +14,10 @@ type TooltipSection = {
   rows: MarketChartHoverRow[];
 };
 
-const groupRows = (rows: readonly MarketChartHoverRow[], fallbackLabel: string): TooltipSection[] => {
+const groupRows = (
+  rows: readonly MarketChartHoverRow[],
+  fallbackLabel: string
+): TooltipSection[] => {
   const groups = new Map<string, MarketChartHoverRow[]>();
   for (const row of rows) {
     const group = row.group ?? fallbackLabel;
@@ -69,8 +72,12 @@ export const MarketChartTooltip = ({ snapshot, containerWidth }: MarketChartTool
   const sections: TooltipSection[] = [
     { id: "core", rows: snapshot.coreRows },
     ...groupRows(snapshot.extensionRows, "Extensions"),
-    ...(snapshot.lowerRows.length ? [{ id: "lower", label: "Lower pane", rows: snapshot.lowerRows }] : []),
-    ...(snapshot.overlayRows.length ? [{ id: "overlays", label: "Overlays", rows: snapshot.overlayRows }] : [])
+    ...(snapshot.lowerRows.length
+      ? [{ id: "lower", label: "Lower pane", rows: snapshot.lowerRows }]
+      : []),
+    ...(snapshot.overlayRows.length
+      ? [{ id: "overlays", label: "Overlays", rows: snapshot.overlayRows }]
+      : [])
   ];
 
   return (

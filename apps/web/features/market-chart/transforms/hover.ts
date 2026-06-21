@@ -167,7 +167,14 @@ const sortByBucketOrder = <T extends { timestampMs: number; sequence?: number }>
   });
 
 const hoverRowsSignature = (rows: readonly MarketChartHoverRow[]): unknown[] =>
-  rows.map((row) => [row.id, row.label, row.value, row.tone ?? "", row.sourceId ?? "", row.group ?? ""]);
+  rows.map((row) => [
+    row.id,
+    row.label,
+    row.value,
+    row.tone ?? "",
+    row.sourceId ?? "",
+    row.group ?? ""
+  ]);
 
 const hoverCandleSignature = (snapshot: MarketChartHoverSnapshot): unknown[] => {
   const { candle } = snapshot;
@@ -244,22 +251,24 @@ export const aggregateOptionNotionalByDirection = (
   context: MarketChartHoverContext,
   items: readonly MarketChartOptionFlowInput[]
 ): MarketChartOptionNotionalSummary => {
-  return items.filter((item) => inHoverBucket(context, item.timestampMs)).reduce(
-    (summary, item) => {
-      const notional = toOptionNotional(item);
-      const direction = normalizeOptionDirection(item.direction);
-      if (direction === "bullish") {
-        summary.bullish += notional;
-      } else if (direction === "bearish") {
-        summary.bearish += notional;
-      } else {
-        summary.neutralUnknown += notional;
-      }
-      summary.count += 1;
-      return summary;
-    },
-    { bullish: 0, bearish: 0, neutralUnknown: 0, count: 0 }
-  );
+  return items
+    .filter((item) => inHoverBucket(context, item.timestampMs))
+    .reduce(
+      (summary, item) => {
+        const notional = toOptionNotional(item);
+        const direction = normalizeOptionDirection(item.direction);
+        if (direction === "bullish") {
+          summary.bullish += notional;
+        } else if (direction === "bearish") {
+          summary.bearish += notional;
+        } else {
+          summary.neutralUnknown += notional;
+        }
+        summary.count += 1;
+        return summary;
+      },
+      { bullish: 0, bearish: 0, neutralUnknown: 0, count: 0 }
+    );
 };
 
 export const buildDirectionalOptionNotionalRows = (
@@ -298,7 +307,9 @@ export const buildFlowContextHoverRows = (
   items: readonly MarketChartFlowContextInput[],
   group = HOVER_EXTENSION_GROUP
 ): MarketChartHoverRow[] => {
-  const bucketItems = sortByBucketOrder(items.filter((item) => inHoverBucket(context, item.timestampMs)));
+  const bucketItems = sortByBucketOrder(
+    items.filter((item) => inHoverBucket(context, item.timestampMs))
+  );
   const smartFlowItems = bucketItems.filter((item) => item.source === "smart-flow");
   const selected = (smartFlowItems.length ? smartFlowItems : bucketItems).at(-1);
   if (!selected) {

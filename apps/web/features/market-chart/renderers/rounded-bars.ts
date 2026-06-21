@@ -13,7 +13,11 @@ import {
 } from "lightweight-charts";
 import { DEFAULT_MARKET_CHART_THEME } from "../defaults";
 import { lowerPointColor } from "../transforms/lower-pane";
-import type { MarketChartDirection, MarketChartLowerLayer, MarketChartThemeOptions } from "../types";
+import type {
+  MarketChartDirection,
+  MarketChartLowerLayer,
+  MarketChartThemeOptions
+} from "../types";
 
 export type MarketChartRoundedBarData = CustomData<UTCTimestamp> & {
   value: number;
@@ -81,7 +85,10 @@ class RoundedBarPaneRenderer implements ICustomSeriesPaneRenderer {
   private data: PaneRendererCustomData<Time, MarketChartRoundedBarData> | null = null;
   private options: RoundedBarSeriesOptions = DEFAULT_ROUNDED_BAR_OPTIONS;
 
-  update(data: PaneRendererCustomData<Time, MarketChartRoundedBarData>, options: RoundedBarSeriesOptions) {
+  update(
+    data: PaneRendererCustomData<Time, MarketChartRoundedBarData>,
+    options: RoundedBarSeriesOptions
+  ) {
     this.data = data;
     this.options = options;
   }
@@ -104,48 +111,47 @@ class RoundedBarPaneRenderer implements ICustomSeriesPaneRenderer {
     const to = Math.min(data.bars.length, Math.ceil(data.visibleRange.to));
     const effectiveSpacing = Math.max(1, data.barSpacing * Math.max(1, data.conflationFactor));
 
-    target.useBitmapCoordinateSpace(
-      ({ context, horizontalPixelRatio, verticalPixelRatio }) => {
-        const width = Math.max(
-          2 * horizontalPixelRatio,
-          Math.min(
-            this.options.maxBarWidth * horizontalPixelRatio,
-            effectiveSpacing * this.options.barWidthRatio * horizontalPixelRatio
-          )
-        );
-        const radius = this.options.radius * Math.min(horizontalPixelRatio, verticalPixelRatio);
-        const baseline = Math.round(zeroCoordinate * verticalPixelRatio);
+    // biome-ignore lint/correctness/useHookAtTopLevel: lightweight-charts exposes this canvas renderer API as a use* method.
+    target.useBitmapCoordinateSpace(({ context, horizontalPixelRatio, verticalPixelRatio }) => {
+      const width = Math.max(
+        2 * horizontalPixelRatio,
+        Math.min(
+          this.options.maxBarWidth * horizontalPixelRatio,
+          effectiveSpacing * this.options.barWidthRatio * horizontalPixelRatio
+        )
+      );
+      const radius = this.options.radius * Math.min(horizontalPixelRatio, verticalPixelRatio);
+      const baseline = Math.round(zeroCoordinate * verticalPixelRatio);
 
-        for (let index = from; index < to; index += 1) {
-          const item = data.bars[index];
-          if (!item) {
-            continue;
-          }
-          const value = item.originalData.value;
-          const valueCoordinate = priceConverter(value);
-          if (valueCoordinate === null) {
-            continue;
-          }
-
-          const x = Math.round(item.x * horizontalPixelRatio - width / 2);
-          const yValue = Math.round(valueCoordinate * verticalPixelRatio);
-          const top = Math.min(yValue, baseline);
-          const rawHeight = Math.abs(baseline - yValue);
-          const height = Math.max(rawHeight, 2 * verticalPixelRatio);
-          const isPositive = value > 0;
-          const isNegative = value < 0;
-          const radii: [number, number, number, number] = isPositive
-            ? [radius, radius, 0, 0]
-            : isNegative
-              ? [0, 0, radius, radius]
-              : [radius, radius, radius, radius];
-
-          context.fillStyle = item.barColor ?? item.originalData.color ?? this.options.color;
-          buildRoundedRectPath(context, x, top, width, height, radii);
-          context.fill();
+      for (let index = from; index < to; index += 1) {
+        const item = data.bars[index];
+        if (!item) {
+          continue;
         }
+        const value = item.originalData.value;
+        const valueCoordinate = priceConverter(value);
+        if (valueCoordinate === null) {
+          continue;
+        }
+
+        const x = Math.round(item.x * horizontalPixelRatio - width / 2);
+        const yValue = Math.round(valueCoordinate * verticalPixelRatio);
+        const top = Math.min(yValue, baseline);
+        const rawHeight = Math.abs(baseline - yValue);
+        const height = Math.max(rawHeight, 2 * verticalPixelRatio);
+        const isPositive = value > 0;
+        const isNegative = value < 0;
+        const radii: [number, number, number, number] = isPositive
+          ? [radius, radius, 0, 0]
+          : isNegative
+            ? [0, 0, radius, radius]
+            : [radius, radius, radius, radius];
+
+        context.fillStyle = item.barColor ?? item.originalData.color ?? this.options.color;
+        buildRoundedRectPath(context, x, top, width, height, radii);
+        context.fill();
       }
-    );
+    });
   }
 }
 
@@ -166,13 +172,17 @@ class RoundedBarPaneView
   }
 
   priceValueBuilder(plotRow: MarketChartRoundedBarData): CustomSeriesPricePlotValues {
-    return plotRow.value >= 0 ? [0, plotRow.value, plotRow.value] : [plotRow.value, 0, plotRow.value];
+    return plotRow.value >= 0
+      ? [0, plotRow.value, plotRow.value]
+      : [plotRow.value, 0, plotRow.value];
   }
 
   isWhitespace(
     data: MarketChartRoundedBarData | CustomSeriesWhitespaceData<Time>
   ): data is CustomSeriesWhitespaceData<Time> {
-    return !isRoundedBarData(data as MarketChartRoundedBarData | CustomSeriesWhitespaceData<UTCTimestamp>);
+    return !isRoundedBarData(
+      data as MarketChartRoundedBarData | CustomSeriesWhitespaceData<UTCTimestamp>
+    );
   }
 
   defaultOptions(): RoundedBarSeriesOptions {

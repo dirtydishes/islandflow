@@ -225,9 +225,7 @@ const featureString = (
   return null;
 };
 
-const flowPacketHoverDirection = (
-  packet: FlowPacket
-): MarketChartOptionFlowInput["direction"] => {
+const flowPacketHoverDirection = (packet: FlowPacket): MarketChartOptionFlowInput["direction"] => {
   const explicitDirection = featureString(packet.features, [
     "direction",
     "primary_direction",
@@ -318,7 +316,9 @@ const toFlowContextHoverInputs = (
       timestampMs: event.source_ts,
       sequence: event.seq,
       source: "legacy-smart-money",
-      direction: event.abstained ? "abstained" : normalizeTerminalDirection(event.primary_direction),
+      direction: event.abstained
+        ? "abstained"
+        : normalizeTerminalDirection(event.primary_direction),
       label: smartMoneyProfileLabel(event.primary_profile_id),
       evidenceScore,
       confidence,
@@ -720,7 +720,13 @@ export const TerminalMarketChartSection = memo(
         active = false;
         abort.abort();
       };
-    }, [state.chartTicker, state.mode, normalizedChartIntervalMs, replayEndTs, setFetchStateIfChanged]);
+    }, [
+      state.chartTicker,
+      state.mode,
+      normalizedChartIntervalMs,
+      replayEndTs,
+      setFetchStateIfChanged
+    ]);
 
     useEffect(() => {
       if (state.mode !== "live") {
