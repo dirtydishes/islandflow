@@ -1,12 +1,11 @@
 import { describe, expect, it } from "bun:test";
 import {
-  chartTimeToMs,
   deriveCandleDirection,
-  formatIntervalLabel,
   normalizeMarketChartCandle,
   toChartCandle,
-  toChartTime
-} from "../index";
+  toHeikinAshiCandles
+} from "./candles";
+import { chartTimeToMs, formatIntervalLabel, toChartTime } from "./time";
 
 describe("market chart candle transforms", () => {
   it("normalizes shared candle shape without terminal state", () => {
@@ -59,6 +58,49 @@ describe("market chart candle transforms", () => {
     expect(deriveCandleDirection(10, 11)).toBe("bullish");
     expect(deriveCandleDirection(10, 9)).toBe("bearish");
     expect(deriveCandleDirection(10, 10)).toBe("neutral");
+  });
+
+  it("builds Heikin Ashi candles without mutating source candles", () => {
+    const source = [
+      normalizeMarketChartCandle({
+        ts: 60_000,
+        open: 10,
+        high: 13,
+        low: 9,
+        close: 12,
+        volume: 100
+      }),
+      normalizeMarketChartCandle({
+        ts: 120_000,
+        open: 12,
+        high: 15,
+        low: 11,
+        close: 14,
+        volume: 150
+      })
+    ];
+
+    expect(toHeikinAshiCandles(source)).toMatchObject([
+      {
+        time: toChartTime(60_000),
+        open: 11,
+        high: 13,
+        low: 9,
+        close: 11,
+        volume: 100,
+        direction: "neutral"
+      },
+      {
+        time: toChartTime(120_000),
+        open: 11,
+        high: 15,
+        low: 11,
+        close: 13,
+        volume: 150,
+        direction: "bullish"
+      }
+    ]);
+    expect(source[0].open).toBe(10);
   });
 
   it("formats known and ad hoc interval labels", () => {

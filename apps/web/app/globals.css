@@ -423,6 +423,10 @@ input {
 .timeframe-dropdown,
 .timeframe-favorite-toggle,
 .overlay-toggle,
+.market-chart-settings-trigger,
+.market-chart-settings-actions button,
+.market-chart-segmented button,
+.market-chart-settings-menu button,
 .drawer-close {
   min-height: 36px;
   border: 1px solid var(--border);
@@ -440,7 +444,9 @@ input {
 .filter-clear:disabled,
 .jump-button:disabled,
 .timeframe-dropdown:disabled,
-.timeframe-favorite-toggle:disabled {
+.timeframe-favorite-toggle:disabled,
+.market-chart-segmented button:disabled,
+.market-chart-settings-menu button:disabled {
   opacity: 0.45;
   cursor: default;
 }
@@ -449,6 +455,9 @@ input {
 .interval-button.active,
 .timeframe-favorite-toggle.is-active,
 .overlay-toggle.overlay-toggle-on,
+.market-chart-settings-trigger.is-active,
+.market-chart-segmented button.is-active,
+.market-chart-settings-menu button.is-active,
 .mode-button {
   border-color: var(--border-strong);
   background: var(--accent-soft);
@@ -458,7 +467,11 @@ input {
 .interval-button:hover,
 .timeframe-dropdown:hover,
 .timeframe-favorite-toggle:hover,
-.overlay-toggle:hover {
+.overlay-toggle:hover,
+.market-chart-settings-trigger:hover,
+.market-chart-settings-actions button:hover,
+.market-chart-segmented button:hover,
+.market-chart-settings-menu button:hover {
   border-color: var(--border-strong);
   color: var(--text);
   background: var(--bg-soft);
@@ -466,14 +479,22 @@ input {
 
 .interval-button.active:hover,
 .timeframe-favorite-toggle.is-active:hover,
-.overlay-toggle.overlay-toggle-on:hover {
+.overlay-toggle.overlay-toggle-on:hover,
+.market-chart-settings-trigger.is-active:hover,
+.market-chart-segmented button.is-active:hover,
+.market-chart-settings-menu button.is-active:hover {
   background: var(--accent-soft);
 }
 
 .interval-button:focus-visible,
 .timeframe-dropdown:focus-visible,
 .timeframe-favorite-toggle:focus-visible,
-.overlay-toggle:focus-visible {
+.overlay-toggle:focus-visible,
+.market-chart-settings-trigger:focus-visible,
+.market-chart-settings-actions button:focus-visible,
+.market-chart-segmented button:focus-visible,
+.market-chart-settings-menu button:focus-visible,
+.market-chart-settings-check:focus-within {
   outline: 2px solid oklch(0.83 0.08 74 / 0.82);
   outline-offset: 2px;
 }
@@ -1875,6 +1896,139 @@ h3 {
   color: var(--accent);
 }
 
+.market-chart-settings {
+  display: inline-flex;
+  position: relative;
+}
+
+.market-chart-settings-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.market-chart-settings-panel {
+  position: fixed;
+  z-index: 80;
+  width: min(380px, calc(100vw - 20px));
+  max-height: min(78vh, 620px);
+  overflow: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: oklch(0.15 0.012 250 / 0.98);
+  color: var(--text);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.42);
+}
+
+.market-chart-settings-head,
+.market-chart-settings-section {
+  border-bottom: 1px solid var(--border);
+}
+
+.market-chart-settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+}
+
+.market-chart-settings-title,
+.market-chart-settings-section h3 {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.market-chart-settings-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.market-chart-settings-actions button {
+  min-height: 30px;
+  padding: 6px 8px;
+  font-size: 0.66rem;
+}
+
+.market-chart-settings-section {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.market-chart-settings-section:last-child {
+  border-bottom: 0;
+}
+
+.market-chart-segmented {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  gap: 6px;
+}
+
+.market-chart-segmented button,
+.market-chart-settings-menu button {
+  min-width: 0;
+  min-height: 34px;
+  padding: 7px 8px;
+  font-size: 0.66rem;
+  text-align: center;
+}
+
+.market-chart-settings-menu {
+  display: grid;
+  gap: 6px;
+}
+
+.market-chart-settings-menu button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+}
+
+.market-chart-settings-menu button span:last-child {
+  color: var(--text-dim);
+  font-size: 0.62rem;
+}
+
+.market-chart-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.market-chart-settings-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 9px;
+  background: var(--bg-soft);
+  color: var(--text);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.market-chart-settings-check input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.market-chart-settings-check span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .status span,
 .timestamp,
 .missed-count,
@@ -3052,6 +3206,10 @@ h3 {
   .timeframe-dropdown,
   .timeframe-favorite-toggle,
   .overlay-toggle,
+  .market-chart-settings-trigger,
+  .market-chart-settings-actions button,
+  .market-chart-segmented button,
+  .market-chart-settings-menu button,
   .drawer-close,
   .command-filter-tooltip button,
   .status-inline-counter,
@@ -3379,6 +3537,10 @@ h3 {
   .timeframe-dropdown,
   .timeframe-favorite-toggle,
   .overlay-toggle,
+  .market-chart-settings-trigger,
+  .market-chart-settings-actions button,
+  .market-chart-segmented button,
+  .market-chart-settings-menu button,
   .drawer-close,
   .contract-filter-button,
   .filter-chip {
@@ -3491,6 +3653,19 @@ h3 {
     width: auto;
     max-height: min(72vh, 560px);
     border-radius: 16px;
+  }
+
+  .market-chart-settings {
+    width: 100%;
+  }
+
+  .market-chart-settings-trigger {
+    width: 100%;
+  }
+
+  .market-chart-settings-panel {
+    width: calc(100vw - 20px);
+    max-height: min(72vh, 560px);
   }
 
   .flow-filter-checkbox-grid,
