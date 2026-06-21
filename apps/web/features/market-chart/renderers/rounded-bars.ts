@@ -140,7 +140,7 @@ class RoundedBarPaneRenderer implements ICustomSeriesPaneRenderer {
               ? [0, 0, radius, radius]
               : [radius, radius, radius, radius];
 
-          context.fillStyle = item.originalData.color;
+          context.fillStyle = item.barColor ?? item.originalData.color ?? this.options.color;
           buildRoundedRectPath(context, x, top, width, height, radii);
           context.fill();
         }

@@ -20,6 +20,7 @@ import {
 } from "../defaults";
 import { createRoundedBarSeriesPaneView, toRoundedBarSeriesData } from "../renderers/rounded-bars";
 import { resolvePriceMode, toCandlestickSeriesData } from "../transforms/candles";
+import { getMarketChartHoverSnapshotSignature } from "../transforms/hover";
 import { chartTimeToMs } from "../transforms/time";
 import type {
   MarketChartApiRefs,
@@ -98,6 +99,7 @@ export const useMarketChartController = ({
   const markerClickRef = useRef(onMarkerClick);
   const crosshairChangeRef = useRef(onCrosshairChange);
   const fittedScopeRef = useRef<string | null>(null);
+  const hoverSnapshotSignatureRef = useRef(getMarketChartHoverSnapshotSignature(null));
   const [hoverSnapshot, setHoverSnapshot] = useState<MarketChartHoverSnapshot | null>(null);
   overlayStateRef.current = {
     overlays,
@@ -124,6 +126,11 @@ export const useMarketChartController = ({
   );
   const priceCandles = useMemo(() => priceMode.transform(candles), [candles, priceMode]);
   const handleCrosshairChange = useCallback((snapshot: MarketChartHoverSnapshot | null) => {
+    const nextSignature = getMarketChartHoverSnapshotSignature(snapshot);
+    if (nextSignature === hoverSnapshotSignatureRef.current) {
+      return;
+    }
+    hoverSnapshotSignatureRef.current = nextSignature;
     setHoverSnapshot(snapshot);
     crosshairChangeRef.current?.(snapshot);
   }, []);

@@ -221,7 +221,8 @@
           Added a compact crosshair readout, pure hover aggregation transforms, terminal-owned flow
           context wiring, rounded directional lower-pane bars, and responsive tooltip hardening. The
           chart module remains reusable; terminal state, smart-flow copy, and legacy smart-money
-          compatibility stay in the terminal adapter.
+          compatibility stay in the terminal adapter. Reviewer repair tightened option-side direction,
+          duplicate hover state, terminal fetch-state churn, and rounded-bar color rendering.
         </p>
       </header>
 
@@ -244,6 +245,7 @@
           <li>Added a <code>lightweight-charts</code> custom series renderer for rounded directional lower-pane bars while keeping hover hit testing in the existing bucket model.</li>
           <li>Wired terminal option prints, flow packets, smart-flow projections, and legacy smart-money context through adapter-owned hover providers without importing terminal code into <code>features/market-chart</code>.</li>
           <li>Hardened tooltip placement and CSS for desktop dashboard, mobile, and compact embed sizes, with labels and text carrying directional meaning instead of relying on red or green alone.</li>
+          <li>Reviewer repair: made option notional direction call/put aware, deduped identical hover and live candle state frames, and rendered lower-pane custom bars with the effective <code>lightweight-charts</code> item color.</li>
         </ul>
       </section>
 
@@ -255,6 +257,18 @@
           <li>Directional option notional always renders bullish, bearish, and neutral or unknown rows so uncertain flow remains visible.</li>
           <li>The rounded-bar renderer uses custom-series pane data and signed values. Positive values round the top corners, negative values round the bottom corners, and neutral values use a dim neutral treatment.</li>
           <li>Tooltip placement flips around the crosshair on wider charts and uses a bounded full-width treatment on narrow charts, avoiding active-candle coverage when practical without layout shift.</li>
+          <li>Hover snapshots are signature-deduped before React state updates, and terminal chart fetch state ignores value-identical candle/status frames from live updates.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Reviewer Repair</h2>
+        <ul>
+          <li>Filed Bead <code>islandflow-n5bg</code> for PR #60 repair work.</li>
+          <li>Fixed option hover notional mapping so ask-side calls and bid-side puts count bullish, ask-side puts and bid-side calls count bearish, and mid or unknown side/right stays neutral or unknown.</li>
+          <li>Added regression coverage for mixed call/put option prints and flow packets in the terminal hover provider.</li>
+          <li>Fixed repeated crosshair snapshots and value-identical live candle updates from causing redundant React state writes during hover/live updates.</li>
+          <li>Fixed rounded lower-pane bars rendering as black by drawing with <code>item.barColor</code> before falling back to original data or series options.</li>
         </ul>
       </section>
 
@@ -264,12 +278,12 @@
           <div class="check">
             <strong>Pass</strong>
             <code>bun test apps/web/features/market-chart/transforms</code>
-            <p>30 pass, 0 fail.</p>
+            <p>31 pass, 0 fail, 72 assertions.</p>
           </div>
           <div class="check">
             <strong>Pass</strong>
             <code>bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code>
-            <p>92 pass, 0 fail after installing workspace dependencies in this worktree.</p>
+            <p>93 pass, 0 fail, 206 assertions.</p>
           </div>
           <div class="check">
             <strong>Pass</strong>
@@ -279,7 +293,7 @@
           <div class="check">
             <strong>Pass</strong>
             <code>bun test</code>
-            <p>350 pass, 0 fail, 1964 assertions.</p>
+            <p>352 pass, 0 fail, 1836 assertions.</p>
           </div>
           <div class="check">
             <strong>Pass</strong>
@@ -295,10 +309,13 @@
         <p class="note">
           Browser visual QA used <code>bun --cwd=apps/web run dev</code> at <code>http://localhost:3000/</code>.
           Desktop 1440x900: hover readout rendered inside the chart with OHLC, volume, trades,
-          directional option notional, and lower-pane context visible. Mobile 390x844: toolbar and
-          tooltip text had no detected overflow, and all readout rows stayed inside the viewport.
-          Compact 820x620: tooltip stayed inside viewport after placement tuning. The browser session
-          emitted replay polling fetch warnings in local dev; chart rendering and hover QA were not blocked.
+          directional option notional, and lower-pane context visible, with no tooltip text overflow or
+          viewport overflow. Mobile 390x844: all readout rows stayed inside the viewport with the bounded
+          narrow placement. Lower-pane crop after renderer repair showed colored rounded bars
+          (15,987 green-ish pixels and 3,635 red-ish pixels in the sampled crop). A production
+          <code>next start</code> smoke on port 3001 served the page with no browser warnings, but local
+          chart data fetch failed in that mode, so tooltip interaction was verified against the data-present
+          dev session.
         </p>
       </section>
 

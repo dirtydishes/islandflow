@@ -5,7 +5,8 @@ import {
   aggregateOptionNotionalByDirection,
   buildDirectionalOptionNotionalRows,
   buildFlowContextHoverRows,
-  buildHoverSnapshot
+  buildHoverSnapshot,
+  marketChartHoverSnapshotsEqual
 } from "./hover";
 
 const context = (ts = 60_000): MarketChartHoverContext => {
@@ -55,6 +56,53 @@ describe("market chart hover transforms", () => {
       "extension:flow"
     ]);
     expect(snapshot.extensionRows[0].group).toBe("Flow context");
+  });
+
+  it("treats duplicate hover frames as equal while preserving point and row changes", () => {
+    const first = buildHoverSnapshot(context(), {
+      extensionRows: [
+        {
+          id: "extension:flow",
+          label: "Flow direction",
+          value: "Bullish hypothesis",
+          tone: "bullish",
+          group: "Flow context"
+        }
+      ],
+      point: { x: 240, y: 110 }
+    });
+    const duplicate = buildHoverSnapshot(context(), {
+      extensionRows: [
+        {
+          id: "extension:flow",
+          label: "Flow direction",
+          value: "Bullish hypothesis",
+          tone: "bullish",
+          group: "Flow context"
+        }
+      ],
+      point: { x: 240, y: 110 }
+    });
+    const moved = buildHoverSnapshot(context(), {
+      extensionRows: first.extensionRows,
+      point: { x: 241, y: 110 }
+    });
+    const changedRows = buildHoverSnapshot(context(), {
+      extensionRows: [
+        {
+          id: "extension:flow",
+          label: "Flow direction",
+          value: "Bearish hypothesis",
+          tone: "bearish",
+          group: "Flow context"
+        }
+      ],
+      point: { x: 240, y: 110 }
+    });
+
+    expect(marketChartHoverSnapshotsEqual(first, duplicate)).toBe(true);
+    expect(marketChartHoverSnapshotsEqual(first, moved)).toBe(false);
+    expect(marketChartHoverSnapshotsEqual(first, changedRows)).toBe(false);
   });
 
   it("aggregates option notional by candle bucket and preserves unknown direction", () => {

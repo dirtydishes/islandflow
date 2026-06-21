@@ -166,6 +166,80 @@ const sortByBucketOrder = <T extends { timestampMs: number; sequence?: number }>
     return (a.sequence ?? 0) - (b.sequence ?? 0);
   });
 
+const hoverRowsSignature = (rows: readonly MarketChartHoverRow[]): unknown[] =>
+  rows.map((row) => [row.id, row.label, row.value, row.tone ?? "", row.sourceId ?? "", row.group ?? ""]);
+
+const hoverCandleSignature = (snapshot: MarketChartHoverSnapshot): unknown[] => {
+  const { candle } = snapshot;
+  if (!candle) {
+    return [];
+  }
+  return [
+    candle.time,
+    candle.timestampMs,
+    candle.open,
+    candle.high,
+    candle.low,
+    candle.close,
+    candle.volume ?? "",
+    candle.notional ?? "",
+    candle.tradeCount ?? "",
+    candle.direction,
+    candle.sequence ?? "",
+    candle.source ?? ""
+  ];
+};
+
+const hoverMarkerSignature = (snapshot: MarketChartHoverSnapshot): unknown[] => {
+  const { marker } = snapshot;
+  if (!marker) {
+    return [];
+  }
+  return [
+    marker.id,
+    marker.time,
+    marker.label,
+    marker.title ?? "",
+    marker.description ?? "",
+    marker.direction ?? "",
+    marker.position,
+    marker.shape,
+    marker.color
+  ];
+};
+
+export const getMarketChartHoverSnapshotSignature = (
+  snapshot: MarketChartHoverSnapshot | null
+): string => {
+  if (!snapshot) {
+    return "null";
+  }
+
+  return JSON.stringify([
+    snapshot.symbol,
+    snapshot.intervalMs,
+    snapshot.time,
+    snapshot.timestampMs,
+    snapshot.bucketStartMs,
+    snapshot.bucketEndMs,
+    snapshot.price ?? "",
+    snapshot.point?.x ?? "",
+    snapshot.point?.y ?? "",
+    hoverCandleSignature(snapshot),
+    hoverMarkerSignature(snapshot),
+    hoverRowsSignature(snapshot.coreRows),
+    hoverRowsSignature(snapshot.extensionRows),
+    hoverRowsSignature(snapshot.lowerRows),
+    hoverRowsSignature(snapshot.overlayRows)
+  ]);
+};
+
+export const marketChartHoverSnapshotsEqual = (
+  current: MarketChartHoverSnapshot | null,
+  next: MarketChartHoverSnapshot | null
+): boolean =>
+  getMarketChartHoverSnapshotSignature(current) === getMarketChartHoverSnapshotSignature(next);
+
 export const aggregateOptionNotionalByDirection = (
   context: MarketChartHoverContext,
   items: readonly MarketChartOptionFlowInput[]

@@ -1,13 +1,14 @@
 "use client";
 
-import type {
-  EquityCandle,
-  EquityPrint,
-  FlowPacket,
-  InferredDarkEvent,
-  OptionPrint,
-  SmartFlowExplainabilityProjection,
-  SmartMoneyEvent
+import {
+  type EquityCandle,
+  type EquityPrint,
+  type FlowPacket,
+  type InferredDarkEvent,
+  type OptionPrint,
+  parseOptionContractId,
+  type SmartFlowExplainabilityProjection,
+  type SmartMoneyEvent
 } from "@islandflow/types";
 import { type ChangeEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -73,6 +74,34 @@ const EMPTY_FETCH_STATE: TerminalChartFetchState = {
   error: null
 };
 
+const terminalCandleSignature = (candle: EquityCandle): unknown[] => [
+  candle.trace_id,
+  candle.seq,
+  candle.ts,
+  candle.interval_ms,
+  candle.underlying_id,
+  candle.open,
+  candle.high,
+  candle.low,
+  candle.close,
+  candle.volume,
+  candle.trade_count,
+  candle.ingest_ts
+];
+
+const terminalChartFetchStateSignature = (state: TerminalChartFetchState): string =>
+  JSON.stringify([
+    state.status,
+    state.lastUpdate ?? "",
+    state.error ?? "",
+    state.candles.map(terminalCandleSignature)
+  ]);
+
+const terminalChartFetchStatesEqual = (
+  current: TerminalChartFetchState,
+  next: TerminalChartFetchState
+): boolean => terminalChartFetchStateSignature(current) === terminalChartFetchStateSignature(next);
+
 const MAX_DARK_MARKERS = 120;
 const MAX_TOTAL_MARKERS = 320;
 const OFF_EXCHANGE_OVERLAY_COLOR = "rgba(77, 163, 255, 0.58)";
@@ -131,16 +160,43 @@ const normalizeTerminalDirection = (value: string | null | undefined): MarketCha
   return "neutral";
 };
 
+type TerminalOptionRight = "call" | "put";
+
+const normalizeOptionRight = (
+  value: string | null | undefined,
+  contractId?: string | null
+): TerminalOptionRight | null => {
+  const normalized = value?.trim().toLowerCase();
+  if (normalized === "call" || normalized === "c") {
+    return "call";
+  }
+  if (normalized === "put" || normalized === "p") {
+    return "put";
+  }
+
+  const parsed = parseOptionContractId(contractId ?? undefined);
+  if (parsed?.right === "C") {
+    return "call";
+  }
+  if (parsed?.right === "P") {
+    return "put";
+  }
+  return null;
+};
+
 const optionSideToHoverDirection = (
-  value: string | null | undefined
+  side: string | null | undefined,
+  optionRight: TerminalOptionRight | null
 ): MarketChartOptionFlowInput["direction"] => {
-  if (value === "AA" || value === "A") {
-    return "bullish";
+  const buySide = side === "AA" || side === "A";
+  const sellSide = side === "B" || side === "BB";
+  if (!optionRight || (!buySide && !sellSide)) {
+    return "unknown";
   }
-  if (value === "B" || value === "BB") {
-    return "bearish";
+  if (optionRight === "call") {
+    return buySide ? "bullish" : "bearish";
   }
-  return "unknown";
+  return buySide ? "bearish" : "bullish";
 };
 
 const featureNumber = (
@@ -186,7 +242,11 @@ const flowPacketHoverDirection = (
     return explicitDirection;
   }
   return optionSideToHoverDirection(
-    featureString(packet.features, ["execution_nbbo_side", "nbbo_side", "side"])
+    featureString(packet.features, ["execution_nbbo_side", "nbbo_side", "side"]),
+    normalizeOptionRight(
+      featureString(packet.features, ["option_type", "option_right", "right"]),
+      featureString(packet.features, ["option_contract_id", "contract_id"])
+    )
   );
 };
 
@@ -209,7 +269,10 @@ const toOptionFlowHoverInputs = (
     notional: print.notional ?? print.price * print.size * 100,
     price: print.price,
     size: print.size,
-    direction: optionSideToHoverDirection(print.execution_nbbo_side ?? print.nbbo_side)
+    direction: optionSideToHoverDirection(
+      print.execution_nbbo_side ?? print.nbbo_side,
+      normalizeOptionRight(print.option_type, print.option_contract_id)
+    )
   }))
 ];
 
@@ -543,6 +606,9 @@ export const TerminalMarketChartSection = memo(
       status: state.mode === "live" ? "connecting" : "connected"
     });
     const overlayAbortRef = useRef<AbortController | null>(null);
+    const setFetchStateIfChanged = useCallback((next: TerminalChartFetchState) => {
+      setFetchState((current) => (terminalChartFetchStatesEqual(current, next) ? current : next));
+    }, []);
 
     const timeframeModel = useMemo(
       () =>
@@ -598,7 +664,7 @@ export const TerminalMarketChartSection = memo(
     useEffect(() => {
       let active = true;
       const abort = new AbortController();
-      setFetchState({
+      setFetchStateIfChanged({
         candles: [],
         status: state.mode === "live" ? "connecting" : "connected",
         lastUpdate: null,
@@ -629,7 +695,7 @@ export const TerminalMarketChartSection = memo(
           }
           const candles = sortByTsSeq(payload.data ?? []);
           const last = candles.at(-1);
-          setFetchState({
+          setFetchStateIfChanged({
             candles,
             status: "connected",
             lastUpdate: last ? (last.ingest_ts ?? last.ts) : null,
@@ -639,7 +705,7 @@ export const TerminalMarketChartSection = memo(
           if (!active || (error instanceof DOMException && error.name === "AbortError")) {
             return;
           }
-          setFetchState({
+          setFetchStateIfChanged({
             candles: [],
             status: "disconnected",
             lastUpdate: null,
@@ -654,7 +720,7 @@ export const TerminalMarketChartSection = memo(
         active = false;
         abort.abort();
       };
-    }, [state.chartTicker, state.mode, normalizedChartIntervalMs, replayEndTs]);
+    }, [state.chartTicker, state.mode, normalizedChartIntervalMs, replayEndTs, setFetchStateIfChanged]);
 
     useEffect(() => {
       if (state.mode !== "live") {
@@ -665,7 +731,7 @@ export const TerminalMarketChartSection = memo(
         return;
       }
       const last = candles.at(-1);
-      setFetchState({
+      setFetchStateIfChanged({
         candles,
         status: state.liveSession.status,
         lastUpdate: last ? (last.ingest_ts ?? last.ts) : state.liveSession.lastUpdate,
@@ -675,7 +741,8 @@ export const TerminalMarketChartSection = memo(
       state.liveSession.chartCandles,
       state.liveSession.lastUpdate,
       state.liveSession.status,
-      state.mode
+      state.mode,
+      setFetchStateIfChanged
     ]);
 
     useEffect(() => {
