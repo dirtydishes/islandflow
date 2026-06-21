@@ -1238,7 +1238,7 @@ h3 {
   min-height: 330px;
 }
 
-.market-command-grid > :nth-child(2) {
+.market-command-chart {
   grid-area: chart;
   min-height: 520px;
 }
@@ -1268,7 +1268,7 @@ h3 {
   min-height: 140px;
 }
 
-.market-command-grid .chart-surface {
+.market-command-grid .market-chart-surface {
   height: 430px;
 }
 
@@ -1781,6 +1781,8 @@ h3 {
 
 .market-chart-section {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
   background: var(--bg-pane);
@@ -1808,6 +1810,21 @@ h3 {
   color: var(--text-dim);
   font-family: var(--font-mono), monospace;
   font-size: 0.72rem;
+}
+
+.terminal-chart-meta {
+  gap: 10px;
+  font-size: 0.72rem;
+}
+
+.terminal-chart-controls {
+  max-width: 100%;
+}
+
+.terminal-market-chart-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-top: 8px;
 }
 
 .chart-empty {
@@ -3177,6 +3194,7 @@ h3 {
   }
 
   .market-command-grid > .terminal-pane,
+  .market-command-chart,
   .opra-options-pane,
   .opra-flow-pane,
   .news-pane-full {
@@ -3524,7 +3542,7 @@ h3 {
     height: 320px;
   }
 
-  .market-command-grid .chart-surface {
+  .market-command-grid .market-chart-surface {
     height: 320px;
   }
 

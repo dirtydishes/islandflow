@@ -4,14 +4,21 @@ import type { ReactNode } from "react";
 
 type MarketChartSectionProps = {
   title: string;
+  className?: string;
   meta?: ReactNode;
   actions?: ReactNode;
   children: ReactNode;
 };
 
-export const MarketChartSection = ({ title, meta, actions, children }: MarketChartSectionProps) => {
+export const MarketChartSection = ({
+  title,
+  className,
+  meta,
+  actions,
+  children
+}: MarketChartSectionProps) => {
   return (
-    <section className="market-chart-section">
+    <section className={["market-chart-section", className].filter(Boolean).join(" ")}>
       <div className="market-chart-section-head">
         <div>
           <h2>{title}</h2>

@@ -2,8 +2,8 @@
 
 import type { ReactNode } from "react";
 
+import { TerminalMarketChartSection } from "../features/terminal/chart-adapter";
 import {
-  ChartPane,
   CommandDecisionLevels,
   CommandDeckHeader,
   CommandMetricsStrip,
@@ -22,6 +22,14 @@ import { useTerminal } from "../features/terminal/state";
 
 export { getChartFlowMarkerItems } from "../features/terminal/charts/markers";
 export type { ChartFlowMarkerItem } from "../features/terminal/charts/markers";
+export {
+  buildTerminalEquityOverlays,
+  buildTerminalMarketChartMarkers,
+  getTerminalChartReplayEndTs,
+  mapTerminalChartStatus,
+  normalizeTerminalChartCandles
+} from "../features/terminal/chart-adapter";
+export type { TerminalMarketChartMarkerPayload } from "../features/terminal/chart-adapter";
 export {
   getTapeVirtualConfig,
   isSyntheticAdminVisible,
@@ -114,7 +122,11 @@ export function OverviewRoute() {
         <CommandSymbolRail state={state} />
         <div className="market-command-grid">
           <CommandPriorityBoard state={state} />
-          <ChartPane state={state} title="Chart Context" />
+          <TerminalMarketChartSection
+            state={state}
+            title="Chart Context"
+            className="market-command-chart"
+          />
           <CommandDecisionLevels state={state} />
           <OptionsPane
             state={state}
