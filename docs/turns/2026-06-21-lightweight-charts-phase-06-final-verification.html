@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lightweight Charts Phase 06 Final Verification</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --pane: #111820;
+        --pane-2: #0b1016;
+        --text: #e6edf4;
+        --dim: #90a0b2;
+        --faint: #6e7b8c;
+        --amber: #f5a623;
+        --green: #25c17a;
+        --red: #ff6b5f;
+        --info: #7fb4ff;
+        --border: #ffffff14;
+        --border-strong: #ffffff24;
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--sans);
+      }
+
+      main {
+        width: min(1120px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 34px 0 54px;
+      }
+
+      header,
+      section {
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+        background: var(--pane);
+      }
+
+      header {
+        padding: 20px;
+      }
+
+      section {
+        margin-top: 14px;
+        padding: 18px 20px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 820px;
+        font-family: var(--mono);
+        font-size: 1.35rem;
+        line-height: 1.18;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      h2,
+      .kicker {
+        color: var(--amber);
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h2 {
+        margin-bottom: 12px;
+      }
+
+      h3 {
+        margin: 14px 0 8px;
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      p,
+      li {
+        color: var(--dim);
+        font-size: 0.92rem;
+        line-height: 1.55;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+
+      li + li {
+        margin-top: 6px;
+      }
+
+      code {
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 0.85em;
+      }
+
+      .summary {
+        margin-top: 10px;
+        max-width: 88ch;
+      }
+
+      .meta,
+      .check-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 10px;
+      }
+
+      .chip,
+      .check {
+        border: 1px solid var(--border);
+        background: var(--pane-2);
+      }
+
+      .chip {
+        padding: 10px;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        color: var(--dim);
+        text-transform: uppercase;
+      }
+
+      .check {
+        padding: 12px;
+      }
+
+      .check strong {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--green);
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .check.warning strong {
+        color: var(--amber);
+      }
+
+      .check p {
+        margin-top: 7px;
+        font-size: 0.82rem;
+      }
+
+      .note {
+        margin-top: 10px;
+        color: var(--faint);
+        font-size: 0.82rem;
+      }
+
+      .status-line {
+        color: var(--info);
+      }
+
+      .diff-shell {
+        border: 1px solid var(--border-strong);
+        background: #05070a;
+        overflow: auto;
+      }
+
+      #rich-diff {
+        display: none;
+      }
+
+      .rich-diff-ready #rich-diff {
+        display: block;
+      }
+
+      .rich-diff-ready #fallback-diff {
+        display: none;
+      }
+
+      pre {
+        margin: 0;
+        padding: 14px;
+        color: var(--dim);
+        font-family: var(--mono);
+        font-size: 0.76rem;
+        line-height: 1.45;
+        white-space: pre-wrap;
+      }
+
+      @media (max-width: 720px) {
+        main {
+          width: min(100% - 20px, 1120px);
+          padding-top: 20px;
+        }
+
+        header,
+        section {
+          padding: 14px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="kicker">Turn documentation · June 21, 2026</div>
+        <h1>Lightweight charts phase 06: final verification and publishing</h1>
+        <p class="summary">
+          Closed the lightweight-charts implementation stream with the required Beads bootstrap,
+          dependency sync, scoped and broad quality gates, web-only browser QA against the hosted
+          backend, docs and boundary audit, and a residual Beads follow-up for stale chart data under
+          nonmatching ticker filters.
+        </p>
+      </header>
+
+      <section>
+        <h2>Scope</h2>
+        <div class="meta">
+          <div class="chip">Bead islandflow-mloi.6</div>
+          <div class="chip">Branch main</div>
+          <div class="chip">Closeout verification only</div>
+          <div class="chip">No application code changes</div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Verification Gates</h2>
+        <div class="check-grid">
+          <div class="check warning">
+            <strong>Recovered</strong>
+            <code>bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code>
+            <p>
+              First run failed because local <code>node_modules</code> still resolved
+              <code>lightweight-charts@4.2.3</code> while the lockfile requires 5.2.0.
+              <code>bun install --frozen-lockfile</code> installed 4 packages and changed no tracked
+              files.
+            </p>
+          </div>
+          <div class="check">
+            <strong>Passed</strong>
+            <code>bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code>
+            <p>93 pass, 0 fail, 206 expects after dependency sync.</p>
+          </div>
+          <div class="check">
+            <strong>Passed</strong>
+            <code>bun test services/candles/tests</code>
+            <p>5 pass, 0 fail, 27 expects.</p>
+          </div>
+          <div class="check">
+            <strong>Passed</strong>
+            <code>bun test services/api/tests</code>
+            <p>41 pass, 0 fail, 132 expects.</p>
+          </div>
+          <div class="check">
+            <strong>Passed</strong>
+            <code>bun test</code>
+            <p>352 pass, 0 fail, 1900 expects.</p>
+          </div>
+          <div class="check">
+            <strong>Passed</strong>
+            <code>bun --cwd=apps/web run build</code>
+            <p>Next.js 16.2.6 production build compiled, typechecked, and generated static pages.</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Browser QA</h2>
+        <ul>
+          <li>Started only <code>bun run dev:web</code>. The web dev server ran on <code>http://localhost:3000</code> and reported <code>NEXT_PUBLIC_API_URL=https://api.flow.deltaisland.io</code>; no local infra, full stack, or backend services were started.</li>
+          <li>Desktop <code>1440x960</code>: dashboard rendered as the flat Market Command section; chart toolbar, lower pane, decision levels, and adjacent tables were aligned without visible overlap.</li>
+          <li>Desktop settings menu: chart settings dialog measured <code>380x620</code> inside the viewport, with price, lower chart, timeframe, and display sections visible and unsupported controls disabled.</li>
+          <li>Timeframe control: native combobox exposes <code>1m</code>, <code>5m</code>, and <code>15m</code> as enabled options and <code>30m unavailable</code>/<code>1h unavailable</code> as disabled options. The OS-native dropdown surface is not exposed as DOM or captured by the browser screenshot layer.</li>
+          <li>Desktop hover readout: chart-area click activated crosshair snapshots; left and right plot-edge probes produced bounded readouts with OHLC, volume, trades, flow context, and lower-pane rows. The dashboard chart is under the compact tooltip threshold, so the readout uses the bounded full-width treatment.</li>
+          <li>Mobile <code>390x844</code>: top controls stacked cleanly; chart controls wrapped into stable rows; chart section measured <code>374px</code> wide; settings dialog measured <code>370x560</code> and stayed inside the viewport.</li>
+          <li>Mobile hover readout: left and right probes produced a <code>358px</code> wide tooltip inside the viewport with no clipping.</li>
+          <li>Empty/loading/error state pass: a practical nonmatching ticker probe found a stale-data defect instead of the expected empty/loading state. Error state was not forced because doing so would require breaking backend/API configuration during closeout.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Docs And Boundary Audit</h2>
+        <ul>
+          <li><code>docs/implementation/lightweight-charts/IMPLEMENT.md</code> and Phase 06 still describe the delivered serial closeout scope and module boundary.</li>
+          <li>Phase 01 through Phase 05 Beads issues are closed; Phase 06 was the only active lightweight-charts child issue during this pass.</li>
+          <li><code>apps/web/features/market-chart</code> has no imports from <code>features/terminal</code>, no <code>TerminalState</code>, and no route, drawer, or transport coupling.</li>
+          <li>Terminal-specific candle fetching, live/replay state, option flow mapping, smart-flow copy, legacy smart-money compatibility, and marker callbacks remain in <code>apps/web/features/terminal/chart-adapter.tsx</code>.</li>
+          <li>The only current <code>MarketChartSection</code> embedding is the Market Command dashboard path; no alternate full-width chart route exists to verify in this phase.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Follow-Up Filed</h2>
+        <ul>
+          <li><code>islandflow-iwzv</code>: entering a nonmatching ticker such as <code>ZZZZZZ</code> relabels the chart and hover readout while retaining prior SPY candle values instead of clearing stale data and showing empty/loading state.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p class="note">
+          No application source changed in this phase. The patch below captures the closeout-only
+          repository delta: Beads tracking plus this turn document. The page attempts to render the
+          patch with browser-side <code>@pierre/diffs/react</code> <code>PatchDiff</code>; the
+          readable unified fallback remains visible if the rich renderer is unavailable.
+        </p>
+        <div class="diff-shell">
+          <div id="rich-diff"></div>
+          <pre id="fallback-diff"><code>diff --git a/.beads/issues.jsonl b/.beads/issues.jsonl
+--- a/.beads/issues.jsonl
++++ b/.beads/issues.jsonl
+@@
++islandflow-mloi.6 claimed and closed after final verification gates, browser QA, docs audit, and publishing.
++islandflow-iwzv created as a residual bug for stale chart data when a ticker filter has no candles.
+
+diff --git a/docs/turns/2026-06-21-lightweight-charts-phase-06-final-verification.html b/docs/turns/2026-06-21-lightweight-charts-phase-06-final-verification.html
+new file mode 100644
+--- /dev/null
++++ b/docs/turns/2026-06-21-lightweight-charts-phase-06-final-verification.html
+@@
++&lt;h1&gt;Lightweight charts phase 06: final verification and publishing&lt;/h1&gt;
++&lt;p&gt;Recorded tests, build, browser QA, docs/boundary audit, and residual Beads follow-up.&lt;/p&gt;
++&lt;li&gt;No application source changed in this phase.&lt;/li&gt;</code></pre>
+        </div>
+      </section>
+    </main>
+
+    <script type="text/plain" id="patch-source">diff --git a/.beads/issues.jsonl b/.beads/issues.jsonl
+--- a/.beads/issues.jsonl
++++ b/.beads/issues.jsonl
+@@
++islandflow-mloi.6 claimed and closed after final verification gates, browser QA, docs audit, and publishing.
++islandflow-iwzv created as a residual bug for stale chart data when a ticker filter has no candles.
+
+diff --git a/docs/turns/2026-06-21-lightweight-charts-phase-06-final-verification.html b/docs/turns/2026-06-21-lightweight-charts-phase-06-final-verification.html
+new file mode 100644
+--- /dev/null
++++ b/docs/turns/2026-06-21-lightweight-charts-phase-06-final-verification.html
+@@
++&lt;h1&gt;Lightweight charts phase 06: final verification and publishing&lt;/h1&gt;
++&lt;p&gt;Recorded tests, build, browser QA, docs/boundary audit, and residual Beads follow-up.&lt;/p&gt;
++&lt;li&gt;No application source changed in this phase.&lt;/li&gt;</script>
+    <script type="module">
+      const source = document.getElementById("patch-source")?.textContent ?? "";
+      const target = document.getElementById("rich-diff");
+      try {
+        const React = await import("react");
+        const { createRoot } = await import("react-dom/client");
+        const { PatchDiff } = await import("@pierre/diffs/react");
+        createRoot(target).render(React.createElement(PatchDiff, { patch: source }));
+        document.documentElement.classList.add("rich-diff-ready");
+      } catch (error) {
+        target.textContent = "Rich diff renderer unavailable in this static context; showing unified fallback.";
+      }
+    </script>
+  </body>
+</html>
