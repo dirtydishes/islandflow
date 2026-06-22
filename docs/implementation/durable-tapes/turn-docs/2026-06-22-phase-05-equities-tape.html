@@ -232,8 +232,11 @@
         <ul>
           <li><span class="status-ok">pass</span> <code>bun test apps/web/features/equities-tape/equities-tape.test.ts</code>: 6 tests passed.</li>
           <li><span class="status-ok">pass</span> <code>bunx biome check apps/web/features/equities-tape apps/web/app/globals.css</code>.</li>
+          <li><span class="status-ok">pass</span> Reviewer focused gate after sparse-filter repair: <code>bun test apps/web/features/equities-tape/equities-tape.test.ts apps/web/features/durable-tape/history.test.ts apps/web/features/durable-tape/templates.test.ts apps/web/features/durable-tape/virtual.test.ts</code>: 24 tests passed.</li>
+          <li><span class="status-ok">pass</span> Reviewer Biome gate after sparse-filter repair: <code>bunx biome check apps/web/features/equities-tape apps/web/features/durable-tape/components/DurableTape.tsx apps/web/features/durable-tape/virtual.ts apps/web/app/globals.css</code>.</li>
           <li><span class="status-ok">pass</span> <code>bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code>: 94 tests passed.</li>
           <li><span class="status-ok">pass</span> <code>bun --cwd=apps/web run build</code>.</li>
+          <li><span class="status-ok">pass</span> Reviewer broad gates: <code>bun run fmt:check</code>, <code>bun run lint</code>, <code>bun run typecheck</code>, <code>bun test</code>, <code>bun run check:public-api-routes</code>, and <code>bun run check:docker-workspace</code>.</li>
           <li><span class="status-ok">pass</span> Browser QA with <code>bun run dev:web</code> against hosted API default: desktop 1280x720 and mobile 390x844 rendered route-sized, dashboard-sized, and narrow parent tapes with rows, off-exchange badges, responsive templates, and no page or tape horizontal scrolling.</li>
         </ul>
       </section>
@@ -254,6 +257,24 @@
           <li>Check the domain template matrix against the no-horizontal-scroll rule, especially the compact off-exchange badge inside the ticker or venue cell.</li>
           <li>Check whether disabling the settings trigger by default for equities is the right domain default, given the shared text trigger clips in narrow headers.</li>
         </ul>
+      </section>
+
+      <section>
+        <h2>Reviewer Repair</h2>
+        <p>
+          Review found one sparse-history pagination bug in the client-side venue and
+          off-exchange filter path. When a bounded scan crossed only non-matching server pages,
+          the source could return an empty item page while still holding a server cursor. The
+          shared tape then had no row-count change to trigger another history request, or could
+          mark the filtered stream exhausted too early.
+        </p>
+        <p>
+          The repair keeps the durable-tape public contract unchanged. <code>DurableTape</code>
+          now remembers the returned <code>nextCursor</code> for the current query and includes
+          cursor advancement in the history-gate signal. The equities source now reports
+          exhaustion only when there is no next cursor. A regression test covers the sparse
+          filtered cap case.
+        </p>
       </section>
 
       <section>
@@ -327,7 +348,7 @@ new file mode 100644
 +    }
 +    nextCursor = payload.next_before;
 +  }
-+  return { items: [], nextCursor, exhausted: true };
++  return { items: [], nextCursor, exhausted: !nextCursor };
 +};
 +
 +export const createEquitiesTapeSource = (options = {}) =&gt; ({
@@ -401,6 +422,57 @@ new file mode 100644
 +  });
 +  expect(page.items.map((print) =&gt; print.trace_id)).toEqual(["match"]);
 +});
+
+diff --git a/apps/web/features/durable-tape/components/DurableTape.tsx b/apps/web/features/durable-tape/components/DurableTape.tsx
+--- a/apps/web/features/durable-tape/components/DurableTape.tsx
++++ b/apps/web/features/durable-tape/components/DurableTape.tsx
+@@
++  const [historyCursor, setHistoryCursor] = useState&lt;DurableTapeCursor | undefined&gt;(undefined);
+@@
+-    const cursor = selectOlderHistoryCursor(items, getCursor);
++    const cursor = historyCursor ?? selectOlderHistoryCursor(items, getCursor);
+@@
++      setHistoryCursor(page.nextCursor ?? undefined);
+@@
++  const historyLoadSignal = historyCursor ? `${historyCursor.ts}:${historyCursor.seq}` : undefined;
+   useDurableVirtualHistoryGate(
+@@
+-    () =&gt; void loadOlder()
++    () =&gt; void loadOlder(),
++    historyLoadSignal
+   );
+
+diff --git a/apps/web/features/durable-tape/virtual.ts b/apps/web/features/durable-tape/virtual.ts
+--- a/apps/web/features/durable-tape/virtual.ts
++++ b/apps/web/features/durable-tape/virtual.ts
+@@
+ export const useDurableVirtualHistoryGate = (
+   enabled: boolean,
+   itemCount: number,
+   lastVirtualIndex: number,
+-  onLoadOlder: () =&gt; void
++  onLoadOlder: () =&gt; void,
++  loadSignal?: string
+ ): void =&gt; {
+@@
+-  }, [enabled, itemCount, lastVirtualIndex]);
++  }, [enabled, itemCount, lastVirtualIndex, loadSignal]);
+ };
+
+diff --git a/apps/web/features/equities-tape/equities-tape.test.ts b/apps/web/features/equities-tape/equities-tape.test.ts
+--- a/apps/web/features/equities-tape/equities-tape.test.ts
++++ b/apps/web/features/equities-tape/equities-tape.test.ts
+@@
++it("keeps sparse filtered history open when the scan cap leaves a cursor", async () =&gt; {
++  const page = await loadEquitiesTapeHistoryPage({
++    cursor: { ts: 1_000, seq: 1 },
++    filters: { venues: ["TRF"], offExchange: true },
++    options: { apiBaseUrl: "https://api.example.test", fetcher, maxFilteredHistoryPages: 1 }
++  });
++  expect(page.items).toEqual([]);
++  expect(page.nextCursor).toEqual({ ts: 900, seq: 2 });
++  expect(page.exhausted).toBe(false);
++});
 </code></pre>
         </div>
       </section>
@@ -458,6 +530,49 @@ diff --git a/apps/web/app/globals.css b/apps/web/app/globals.css
 +  background: var(--blue-soft);
 +  color: oklch(0.82 0.09 247);
 +}
+
+diff --git a/apps/web/features/durable-tape/components/DurableTape.tsx b/apps/web/features/durable-tape/components/DurableTape.tsx
+--- a/apps/web/features/durable-tape/components/DurableTape.tsx
++++ b/apps/web/features/durable-tape/components/DurableTape.tsx
+@@
++  const [historyCursor, setHistoryCursor] = useState<DurableTapeCursor | undefined>(undefined);
+@@
+-    const cursor = selectOlderHistoryCursor(items, getCursor);
++    const cursor = historyCursor ?? selectOlderHistoryCursor(items, getCursor);
+@@
++      setHistoryCursor(page.nextCursor ?? undefined);
+@@
++  const historyLoadSignal = historyCursor ? `${historyCursor.ts}:${historyCursor.seq}` : undefined;
+   useDurableVirtualHistoryGate(
+@@
+-    () => void loadOlder()
++    () => void loadOlder(),
++    historyLoadSignal
+   );
+
+diff --git a/apps/web/features/durable-tape/virtual.ts b/apps/web/features/durable-tape/virtual.ts
+--- a/apps/web/features/durable-tape/virtual.ts
++++ b/apps/web/features/durable-tape/virtual.ts
+@@
+ export const useDurableVirtualHistoryGate = (
+   enabled: boolean,
+   itemCount: number,
+   lastVirtualIndex: number,
+-  onLoadOlder: () => void
++  onLoadOlder: () => void,
++  loadSignal?: string
+ ): void => {
+@@
+-  }, [enabled, itemCount, lastVirtualIndex]);
++  }, [enabled, itemCount, lastVirtualIndex, loadSignal]);
+ };
+
+diff --git a/apps/web/features/equities-tape/source.ts b/apps/web/features/equities-tape/source.ts
+--- a/apps/web/features/equities-tape/source.ts
++++ b/apps/web/features/equities-tape/source.ts
+@@
+-  return { items: [], nextCursor, exhausted: true };
++  return { items: [], nextCursor, exhausted: !nextCursor };
 </script>
     <script type="module">
       const source = document.getElementById("patch-source")?.textContent ?? "";

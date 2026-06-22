@@ -118,6 +118,32 @@ describe("equities tape helpers", () => {
     expect(page.exhausted).toBe(true);
   });
 
+  it("keeps sparse filtered history open when the scan cap leaves a cursor", async () => {
+    const fetcher = async () =>
+      new Response(
+        JSON.stringify({
+          data: [makePrint({ trace_id: "miss", exchange: "ARCA" })],
+          next_before: { ts: 900, seq: 2 }
+        }),
+        { status: 200 }
+      );
+
+    const page = await loadEquitiesTapeHistoryPage({
+      cursor: { ts: 1_000, seq: 1 },
+      filters: { venues: ["TRF"], offExchange: true },
+      options: {
+        apiBaseUrl: "https://api.example.test",
+        fetcher,
+        historyPageSize: 1,
+        maxFilteredHistoryPages: 1
+      }
+    });
+
+    expect(page.items).toEqual([]);
+    expect(page.nextCursor).toEqual({ ts: 900, seq: 2 });
+    expect(page.exhausted).toBe(false);
+  });
+
   it("maps durable row focus to print inspect callback payload", () => {
     const print = makePrint();
 

@@ -118,7 +118,7 @@ export const loadEquitiesTapeHistoryPage = async ({
   return {
     items: [],
     nextCursor,
-    exhausted: true
+    exhausted: !nextCursor
   };
 };
 

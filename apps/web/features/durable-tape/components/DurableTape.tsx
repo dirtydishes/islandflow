@@ -20,6 +20,7 @@ import {
 import { selectDurableTapeTemplate } from "../templates";
 import type {
   DurableTapeColumnDefinition,
+  DurableTapeCursor,
   DurableTapeProps,
   DurableTapeScrollHoldState,
   DurableTapeTemplate
@@ -89,6 +90,7 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
   const [historyItems, setHistoryItems] = useState<TItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyExhausted, setHistoryExhausted] = useState(false);
+  const [historyCursor, setHistoryCursor] = useState<DurableTapeCursor | undefined>(undefined);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [hovered, setHovered] = useState<{
     item: TItem;
@@ -141,6 +143,7 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
     setHistoryItems([]);
     setHistoryLoading(false);
     setHistoryExhausted(false);
+    setHistoryCursor(undefined);
     setHovered(null);
     setScrollHold(createEmptyDurableTapeScrollHold<TItem>());
     wasAtTopRef.current = true;
@@ -193,7 +196,7 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
       return;
     }
 
-    const cursor = selectOlderHistoryCursor(items, getCursor);
+    const cursor = historyCursor ?? selectOlderHistoryCursor(items, getCursor);
     if (!cursor) {
       return;
     }
@@ -204,12 +207,14 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
       setHistoryItems((current) =>
         appendHistoryTail(current, page.items, scrollHold.visible, 0, itemAccessors)
       );
+      setHistoryCursor(page.nextCursor ?? undefined);
       setHistoryExhausted(page.exhausted === true || page.nextCursor === null);
     } finally {
       setHistoryLoading(false);
     }
   }, [
     getCursor,
+    historyCursor,
     historyExhausted,
     historyLoading,
     itemAccessors,
@@ -220,11 +225,14 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
     source
   ]);
 
+  const historyLoadSignal = historyCursor ? `${historyCursor.ts}:${historyCursor.seq}` : undefined;
+
   useDurableVirtualHistoryGate(
     resolvedFeatures.clickhouseHistory,
     items.length,
     virtual.virtualItems.at(-1)?.index ?? -1,
-    () => void loadOlder()
+    () => void loadOlder(),
+    historyLoadSignal
   );
 
   const flushToLiveHead = useCallback(() => {
