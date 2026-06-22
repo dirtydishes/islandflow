@@ -404,6 +404,7 @@
       <nav class="toc" aria-label="Plan sections">
         <a href="#rules">Rules</a>
         <a href="#modules">Modules</a>
+        <a href="#orchestrator">Orchestrator</a>
         <a href="#phases">Phases</a>
         <a href="#parallel">Parallel Work</a>
         <a href="#reviewers">Reviewers</a>
@@ -473,6 +474,31 @@
           <div>
             <strong>features/alerts</strong>
             <p>Alert list, alert detail, evidence hydration, and links to options, flow, and equities modules.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="orchestrator">
+        <div class="section-head">
+          <h2>Orchestrator Loop</h2>
+          <span class="chip">Selector subagent, worker thread, callback</span>
+        </div>
+        <div class="summary-grid">
+          <div>
+            <strong>Find work from Beads</strong>
+            <p>The orchestrator reads <code>IMPLEMENT.md</code>, then asks a narrow subagent to run <code>bd ready</code>, inspect the durable-tapes issue, and report the next phase.</p>
+          </div>
+          <div>
+            <strong>Create a worker thread</strong>
+            <p>The orchestrator starts a worker thread with the full phase doc, Beads issue, gates, branch posture, and the orchestrator thread ID.</p>
+          </div>
+          <div>
+            <strong>Require one callback</strong>
+            <p>The worker messages the orchestrator thread only when complete or genuinely blocked, with changed files, tests, Beads updates, push or PR state, and follow-up issues.</p>
+          </div>
+          <div>
+            <strong>Review separately</strong>
+            <p>Implementation phases get a separate ambitious reviewer thread after the worker completes or opens the assigned PR.</p>
           </div>
         </div>
       </section>
