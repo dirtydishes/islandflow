@@ -148,6 +148,7 @@ export type DurableTapeProps<TItem, TScope = unknown, TFilters = unknown> = {
   renderRow: DurableTapeRowRenderer<TItem>;
   renderHover?: DurableTapeHoverRenderer<TItem>;
   onFocus?: (event: DurableTapeFocusEvent<TItem>) => void;
+  onActivate?: (event: DurableTapeFocusEvent<TItem>) => void;
   rowHeight?: number;
   overscan?: number;
 };

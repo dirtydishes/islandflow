@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 
+import { NewsWire } from "../features/news-wire";
 import { TerminalMarketChartSection } from "../features/terminal/chart-adapter";
 import {
   CommandDecisionLevels,
@@ -14,7 +15,6 @@ import {
   HomeReplayRail
 } from "../features/terminal/components/charts";
 import { renderTerminalDrawers } from "../features/terminal/components/drawers";
-import { NewsControlRails, NewsPane } from "../features/terminal/components/news";
 import { FlowPane, OpraIntakeRail, OptionsPane } from "../features/terminal/components/opra";
 import { FlowFilterPopover, PageFrame } from "../features/terminal/components/primitives";
 import { TerminalAppShell as TerminalFeatureAppShell } from "../features/terminal/shell";
@@ -151,8 +151,15 @@ export function NewsRoute() {
   return (
     <PageFrame title="Newswire" eyebrow="News" variant="news">
       <div className="wire-control-shell">
-        <NewsControlRails state={state} />
-        <NewsPane state={state} className="news-pane-full" />
+        <NewsWire
+          className="news-pane-full"
+          lastUpdate={state.liveSession.lastUpdate}
+          liveEnabled={state.mode === "live"}
+          scopeSymbols={state.activeTickers}
+          showControlRails
+          status={state.liveSession.status}
+          stories={state.liveSession.news}
+        />
       </div>
     </PageFrame>
   );

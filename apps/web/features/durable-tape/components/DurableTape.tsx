@@ -78,6 +78,7 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
   renderRow,
   renderHover,
   onFocus,
+  onActivate,
   rowHeight = DEFAULT_ROW_HEIGHT,
   overscan = DEFAULT_OVERSCAN
 }: DurableTapeProps<TItem, TScope, TFilters>) => {
@@ -228,7 +229,9 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
   const historyLoadSignal = historyCursor ? `${historyCursor.ts}:${historyCursor.seq}` : undefined;
 
   useDurableVirtualHistoryGate(
-    resolvedFeatures.clickhouseHistory,
+    resolvedFeatures.clickhouseHistory &&
+      virtual.virtualItems.length > 0 &&
+      virtual.virtualItems.length < items.length,
     items.length,
     virtual.virtualItems.at(-1)?.index ?? -1,
     () => void loadOlder(),
@@ -273,7 +276,8 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
     .join(" ");
   const rowStyle = { "--durable-tape-grid": gridTemplateColumns } as CSSProperties;
   const tapeLabel = ariaLabel ?? title ?? "Durable tape";
-  const canInspectRows = resolvedFeatures.keyboardInspect || Boolean(onFocus);
+  const canInspectRows =
+    resolvedFeatures.keyboardInspect || Boolean(onFocus) || Boolean(onActivate);
   const canShowHover = resolvedFeatures.hoverDetails && Boolean(renderHover);
 
   const showHoverDetail = useCallback(
@@ -288,6 +292,13 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
   const clearHoverDetail = useCallback((rowKey: string) => {
     setHovered((current) => (current?.rowKey === rowKey ? null : current));
   }, []);
+
+  const activateRow = useCallback(
+    (item: TItem, rowKey: string, index: number) => {
+      onActivate?.({ item, rowKey, index });
+    },
+    [onActivate]
+  );
 
   return (
     <section
@@ -357,6 +368,14 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
                   showHoverDetail(item, key, index);
                 }}
                 onBlur={() => clearHoverDetail(key)}
+                onClick={() => activateRow(item, key, index)}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter" && event.key !== " ") {
+                    return;
+                  }
+                  event.preventDefault();
+                  activateRow(item, key, index);
+                }}
                 onMouseEnter={() => showHoverDetail(item, key, index)}
                 onMouseLeave={() => clearHoverDetail(key)}
                 onPointerDown={() => showHoverDetail(item, key, index)}
