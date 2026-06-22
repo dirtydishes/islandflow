@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Phase 04 News Wire Turn Document</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "@pierre/diffs/react": "../../../../node_modules/@pierre/diffs/dist/react/index.js",
+          "react": "../../../../node_modules/react/index.js",
+          "react/jsx-runtime": "../../../../node_modules/react/jsx-runtime.js",
+          "react-dom/client": "../../../../node_modules/react-dom/client.js"
+        }
+      }
+    </script>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #0d141b;
+        --panel-2: #111820;
+        --line: #ffffff14;
+        --line-strong: #ffb13059;
+        --text: #e6edf4;
+        --dim: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --green: #25c17a;
+        --blue: #4da3ff;
+        --red: #ff6b5f;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          IBM Plex Sans,
+          Inter,
+          system-ui,
+          sans-serif;
+        line-height: 1.45;
+      }
+
+      main {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 28px 0 40px;
+      }
+
+      header {
+        display: grid;
+        gap: 8px;
+        padding: 18px 0 20px;
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 1.55rem;
+        line-height: 1.15;
+      }
+
+      h2 {
+        margin-top: 24px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--line);
+        color: var(--text);
+        font-size: 1rem;
+      }
+
+      h3 {
+        color: var(--text);
+        font-size: 0.86rem;
+      }
+
+      .meta,
+      .label,
+      th,
+      code {
+        font-family:
+          IBM Plex Mono,
+          ui-monospace,
+          SFMono-Regular,
+          monospace;
+      }
+
+      .meta {
+        color: var(--dim);
+        font-size: 0.78rem;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: 14px;
+      }
+
+      .cell {
+        min-width: 0;
+        border-top: 1px solid var(--line-strong);
+        border-bottom: 1px solid var(--line);
+        padding: 10px 12px;
+        background: var(--panel);
+      }
+
+      .cell .label {
+        display: block;
+        color: var(--faint);
+        font-size: 0.66rem;
+        text-transform: uppercase;
+      }
+
+      .cell strong {
+        display: block;
+        margin-top: 4px;
+        font-size: 0.86rem;
+      }
+
+      .section {
+        display: grid;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+
+      li + li {
+        margin-top: 6px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 12px;
+        background: var(--panel);
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 8px 10px;
+        text-align: left;
+        vertical-align: top;
+        font-size: 0.82rem;
+      }
+
+      th {
+        color: var(--faint);
+        font-size: 0.66rem;
+        text-transform: uppercase;
+      }
+
+      .pass {
+        color: var(--green);
+      }
+
+      .note {
+        color: var(--dim);
+      }
+
+      .warn {
+        color: var(--accent);
+      }
+
+      .diff-shell {
+        margin-top: 14px;
+        border: 1px solid var(--line);
+        background: var(--panel-2);
+      }
+
+      .diff-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .diff-head span {
+        color: var(--faint);
+        font-size: 0.72rem;
+      }
+
+      #diff-rich {
+        display: none;
+        overflow: auto;
+      }
+
+      #diff-rich.is-ready {
+        display: block;
+      }
+
+      #diff-fallback {
+        max-height: 640px;
+        margin: 0;
+        overflow: auto;
+        padding: 12px;
+        color: var(--text);
+        background: #070b10;
+        font-size: 0.72rem;
+        line-height: 1.45;
+      }
+
+      @media (max-width: 760px) {
+        main {
+          width: min(100vw - 20px, 720px);
+          padding-top: 18px;
+        }
+
+        .grid {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="meta">Islandflow durable tapes | islandflow-h9c0.8 | 2026-06-22</p>
+        <h1>Phase 04: News Wire Module</h1>
+        <p class="meta">Branch: lavender/durable-tape-phase-04-news-wire</p>
+      </header>
+
+      <section class="grid" aria-label="Implementation summary">
+        <div class="cell">
+          <span class="label">Module</span>
+          <strong>apps/web/features/news-wire</strong>
+        </div>
+        <div class="cell">
+          <span class="label">Route</span>
+          <strong>/news through NewsWire</strong>
+        </div>
+        <div class="cell">
+          <span class="label">Shared API</span>
+          <strong>durable-tape unchanged</strong>
+        </div>
+      </section>
+
+      <h2>What Changed</h2>
+      <section class="section">
+        <ul>
+          <li>Added a reusable <code>NewsWire</code> module with source and symbol filters, mapped/unmapped and updated-only controls, hover metadata, module-owned story detail, responsive templates, and live-first history loading.</li>
+          <li>Replaced the dedicated <code>/news</code> composition with <code>NewsWire</code> while keeping terminal route state as a thin adapter for live stories, status, active ticker scope, and mode.</li>
+          <li>Moved default visible columns to the Phase 04 matrix: full <code>TIME | SOURCE | SYMBOLS | HEADLINE</code>, two-thirds <code>TIME | SYMBOLS | HEADLINE</code>, and one-third <code>TIME | HEADLINE</code>. Summary, provider metadata, updated state, raw mapped symbols, content HTML, and source link now live in hover/detail by default.</li>
+          <li>Kept the existing terminal news helpers compatible by re-exporting the reusable module helpers from <code>features/terminal/components/news.tsx</code>.</li>
+          <li>Filed follow-up <code>islandflow-6t32</code> for local alternate-port QA against the hosted API, because <code>api.flow.deltaisland.io</code> currently emits CORS for <code>http://localhost:3000</code> but not the fallback port used during this session.</li>
+        </ul>
+      </section>
+
+      <h2>Validation</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Gate</th>
+            <th>Result</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>bun test apps/web/features/news-wire/news-wire.test.ts apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code></td>
+            <td class="pass">pass</td>
+            <td>99 tests, 226 expectations. Includes required terminal and route tests plus news-wire helper coverage.</td>
+          </tr>
+          <tr>
+            <td><code>bun --cwd=apps/web run build</code></td>
+            <td class="pass">pass</td>
+            <td>Next production build and TypeScript validation completed.</td>
+          </tr>
+          <tr>
+            <td><code>git diff --check</code></td>
+            <td class="pass">pass</td>
+            <td>No whitespace errors.</td>
+          </tr>
+          <tr>
+            <td>Desktop browser QA</td>
+            <td class="pass">pass</td>
+            <td>1280x800 on <code>/news</code>: full template, 96 virtual rows, no page/tape/control horizontal overflow, no old <code>.data-table-news</code>, no console errors.</td>
+          </tr>
+          <tr>
+            <td>Mobile browser QA</td>
+            <td class="pass">pass</td>
+            <td>390x844 on <code>/news</code>: one-third template, 96 virtual rows, no horizontal overflow, module-owned detail opened inside viewport, no console errors.</td>
+          </tr>
+          <tr>
+            <td>History scroll gate smoke</td>
+            <td class="warn">partial</td>
+            <td>The bottom-scroll gate fired and surfaced a history warning. The fetch was blocked by hosted API CORS because the branch had to run on port 3001 while another worktree owned port 3000. Direct curl confirmed <code>/history/news</code> is healthy and CORS allows <code>http://localhost:3000</code>.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Relevant Diff Snippets</h2>
+      <div class="diff-shell">
+        <div class="diff-head">
+          <h3>Rich renderer: browser-side @pierre/diffs PatchDiff</h3>
+          <span>The plain HTML fallback remains visible unless PatchDiff renders successfully.</span>
+        </div>
+        <div id="diff-rich" aria-label="Rich diff view"></div>
+        <pre id="diff-fallback" aria-label="Plain unified diff fallback">diff --git a/apps/web/features/news-wire/templates.ts b/apps/web/features/news-wire/templates.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/news-wire/templates.ts
+@@
++export type NewsWireColumnId = "time" | "source" | "symbols" | "headline";
++
++export const NEWS_WIRE_COLUMNS = [
++  { id: "time", label: "Time", minWidth: 84, className: "news-wire-time-cell" },
++  { id: "source", label: "Source", minWidth: 100, className: "news-wire-source-cell" },
++  { id: "symbols", label: "Symbols", minWidth: 124, className: "news-wire-symbols-cell" },
++  { id: "headline", label: "Headline", minWidth: 260, className: "news-wire-headline-cell" }
++];
++
++export const NEWS_WIRE_TEMPLATES = [
++  { id: "full", columns: ["time", "source", "symbols", "headline"] },
++  { id: "twoThirds", columns: ["time", "symbols", "headline"] },
++  { id: "oneThird", columns: ["time", "headline"] },
++  { id: "micro", columns: ["headline"] }
++];
+
+diff --git a/apps/web/features/news-wire/history.ts b/apps/web/features/news-wire/history.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/news-wire/history.ts
+@@
++export const NEWS_WIRE_HISTORY_ENDPOINT = "/history/news";
++export const NEWS_WIRE_HISTORY_BATCH = 200;
++
++export const buildNewsWireHistoryUrl = ({
++  cursor,
++  limit = NEWS_WIRE_HISTORY_BATCH,
++  buildApiUrl = buildNewsWireApiUrl
++}: {
++  cursor: DurableTapeCursor;
++  limit?: number;
++  buildApiUrl?: NewsWireApiUrlBuilder;
++}): string =&gt; {
++  const url = new URL(buildApiUrl(NEWS_WIRE_HISTORY_ENDPOINT));
++  url.search = new URLSearchParams({
++    before_ts: String(cursor.ts),
++    before_seq: String(cursor.seq),
++    limit: String(limit)
++  }).toString();
++  return url.toString();
++};
+
+diff --git a/apps/web/features/news-wire/NewsWire.tsx b/apps/web/features/news-wire/NewsWire.tsx
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/news-wire/NewsWire.tsx
+@@
++export type NewsWireProps = {
++  stories: readonly NewsStory[];
++  title?: string;
++  className?: string;
++  mode?: NewsWireMode;
++  status?: NewsWireConnectionStatus;
++  lastUpdate?: number | null;
++  scopeSymbols?: readonly string[];
++  showControlRails?: boolean;
++  template?: DurableTapeTemplateId | "auto";
++  historyEnabled?: boolean;
++  fetcher?: NewsWireHistoryFetcher;
++  buildApiUrl?: NewsWireApiUrlBuilder;
++  onStorySelect?: (story: NewsStory) =&gt; void;
++};
+@@
++          &lt;DurableTape
++            ariaLabel="News wire"
++            className="news-wire-tape"
++            columns={NEWS_WIRE_COLUMNS}
++            features={[
++              "default",
++              { key: "settingsGear", enabled: false },
++              { key: "template", value: template }
++            ]}
++            filters={filterKey}
++            getCursor={getNewsStoryCursor}
++            getRowKey={getNewsStoryKey}
++            onFocus={({ item }) =&gt; selectStory(item)}
++            renderHover={({ item }) =&gt; &lt;NewsWireHover story={item} /&gt;}
++            renderRow={renderRow}
++            rowHeight={52}
++            overscan={28}
++            source={source}
++            template={template}
++            templates={NEWS_WIRE_TEMPLATES}
++            title={title}
++          /&gt;
+
+diff --git a/apps/web/app/terminal.tsx b/apps/web/app/terminal.tsx
+--- a/apps/web/app/terminal.tsx
++++ b/apps/web/app/terminal.tsx
+@@
++import { NewsWire } from "../features/news-wire";
+@@
+ export function NewsRoute() {
+   const state = useTerminal();
+   return (
+     &lt;PageFrame title="Newswire" eyebrow="News" variant="news"&gt;
+       &lt;div className="wire-control-shell"&gt;
+-        &lt;NewsControlRails state={state} /&gt;
+-        &lt;NewsPane state={state} className="news-pane-full" /&gt;
++        &lt;NewsWire
++          className="news-pane-full"
++          lastUpdate={state.liveSession.lastUpdate}
++          mode={state.mode}
++          scopeSymbols={state.activeTickers}
++          showControlRails
++          status={state.liveSession.status}
++          stories={state.liveSession.news}
++        /&gt;
+       &lt;/div&gt;
+     &lt;/PageFrame&gt;
+   );
+ }</pre>
+      </div>
+
+      <script type="text/plain" id="phase-diff">diff --git a/apps/web/features/news-wire/templates.ts b/apps/web/features/news-wire/templates.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/news-wire/templates.ts
+@@
++export type NewsWireColumnId = "time" | "source" | "symbols" | "headline";
++
++export const NEWS_WIRE_COLUMNS = [
++  { id: "time", label: "Time", minWidth: 84, className: "news-wire-time-cell" },
++  { id: "source", label: "Source", minWidth: 100, className: "news-wire-source-cell" },
++  { id: "symbols", label: "Symbols", minWidth: 124, className: "news-wire-symbols-cell" },
++  { id: "headline", label: "Headline", minWidth: 260, className: "news-wire-headline-cell" }
++];
++
++export const NEWS_WIRE_TEMPLATES = [
++  { id: "full", columns: ["time", "source", "symbols", "headline"] },
++  { id: "twoThirds", columns: ["time", "symbols", "headline"] },
++  { id: "oneThird", columns: ["time", "headline"] },
++  { id: "micro", columns: ["headline"] }
++];
+
+diff --git a/apps/web/features/news-wire/history.ts b/apps/web/features/news-wire/history.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/news-wire/history.ts
+@@
++export const NEWS_WIRE_HISTORY_ENDPOINT = "/history/news";
++export const NEWS_WIRE_HISTORY_BATCH = 200;
++
++export const buildNewsWireHistoryUrl = ({
++  cursor,
++  limit = NEWS_WIRE_HISTORY_BATCH,
++  buildApiUrl = buildNewsWireApiUrl
++}: {
++  cursor: DurableTapeCursor;
++  limit?: number;
++  buildApiUrl?: NewsWireApiUrlBuilder;
++}): string => {
++  const url = new URL(buildApiUrl(NEWS_WIRE_HISTORY_ENDPOINT));
++  url.search = new URLSearchParams({
++    before_ts: String(cursor.ts),
++    before_seq: String(cursor.seq),
++    limit: String(limit)
++  }).toString();
++  return url.toString();
++};
+
+diff --git a/apps/web/features/news-wire/NewsWire.tsx b/apps/web/features/news-wire/NewsWire.tsx
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/news-wire/NewsWire.tsx
+@@
++export type NewsWireProps = {
++  stories: readonly NewsStory[];
++  title?: string;
++  className?: string;
++  mode?: NewsWireMode;
++  status?: NewsWireConnectionStatus;
++  lastUpdate?: number | null;
++  scopeSymbols?: readonly string[];
++  showControlRails?: boolean;
++  template?: DurableTapeTemplateId | "auto";
++  historyEnabled?: boolean;
++  fetcher?: NewsWireHistoryFetcher;
++  buildApiUrl?: NewsWireApiUrlBuilder;
++  onStorySelect?: (story: NewsStory) => void;
++};
+@@
++          <DurableTape
++            ariaLabel="News wire"
++            className="news-wire-tape"
++            columns={NEWS_WIRE_COLUMNS}
++            features={[
++              "default",
++              { key: "settingsGear", enabled: false },
++              { key: "template", value: template }
++            ]}
++            filters={filterKey}
++            getCursor={getNewsStoryCursor}
++            getRowKey={getNewsStoryKey}
++            onFocus={({ item }) => selectStory(item)}
++            renderHover={({ item }) => <NewsWireHover story={item} />}
++            renderRow={renderRow}
++            rowHeight={52}
++            overscan={28}
++            source={source}
++            template={template}
++            templates={NEWS_WIRE_TEMPLATES}
++            title={title}
++          />
+
+diff --git a/apps/web/app/terminal.tsx b/apps/web/app/terminal.tsx
+--- a/apps/web/app/terminal.tsx
++++ b/apps/web/app/terminal.tsx
+@@
++import { NewsWire } from "../features/news-wire";
+@@
+ export function NewsRoute() {
+   const state = useTerminal();
+   return (
+     <PageFrame title="Newswire" eyebrow="News" variant="news">
+       <div className="wire-control-shell">
+-        <NewsControlRails state={state} />
+-        <NewsPane state={state} className="news-pane-full" />
++        <NewsWire
++          className="news-pane-full"
++          lastUpdate={state.liveSession.lastUpdate}
++          mode={state.mode}
++          scopeSymbols={state.activeTickers}
++          showControlRails
++          status={state.liveSession.status}
++          stories={state.liveSession.news}
++        />
+       </div>
+     </PageFrame>
+   );
+ }</script>
+      <script type="module">
+        import React from "react";
+        import { createRoot } from "react-dom/client";
+        import { PatchDiff } from "@pierre/diffs/react";
+
+        const patch = document.getElementById("phase-diff")?.textContent ?? "";
+        const mount = document.getElementById("diff-rich");
+        const fallback = document.getElementById("diff-fallback");
+
+        try {
+          createRoot(mount).render(
+            React.createElement(PatchDiff, {
+              patch,
+              disableWorkerPool: true,
+              options: {
+                layout: "stacked",
+                lineNumbers: true,
+                wrap: true
+              }
+            })
+          );
+          mount.classList.add("is-ready");
+          fallback.hidden = true;
+        } catch (error) {
+          console.warn("PatchDiff render failed; leaving HTML fallback visible.", error);
+        }
+      </script>
+    </main>
+  </body>
+</html>

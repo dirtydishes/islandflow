@@ -5,6 +5,7 @@ import { getSubscriptionKey as getLiveSubscriptionKey } from "@islandflow/types"
 import Link from "next/link";
 import { memo, useMemo } from "react";
 
+import { formatNewsSymbolsLabel, getNewsWireStatus } from "../../news-wire";
 import { getTapeVirtualConfig } from "../config";
 import { decodeNewsText, formatNewsTimestamp, statusLabel } from "../format";
 import type { TerminalState } from "../state";
@@ -18,21 +19,7 @@ type NewsPaneProps = {
   className?: string;
 };
 
-export const formatNewsSymbolsLabel = (story: NewsStory): string => {
-  if (story.resolved_symbols.length === 0) {
-    return story.symbol_resolution === "none" ? "unmapped" : "market";
-  }
-  const visible = story.resolved_symbols.slice(0, 4);
-  const extra = story.resolved_symbols.length - visible.length;
-  return extra > 0 ? `${visible.join(", ")} +${extra}` : visible.join(", ");
-};
-
-export const getNewsWireStatus = (story: NewsStory): "updated" | "mapped" | "unmapped" => {
-  if (story.updated_ts > story.published_ts) {
-    return "updated";
-  }
-  return story.resolved_symbols.length > 0 ? "mapped" : "unmapped";
-};
+export { formatNewsSymbolsLabel, getNewsWireStatus };
 
 export const openNewsStory = (state: TerminalState, story: NewsStory): void => {
   state.setSelectedNewsStory(null);
