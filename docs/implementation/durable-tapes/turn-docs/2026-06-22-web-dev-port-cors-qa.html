@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Web Dev Port CORS QA</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #0d141b;
+        --panel-2: #111820;
+        --line: rgba(230, 237, 244, 0.14);
+        --line-strong: rgba(245, 166, 35, 0.36);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --green: #25c17a;
+        --red: #ff6b5f;
+        --blue: #4da3ff;
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: linear-gradient(180deg, #0b1016 0%, var(--bg) 100%);
+        color: var(--text);
+        font: 15px/1.55 var(--sans);
+      }
+
+      main {
+        width: min(1120px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+
+      header {
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      .eyebrow,
+      h2,
+      .meta-label,
+      code,
+      pre {
+        font-family: var(--mono);
+      }
+
+      .eyebrow {
+        margin-bottom: 8px;
+        color: var(--accent);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 860px;
+        font-size: 2rem;
+        line-height: 1.08;
+        letter-spacing: 0;
+        text-wrap: balance;
+      }
+
+      .subtitle {
+        max-width: 78ch;
+        margin-top: 12px;
+        color: var(--muted);
+      }
+
+      .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 1px;
+        margin-top: 18px;
+        border: 1px solid var(--line);
+        background: var(--line);
+      }
+
+      .meta-cell {
+        min-width: 0;
+        padding: 10px 12px;
+        background: var(--panel-2);
+      }
+
+      .meta-label {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--faint);
+        font-size: 0.66rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      section {
+        padding: 20px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      h2 {
+        margin-bottom: 10px;
+        color: var(--accent);
+        font-size: 0.9rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      p {
+        max-width: 82ch;
+        color: var(--text);
+      }
+
+      p + p {
+        margin-top: 10px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 7px;
+      }
+
+      code {
+        color: var(--accent);
+      }
+
+      pre {
+        white-space: pre-wrap;
+      }
+
+      .ok {
+        color: var(--green);
+      }
+
+      .warn {
+        color: var(--red);
+      }
+
+      .note {
+        color: var(--blue);
+      }
+
+      .diff-shell {
+        display: grid;
+        gap: 12px;
+      }
+
+      #rich-diff {
+        min-height: 32px;
+      }
+
+      #fallback-diff {
+        max-height: 560px;
+        overflow: auto;
+        margin: 0;
+        padding: 12px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--text);
+        font-size: 0.76rem;
+        line-height: 1.45;
+      }
+
+      .rich-diff-ready #fallback-diff {
+        display: none;
+      }
+
+      .diff-note {
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="eyebrow">Durable tapes follow-up</div>
+        <h1>Web Dev Port CORS QA</h1>
+        <p class="subtitle">
+          Made web-only hosted-backend QA usable when port 3000 is occupied by giving
+          <code>bun run dev:web</code> a supported alternate port path and locking the API CORS
+          expectation in tests.
+        </p>
+        <div class="meta-grid" aria-label="Turn metadata">
+          <div class="meta-cell"><span class="meta-label">Branch</span>lavender/fix-web-dev-port-cors-qa</div>
+          <div class="meta-cell"><span class="meta-label">Beads</span>islandflow-6t32</div>
+          <div class="meta-cell"><span class="meta-label">Scope</span>web dev runner and CORS QA config</div>
+          <div class="meta-cell"><span class="meta-label">Timestamp</span>2026-06-22 19:02 EDT</div>
+        </div>
+      </header>
+
+      <section>
+        <h2>Root Cause</h2>
+        <p>
+          Hosted API CORS reflects <code>http://localhost:3000</code> and
+          <code>http://localhost:3100</code>, but not <code>http://localhost:3001</code>. The web
+          dev runner always started Next on <code>3000</code>, so a worker with another worktree on
+          that port had no documented first-class fallback and manually landed on the unsupported
+          <code>3001</code> origin.
+        </p>
+      </section>
+
+      <section>
+        <h2>Fix</h2>
+        <ul>
+          <li>Added <code>apps/web/scripts/dev-config.ts</code> to resolve the web dev API URL and port from environment values.</li>
+          <li><code>WEB_DEV_PORT</code> is the explicit knob; <code>PORT</code> also works for environments that already set it.</li>
+          <li>The supported hosted-backend fallback is <code>WEB_DEV_PORT=3100 bun run dev:web</code>.</li>
+          <li>The runner warns when the hosted API is paired with unsupported local ports such as <code>3001</code>.</li>
+          <li><code>.env.example</code> now documents the <code>3100</code> hosted QA fallback, and API tests lock the default <code>3100</code> allowlist expectation.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li><span class="ok">passed</span> <code>bun test apps/web/scripts/dev-config.test.ts services/api/tests/cors.test.ts</code></li>
+          <li><span class="ok">passed</span> <code>bunx biome check apps/web/scripts/dev.ts apps/web/scripts/dev-config.ts apps/web/scripts/dev-config.test.ts services/api/tests/cors.test.ts</code></li>
+          <li><span class="ok">passed</span> <code>bun --cwd=apps/web run build</code></li>
+          <li><span class="ok">passed</span> hosted API header probe: <code>localhost:3000</code> and <code>localhost:3100</code> reflected CORS headers for <code>/health</code>, <code>/history/options</code>, and <code>/history/news</code>; <code>localhost:3001</code> did not.</li>
+          <li><span class="ok">passed</span> browser QA: <code>WEB_DEV_PORT=3100 NEXT_PUBLIC_API_URL=https://api.flow.deltaisland.io bun run dev:web</code>, opened <code>http://localhost:3100/news</code>, saw connected news content with no browser console errors, and Next served <code>GET /news 200</code>.</li>
+          <li><span class="note">environment note</span> this fresh worktree needed <code>bun install --frozen-lockfile</code> before the web build because dependencies were not installed.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p class="diff-note">
+          The rich view below attempts to render with browser-side <code>PatchDiff</code> from
+          <code>@pierre/diffs/react</code>. The unified HTML fallback remains visible unless that
+          browser render succeeds.
+        </p>
+        <div class="diff-shell">
+          <div id="rich-diff" aria-label="Rich diff renderer"></div>
+          <pre id="fallback-diff"><code>diff --git a/apps/web/scripts/dev-config.ts b/apps/web/scripts/dev-config.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/scripts/dev-config.ts
+@@
++export const DEFAULT_REMOTE_API_URL = "https://api.flow.deltaisland.io";
++export const DEFAULT_WEB_DEV_PORT = 3000;
++export const HOSTED_API_QA_WEB_DEV_PORT = 3100;
++export const resolveWebDevConfig = (env) =&gt; {
++  const configuredPort = firstConfiguredValue([
++    ["WEB_DEV_PORT", env.WEB_DEV_PORT],
++    ["PORT", env.PORT]
++  ]);
++  const port = configuredPort
++    ? parseWebDevPort(configuredPort.value, configuredPort.source)
++    : DEFAULT_WEB_DEV_PORT;
++  const { apiUrl, apiUrlSource } = resolveApiUrl(env);
++  return {
++    apiUrl,
++    apiUrlSource,
++    hostedApiCorsWarning: resolveHostedApiCorsWarning(apiUrl, port),
++    port,
++    portSource: configuredPort?.source ?? "default"
++  };
++};
+
+diff --git a/apps/web/scripts/dev.ts b/apps/web/scripts/dev.ts
+--- a/apps/web/scripts/dev.ts
++++ b/apps/web/scripts/dev.ts
+@@
+-const DEFAULT_REMOTE_API_URL = "https://api.flow.deltaisland.io";
++import { resolveWebDevConfig } from "./dev-config";
+@@
+-  const port = 3000;
++  const config = resolveWebDevConfig(Bun.env);
++  const { apiUrl, apiUrlSource, port, portSource } = config;
+@@
+-  console.log(`[web] starting Next.js dev server on port ${port}`);
++  console.log(`[web] starting Next.js dev server on port ${port} (${portSource})`);
++  console.log(`[web] API origin: ${apiUrl} (${apiUrlSource})`);
++  if (config.hostedApiCorsWarning) {
++    console.warn(`[web] ${config.hostedApiCorsWarning}`);
++  }
+@@
+-      NEXT_PUBLIC_API_URL: Bun.env.NEXT_PUBLIC_API_URL ?? DEFAULT_REMOTE_API_URL,
++      NEXT_PUBLIC_API_URL: apiUrl,
+       PORT: String(port)
+
+diff --git a/apps/web/scripts/dev-config.test.ts b/apps/web/scripts/dev-config.test.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/scripts/dev-config.test.ts
+@@
++it("allows the supported hosted-backend QA fallback port", () =&gt; {
++  expect(resolveWebDevConfig({ WEB_DEV_PORT: "3100" })).toMatchObject({
++    hostedApiCorsWarning: null,
++    port: 3100,
++    portSource: "WEB_DEV_PORT"
++  });
++});
++it("warns when the hosted API is paired with an unsupported local port", () =&gt; {
++  expect(resolveWebDevConfig({ WEB_DEV_PORT: "3001" }).hostedApiCorsWarning).toContain(
++    "WEB_DEV_PORT=3100"
++  );
++});
+
+diff --git a/services/api/tests/cors.test.ts b/services/api/tests/cors.test.ts
+--- a/services/api/tests/cors.test.ts
++++ b/services/api/tests/cors.test.ts
+@@
++it("keeps the hosted-backend web QA fallback port in default origins", () =&gt; {
++  const defaultOrigins = parseCorsAllowedOrigins(DEFAULT_API_CORS_ORIGINS);
++  const req = new Request("https://api.flow.deltaisland.io/history/news", {
++    headers: { origin: "http://localhost:3100" }
++  });
++  expect(resolveCorsOrigin(req, defaultOrigins)).toBe("http://localhost:3100");
++});
+
+diff --git a/.env.example b/.env.example
+--- a/.env.example
++++ b/.env.example
+@@
+ NEXT_PUBLIC_API_URL=http://127.0.0.1:4000
++# Use WEB_DEV_PORT=3100 for web-only QA against the hosted API when 3000 is occupied.
++WEB_DEV_PORT=3000
+ API_CORS_ORIGINS=https://flow.deltaisland.io,http://127.0.0.1:3000,http://localhost:3000,http://127.0.0.1:3100,http://localhost:3100
+</code></pre>
+        </div>
+      </section>
+    </main>
+
+    <script type="text/plain" id="patch-source">diff --git a/apps/web/scripts/dev-config.ts b/apps/web/scripts/dev-config.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/scripts/dev-config.ts
+@@
++export const DEFAULT_REMOTE_API_URL = "https://api.flow.deltaisland.io";
++export const DEFAULT_WEB_DEV_PORT = 3000;
++export const HOSTED_API_QA_WEB_DEV_PORT = 3100;
++export const resolveWebDevConfig = (env) => {
++  const configuredPort = firstConfiguredValue([
++    ["WEB_DEV_PORT", env.WEB_DEV_PORT],
++    ["PORT", env.PORT]
++  ]);
++  const port = configuredPort
++    ? parseWebDevPort(configuredPort.value, configuredPort.source)
++    : DEFAULT_WEB_DEV_PORT;
++  const { apiUrl, apiUrlSource } = resolveApiUrl(env);
++  return {
++    apiUrl,
++    apiUrlSource,
++    hostedApiCorsWarning: resolveHostedApiCorsWarning(apiUrl, port),
++    port,
++    portSource: configuredPort?.source ?? "default"
++  };
++};
+
+diff --git a/apps/web/scripts/dev.ts b/apps/web/scripts/dev.ts
+--- a/apps/web/scripts/dev.ts
++++ b/apps/web/scripts/dev.ts
+@@
+-const DEFAULT_REMOTE_API_URL = "https://api.flow.deltaisland.io";
++import { resolveWebDevConfig } from "./dev-config";
+@@
+-  const port = 3000;
++  const config = resolveWebDevConfig(Bun.env);
++  const { apiUrl, apiUrlSource, port, portSource } = config;
+@@
+-  console.log(`[web] starting Next.js dev server on port ${port}`);
++  console.log(`[web] starting Next.js dev server on port ${port} (${portSource})`);
++  console.log(`[web] API origin: ${apiUrl} (${apiUrlSource})`);
++  if (config.hostedApiCorsWarning) {
++    console.warn(`[web] ${config.hostedApiCorsWarning}`);
++  }
+@@
+-      NEXT_PUBLIC_API_URL: Bun.env.NEXT_PUBLIC_API_URL ?? DEFAULT_REMOTE_API_URL,
++      NEXT_PUBLIC_API_URL: apiUrl,
+       PORT: String(port)
+
+diff --git a/apps/web/scripts/dev-config.test.ts b/apps/web/scripts/dev-config.test.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/scripts/dev-config.test.ts
+@@
++it("allows the supported hosted-backend QA fallback port", () => {
++  expect(resolveWebDevConfig({ WEB_DEV_PORT: "3100" })).toMatchObject({
++    hostedApiCorsWarning: null,
++    port: 3100,
++    portSource: "WEB_DEV_PORT"
++  });
++});
++it("warns when the hosted API is paired with an unsupported local port", () => {
++  expect(resolveWebDevConfig({ WEB_DEV_PORT: "3001" }).hostedApiCorsWarning).toContain(
++    "WEB_DEV_PORT=3100"
++  );
++});
+
+diff --git a/services/api/tests/cors.test.ts b/services/api/tests/cors.test.ts
+--- a/services/api/tests/cors.test.ts
++++ b/services/api/tests/cors.test.ts
+@@
++it("keeps the hosted-backend web QA fallback port in default origins", () => {
++  const defaultOrigins = parseCorsAllowedOrigins(DEFAULT_API_CORS_ORIGINS);
++  const req = new Request("https://api.flow.deltaisland.io/history/news", {
++    headers: { origin: "http://localhost:3100" }
++  });
++  expect(resolveCorsOrigin(req, defaultOrigins)).toBe("http://localhost:3100");
++});
+
+diff --git a/.env.example b/.env.example
+--- a/.env.example
++++ b/.env.example
+@@
+ NEXT_PUBLIC_API_URL=http://127.0.0.1:4000
++# Use WEB_DEV_PORT=3100 for web-only QA against the hosted API when 3000 is occupied.
++WEB_DEV_PORT=3000
+ API_CORS_ORIGINS=https://flow.deltaisland.io,http://127.0.0.1:3000,http://localhost:3000,http://127.0.0.1:3100,http://localhost:3100
+</script>
+    <script type="module">
+      const source = document.getElementById("patch-source")?.textContent ?? "";
+      const target = document.getElementById("rich-diff");
+      try {
+        const React = await import("react");
+        const { createRoot } = await import("react-dom/client");
+        const { PatchDiff } = await import("@pierre/diffs/react");
+        createRoot(target).render(React.createElement(PatchDiff, { patch: source }));
+        document.documentElement.classList.add("rich-diff-ready");
+      } catch (error) {
+        target.textContent =
+          "Rich diff renderer unavailable in this static context; showing unified fallback.";
+      }
+    </script>
+  </body>
+</html>
