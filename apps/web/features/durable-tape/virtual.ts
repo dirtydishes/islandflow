@@ -115,7 +115,8 @@ export const useDurableVirtualHistoryGate = (
   enabled: boolean,
   itemCount: number,
   lastVirtualIndex: number,
-  onLoadOlder: () => void
+  onLoadOlder: () => void,
+  loadSignal?: string
 ): void => {
   const loadRef = useRef(onLoadOlder);
   useEffect(() => {
@@ -133,5 +134,5 @@ export const useDurableVirtualHistoryGate = (
       return;
     }
     loadRef.current();
-  }, [enabled, itemCount, lastVirtualIndex]);
+  }, [enabled, itemCount, lastVirtualIndex, loadSignal]);
 };

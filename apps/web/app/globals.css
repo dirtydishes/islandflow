@@ -2744,6 +2744,112 @@ h3 {
   font-size: 0.78rem;
 }
 
+.durable-tape-cell-number,
+.equities-tape .durable-tape-cell[data-align="end"] {
+  font-family: var(--font-mono), monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.equities-tape-ticker,
+.equities-tape-venue {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.equities-tape-ticker > span:first-child,
+.equities-tape-venue > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.equities-tape-ticker-button {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+}
+
+.equities-tape-ticker-button:hover {
+  color: var(--accent);
+}
+
+.equities-tape-ticker-button:focus-visible {
+  outline: 2px solid oklch(0.83 0.08 74 / 0.82);
+  outline-offset: 2px;
+}
+
+.equities-tape-badge {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: 18px;
+  padding: 2px 5px;
+  border: 1px solid oklch(0.72 0.13 247 / 0.36);
+  border-radius: 999px;
+  background: var(--blue-soft);
+  color: oklch(0.82 0.09 247);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.equities-tape-detail {
+  display: grid;
+  gap: 10px;
+  min-width: min(360px, calc(100vw - 60px));
+}
+
+.equities-tape-detail dl {
+  display: grid;
+  grid-template-columns: minmax(92px, 0.8fr) minmax(0, 1.4fr);
+  gap: 6px 12px;
+  margin: 0;
+}
+
+.equities-tape-detail-row {
+  display: contents;
+}
+
+.equities-tape-detail dt,
+.equities-tape-detail dd {
+  min-width: 0;
+  margin: 0;
+}
+
+.equities-tape-detail dt {
+  color: var(--text-faint);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.equities-tape-detail dd {
+  overflow: hidden;
+  color: var(--text);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.equities-tape-linked-context {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  color: var(--text-dim);
+}
+
 .options-table {
   display: flex;
   min-height: 0;
