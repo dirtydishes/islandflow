@@ -9,12 +9,13 @@ Run an implementation loop for this project.
 
 Project root: [PROJECT_ROOT]
 Implementation index: [IMPLEMENT_DOC_PATH]
-Tracker system: [TRACKER_NAME_AND_COMMANDS]
-Epic or task stream: [EPIC_OR_STREAM_ID_OR_DESCRIPTION]
+Beads epic or task stream: [BEADS_EPIC_OR_STREAM_ID_OR_DESCRIPTION]
 Canonical git remote: [REMOTE_NAME_AND_HOST]
 Branch prefix, if branches are assigned: [BRANCH_PREFIX]
 Turn-doc location: [TURN_DOC_DIRECTORY]
 Special QA runner notes: [QA_RUNNER_NOTES]
+
+Assume Beads is the tracker for this project. Run `bd prime` before acting, use `bd ready` and `bd show <issue-id>` for selection, `bd update <issue-id> --claim` when starting work, `bd create` for follow-ups, `bd close` for completed work, and `bd dolt push` during closeout.
 
 Use the implementation index as the source of truth. Read it first, then follow it for phase order, scope, dependencies, PR posture, concurrency rules, quality gates, subagent guidance, and closeout rules. If the implementation index conflicts with this prompt, prefer the project-specific implementation index unless I explicitly correct it in this thread.
 
@@ -22,9 +23,9 @@ Run the loop like this:
 
 1. Start with a selector subagent.
    - The selector must read the implementation index.
-   - The selector must inspect the tracker for ready work.
+   - The selector must run `bd prime`, `bd ready`, and `bd show <issue-id>` for candidate ready work.
    - The selector must report the next ready phase or phases, their issue IDs, linked phase docs, dependency state, safe parallelism, and any blocking contracts that must be pinned before worker launch.
-   - Do not hand-pick work from memory when tracker state and phase docs exist.
+   - Do not hand-pick work from memory when Beads state and phase docs exist.
 
 2. Create implementation worker thread(s) only for selector-approved ready work.
    - Pass each worker:
@@ -41,7 +42,7 @@ Run the loop like this:
    - Tell the worker to keep the PR phase-bounded.
    - Tell the worker not to create the reviewer thread.
    - Tell the worker to message this orchestrator thread exactly once when the PR is open and local gates are complete, or when genuinely blocked.
-   - The worker callback must include changed files, PR/branch/commit state, local tests/builds/QA run, tracker updates, push status, follow-up issue IDs, and known risks.
+   - The worker callback must include changed files, PR/branch/commit state, local tests/builds/QA run, Beads updates, `bd dolt push` status, git push status, follow-up issue IDs, and known risks.
 
 3. Do not constantly monitor worker threads.
    - Workers should call back here when they finish or block.
@@ -87,7 +88,7 @@ Run the loop like this:
 
 7. Reviewer repairs and docs.
    - If issues can be repaired safely within scope, reviewers should repair them on the same branch/PR.
-   - If an issue is real but out of scope, file a focused follow-up tracker issue instead of widening the PR.
+   - If an issue is real but out of scope, file a focused follow-up Beads issue instead of widening the PR.
    - Reviewers must update the existing phase turn doc. They must not create a separate reviewer turn doc unless I explicitly request that.
    - Turn docs for this stream belong under [TURN_DOC_DIRECTORY].
    - The turn doc should record review findings, repairs, local/browser QA, CI state, follow-up issues, and final review disposition.
@@ -102,13 +103,13 @@ Run the loop like this:
    - Read the reviewer callback carefully.
    - If review is blocked, route the blocker to the correct worker/resolver and do not merge.
    - If review is complete and CI is green, merge or close out the PR according to the project PR workflow.
-   - Sync tracker state, tracker persistence, git remotes, and docs according to project instructions.
+   - Sync Beads state, `bd dolt push`, git remotes, and docs according to project instructions.
    - Verify the target branch is clean and up to date with the canonical remote.
    - Delete or update obsolete heartbeat automation instructions so they do not keep watching completed work.
 
 10. Repeat.
    - After closeout, run the selector subagent again.
-   - Launch only the next ready work allowed by tracker dependencies and implementation-index concurrency rules.
+   - Launch only the next ready work allowed by Beads dependencies and implementation-index concurrency rules.
    - If a callback contract must be pinned before parallel phases can start, pin it in each affected worker prompt before launching those workers.
    - Continue selector -> worker -> reviewer -> closeout until the epic or task stream is complete.
 
@@ -119,7 +120,7 @@ Callback requirements for every worker:
 - PR URL/number, or blocked reason
 - changed files
 - tests/builds/browser QA run and results
-- tracker status and tracker persistence status
+- Beads status and `bd dolt push` status
 - git push/status result
 - follow-up issue IDs
 - CI status if known, while noting that the reviewer must verify CI
@@ -132,11 +133,11 @@ Callback requirements for every reviewer:
 - tests/builds/browser QA run and results
 - CI run IDs/statuses after any repair commit
 - existing turn-doc path updated
-- tracker updates and tracker persistence status
+- Beads updates and `bd dolt push` status
 - git push/status result
 - final disposition: ready to merge, blocked, or needs further implementation
 
-Keep the orchestration callback-driven, tracker-driven, and phase-bounded. Do not drift into unrelated work just because it is nearby.
+Keep the orchestration callback-driven, Beads-driven, and phase-bounded. Do not drift into unrelated work just because it is nearby.
 ```
 
 ## Notes For Islandflow
@@ -145,7 +146,7 @@ For Islandflow durable-tapes work, the concrete substitutions are:
 
 - `Project root`: `/Users/kell/dev/islandflow`
 - `Implementation index`: `docs/implementation/durable-tapes/IMPLEMENT.md`
-- `Tracker`: Beads (`bd ready`, `bd show`, `bd update --claim`, `bd close`, `bd dolt push`)
+- `Beads stream`: durable-tapes epic `islandflow-h9c0`
 - `Canonical git remote`: Forgejo remote `forgejo`
 - `Branch prefix`: `lavender/` when a branch is explicitly assigned
 - `Turn-doc location`: `docs/implementation/durable-tapes/turn-docs/`
