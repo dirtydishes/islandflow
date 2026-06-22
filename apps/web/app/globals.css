@@ -2505,6 +2505,245 @@ h3 {
   pointer-events: none;
 }
 
+.durable-tape {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: oklch(0.105 0.01 250);
+}
+
+.durable-tape-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 40px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  background: oklch(0.125 0.012 250 / 0.98);
+}
+
+.durable-tape-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.durable-tape-title {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.86rem;
+  line-height: 1.2;
+}
+
+.durable-tape-status,
+.durable-tape-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.durable-tape-settings-trigger,
+.durable-tape-jump {
+  min-height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 9px;
+  background: var(--bg-soft);
+  color: var(--text);
+  cursor: pointer;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.durable-tape-settings-trigger:focus-visible,
+.durable-tape-jump:focus-visible,
+.durable-tape-row:focus-visible {
+  outline: 2px solid oklch(0.83 0.08 74 / 0.82);
+  outline-offset: 2px;
+}
+
+.durable-tape-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.durable-tape-jump:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.durable-tape-jump.is-active {
+  border-color: var(--border-strong);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.durable-tape-jump-icon {
+  display: inline-grid;
+  width: 14px;
+  height: 14px;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  line-height: 1;
+}
+
+.durable-tape-table {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.durable-tape-head,
+.durable-tape-row {
+  display: grid;
+  grid-template-columns: var(--durable-tape-grid);
+  align-items: center;
+  column-gap: 8px;
+}
+
+.durable-tape-head {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 0 10px;
+  border-bottom: 1px solid oklch(0.72 0.012 250 / 0.12);
+  background: oklch(0.125 0.012 250 / 0.98);
+  color: var(--text-faint);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.durable-tape-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.durable-tape-body {
+  position: relative;
+  min-width: 100%;
+}
+
+.durable-tape-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 10px;
+  border-bottom: 1px solid oklch(0.72 0.012 250 / 0.08);
+  background: transparent;
+  color: inherit;
+}
+
+.durable-tape-row:hover,
+.durable-tape-row:focus-visible {
+  background: oklch(0.78 0.12 74 / 0.05);
+}
+
+.durable-tape-cell {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.72rem;
+}
+
+.durable-tape-settings,
+.durable-tape-hover {
+  position: fixed;
+  z-index: 55;
+  border: 1px solid var(--border);
+  background: oklch(0.12 0.012 250 / 0.98);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.42);
+}
+
+.durable-tape-settings {
+  top: 76px;
+  right: 18px;
+  width: min(340px, calc(100vw - 36px));
+  padding: 12px;
+}
+
+.durable-tape-settings-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.durable-tape-settings-title {
+  color: var(--text);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.durable-tape-settings-copy {
+  margin-top: 3px;
+  color: var(--text-dim);
+  font-size: 0.76rem;
+}
+
+.durable-tape-settings-list {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+}
+
+.durable-tape-settings-list div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.durable-tape-settings-list dt,
+.durable-tape-settings-list dd {
+  margin: 0;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+.durable-tape-settings-list dt {
+  color: var(--text-faint);
+}
+
+.durable-tape-settings-list dd {
+  color: var(--text);
+}
+
+.durable-tape-hover {
+  right: 18px;
+  bottom: 18px;
+  max-width: min(420px, calc(100vw - 36px));
+  padding: 10px 12px;
+  color: var(--text);
+  font-size: 0.78rem;
+}
+
 .options-table {
   display: flex;
   min-height: 0;

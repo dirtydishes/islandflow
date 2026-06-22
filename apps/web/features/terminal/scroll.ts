@@ -1,4 +1,3 @@
-import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   type MutableRefObject,
   type RefObject,
@@ -7,7 +6,8 @@ import {
   useRef,
   useState
 } from "react";
-import { DEV_TAPE_DEBUG, bumpTapeDebugMetric, logTapeDebug } from "./debug";
+import { shouldLoadOlderFromVirtualRows, useDurableTapeVirtualList } from "../durable-tape";
+import { bumpTapeDebugMetric, DEV_TAPE_DEBUG, logTapeDebug } from "./debug";
 import { findAnchorRestoreIndex, getTapeItemKey } from "./tape";
 import type { SortableItem, TapeVirtualListConfig } from "./types";
 
@@ -235,10 +235,13 @@ export const useVirtualHistoryGate = (
   }, [onLoadOlder]);
 
   useEffect(() => {
-    if (!enabled || itemCount === 0) {
-      return;
-    }
-    if (lastVirtualIndex < itemCount - 1) {
+    if (
+      !shouldLoadOlderFromVirtualRows({
+        enabled,
+        itemCount,
+        lastVirtualIndex
+      })
+    ) {
       return;
     }
     loadRef.current();
@@ -264,60 +267,10 @@ export const useTapeVirtualList = <T extends SortableItem>(
   listRef: RefObject<HTMLDivElement | null>,
   config: TapeVirtualListConfig
 ): TapeVirtualListResult<T> => {
-  const virtualizer = useVirtualizer<HTMLDivElement, HTMLElement>({
-    count: items.length,
-    getScrollElement: () => listRef.current,
-    estimateSize: () => config.rowHeight,
+  return useDurableTapeVirtualList(items, listRef, {
+    rowHeight: config.rowHeight,
     overscan: config.overscan,
-    getItemKey: (index) => getTapeItemKey(items[index] as SortableItem)
+    debugLabel: DEV_TAPE_DEBUG ? config.debugLabel : undefined,
+    getRowKey: getTapeItemKey
   });
-
-  const virtualItems: TapeVirtualRow<T>[] = virtualizer
-    .getVirtualItems()
-    .map((virtualItem) => {
-      const item = items[virtualItem.index] as T | undefined;
-      if (!item) {
-        return null;
-      }
-      return {
-        item,
-        key: getTapeItemKey(item),
-        index: virtualItem.index,
-        start: virtualItem.start,
-        size: virtualItem.size,
-        end: virtualItem.end
-      };
-    })
-    .filter((virtualItem): virtualItem is TapeVirtualRow<T> => virtualItem !== null);
-
-  useEffect(() => {
-    if (!DEV_TAPE_DEBUG || items.length === 0) {
-      return;
-    }
-    const element = listRef.current;
-    if (!element) {
-      return;
-    }
-    const first = virtualItems[0];
-    const last = virtualItems.at(-1);
-    if (!first || !last) {
-      return;
-    }
-    const visibleTopGap = Math.max(0, first.start - element.scrollTop);
-    const visibleBottomGap = Math.max(0, element.scrollTop + element.clientHeight - last.end);
-    if (visibleTopGap > element.clientHeight || visibleBottomGap > element.clientHeight) {
-      console.warn("[tape] false-gap watchdog", {
-        pane: config.debugLabel,
-        item_count: items.length,
-        visible_top_gap: visibleTopGap,
-        visible_bottom_gap: visibleBottomGap,
-        viewport_height: element.clientHeight
-      });
-    }
-  }, [config.debugLabel, items.length, listRef, virtualItems]);
-
-  return {
-    totalSize: virtualizer.getTotalSize(),
-    virtualItems
-  };
 };
