@@ -222,9 +222,9 @@
         <ul>
           <li>Added <code>apps/web/scripts/dev-config.ts</code> to resolve the web dev API URL and port from environment values.</li>
           <li><code>WEB_DEV_PORT</code> is the explicit knob; <code>PORT</code> also works for environments that already set it.</li>
-          <li>The supported hosted-backend fallback is <code>WEB_DEV_PORT=3100 bun run dev:web</code>.</li>
+          <li>The supported hosted-backend fallback is <code>NEXT_PUBLIC_API_URL=https://api.flow.deltaisland.io WEB_DEV_PORT=3100 bun run dev:web</code>.</li>
           <li>The runner warns when the hosted API is paired with unsupported local ports such as <code>3001</code>.</li>
-          <li><code>.env.example</code> now documents the <code>3100</code> hosted QA fallback, and API tests lock the default <code>3100</code> allowlist expectation.</li>
+          <li><code>.env.example</code> now documents the full hosted QA fallback command with <code>NEXT_PUBLIC_API_URL=https://api.flow.deltaisland.io</code> and <code>WEB_DEV_PORT=3100</code>, and API tests lock the default <code>3100</code> allowlist expectation.</li>
         </ul>
       </section>
 
@@ -237,6 +237,18 @@
           <li><span class="ok">passed</span> hosted API header probe: <code>localhost:3000</code> and <code>localhost:3100</code> reflected CORS headers for <code>/health</code>, <code>/history/options</code>, and <code>/history/news</code>; <code>localhost:3001</code> did not.</li>
           <li><span class="ok">passed</span> browser QA: <code>WEB_DEV_PORT=3100 NEXT_PUBLIC_API_URL=https://api.flow.deltaisland.io bun run dev:web</code>, opened <code>http://localhost:3100/news</code>, saw connected news content with no browser console errors, and Next served <code>GET /news 200</code>.</li>
           <li><span class="note">environment note</span> this fresh worktree needed <code>bun install --frozen-lockfile</code> before the web build because dependencies were not installed.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Reviewer Closeout</h2>
+        <ul>
+          <li><span class="ok">reviewed</span> PR head <code>43578751bc</code> against <code>forgejo/main</code>; scope stayed limited to the web dev runner, hosted API CORS default, tests, and this turn document.</li>
+          <li><span class="warn">repaired</span> the <code>.env.example</code> hosted QA note so it names the required hosted API URL as well as <code>WEB_DEV_PORT=3100</code>. Without that, readers copying from the example could keep the local API URL and miss the hosted-backend QA path.</li>
+          <li><span class="ok">repaired</span> the CORS regression test to cover both default loopback origins for the supported fallback port: <code>http://localhost:3100</code> and <code>http://127.0.0.1:3100</code>.</li>
+          <li><span class="ok">reviewer validation passed</span> <code>bun test apps/web/scripts/dev-config.test.ts services/api/tests/cors.test.ts</code>, <code>bunx biome check apps/web/scripts/dev.ts apps/web/scripts/dev-config.ts apps/web/scripts/dev-config.test.ts services/api/tests/cors.test.ts .env.example</code>, and <code>bun --cwd=apps/web run build</code>.</li>
+          <li><span class="ok">reviewer browser QA passed</span> <code>WEB_DEV_PORT=3100 NEXT_PUBLIC_API_URL=https://api.flow.deltaisland.io bun run dev:web</code>, opened <code>http://localhost:3100/news</code>, saw connected news content, and observed no browser console errors.</li>
+          <li><span class="ok">reviewer hosted API probe passed</span> <code>http://localhost:3000</code>, <code>http://localhost:3100</code>, and <code>http://127.0.0.1:3100</code> reflected CORS headers for <code>/health</code>; <code>http://localhost:3001</code> did not.</li>
         </ul>
       </section>
 
@@ -321,10 +333,12 @@ diff --git a/services/api/tests/cors.test.ts b/services/api/tests/cors.test.ts
 @@
 +it("keeps the hosted-backend web QA fallback port in default origins", () =&gt; {
 +  const defaultOrigins = parseCorsAllowedOrigins(DEFAULT_API_CORS_ORIGINS);
-+  const req = new Request("https://api.flow.deltaisland.io/history/news", {
-+    headers: { origin: "http://localhost:3100" }
-+  });
-+  expect(resolveCorsOrigin(req, defaultOrigins)).toBe("http://localhost:3100");
++  for (const origin of ["http://127.0.0.1:3100", "http://localhost:3100"]) {
++    const req = new Request("https://api.flow.deltaisland.io/history/news", {
++      headers: { origin }
++    });
++    expect(resolveCorsOrigin(req, defaultOrigins)).toBe(origin);
++  }
 +});
 
 diff --git a/.env.example b/.env.example
@@ -332,7 +346,8 @@ diff --git a/.env.example b/.env.example
 +++ b/.env.example
 @@
  NEXT_PUBLIC_API_URL=http://127.0.0.1:4000
-+# Use WEB_DEV_PORT=3100 for web-only QA against the hosted API when 3000 is occupied.
++# Hosted API web-only QA fallback when 3000 is occupied:
++# NEXT_PUBLIC_API_URL=https://api.flow.deltaisland.io WEB_DEV_PORT=3100 bun run dev:web
 +WEB_DEV_PORT=3000
  API_CORS_ORIGINS=https://flow.deltaisland.io,http://127.0.0.1:3000,http://localhost:3000,http://127.0.0.1:3100,http://localhost:3100
 </code></pre>
@@ -412,10 +427,12 @@ diff --git a/services/api/tests/cors.test.ts b/services/api/tests/cors.test.ts
 @@
 +it("keeps the hosted-backend web QA fallback port in default origins", () => {
 +  const defaultOrigins = parseCorsAllowedOrigins(DEFAULT_API_CORS_ORIGINS);
-+  const req = new Request("https://api.flow.deltaisland.io/history/news", {
-+    headers: { origin: "http://localhost:3100" }
-+  });
-+  expect(resolveCorsOrigin(req, defaultOrigins)).toBe("http://localhost:3100");
++  for (const origin of ["http://127.0.0.1:3100", "http://localhost:3100"]) {
++    const req = new Request("https://api.flow.deltaisland.io/history/news", {
++      headers: { origin }
++    });
++    expect(resolveCorsOrigin(req, defaultOrigins)).toBe(origin);
++  }
 +});
 
 diff --git a/.env.example b/.env.example
@@ -423,7 +440,8 @@ diff --git a/.env.example b/.env.example
 +++ b/.env.example
 @@
  NEXT_PUBLIC_API_URL=http://127.0.0.1:4000
-+# Use WEB_DEV_PORT=3100 for web-only QA against the hosted API when 3000 is occupied.
++# Hosted API web-only QA fallback when 3000 is occupied:
++# NEXT_PUBLIC_API_URL=https://api.flow.deltaisland.io WEB_DEV_PORT=3100 bun run dev:web
 +WEB_DEV_PORT=3000
  API_CORS_ORIGINS=https://flow.deltaisland.io,http://127.0.0.1:3000,http://localhost:3000,http://127.0.0.1:3100,http://localhost:3100
 </script>

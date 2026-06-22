@@ -31,13 +31,16 @@ describe("api cors helpers", () => {
 
   it("keeps the hosted-backend web QA fallback port in default origins", () => {
     const defaultOrigins = parseCorsAllowedOrigins(DEFAULT_API_CORS_ORIGINS);
-    const req = new Request("https://api.flow.deltaisland.io/history/news", {
-      headers: {
-        origin: "http://localhost:3100"
-      }
-    });
 
-    expect(resolveCorsOrigin(req, defaultOrigins)).toBe("http://localhost:3100");
+    for (const origin of ["http://127.0.0.1:3100", "http://localhost:3100"]) {
+      const req = new Request("https://api.flow.deltaisland.io/history/news", {
+        headers: {
+          origin
+        }
+      });
+
+      expect(resolveCorsOrigin(req, defaultOrigins)).toBe(origin);
+    }
   });
 
   it("does not reflect unknown origins", () => {
