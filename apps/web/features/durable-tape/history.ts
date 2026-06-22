@@ -1,21 +1,46 @@
 import {
-  compareDurableTapeNewestFirst,
+  compareDurableTapeNewestCursorFirst,
   compareDurableTapeOldestFirst,
   extractDurableTapeSortSeq,
   extractDurableTapeSortTs,
   getDurableTapeCursor,
   getDurableTapeItemKey
 } from "./keys";
-import type { DurableTapeCursor, DurableTapeSortableItem } from "./types";
+import type { DurableTapeCursor, DurableTapeItemAccessors, DurableTapeSortableItem } from "./types";
 
 export const DURABLE_TAPE_DEFAULT_HOT_LIMIT = 500;
 
-export const mergeNewestWithOverflow = <TItem extends DurableTapeSortableItem>(
+const DEFAULT_SORTABLE_ACCESSORS: DurableTapeItemAccessors<DurableTapeSortableItem> = {
+  getKey: getDurableTapeItemKey,
+  getCursor: getDurableTapeCursor
+};
+
+export const getDefaultDurableTapeItemAccessors = <
+  TItem extends DurableTapeSortableItem
+>(): DurableTapeItemAccessors<TItem> => {
+  return DEFAULT_SORTABLE_ACCESSORS as DurableTapeItemAccessors<TItem>;
+};
+
+export function mergeNewestWithOverflow<TItem extends DurableTapeSortableItem>(
+  incoming: readonly TItem[],
+  existing: readonly TItem[],
+  limit?: number,
+  onTrim?: (evicted: number) => void
+): { kept: TItem[]; evicted: TItem[] };
+export function mergeNewestWithOverflow<TItem>(
+  incoming: readonly TItem[],
+  existing: readonly TItem[],
+  limit: number | undefined,
+  onTrim: ((evicted: number) => void) | undefined,
+  accessors: DurableTapeItemAccessors<TItem>
+): { kept: TItem[]; evicted: TItem[] };
+export function mergeNewestWithOverflow<TItem>(
   incoming: readonly TItem[],
   existing: readonly TItem[],
   limit = DURABLE_TAPE_DEFAULT_HOT_LIMIT,
-  onTrim?: (evicted: number) => void
-): { kept: TItem[]; evicted: TItem[] } => {
+  onTrim?: (evicted: number) => void,
+  accessors: DurableTapeItemAccessors<TItem> = DEFAULT_SORTABLE_ACCESSORS as DurableTapeItemAccessors<TItem>
+): { kept: TItem[]; evicted: TItem[] } {
   const combined = [...incoming, ...existing];
   if (combined.length === 0) {
     return { kept: combined, evicted: [] };
@@ -25,7 +50,7 @@ export const mergeNewestWithOverflow = <TItem extends DurableTapeSortableItem>(
   const deduped: TItem[] = [];
 
   for (const item of combined) {
-    const key = getDurableTapeItemKey(item);
+    const key = accessors.getKey(item);
     if (seen.has(key)) {
       continue;
     }
@@ -33,7 +58,9 @@ export const mergeNewestWithOverflow = <TItem extends DurableTapeSortableItem>(
     deduped.push(item);
   }
 
-  deduped.sort(compareDurableTapeNewestFirst);
+  deduped.sort((left, right) =>
+    compareDurableTapeNewestCursorFirst(accessors.getCursor(left), accessors.getCursor(right))
+  );
 
   const safeLimit = Math.max(1, Math.floor(limit));
   const evicted = deduped.slice(safeLimit);
@@ -45,44 +72,92 @@ export const mergeNewestWithOverflow = <TItem extends DurableTapeSortableItem>(
     kept: deduped.slice(0, safeLimit),
     evicted
   };
-};
+}
 
-export const mergeNewest = <TItem extends DurableTapeSortableItem>(
+export function mergeNewest<TItem extends DurableTapeSortableItem>(
+  incoming: readonly TItem[],
+  existing: readonly TItem[],
+  limit?: number,
+  onTrim?: (evicted: number) => void
+): TItem[];
+export function mergeNewest<TItem>(
+  incoming: readonly TItem[],
+  existing: readonly TItem[],
+  limit: number | undefined,
+  onTrim: ((evicted: number) => void) | undefined,
+  accessors: DurableTapeItemAccessors<TItem>
+): TItem[];
+export function mergeNewest<TItem>(
   incoming: readonly TItem[],
   existing: readonly TItem[],
   limit = DURABLE_TAPE_DEFAULT_HOT_LIMIT,
-  onTrim?: (evicted: number) => void
-): TItem[] => {
-  return mergeNewestWithOverflow(incoming, existing, limit, onTrim).kept;
-};
+  onTrim?: (evicted: number) => void,
+  accessors?: DurableTapeItemAccessors<TItem>
+): TItem[] {
+  return mergeNewestWithOverflow(
+    incoming,
+    existing,
+    limit,
+    onTrim,
+    accessors ?? (DEFAULT_SORTABLE_ACCESSORS as DurableTapeItemAccessors<TItem>)
+  ).kept;
+}
 
-export const composeTapeItems = <TItem extends DurableTapeSortableItem>(
+export function composeTapeItems<TItem extends DurableTapeSortableItem>(
   seedItems: readonly TItem[],
   liveItems: readonly TItem[],
   historyItems: readonly TItem[]
-): TItem[] => {
+): TItem[];
+export function composeTapeItems<TItem>(
+  seedItems: readonly TItem[],
+  liveItems: readonly TItem[],
+  historyItems: readonly TItem[],
+  accessors: DurableTapeItemAccessors<TItem>
+): TItem[];
+export function composeTapeItems<TItem>(
+  seedItems: readonly TItem[],
+  liveItems: readonly TItem[],
+  historyItems: readonly TItem[],
+  accessors: DurableTapeItemAccessors<TItem> = DEFAULT_SORTABLE_ACCESSORS as DurableTapeItemAccessors<TItem>
+): TItem[] {
   const deduped = new Map<string, TItem>();
   for (const item of [...seedItems, ...liveItems, ...historyItems]) {
-    deduped.set(getDurableTapeItemKey(item), item);
+    deduped.set(accessors.getKey(item), item);
   }
-  return Array.from(deduped.values()).sort(compareDurableTapeNewestFirst);
-};
+  return Array.from(deduped.values()).sort((left, right) =>
+    compareDurableTapeNewestCursorFirst(accessors.getCursor(left), accessors.getCursor(right))
+  );
+}
 
-export const appendHistoryTail = <TItem extends DurableTapeSortableItem>(
+export function appendHistoryTail<TItem extends DurableTapeSortableItem>(
   current: readonly TItem[],
   incoming: readonly TItem[],
   liveHead: readonly TItem[],
-  cap = 0
-): TItem[] => {
+  cap?: number
+): TItem[];
+export function appendHistoryTail<TItem>(
+  current: readonly TItem[],
+  incoming: readonly TItem[],
+  liveHead: readonly TItem[],
+  cap: number | undefined,
+  accessors: DurableTapeItemAccessors<TItem>
+): TItem[];
+export function appendHistoryTail<TItem>(
+  current: readonly TItem[],
+  incoming: readonly TItem[],
+  liveHead: readonly TItem[],
+  cap = 0,
+  accessors: DurableTapeItemAccessors<TItem> = DEFAULT_SORTABLE_ACCESSORS as DurableTapeItemAccessors<TItem>
+): TItem[] {
   if (incoming.length === 0) {
     return [...current];
   }
 
-  const seen = new Set<string>(liveHead.map((item) => getDurableTapeItemKey(item)));
+  const seen = new Set<string>(liveHead.map((item) => accessors.getKey(item)));
   const combined: TItem[] = [];
 
   for (const item of [...current, ...incoming]) {
-    const key = getDurableTapeItemKey(item);
+    const key = accessors.getKey(item);
     if (seen.has(key)) {
       continue;
     }
@@ -90,10 +165,12 @@ export const appendHistoryTail = <TItem extends DurableTapeSortableItem>(
     combined.push(item);
   }
 
-  combined.sort(compareDurableTapeNewestFirst);
+  combined.sort((left, right) =>
+    compareDurableTapeNewestCursorFirst(accessors.getCursor(left), accessors.getCursor(right))
+  );
 
   return cap > 0 ? combined.slice(0, cap) : combined;
-};
+}
 
 export const mergeHeldTapeHistory = <TItem extends DurableTapeSortableItem>(
   displayedHistory: readonly TItem[],

@@ -1,8 +1,16 @@
 "use client";
 
-import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState
+} from "react";
 
-import { resolveDurableTapeFeatures } from "../feature-flags";
+import { resolveDurableTapeComponentFeatures } from "../feature-flags";
 import { appendHistoryTail, composeTapeItems, selectOlderHistoryCursor } from "../history";
 import {
   createEmptyDurableTapeScrollHold,
@@ -59,7 +67,7 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
   scope,
   filters,
   features: featureInputs,
-  template = "auto",
+  template: templateProp,
   templates = EMPTY_TEMPLATES,
   columns = EMPTY_COLUMNS as DurableTapeColumnDefinition<TItem>[],
   columnOverrides,
@@ -74,7 +82,9 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
 }: DurableTapeProps<TItem, TScope, TFilters>) => {
   const { ref: rootRef, width } = useMeasuredWidth();
   const listRef = useRef<HTMLDivElement | null>(null);
+  const settingsTriggerRef = useRef<HTMLButtonElement | null>(null);
   const wasAtTopRef = useRef(true);
+  const settingsDialogId = useId();
   const [isAtTop, setIsAtTop] = useState(true);
   const [historyItems, setHistoryItems] = useState<TItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -89,12 +99,20 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
     createEmptyDurableTapeScrollHold<TItem>()
   );
 
+  const itemAccessors = useMemo(
+    () => ({
+      getKey: getRowKey,
+      getCursor
+    }),
+    [getCursor, getRowKey]
+  );
+
   const resolvedFeatures = useMemo(() => {
-    return resolveDurableTapeFeatures([
-      ...(featureInputs ?? ["default"]),
-      { key: "template", value: template }
-    ]);
-  }, [featureInputs, template]);
+    return resolveDurableTapeComponentFeatures({
+      features: featureInputs,
+      template: templateProp
+    });
+  }, [featureInputs, templateProp]);
 
   const selectedTemplate = useMemo(() => {
     return selectDurableTapeTemplate({
@@ -104,16 +122,15 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
       containerWidth: width,
       requestedTemplate: resolvedFeatures.responsiveTemplates
         ? resolvedFeatures.template
-        : template === "auto"
+        : resolvedFeatures.template === "auto"
           ? "full"
-          : template
+          : resolvedFeatures.template
     });
   }, [
     columnOverrides,
     columns,
     resolvedFeatures.responsiveTemplates,
     resolvedFeatures.template,
-    template,
     templates,
     width
   ]);
@@ -121,16 +138,30 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
   const query = useMemo(() => ({ scope, filters }), [scope, filters]);
 
   useEffect(() => {
+    setHistoryItems([]);
+    setHistoryLoading(false);
+    setHistoryExhausted(false);
+    setHovered(null);
+    setScrollHold(createEmptyDurableTapeScrollHold<TItem>());
+    wasAtTopRef.current = true;
+    setIsAtTop(true);
+    if (listRef.current) {
+      listRef.current.scrollTop = 0;
+    }
+  }, [query, source]);
+
+  useEffect(() => {
     const subscription = source.subscribe(query);
     const applySnapshot = (items: readonly TItem[]) => {
-      setScrollHold(
-        (current) =>
-          reduceDurableTapeScrollHold(
-            current as DurableTapeScrollHoldState<TItem & { ts?: number; seq?: number }>,
-            items as readonly (TItem & { ts?: number; seq?: number })[],
-            resolvedFeatures.scrollHold && !wasAtTopRef.current,
-            DEFAULT_HOT_LIMIT
-          ) as DurableTapeScrollHoldState<TItem>
+      setScrollHold((current) =>
+        reduceDurableTapeScrollHold(
+          current,
+          items,
+          resolvedFeatures.scrollHold && !wasAtTopRef.current,
+          DEFAULT_HOT_LIMIT,
+          undefined,
+          itemAccessors
+        )
       );
     };
 
@@ -144,15 +175,11 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
       unsubscribe?.();
       subscription.unsubscribe();
     };
-  }, [query, resolvedFeatures.scrollHold, source]);
+  }, [itemAccessors, query, resolvedFeatures.scrollHold, source]);
 
   const items = useMemo(() => {
-    return composeTapeItems(
-      [],
-      scrollHold.visible as (TItem & { ts?: number; seq?: number })[],
-      historyItems as (TItem & { ts?: number; seq?: number })[]
-    ) as TItem[];
-  }, [historyItems, scrollHold.visible]);
+    return composeTapeItems([], scrollHold.visible, historyItems, itemAccessors);
+  }, [historyItems, itemAccessors, scrollHold.visible]);
 
   const virtual = useDurableTapeVirtualList(items, listRef, {
     rowHeight,
@@ -174,14 +201,8 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
     setHistoryLoading(true);
     try {
       const page = await source.loadOlder(cursor, query);
-      setHistoryItems(
-        (current) =>
-          appendHistoryTail(
-            current as (TItem & { ts?: number; seq?: number })[],
-            page.items as (TItem & { ts?: number; seq?: number })[],
-            scrollHold.visible as (TItem & { ts?: number; seq?: number })[],
-            0
-          ) as TItem[]
+      setHistoryItems((current) =>
+        appendHistoryTail(current, page.items, scrollHold.visible, 0, itemAccessors)
       );
       setHistoryExhausted(page.exhausted === true || page.nextCursor === null);
     } finally {
@@ -191,6 +212,7 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
     getCursor,
     historyExhausted,
     historyLoading,
+    itemAccessors,
     items,
     query,
     resolvedFeatures.clickhouseHistory,
@@ -207,20 +229,22 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
 
   const flushToLiveHead = useCallback(() => {
     setScrollHold((current) => {
-      const result = flushDurableTapeJumpToLive(
-        current as DurableTapeScrollHoldState<TItem & { ts?: number; seq?: number }>,
-        DEFAULT_HOT_LIMIT,
-        {
-          reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-        }
-      );
-      return result.state as DurableTapeScrollHoldState<TItem>;
+      const result = flushDurableTapeJumpToLive(current, DEFAULT_HOT_LIMIT, {
+        reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+        accessors: itemAccessors
+      });
+      return result.state;
     });
     if (listRef.current) {
       listRef.current.scrollTop = 0;
     }
     wasAtTopRef.current = true;
     setIsAtTop(true);
+  }, [itemAccessors]);
+
+  const closeSettings = useCallback(() => {
+    setSettingsOpen(false);
+    settingsTriggerRef.current?.focus();
   }, []);
 
   const onScroll = useCallback(() => {
@@ -240,6 +264,22 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
     .map((column) => `minmax(0, ${Math.max(1, column.minWidth)}fr)`)
     .join(" ");
   const rowStyle = { "--durable-tape-grid": gridTemplateColumns } as CSSProperties;
+  const tapeLabel = ariaLabel ?? title ?? "Durable tape";
+  const canInspectRows = resolvedFeatures.keyboardInspect || Boolean(onFocus);
+  const canShowHover = resolvedFeatures.hoverDetails && Boolean(renderHover);
+
+  const showHoverDetail = useCallback(
+    (item: TItem, rowKey: string, index: number) => {
+      if (canShowHover) {
+        setHovered({ item, rowKey, index });
+      }
+    },
+    [canShowHover]
+  );
+
+  const clearHoverDetail = useCallback((rowKey: string) => {
+    setHovered((current) => (current?.rowKey === rowKey ? null : current));
+  }, []);
 
   return (
     <section
@@ -263,7 +303,9 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
               <button
                 className="durable-tape-settings-trigger"
                 type="button"
+                ref={settingsTriggerRef}
                 aria-expanded={settingsOpen}
+                aria-controls={settingsOpen ? settingsDialogId : undefined}
                 onClick={() => setSettingsOpen((open) => !open)}
               >
                 Settings
@@ -272,7 +314,7 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
           </>
         }
       />
-      <div className="durable-tape-table" role="table" aria-label={ariaLabel ?? title}>
+      <div className="durable-tape-table" role="table" aria-label={tapeLabel}>
         {selectedTemplate.columns.length > 0 ? (
           <div className="durable-tape-head" role="row" style={rowStyle}>
             {selectedTemplate.columns.map((column) => (
@@ -296,15 +338,20 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
                 data-row-size={size}
                 key={key}
                 role="row"
-                tabIndex={0}
+                tabIndex={canInspectRows ? 0 : -1}
                 style={{
                   ...rowStyle,
                   height: `${size}px`,
                   transform: `translateY(${start}px)`
                 }}
-                onFocus={() => onFocus?.({ item, rowKey: key, index })}
-                onMouseEnter={() => setHovered({ item, rowKey: key, index })}
-                onMouseLeave={() => setHovered(null)}
+                onFocus={() => {
+                  onFocus?.({ item, rowKey: key, index });
+                  showHoverDetail(item, key, index);
+                }}
+                onBlur={() => clearHoverDetail(key)}
+                onMouseEnter={() => showHoverDetail(item, key, index)}
+                onMouseLeave={() => clearHoverDetail(key)}
+                onPointerDown={() => showHoverDetail(item, key, index)}
               >
                 {renderRow({ item, rowKey: key, index, columns: selectedTemplate.columns })}
               </div>
@@ -313,12 +360,13 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
         </div>
       </div>
       <DurableTapeSettingsPopover
+        id={settingsDialogId}
         open={settingsOpen}
         features={resolvedFeatures}
         template={selectedTemplate.template.id}
-        onClose={() => setSettingsOpen(false)}
+        onClose={closeSettings}
       />
-      <DurableTapeHoverSurface open={Boolean(renderHover && hovered)}>
+      <DurableTapeHoverSurface open={Boolean(canShowHover && hovered)}>
         {renderHover && hovered ? renderHover(hovered) : null}
       </DurableTapeHoverSurface>
     </section>

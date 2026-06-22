@@ -1,6 +1,10 @@
 import { mergeNewest } from "./history";
 import { getDurableTapeItemKey } from "./keys";
-import type { DurableTapeScrollHoldState, DurableTapeSortableItem } from "./types";
+import type {
+  DurableTapeItemAccessors,
+  DurableTapeScrollHoldState,
+  DurableTapeSortableItem
+} from "./types";
 
 export const DURABLE_TAPE_NEW_ITEM_COUNT_CAP = 999;
 
@@ -23,13 +27,37 @@ export const formatDurableTapeNewItemCount = (
   return count > cap ? `${cap}+` : String(count);
 };
 
-export const reduceDurableTapeScrollHold = <TItem extends DurableTapeSortableItem>(
+const DEFAULT_SORTABLE_ACCESSORS: DurableTapeItemAccessors<DurableTapeSortableItem> = {
+  getKey: getDurableTapeItemKey,
+  getCursor: (item) => ({
+    ts: item.ts ?? item.source_ts ?? item.ingest_ts ?? 0,
+    seq: item.seq ?? 0
+  })
+};
+
+export function reduceDurableTapeScrollHold<TItem extends DurableTapeSortableItem>(
   current: DurableTapeScrollHoldState<TItem>,
   incoming: readonly TItem[],
   hold: boolean,
   retentionLimit: number,
   onTrim?: (evicted: number) => void
-): DurableTapeScrollHoldState<TItem> => {
+): DurableTapeScrollHoldState<TItem>;
+export function reduceDurableTapeScrollHold<TItem>(
+  current: DurableTapeScrollHoldState<TItem>,
+  incoming: readonly TItem[],
+  hold: boolean,
+  retentionLimit: number,
+  onTrim: ((evicted: number) => void) | undefined,
+  accessors: DurableTapeItemAccessors<TItem>
+): DurableTapeScrollHoldState<TItem>;
+export function reduceDurableTapeScrollHold<TItem>(
+  current: DurableTapeScrollHoldState<TItem>,
+  incoming: readonly TItem[],
+  hold: boolean,
+  retentionLimit: number,
+  onTrim?: (evicted: number) => void,
+  accessors: DurableTapeItemAccessors<TItem> = DEFAULT_SORTABLE_ACCESSORS as DurableTapeItemAccessors<TItem>
+): DurableTapeScrollHoldState<TItem> {
   if (incoming.length === 0) {
     return current;
   }
@@ -39,7 +67,7 @@ export const reduceDurableTapeScrollHold = <TItem extends DurableTapeSortableIte
   const unseen: TItem[] = [];
 
   for (const item of incoming) {
-    const key = getDurableTapeItemKey(item);
+    const key = accessors.getKey(item);
     if (seenKeys.has(key)) {
       break;
     }
@@ -57,7 +85,7 @@ export const reduceDurableTapeScrollHold = <TItem extends DurableTapeSortableIte
   if (hold) {
     return {
       visible: current.visible,
-      queued: mergeNewest(unseen, current.queued, retentionLimit, onTrim),
+      queued: mergeNewest(unseen, current.queued, retentionLimit, onTrim, accessors),
       seenKeys: nextSeenKeys ?? seenKeys,
       dropped: current.dropped + unseen.length
     };
@@ -65,29 +93,41 @@ export const reduceDurableTapeScrollHold = <TItem extends DurableTapeSortableIte
 
   const nextBatch = current.queued.length > 0 ? [...current.queued, ...unseen] : unseen;
   return {
-    visible: mergeNewest(nextBatch, current.visible, retentionLimit, onTrim),
+    visible: mergeNewest(nextBatch, current.visible, retentionLimit, onTrim, accessors),
     queued: [],
     seenKeys: nextSeenKeys ?? seenKeys,
     dropped: 0
   };
-};
+}
 
-export const flushDurableTapeScrollHold = <TItem extends DurableTapeSortableItem>(
+export function flushDurableTapeScrollHold<TItem extends DurableTapeSortableItem>(
   current: DurableTapeScrollHoldState<TItem>,
   retentionLimit: number,
   onTrim?: (evicted: number) => void
-): DurableTapeScrollHoldState<TItem> => {
+): DurableTapeScrollHoldState<TItem>;
+export function flushDurableTapeScrollHold<TItem>(
+  current: DurableTapeScrollHoldState<TItem>,
+  retentionLimit: number,
+  onTrim: ((evicted: number) => void) | undefined,
+  accessors: DurableTapeItemAccessors<TItem>
+): DurableTapeScrollHoldState<TItem>;
+export function flushDurableTapeScrollHold<TItem>(
+  current: DurableTapeScrollHoldState<TItem>,
+  retentionLimit: number,
+  onTrim?: (evicted: number) => void,
+  accessors: DurableTapeItemAccessors<TItem> = DEFAULT_SORTABLE_ACCESSORS as DurableTapeItemAccessors<TItem>
+): DurableTapeScrollHoldState<TItem> {
   if (current.queued.length === 0) {
     return current.dropped === 0 ? current : { ...current, dropped: 0 };
   }
 
   return {
-    visible: mergeNewest(current.queued, current.visible, retentionLimit, onTrim),
+    visible: mergeNewest(current.queued, current.visible, retentionLimit, onTrim, accessors),
     queued: [],
     seenKeys: current.seenKeys,
     dropped: 0
   };
-};
+}
 
 export type DurableTapeJumpToLiveResult<TItem> = {
   state: DurableTapeScrollHoldState<TItem>;
@@ -96,18 +136,38 @@ export type DurableTapeJumpToLiveResult<TItem> = {
   motion: "animated" | "instant";
 };
 
-export const flushDurableTapeJumpToLive = <TItem extends DurableTapeSortableItem>(
+export function flushDurableTapeJumpToLive<TItem extends DurableTapeSortableItem>(
+  current: DurableTapeScrollHoldState<TItem>,
+  retentionLimit: number,
+  options?: {
+    reducedMotion?: boolean;
+    onTrim?: (evicted: number) => void;
+  }
+): DurableTapeJumpToLiveResult<TItem>;
+export function flushDurableTapeJumpToLive<TItem>(
   current: DurableTapeScrollHoldState<TItem>,
   retentionLimit: number,
   options: {
     reducedMotion?: boolean;
     onTrim?: (evicted: number) => void;
+    accessors: DurableTapeItemAccessors<TItem>;
+  }
+): DurableTapeJumpToLiveResult<TItem>;
+export function flushDurableTapeJumpToLive<TItem>(
+  current: DurableTapeScrollHoldState<TItem>,
+  retentionLimit: number,
+  options: {
+    reducedMotion?: boolean;
+    onTrim?: (evicted: number) => void;
+    accessors?: DurableTapeItemAccessors<TItem>;
   } = {}
-): DurableTapeJumpToLiveResult<TItem> => {
+): DurableTapeJumpToLiveResult<TItem> {
+  const accessors =
+    options.accessors ?? (DEFAULT_SORTABLE_ACCESSORS as DurableTapeItemAccessors<TItem>);
   return {
-    state: flushDurableTapeScrollHold(current, retentionLimit, options.onTrim),
+    state: flushDurableTapeScrollHold(current, retentionLimit, options.onTrim, accessors),
     flushedCount: current.queued.length,
     scrollToTop: true,
     motion: options.reducedMotion ? "instant" : "animated"
   };
-};
+}

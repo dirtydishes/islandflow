@@ -56,6 +56,13 @@ export const compareDurableTapeOldestFirst = (
   return left.seq - right.seq;
 };
 
+export const compareDurableTapeNewestCursorFirst = (
+  left: DurableTapeCursor,
+  right: DurableTapeCursor
+): number => {
+  return compareDurableTapeOldestFirst(right, left);
+};
+
 export const findAnchorRestoreIndex = (
   keys: readonly string[],
   anchorKey: string,

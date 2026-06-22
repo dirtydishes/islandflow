@@ -15,6 +15,11 @@ const makeItem = (traceId: string, seq: number, ts: number) => ({
   ts
 });
 
+const customAccessors = {
+  getKey: (item: { key: string; cursor: { ts: number; seq: number } }) => item.key,
+  getCursor: (item: { key: string; cursor: { ts: number; seq: number } }) => item.cursor
+};
+
 describe("durable tape history composition", () => {
   it("sorts the hot head newest-first and returns overflow", () => {
     const { kept, evicted } = mergeNewestWithOverflow(
@@ -37,6 +42,20 @@ describe("durable tape history composition", () => {
     expect(items.map((item) => item.trace_id)).toEqual(["new", "clicked", "older"]);
   });
 
+  it("supports caller-provided identity and cursor accessors", () => {
+    const items = composeTapeItems(
+      [{ key: "clicked", cursor: { ts: 200, seq: 2 } }],
+      [
+        { key: "new", cursor: { ts: 400, seq: 4 } },
+        { key: "clicked", cursor: { ts: 200, seq: 2 } }
+      ],
+      [{ key: "older", cursor: { ts: 100, seq: 1 } }],
+      customAccessors
+    );
+
+    expect(items.map((item) => item.key)).toEqual(["new", "clicked", "older"]);
+  });
+
   it("promotes hot overflow into the history tail without duplicating the live head", () => {
     const hot = [makeItem("hot-3", 3, 300), makeItem("hot-2", 2, 200)];
     const { kept, evicted } = mergeNewestWithOverflow([makeItem("hot-4", 4, 400)], hot, 2);
@@ -44,6 +63,19 @@ describe("durable tape history composition", () => {
 
     expect(kept.map((item) => item.trace_id)).toEqual(["hot-4", "hot-3"]);
     expect(history.map((item) => item.trace_id)).toEqual(["hot-2"]);
+  });
+
+  it("uses caller-provided accessors when appending the history tail", () => {
+    const current = [{ key: "hist-2", cursor: { ts: 200, seq: 2 } }];
+    const incoming = [
+      { key: "live-duplicate", cursor: { ts: 300, seq: 3 } },
+      { key: "hist-1", cursor: { ts: 100, seq: 1 } }
+    ];
+    const liveHead = [{ key: "live-duplicate", cursor: { ts: 300, seq: 3 } }];
+
+    const history = appendHistoryTail(current, incoming, liveHead, 0, customAccessors);
+
+    expect(history.map((item) => item.key)).toEqual(["hist-2", "hist-1"]);
   });
 
   it("keeps held history stable while appending truly older rows", () => {

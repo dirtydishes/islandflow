@@ -25,6 +25,11 @@ export type DurableTapeHistoryPage<TItem> = {
   exhausted?: boolean;
 };
 
+export type DurableTapeItemAccessors<TItem> = {
+  getKey: (item: TItem) => string;
+  getCursor: (item: TItem) => DurableTapeCursor;
+};
+
 export type DurableTapeSubscription<TItem> = {
   getSnapshot?: () => readonly TItem[];
   listen?: (listener: (items: readonly TItem[]) => void) => () => void;

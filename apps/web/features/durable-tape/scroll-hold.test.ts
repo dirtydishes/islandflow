@@ -14,6 +14,11 @@ const makeItem = (traceId: string, seq: number, ts: number) => ({
   ts
 });
 
+const customAccessors = {
+  getKey: (item: { key: string; cursor: { ts: number; seq: number } }) => item.key,
+  getCursor: (item: { key: string; cursor: { ts: number; seq: number } }) => item.cursor
+};
+
 describe("durable tape scroll hold", () => {
   it("inserts incoming rows immediately at the live head", () => {
     const state = reduceDurableTapeScrollHold(
@@ -40,6 +45,22 @@ describe("durable tape scroll hold", () => {
     expect(held.visible.map((item) => item.trace_id)).toEqual(["a"]);
     expect(held.queued.map((item) => item.trace_id)).toEqual(["b"]);
     expect(held.dropped).toBe(1);
+  });
+
+  it("uses caller-provided identity and cursor accessors", () => {
+    const state = reduceDurableTapeScrollHold(
+      createEmptyDurableTapeScrollHold<{ key: string; cursor: { ts: number; seq: number } }>(),
+      [
+        { key: "a", cursor: { ts: 100, seq: 1 } },
+        { key: "b", cursor: { ts: 200, seq: 2 } }
+      ],
+      false,
+      10,
+      undefined,
+      customAccessors
+    );
+
+    expect(state.visible.map((item) => item.key)).toEqual(["b", "a"]);
   });
 
   it("flushes queued rows in one batch when returning to live", () => {

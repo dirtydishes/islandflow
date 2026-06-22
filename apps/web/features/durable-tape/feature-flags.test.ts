@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { resolveDurableTapeFeatures } from "./feature-flags";
+import { resolveDurableTapeComponentFeatures, resolveDurableTapeFeatures } from "./feature-flags";
 
 describe("durable tape feature resolver", () => {
   it("expands default features in place", () => {
@@ -41,5 +41,22 @@ describe("durable tape feature resolver", () => {
     expect(() => resolveDurableTapeFeatures(["default", "bogus" as any])).toThrow(
       "Unknown durable tape feature"
     );
+  });
+
+  it("keeps feature-level template overrides when no template prop is supplied", () => {
+    const resolved = resolveDurableTapeComponentFeatures({
+      features: ["default", { key: "template", value: "twoThirds" }]
+    });
+
+    expect(resolved.template).toBe("twoThirds");
+  });
+
+  it("lets an explicit template prop override feature-level template entries", () => {
+    const resolved = resolveDurableTapeComponentFeatures({
+      features: ["default", { key: "template", value: "twoThirds" }],
+      template: "half"
+    });
+
+    expect(resolved.template).toBe("half");
   });
 });

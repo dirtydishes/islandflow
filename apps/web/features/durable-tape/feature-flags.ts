@@ -100,3 +100,16 @@ export const resolveDurableTapeFeatures = (
 
   return resolved;
 };
+
+export const resolveDurableTapeComponentFeatures = ({
+  features,
+  template
+}: {
+  features?: readonly DurableTapeFeatureInput[];
+  template?: DurableTapeTemplateId | "auto";
+}): DurableTapeResolvedFeatures => {
+  return resolveDurableTapeFeatures([
+    ...(features ?? ["default"]),
+    ...(template ? ([{ key: "template", value: template }] as const) : [])
+  ]);
+};

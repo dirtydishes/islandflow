@@ -1,5 +1,5 @@
 import { useVirtualizer, type VirtualItem } from "@tanstack/react-virtual";
-import { type RefObject, useEffect } from "react";
+import { type RefObject, useEffect, useRef } from "react";
 
 export type DurableTapeVirtualListConfig<TItem> = {
   rowHeight: number;
@@ -117,6 +117,11 @@ export const useDurableVirtualHistoryGate = (
   lastVirtualIndex: number,
   onLoadOlder: () => void
 ): void => {
+  const loadRef = useRef(onLoadOlder);
+  useEffect(() => {
+    loadRef.current = onLoadOlder;
+  }, [onLoadOlder]);
+
   useEffect(() => {
     if (
       !shouldLoadOlderFromVirtualRows({
@@ -127,6 +132,6 @@ export const useDurableVirtualHistoryGate = (
     ) {
       return;
     }
-    onLoadOlder();
-  }, [enabled, itemCount, lastVirtualIndex, onLoadOlder]);
+    loadRef.current();
+  }, [enabled, itemCount, lastVirtualIndex]);
 };

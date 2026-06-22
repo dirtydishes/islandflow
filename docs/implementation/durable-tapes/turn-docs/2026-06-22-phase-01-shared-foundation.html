@@ -229,10 +229,12 @@
       <section>
         <h2>Verification</h2>
         <ul>
-          <li><span class="status-ok">pass</span> <code>bun test apps/web/features/durable-tape</code></li>
-          <li><span class="status-ok">pass</span> <code>bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code></li>
-          <li><span class="status-ok">pass</span> <code>bun --cwd=apps/web run build</code></li>
-          <li><span class="status-ok">pass</span> <code>bunx biome check apps/web/features/durable-tape apps/web/features/terminal/scroll.ts apps/web/features/terminal/tape.ts apps/web/app/globals.css</code></li>
+          <li><span class="status-ok">pass</span> <code>bun test apps/web/features/durable-tape</code> after reviewer repairs: 29 tests passed.</li>
+          <li><span class="status-ok">pass</span> <code>bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code> after reviewer repairs: 94 tests passed.</li>
+          <li><span class="status-ok">pass</span> <code>bun --cwd=apps/web run build</code> after reviewer repairs.</li>
+          <li><span class="status-ok">pass</span> <code>bunx biome check apps/web/features/durable-tape apps/web/features/terminal/scroll.ts apps/web/features/terminal/tape.ts apps/web/app/globals.css</code> after reviewer repairs.</li>
+          <li><span class="status-ok">pass</span> Browser QA with <code>bun run dev:web</code> against hosted API: <code>/options</code> and <code>/news</code> rendered at 1280x720 and 390x844 without page-level horizontal overflow, visible alert errors, or browser console errors.</li>
+          <li><span class="status-ok">pass</span> Forgejo Actions Validate #212 was verified green for worker commit <code>6f806f6d83</code> before reviewer repairs.</li>
           <li><span class="status-note">note</span> <code>bun install --frozen-lockfile</code> was needed first because this fresh worktree had not installed workspace web dependencies.</li>
         </ul>
       </section>
@@ -244,6 +246,28 @@
           <li>Check that terminal adapters preserve old hot/history dedupe, scroll hold, history gate, and virtual row key behavior.</li>
           <li>Check that the template resolver keeps the no-horizontal-scroll rule without forcing domain modules to expose rare inspection fields as default columns.</li>
         </ul>
+      </section>
+
+      <section>
+        <h2>Reviewer Findings And Repairs</h2>
+        <ul>
+          <li><span class="status-ok">repaired</span> The generic tape API exposed <code>getRowKey</code> and <code>getCursor</code>, but shared history and scroll-hold mechanics still deduped and sorted through terminal-shaped fields such as <code>trace_id</code>, <code>id</code>, <code>ts</code>, and <code>seq</code>. The repair threads a small item accessor contract through hot merge, history append, scroll hold, jump-to-live flush, and <code>DurableTape</code> composition while keeping terminal adapters on the legacy default accessors.</li>
+          <li><span class="status-ok">repaired</span> Feature-level template overrides were overwritten by the component's default <code>template</code> path. The repair adds a component feature resolver that preserves documented left-to-right feature overrides unless the caller explicitly supplies a <code>template</code> prop.</li>
+          <li><span class="status-ok">repaired</span> Scope, filter, or source changes resubscribed but kept old visible rows, history rows, exhausted-history state, and dedupe keys. The repair resets live/history/hover/scroll state at that query boundary.</li>
+          <li><span class="status-ok">repaired</span> The shared virtual history gate depended directly on an inline <code>onLoadOlder</code>, so unrelated renders at the tail could repeat history fetches. The repair matches the terminal adapter's ref-stabilized callback pattern.</li>
+          <li><span class="status-ok">repaired</span> Hover detail was mouse-only despite default keyboard inspection. Focus and pointer-down now open the same outside hover/detail surface when hover details are enabled.</li>
+          <li><span class="status-ok">repaired</span> The settings popout now focuses its close button when opened, supports Escape, restores focus to the trigger on close, and wires <code>aria-controls</code> from the trigger to the dialog.</li>
+          <li><span class="status-note">follow-up considered</span> The generic row renderer still leaves ARIA cell semantics and mobile touch-target sizing to domain modules. That is acceptable for Phase 01 foundation because no domain tape route consumes <code>DurableTape</code> yet, but Phase 02 should decide whether the foundation owns cell rendering or whether domain row renderers must provide cells explicitly.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Review Closeout</h2>
+        <p>
+          Reviewer repairs stayed within Phase 01 foundation scope: no domain tape rebuild, no API
+          contract changes, and no route composition changes. The PR is ready for orchestrator
+          closeout after the pushed reviewer head has green Forgejo CI.
+        </p>
       </section>
 
       <section>
@@ -287,23 +311,31 @@ new file mode 100644
 +  }
 +  return resolved;
 +};
++export const resolveDurableTapeComponentFeatures = ({ features, template }) =&gt; {
++  return resolveDurableTapeFeatures([
++    ...(features ?? ["default"]),
++    ...(template ? [{ key: "template", value: template }] : [])
++  ]);
++};
 
 diff --git a/apps/web/features/durable-tape/history.ts b/apps/web/features/durable-tape/history.ts
 new file mode 100644
 --- /dev/null
 +++ b/apps/web/features/durable-tape/history.ts
 @@
-+export const mergeNewestWithOverflow = (incoming, existing, limit, onTrim) =&gt; {
++export const mergeNewestWithOverflow = (incoming, existing, limit, onTrim, accessors) =&gt; {
 +  const combined = [...incoming, ...existing];
 +  const seen = new Set();
 +  const deduped = [];
 +  for (const item of combined) {
-+    const key = getDurableTapeItemKey(item);
++    const key = accessors.getKey(item);
 +    if (seen.has(key)) continue;
 +    seen.add(key);
 +    deduped.push(item);
 +  }
-+  deduped.sort(compareDurableTapeNewestFirst);
++  deduped.sort((left, right) =&gt;
++    compareDurableTapeNewestCursorFirst(accessors.getCursor(left), accessors.getCursor(right))
++  );
 +  const evicted = deduped.slice(limit);
 +  if (evicted.length &gt; 0) onTrim?.(evicted.length);
 +  return { kept: deduped.slice(0, limit), evicted };
@@ -323,9 +355,13 @@ new file mode 100644
 +++ b/apps/web/features/durable-tape/components/DurableTape.tsx
 @@
 +export const DurableTape = ({ source, getRowKey, getCursor, renderRow, renderHover, ...props }) =&gt; {
-+  const resolvedFeatures = resolveDurableTapeFeatures(props.features ?? ["default"]);
++  const itemAccessors = { getKey: getRowKey, getCursor };
++  const resolvedFeatures = resolveDurableTapeComponentFeatures({
++    features: props.features,
++    template: props.template
++  });
 +  const selectedTemplate = selectDurableTapeTemplate({ /* container width and columns */ });
-+  const items = composeTapeItems([], scrollHold.visible, historyItems);
++  const items = composeTapeItems([], scrollHold.visible, historyItems, itemAccessors);
 +  const virtual = useDurableTapeVirtualList(items, listRef, {
 +    rowHeight,
 +    overscan,
@@ -337,6 +373,7 @@ new file mode 100644
 +    virtual.virtualItems.at(-1)?.index ?? -1,
 +    () =&gt; void loadOlder()
 +  );
++  /* query/source changes reset live, history, hover, and scroll-hold state */
 +  return (
 +    &lt;section className="durable-tape" data-template={selectedTemplate.template.id}&gt;
 +      &lt;DurableTapeHeader actions={/* jump-to-live and settings */} /&gt;
@@ -424,23 +461,31 @@ new file mode 100644
 +  }
 +  return resolved;
 +};
++export const resolveDurableTapeComponentFeatures = ({ features, template }) => {
++  return resolveDurableTapeFeatures([
++    ...(features ?? ["default"]),
++    ...(template ? [{ key: "template", value: template }] : [])
++  ]);
++};
 
 diff --git a/apps/web/features/durable-tape/history.ts b/apps/web/features/durable-tape/history.ts
 new file mode 100644
 --- /dev/null
 +++ b/apps/web/features/durable-tape/history.ts
 @@
-+export const mergeNewestWithOverflow = (incoming, existing, limit, onTrim) => {
++export const mergeNewestWithOverflow = (incoming, existing, limit, onTrim, accessors) => {
 +  const combined = [...incoming, ...existing];
 +  const seen = new Set();
 +  const deduped = [];
 +  for (const item of combined) {
-+    const key = getDurableTapeItemKey(item);
++    const key = accessors.getKey(item);
 +    if (seen.has(key)) continue;
 +    seen.add(key);
 +    deduped.push(item);
 +  }
-+  deduped.sort(compareDurableTapeNewestFirst);
++  deduped.sort((left, right) =>
++    compareDurableTapeNewestCursorFirst(accessors.getCursor(left), accessors.getCursor(right))
++  );
 +  const evicted = deduped.slice(limit);
 +  if (evicted.length > 0) onTrim?.(evicted.length);
 +  return { kept: deduped.slice(0, limit), evicted };
@@ -460,9 +505,13 @@ new file mode 100644
 +++ b/apps/web/features/durable-tape/components/DurableTape.tsx
 @@
 +export const DurableTape = ({ source, getRowKey, getCursor, renderRow, renderHover, ...props }) => {
-+  const resolvedFeatures = resolveDurableTapeFeatures(props.features ?? ["default"]);
++  const itemAccessors = { getKey: getRowKey, getCursor };
++  const resolvedFeatures = resolveDurableTapeComponentFeatures({
++    features: props.features,
++    template: props.template
++  });
 +  const selectedTemplate = selectDurableTapeTemplate({ /* container width and columns */ });
-+  const items = composeTapeItems([], scrollHold.visible, historyItems);
++  const items = composeTapeItems([], scrollHold.visible, historyItems, itemAccessors);
 +  const virtual = useDurableTapeVirtualList(items, listRef, {
 +    rowHeight,
 +    overscan,
@@ -474,6 +523,7 @@ new file mode 100644
 +    virtual.virtualItems.at(-1)?.index ?? -1,
 +    () => void loadOlder()
 +  );
++  /* query/source changes reset live, history, hover, and scroll-hold state */
 +  return (
 +    <section className="durable-tape" data-template={selectedTemplate.template.id}>
 +      <DurableTapeHeader actions={/* jump-to-live and settings */} />
