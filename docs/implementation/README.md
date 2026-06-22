@@ -42,6 +42,7 @@ Research reports provide rationale and useful constraints. They do not add activ
 | Synthetic market data | `islandflow-259` - Plan synthetic market-data implementation phases | `docs/implementation/synthetic-market-data/00-roadmap.md` |
 | Smart money / smart flow | `islandflow-zxh` - Plan smart-money to smart-flow implementation phases | `docs/implementation/smart-money/00-roadmap.md` |
 | Reusable market chart | `islandflow-mloi` - Plan reusable lightweight-charts market chart module | `docs/implementation/lightweight-charts/IMPLEMENT.md` |
+| Durable tape modules | `islandflow-h9c0` - Plan durable reusable tape modules | `docs/implementation/durable-tapes/IMPLEMENT.md` |
 
 ## Dependency Order
 
