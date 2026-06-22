@@ -3341,7 +3341,8 @@ h3 {
 }
 
 .news-pane-full {
-  min-height: calc(100vh - var(--topbar-height) - 190px);
+  height: max(520px, calc(100vh - var(--topbar-height) - 190px));
+  min-height: 0;
 }
 
 .news-wire-module {
@@ -3350,6 +3351,10 @@ h3 {
   min-width: 0;
   min-height: 0;
   gap: 8px;
+}
+
+.news-wire-module.news-pane-full {
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .news-wire-control-rails {
@@ -3442,11 +3447,16 @@ h3 {
 }
 
 .news-wire-filter-rail button:hover,
-.news-wire-filter-rail button:focus-visible,
 .news-wire-filter-rail button.is-active {
   background: var(--route-accent-soft);
   color: var(--text);
+}
+
+.news-wire-filter-rail button:focus-visible {
+  background: var(--route-accent-soft);
+  color: var(--text);
   outline: none;
+  box-shadow: inset 0 0 0 2px var(--route-accent);
 }
 
 .news-wire-filter-rail button:disabled {
@@ -3478,14 +3488,16 @@ h3 {
   display: flex;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
 }
 
 .news-wire-tape-frame .news-wire-tape {
   flex: 1 1 auto;
+  min-height: 0;
 }
 
 .news-wire-tape .durable-tape-scroll {
-  min-height: 420px;
+  min-height: 0;
 }
 
 .news-wire-tape .durable-tape-row {
@@ -3675,6 +3687,7 @@ h3 {
   color: var(--text);
   font-size: 1rem;
   line-height: 1.25;
+  overflow-wrap: anywhere;
   text-wrap: pretty;
 }
 
@@ -3726,6 +3739,7 @@ h3 {
   color: var(--text-dim);
   font-size: 0.82rem;
   line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .news-wire-detail-body a {

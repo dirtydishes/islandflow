@@ -154,7 +154,7 @@ export function NewsRoute() {
         <NewsWire
           className="news-pane-full"
           lastUpdate={state.liveSession.lastUpdate}
-          mode={state.mode}
+          liveEnabled={state.mode === "live"}
           scopeSymbols={state.activeTickers}
           showControlRails
           status={state.liveSession.status}

@@ -82,10 +82,8 @@ export const getNewsStoryCursor = (story: NewsStory): { ts: number; seq: number 
   seq: story.seq
 });
 
-export const sanitizeNewsHtml = (
-  value: string
-): { html: string; fallbackText: string; sanitized: boolean } => {
-  const fallbackText = decodeNewsText(
+export const formatNewsBodyText = (value: string): string =>
+  decodeNewsText(
     value
       .replace(/<script[\s\S]*?<\/script>/gi, " ")
       .replace(/<style[\s\S]*?<\/style>/gi, " ")
@@ -93,19 +91,3 @@ export const sanitizeNewsHtml = (
       .replace(/\s+/g, " ")
       .trim()
   );
-
-  try {
-    const sanitized = value
-      .replace(/<script[\s\S]*?<\/script>/gi, "")
-      .replace(/<style[\s\S]*?<\/style>/gi, "")
-      .replace(/\son\w+=(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-      .replace(/\shref=(["'])javascript:[\s\S]*?\1/gi, ' href="#"')
-      .replace(
-        /<(?!\/?(p|div|section|article|span|strong|em|b|i|ul|ol|li|br|a|h1|h2|h3|h4|blockquote)\b)[^>]*>/gi,
-        ""
-      );
-    return { html: sanitized, fallbackText, sanitized: true };
-  } catch {
-    return { html: "", fallbackText, sanitized: false };
-  }
-};

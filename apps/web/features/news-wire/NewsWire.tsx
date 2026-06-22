@@ -23,13 +23,13 @@ import {
 } from "./filters";
 import {
   decodeNewsText,
+  formatNewsBodyText,
   formatNewsDateTime,
   formatNewsSymbolsLabel,
   formatNewsTimestamp,
   getNewsStoryCursor,
   getNewsStoryKey,
-  getNewsWireStatus,
-  sanitizeNewsHtml
+  getNewsWireStatus
 } from "./format";
 import {
   fetchNewsWireHistoryPage,
@@ -38,14 +38,13 @@ import {
 } from "./history";
 import { NEWS_WIRE_COLUMNS, NEWS_WIRE_TEMPLATES } from "./templates";
 
-export type NewsWireMode = "live" | "replay";
 export type NewsWireConnectionStatus = "connecting" | "connected" | "disconnected" | "stale";
 
 export type NewsWireProps = {
   stories: readonly NewsStory[];
   title?: string;
   className?: string;
-  mode?: NewsWireMode;
+  liveEnabled?: boolean;
   status?: NewsWireConnectionStatus;
   lastUpdate?: number | null;
   scopeSymbols?: readonly string[];
@@ -357,7 +356,7 @@ const NewsWireHover = ({ story }: { story: NewsStory }) => {
 const NewsWireDetail = ({ story, onClose }: { story: NewsStory; onClose: () => void }) => {
   const headline = decodeNewsText(story.headline);
   const summary = decodeNewsText(story.summary);
-  const body = sanitizeNewsHtml(story.content_html);
+  const bodyText = formatNewsBodyText(story.content_html);
   const status = getNewsWireStatus(story);
 
   return (
@@ -403,10 +402,8 @@ const NewsWireDetail = ({ story, onClose }: { story: NewsStory; onClose: () => v
 
       <section>
         <h4>Story</h4>
-        {body.sanitized && body.html ? (
-          <div className="news-wire-detail-body" dangerouslySetInnerHTML={{ __html: body.html }} />
-        ) : body.fallbackText ? (
-          <p>{body.fallbackText}</p>
+        {bodyText ? (
+          <p className="news-wire-detail-body">{bodyText}</p>
         ) : (
           <p>Story body unavailable.</p>
         )}
@@ -433,7 +430,7 @@ export const NewsWire = ({
   stories,
   title = "News Wire",
   className = "",
-  mode = "live",
+  liveEnabled = true,
   status,
   lastUpdate,
   scopeSymbols,
@@ -461,7 +458,7 @@ export const NewsWire = ({
   const source = useArrayNewsWireSource({
     stories: filteredStories,
     filters: wireFilters,
-    historyEnabled: mode === "live" && historyEnabled,
+    historyEnabled: liveEnabled && historyEnabled,
     fetcher,
     buildApiUrl,
     onHistoryState: setHistoryState
@@ -502,12 +499,24 @@ export const NewsWire = ({
     });
   }, []);
 
-  const emptyMessage =
-    mode === "replay"
-      ? "News is live only in v1."
-      : activeFilters || (scopeSymbols && scopeSymbols.length > 0)
-        ? "No news stories match the current filter."
-        : "Waiting for live news stories.";
+  const emptyMessage = !liveEnabled
+    ? "News is live only in v1."
+    : activeFilters || (scopeSymbols && scopeSymbols.length > 0)
+      ? "No news stories match the current filter."
+      : "Waiting for live news stories.";
+
+  useEffect(() => {
+    if (!selectedStory) {
+      return;
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setSelectedStory(null);
+      }
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [selectedStory]);
 
   return (
     <section className={`news-wire-module ${className}`.trim()}>
@@ -545,7 +554,7 @@ export const NewsWire = ({
         </div>
       ) : null}
 
-      {mode === "replay" ? (
+      {!liveEnabled ? (
         <div className="news-wire-live-only" role="status">
           {emptyMessage}
         </div>
@@ -563,7 +572,7 @@ export const NewsWire = ({
             filters={filterKey}
             getCursor={getNewsStoryCursor}
             getRowKey={getNewsStoryKey}
-            onFocus={({ item }) => selectStory(item)}
+            onActivate={({ item }) => selectStory(item)}
             renderHover={({ item }) => <NewsWireHover story={item} />}
             renderRow={renderRow}
             rowHeight={52}

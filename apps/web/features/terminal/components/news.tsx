@@ -5,7 +5,7 @@ import { getSubscriptionKey as getLiveSubscriptionKey } from "@islandflow/types"
 import Link from "next/link";
 import { memo, useMemo } from "react";
 
-import { formatNewsSymbolsLabel, getNewsWireStatus } from "../../news-wire";
+import { formatNewsSymbolsLabel, getNewsWireStatus } from "../../news-wire/format";
 import { getTapeVirtualConfig } from "../config";
 import { decodeNewsText, formatNewsTimestamp, statusLabel } from "../format";
 import type { TerminalState } from "../state";

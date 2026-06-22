@@ -2,9 +2,15 @@ import { describe, expect, it } from "bun:test";
 
 import { selectDurableTapeTemplate } from "../durable-tape/templates";
 import { filterNewsStories } from "./filters";
-import { formatNewsSymbolsLabel, getNewsStoryCursor, getNewsWireStatus } from "./format";
+import {
+  formatNewsBodyText,
+  formatNewsSymbolsLabel,
+  getNewsStoryCursor,
+  getNewsWireStatus
+} from "./format";
 import {
   buildNewsWireHistoryUrl,
+  fetchNewsWireHistoryPage,
   NEWS_WIRE_HISTORY_BATCH,
   NEWS_WIRE_HISTORY_ENDPOINT
 } from "./history";
@@ -108,5 +114,68 @@ describe("news wire helpers", () => {
     expect(url).toBe(
       `https://api.flow.deltaisland.io${NEWS_WIRE_HISTORY_ENDPOINT}?before_ts=123456&before_seq=9&limit=${NEWS_WIRE_HISTORY_BATCH}`
     );
+  });
+
+  it("continues paging history until client-side filters find a matching story", async () => {
+    const requestedUrls: string[] = [];
+    const matchingStory = makeStory({
+      trace_id: "matching",
+      seq: 6,
+      published_ts: 600,
+      resolved_symbols: ["AAPL"]
+    });
+
+    const page = await fetchNewsWireHistoryPage({
+      cursor: { ts: 1_000, seq: 10 },
+      filters: { symbols: ["AAPL"] },
+      buildApiUrl: (path) => `https://api.flow.deltaisland.io${path}`,
+      fetcher: async (url) => {
+        requestedUrls.push(url);
+        if (requestedUrls.length === 1) {
+          return Response.json({
+            data: [
+              makeStory({
+                trace_id: "miss",
+                seq: 9,
+                published_ts: 900,
+                resolved_symbols: ["MSFT"]
+              })
+            ],
+            next_before: { ts: 900, seq: 9 }
+          });
+        }
+        return Response.json({
+          data: [matchingStory],
+          next_before: { ts: 600, seq: 6 }
+        });
+      }
+    });
+
+    expect(requestedUrls).toHaveLength(2);
+    expect(requestedUrls[1]).toContain("before_ts=900&before_seq=9");
+    expect(page.items.map((story) => story.trace_id)).toEqual(["matching"]);
+    expect(page.nextCursor).toEqual({ ts: 600, seq: 6 });
+    expect(page.exhausted).toBe(false);
+  });
+
+  it("surfaces non-ok history response details", async () => {
+    await expect(
+      fetchNewsWireHistoryPage({
+        cursor: { ts: 1_000, seq: 10 },
+        fetcher: async () =>
+          new Response(JSON.stringify({ detail: "history unavailable" }), {
+            status: 503,
+            statusText: "Service Unavailable"
+          })
+      })
+    ).rejects.toThrow("history unavailable");
+  });
+
+  it("formats provider html bodies as decoded text for detail rendering", () => {
+    expect(
+      formatNewsBodyText(
+        '<p>Safe &amp; useful</p><img src=x onerror="alert(1)"><script>alert(2)</script>'
+      )
+    ).toBe("Safe & useful");
   });
 });

@@ -55,6 +55,8 @@ export const buildNewsWireHistoryUrl = ({
   return url.toString();
 };
 
+const getCursorKey = (cursor: DurableTapeCursor): string => `${cursor.ts}:${cursor.seq}`;
+
 const readHistoryError = async (response: Response): Promise<string> => {
   const statusLabel = `HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ""}`;
   const text = await response.text();
@@ -82,16 +84,35 @@ export const fetchNewsWireHistoryPage = async ({
   buildApiUrl?: NewsWireApiUrlBuilder;
   limit?: number;
 }): Promise<DurableTapeHistoryPage<NewsStory>> => {
-  const response = await fetcher(buildNewsWireHistoryUrl({ cursor, limit, buildApiUrl }));
-  if (!response.ok) {
-    throw new Error(await readHistoryError(response));
+  let activeCursor: DurableTapeCursor | null = cursor;
+  const seenCursors = new Set<string>([getCursorKey(cursor)]);
+
+  while (activeCursor) {
+    const response = await fetcher(
+      buildNewsWireHistoryUrl({ cursor: activeCursor, limit, buildApiUrl })
+    );
+    if (!response.ok) {
+      throw new Error(await readHistoryError(response));
+    }
+
+    const payload = (await response.json()) as NewsWireHistoryResponse;
+    const items = filterNewsStories(payload.data ?? [], filters ?? {});
+    const nextCursor = payload.next_before ?? null;
+    if (items.length > 0 || nextCursor === null) {
+      return {
+        items,
+        nextCursor,
+        exhausted: nextCursor === null
+      };
+    }
+
+    const nextCursorKey = getCursorKey(nextCursor);
+    if (seenCursors.has(nextCursorKey)) {
+      return { items: [], nextCursor: null, exhausted: true };
+    }
+    seenCursors.add(nextCursorKey);
+    activeCursor = nextCursor;
   }
 
-  const payload = (await response.json()) as NewsWireHistoryResponse;
-  const items = filterNewsStories(payload.data ?? [], filters ?? {});
-  return {
-    items,
-    nextCursor: payload.next_before ?? null,
-    exhausted: payload.next_before === null
-  };
+  return { items: [], nextCursor: null, exhausted: true };
 };
