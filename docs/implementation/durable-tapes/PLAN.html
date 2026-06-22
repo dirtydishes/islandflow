@@ -1,0 +1,772 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Durable Tape Modules Plan</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --bg-2: #0b1016;
+        --pane: #111820;
+        --pane-2: #0d141b;
+        --soft: #ffffff08;
+        --line: #ffffff14;
+        --line-strong: #ffffff24;
+        --ink: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --amber: #f5a623;
+        --amber-soft: #f5a6231f;
+        --green: #25c17a;
+        --green-soft: #25c17a1f;
+        --blue: #4da3ff;
+        --blue-soft: #4da3ff24;
+        --red: #ff6b5f;
+        --red-soft: #ff6b5f24;
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        background: var(--bg);
+        color: var(--ink);
+        font-family: var(--sans);
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+      }
+
+      a {
+        color: var(--amber);
+        text-decoration-color: #f5a62366;
+        text-underline-offset: 3px;
+      }
+
+      a:hover {
+        text-decoration-color: var(--amber);
+      }
+
+      .shell {
+        width: min(1480px, 100%);
+        margin: 0 auto;
+        padding: 22px;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 16px;
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .eyebrow,
+      .label,
+      .chip,
+      th,
+      .phase-id,
+      .toc a {
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .eyebrow {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--amber);
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 880px;
+        font-size: 2rem;
+        line-height: 1.08;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        font-size: 1.08rem;
+        line-height: 1.2;
+      }
+
+      h3 {
+        font-size: 0.95rem;
+        line-height: 1.25;
+      }
+
+      p,
+      li,
+      td {
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.55;
+      }
+
+      strong {
+        color: var(--ink);
+      }
+
+      code {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 0.08rem 0.3rem;
+        background: var(--soft);
+        color: var(--ink);
+        font-family: var(--mono);
+        font-size: 0.92em;
+      }
+
+      pre {
+        margin: 0;
+        overflow-x: auto;
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        padding: 12px 0;
+        color: var(--muted);
+        font: 0.82rem/1.55 var(--mono);
+      }
+
+      pre code {
+        border: 0;
+        padding: 0;
+        background: transparent;
+        color: inherit;
+      }
+
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 5px 9px;
+        background: var(--soft);
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      .chip-active {
+        border-color: #f5a62359;
+        background: var(--amber-soft);
+        color: var(--ink);
+      }
+
+      .intro {
+        display: grid;
+        grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+        gap: 16px;
+        padding: 18px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .summary-grid,
+      .rules-grid,
+      .module-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+        gap: 1px;
+        border: 1px solid var(--line);
+        background: var(--line);
+      }
+
+      .summary-grid > div,
+      .rules-grid > div,
+      .module-grid > div {
+        min-height: 104px;
+        padding: 12px;
+        background: var(--pane);
+      }
+
+      .summary-grid strong,
+      .rules-grid strong,
+      .module-grid strong {
+        display: block;
+        margin-bottom: 6px;
+      }
+
+      .toc {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 16px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .toc a {
+        min-height: 30px;
+        display: inline-flex;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 6px 10px;
+        background: var(--soft);
+        color: var(--muted);
+        text-decoration: none;
+      }
+
+      .toc a:hover {
+        border-color: #f5a62359;
+        background: var(--amber-soft);
+        color: var(--ink);
+      }
+
+      .section {
+        padding: 18px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .section-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+
+      .phase {
+        display: grid;
+        grid-template-columns: 92px minmax(0, 1fr) minmax(260px, 0.45fr);
+        gap: 14px;
+        padding: 16px 0;
+        border-top: 1px solid var(--line);
+      }
+
+      .phase:first-of-type {
+        border-top: 0;
+      }
+
+      .phase-id {
+        color: var(--amber);
+      }
+
+      .phase-main {
+        display: grid;
+        gap: 10px;
+      }
+
+      .phase-side {
+        display: grid;
+        gap: 8px;
+        align-content: start;
+      }
+
+      .phase-row {
+        display: grid;
+        grid-template-columns: 96px minmax(0, 1fr);
+        gap: 8px;
+        border-top: 1px solid var(--line);
+        padding-top: 8px;
+      }
+
+      .phase-row:first-child {
+        border-top: 0;
+        padding-top: 0;
+      }
+
+      .phase-row .label {
+        color: var(--faint);
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+
+      li + li {
+        margin-top: 4px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        border-top: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+      }
+
+      th,
+      td {
+        padding: 9px 8px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--faint);
+        background: var(--pane-2);
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .lane {
+        border-top: 1px solid var(--line);
+        padding-top: 10px;
+      }
+
+      .lane + .lane {
+        margin-top: 10px;
+      }
+
+      .status-ok {
+        color: var(--green);
+      }
+
+      .status-warn {
+        color: var(--amber);
+      }
+
+      @media (max-width: 980px) {
+        .shell {
+          padding: 14px;
+        }
+
+        .topbar,
+        .intro,
+        .phase {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        .topbar {
+          align-items: start;
+        }
+
+        .meta {
+          justify-content: flex-start;
+        }
+
+        .phase-row {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <span class="eyebrow">Implementation Plan</span>
+          <h1>Durable reusable tape modules</h1>
+        </div>
+        <div class="meta">
+          <span class="chip chip-active">Epic islandflow-h9c0</span>
+          <span class="chip">Phase 00 docs</span>
+          <span class="chip">Updated 2026-06-22</span>
+        </div>
+      </header>
+
+      <section class="intro">
+        <div>
+          <p>
+            Islandflow needs one shared durable tape foundation and a set of domain modules for
+            options, flow packets, news, equities, and alerts. The shared foundation owns live hot
+            heads, ClickHouse history, virtual scrolling, scroll hold, feature flags, templates, and
+            hover primitives. Domain modules own market meaning and route composition.
+          </p>
+        </div>
+        <div>
+          <p>
+            The UI direction is restrained, dense, flat, and table-first. Production templates must
+            not require horizontal scrolling. Omitted context belongs in hover, focus, settings, or
+            module-owned detail surfaces.
+          </p>
+        </div>
+      </section>
+
+      <nav class="toc" aria-label="Plan sections">
+        <a href="#rules">Rules</a>
+        <a href="#modules">Modules</a>
+        <a href="#phases">Phases</a>
+        <a href="#parallel">Parallel Work</a>
+        <a href="#templates">Templates</a>
+        <a href="#gates">Gates</a>
+      </nav>
+
+      <section class="section" id="rules">
+        <div class="section-head">
+          <h2>Product Rules</h2>
+          <span class="chip">Use $impeccable for UI and UX</span>
+        </div>
+        <div class="rules-grid">
+          <div>
+            <strong>No horizontal scroll</strong>
+            <p>Templates step down by container width. The registry may be rich, but visible columns stay small.</p>
+          </div>
+          <div>
+            <strong>Scroll hold is default</strong>
+            <p>Scrolling away from the live head pauses visible insertion, not ingestion. Jump-to-live flushes queued rows.</p>
+          </div>
+          <div>
+            <strong>Signal as row treatment</strong>
+            <p>Signals and hypotheses tint rows and appear in hover/detail. They do not consume a default column.</p>
+          </div>
+          <div>
+            <strong>Small settings gear</strong>
+            <p>Filters live in a popout rendered outside virtual scroll containers so it cannot be clipped.</p>
+          </div>
+          <div>
+            <strong>Domain modules stay separate</strong>
+            <p>Options does not own alerts, alerts do not own packet UI, and routes compose modules.</p>
+          </div>
+          <div>
+            <strong>Historical rows are first-class</strong>
+            <p>ClickHouse history renders like valid tape data. Feed health and row validity are separate concepts.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="modules">
+        <div class="section-head">
+          <h2>Target Module Stack</h2>
+          <span class="chip">Shared mechanics, domain meaning</span>
+        </div>
+        <div class="module-grid">
+          <div>
+            <strong>features/durable-tape</strong>
+            <p>Feature flags, templates, virtual table shell, hot/history merge, scroll hold, settings and hover primitives.</p>
+          </div>
+          <div>
+            <strong>features/options-tape</strong>
+            <p>Signal-first options tape, contract focus, packet-print focus, settings filters, readable contracts.</p>
+          </div>
+          <div>
+            <strong>features/flow-packets</strong>
+            <p>Packet summaries, packet detail, packet focus callbacks, and durable packet history.</p>
+          </div>
+          <div>
+            <strong>features/news-wire</strong>
+            <p>Live-first news, source and symbol filters, headline-first templates, story detail.</p>
+          </div>
+          <div>
+            <strong>features/equities-tape</strong>
+            <p>Equity prints, ticker scope, venue and off-exchange context, chart-independent tape behavior.</p>
+          </div>
+          <div>
+            <strong>features/alerts</strong>
+            <p>Alert list, alert detail, evidence hydration, and links to options, flow, and equities modules.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="phases">
+        <div class="section-head">
+          <h2>Phase Plan</h2>
+          <span class="chip">Read the linked phase doc before coding</span>
+        </div>
+
+        <article class="phase" id="phase-00">
+          <div class="phase-id">Phase 00</div>
+          <div class="phase-main">
+            <h3>Durable tape planning docs</h3>
+            <p>Create this planning set: <code>IMPLEMENT.md</code>, phase docs, and <code>PLAN.html</code>. This phase does not change runtime behavior.</p>
+            <div class="phase-row">
+              <span class="label">Issue</span>
+              <span><code>islandflow-h9c0.2</code></span>
+            </div>
+            <div class="phase-row">
+              <span class="label">Doc</span>
+              <span><a href="./00-roadmap.md">00-roadmap.md</a></span>
+            </div>
+          </div>
+          <div class="phase-side">
+            <p><strong class="status-ok">Parallel:</strong> none. This is the root planning phase.</p>
+            <p><strong class="status-warn">Stack:</strong> docs-only commit.</p>
+            <p><strong>Subagents:</strong> not needed unless auditing docs for omissions.</p>
+          </div>
+        </article>
+
+        <article class="phase" id="phase-01">
+          <div class="phase-id">Phase 01</div>
+          <div class="phase-main">
+            <h3>Shared durable tape foundation</h3>
+            <p>Extract the shared tape mechanics: hot head, ClickHouse history, virtual table shell, scroll hold, jump-to-live, feature flags, templates, settings, and hover primitives.</p>
+            <div class="phase-row">
+              <span class="label">Issue</span>
+              <span><code>islandflow-h9c0.3</code></span>
+            </div>
+            <div class="phase-row">
+              <span class="label">Doc</span>
+              <span><a href="./01-shared-foundation.md">01-shared-foundation.md</a></span>
+            </div>
+          </div>
+          <div class="phase-side">
+            <p><strong class="status-ok">Parallel:</strong> helper inventory, pure test design, type draft review.</p>
+            <p><strong class="status-warn">Stack:</strong> do not stack domain modules until exported types are stable.</p>
+            <p><strong>Subagents:</strong> inventory current virtual, history, and scroll-hold helpers.</p>
+          </div>
+        </article>
+
+        <article class="phase" id="phase-02">
+          <div class="phase-id">Phase 02</div>
+          <div class="phase-main">
+            <h3>Options tape module</h3>
+            <p>Make `/options` tape-first with signal defaults, readable contract labels, settings filters, contract focus, packet-print focus, and hover details.</p>
+            <div class="phase-row">
+              <span class="label">Issue</span>
+              <span><code>islandflow-h9c0.1</code></span>
+            </div>
+            <div class="phase-row">
+              <span class="label">Doc</span>
+              <span><a href="./02-options-tape.md">02-options-tape.md</a></span>
+            </div>
+          </div>
+          <div class="phase-side">
+            <p><strong class="status-ok">Parallel:</strong> contract formatter, column templates, settings preset model, hover content inventory.</p>
+            <p><strong class="status-warn">Stack:</strong> can stack on Phase 01 after foundation exports stabilize.</p>
+            <p><strong>Subagents:</strong> review option fields, support lookups, filters, and no-horizontal-scroll templates.</p>
+          </div>
+        </article>
+
+        <article class="phase" id="phase-03">
+          <div class="phase-id">Phase 03</div>
+          <div class="phase-main">
+            <h3>Flow packets module</h3>
+            <p>Create a reusable durable packet tape with packet summaries, quality context, packet detail, and packet focus callbacks.</p>
+            <div class="phase-row">
+              <span class="label">Issue</span>
+              <span><code>islandflow-h9c0.4</code></span>
+            </div>
+            <div class="phase-row">
+              <span class="label">Doc</span>
+              <span><a href="./03-flow-packets.md">03-flow-packets.md</a></span>
+            </div>
+          </div>
+          <div class="phase-side">
+            <p><strong class="status-ok">Parallel:</strong> can run beside options after packet-focus callback agreement.</p>
+            <p><strong class="status-warn">Stack:</strong> stack after Phase 01 only if packet member semantics are stable.</p>
+            <p><strong>Subagents:</strong> inventory <code>FlowPane</code> fields and flow history coverage.</p>
+          </div>
+        </article>
+
+        <article class="phase" id="phase-04">
+          <div class="phase-id">Phase 04</div>
+          <div class="phase-main">
+            <h3>News wire module</h3>
+            <p>Extract live-first news into a reusable module with source and symbol filters, headline-first templates, history gate, and detail surfaces.</p>
+            <div class="phase-row">
+              <span class="label">Issue</span>
+              <span><code>islandflow-h9c0.8</code></span>
+            </div>
+            <div class="phase-row">
+              <span class="label">Doc</span>
+              <span><a href="./04-news-wire.md">04-news-wire.md</a></span>
+            </div>
+          </div>
+          <div class="phase-side">
+            <p><strong class="status-ok">Parallel:</strong> safest parallel domain module after Phase 01.</p>
+            <p><strong class="status-warn">Stack:</strong> can stack after foundation without waiting on alerts.</p>
+            <p><strong>Subagents:</strong> audit current news pane, rails, drawer, and mobile truncation.</p>
+          </div>
+        </article>
+
+        <article class="phase" id="phase-05">
+          <div class="phase-id">Phase 05</div>
+          <div class="phase-main">
+            <h3>Equities tape module</h3>
+            <p>Build chart-independent durable equity prints with ticker scope, venue context, off-exchange treatment, and tape templates.</p>
+            <div class="phase-row">
+              <span class="label">Issue</span>
+              <span><code>islandflow-h9c0.5</code></span>
+            </div>
+            <div class="phase-row">
+              <span class="label">Doc</span>
+              <span><a href="./05-equities-tape.md">05-equities-tape.md</a></span>
+            </div>
+          </div>
+          <div class="phase-side">
+            <p><strong class="status-ok">Parallel:</strong> can run with news or flow packets after Phase 01.</p>
+            <p><strong class="status-warn">Stack:</strong> do not stack with chart changes unless callbacks are already merged.</p>
+            <p><strong>Subagents:</strong> inventory equity print, quote, join, and inferred-dark dependencies.</p>
+          </div>
+        </article>
+
+        <article class="phase" id="phase-06">
+          <div class="phase-id">Phase 06</div>
+          <div class="phase-main">
+            <h3>Alerts module</h3>
+            <p>Rebuild alerts as a separate module with alert rows, alert detail, evidence hydration, and links to options, flow, and equities modules.</p>
+            <div class="phase-row">
+              <span class="label">Issue</span>
+              <span><code>islandflow-h9c0.7</code></span>
+            </div>
+            <div class="phase-row">
+              <span class="label">Doc</span>
+              <span><a href="./06-alerts-module.md">06-alerts-module.md</a></span>
+            </div>
+          </div>
+          <div class="phase-side">
+            <p><strong class="status-ok">Parallel:</strong> planning inventory only until options and flow contracts land.</p>
+            <p><strong class="status-warn">Stack:</strong> avoid runtime stack behind unreviewed callback contracts.</p>
+            <p><strong>Subagents:</strong> map selected alert state, evidence refs, and pinned stores.</p>
+          </div>
+        </article>
+
+        <article class="phase" id="phase-07">
+          <div class="phase-id">Phase 07</div>
+          <div class="phase-main">
+            <h3>Route composition and closeout</h3>
+            <p>Compose the modules into routes, retire terminal-specific pane and drawer attachments, and verify the module family as a coherent product surface.</p>
+            <div class="phase-row">
+              <span class="label">Issue</span>
+              <span><code>islandflow-h9c0.6</code></span>
+            </div>
+            <div class="phase-row">
+              <span class="label">Doc</span>
+              <span><a href="./07-route-composition-closeout.md">07-route-composition-closeout.md</a></span>
+            </div>
+          </div>
+          <div class="phase-side">
+            <p><strong class="status-ok">Parallel:</strong> QA matrix, dead-code audit, documentation updates.</p>
+            <p><strong class="status-warn">Stack:</strong> do not stack. Run after domain modules merge.</p>
+            <p><strong>Subagents:</strong> route visual QA and import reachability audits.</p>
+          </div>
+        </article>
+      </section>
+
+      <section class="section" id="parallel">
+        <div class="section-head">
+          <h2>Parallel And Stacked Work</h2>
+          <span class="chip">Foundation first</span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Work</th>
+              <th>Parallel posture</th>
+              <th>Stacking posture</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Phase 01 foundation</td>
+              <td>Internal inventory and pure test lanes only.</td>
+              <td>One focused PR.</td>
+            </tr>
+            <tr>
+              <td>Phase 02 options</td>
+              <td>Can run beside flow after packet callback agreement.</td>
+              <td>Can stack on stable foundation exports.</td>
+            </tr>
+            <tr>
+              <td>Phase 03 flow packets</td>
+              <td>Can run beside options after packet callback agreement.</td>
+              <td>Can stack on stable foundation exports.</td>
+            </tr>
+            <tr>
+              <td>Phase 04 news</td>
+              <td>Good parallel candidate after foundation.</td>
+              <td>Can stack after foundation.</td>
+            </tr>
+            <tr>
+              <td>Phase 05 equities</td>
+              <td>Good parallel candidate after foundation.</td>
+              <td>Can stack after foundation if chart work is not mixed in.</td>
+            </tr>
+            <tr>
+              <td>Phase 06 alerts</td>
+              <td>Inventory can run early. Runtime waits for options and flow contracts.</td>
+              <td>Separate PR after callback contracts exist.</td>
+            </tr>
+            <tr>
+              <td>Phase 07 closeout</td>
+              <td>QA and audits can parallelize.</td>
+              <td>Do not stack.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="section" id="templates">
+        <div class="section-head">
+          <h2>Default Templates</h2>
+          <span class="chip">No horizontal scroll</span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Module</th>
+              <th>Full</th>
+              <th>Narrow</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Options global</td>
+              <td><code>TIME | CONTRACT | PX | SIZE | PREMIUM | SIDE | IV</code></td>
+              <td><code>TIME | CONTRACT | PREMIUM | SIDE</code></td>
+            </tr>
+            <tr>
+              <td>Options packet</td>
+              <td><code>DT | TIME | PX | SIZE | PREMIUM | SIDE | SPOT</code></td>
+              <td><code>TIME | PX | PREMIUM | SIDE</code></td>
+            </tr>
+            <tr>
+              <td>Flow packets</td>
+              <td><code>TIME | CONTRACT | PRINTS | PREMIUM | WINDOW | SIDE | QUALITY</code></td>
+              <td><code>CONTRACT | PRINTS | PREMIUM</code></td>
+            </tr>
+            <tr>
+              <td>News</td>
+              <td><code>TIME | SOURCE | SYMBOLS | HEADLINE</code></td>
+              <td><code>TIME | HEADLINE</code></td>
+            </tr>
+            <tr>
+              <td>Equities</td>
+              <td><code>TIME | TICKER | PX | SIZE | NOTIONAL | VENUE</code></td>
+              <td><code>TICKER | PX | SIZE</code></td>
+            </tr>
+            <tr>
+              <td>Alerts</td>
+              <td><code>TIME | SYMBOL | KIND | SCORE | STATE</code></td>
+              <td><code>TIME | SYMBOL | STATE</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="section" id="gates">
+        <div class="section-head">
+          <h2>Validation Gates</h2>
+          <span class="chip">Phase-specific gates still apply</span>
+        </div>
+        <pre><code>bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts
+bun test services/api/tests/live.test.ts
+bun test packages/storage/tests/option-prints.test.ts
+bun --cwd=apps/web run build</code></pre>
+        <p>
+          UI phases also require browser checks across desktop and mobile widths. Verify live head,
+          scroll-held, history-gate, hover/detail, settings popout, and no-horizontal-scroll states
+          for each completed module.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>
