@@ -54,7 +54,7 @@ export type EquitiesTapeSourceOptions = {
   snapshotLimit?: number;
   maxFilteredHistoryPages?: number;
   live?: boolean;
-  fetcher?: typeof fetch;
+  fetcher?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
   createWebSocket?: (url: string) => WebSocket;
 };
 

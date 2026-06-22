@@ -79,7 +79,8 @@ describe("equities tape helpers", () => {
 
   it("walks history pages until a client-side venue filter matches", async () => {
     const urls: string[] = [];
-    const fetcher = async (url: string) => {
+    const fetcher = async (input: RequestInfo | URL) => {
+      const url = input instanceof Request ? input.url : input.toString();
       urls.push(url);
       const page =
         urls.length === 1
