@@ -217,6 +217,24 @@ Do not delegate:
 - Committing, pushing, or closing issues.
 - Resolving cross-phase callback contracts without main-agent review.
 
+## Reviewer Thread Standard
+
+Reviewer threads for this stream should be ambitious. Do not stop at minor cleanup comments or "this could be a bit cleaner."
+
+Reviewers should actively look for a code-judo move: a reorganization that uses the existing architecture more effectively and makes the implementation feel inevitable in hindsight.
+
+Push hard for changes that delete complexity:
+
+- Remove whole branches, helpers, modes, conditionals, or layers when the design makes them unnecessary.
+- Prefer one deeper module over several pass-through modules.
+- Prefer domain callbacks and route composition over shared global state.
+- Prefer a simpler data contract over UI branching that compensates for ambiguous data.
+- Prefer one scroll/history mechanic in `features/durable-tape/` over per-domain clones.
+- Prefer template stepping and hover detail over column proliferation.
+- Prefer deleting legacy terminal drawer/pane coupling over wrapping it in another adapter layer.
+
+Reviewer output should lead with behavioral or architectural risk, then name the simpler shape. If the best finding is "this entire helper/layer can disappear," say that directly and explain the replacement.
+
 ## Scope Discipline
 
 - Do not build five separate table implementations.
