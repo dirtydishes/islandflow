@@ -41,6 +41,27 @@ Phase issues:
 6. Claim the issue with `bd update <issue-id> --claim`.
 7. Implement only that phase unless the phase doc explicitly names a separable lane.
 
+## Orchestrator Thread Loop
+
+When this stream is run from an orchestrator thread, the orchestrator should not hand-pick implementation work from memory.
+
+Loop:
+
+1. Read this `IMPLEMENT.md`.
+2. Spin up a narrow subagent to select the next task from Beads.
+3. The selector subagent must run `bd ready`, filter for the durable-tapes stream, run `bd show <issue-id>`, read the linked `spec_id`, and report the next task plus the required phase context.
+4. The orchestrator creates a separate implementation worker thread for that task.
+5. The worker thread receives this `IMPLEMENT.md`, the full linked phase document, the Beads issue ID, relevant quality gates, branch/PR posture from the phase table, and the orchestrator thread ID.
+6. The worker must follow repo branch rules. Do not create a branch unless the orchestrator explicitly assigns one.
+7. The worker must message the orchestrator thread ID only once the assigned task is complete or genuinely blocked.
+8. The callback must include changed files, commit or PR state, tests and build results, Beads updates, push status, and any follow-up issue IDs.
+
+Reviewer handoff:
+
+- For implementation phases, the orchestrator should create a separate reviewer thread after the worker reports completion or opens the assigned PR.
+- Reviewer threads must receive the orchestrator thread ID and the `Reviewer Thread Standard` from this file.
+- Reviewer threads should message back only after review is complete, requested repairs are either pushed or filed, and CI or local gates have a clear state.
+
 ## Product And UX Rules
 
 Use the repo-local `$impeccable` skill for all UI/UX work in this stream.
