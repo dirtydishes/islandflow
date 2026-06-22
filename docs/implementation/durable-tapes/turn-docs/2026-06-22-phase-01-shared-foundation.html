@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Durable Tape Phase 01 Foundation</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #0d141b;
+        --panel-2: #111820;
+        --line: rgba(230, 237, 244, 0.14);
+        --line-strong: rgba(245, 166, 35, 0.36);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --green: #25c17a;
+        --blue: #4da3ff;
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: linear-gradient(180deg, #0b1016 0%, var(--bg) 100%);
+        color: var(--text);
+        font: 15px/1.55 var(--sans);
+      }
+
+      main {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+
+      header {
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      .eyebrow,
+      h2,
+      .meta-label,
+      code,
+      pre {
+        font-family: var(--mono);
+      }
+
+      .eyebrow {
+        margin-bottom: 8px;
+        color: var(--accent);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 860px;
+        font-size: 2rem;
+        line-height: 1.08;
+        letter-spacing: 0;
+        text-wrap: balance;
+      }
+
+      .subtitle {
+        max-width: 78ch;
+        margin-top: 12px;
+        color: var(--muted);
+      }
+
+      .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1px;
+        margin-top: 18px;
+        border: 1px solid var(--line);
+        background: var(--line);
+      }
+
+      .meta-cell {
+        min-width: 0;
+        padding: 10px 12px;
+        background: var(--panel-2);
+      }
+
+      .meta-label {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--faint);
+        font-size: 0.66rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      section {
+        padding: 20px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      h2 {
+        margin-bottom: 10px;
+        color: var(--accent);
+        font-size: 0.9rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      p {
+        max-width: 82ch;
+        color: var(--text);
+      }
+
+      p + p {
+        margin-top: 10px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 7px;
+      }
+
+      code {
+        padding: 0.08rem 0.28rem;
+        border: 1px solid rgba(245, 166, 35, 0.18);
+        border-radius: 5px;
+        background: rgba(245, 166, 35, 0.1);
+        color: #ffe0a3;
+        font-size: 0.9em;
+      }
+
+      .status-ok {
+        color: var(--green);
+      }
+
+      .status-note {
+        color: var(--blue);
+      }
+
+      .diff-shell {
+        display: grid;
+        gap: 12px;
+      }
+
+      #rich-diff {
+        min-height: 32px;
+      }
+
+      #fallback-diff {
+        max-height: 560px;
+        overflow: auto;
+        margin: 0;
+        padding: 12px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--text);
+        font-size: 0.76rem;
+        line-height: 1.45;
+      }
+
+      .rich-diff-ready #fallback-diff {
+        display: none;
+      }
+
+      .diff-note {
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="eyebrow">Repository turn document</div>
+        <h1>Durable Tape Phase 01 Foundation</h1>
+        <p class="subtitle">
+          Created the shared durable-tape foundation for reusable live-plus-history tape mechanics,
+          while keeping existing terminal options, flow, and news surfaces on their current paths.
+        </p>
+        <div class="meta-grid" aria-label="Turn metadata">
+          <div class="meta-cell"><span class="meta-label">Branch</span>lavender/durable-tape-phase-01-foundation</div>
+          <div class="meta-cell"><span class="meta-label">Beads</span>islandflow-h9c0.3</div>
+          <div class="meta-cell"><span class="meta-label">Phase</span>01 shared foundation</div>
+          <div class="meta-cell"><span class="meta-label">Timestamp</span>2026-06-22 17:33 EDT</div>
+        </div>
+      </header>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          The new <code>apps/web/features/durable-tape</code> module owns the reusable feature
+          resolver, responsive template selection, column helpers, row keys, hot/history composition,
+          cursor selection, scroll-hold reducer, TanStack virtual list wrapper, and flat tape UI
+          primitives.
+        </p>
+        <p>
+          Existing terminal helpers in <code>terminal/tape.ts</code> and <code>terminal/scroll.ts</code>
+          now forward to the shared foundation, preserving the old exports and behavior while giving
+          later domain phases a stable import target.
+        </p>
+      </section>
+
+      <section>
+        <h2>Scope Held</h2>
+        <ul>
+          <li>No rebuild of <code>/options</code>, <code>/news</code>, dashboard, alerts, equities, or domain callback contracts.</li>
+          <li>No API, storage, filter, or ClickHouse contract changes.</li>
+          <li>Equities dashboard behavior was preserved as summary/chart consumption, not converted into a visible scroll-held tape.</li>
+          <li>Web-only QA did not start the full local stack. If browser QA is needed later, use <code>bun run dev:web</code>, which is the exact script present in this repo.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Verification</h2>
+        <ul>
+          <li><span class="status-ok">pass</span> <code>bun test apps/web/features/durable-tape</code> after reviewer repairs: 29 tests passed.</li>
+          <li><span class="status-ok">pass</span> <code>bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code> after reviewer repairs: 94 tests passed.</li>
+          <li><span class="status-ok">pass</span> <code>bun --cwd=apps/web run build</code> after reviewer repairs.</li>
+          <li><span class="status-ok">pass</span> <code>bunx biome check apps/web/features/durable-tape apps/web/features/terminal/scroll.ts apps/web/features/terminal/tape.ts apps/web/app/globals.css</code> after reviewer repairs.</li>
+          <li><span class="status-ok">pass</span> Browser QA with <code>bun run dev:web</code> against hosted API: <code>/options</code> and <code>/news</code> rendered at 1280x720 and 390x844 without page-level horizontal overflow, visible alert errors, or browser console errors.</li>
+          <li><span class="status-ok">pass</span> Forgejo Actions Validate #212 was verified green for worker commit <code>6f806f6d83</code> before reviewer repairs.</li>
+          <li><span class="status-note">note</span> <code>bun install --frozen-lockfile</code> was needed first because this fresh worktree had not installed workspace web dependencies.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Reviewer Focus</h2>
+        <ul>
+          <li>Check whether the shared <code>DurableTapeProps</code> public interface is small enough for Phase 02 and Phase 03 domain modules.</li>
+          <li>Check that terminal adapters preserve old hot/history dedupe, scroll hold, history gate, and virtual row key behavior.</li>
+          <li>Check that the template resolver keeps the no-horizontal-scroll rule without forcing domain modules to expose rare inspection fields as default columns.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Reviewer Findings And Repairs</h2>
+        <ul>
+          <li><span class="status-ok">repaired</span> The generic tape API exposed <code>getRowKey</code> and <code>getCursor</code>, but shared history and scroll-hold mechanics still deduped and sorted through terminal-shaped fields such as <code>trace_id</code>, <code>id</code>, <code>ts</code>, and <code>seq</code>. The repair threads a small item accessor contract through hot merge, history append, scroll hold, jump-to-live flush, and <code>DurableTape</code> composition while keeping terminal adapters on the legacy default accessors.</li>
+          <li><span class="status-ok">repaired</span> Feature-level template overrides were overwritten by the component's default <code>template</code> path. The repair adds a component feature resolver that preserves documented left-to-right feature overrides unless the caller explicitly supplies a <code>template</code> prop.</li>
+          <li><span class="status-ok">repaired</span> Scope, filter, or source changes resubscribed but kept old visible rows, history rows, exhausted-history state, and dedupe keys. The repair resets live/history/hover/scroll state at that query boundary.</li>
+          <li><span class="status-ok">repaired</span> The shared virtual history gate depended directly on an inline <code>onLoadOlder</code>, so unrelated renders at the tail could repeat history fetches. The repair matches the terminal adapter's ref-stabilized callback pattern.</li>
+          <li><span class="status-ok">repaired</span> Hover detail was mouse-only despite default keyboard inspection. Focus and pointer-down now open the same outside hover/detail surface when hover details are enabled.</li>
+          <li><span class="status-ok">repaired</span> The settings popout now focuses its close button when opened, supports Escape, restores focus to the trigger on close, and wires <code>aria-controls</code> from the trigger to the dialog.</li>
+          <li><span class="status-note">follow-up considered</span> The generic row renderer still leaves ARIA cell semantics and mobile touch-target sizing to domain modules. That is acceptable for Phase 01 foundation because no domain tape route consumes <code>DurableTape</code> yet, but Phase 02 should decide whether the foundation owns cell rendering or whether domain row renderers must provide cells explicitly.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Review Closeout</h2>
+        <p>
+          Reviewer repairs stayed within Phase 01 foundation scope: no domain tape rebuild, no API
+          contract changes, and no route composition changes. The PR is ready for orchestrator
+          closeout after the pushed reviewer head has green Forgejo CI.
+        </p>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p class="diff-note">
+          The rich view below attempts to render with browser-side <code>PatchDiff</code> from
+          <code>@pierre/diffs/react</code>. The unified HTML fallback remains visible unless that
+          browser render succeeds.
+        </p>
+        <div class="diff-shell">
+          <div id="rich-diff" aria-label="Rich diff renderer"></div>
+          <pre id="fallback-diff"><code>diff --git a/apps/web/features/durable-tape/feature-flags.ts b/apps/web/features/durable-tape/feature-flags.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/durable-tape/feature-flags.ts
+@@
++export const DURABLE_TAPE_DEFAULT_FEATURES = [
++  "liveHotHead",
++  "clickhouseHistory",
++  "scrollGate",
++  "scrollHold",
++  "jumpToLive",
++  "newItemCount",
++  "hoverDetails",
++  "keyboardInspect",
++  "responsiveTemplates",
++  "rowTinting",
++  "settingsGear",
++  "noHorizontalScroll"
++] as const;
++export const resolveDurableTapeFeatures = (inputs = ["default"]) =&gt; {
++  const resolved = createEmptyFeatureState();
++  for (const input of inputs) {
++    if (input === "default") {
++      for (const feature of DURABLE_TAPE_DEFAULT_FEATURES) {
++        resolved[feature] = true;
++      }
++      continue;
++    }
++    /* string and structured overrides apply left to right */
++  }
++  return resolved;
++};
++export const resolveDurableTapeComponentFeatures = ({ features, template }) =&gt; {
++  return resolveDurableTapeFeatures([
++    ...(features ?? ["default"]),
++    ...(template ? [{ key: "template", value: template }] : [])
++  ]);
++};
+
+diff --git a/apps/web/features/durable-tape/history.ts b/apps/web/features/durable-tape/history.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/durable-tape/history.ts
+@@
++export const mergeNewestWithOverflow = (incoming, existing, limit, onTrim, accessors) =&gt; {
++  const combined = [...incoming, ...existing];
++  const seen = new Set();
++  const deduped = [];
++  for (const item of combined) {
++    const key = accessors.getKey(item);
++    if (seen.has(key)) continue;
++    seen.add(key);
++    deduped.push(item);
++  }
++  deduped.sort((left, right) =&gt;
++    compareDurableTapeNewestCursorFirst(accessors.getCursor(left), accessors.getCursor(right))
++  );
++  const evicted = deduped.slice(limit);
++  if (evicted.length &gt; 0) onTrim?.(evicted.length);
++  return { kept: deduped.slice(0, limit), evicted };
++};
++export const selectOlderHistoryCursor = (items, getCursor) =&gt; {
++  let oldest = null;
++  for (const item of items) {
++    const cursor = getCursor(item);
++    if (!oldest || compareDurableTapeOldestFirst(cursor, oldest) &lt; 0) oldest = cursor;
++  }
++  return oldest;
++};
+
+diff --git a/apps/web/features/durable-tape/components/DurableTape.tsx b/apps/web/features/durable-tape/components/DurableTape.tsx
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/durable-tape/components/DurableTape.tsx
+@@
++export const DurableTape = ({ source, getRowKey, getCursor, renderRow, renderHover, ...props }) =&gt; {
++  const itemAccessors = { getKey: getRowKey, getCursor };
++  const resolvedFeatures = resolveDurableTapeComponentFeatures({
++    features: props.features,
++    template: props.template
++  });
++  const selectedTemplate = selectDurableTapeTemplate({ /* container width and columns */ });
++  const items = composeTapeItems([], scrollHold.visible, historyItems, itemAccessors);
++  const virtual = useDurableTapeVirtualList(items, listRef, {
++    rowHeight,
++    overscan,
++    getRowKey
++  });
++  useDurableVirtualHistoryGate(
++    resolvedFeatures.clickhouseHistory,
++    items.length,
++    virtual.virtualItems.at(-1)?.index ?? -1,
++    () =&gt; void loadOlder()
++  );
++  /* query/source changes reset live, history, hover, and scroll-hold state */
++  return (
++    &lt;section className="durable-tape" data-template={selectedTemplate.template.id}&gt;
++      &lt;DurableTapeHeader actions={/* jump-to-live and settings */} /&gt;
++      &lt;div className="durable-tape-scroll" ref={listRef} onScroll={onScroll}&gt;
++        {/* virtual rows render caller-owned domain row content */}
++      &lt;/div&gt;
++    &lt;/section&gt;
++  );
++};
+
+diff --git a/apps/web/features/terminal/scroll.ts b/apps/web/features/terminal/scroll.ts
+--- a/apps/web/features/terminal/scroll.ts
++++ b/apps/web/features/terminal/scroll.ts
+@@
+-import { useVirtualizer } from "@tanstack/react-virtual";
++import { shouldLoadOlderFromVirtualRows, useDurableTapeVirtualList } from "../durable-tape";
+@@
+-    if (!enabled || itemCount === 0) return;
+-    if (lastVirtualIndex &lt; itemCount - 1) return;
++    if (!shouldLoadOlderFromVirtualRows({ enabled, itemCount, lastVirtualIndex })) return;
+     loadRef.current();
+@@
+-  const virtualizer = useVirtualizer({ count: items.length, ... });
+-  return { totalSize: virtualizer.getTotalSize(), virtualItems };
++  return useDurableTapeVirtualList(items, listRef, {
++    rowHeight: config.rowHeight,
++    overscan: config.overscan,
++    debugLabel: DEV_TAPE_DEBUG ? config.debugLabel : undefined,
++    getRowKey: getTapeItemKey
++  });
+
+diff --git a/apps/web/features/terminal/tape.ts b/apps/web/features/terminal/tape.ts
+--- a/apps/web/features/terminal/tape.ts
++++ b/apps/web/features/terminal/tape.ts
+@@
++import {
++  appendHistoryTail,
++  composeTapeItems,
++  flushDurableTapeScrollHold,
++  mergeHeldTapeHistory,
++  mergeNewestWithOverflow,
++  reduceDurableTapeScrollHold
++} from "../durable-tape";
+@@
+-export const reducePausableTapeData = (...) =&gt; { /* terminal-local reducer */ };
++export const reducePausableTapeData = (current, incoming, paused, retentionLimit) =&gt; {
++  return reduceDurableTapeScrollHold(current, incoming, paused, retentionLimit, (evicted) =&gt;
++    incrementRetentionMetric("hotWindowEvictions", evicted)
++  );
++};
+</code></pre>
+        </div>
+      </section>
+    </main>
+
+    <script type="text/plain" id="patch-source">diff --git a/apps/web/features/durable-tape/feature-flags.ts b/apps/web/features/durable-tape/feature-flags.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/durable-tape/feature-flags.ts
+@@
++export const DURABLE_TAPE_DEFAULT_FEATURES = [
++  "liveHotHead",
++  "clickhouseHistory",
++  "scrollGate",
++  "scrollHold",
++  "jumpToLive",
++  "newItemCount",
++  "hoverDetails",
++  "keyboardInspect",
++  "responsiveTemplates",
++  "rowTinting",
++  "settingsGear",
++  "noHorizontalScroll"
++] as const;
++export const resolveDurableTapeFeatures = (inputs = ["default"]) => {
++  const resolved = createEmptyFeatureState();
++  for (const input of inputs) {
++    if (input === "default") {
++      for (const feature of DURABLE_TAPE_DEFAULT_FEATURES) {
++        resolved[feature] = true;
++      }
++      continue;
++    }
++    /* string and structured overrides apply left to right */
++  }
++  return resolved;
++};
++export const resolveDurableTapeComponentFeatures = ({ features, template }) => {
++  return resolveDurableTapeFeatures([
++    ...(features ?? ["default"]),
++    ...(template ? [{ key: "template", value: template }] : [])
++  ]);
++};
+
+diff --git a/apps/web/features/durable-tape/history.ts b/apps/web/features/durable-tape/history.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/durable-tape/history.ts
+@@
++export const mergeNewestWithOverflow = (incoming, existing, limit, onTrim, accessors) => {
++  const combined = [...incoming, ...existing];
++  const seen = new Set();
++  const deduped = [];
++  for (const item of combined) {
++    const key = accessors.getKey(item);
++    if (seen.has(key)) continue;
++    seen.add(key);
++    deduped.push(item);
++  }
++  deduped.sort((left, right) =>
++    compareDurableTapeNewestCursorFirst(accessors.getCursor(left), accessors.getCursor(right))
++  );
++  const evicted = deduped.slice(limit);
++  if (evicted.length > 0) onTrim?.(evicted.length);
++  return { kept: deduped.slice(0, limit), evicted };
++};
++export const selectOlderHistoryCursor = (items, getCursor) => {
++  let oldest = null;
++  for (const item of items) {
++    const cursor = getCursor(item);
++    if (!oldest || compareDurableTapeOldestFirst(cursor, oldest) < 0) oldest = cursor;
++  }
++  return oldest;
++};
+
+diff --git a/apps/web/features/durable-tape/components/DurableTape.tsx b/apps/web/features/durable-tape/components/DurableTape.tsx
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/durable-tape/components/DurableTape.tsx
+@@
++export const DurableTape = ({ source, getRowKey, getCursor, renderRow, renderHover, ...props }) => {
++  const itemAccessors = { getKey: getRowKey, getCursor };
++  const resolvedFeatures = resolveDurableTapeComponentFeatures({
++    features: props.features,
++    template: props.template
++  });
++  const selectedTemplate = selectDurableTapeTemplate({ /* container width and columns */ });
++  const items = composeTapeItems([], scrollHold.visible, historyItems, itemAccessors);
++  const virtual = useDurableTapeVirtualList(items, listRef, {
++    rowHeight,
++    overscan,
++    getRowKey
++  });
++  useDurableVirtualHistoryGate(
++    resolvedFeatures.clickhouseHistory,
++    items.length,
++    virtual.virtualItems.at(-1)?.index ?? -1,
++    () => void loadOlder()
++  );
++  /* query/source changes reset live, history, hover, and scroll-hold state */
++  return (
++    <section className="durable-tape" data-template={selectedTemplate.template.id}>
++      <DurableTapeHeader actions={/* jump-to-live and settings */} />
++      <div className="durable-tape-scroll" ref={listRef} onScroll={onScroll}>
++        {/* virtual rows render caller-owned domain row content */}
++      </div>
++    </section>
++  );
++};
+
+diff --git a/apps/web/features/terminal/scroll.ts b/apps/web/features/terminal/scroll.ts
+--- a/apps/web/features/terminal/scroll.ts
++++ b/apps/web/features/terminal/scroll.ts
+@@
+-import { useVirtualizer } from "@tanstack/react-virtual";
++import { shouldLoadOlderFromVirtualRows, useDurableTapeVirtualList } from "../durable-tape";
+@@
+-    if (!enabled || itemCount === 0) return;
+-    if (lastVirtualIndex < itemCount - 1) return;
++    if (!shouldLoadOlderFromVirtualRows({ enabled, itemCount, lastVirtualIndex })) return;
+     loadRef.current();
+@@
+-  const virtualizer = useVirtualizer({ count: items.length, ... });
+-  return { totalSize: virtualizer.getTotalSize(), virtualItems };
++  return useDurableTapeVirtualList(items, listRef, {
++    rowHeight: config.rowHeight,
++    overscan: config.overscan,
++    debugLabel: DEV_TAPE_DEBUG ? config.debugLabel : undefined,
++    getRowKey: getTapeItemKey
++  });
+
+diff --git a/apps/web/features/terminal/tape.ts b/apps/web/features/terminal/tape.ts
+--- a/apps/web/features/terminal/tape.ts
++++ b/apps/web/features/terminal/tape.ts
+@@
++import {
++  appendHistoryTail,
++  composeTapeItems,
++  flushDurableTapeScrollHold,
++  mergeHeldTapeHistory,
++  mergeNewestWithOverflow,
++  reduceDurableTapeScrollHold
++} from "../durable-tape";
+@@
+-export const reducePausableTapeData = (...) => { /* terminal-local reducer */ };
++export const reducePausableTapeData = (current, incoming, paused, retentionLimit) => {
++  return reduceDurableTapeScrollHold(current, incoming, paused, retentionLimit, (evicted) =>
++    incrementRetentionMetric("hotWindowEvictions", evicted)
++  );
++};
+</script>
+    <script type="module">
+      const source = document.getElementById("patch-source")?.textContent ?? "";
+      const target = document.getElementById("rich-diff");
+      try {
+        const React = await import("react");
+        const { createRoot } = await import("react-dom/client");
+        const { PatchDiff } = await import("@pierre/diffs/react");
+        createRoot(target).render(React.createElement(PatchDiff, { patch: source }));
+        document.documentElement.classList.add("rich-diff-ready");
+      } catch (error) {
+        target.textContent =
+          "Rich diff renderer unavailable in this static context; showing unified fallback.";
+      }
+    </script>
+  </body>
+</html>
