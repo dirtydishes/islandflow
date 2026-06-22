@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   createCorsPreflightResponse,
+  DEFAULT_API_CORS_ORIGINS,
   parseCorsAllowedOrigins,
   resolveCorsOrigin,
   withCorsHeaders
@@ -26,6 +27,20 @@ describe("api cors helpers", () => {
     });
 
     expect(resolveCorsOrigin(req, allowedOrigins)).toBe("http://127.0.0.1:3000");
+  });
+
+  it("keeps the hosted-backend web QA fallback port in default origins", () => {
+    const defaultOrigins = parseCorsAllowedOrigins(DEFAULT_API_CORS_ORIGINS);
+
+    for (const origin of ["http://127.0.0.1:3100", "http://localhost:3100"]) {
+      const req = new Request("https://api.flow.deltaisland.io/history/news", {
+        headers: {
+          origin
+        }
+      });
+
+      expect(resolveCorsOrigin(req, defaultOrigins)).toBe(origin);
+    }
   });
 
   it("does not reflect unknown origins", () => {

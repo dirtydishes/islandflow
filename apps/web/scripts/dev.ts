@@ -1,16 +1,15 @@
 import { rm } from "node:fs/promises";
-
-const DEFAULT_REMOTE_API_URL = "https://api.flow.deltaisland.io";
+import { resolveWebDevConfig } from "./dev-config";
 
 const run = async () => {
-  const port = 3000;
+  const config = resolveWebDevConfig(Bun.env);
+  const { apiUrl, apiUrlSource, port, portSource } = config;
   const distDir = ".next-dev";
-  console.log(`[web] starting Next.js dev server on port ${port}`);
-  console.log(
-    `[web] API origin: ${Bun.env.NEXT_PUBLIC_API_URL ?? DEFAULT_REMOTE_API_URL}${
-      Bun.env.NEXT_PUBLIC_API_URL ? " (from NEXT_PUBLIC_API_URL)" : " (default)"
-    }`
-  );
+  console.log(`[web] starting Next.js dev server on port ${port} (${portSource})`);
+  console.log(`[web] API origin: ${apiUrl} (${apiUrlSource})`);
+  if (config.hostedApiCorsWarning) {
+    console.warn(`[web] ${config.hostedApiCorsWarning}`);
+  }
 
   const path = Bun.env.PATH ?? "";
   const cwd = `${import.meta.dir}/..`;
@@ -28,7 +27,7 @@ const run = async () => {
     env: {
       ...Bun.env,
       PATH: `${cwd}/node_modules/.bin:${path}`,
-      NEXT_PUBLIC_API_URL: Bun.env.NEXT_PUBLIC_API_URL ?? DEFAULT_REMOTE_API_URL,
+      NEXT_PUBLIC_API_URL: apiUrl,
       PORT: String(port)
     }
   });
