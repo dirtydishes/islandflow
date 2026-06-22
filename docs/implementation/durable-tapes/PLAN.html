@@ -406,6 +406,7 @@
         <a href="#modules">Modules</a>
         <a href="#phases">Phases</a>
         <a href="#parallel">Parallel Work</a>
+        <a href="#reviewers">Reviewers</a>
         <a href="#templates">Templates</a>
         <a href="#gates">Gates</a>
       </nav>
@@ -702,6 +703,31 @@
             </tr>
           </tbody>
         </table>
+      </section>
+
+      <section class="section" id="reviewers">
+        <div class="section-head">
+          <h2>Reviewer Thread Standard</h2>
+          <span class="chip">Push for deletion</span>
+        </div>
+        <div class="summary-grid">
+          <div>
+            <strong>Review ambitiously</strong>
+            <p>Reviewer threads should not stop at minor cleanup. They should look for the simpler shape that makes the change feel inevitable.</p>
+          </div>
+          <div>
+            <strong>Delete complexity</strong>
+            <p>Prefer findings that remove helpers, branches, conditionals, modes, layers, or legacy coupling instead of rearranging them.</p>
+          </div>
+          <div>
+            <strong>Use the existing architecture</strong>
+            <p>Push code toward route composition, domain modules, and one shared durable-tape mechanic instead of per-domain clones.</p>
+          </div>
+          <div>
+            <strong>Name the better shape</strong>
+            <p>Lead with behavioral or architectural risk, then state the code-judo move that would make the implementation smaller.</p>
+          </div>
+        </div>
       </section>
 
       <section class="section" id="templates">
