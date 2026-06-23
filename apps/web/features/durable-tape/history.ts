@@ -223,6 +223,14 @@ export const isSameDurableTapeCursor = (
   right: DurableTapeCursor
 ): boolean => left.ts === right.ts && left.seq === right.seq;
 
+export const shouldApplyDurableTapeHistoryLoad = ({
+  loadGeneration,
+  currentGeneration
+}: {
+  loadGeneration: number;
+  currentGeneration: number;
+}): boolean => loadGeneration === currentGeneration;
+
 export const selectDurableTapeHistoryCursor = <TItem>({
   currentCursor,
   items,

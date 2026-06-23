@@ -15,7 +15,8 @@ import {
   appendHistoryTail,
   composeTapeItems,
   isSameDurableTapeCursor,
-  selectDurableTapeHistoryCursor
+  selectDurableTapeHistoryCursor,
+  shouldApplyDurableTapeHistoryLoad
 } from "../history";
 import {
   createEmptyDurableTapeScrollHold,
@@ -92,6 +93,7 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
   const settingsTriggerRef = useRef<HTMLButtonElement | null>(null);
   const wasAtTopRef = useRef(true);
   const initialHistoryLoadKeysRef = useRef(new Set<string>());
+  const historyLoadGenerationRef = useRef(0);
   const settingsDialogId = useId();
   const [isAtTop, setIsAtTop] = useState(true);
   const [historyItems, setHistoryItems] = useState<TItem[]>([]);
@@ -147,6 +149,7 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
   const query = useMemo(() => ({ scope, filters }), [scope, filters]);
 
   useEffect(() => {
+    historyLoadGenerationRef.current += 1;
     setHistoryItems([]);
     setHistoryLoading(false);
     setHistoryExhausted(false);
@@ -222,8 +225,17 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
       }
 
       setHistoryLoading(true);
+      const loadGeneration = historyLoadGenerationRef.current;
       try {
         const page = await source.loadOlder(cursor, query);
+        if (
+          !shouldApplyDurableTapeHistoryLoad({
+            loadGeneration,
+            currentGeneration: historyLoadGenerationRef.current
+          })
+        ) {
+          return;
+        }
         const nextCursor = page.nextCursor ?? null;
         const cursorStalled = nextCursor ? isSameDurableTapeCursor(nextCursor, cursor) : false;
         setHistoryItems((current) =>
@@ -232,7 +244,14 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
         setHistoryCursor(cursorStalled ? undefined : (nextCursor ?? undefined));
         setHistoryExhausted(page.exhausted === true || nextCursor === null || cursorStalled);
       } finally {
-        setHistoryLoading(false);
+        if (
+          shouldApplyDurableTapeHistoryLoad({
+            loadGeneration,
+            currentGeneration: historyLoadGenerationRef.current
+          })
+        ) {
+          setHistoryLoading(false);
+        }
       }
     },
     [

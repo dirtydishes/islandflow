@@ -9,7 +9,8 @@ import {
   mergeNewestWithOverflow,
   selectDurableTapeHistoryCursor,
   selectOlderHistoryCursor,
-  selectOlderHistoryCursorFromSortable
+  selectOlderHistoryCursorFromSortable,
+  shouldApplyDurableTapeHistoryLoad
 } from "./history";
 
 const makeItem = (traceId: string, seq: number, ts: number) => ({
@@ -147,5 +148,20 @@ describe("durable tape history composition", () => {
   it("detects repeated history cursors", () => {
     expect(isSameDurableTapeCursor({ ts: 1_000, seq: 4 }, { ts: 1_000, seq: 4 })).toBe(true);
     expect(isSameDurableTapeCursor({ ts: 1_000, seq: 4 }, { ts: 1_000, seq: 3 })).toBe(false);
+  });
+
+  it("rejects history pages that resolve after a query or source reset", () => {
+    expect(
+      shouldApplyDurableTapeHistoryLoad({
+        loadGeneration: 4,
+        currentGeneration: 4
+      })
+    ).toBe(true);
+    expect(
+      shouldApplyDurableTapeHistoryLoad({
+        loadGeneration: 4,
+        currentGeneration: 5
+      })
+    ).toBe(false);
   });
 });
