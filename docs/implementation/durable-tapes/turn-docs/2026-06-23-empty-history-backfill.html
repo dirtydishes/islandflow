@@ -227,6 +227,22 @@
       </section>
 
       <section>
+        <h2>Reviewer Pass</h2>
+        <p>
+          Reviewer repair commit <code>3f9d2c8</code> found and fixed a shared state-machine race:
+          a history request started for one query or source could resolve after a reset and append
+          stale rows into the new tape state. <code>DurableTape</code> now versions history loads by
+          query/source generation and discards stale completions before mutating history items,
+          cursors, exhausted state, or loading state.
+        </p>
+        <p>
+          No domain-specific workaround was added. The repair stays in the shared durable-tape
+          loader, so options, flow packets, equities, news wire, and the upcoming alerts module use
+          the same reset-safe history mechanic.
+        </p>
+      </section>
+
+      <section>
         <h2>Verification</h2>
         <ul>
           <li><span class="status-ok">pass</span> <code>bun test apps/web/features/durable-tape</code></li>
@@ -237,6 +253,7 @@
           <li><span class="status-ok">pass</span> <code>bun run lint</code></li>
           <li><span class="status-ok">pass</span> <code>bun --cwd=apps/web run build</code></li>
           <li><span class="status-ok">pass</span> <code>git diff --check</code></li>
+          <li><span class="status-ok">pass</span> Forgejo Validate task <code>#239</code> on worker head <code>be38017</code>.</li>
           <li><span class="status-note">not run</span> browser QA; this change is a shared data-loading path with no visual surface change.</li>
         </ul>
       </section>
@@ -305,6 +322,13 @@ diff --git a/apps/web/features/durable-tape/components/DurableTape.tsx b/apps/we
 +        const nextCursor = page.nextCursor ?? null;
 +        const cursorStalled = nextCursor ? isSameDurableTapeCursor(nextCursor, cursor) : false;
 @@
++  const historyLoadGenerationRef = useRef(0);
+@@
++    historyLoadGenerationRef.current += 1;
+@@
++      const loadGeneration = historyLoadGenerationRef.current;
++      if (!shouldApplyDurableTapeHistoryLoad({ loadGeneration, currentGeneration: historyLoadGenerationRef.current })) return;
+@@
 +  useEffect(() =&gt; {
 +    if (
 +      !resolvedFeatures.clickhouseHistory ||
@@ -361,6 +385,11 @@ diff --git a/apps/web/features/durable-tape/components/DurableTape.tsx b/apps/we
 +  }, [query, source]);
 @@
 +    void loadOlder(initialHistoryCursor);
+@@
++  const historyLoadGenerationRef = useRef(0);
++  historyLoadGenerationRef.current += 1;
++  const loadGeneration = historyLoadGenerationRef.current;
++  if (!shouldApplyDurableTapeHistoryLoad({ loadGeneration, currentGeneration: historyLoadGenerationRef.current })) return;
 
 diff --git a/apps/web/features/options-tape/source.ts b/apps/web/features/options-tape/source.ts
 @@
