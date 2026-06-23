@@ -89,7 +89,11 @@ export const toFlowPacketFocusRequest = (
   packet: FlowPacket,
   source: FlowPacketFocusRequest["source"] = "flow-packets"
 ): FlowPacketFocusRequest => {
-  const optionContractId = getFlowPacketContractId(packet);
+  const optionContractId =
+    typeof packet.features.option_contract_id === "string" &&
+    packet.features.option_contract_id.trim().length > 0
+      ? packet.features.option_contract_id.trim()
+      : undefined;
   return {
     packetId: packet.id,
     memberTraceIds: packet.members,

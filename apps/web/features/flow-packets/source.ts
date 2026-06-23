@@ -94,6 +94,9 @@ const parseHistoryResponse = async (
   };
 };
 
+const isSameCursor = (left: DurableTapeCursor, right: DurableTapeCursor): boolean =>
+  left.ts === right.ts && left.seq === right.seq;
+
 export const loadFlowPacketsTapeHistoryPage = async ({
   cursor,
   scope,
@@ -124,14 +127,16 @@ export const loadFlowPacketsTapeHistoryPage = async ({
 
     const payload = await parseHistoryResponse(response);
     const filtered = filterFlowPackets(payload.data ?? [], scope, filters);
-    if (filtered.length > 0 || !payload.next_before) {
+    const responseCursor = payload.next_before ?? null;
+    const cursorStalled = responseCursor ? isSameCursor(responseCursor, nextCursor) : false;
+    if (filtered.length > 0 || !responseCursor || cursorStalled) {
       return {
         items: filtered,
-        nextCursor: payload.next_before,
-        exhausted: !payload.next_before
+        nextCursor: cursorStalled ? null : responseCursor,
+        exhausted: !responseCursor || cursorStalled
       };
     }
-    nextCursor = payload.next_before;
+    nextCursor = responseCursor;
   }
 
   return {

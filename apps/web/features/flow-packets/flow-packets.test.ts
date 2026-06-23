@@ -5,6 +5,7 @@ import {
   filterFlowPackets,
   getFlowPacketKey,
   getFlowPacketQualityLabel,
+  loadFlowPacketsTapeHistoryPage,
   mapFlowPacketsTapeInspectEvent,
   normalizeFlowPacketsTapeScope,
   toFlowPacketFocusRequest
@@ -80,6 +81,56 @@ describe("flow packets tape helpers", () => {
       memberTraceIds: ["print-1", "print-2"],
       optionContractId: "SPY-2026-06-19-500-C",
       source: "flow-packets"
+    });
+  });
+
+  it("omits option contract id from focus requests when the packet has no contract feature", () => {
+    expect(
+      toFlowPacketFocusRequest(
+        makePacket({
+          id: "packet-without-contract",
+          features: {
+            underlying_id: "SPY",
+            count: 1
+          }
+        })
+      )
+    ).toEqual({
+      packetId: "packet-without-contract",
+      memberTraceIds: ["print-1", "print-2"],
+      source: "flow-packets"
+    });
+  });
+
+  it("exhausts history when the api repeats an empty filtered cursor", async () => {
+    const cursor = { ts: 1_000, seq: 1 };
+    const response = await loadFlowPacketsTapeHistoryPage({
+      cursor,
+      scope: { underlyingIds: ["SPY"] },
+      options: {
+        apiBaseUrl: "https://api.example.test",
+        fetcher: async () =>
+          new Response(
+            JSON.stringify({
+              data: [
+                makePacket({
+                  id: "aapl",
+                  features: {
+                    option_contract_id: "AAPL-2026-06-19-250-C",
+                    underlying_id: "AAPL"
+                  }
+                })
+              ],
+              next_before: cursor
+            })
+          )
+      }
+    });
+
+    expect(response).toEqual({
+      items: [],
+      nextCursor: null,
+      exhausted: true
     });
   });
 

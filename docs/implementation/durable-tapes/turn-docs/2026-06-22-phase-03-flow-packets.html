@@ -254,7 +254,7 @@
           <div class="cell"><span class="label">Phase</span>03 flow packets module</div>
           <div class="cell"><span class="label">Turn doc</span>2026-06-22-phase-03-flow-packets.html</div>
           <div class="cell"><span class="label">PR</span>https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/66</div>
-          <div class="cell"><span class="label">CI</span>reviewer verifies after PR</div>
+          <div class="cell"><span class="label">CI</span>reviewer verifies final pushed head</div>
         </div>
       </header>
 
@@ -267,7 +267,39 @@
           <li>Kept packet focus as a typed callback. The module does not import terminal drawer state or mutate route-specific terminal focus state.</li>
           <li>Changed <code>FlowPane</code> into a compatibility adapter that passes terminal filters/scope into <code>FlowPacketsTape</code>.</li>
           <li>Added explicit stale/missing quote text badges so warning state is not color-only.</li>
+          <li>Reviewer repaired packet-focus fallback semantics so <code>optionContractId</code> is emitted only from <code>FlowPacket.features.option_contract_id</code>, never from the packet display fallback.</li>
+          <li>Reviewer repaired flow history paging so repeated <code>next_before</code> cursors are treated as exhausted instead of allowing repeated empty filtered-page fetches.</li>
         </ul>
+      </section>
+
+      <section>
+        <h2>Reviewer Pass</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Finding</th>
+              <th>Disposition</th>
+              <th>Evidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Packet focus payload could fall back to <code>packet.id</code> for <code>optionContractId</code> when the packet lacked <code>features.option_contract_id</code>.</td>
+              <td class="ok">repaired</td>
+              <td>The callback now omits <code>optionContractId</code> unless the packet feature is present and non-empty.</td>
+            </tr>
+            <tr>
+              <td>Flow history paging did not stop when the API repeated a cursor after an empty locally filtered page.</td>
+              <td class="ok">repaired</td>
+              <td>Repeated <code>next_before</code> is now exhausted, with focused regression coverage.</td>
+            </tr>
+            <tr>
+              <td>Module ownership, terminal coupling, responsive templates, hover detail, and scope discipline.</td>
+              <td class="ok">accepted</td>
+              <td>No terminal drawer/pane state leaked into <code>apps/web/features/flow-packets</code>; the terminal route remains a thin compatibility adapter.</td>
+            </tr>
+          </tbody>
+        </table>
       </section>
 
       <section>
@@ -294,12 +326,12 @@
             <tr>
               <td><code>bun test apps/web/features/flow-packets/flow-packets.test.ts</code></td>
               <td class="ok">passed</td>
-              <td>5 tests, helper coverage for scope, filtering, focus payload, quality labels, inspect mapping.</td>
+              <td>7 tests, helper coverage for scope, filtering, focus payload, missing-contract focus fallback, repeated history cursor exhaustion, quality labels, inspect mapping.</td>
             </tr>
             <tr>
               <td><code>bun test apps/web/features/flow-packets/flow-packets.test.ts apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code></td>
               <td class="ok">passed</td>
-              <td>99 tests, 215 assertions.</td>
+              <td>101 tests, 217 assertions.</td>
             </tr>
             <tr>
               <td><code>bun --cwd=apps/web run build</code></td>
@@ -311,6 +343,11 @@
               <td class="ok">passed</td>
               <td>No formatting fixes required after final edits.</td>
             </tr>
+            <tr>
+              <td><code>git diff --check</code></td>
+              <td class="ok">passed</td>
+              <td>No whitespace errors after reviewer repair.</td>
+            </tr>
           </tbody>
         </table>
       </section>
@@ -319,7 +356,7 @@
         <h2>Browser QA</h2>
         <p>
           Ran <code>WEB_DEV_PORT=3100 NEXT_PUBLIC_API_URL=https://api.flow.deltaisland.io bun run dev:web</code>
-          and checked <code>http://localhost:3100/options</code> in the in-app browser.
+          and checked <code>http://localhost:3100/options</code> with system Chrome automation.
         </p>
         <table>
           <thead>
@@ -333,17 +370,17 @@
             <tr>
               <td>1440 x 900</td>
               <td><code>twoThirds</code>: TIME, CONTRACT, PRINTS, PREMIUM, SIDE</td>
-              <td class="ok">200 packet rows rendered, no table or page horizontal overflow.</td>
+              <td class="ok">200 packet rows rendered, hover detail rendered, no table or page horizontal overflow.</td>
             </tr>
             <tr>
               <td>390 x 844</td>
               <td><code>oneThird</code>: CONTRACT, PRINTS, PREMIUM</td>
-              <td class="ok">200 packet rows rendered, no table or page horizontal overflow.</td>
+              <td class="ok">200 packet rows rendered, hover detail rendered, no table or page horizontal overflow.</td>
             </tr>
             <tr>
               <td>Console</td>
               <td>fresh reload after adapter stability fix</td>
-              <td class="ok">no fresh error logs after reload timestamp <code>2026-06-22T23:58:08.220Z</code>.</td>
+              <td class="ok">flow packets surface rendered stably; a diagnostic reload observed one hosted <code>/lookup/options-support</code> abort outside this module.</td>
             </tr>
           </tbody>
         </table>
@@ -487,7 +524,11 @@ new file mode 100644
 +  packet: FlowPacket,
 +  source: FlowPacketFocusRequest["source"] = "flow-packets"
 +): FlowPacketFocusRequest =&gt; {
-+  const optionContractId = getFlowPacketContractId(packet);
++  const optionContractId =
++    typeof packet.features.option_contract_id === "string" &amp;&amp;
++    packet.features.option_contract_id.trim().length &gt; 0
++      ? packet.features.option_contract_id.trim()
++      : undefined;
 +  return {
 +    packetId: packet.id,
 +    memberTraceIds: packet.members,
@@ -495,6 +536,27 @@ new file mode 100644
 +    source
 +  };
 +};
+
+diff --git a/apps/web/features/flow-packets/source.ts b/apps/web/features/flow-packets/source.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/flow-packets/source.ts
+@@
++const isSameCursor = (left: DurableTapeCursor, right: DurableTapeCursor): boolean =&gt;
++  left.ts === right.ts &amp;&amp; left.seq === right.seq;
++@@
++    const payload = await parseHistoryResponse(response);
++    const filtered = filterFlowPackets(payload.data ?? [], scope, filters);
++    const responseCursor = payload.next_before ?? null;
++    const cursorStalled = responseCursor ? isSameCursor(responseCursor, nextCursor) : false;
++    if (filtered.length &gt; 0 || !responseCursor || cursorStalled) {
++      return {
++        items: filtered,
++        nextCursor: cursorStalled ? null : responseCursor,
++        exhausted: !responseCursor || cursorStalled
++      };
++    }
++    nextCursor = responseCursor;
 
 diff --git a/apps/web/features/terminal/components/opra.tsx b/apps/web/features/terminal/components/opra.tsx
 --- a/apps/web/features/terminal/components/opra.tsx
@@ -588,6 +650,19 @@ new file mode 100644
 +    optionContractId: "SPY-2026-06-19-500-C",
 +    source: "flow-packets"
 +  });
++});
++
++it("omits option contract id from focus requests when the packet has no contract feature", () =&gt; {
++  expect(toFlowPacketFocusRequest(makePacket({ id: "packet-without-contract" }))).toEqual({
++    packetId: "packet-without-contract",
++    memberTraceIds: ["print-1", "print-2"],
++    source: "flow-packets"
++  });
++});
++
++it("exhausts history when the api repeats an empty filtered cursor", async () =&gt; {
++  const response = await loadFlowPacketsTapeHistoryPage({ cursor, scope, options });
++  expect(response).toEqual({ items: [], nextCursor: null, exhausted: true });
 +});
 +
 +it("renders quality as explicit text labels", () =&gt; {
