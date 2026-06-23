@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import type { EquityPrint } from "@islandflow/types";
 
 import {
+  createStaticEquitiesTapeSource,
   filterEquityPrints,
   getEquitiesTapeHistoryParams,
   getEquityPrintKey,
@@ -64,6 +65,37 @@ describe("equities tape helpers", () => {
         (print) => print.trace_id
       )
     ).toEqual(["dark"]);
+  });
+
+  it("creates a static source that applies scope and filters", () => {
+    const prints = [
+      makePrint({ trace_id: "spy-lit", underlying_id: "SPY", exchange: "ARCA" }),
+      makePrint({
+        trace_id: "spy-dark",
+        seq: 2,
+        underlying_id: "SPY",
+        exchange: "TRF",
+        offExchangeFlag: true
+      }),
+      makePrint({
+        trace_id: "aapl-dark",
+        seq: 3,
+        underlying_id: "AAPL",
+        exchange: "TRF",
+        offExchangeFlag: true
+      })
+    ];
+    const source = createStaticEquitiesTapeSource(prints);
+    const subscription = source.subscribe({
+      scope: { underlyingIds: ["SPY"] },
+      filters: { offExchange: true }
+    });
+    const listened: EquityPrint[][] = [];
+
+    subscription.listen?.((items) => listened.push([...items]));
+
+    expect(subscription.getSnapshot?.().map((print) => print.trace_id)).toEqual(["spy-dark"]);
+    expect(listened.map((items) => items.map((print) => print.trace_id))).toEqual([["spy-dark"]]);
   });
 
   it("builds history params with ticker scope", () => {
