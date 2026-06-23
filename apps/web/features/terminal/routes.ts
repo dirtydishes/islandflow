@@ -6,7 +6,13 @@ import type { EquityScope, OptionScope, RouteFeatures } from "./types";
 
 const CANONICAL_OPTIONS_PATH = "/options";
 const TAPE_COMPAT_PATH = "/tape";
-const KNOWN_TERMINAL_PATHS = new Set([CANONICAL_OPTIONS_PATH, TAPE_COMPAT_PATH, "/news"]);
+const DURABLE_TAPES_PATH = "/durable-tapes";
+const KNOWN_TERMINAL_PATHS = new Set([
+  CANONICAL_OPTIONS_PATH,
+  TAPE_COMPAT_PATH,
+  "/news",
+  DURABLE_TAPES_PATH
+]);
 
 export const normalizeTerminalPathname = (pathname: string): string => {
   if (pathname === TAPE_COMPAT_PATH) {
@@ -67,6 +73,31 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         showChartPane: false,
         needsClassifierDecor: false,
         needsAlertEvidencePrefetch: false,
+        needsDarkUnderlying: false
+      };
+    case DURABLE_TAPES_PATH:
+      return {
+        options: true,
+        nbbo: true,
+        equities: true,
+        flow: true,
+        news: true,
+        alerts: true,
+        smartMoney: false,
+        classifierHits: true,
+        inferredDark: false,
+        equityJoins: false,
+        equityCandles: false,
+        equityOverlay: false,
+        showOptionsPane: true,
+        showEquitiesPane: true,
+        showFlowPane: true,
+        showNewsPane: true,
+        showAlertsPane: true,
+        showDarkPane: false,
+        showChartPane: false,
+        needsClassifierDecor: true,
+        needsAlertEvidencePrefetch: true,
         needsDarkUnderlying: false
       };
     case "/":

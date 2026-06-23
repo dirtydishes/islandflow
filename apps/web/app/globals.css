@@ -587,6 +587,12 @@ input {
   --route-line: oklch(0.72 0.13 247 / 0.22);
 }
 
+.page-shell-durable-tapes {
+  --route-accent: var(--accent);
+  --route-accent-soft: var(--accent-soft);
+  --route-line: oklch(0.78 0.12 74 / 0.22);
+}
+
 .page-header {
   display: flex;
   align-items: center;
@@ -4489,6 +4495,97 @@ h3 {
   color: var(--accent);
 }
 
+.durable-tapes-route-shell {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.durable-tapes-grid {
+  display: grid;
+  grid-template-areas:
+    "options flow alerts"
+    "options equities alerts"
+    "news news news";
+  grid-template-columns: minmax(440px, 1.42fr) minmax(260px, 0.84fr) minmax(320px, 0.95fr);
+  grid-template-rows: minmax(190px, 0.78fr) minmax(190px, 0.78fr) minmax(240px, 0.92fr);
+  gap: 8px;
+  width: 100%;
+  height: max(700px, calc(100vh - var(--topbar-height) - 124px));
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.durable-tapes-grid > * {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.durable-tapes-options {
+  grid-area: options;
+}
+
+.durable-tapes-flow {
+  grid-area: flow;
+}
+
+.durable-tapes-equities {
+  grid-area: equities;
+}
+
+.durable-tapes-alerts {
+  grid-area: alerts;
+}
+
+.durable-tapes-news {
+  grid-area: news;
+}
+
+.durable-tapes-options.options-tape-module,
+.durable-tapes-alerts.alerts-module,
+.durable-tapes-news.news-wire-module,
+.durable-tapes-flow.durable-tape,
+.durable-tapes-equities.durable-tape {
+  height: 100%;
+}
+
+.durable-tapes-options.options-tape-module,
+.durable-tapes-news.news-wire-module {
+  overflow: hidden;
+}
+
+.durable-tapes-options .options-tape,
+.durable-tapes-alerts .alerts-tape,
+.durable-tapes-news .news-wire-tape-frame,
+.durable-tapes-news .news-wire-tape {
+  min-height: 0;
+}
+
+.durable-tapes-alerts.alerts-module {
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.durable-tapes-alerts .alerts-module-detail {
+  max-height: min(220px, 42%);
+  overflow: auto;
+  border-bottom: 1px solid var(--border);
+  padding: 8px 10px 10px;
+  background: oklch(0.105 0.01 250 / 0.54);
+}
+
+.durable-tapes-news.news-wire-module {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.durable-tapes-news .news-wire-control-rails {
+  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1fr) minmax(0, 1fr) minmax(220px, 0.9fr);
+}
+
+.durable-tapes-news .news-wire-mode-rail {
+  grid-column: auto;
+}
+
 .news-wire-detail-body p,
 .news-wire-detail-body ul,
 .news-wire-detail-body ol,
@@ -4692,6 +4789,77 @@ h3 {
   }
   100% {
     transform: scale(1);
+  }
+}
+
+@media (max-width: 1180px) {
+  .durable-tapes-grid {
+    grid-template-areas:
+      "options flow"
+      "options equities"
+      "alerts alerts"
+      "news news";
+    grid-template-columns: minmax(360px, 1.2fr) minmax(280px, 1fr);
+    grid-template-rows: minmax(220px, 0.84fr) minmax(220px, 0.84fr) minmax(260px, 0.9fr) minmax(
+        300px,
+        1fr
+      );
+    height: max(1040px, calc(100vh - var(--topbar-height) - 124px));
+  }
+
+  .durable-tapes-news .news-wire-control-rails {
+    grid-template-columns: minmax(220px, 0.9fr) minmax(0, 1fr);
+  }
+
+  .durable-tapes-news .news-wire-mode-rail {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 720px) {
+  .durable-tapes-route-shell {
+    overflow: visible;
+  }
+
+  .durable-tapes-grid {
+    grid-template-areas:
+      "options"
+      "flow"
+      "equities"
+      "alerts"
+      "news";
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    height: auto;
+    overflow: visible;
+  }
+
+  .durable-tapes-options.options-tape-module {
+    height: min(620px, 70vh);
+    min-height: 420px;
+  }
+
+  .durable-tapes-flow.durable-tape,
+  .durable-tapes-equities.durable-tape,
+  .durable-tapes-alerts.alerts-module {
+    height: 360px;
+  }
+
+  .durable-tapes-news.news-wire-module {
+    height: min(560px, 72vh);
+    min-height: 420px;
+  }
+
+  .durable-tapes-news .news-wire-control-rails {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .durable-tapes-news .news-wire-mode-rail {
+    grid-column: auto;
+  }
+
+  .durable-tapes-alerts .alerts-module-detail {
+    max-height: 180px;
   }
 }
 

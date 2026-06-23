@@ -18,9 +18,9 @@ import {
 } from "react";
 
 import {
-  DEFAULT_FLOW_SECURITY_TYPES,
   buildDefaultFlowFilters,
   countActiveFlowFilterGroups,
+  DEFAULT_FLOW_SECURITY_TYPES,
   nextFlowFilterPopoverState,
   toggleFilterValue
 } from "../filters";
@@ -108,7 +108,7 @@ export const TapeControls = ({
   );
 };
 
-type PageFrameVariant = "default" | "dashboard" | "options" | "news";
+type PageFrameVariant = "default" | "dashboard" | "options" | "news" | "durable-tapes";
 
 type PageFrameProps = {
   title: string;

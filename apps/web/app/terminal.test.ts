@@ -329,6 +329,28 @@ describe("live manifest", () => {
     ).toEqual(["news"]);
   });
 
+  it("subscribes /durable-tapes to every composed tape feed without chart feeds", () => {
+    const filters = buildDefaultFlowFilters();
+    const manifest = getLiveManifest("/durable-tapes", "SPY", 60000, filters);
+    const channels = manifest.map((subscription) => subscription.channel);
+
+    expect(channels).toEqual([
+      "options",
+      "nbbo",
+      "equities",
+      "flow",
+      "news",
+      "alerts",
+      "classifier-hits"
+    ]);
+    expect(manifest.find((subscription) => subscription.channel === "options")?.filters).toBe(
+      filters
+    );
+    expect(manifest.find((subscription) => subscription.channel === "flow")?.filters).toBe(filters);
+    expect(channels).not.toContain("equity-candles");
+    expect(channels).not.toContain("equity-overlay");
+  });
+
   it("normalizes retired route subscriptions to the home manifest", () => {
     const home = getLiveManifest("/", "SPY", 60000, buildDefaultFlowFilters());
 
@@ -551,6 +573,21 @@ describe("route feature map", () => {
     expect(features.news).toBe(true);
     expect(features.showNewsPane).toBe(true);
     expect(features.showAlertsPane).toBe(false);
+  });
+
+  it("maps /durable-tapes to all durable module panes while keeping chart feeds off", () => {
+    const features = getRouteFeatures("/durable-tapes");
+    expect(normalizeTerminalPathname("/durable-tapes")).toBe("/durable-tapes");
+    expect(getTerminalNavCurrentHref("/durable-tapes")).toBe("/durable-tapes");
+    expect(features.showOptionsPane).toBe(true);
+    expect(features.showFlowPane).toBe(true);
+    expect(features.showEquitiesPane).toBe(true);
+    expect(features.showNewsPane).toBe(true);
+    expect(features.showAlertsPane).toBe(true);
+    expect(features.needsClassifierDecor).toBe(true);
+    expect(features.needsAlertEvidencePrefetch).toBe(true);
+    expect(features.showChartPane).toBe(false);
+    expect(features.equityCandles).toBe(false);
   });
 });
 
