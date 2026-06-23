@@ -11,6 +11,7 @@ import type {
   SmartMoneyEvent
 } from "@islandflow/types";
 
+import { AlertDetailDrawer } from "../../alerts";
 import { getSmartFlowEvidenceRefs } from "../evidence";
 import {
   decodeNewsText,
@@ -876,11 +877,13 @@ export const DarkDrawer = ({ event, evidence, underlying, onClose }: DarkDrawerP
 export const renderTerminalDrawers: TerminalDrawersRenderer = (state) => (
   <>
     {state.selectedAlert ? (
-      <AlertDrawer
+      <AlertDetailDrawer
         alert={state.selectedAlert}
-        flowPacket={state.selectedFlowPacket}
-        evidence={state.selectedEvidence}
-        contextStatus={state.selectedAlertContextStatus}
+        flowPacketById={state.flowPacketMap}
+        optionPrintByTraceId={state.optionPrintMap}
+        onContractFocus={state.focusAlertContract}
+        onEquityFocus={state.focusAlertEquity}
+        onPacketFocus={state.focusFlowPacketRequest}
         onClose={() => state.setSelectedAlert(null)}
       />
     ) : null}

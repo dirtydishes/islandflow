@@ -10,6 +10,7 @@ import type {
   SmartMoneyEvent
 } from "@islandflow/types";
 import { parseOptionContractId } from "@islandflow/types";
+import { AlertsModule } from "../../alerts";
 import {
   createChart,
   createSeriesMarkers,
@@ -1451,17 +1452,6 @@ export const FeedHealthPane = ({ state }: { state: TerminalState }) => {
 
 export const EventContextPane = ({ state }: { state: TerminalState }) => {
   const events = [
-    ...state.filteredAlerts.slice(0, 3).map((alert) => ({
-      key: `alert-${alert.trace_id}-${alert.seq}`,
-      ts: alert.source_ts,
-      label: "Alert",
-      title: alert.hits[0] ? humanizeClassifierId(alert.hits[0].classifier_id) : "Classifier alert",
-      detail: alert.hits[0]?.explanations?.[0] ?? `${alert.hits.length} linked hits`,
-      action: () => {
-        state.setSelectedSmartFlowProjection(null);
-        state.setSelectedAlert(alert);
-      }
-    })),
     ...state.filteredSmartFlowProjections.slice(0, 3).map((projection) => ({
       key: `smart-flow-${projection.refs.hypothesis_id}-${projection.seq}`,
       ts: projection.source_ts,
@@ -1499,9 +1489,35 @@ export const EventContextPane = ({ state }: { state: TerminalState }) => {
       title="Event Context"
       status={<span className="command-pane-meta">Focus evidence</span>}
     >
-      {events.length === 0 ? (
+      {state.filteredAlerts.length > 0 ? (
+        <AlertsModule
+          alerts={state.filteredAlerts.slice(0, 12)}
+          className="command-alerts-module"
+          features={[
+            "default",
+            { key: "clickhouseHistory", enabled: false },
+            { key: "settingsGear", enabled: false }
+          ]}
+          flowPacketById={state.flowPacketMap}
+          onCloseDetail={() => state.setSelectedAlert(null)}
+          onSelectAlert={(alert) => {
+            state.setSelectedNewsStory(null);
+            state.setSelectedDarkEvent(null);
+            state.setSelectedClassifierHit(null);
+            state.setSelectedSmartFlowProjection(null);
+            state.setSelectedSmartMoneyEvent(null);
+            state.setSelectedAlert(alert);
+          }}
+          optionPrintByTraceId={state.optionPrintMap}
+          selectedAlert={state.selectedAlert}
+          showDetail={false}
+          template="oneThird"
+          title="Alert Tape"
+        />
+      ) : null}
+      {events.length === 0 && state.filteredAlerts.length === 0 ? (
         <div className="empty">No linked evidence is available for this scope yet.</div>
-      ) : (
+      ) : events.length > 0 ? (
         <div className="command-context-list" role="list">
           {events.map((event) => (
             <button
@@ -1517,7 +1533,7 @@ export const EventContextPane = ({ state }: { state: TerminalState }) => {
             </button>
           ))}
         </div>
-      )}
+      ) : null}
     </Pane>
   );
 };

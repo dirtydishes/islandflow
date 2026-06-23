@@ -1,54 +1,15 @@
-import type {
-  AlertEvent,
-  FlowPacket,
-  OptionPrint,
-  SmartFlowExplainabilityProjection
-} from "@islandflow/types";
+import type { SmartFlowExplainabilityProjection } from "@islandflow/types";
 import { PINNED_EVIDENCE_MAX_ITEMS, PINNED_EVIDENCE_TTL_MS } from "./config";
 import type { PinnedEntry } from "./types";
-
-type AlertContextBundle = {
-  alert: AlertEvent | null;
-  flow_packets: FlowPacket[];
-  option_prints: OptionPrint[];
-  missing_refs: string[];
-};
+export {
+  buildAlertContextPath,
+  collectAlertContextEvidence,
+  getAlertFlowPacketRefs,
+  resolveAlertFlowPacket
+} from "../alerts";
 
 const uniqueNonEmpty = (items: string[]): string[] => {
   return Array.from(new Set(items.map((item) => item.trim()).filter(Boolean)));
-};
-
-export const buildAlertContextPath = (traceId: string): string =>
-  `/flow/alerts/${encodeURIComponent(traceId)}/context`;
-
-export const collectAlertContextEvidence = (
-  bundle: AlertContextBundle
-): {
-  packets: Map<string, FlowPacket>;
-  prints: Map<string, OptionPrint>;
-} => {
-  const packets = new Map<string, FlowPacket>();
-  const prints = new Map<string, OptionPrint>();
-
-  for (const packet of bundle.flow_packets) {
-    if (packet.id) {
-      packets.set(packet.id, packet);
-    }
-    if (packet.trace_id) {
-      packets.set(packet.trace_id, packet);
-    }
-  }
-  for (const print of bundle.option_prints) {
-    if (print.trace_id) {
-      prints.set(print.trace_id, print);
-    }
-  }
-
-  return { packets, prints };
-};
-
-export const getAlertFlowPacketRefs = (alert: Pick<AlertEvent, "evidence_refs">): string[] => {
-  return alert.evidence_refs.filter((ref) => ref.startsWith("flowpacket:"));
 };
 
 export const getSmartFlowEvidenceRefs = (
@@ -77,20 +38,6 @@ export const getSmartFlowPinnedFlowKeys = (
 export const getSmartFlowPinnedOptionKeys = (
   projection: Pick<SmartFlowExplainabilityProjection, "refs" | "evidence" | "hypothesis"> | null
 ): string[] => (projection ? getSmartFlowOptionPrintRefs(projection) : []);
-
-export const resolveAlertFlowPacket = (
-  alert: Pick<AlertEvent, "evidence_refs">,
-  packets: Map<string, FlowPacket>
-): FlowPacket | null => {
-  for (const ref of getAlertFlowPacketRefs(alert)) {
-    const packet = packets.get(ref);
-    if (packet) {
-      return packet;
-    }
-  }
-
-  return null;
-};
 
 export const prunePinnedEntries = <T>(
   current: Map<string, PinnedEntry<T>>,
