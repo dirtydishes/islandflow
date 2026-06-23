@@ -63,6 +63,7 @@ Testing and validation in this repo are Bun-first:
 - Run tests: `bun test`
 - Run scoped tests: `bun test services/compute/tests` (or another package/service path)
 - Validate web production build when UI code changes: `bun --cwd=apps/web run build`
+- For web UI testing, run only `bun run dev:web` unless the full stack is explicitly required; the web app's API target should point at the VPS backend at `api.flow.deltaisland.io`.
 
 Working style that avoids common problems here:
 - Prefer editing in the touched workspace (`services/<name>`, `packages/<name>`, `apps/web`) and keep shared contract changes in `packages/types`.
