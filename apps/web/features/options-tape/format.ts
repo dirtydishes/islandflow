@@ -88,8 +88,9 @@ export const formatOptionsTapePrice = (value: number): string =>
 export const formatOptionsTapeSize = (value: number): string =>
   Number.isFinite(value) ? value.toLocaleString() : "--";
 
-export const getOptionsTapePremium = (print: Pick<OptionPrint, "notional" | "price" | "size">): number =>
-  print.notional ?? print.price * print.size * 100;
+export const getOptionsTapePremium = (
+  print: Pick<OptionPrint, "notional" | "price" | "size">
+): number => print.notional ?? print.price * print.size * 100;
 
 export const formatOptionsTapePremium = (value: number): string => {
   if (!Number.isFinite(value)) {

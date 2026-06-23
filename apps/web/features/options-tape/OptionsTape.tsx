@@ -24,6 +24,7 @@ import {
   applyOptionsTapeTypePreset,
   applyOptionsTapeView,
   buildDefaultOptionsTapeFilters,
+  getOptionsTapeScopeFilters,
   getOptionsTapeSidePreset
 } from "./filters";
 import {
@@ -44,10 +45,7 @@ import type {
 } from "./types";
 
 const DEFAULT_TITLE = "Options Tape";
-const OPTIONS_TAPE_DEFAULT_FEATURES = [
-  "default",
-  { key: "settingsGear", enabled: false }
-] as const;
+const OPTIONS_TAPE_DEFAULT_FEATURES = ["default", { key: "settingsGear", enabled: false }] as const;
 
 const GLOBAL_SCOPE: OptionsTapeScope = { mode: "global" };
 
@@ -85,7 +83,9 @@ const scopeToSourceScope = (scope: OptionsTapeScope): OptionsTapeSourceScope => 
   };
 };
 
-const getContractFocusScope = (print: OptionPrint): Extract<OptionsTapeScope, { mode: "contract" }> => ({
+const getContractFocusScope = (
+  print: OptionPrint
+): Extract<OptionsTapeScope, { mode: "contract" }> => ({
   mode: "contract",
   optionContractId: normalizeOptionsTapeContractId(print.option_contract_id),
   underlyingId: getOptionsTapeUnderlying(print)
@@ -98,7 +98,8 @@ const getPacketFocusScope = (
   mode: "packet",
   packetId: packet.id,
   memberTraceIds: packet.members,
-  optionContractId: getPacketContractId(packet) ?? normalizeOptionsTapeContractId(print.option_contract_id),
+  optionContractId:
+    getPacketContractId(packet) ?? normalizeOptionsTapeContractId(print.option_contract_id),
   underlyingId: getOptionsTapeUnderlying(print)
 });
 
@@ -154,7 +155,11 @@ const OptionsTapeSettings = ({
         Settings
       </button>
       {open ? (
-        <div className="options-tape-settings-panel" role="dialog" aria-label="Options tape filters">
+        <div
+          className="options-tape-settings-panel"
+          role="dialog"
+          aria-label="Options tape filters"
+        >
           <div className="options-tape-settings-head">
             <strong>Options Filters</strong>
             <button
@@ -407,10 +412,14 @@ export const OptionsTape = ({
   const activeSource = source ?? tapeSource;
   const mode = deriveMode(scope);
   const sourceScope = useMemo(() => scopeToSourceScope(scope), [scope]);
+  const sourceFilters = useMemo(
+    () => getOptionsTapeScopeFilters(sourceScope, activeFilters),
+    [activeFilters, sourceScope]
+  );
   const templates = OPTIONS_TAPE_TEMPLATES_BY_MODE[mode];
 
   useEffect(() => {
-    if (!focusedContractId && scope.mode !== "global") {
+    if (focusedContractId === null && scope.mode !== "global") {
       setScope(GLOBAL_SCOPE);
     }
   }, [focusedContractId, scope.mode]);
@@ -441,6 +450,15 @@ export const OptionsTape = ({
     onClearFocus?.();
   }, [onClearFocus]);
 
+  const updateFilters = useCallback<Dispatch<SetStateAction<OptionFlowFilters>>>(
+    (nextFilters) => {
+      setScope(GLOBAL_SCOPE);
+      onClearFocus?.();
+      setFilters(nextFilters);
+    },
+    [onClearFocus, setFilters]
+  );
+
   const showAllForContract = useCallback(() => {
     if (scope.mode !== "packet") {
       return;
@@ -459,7 +477,9 @@ export const OptionsTape = ({
         const nextScope = getPacketFocusScope(print, packet.packet);
         setScope(nextScope);
         onContractFocus?.(print);
-        onPacketFocus?.(packetRequestFromPrint({ print, packet: packet.packet, source: "options-tape" }));
+        onPacketFocus?.(
+          packetRequestFromPrint({ print, packet: packet.packet, source: "options-tape" })
+        );
         return;
       }
       setScope(getContractFocusScope(print));
@@ -480,7 +500,10 @@ export const OptionsTape = ({
         ["Exchange", item.exchange],
         ["Conditions", item.conditions?.join(", ") || "--"],
         ["NBBO", context.nbbo ? `${context.nbbo.bid} x ${context.nbbo.ask}` : "--"],
-        ["Quote age", item.execution_nbbo_age_ms ? `${Math.round(item.execution_nbbo_age_ms)}ms` : "--"],
+        [
+          "Quote age",
+          item.execution_nbbo_age_ms ? `${Math.round(item.execution_nbbo_age_ms)}ms` : "--"
+        ],
         ["IV source", item.execution_iv_source ?? "--"],
         ["Signal", item.signal_profile ?? (item.signal_pass ? "signal" : "--")],
         ["Reasons", item.signal_reasons?.join(", ") || "--"],
@@ -510,7 +533,7 @@ export const OptionsTape = ({
           <span>View</span>
           <strong>{activeFilters.view === "raw" ? "all prints" : "signal prints"}</strong>
         </div>
-        <OptionsTapeSettings filters={activeFilters} onChange={setFilters} />
+        <OptionsTapeSettings filters={activeFilters} onChange={updateFilters} />
       </div>
       {renderScopeBand({ scope, onShowAll: showAllForContract, onClear: clearScope })}
       <DurableTape
@@ -518,7 +541,7 @@ export const OptionsTape = ({
         className={`options-tape options-tape-mode-${mode}`}
         columns={OPTIONS_TAPE_COLUMNS}
         features={features}
-        filters={activeFilters}
+        filters={sourceFilters}
         getCursor={getOptionsTapePrintCursor}
         getRowKey={getOptionsTapePrintKey}
         onActivate={activatePrint}

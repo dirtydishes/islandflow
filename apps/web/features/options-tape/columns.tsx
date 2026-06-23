@@ -18,94 +18,92 @@ import {
 } from "./format";
 import type { OptionsTapeColumnId, OptionsTapeMode, OptionsTapeRowContext } from "./types";
 
-export const OPTIONS_TAPE_COLUMNS: DurableTapeColumnDefinition<
-  OptionPrint,
-  OptionsTapeColumnId
->[] = [
-  {
-    id: "time",
-    label: "TIME",
-    minWidth: 72,
-    className: "options-tape-cell-time durable-tape-cell-number",
-    render: (print) => formatOptionsTapeTime(print.ts)
-  },
-  {
-    id: "contract",
-    label: "CONTRACT",
-    minWidth: 150,
-    className: "options-tape-cell-contract",
-    render: (print) => formatOptionsTapeContractLabel(print.option_contract_id)
-  },
-  {
-    id: "dte",
-    label: "DT",
-    minWidth: 56,
-    className: "options-tape-cell-dte durable-tape-cell-number",
-    render: (print) => formatOptionsTapeDteLabel(print.option_contract_id)
-  },
-  {
-    id: "price",
-    label: "PX",
-    minWidth: 64,
-    align: "end",
-    className: "options-tape-cell-price durable-tape-cell-number",
-    render: (print) => formatOptionsTapePrice(print.price)
-  },
-  {
-    id: "size",
-    label: "SIZE",
-    minWidth: 62,
-    align: "end",
-    className: "options-tape-cell-size durable-tape-cell-number",
-    render: (print) => formatOptionsTapeSize(print.size)
-  },
-  {
-    id: "premium",
-    label: "PREMIUM",
-    minWidth: 92,
-    align: "end",
-    className: "options-tape-cell-premium durable-tape-cell-number",
-    render: (print) => formatOptionsTapePremium(getOptionsTapePremium(print))
-  },
-  {
-    id: "side",
-    label: "SIDE",
-    minWidth: 62,
-    className: "options-tape-cell-side",
-    render: (print) => getOptionsTapeSide(print)
-  },
-  {
-    id: "iv",
-    label: "IV",
-    minWidth: 52,
-    align: "end",
-    className: "options-tape-cell-iv durable-tape-cell-number",
-    render: (print) => formatOptionsTapePercent(print.execution_iv)
-  },
-  {
-    id: "spot",
-    label: "SPOT",
-    minWidth: 68,
-    align: "end",
-    className: "options-tape-cell-spot durable-tape-cell-number",
-    render: (print) => formatOptionsTapePrice(print.execution_underlying_spot ?? Number.NaN)
-  },
-  {
-    id: "nbbo",
-    label: "NBBO",
-    minWidth: 112,
-    align: "end",
-    className: "options-tape-cell-nbbo durable-tape-cell-number",
-    render: (print) => formatOptionsTapeNbbo(print)
-  },
-  {
-    id: "exchange",
-    label: "EXCH",
-    minWidth: 58,
-    className: "options-tape-cell-exchange",
-    render: (print) => print.exchange || "--"
-  }
-];
+export const OPTIONS_TAPE_COLUMNS: DurableTapeColumnDefinition<OptionPrint, OptionsTapeColumnId>[] =
+  [
+    {
+      id: "time",
+      label: "TIME",
+      minWidth: 72,
+      className: "options-tape-cell-time durable-tape-cell-number",
+      render: (print) => formatOptionsTapeTime(print.ts)
+    },
+    {
+      id: "contract",
+      label: "CONTRACT",
+      minWidth: 150,
+      className: "options-tape-cell-contract",
+      render: (print) => formatOptionsTapeContractLabel(print.option_contract_id)
+    },
+    {
+      id: "dte",
+      label: "DT",
+      minWidth: 56,
+      className: "options-tape-cell-dte durable-tape-cell-number",
+      render: (print) => formatOptionsTapeDteLabel(print.option_contract_id)
+    },
+    {
+      id: "price",
+      label: "PX",
+      minWidth: 64,
+      align: "end",
+      className: "options-tape-cell-price durable-tape-cell-number",
+      render: (print) => formatOptionsTapePrice(print.price)
+    },
+    {
+      id: "size",
+      label: "SIZE",
+      minWidth: 62,
+      align: "end",
+      className: "options-tape-cell-size durable-tape-cell-number",
+      render: (print) => formatOptionsTapeSize(print.size)
+    },
+    {
+      id: "premium",
+      label: "PREMIUM",
+      minWidth: 92,
+      align: "end",
+      className: "options-tape-cell-premium durable-tape-cell-number",
+      render: (print) => formatOptionsTapePremium(getOptionsTapePremium(print))
+    },
+    {
+      id: "side",
+      label: "SIDE",
+      minWidth: 62,
+      className: "options-tape-cell-side",
+      render: (print) => getOptionsTapeSide(print)
+    },
+    {
+      id: "iv",
+      label: "IV",
+      minWidth: 52,
+      align: "end",
+      className: "options-tape-cell-iv durable-tape-cell-number",
+      render: (print) => formatOptionsTapePercent(print.execution_iv)
+    },
+    {
+      id: "spot",
+      label: "SPOT",
+      minWidth: 68,
+      align: "end",
+      className: "options-tape-cell-spot durable-tape-cell-number",
+      render: (print) => formatOptionsTapePrice(print.execution_underlying_spot ?? Number.NaN)
+    },
+    {
+      id: "nbbo",
+      label: "NBBO",
+      minWidth: 112,
+      align: "end",
+      className: "options-tape-cell-nbbo durable-tape-cell-number",
+      render: (print) => formatOptionsTapeNbbo(print)
+    },
+    {
+      id: "exchange",
+      label: "EXCH",
+      minWidth: 58,
+      className: "options-tape-cell-exchange",
+      render: (print) => print.exchange || "--"
+    }
+  ];
 
 export const OPTIONS_TAPE_TEMPLATES_BY_MODE: Record<
   OptionsTapeMode,

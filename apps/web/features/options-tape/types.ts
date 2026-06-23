@@ -117,4 +117,3 @@ export type OptionsTapeProps = {
   rowHeight?: number;
   overscan?: number;
 };
-

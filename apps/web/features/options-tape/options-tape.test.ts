@@ -8,7 +8,9 @@ import {
   applyOptionsTapeSidePreset,
   applyOptionsTapeTypePreset,
   buildDefaultOptionsTapeFilters,
+  filterOptionsTapePrints,
   getOptionsTapeQueryParams,
+  getOptionsTapeScopeFilters,
   getOptionsTapeSidePreset
 } from "./filters";
 import {
@@ -42,9 +44,7 @@ describe("options tape helpers", () => {
   it("formats primary contract labels for 0DTE and dated expiries", () => {
     const now = new Date("2026-06-22T13:30:00").getTime();
     expect(formatOptionsTapeContractLabel("SPY-2026-06-22-555-C", now)).toBe("SPY 0DTE 555C");
-    expect(formatOptionsTapeContractLabel("NVDA-2026-06-28-145-P", now)).toBe(
-      "NVDA 6/28 145P"
-    );
+    expect(formatOptionsTapeContractLabel("NVDA-2026-06-28-145-P", now)).toBe("NVDA 6/28 145P");
     expect(formatOptionsTapeDteLabel("NVDA-2026-06-28-145-P", now)).toBe("6D");
   });
 
@@ -161,5 +161,33 @@ describe("options tape helpers", () => {
     expect(requestedUrls[0]).toContain("/history/options?");
     expect(page.items.map((print) => print.trace_id)).toEqual(["member-2"]);
     expect(page.exhausted).toBe(true);
+  });
+
+  it("keeps broad filters out of packet and contract scopes", () => {
+    const filters = { ...buildDefaultOptionsTapeFilters(), nbboSides: ["AA" as const] };
+    const packetScope = {
+      optionContractId: "SPY-2026-06-22-555-C",
+      packetMemberTraceIds: ["member-1", "member-2"]
+    };
+    const contractScope = { optionContractId: "SPY-2026-06-22-555-C" };
+    const prints = [
+      makePrint({ trace_id: "member-1", nbbo_side: "B", signal_pass: false }),
+      makePrint({ trace_id: "member-2", nbbo_side: "BB", signal_pass: false }),
+      makePrint({ trace_id: "other", nbbo_side: "AA" })
+    ];
+
+    expect(getOptionsTapeScopeFilters(undefined, filters)).toBe(filters);
+    expect(getOptionsTapeScopeFilters(packetScope, filters)).toBeUndefined();
+    expect(getOptionsTapeScopeFilters(contractScope, filters)).toBeUndefined();
+    expect(
+      filterOptionsTapePrints(prints, packetScope, getOptionsTapeScopeFilters(packetScope, filters))
+    ).toEqual([prints[0], prints[1]]);
+    expect(
+      filterOptionsTapePrints(
+        prints,
+        contractScope,
+        getOptionsTapeScopeFilters(contractScope, filters)
+      )
+    ).toEqual(prints);
   });
 });

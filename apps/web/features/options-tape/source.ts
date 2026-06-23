@@ -4,11 +4,7 @@ import type { OptionFlowFilters, OptionPrint } from "@islandflow/types";
 import { OptionPrintSchema } from "@islandflow/types";
 import { useEffect, useMemo, useRef } from "react";
 
-import type {
-  DurableTapeCursor,
-  DurableTapeHistoryPage,
-  DurableTapeSource
-} from "../durable-tape";
+import type { DurableTapeCursor, DurableTapeHistoryPage, DurableTapeSource } from "../durable-tape";
 import { filterOptionsTapePrints, getOptionsTapeQueryParams } from "./filters";
 import type {
   OptionsTapeHistoryResponse,
@@ -42,6 +38,12 @@ export const buildOptionsTapeApiUrl = (path: string, apiBaseUrl?: string): strin
 
 const parseOptionPrints = (items: unknown[]): OptionPrint[] =>
   OptionPrintSchema.array().parse(items);
+
+type OptionsTapeArrayListener = {
+  scope: OptionsTapeSourceScope | undefined;
+  filters: OptionFlowFilters | undefined;
+  listener: (items: readonly OptionPrint[]) => void;
+};
 
 const parseHistoryResponse = async (response: Response): Promise<OptionsTapeHistoryResponse> => {
   const payload = (await response.json()) as OptionsTapeHistoryResponse;
@@ -106,13 +108,13 @@ export const useOptionsTapeArraySource = ({
   options?: OptionsTapeSourceOptions;
 }): DurableTapeSource<OptionPrint, OptionsTapeSourceScope, OptionFlowFilters> => {
   const printsRef = useRef<readonly OptionPrint[]>(prints);
-  const listenersRef = useRef(new Set<(items: readonly OptionPrint[]) => void>());
+  const listenersRef = useRef(new Set<OptionsTapeArrayListener>());
   const optionsRef = useRef(options);
 
   useEffect(() => {
     printsRef.current = prints;
-    for (const listener of listenersRef.current) {
-      listener(prints);
+    for (const entry of listenersRef.current) {
+      entry.listener(filterOptionsTapePrints(prints, entry.scope, entry.filters));
     }
   }, [prints]);
 
@@ -125,10 +127,11 @@ export const useOptionsTapeArraySource = ({
       subscribe: ({ scope, filters }) => ({
         getSnapshot: () => filterOptionsTapePrints(printsRef.current, scope, filters),
         listen: (listener) => {
-          listenersRef.current.add(listener);
+          const entry = { scope, filters, listener };
+          listenersRef.current.add(entry);
           listener(filterOptionsTapePrints(printsRef.current, scope, filters));
           return () => {
-            listenersRef.current.delete(listener);
+            listenersRef.current.delete(entry);
           };
         },
         unsubscribe: () => {
@@ -146,4 +149,3 @@ export const useOptionsTapeArraySource = ({
     []
   );
 };
-

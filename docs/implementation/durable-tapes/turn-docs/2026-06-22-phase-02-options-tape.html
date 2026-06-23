@@ -242,16 +242,34 @@
       </section>
 
       <section>
+        <h2>Reviewer Results</h2>
+        <ul>
+          <li><span class="status-note">diagnosed</span> Forgejo Validate run <code>#232</code> failed on <code>bun run fmt:check</code>. The options-tape files were not Biome-formatted in commit <code>c1ccd03</code>.</li>
+          <li><span class="status-ok">repaired</span> Ran the project formatter and kept the repair scoped to the new options-tape files.</li>
+          <li><span class="status-ok">repaired</span> Preserved uncontrolled row-click scope by treating <code>focusedContractId: null</code> as the explicit clear signal and <code>undefined</code> as local module ownership.</li>
+          <li><span class="status-ok">repaired</span> Kept later live <code>prints</code> updates filtered per active subscription query, so scroll-held queued counts cannot include rows outside the active scope or filter.</li>
+          <li><span class="status-ok">repaired</span> Packet and contract scopes now ignore broad signal/side/type/security filters. Packet focus shows the packet member prints, and <code>Show all</code> expands to all prints for the focused contract.</li>
+          <li><span class="status-note">follow-up</span> Filed <code>islandflow-lhhs</code> for Phase 03 to omit <code>optionContractId</code> when a packet lacks a real <code>features.option_contract_id</code>.</li>
+          <li><span class="status-note">follow-up</span> Filed <code>islandflow-m2m7</code> for the shared durable-tape empty-live-head history backfill gap.</li>
+        </ul>
+      </section>
+
+      <section>
         <h2>Verification</h2>
         <ul>
-          <li><span class="status-ok">pass</span> <code>bun test apps/web/features/options-tape/options-tape.test.ts</code>: 7 tests passed.</li>
+          <li><span class="status-ok">pass</span> <code>bun run fmt:check</code>.</li>
+          <li><span class="status-ok">pass</span> <code>bun run lint</code>.</li>
+          <li><span class="status-ok">pass</span> <code>bun run typecheck</code>.</li>
+          <li><span class="status-ok">pass</span> <code>bun test apps/web/features/options-tape/options-tape.test.ts</code>: 8 tests passed.</li>
           <li><span class="status-ok">pass</span> <code>bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code>: 94 tests passed.</li>
           <li><span class="status-ok">pass</span> <code>bun test services/api/tests/live.test.ts packages/storage/tests/option-prints.test.ts</code>: 29 tests passed.</li>
+          <li><span class="status-ok">pass</span> <code>bun test</code>: 415 tests passed.</li>
+          <li><span class="status-ok">pass</span> <code>bun run check:public-api-routes</code>.</li>
+          <li><span class="status-ok">pass</span> <code>bun run check:docker-workspace</code>.</li>
           <li><span class="status-ok">pass</span> <code>bun --cwd=apps/web run build</code>.</li>
-          <li><span class="status-ok">pass</span> Browser QA with <code>WEB_DEV_PORT=3000 NEXT_PUBLIC_API_URL=https://api.flow.deltaisland.io bun run dev:web</code>.</li>
-          <li><span class="status-ok">pass</span> Desktop browser QA: <code>/options</code> rendered 77 rows, global headers matched phase contract, settings opened and applied all-prints view, row activation produced packet focus, <code>Show all</code> expanded to contract focus, no drawer opened, and overflow X was 0.</li>
-          <li><span class="status-ok">pass</span> Mobile browser QA at 390x844: template stepped down to <code>CONTRACT | PREMIUM | SIDE</code>, settings remained visible, and overflow X was 0.</li>
-          <li><span class="status-note">note</span> <code>WEB_DEV_PORT=3100</code> was occupied by another local process, so QA used free supported port 3000. A temporary 3200 attempt was stopped because hosted API CORS only supports 3000 and 3100.</li>
+          <li><span class="status-ok">pass</span> Reviewer browser QA with <code>WEB_DEV_PORT=3100 NEXT_PUBLIC_API_URL=https://api.flow.deltaisland.io bun run dev:web</code>.</li>
+          <li><span class="status-ok">pass</span> Desktop browser QA: <code>/options</code> rendered 77 rows, global headers matched <code>TIME | CONTRACT | PX | SIZE | PREMIUM | SIDE | IV</code>, row activation produced packet focus with 7 rows and <code>DT | TIME | PX | SIZE | PREMIUM | SIDE | SPOT</code>, <code>Show all</code> expanded to contract focus with 12 rows and <code>TIME | PX | SIZE | PREMIUM | NBBO | SIDE | EXCH | IV</code>, <code>Clear</code> returned to global signal headers, and overflow X was 0.</li>
+          <li><span class="status-ok">pass</span> Mobile browser QA at 390x844: template stepped down to <code>CONTRACT | PREMIUM | SIDE</code>, rendered 77 rows, and overflow X was 0.</li>
         </ul>
       </section>
 
@@ -259,17 +277,18 @@
         <h2>Beads And Follow Ups</h2>
         <ul>
           <li><code>islandflow-h9c0.1</code> was claimed for this implementation.</li>
-          <li>No follow-up Beads issues were filed during implementation. No missing packet/member fields blocked the UI contract.</li>
-          <li>Closeout should close <code>islandflow-h9c0.1</code> after the PR is opened, local gates remain green, and Beads sync succeeds.</li>
+          <li><code>islandflow-h9c0.1</code> remains closed after reviewer repair.</li>
+          <li><code>islandflow-lhhs</code> tracks the Phase 03 packet-focus optional contract-id repair.</li>
+          <li><code>islandflow-m2m7</code> tracks shared durable-tape history backfill when the live head is empty.</li>
         </ul>
       </section>
 
       <section>
         <h2>Reviewer Focus</h2>
         <ul>
-          <li>Check whether the route should keep the flow subscription only for packet/decor context or further decouple it before Phase 03.</li>
-          <li>Check that packet focus as <code>FlowPacketFocusRequest</code> is narrow enough for Phase 03 without leaking terminal state.</li>
-          <li>Check the settings popout and scope controls for keyboard/a11y polish beyond the verified outside-click dismissal and no-overflow behavior.</li>
+          <li>Packet focus stays a domain callback and does not import or mutate legacy terminal drawer/pane state.</li>
+          <li>Phase 03 has a focused follow-up for its display fallback leaking into callback payload semantics.</li>
+          <li>The only remaining reviewer risk is the shared empty-live-history gap recorded in <code>islandflow-m2m7</code>.</li>
         </ul>
       </section>
 

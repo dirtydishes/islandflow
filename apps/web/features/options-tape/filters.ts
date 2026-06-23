@@ -14,14 +14,7 @@ export const OPTIONS_TAPE_DEFAULT_SIDES: OptionNbboSide[] = ["AA", "A", "MID"];
 export const OPTIONS_TAPE_DEFAULT_OPTION_TYPES: OptionType[] = ["call", "put"];
 export const OPTIONS_TAPE_DEFAULT_SECURITY_TYPES: OptionSecurityType[] = ["stock"];
 
-export type OptionsTapeSidePreset =
-  | "default"
-  | "aa"
-  | "ask"
-  | "mid"
-  | "bid"
-  | "bb"
-  | "custom";
+export type OptionsTapeSidePreset = "default" | "aa" | "ask" | "mid" | "bid" | "bb" | "custom";
 
 export const buildDefaultOptionsTapeFilters = (): OptionFlowFilters => ({
   view: "signal",
@@ -152,6 +145,12 @@ export const getOptionsTapeQueryParams = (
   }
   return params;
 };
+
+export const getOptionsTapeScopeFilters = (
+  scope: OptionsTapeSourceScope | undefined,
+  filters: OptionFlowFilters | undefined
+): OptionFlowFilters | undefined =>
+  scope?.packetMemberTraceIds?.length || scope?.optionContractId ? undefined : filters;
 
 export const filterOptionsTapePrints = (
   prints: readonly OptionPrint[],
