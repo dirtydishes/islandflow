@@ -2,8 +2,9 @@
 
 import { type ReactNode, useMemo } from "react";
 
-import { EquitiesTape, createStaticEquitiesTapeSource } from "../features/equities-tape";
-import { FlowPacketsTape, createStaticFlowPacketsTapeSource } from "../features/flow-packets";
+import { AlertsModule } from "../features/alerts";
+import { createStaticEquitiesTapeSource, EquitiesTape } from "../features/equities-tape";
+import { createStaticFlowPacketsTapeSource, FlowPacketsTape } from "../features/flow-packets";
 import { NewsWire } from "../features/news-wire";
 import { OptionsTape } from "../features/options-tape";
 import { TerminalMarketChartSection } from "../features/terminal/chart-adapter";
@@ -197,6 +198,101 @@ export function OverviewRoute() {
           <FeedHealthPane state={state} />
           <EventContextPane state={state} />
           <HomeReplayRail state={state} />
+        </div>
+      </div>
+    </PageFrame>
+  );
+}
+
+export function DurableTapesExampleRoute() {
+  const state = useTerminal();
+  const flowSource = useMemo(
+    () => createStaticFlowPacketsTapeSource(state.filteredFlow),
+    [state.filteredFlow]
+  );
+  const equitiesSource = useMemo(
+    () => createStaticEquitiesTapeSource(state.filteredEquities),
+    [state.filteredEquities]
+  );
+  const routeTapeFeatures = useMemo(
+    () =>
+      [
+        "default",
+        { key: "clickhouseHistory", enabled: false },
+        { key: "settingsGear", enabled: false }
+      ] as const,
+    []
+  );
+
+  return (
+    <PageFrame title="Durable Tapes" eyebrow="QA" variant="durable-tapes">
+      <div className="durable-tapes-route-shell">
+        <div className="durable-tapes-grid">
+          <OptionsTape
+            className="durable-tapes-options"
+            decorByTraceId={state.classifierDecorByOptionTraceId}
+            features={routeTapeFeatures}
+            filters={state.flowFilters}
+            flowPacketById={state.flowPacketMap}
+            focusedContractId={
+              state.selectedInstrument?.kind === "option-contract"
+                ? state.selectedInstrument.contractId
+                : null
+            }
+            nbboByContractId={state.nbboMap}
+            nbboByTraceId={state.historicalNbboByTraceId}
+            onClearFocus={() => state.setSelectedInstrument(null)}
+            onContractFocus={state.focusOptionContract}
+            onFiltersChange={state.setFlowFilters}
+            onPacketFocus={state.focusFlowPacketRequest}
+            packetIdByOptionTraceId={state.packetIdByOptionTraceId}
+            prints={state.filteredOptions}
+            rowHeight={34}
+            title="Options Tape"
+          />
+          <FlowPacketsTape
+            className="durable-tapes-flow"
+            features={routeTapeFeatures}
+            filters={state.flowFilters}
+            onPacketFocus={state.focusFlowPacketRequest}
+            rowHeight={40}
+            source={flowSource}
+            title="Flow Packets"
+          />
+          <EquitiesTape
+            className="durable-tapes-equities"
+            features={routeTapeFeatures}
+            onTickerFocus={(event) => state.focusEquityTicker(event.print)}
+            rowHeight={34}
+            source={equitiesSource}
+            title="Equities Tape"
+          />
+          <AlertsModule
+            alerts={state.filteredAlerts}
+            className="durable-tapes-alerts"
+            features={routeTapeFeatures}
+            flowPacketById={state.flowPacketMap}
+            onCloseDetail={() => state.setSelectedAlert(null)}
+            onContractFocus={state.focusAlertContract}
+            onEquityFocus={state.focusAlertEquity}
+            onPacketFocus={state.focusFlowPacketRequest}
+            onSelectAlert={state.setSelectedAlert}
+            optionPrintByTraceId={state.optionPrintMap}
+            rowHeight={36}
+            selectedAlert={state.selectedAlert}
+            title="Alerts"
+          />
+          <NewsWire
+            className="durable-tapes-news"
+            historyEnabled={false}
+            lastUpdate={state.liveSession.lastUpdate}
+            liveEnabled={state.mode === "live"}
+            scopeSymbols={state.activeTickers}
+            showControlRails
+            status={state.liveSession.status}
+            stories={state.filteredNews}
+            title="News Wire"
+          />
         </div>
       </div>
     </PageFrame>

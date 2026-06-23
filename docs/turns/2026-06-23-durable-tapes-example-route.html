@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Durable Tapes Example Route</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #0d141b;
+        --panel-2: #111820;
+        --line: rgba(230, 237, 244, 0.14);
+        --line-strong: rgba(245, 166, 35, 0.36);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --green: #25c17a;
+        --red: #ff6b5f;
+        --blue: #4da3ff;
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: linear-gradient(180deg, #0b1016 0%, var(--bg) 100%);
+        color: var(--text);
+        font: 15px/1.55 var(--sans);
+      }
+
+      main {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+
+      header {
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      .eyebrow,
+      h2,
+      .meta-label,
+      code,
+      pre {
+        font-family: var(--mono);
+      }
+
+      .eyebrow {
+        margin-bottom: 8px;
+        color: var(--accent);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 900px;
+        font-size: 2rem;
+        line-height: 1.08;
+        letter-spacing: 0;
+        text-wrap: balance;
+      }
+
+      .subtitle {
+        max-width: 78ch;
+        margin-top: 12px;
+        color: var(--muted);
+      }
+
+      .meta-grid,
+      .qa-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 1px;
+        margin-top: 18px;
+        border: 1px solid var(--line);
+        background: var(--line);
+      }
+
+      .meta-cell,
+      .qa-cell {
+        min-width: 0;
+        padding: 10px 12px;
+        background: var(--panel-2);
+      }
+
+      .meta-label {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--faint);
+        font-size: 0.66rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      section {
+        padding: 20px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      h2 {
+        margin-bottom: 10px;
+        color: var(--accent);
+        font-size: 0.9rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      p {
+        max-width: 82ch;
+        color: var(--text);
+      }
+
+      p + p {
+        margin-top: 10px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 7px;
+      }
+
+      code {
+        padding: 0.08rem 0.28rem;
+        border: 1px solid rgba(245, 166, 35, 0.18);
+        border-radius: 5px;
+        background: rgba(245, 166, 35, 0.1);
+        color: #ffe0a3;
+        font-size: 0.9em;
+      }
+
+      .status-ok {
+        color: var(--green);
+      }
+
+      .status-note {
+        color: var(--blue);
+      }
+
+      .status-risk {
+        color: var(--red);
+      }
+
+      .diff-shell {
+        display: grid;
+        gap: 12px;
+      }
+
+      #rich-diff-root {
+        min-height: 32px;
+      }
+
+      #diff-fallback {
+        max-height: 560px;
+        overflow: auto;
+        margin: 0;
+        padding: 12px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--text);
+        font-size: 0.76rem;
+        line-height: 1.45;
+      }
+
+      .diff-note,
+      .qa-cell span {
+        color: var(--muted);
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "@pierre/diffs/react": "../../node_modules/@pierre/diffs/dist/react/index.js",
+          "react": "../../node_modules/react/index.js",
+          "react-dom/client": "../../node_modules/react-dom/client.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="eyebrow">Repository turn document</div>
+        <h1>Durable Tapes Example Route</h1>
+        <p class="subtitle">
+          Added a hidden <code>/durable-tapes</code> QA route that composes the five durable tape
+          domain modules from existing terminal state without adding a public navigation item or
+          changing the domain module APIs.
+        </p>
+        <div class="meta-grid" aria-label="Turn metadata">
+          <div class="meta-cell"><span class="meta-label">Branch</span>lavender/durable-tapes-example-route</div>
+          <div class="meta-cell"><span class="meta-label">Beads</span>islandflow-tpy3</div>
+          <div class="meta-cell"><span class="meta-label">Route</span>/durable-tapes</div>
+          <div class="meta-cell"><span class="meta-label">Scope</span>hidden route composition and CSS</div>
+          <div class="meta-cell"><span class="meta-label">Modules</span>Options, flow packets, equities, news, alerts</div>
+        </div>
+      </header>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          The route lives in the existing terminal route module as <code>DurableTapesExampleRoute</code>
+          and is exposed by a new Next entrypoint at <code>apps/web/app/durable-tapes/page.tsx</code>.
+          It uses <code>useTerminal()</code> state and wires the existing terminal maps and focus
+          callbacks into <code>OptionsTape</code>, <code>FlowPacketsTape</code>,
+          <code>EquitiesTape</code>, <code>NewsWire</code>, and <code>AlertsModule</code>.
+        </p>
+        <p>
+          The route is intentionally hidden. <code>NAV_ITEMS</code> remains unchanged, while
+          <code>getRouteFeatures("/durable-tapes")</code> subscribes to options, NBBO, equities,
+          flow, news, alerts, and classifier hits. Chart and overlay feeds stay off.
+        </p>
+      </section>
+
+      <section>
+        <h2>Implementation Notes</h2>
+        <ul>
+          <li>Flow packets and equities use static durable tape sources built from <code>state.filteredFlow</code> and <code>state.filteredEquities</code>.</li>
+          <li>Options use <code>state.filteredOptions</code>, flow packet maps, NBBO maps, classifier decor, and shared <code>flowFilters</code>.</li>
+          <li>Alerts use <code>state.filteredAlerts</code>, <code>state.selectedAlert</code>, evidence maps, and alert callbacks for packet, contract, and equity focus.</li>
+          <li>News uses <code>state.filteredNews</code>, live session status, compact rails, and route-local history disabled so the page stays a composition proof over terminal live state.</li>
+          <li>The CSS uses a flat terminal grid with stable module heights, independent tape scroll regions, responsive template stepping, and no route-level horizontal scrolling.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Verification</h2>
+        <div class="qa-grid" aria-label="Quality gates">
+          <div class="qa-cell"><span class="meta-label">Focused tests</span><span class="status-ok">pass</span> <code>bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code></div>
+          <div class="qa-cell"><span class="meta-label">Scoped Biome</span><span class="status-ok">pass</span> <code>bunx biome check</code> on the touched app files</div>
+          <div class="qa-cell"><span class="meta-label">Web build</span><span class="status-ok">pass</span> <code>bun --cwd=apps/web run build</code></div>
+          <div class="qa-cell"><span class="meta-label">Dev server</span><span class="status-ok">pass</span> <code>WEB_DEV_PORT=3100 bun run dev:web</code></div>
+          <div class="qa-cell"><span class="meta-label">Port 3000</span><span class="status-note">occupied</span> default dev server port was already in use</div>
+          <div class="qa-cell"><span class="meta-label">Repo Biome</span><span class="status-risk">blocked</span> pre-existing import-order drift outside this change still fails <code>bun run check</code></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Browser QA</h2>
+        <ul>
+          <li><span class="status-ok">Desktop 1440x900:</span> all five module headings rendered, five independent <code>.durable-tape-scroll</code> regions existed, row counts were nonzero, and document, route, and tape horizontal overflow checks were false.</li>
+          <li><span class="status-ok">Narrow 390x844:</span> modules stacked as options, flow, equities, alerts, news; all five scroll regions remained present; document width equaled client width; no route or tape horizontal overflow was detected.</li>
+          <li><span class="status-ok">Interactions:</span> flow packet, option contract, equity ticker, and alert selection paths were exercised from live rows without browser console errors. Equity focus updated the terminal focus chip and alert selection opened inline alert detail.</li>
+          <li><span class="status-note">Screenshot note:</span> browser screenshot capture timed out in the automation layer, so the record relies on DOM layout metrics and interaction checks rather than embedded screenshots.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <div class="diff-shell">
+          <p class="diff-note">
+            The standard unified fallback is visible by default. The richer view attempts to render
+            the same patch with browser-side <code>PatchDiff</code> from <code>@pierre/diffs/react</code>,
+            following the Diffs documentation for patch-file consumption. No SSR or preload diff
+            exports are used.
+          </p>
+          <div id="rich-diff-root" hidden></div>
+          <pre id="diff-fallback"><code>diff --git a/apps/web/app/durable-tapes/page.tsx b/apps/web/app/durable-tapes/page.tsx
+new file mode 100644
+--- /dev/null
++++ b/apps/web/app/durable-tapes/page.tsx
+@@
++import { DurableTapesExampleRoute } from "../terminal";
++
++export const dynamic = "force-dynamic";
++
++export default function Page() {
++  return &lt;DurableTapesExampleRoute /&gt;;
++}
+diff --git a/apps/web/app/terminal.tsx b/apps/web/app/terminal.tsx
+--- a/apps/web/app/terminal.tsx
++++ b/apps/web/app/terminal.tsx
+@@
++import { AlertsModule } from "../features/alerts";
+@@
++export function DurableTapesExampleRoute() {
++  const state = useTerminal();
++  const flowSource = useMemo(
++    () =&gt; createStaticFlowPacketsTapeSource(state.filteredFlow),
++    [state.filteredFlow]
++  );
++  const equitiesSource = useMemo(
++    () =&gt; createStaticEquitiesTapeSource(state.filteredEquities),
++    [state.filteredEquities]
++  );
++  const routeTapeFeatures = useMemo(
++    () =&gt;
++      [
++        "default",
++        { key: "clickhouseHistory", enabled: false },
++        { key: "settingsGear", enabled: false }
++      ] as const,
++    []
++  );
++
++  return (
++    &lt;PageFrame title="Durable Tapes" eyebrow="QA" variant="durable-tapes"&gt;
++      &lt;div className="durable-tapes-route-shell"&gt;
++        &lt;div className="durable-tapes-grid"&gt;
++          &lt;OptionsTape prints={state.filteredOptions} filters={state.flowFilters} /&gt;
++          &lt;FlowPacketsTape source={flowSource} filters={state.flowFilters} /&gt;
++          &lt;EquitiesTape source={equitiesSource} /&gt;
++          &lt;AlertsModule alerts={state.filteredAlerts} selectedAlert={state.selectedAlert} /&gt;
++          &lt;NewsWire stories={state.filteredNews} showControlRails historyEnabled={false} /&gt;
++        &lt;/div&gt;
++      &lt;/div&gt;
++    &lt;/PageFrame&gt;
++  );
++}
+diff --git a/apps/web/features/terminal/routes.ts b/apps/web/features/terminal/routes.ts
+--- a/apps/web/features/terminal/routes.ts
++++ b/apps/web/features/terminal/routes.ts
+@@
++const DURABLE_TAPES_PATH = "/durable-tapes";
++const KNOWN_TERMINAL_PATHS = new Set([
++  CANONICAL_OPTIONS_PATH,
++  TAPE_COMPAT_PATH,
++  "/news",
++  DURABLE_TAPES_PATH
++]);
+@@
++    case DURABLE_TAPES_PATH:
++      return {
++        options: true,
++        nbbo: true,
++        equities: true,
++        flow: true,
++        news: true,
++        alerts: true,
++        smartMoney: false,
++        classifierHits: true,
++        inferredDark: false,
++        equityCandles: false,
++        equityOverlay: false,
++        showOptionsPane: true,
++        showEquitiesPane: true,
++        showFlowPane: true,
++        showNewsPane: true,
++        showAlertsPane: true,
++        showChartPane: false,
++        needsClassifierDecor: true,
++        needsAlertEvidencePrefetch: true,
++        needsDarkUnderlying: false
++      };
+diff --git a/apps/web/app/globals.css b/apps/web/app/globals.css
+--- a/apps/web/app/globals.css
++++ b/apps/web/app/globals.css
+@@
++.page-shell-durable-tapes {
++  --route-accent: var(--accent);
++  --route-accent-soft: var(--accent-soft);
++  --route-line: oklch(0.78 0.12 74 / 0.22);
++}
+@@
++.durable-tapes-grid {
++  display: grid;
++  grid-template-areas:
++    "options flow alerts"
++    "options equities alerts"
++    "news news news";
++  grid-template-columns: minmax(440px, 1.42fr) minmax(260px, 0.84fr) minmax(320px, 0.95fr);
++  grid-template-rows: minmax(190px, 0.78fr) minmax(190px, 0.78fr) minmax(240px, 0.92fr);
++  gap: 8px;
++  height: max(700px, calc(100vh - var(--topbar-height) - 124px));
++  min-width: 0;
++  min-height: 0;
++  overflow: hidden;
++}
+@@
++@media (max-width: 720px) {
++  .durable-tapes-grid {
++    grid-template-areas:
++      "options"
++      "flow"
++      "equities"
++      "alerts"
++      "news";
++    grid-template-columns: minmax(0, 1fr);
++    height: auto;
++    overflow: visible;
++  }
++}
+diff --git a/apps/web/app/terminal.test.ts b/apps/web/app/terminal.test.ts
+--- a/apps/web/app/terminal.test.ts
++++ b/apps/web/app/terminal.test.ts
+@@
++  it("subscribes /durable-tapes to every composed tape feed without chart feeds", () =&gt; {
++    const manifest = getLiveManifest("/durable-tapes", "SPY", 60000, buildDefaultFlowFilters());
++    expect(manifest.map((subscription) =&gt; subscription.channel)).toEqual([
++      "options",
++      "nbbo",
++      "equities",
++      "flow",
++      "news",
++      "alerts",
++      "classifier-hits"
++    ]);
++  });
+@@
++  it("maps /durable-tapes to all durable module panes while keeping chart feeds off", () =&gt; {
++    const features = getRouteFeatures("/durable-tapes");
++    expect(features.showOptionsPane).toBe(true);
++    expect(features.showFlowPane).toBe(true);
++    expect(features.showEquitiesPane).toBe(true);
++    expect(features.showNewsPane).toBe(true);
++    expect(features.showAlertsPane).toBe(true);
++    expect(features.showChartPane).toBe(false);
++  });</code></pre>
+        </div>
+      </section>
+
+      <script type="text/plain" id="diff-source">diff --git a/apps/web/app/durable-tapes/page.tsx b/apps/web/app/durable-tapes/page.tsx
+new file mode 100644
+--- /dev/null
++++ b/apps/web/app/durable-tapes/page.tsx
+@@
++import { DurableTapesExampleRoute } from "../terminal";
++
++export const dynamic = "force-dynamic";
++
++export default function Page() {
++  return <DurableTapesExampleRoute />;
++}
+diff --git a/apps/web/app/terminal.tsx b/apps/web/app/terminal.tsx
+--- a/apps/web/app/terminal.tsx
++++ b/apps/web/app/terminal.tsx
+@@
++import { AlertsModule } from "../features/alerts";
+@@
++export function DurableTapesExampleRoute() {
++  const state = useTerminal();
++  const flowSource = useMemo(
++    () => createStaticFlowPacketsTapeSource(state.filteredFlow),
++    [state.filteredFlow]
++  );
++  const equitiesSource = useMemo(
++    () => createStaticEquitiesTapeSource(state.filteredEquities),
++    [state.filteredEquities]
++  );
++  const routeTapeFeatures = useMemo(
++    () =>
++      [
++        "default",
++        { key: "clickhouseHistory", enabled: false },
++        { key: "settingsGear", enabled: false }
++      ] as const,
++    []
++  );
++
++  return (
++    <PageFrame title="Durable Tapes" eyebrow="QA" variant="durable-tapes">
++      <div className="durable-tapes-route-shell">
++        <div className="durable-tapes-grid">
++          <OptionsTape prints={state.filteredOptions} filters={state.flowFilters} />
++          <FlowPacketsTape source={flowSource} filters={state.flowFilters} />
++          <EquitiesTape source={equitiesSource} />
++          <AlertsModule alerts={state.filteredAlerts} selectedAlert={state.selectedAlert} />
++          <NewsWire stories={state.filteredNews} showControlRails historyEnabled={false} />
++        </div>
++      </div>
++    </PageFrame>
++  );
++}
+diff --git a/apps/web/features/terminal/routes.ts b/apps/web/features/terminal/routes.ts
+--- a/apps/web/features/terminal/routes.ts
++++ b/apps/web/features/terminal/routes.ts
+@@
++const DURABLE_TAPES_PATH = "/durable-tapes";
++const KNOWN_TERMINAL_PATHS = new Set([
++  CANONICAL_OPTIONS_PATH,
++  TAPE_COMPAT_PATH,
++  "/news",
++  DURABLE_TAPES_PATH
++]);
+@@
++    case DURABLE_TAPES_PATH:
++      return {
++        options: true,
++        nbbo: true,
++        equities: true,
++        flow: true,
++        news: true,
++        alerts: true,
++        smartMoney: false,
++        classifierHits: true,
++        inferredDark: false,
++        equityCandles: false,
++        equityOverlay: false,
++        showOptionsPane: true,
++        showEquitiesPane: true,
++        showFlowPane: true,
++        showNewsPane: true,
++        showAlertsPane: true,
++        showChartPane: false,
++        needsClassifierDecor: true,
++        needsAlertEvidencePrefetch: true,
++        needsDarkUnderlying: false
++      };
+diff --git a/apps/web/app/globals.css b/apps/web/app/globals.css
+--- a/apps/web/app/globals.css
++++ b/apps/web/app/globals.css
+@@
++.page-shell-durable-tapes {
++  --route-accent: var(--accent);
++  --route-accent-soft: var(--accent-soft);
++  --route-line: oklch(0.78 0.12 74 / 0.22);
++}
+@@
++.durable-tapes-grid {
++  display: grid;
++  grid-template-areas:
++    "options flow alerts"
++    "options equities alerts"
++    "news news news";
++  grid-template-columns: minmax(440px, 1.42fr) minmax(260px, 0.84fr) minmax(320px, 0.95fr);
++  grid-template-rows: minmax(190px, 0.78fr) minmax(190px, 0.78fr) minmax(240px, 0.92fr);
++  gap: 8px;
++  height: max(700px, calc(100vh - var(--topbar-height) - 124px));
++  min-width: 0;
++  min-height: 0;
++  overflow: hidden;
++}
+@@
++@media (max-width: 720px) {
++  .durable-tapes-grid {
++    grid-template-areas:
++      "options"
++      "flow"
++      "equities"
++      "alerts"
++      "news";
++    grid-template-columns: minmax(0, 1fr);
++    height: auto;
++    overflow: visible;
++  }
++}
+diff --git a/apps/web/app/terminal.test.ts b/apps/web/app/terminal.test.ts
+--- a/apps/web/app/terminal.test.ts
++++ b/apps/web/app/terminal.test.ts
+@@
++  it("subscribes /durable-tapes to every composed tape feed without chart feeds", () => {
++    const manifest = getLiveManifest("/durable-tapes", "SPY", 60000, buildDefaultFlowFilters());
++    expect(manifest.map((subscription) => subscription.channel)).toEqual([
++      "options",
++      "nbbo",
++      "equities",
++      "flow",
++      "news",
++      "alerts",
++      "classifier-hits"
++    ]);
++  });
+@@
++  it("maps /durable-tapes to all durable module panes while keeping chart feeds off", () => {
++    const features = getRouteFeatures("/durable-tapes");
++    expect(features.showOptionsPane).toBe(true);
++    expect(features.showFlowPane).toBe(true);
++    expect(features.showEquitiesPane).toBe(true);
++    expect(features.showNewsPane).toBe(true);
++    expect(features.showAlertsPane).toBe(true);
++    expect(features.showChartPane).toBe(false);
++  });</script>
+      <script type="module">
+        const source = document.getElementById("diff-source")?.textContent?.trim() ?? "";
+        const root = document.getElementById("rich-diff-root");
+        const fallback = document.getElementById("diff-fallback");
+
+        if (source && root && fallback) {
+          try {
+            const React = await import("react");
+            const { createRoot } = await import("react-dom/client");
+            const { PatchDiff } = await import("@pierre/diffs/react");
+            createRoot(root).render(
+              React.createElement(PatchDiff, {
+                patch: source,
+                diffStyle: "unified"
+              })
+            );
+            root.hidden = false;
+            fallback.hidden = true;
+          } catch (error) {
+            root.hidden = true;
+            fallback.hidden = false;
+          }
+        }
+      </script>
+    </main>
+  </body>
+</html>

@@ -35,4 +35,10 @@ describe("legacy page redirects", () => {
     expect(() => mod.default()).toThrow("NEXT_REDIRECT:/options");
     expect(redirect).toHaveBeenCalledWith("/options");
   });
+
+  it("exposes /durable-tapes without redirecting", async () => {
+    const mod = await import("./durable-tapes/page");
+    expect(typeof mod.default).toBe("function");
+    expect(redirect).not.toHaveBeenCalled();
+  });
 });
