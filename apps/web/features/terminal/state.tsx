@@ -41,8 +41,6 @@ import {
 } from "./config";
 import { bumpTapeDebugMetric, logTapeDebug } from "./debug";
 import {
-  buildAlertContextPath,
-  collectAlertContextEvidence,
   getAlertFlowPacketRefs,
   getSmartFlowEvidenceRefs,
   getSmartFlowOptionPrintRefs,
@@ -52,6 +50,8 @@ import {
   prunePinnedEntries,
   resolveAlertFlowPacket
 } from "./evidence";
+import type { AlertContractFocusRequest, AlertEquityFocusRequest } from "../alerts";
+import type { FlowPacketFocusRequest } from "../flow-packets";
 import {
   buildDefaultFlowFilters,
   buildOptionTapeQueryParams,
@@ -78,8 +78,6 @@ import {
   normalizeJoinRefCandidates,
   resolveJoinFromRef,
   upsertPinnedEntries,
-  type AlertContextBundle,
-  type AlertContextStatus,
   type ClassifierDecor,
   type DarkEvidenceItem,
   type EvidenceItem
@@ -739,12 +737,6 @@ export const useTerminalState = () => {
   const [pinnedEquityJoinMap, setPinnedEquityJoinMap] = useState<
     Map<string, PinnedEntry<EquityPrintJoin>>
   >(() => new Map());
-  const [selectedAlertContextStatus, setSelectedAlertContextStatus] = useState<AlertContextStatus>({
-    traceId: null,
-    loading: false,
-    missingRefs: [],
-    error: null
-  });
   const [optionSupportSmartMoney, setOptionSupportSmartMoney] = useState<SmartMoneyEvent[]>([]);
   const [optionSupportClassifierHits, setOptionSupportClassifierHits] = useState<
     ClassifierHitEvent[]
@@ -790,69 +782,6 @@ export const useTerminalState = () => {
       pinnedOptionPrintMap.size + pinnedFlowPacketMap.size + pinnedEquityJoinMap.size
     );
   }, [pinnedOptionPrintMap.size, pinnedFlowPacketMap.size, pinnedEquityJoinMap.size]);
-
-  useEffect(() => {
-    if (!selectedAlert) {
-      setSelectedAlertContextStatus({
-        traceId: null,
-        loading: false,
-        missingRefs: [],
-        error: null
-      });
-      return;
-    }
-
-    const abort = new AbortController();
-    setSelectedAlertContextStatus({
-      traceId: selectedAlert.trace_id,
-      loading: true,
-      missingRefs: [],
-      error: null
-    });
-    incrementRetentionMetric("pinnedFetchMisses", selectedAlert.evidence_refs.length);
-
-    void fetch(buildApiUrl(buildAlertContextPath(selectedAlert.trace_id)), { signal: abort.signal })
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error(await readErrorDetail(response));
-        }
-        return response.json();
-      })
-      .then((payload: AlertContextBundle) => {
-        if (abort.signal.aborted) {
-          return;
-        }
-        const { packets, prints } = collectAlertContextEvidence(payload);
-        const now = Date.now();
-        if (packets.size > 0) {
-          setPinnedFlowPacketMap((prev) => upsertPinnedEntries(prev, packets, now));
-        }
-        if (prints.size > 0) {
-          setPinnedOptionPrintMap((prev) => upsertPinnedEntries(prev, prints, now));
-        }
-        setSelectedAlertContextStatus({
-          traceId: selectedAlert.trace_id,
-          loading: false,
-          missingRefs: payload.missing_refs ?? [],
-          error: null
-        });
-      })
-      .catch((error) => {
-        if (abort.signal.aborted) {
-          return;
-        }
-        incrementRetentionMetric("pinnedFetchFailures", 1);
-        console.warn("Failed to fetch persisted alert context", error);
-        setSelectedAlertContextStatus({
-          traceId: selectedAlert.trace_id,
-          loading: false,
-          missingRefs: [],
-          error: error instanceof Error ? error.message : String(error)
-        });
-      });
-
-    return () => abort.abort();
-  }, [selectedAlert]);
 
   useEffect(() => {
     if (!selectedDarkEvent || mode !== "live") {
@@ -906,31 +835,6 @@ export const useTerminalState = () => {
         console.warn("Failed to fetch dark evidence joins", error);
       });
   }, [selectedDarkEvent, mode, resolvedEquityJoinMap]);
-
-  const selectedEvidence = useMemo((): EvidenceItem[] => {
-    if (!selectedAlert) {
-      return [];
-    }
-
-    return selectedAlert.evidence_refs.map((id) => {
-      const packet = resolvedFlowPacketMap.get(id);
-      if (packet) {
-        return { kind: "flow", id, packet };
-      }
-      const print = resolvedOptionPrintMap.get(id);
-      if (print) {
-        return { kind: "print", id, print };
-      }
-      return { kind: "unknown", id };
-    });
-  }, [selectedAlert, resolvedFlowPacketMap, resolvedOptionPrintMap]);
-
-  const selectedFlowPacket = useMemo(() => {
-    if (!selectedAlert) {
-      return null;
-    }
-    return resolveAlertFlowPacket(selectedAlert, resolvedFlowPacketMap);
-  }, [selectedAlert, resolvedFlowPacketMap]);
 
   const selectedDarkEvidence = useMemo((): DarkEvidenceItem[] => {
     if (!selectedDarkEvent) {
@@ -1601,6 +1505,79 @@ export const useTerminalState = () => {
     [filteredEquities]
   );
 
+  const focusFlowPacketRequest = useCallback(
+    (request: FlowPacketFocusRequest) => {
+      if (!request.optionContractId) {
+        return;
+      }
+      const contractId = normalizeContractId(request.optionContractId);
+      const parsed = parseOptionContractId(contractId);
+      const underlyingId = (parsed?.root ?? extractUnderlying(contractId)).toUpperCase();
+      const scopeKey = `option-contract:${contractId}`;
+      const subscriptionKey = getLiveSubscriptionKey({
+        channel: "options",
+        underlying_ids: [underlyingId],
+        option_contract_id: contractId
+      });
+      const memberTraceIds = new Set(request.memberTraceIds);
+      const memberPrints = request.memberTraceIds
+        .map((traceId) => resolvedOptionPrintMap.get(traceId))
+        .filter((print): print is OptionPrint => Boolean(print));
+      const seedItems = composeTapeItems(
+        memberPrints,
+        filteredOptions.filter(
+          (candidate) =>
+            normalizeContractId(candidate.option_contract_id) === contractId &&
+            (memberTraceIds.size === 0 || memberTraceIds.has(candidate.trace_id))
+        ),
+        []
+      );
+      setOptionFocusSeed({ scopeKey, subscriptionKey, items: seedItems });
+      bumpTapeDebugMetric("focusSeedRowCount", seedItems.length);
+      logTapeDebug("packet focus seed captured", {
+        packet_id: request.packetId,
+        source: request.source,
+        contract_id: contractId,
+        row_count: seedItems.length
+      });
+      setSelectedInstrument({
+        kind: "option-contract",
+        contractId,
+        underlyingId
+      });
+    },
+    [filteredOptions, resolvedOptionPrintMap]
+  );
+
+  const focusAlertContract = useCallback(
+    (request: AlertContractFocusRequest) => {
+      focusOptionContract(request.print);
+    },
+    [focusOptionContract]
+  );
+
+  const focusAlertEquity = useCallback(
+    (request: AlertEquityFocusRequest) => {
+      const underlyingId = request.underlyingId.toUpperCase();
+      const scopeKey = `equity:${underlyingId}`;
+      const seedItems = filteredEquities.filter(
+        (candidate) => candidate.underlying_id.toUpperCase() === underlyingId
+      );
+      setEquityFocusSeed({ scopeKey, items: seedItems });
+      bumpTapeDebugMetric("focusSeedRowCount", seedItems.length);
+      logTapeDebug("alert equity focus captured", {
+        underlying_id: underlyingId,
+        source: request.source,
+        row_count: seedItems.length
+      });
+      setSelectedInstrument({
+        kind: "equity",
+        underlyingId
+      });
+    },
+    [filteredEquities]
+  );
+
   const equitiesSilentWarning = shouldShowEquitiesSilentFeedWarning({
     wsStatus: liveSession.status,
     equitiesSubscribed: mode === "live" && equitiesLiveSubscriptionActive,
@@ -2179,9 +2156,6 @@ export const useTerminalState = () => {
     classifierHitsByPacketId,
     packetIdByOptionTraceId,
     classifierDecorByOptionTraceId,
-    selectedEvidence,
-    selectedAlertContextStatus,
-    selectedFlowPacket,
     selectedDarkEvidence,
     selectedDarkUnderlying,
     selectedClassifierPacketId,
@@ -2207,6 +2181,9 @@ export const useTerminalState = () => {
     chartInferredDark,
     focusOptionContract,
     focusEquityTicker,
+    focusFlowPacketRequest,
+    focusAlertContract,
+    focusAlertEquity,
     openFromSmartFlowProjection,
     openFromSmartMoneyEvent,
     openFromClassifierHit,

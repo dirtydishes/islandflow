@@ -1,7 +1,6 @@
 "use client";
 
 import type {
-  AlertEvent,
   ClassifierHitEvent,
   EquityPrintJoin,
   FlowPacket,
@@ -11,12 +10,11 @@ import type {
   SmartMoneyEvent
 } from "@islandflow/types";
 
+import { AlertDetailDrawer } from "../../alerts";
 import { getSmartFlowEvidenceRefs } from "../evidence";
 import {
   decodeNewsText,
-  deriveAlertDirection,
   formatCompactUsd,
-  normalizeAlertSeverity,
   smartFlowDirectionLabel,
   smartFlowDirectionTone,
   smartFlowEvidenceQualityLabel,
@@ -24,12 +22,7 @@ import {
   smartMoneyProfileLabel
 } from "../format";
 import type { TerminalDrawersRenderer } from "../shell";
-import {
-  formatDarkTrace,
-  type AlertContextStatus,
-  type DarkEvidenceItem,
-  type EvidenceItem
-} from "../state-helpers";
+import { formatDarkTrace, type DarkEvidenceItem, type EvidenceItem } from "../state-helpers";
 import {
   formatConfidence,
   formatDateTime,
@@ -47,197 +40,6 @@ import {
   sanitizeNewsHtml,
   smartFlowReasonLabel
 } from "./ui-helpers";
-
-type AlertDrawerProps = {
-  alert: AlertEvent;
-  flowPacket: FlowPacket | null;
-  evidence: EvidenceItem[];
-  contextStatus: AlertContextStatus;
-  onClose: () => void;
-};
-
-const formatOptionalMoney = (value: unknown): string | null => {
-  const parsed = parseNumber(value, Number.NaN);
-  return Number.isFinite(parsed) ? `$${formatPrice(parsed)}` : null;
-};
-
-const formatOptionalMs = (value: unknown): string | null => {
-  const parsed = parseNumber(value, Number.NaN);
-  return Number.isFinite(parsed) ? `${Math.round(parsed)}ms` : null;
-};
-
-export const AlertDrawer = ({
-  alert,
-  flowPacket,
-  evidence,
-  contextStatus,
-  onClose
-}: AlertDrawerProps) => {
-  const primary = alert.hits[0];
-  const direction = deriveAlertDirection(alert);
-  const severity = normalizeAlertSeverity(alert);
-  const evidencePrints = evidence.filter((item) => item.kind === "print");
-  const unknownCount = evidence.filter((item) => item.kind === "unknown").length;
-  const isContextLoading = contextStatus.traceId === alert.trace_id && contextStatus.loading;
-  const missingRefs = contextStatus.traceId === alert.trace_id ? contextStatus.missingRefs : [];
-
-  return (
-    <aside className="drawer">
-      <div className="drawer-header">
-        <div>
-          <p className="drawer-eyebrow">Alert details</p>
-          <h3>{primary ? humanizeClassifierId(primary.classifier_id) : "Alert"}</h3>
-          <p className="drawer-subtitle">{formatDateTime(alert.source_ts)}</p>
-        </div>
-        <button className="drawer-close" type="button" onClick={onClose}>
-          Close
-        </button>
-      </div>
-
-      <div className="drawer-meta">
-        <span className={`pill severity-${severity}`}>{severity}</span>
-        <span className="drawer-chip">Score {Math.round(alert.score)}</span>
-        <span className={`pill direction-${direction}`}>{direction}</span>
-        {isContextLoading ? <span className="drawer-chip">Loading context</span> : null}
-      </div>
-      {isContextLoading ? (
-        <div
-          className="drawer-section drawer-context-loading"
-          aria-label="Loading persisted evidence"
-        >
-          <div className="drawer-skeleton drawer-skeleton-wide" />
-          <div className="drawer-skeleton" />
-        </div>
-      ) : null}
-      {contextStatus.traceId === alert.trace_id && contextStatus.error ? (
-        <p className="drawer-empty">Persisted context could not be loaded: {contextStatus.error}</p>
-      ) : null}
-
-      <div className="drawer-section">
-        <h4>Classifier hits</h4>
-        {alert.hits.length === 0 ? (
-          <p className="drawer-empty">No classifier hits captured.</p>
-        ) : (
-          <div className="drawer-list">
-            {alert.hits.map((hit, index) => (
-              <div className="drawer-row" key={`${alert.trace_id}-${hit.classifier_id}-${index}`}>
-                <div className="drawer-row-title">{humanizeClassifierId(hit.classifier_id)}</div>
-                <div className="drawer-row-meta">
-                  <span className={`pill direction-${normalizeDirection(hit.direction)}`}>
-                    {normalizeDirection(hit.direction)}
-                  </span>
-                  <span>Confidence {formatConfidence(hit.confidence)}</span>
-                </div>
-                {hit.explanations?.[0] ? (
-                  <p className="drawer-note">{hit.explanations[0]}</p>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="drawer-section">
-        <h4>Flow packet</h4>
-        {flowPacket ? (
-          <div className="drawer-row">
-            <div className="drawer-row-title">
-              {String(flowPacket.features.option_contract_id ?? flowPacket.id ?? "Flow packet")}
-            </div>
-            <div className="drawer-row-meta">
-              <span>
-                {formatFlowMetric(
-                  parseNumber(flowPacket.features.count, flowPacket.members.length)
-                )}{" "}
-                prints
-              </span>
-              <span>{formatFlowMetric(parseNumber(flowPacket.features.total_size, 0))} size</span>
-              <span>
-                Notional $
-                {formatUsd(
-                  parseNumber(
-                    flowPacket.features.total_notional,
-                    parseNumber(flowPacket.features.total_premium, 0) * 100
-                  )
-                )}
-              </span>
-            </div>
-            <p className="drawer-note">
-              Window {formatFlowMetric(parseNumber(flowPacket.features.window_ms, 0), "ms")} ·{" "}
-              {formatTime(parseNumber(flowPacket.features.start_ts, flowPacket.source_ts))} →{" "}
-              {formatTime(parseNumber(flowPacket.features.end_ts, flowPacket.source_ts))}
-            </p>
-          </div>
-        ) : (
-          <p className="drawer-empty">Persisted flow packet is not available for this alert.</p>
-        )}
-      </div>
-
-      <div className="drawer-section">
-        <h4>Evidence prints</h4>
-        {evidencePrints.length === 0 ? (
-          <p className="drawer-empty">
-            Persisted evidence prints are not available for this alert.
-          </p>
-        ) : (
-          <div className="drawer-list">
-            {evidencePrints.slice(0, 6).map((item) => (
-              <div className="drawer-row" key={item.id}>
-                <div className="drawer-row-title">{item.print.option_contract_id}</div>
-                <div className="drawer-row-meta">
-                  <span>${formatPrice(item.print.price)}</span>
-                  <span>{formatSize(item.print.size)}x</span>
-                  <span>{item.print.exchange}</span>
-                  {item.print.execution_nbbo_side ? (
-                    <span>Side {item.print.execution_nbbo_side}</span>
-                  ) : null}
-                  {formatOptionalMs(item.print.execution_nbbo_age_ms) ? (
-                    <span>Quote {formatOptionalMs(item.print.execution_nbbo_age_ms)}</span>
-                  ) : null}
-                </div>
-                <div className="drawer-row-meta drawer-evidence-context">
-                  {formatOptionalMoney(item.print.execution_nbbo_bid) ? (
-                    <span>Bid {formatOptionalMoney(item.print.execution_nbbo_bid)}</span>
-                  ) : null}
-                  {formatOptionalMoney(item.print.execution_nbbo_ask) ? (
-                    <span>Ask {formatOptionalMoney(item.print.execution_nbbo_ask)}</span>
-                  ) : null}
-                  {formatOptionalMoney(item.print.execution_nbbo_mid) ? (
-                    <span>Mid {formatOptionalMoney(item.print.execution_nbbo_mid)}</span>
-                  ) : null}
-                  {formatOptionalMoney(item.print.execution_nbbo_spread) ? (
-                    <span>Spr {formatOptionalMoney(item.print.execution_nbbo_spread)}</span>
-                  ) : null}
-                  {formatOptionalMoney(item.print.execution_underlying_spot) ? (
-                    <span>Spot {formatOptionalMoney(item.print.execution_underlying_spot)}</span>
-                  ) : null}
-                  {formatOptionalMoney(item.print.execution_underlying_bid) ? (
-                    <span>U Bid {formatOptionalMoney(item.print.execution_underlying_bid)}</span>
-                  ) : null}
-                  {formatOptionalMoney(item.print.execution_underlying_ask) ? (
-                    <span>U Ask {formatOptionalMoney(item.print.execution_underlying_ask)}</span>
-                  ) : null}
-                  {formatOptionalMoney(item.print.execution_underlying_mid) ? (
-                    <span>U Mid {formatOptionalMoney(item.print.execution_underlying_mid)}</span>
-                  ) : null}
-                </div>
-                <p className="drawer-note">{formatTime(item.print.ts)}</p>
-              </div>
-            ))}
-          </div>
-        )}
-        {unknownCount > 0 ? (
-          <p className="drawer-empty">
-            +{unknownCount} evidence refs unresolved in persisted context.
-          </p>
-        ) : null}
-        {missingRefs.length > 0 ? (
-          <p className="drawer-empty">Missing refs: {missingRefs.slice(0, 4).join(", ")}</p>
-        ) : null}
-      </div>
-    </aside>
-  );
-};
 
 type NewsDrawerProps = {
   story: NewsStory;
@@ -876,11 +678,13 @@ export const DarkDrawer = ({ event, evidence, underlying, onClose }: DarkDrawerP
 export const renderTerminalDrawers: TerminalDrawersRenderer = (state) => (
   <>
     {state.selectedAlert ? (
-      <AlertDrawer
+      <AlertDetailDrawer
         alert={state.selectedAlert}
-        flowPacket={state.selectedFlowPacket}
-        evidence={state.selectedEvidence}
-        contextStatus={state.selectedAlertContextStatus}
+        flowPacketById={state.flowPacketMap}
+        optionPrintByTraceId={state.optionPrintMap}
+        onContractFocus={state.focusAlertContract}
+        onEquityFocus={state.focusAlertEquity}
+        onPacketFocus={state.focusFlowPacketRequest}
         onClose={() => state.setSelectedAlert(null)}
       />
     ) : null}
