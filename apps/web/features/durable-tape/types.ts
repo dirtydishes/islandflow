@@ -38,6 +38,9 @@ export type DurableTapeSubscription<TItem> = {
 
 export type DurableTapeSource<TItem, TScope, TFilters> = {
   subscribe: (input: DurableTapeQuery<TScope, TFilters>) => DurableTapeSubscription<TItem>;
+  getInitialHistoryCursor?: (
+    input: DurableTapeQuery<TScope, TFilters>
+  ) => DurableTapeCursor | null | undefined;
   loadOlder: (
     cursor: DurableTapeCursor,
     input: DurableTapeQuery<TScope, TFilters>

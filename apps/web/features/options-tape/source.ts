@@ -4,7 +4,12 @@ import type { OptionFlowFilters, OptionPrint } from "@islandflow/types";
 import { OptionPrintSchema } from "@islandflow/types";
 import { useEffect, useMemo, useRef } from "react";
 
-import type { DurableTapeCursor, DurableTapeHistoryPage, DurableTapeSource } from "../durable-tape";
+import {
+  createDurableTapeInitialHistoryCursor,
+  type DurableTapeCursor,
+  type DurableTapeHistoryPage,
+  type DurableTapeSource
+} from "../durable-tape";
 import { filterOptionsTapePrints, getOptionsTapeQueryParams } from "./filters";
 import type {
   OptionsTapeHistoryResponse,
@@ -138,6 +143,7 @@ export const useOptionsTapeArraySource = ({
           listenersRef.current.clear();
         }
       }),
+      getInitialHistoryCursor: () => createDurableTapeInitialHistoryCursor(),
       loadOlder: (cursor, { scope, filters }) =>
         loadOptionsTapeHistoryPage({
           cursor,
