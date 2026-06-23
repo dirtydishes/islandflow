@@ -2850,6 +2850,166 @@ h3 {
   color: var(--text-dim);
 }
 
+.flow-packets-tape .durable-tape-row:has(.flow-packets-badge-stale),
+.flow-packets-tape .durable-tape-row:has(.flow-packets-badge-missing) {
+  box-shadow: inset 0 0 0 1px oklch(0.68 0.16 28 / 0.28);
+}
+
+.flow-packets-tape .durable-tape-cell[data-align="end"] {
+  font-family: var(--font-mono), monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.flow-packets-contract {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.flow-packets-contract > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.flow-packets-contract-button,
+.flow-packets-inspect-button {
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.flow-packets-contract-button {
+  min-width: 0;
+  padding: 0;
+  font-weight: 700;
+}
+
+.flow-packets-contract-button:hover,
+.flow-packets-inspect-button:hover {
+  color: var(--accent);
+}
+
+.flow-packets-contract-button:focus-visible,
+.flow-packets-inspect-button:focus-visible {
+  outline: 2px solid oklch(0.83 0.08 74 / 0.82);
+  outline-offset: 2px;
+}
+
+.flow-packets-badge {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: 18px;
+  border: 1px solid oklch(0.72 0.012 250 / 0.22);
+  border-radius: 999px;
+  padding: 2px 5px;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.flow-packets-badge-stale {
+  border-color: oklch(0.75 0.13 74 / 0.38);
+  background: var(--accent-soft);
+  color: oklch(0.83 0.1 74);
+}
+
+.flow-packets-badge-missing {
+  border-color: oklch(0.66 0.16 28 / 0.42);
+  background: var(--red-soft);
+  color: oklch(0.78 0.12 28);
+}
+
+.flow-packets-detail {
+  display: grid;
+  gap: 10px;
+  min-width: min(380px, calc(100vw - 60px));
+}
+
+.flow-packets-detail-head {
+  display: grid;
+  gap: 3px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
+
+.flow-packets-detail-head strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flow-packets-detail-head span {
+  color: var(--text-dim);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.68rem;
+}
+
+.flow-packets-detail dl {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.9fr) minmax(0, 1.5fr);
+  gap: 6px 12px;
+  margin: 0;
+}
+
+.flow-packets-detail-row {
+  display: contents;
+}
+
+.flow-packets-detail dt,
+.flow-packets-detail dd {
+  min-width: 0;
+  margin: 0;
+}
+
+.flow-packets-detail dt {
+  color: var(--text-faint);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.flow-packets-detail dd {
+  overflow: hidden;
+  color: var(--text);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flow-packets-inspect-button {
+  min-height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: var(--bg-soft);
+  color: var(--text);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.flow-packets-linked-context {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  color: var(--text-dim);
+}
+
 .options-table {
   display: flex;
   min-height: 0;

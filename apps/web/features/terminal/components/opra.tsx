@@ -4,8 +4,9 @@ import {
   getSubscriptionKey as getLiveSubscriptionKey,
   parseOptionContractId
 } from "@islandflow/types";
-import { type CSSProperties, memo, type MouseEvent as ReactMouseEvent } from "react";
+import { type CSSProperties, memo, type MouseEvent as ReactMouseEvent, useMemo } from "react";
 
+import { FlowPacketsTape } from "../../flow-packets";
 import { getTapeVirtualConfig } from "../config";
 import { countActiveFlowFilterGroups } from "../filters";
 import { formatCompactUsd, formatOptionContractLabel } from "../format";
@@ -16,14 +17,11 @@ import { Pane, TapeControls, TapeStatus, FlowFilterPopover } from "./primitives"
 import {
   classifyNbboSide,
   formatContractLabel,
-  formatFlowMetric,
   formatPct,
   formatPrice,
   formatSize,
   formatTime,
-  formatUsd,
-  humanizeClassifierId,
-  parseNumber
+  humanizeClassifierId
 } from "./ui-helpers";
 
 type OptionsPaneProps = {
@@ -282,171 +280,32 @@ type FlowPaneProps = {
 };
 
 export const FlowPane = memo(({ state, limit, title = "Flow", className }: FlowPaneProps) => {
-  const items = limit ? state.filteredFlow.slice(0, limit) : state.filteredFlow;
-  const virtual = useTapeVirtualList(items, state.flowScroll.listRef, getTapeVirtualConfig("flow"));
-  useVirtualHistoryGate(
-    state.mode === "live" && !limit,
-    items.length,
-    virtual.virtualItems.at(-1)?.index ?? -1,
-    () => void state.liveSession.loadOlder("flow")
+  const optionContractId =
+    state.selectedInstrument?.kind === "option-contract"
+      ? state.selectedInstrument.contractId
+      : null;
+  const scope = useMemo(
+    () => ({
+      tickers: state.activeTickers,
+      optionContractId
+    }),
+    [optionContractId, state.activeTickers]
+  );
+  const sourceOptions = useMemo(
+    () => ({ live: state.mode === "live", snapshotLimit: limit ?? undefined }),
+    [limit, state.mode]
   );
 
   return (
-    <Pane
+    <FlowPacketsTape
       className={className}
+      filters={state.flowFilters}
+      rowHeight={limit ? 40 : 44}
+      scope={scope}
+      sourceOptions={sourceOptions}
+      template={limit ? "twoThirds" : "auto"}
       title={title}
-      status={
-        <TapeStatus
-          status={state.flow.status}
-          lastUpdate={state.flow.lastUpdate}
-          replayTime={state.flow.replayTime}
-          replayComplete={state.flow.replayComplete}
-          paused={state.flow.paused}
-          dropped={state.flow.dropped}
-          mode={state.mode}
-        />
-      }
-      actions={
-        <TapeControls
-          mode={state.mode}
-          paused={state.flow.paused}
-          onTogglePause={state.flow.togglePause}
-          isAtTop={state.flowScroll.isAtTop}
-          missed={state.flowScroll.missed}
-          onJump={state.flowScroll.jumpToTop}
-        />
-      }
-    >
-      <div className="data-table-shell">
-        {items.length === 0 ? (
-          <div className="empty">
-            {state.tickerSet.size > 0
-              ? "No flow packets match the current filter."
-              : state.mode === "live"
-                ? state.flow.status === "stale"
-                  ? "Feed behind. Waiting for fresh flow packets."
-                  : "No flow packets yet. Start compute."
-                : "Replay queue empty. Ensure ClickHouse has data."}
-          </div>
-        ) : (
-          <div className="data-table-wrap">
-            <div className="data-table data-table-flow" role="table" aria-label="Flow packets">
-              <div className="data-table-head" role="row">
-                <span className="data-table-cell">TIME</span>
-                <span className="data-table-cell">CONTRACT</span>
-                <span className="data-table-cell">PRINTS</span>
-                <span className="data-table-cell">SIZE</span>
-                <span className="data-table-cell">NOTIONAL</span>
-                <span className="data-table-cell">WINDOW</span>
-                <span className="data-table-cell">STRUCTURE</span>
-                <span className="data-table-cell">NBBO</span>
-                <span className="data-table-cell">QUALITY</span>
-              </div>
-              <div className="data-table-scroll" ref={state.flowScroll.setListRef}>
-                <div className="data-table-body" style={{ height: `${virtual.totalSize}px` }}>
-                  {virtual.virtualItems.map(({ item: packet, key, index, start, size }) => {
-                    const features = packet.features ?? {};
-                    const contract = String(features.option_contract_id ?? packet.id ?? "unknown");
-                    const count = parseNumber(features.count, packet.members.length);
-                    const totalSize = parseNumber(features.total_size, 0);
-                    const totalNotional = parseNumber(features.total_notional, Number.NaN);
-                    const notional = Number.isFinite(totalNotional)
-                      ? totalNotional
-                      : parseNumber(features.total_premium, 0) * 100;
-                    const startTs = parseNumber(features.start_ts, packet.source_ts);
-                    const endTs = parseNumber(features.end_ts, startTs);
-                    const windowMs = parseNumber(features.window_ms, 0);
-                    const structureType =
-                      typeof features.structure_type === "string" ? features.structure_type : "";
-                    const structureLegs = parseNumber(features.structure_legs, 0);
-                    const structureRights =
-                      typeof features.structure_rights === "string"
-                        ? features.structure_rights
-                        : "";
-                    const structureStrikes = parseNumber(features.structure_strikes, 0);
-                    const nbboBid = parseNumber(features.nbbo_bid, Number.NaN);
-                    const nbboAsk = parseNumber(features.nbbo_ask, Number.NaN);
-                    const nbboMid = parseNumber(features.nbbo_mid, Number.NaN);
-                    const nbboSpread = parseNumber(features.nbbo_spread, Number.NaN);
-                    const aggressiveBuyRatio = parseNumber(
-                      features.nbbo_aggressive_buy_ratio,
-                      Number.NaN
-                    );
-                    const aggressiveSellRatio = parseNumber(
-                      features.nbbo_aggressive_sell_ratio,
-                      Number.NaN
-                    );
-                    const aggressiveCoverage = parseNumber(
-                      features.nbbo_coverage_ratio,
-                      Number.NaN
-                    );
-                    const insideRatio = parseNumber(features.nbbo_inside_ratio, Number.NaN);
-                    const nbboAge = parseNumber(packet.join_quality.nbbo_age_ms, Number.NaN);
-                    const nbboStale = parseNumber(packet.join_quality.nbbo_stale, 0) > 0;
-                    const nbboMissing = parseNumber(packet.join_quality.nbbo_missing, 0) > 0;
-                    const structureLabel = structureType
-                      ? `${structureType.replace(/_/g, " ")}${structureRights ? ` ${structureRights}` : ""}${structureLegs > 0 ? ` ${structureLegs}L` : ""}${structureStrikes > 0 ? ` ${structureStrikes}K` : ""}`
-                      : "--";
-                    const nbboLabel =
-                      Number.isFinite(nbboBid) && Number.isFinite(nbboAsk)
-                        ? `${formatPrice(nbboBid)} x ${formatPrice(nbboAsk)}`
-                        : Number.isFinite(nbboMid)
-                          ? `Mid ${formatPrice(nbboMid)}`
-                          : "--";
-                    const qualityLabel = [
-                      Number.isFinite(aggressiveCoverage) && aggressiveCoverage > 0
-                        ? `Agg ${formatPct(aggressiveBuyRatio)}/${formatPct(aggressiveSellRatio)} ${formatPct(aggressiveCoverage)} cov`
-                        : null,
-                      Number.isFinite(insideRatio) && insideRatio > 0
-                        ? `In ${formatPct(insideRatio)}`
-                        : null,
-                      Number.isFinite(nbboSpread) ? `Spr ${formatPrice(nbboSpread)}` : null,
-                      Number.isFinite(nbboAge) ? `${Math.round(nbboAge)}ms` : null,
-                      nbboStale ? "Stale" : null,
-                      nbboMissing ? "Missing" : null
-                    ]
-                      .filter(Boolean)
-                      .join(" | ");
-
-                    return (
-                      <div
-                        className={`data-table-row data-table-row-flow data-table-virtual-row${index % 2 === 1 ? " is-even" : ""}${nbboStale || nbboMissing ? " data-table-row-warn" : ""}`}
-                        key={key}
-                        data-index={index}
-                        data-row-start={String(start)}
-                        data-row-size={String(size)}
-                        data-tape-key={key}
-                        style={{ transform: `translateY(${start}px)` }}
-                      >
-                        <span className="data-table-cell data-table-cell-number">
-                          {formatTime(startTs)} → {formatTime(endTs)}
-                        </span>
-                        <span className="data-table-cell">{contract}</span>
-                        <span className="data-table-cell data-table-cell-number">
-                          {formatFlowMetric(count)}
-                        </span>
-                        <span className="data-table-cell data-table-cell-number">
-                          {formatFlowMetric(totalSize)}
-                        </span>
-                        <span className="data-table-cell data-table-cell-number">
-                          ${formatUsd(notional)}
-                        </span>
-                        <span className="data-table-cell data-table-cell-number">
-                          {windowMs > 0 ? formatFlowMetric(windowMs, "ms") : "--"}
-                        </span>
-                        <span className="data-table-cell">{structureLabel}</span>
-                        <span className="data-table-cell data-table-cell-number">{nbboLabel}</span>
-                        <span className="data-table-cell">{qualityLabel || "--"}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </Pane>
+    />
   );
 });
 

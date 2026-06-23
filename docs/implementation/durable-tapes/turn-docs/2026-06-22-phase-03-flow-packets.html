@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Phase 03 Flow Packets Turn Document</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "@pierre/diffs/react": "../../../../node_modules/@pierre/diffs/dist/react/index.js",
+          "react": "../../../../node_modules/react/index.js",
+          "react/jsx-runtime": "../../../../node_modules/react/jsx-runtime.js",
+          "react-dom/client": "../../../../node_modules/react-dom/client.js"
+        }
+      }
+    </script>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #0d141b;
+        --panel-2: #111820;
+        --line: #ffffff14;
+        --line-strong: #ffb13059;
+        --text: #e6edf4;
+        --dim: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --green: #25c17a;
+        --blue: #4da3ff;
+        --red: #ff6b5f;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          IBM Plex Sans,
+          Inter,
+          system-ui,
+          sans-serif;
+        line-height: 1.45;
+      }
+
+      main {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 28px 0 40px;
+      }
+
+      header {
+        display: grid;
+        gap: 8px;
+        padding: 18px 0 20px;
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 1.55rem;
+        line-height: 1.15;
+      }
+
+      h2 {
+        margin-top: 24px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--line);
+        font-size: 1rem;
+      }
+
+      h3 {
+        font-size: 0.86rem;
+      }
+
+      .meta,
+      .label,
+      th,
+      code,
+      pre {
+        font-family:
+          IBM Plex Mono,
+          ui-monospace,
+          SFMono-Regular,
+          monospace;
+      }
+
+      .meta {
+        color: var(--dim);
+        font-size: 0.78rem;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: 14px;
+      }
+
+      .cell {
+        min-width: 0;
+        border-top: 1px solid var(--line-strong);
+        border-bottom: 1px solid var(--line);
+        padding: 10px 12px;
+        background: var(--panel);
+      }
+
+      .cell .label {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--faint);
+        font-size: 0.68rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      section {
+        padding-top: 6px;
+      }
+
+      p {
+        max-width: 86ch;
+        color: var(--dim);
+      }
+
+      ul {
+        margin: 10px 0 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 6px;
+      }
+
+      code {
+        border: 1px solid #ffb13033;
+        border-radius: 5px;
+        padding: 1px 4px;
+        background: #ffb1301a;
+        color: #ffe0a3;
+        font-size: 0.9em;
+      }
+
+      table {
+        width: 100%;
+        margin-top: 12px;
+        border-collapse: collapse;
+        background: var(--panel);
+      }
+
+      th,
+      td {
+        border: 1px solid var(--line);
+        padding: 9px 10px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--faint);
+        font-size: 0.7rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .ok {
+        color: var(--green);
+      }
+
+      .note {
+        color: var(--blue);
+      }
+
+      .warn {
+        color: var(--red);
+      }
+
+      .diff-shell {
+        display: grid;
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      .diff-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .diff-head span {
+        color: var(--dim);
+        font-size: 0.8rem;
+      }
+
+      #diff-rich {
+        display: none;
+        border: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      #diff-rich.is-ready {
+        display: block;
+      }
+
+      #diff-fallback {
+        max-height: 560px;
+        overflow: auto;
+        margin: 0;
+        border: 1px solid var(--line);
+        padding: 12px;
+        background: var(--panel);
+        color: var(--text);
+        font-size: 0.76rem;
+        line-height: 1.45;
+        white-space: pre-wrap;
+      }
+
+      @media (max-width: 760px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+
+        .diff-head {
+          display: grid;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="meta">Durable tapes implementation turn</div>
+        <h1>Phase 03: Flow Packets Module</h1>
+        <p>
+          Extracted the packet summary, responsive columns, hover detail, live/history source, and
+          typed packet-focus callback into <code>apps/web/features/flow-packets</code>. The terminal
+          OPRA route now renders Packet Fit through this module instead of the inline legacy flow
+          table.
+        </p>
+        <div class="grid" aria-label="Turn metadata">
+          <div class="cell"><span class="label">Branch</span>lavender/durable-tape-phase-03-flow-packets</div>
+          <div class="cell"><span class="label">Beads</span>islandflow-h9c0.4</div>
+          <div class="cell"><span class="label">Phase</span>03 flow packets module</div>
+          <div class="cell"><span class="label">Turn doc</span>2026-06-22-phase-03-flow-packets.html</div>
+          <div class="cell"><span class="label">PR</span>pending creation</div>
+          <div class="cell"><span class="label">CI</span>reviewer verifies after PR</div>
+        </div>
+      </header>
+
+      <section>
+        <h2>Implementation Notes</h2>
+        <ul>
+          <li>Added <code>FlowPacketsTape</code> as the domain wrapper over the shared <code>DurableTape</code> foundation.</li>
+          <li>Moved packet summary logic into explicit helpers for contract, member count, premium/notional, window, side, quote state, and quality labels.</li>
+          <li>Added the shared packet-focus contract in <code>apps/web/features/flow-packets/types.ts</code>: <code>FlowPacketFocusRequest</code> and <code>OnPacketFocus</code>.</li>
+          <li>Kept packet focus as a typed callback. The module does not import terminal drawer state or mutate route-specific terminal focus state.</li>
+          <li>Changed <code>FlowPane</code> into a compatibility adapter that passes terminal filters/scope into <code>FlowPacketsTape</code>.</li>
+          <li>Added explicit stale/missing quote text badges so warning state is not color-only.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Scope Held</h2>
+        <ul>
+          <li>No options packet-print table behavior was added.</li>
+          <li>No alert evidence hydration was changed.</li>
+          <li>No new packet scoring or classifier policy was introduced.</li>
+          <li>No durable-tape public interface churn was needed.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Gates</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Gate</th>
+              <th>Result</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>bun test apps/web/features/flow-packets/flow-packets.test.ts</code></td>
+              <td class="ok">passed</td>
+              <td>5 tests, helper coverage for scope, filtering, focus payload, quality labels, inspect mapping.</td>
+            </tr>
+            <tr>
+              <td><code>bun test apps/web/features/flow-packets/flow-packets.test.ts apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code></td>
+              <td class="ok">passed</td>
+              <td>99 tests, 215 assertions.</td>
+            </tr>
+            <tr>
+              <td><code>bun --cwd=apps/web run build</code></td>
+              <td class="ok">passed</td>
+              <td>Next production build and TypeScript completed successfully.</td>
+            </tr>
+            <tr>
+              <td><code>bunx biome format apps/web/features/flow-packets apps/web/features/terminal/components/opra.tsx apps/web/app/globals.css</code></td>
+              <td class="ok">passed</td>
+              <td>No formatting fixes required after final edits.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Browser QA</h2>
+        <p>
+          Ran <code>WEB_DEV_PORT=3100 NEXT_PUBLIC_API_URL=https://api.flow.deltaisland.io bun run dev:web</code>
+          and checked <code>http://localhost:3100/options</code> in the in-app browser.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Viewport</th>
+              <th>Observed template</th>
+              <th>Result</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1440 x 900</td>
+              <td><code>twoThirds</code>: TIME, CONTRACT, PRINTS, PREMIUM, SIDE</td>
+              <td class="ok">200 packet rows rendered, no table or page horizontal overflow.</td>
+            </tr>
+            <tr>
+              <td>390 x 844</td>
+              <td><code>oneThird</code>: CONTRACT, PRINTS, PREMIUM</td>
+              <td class="ok">200 packet rows rendered, no table or page horizontal overflow.</td>
+            </tr>
+            <tr>
+              <td>Console</td>
+              <td>fresh reload after adapter stability fix</td>
+              <td class="ok">no fresh error logs after reload timestamp <code>2026-06-22T23:58:08.220Z</code>.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Follow-Ups Filed</h2>
+        <ul>
+          <li><code>islandflow-lcrs</code>: add API route coverage for <code>/history/flow</code> response and cursor behavior.</li>
+          <li><code>islandflow-5thp</code>: cover flow packet member lookup semantics for storage/API packet-focus support.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Packet-Focus Contract</h2>
+        <p>
+          The exact shared type location used by this phase is
+          <code>apps/web/features/flow-packets/types.ts</code>. The shape is:
+        </p>
+        <pre><code>export type FlowPacketFocusRequest = {
+  packetId: string;
+  memberTraceIds: string[];
+  optionContractId?: string;
+  source: "options-tape" | "flow-packets" | "alerts";
+};
+
+export type OnPacketFocus = (request: FlowPacketFocusRequest) =&gt; void;</code></pre>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <div class="diff-shell">
+          <div class="diff-head">
+            <h3>Rich renderer: browser-side @pierre/diffs PatchDiff</h3>
+            <span>The plain HTML fallback remains visible unless PatchDiff renders successfully.</span>
+          </div>
+          <div id="diff-rich" aria-label="Rich diff view"></div>
+          <pre id="diff-fallback" aria-label="Plain unified diff fallback">diff --git a/apps/web/features/flow-packets/types.ts b/apps/web/features/flow-packets/types.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/flow-packets/types.ts
+@@
++export type FlowPacketFocusRequest = {
++  packetId: string;
++  memberTraceIds: string[];
++  optionContractId?: string;
++  source: "options-tape" | "flow-packets" | "alerts";
++};
++
++export type OnPacketFocus = (request: FlowPacketFocusRequest) =&gt; void;
++
++export type FlowPacketsTapeProps = {
++  title?: string;
++  ariaLabel?: string;
++  className?: string;
++  scope?: FlowPacketsTapeScope;
++  filters?: FlowPacketsTapeFilters;
++  features?: readonly DurableTapeFeatureInput[];
++  template?: DurableTapeTemplateId | "auto";
++  source?: DurableTapeSource&lt;FlowPacket, NormalizedFlowPacketsTapeScope, FlowPacketsTapeFilters&gt;;
++  sourceOptions?: FlowPacketsTapeSourceOptions;
++  onInspectPacket?: (event: FlowPacketsTapeInspectEvent) =&gt; void;
++  onPacketFocus?: OnPacketFocus;
++  renderLinkedContext?: (packet: FlowPacket) =&gt; ReactNode;
++  rowHeight?: number;
++  overscan?: number;
++};
+
+diff --git a/apps/web/features/flow-packets/FlowPacketsTape.tsx b/apps/web/features/flow-packets/FlowPacketsTape.tsx
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/flow-packets/FlowPacketsTape.tsx
+@@
++export const FlowPacketsTape = ({
++  title = DEFAULT_TITLE,
++  ariaLabel = "Flow packets",
++  className,
++  scope,
++  filters,
++  features = FLOW_PACKETS_TAPE_DEFAULT_FEATURES,
++  template = "auto",
++  source,
++  sourceOptions,
++  onInspectPacket,
++  onPacketFocus,
++  renderLinkedContext,
++  rowHeight = 44,
++  overscan = 16
++}: FlowPacketsTapeProps) =&gt; {
++  const normalizedScope = useMemo(() =&gt; normalizeFlowPacketsTapeScope(scope), [scope]);
++  const tapeSource = useMemo(
++    () =&gt; source ?? createFlowPacketsTapeSource(sourceOptions),
++    [source, sourceOptions]
++  );
++
++  return (
++    &lt;DurableTape
++      ariaLabel={ariaLabel}
++      className={`flow-packets-tape ${className ?? ""}`.trim()}
++      columns={FLOW_PACKETS_TAPE_COLUMNS}
++      features={features}
++      filters={filters}
++      getCursor={getFlowPacketCursor}
++      getRowKey={getFlowPacketKey}
++      onActivate={(event) =&gt; onPacketFocus?.(toFlowPacketFocusRequest(event.item))}
++      onFocus={(event) =&gt; onInspectPacket?.(mapFlowPacketsTapeInspectEvent(event))}
++      renderHover={({ item }) =&gt;
++        renderFlowPacketsTapeHover(item, renderLinkedContext, onPacketFocus)
++      }
++      renderRow={({ item, columns }) =&gt;
++        renderFlowPacketsTapeRow({
++          packet: item,
++          columns,
++          onPacketFocus
++        })
++      }
++      rowHeight={rowHeight}
++      overscan={overscan}
++      scope={normalizedScope}
++      source={tapeSource}
++      template={template}
++      templates={FLOW_PACKETS_TAPE_TEMPLATES}
++      title={title}
++    /&gt;
++  );
++};
+
+diff --git a/apps/web/features/flow-packets/columns.tsx b/apps/web/features/flow-packets/columns.tsx
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/flow-packets/columns.tsx
+@@
++export const FLOW_PACKETS_TAPE_TEMPLATES: DurableTapeTemplate&lt;FlowPacketColumnId&gt;[] = [
++  { id: "full", columns: ["time", "contract", "prints", "premium", "window", "side", "quality"] },
++  { id: "twoThirds", columns: ["time", "contract", "prints", "premium", "side"] },
++  { id: "oneThird", columns: ["contract", "prints", "premium"] },
++  { id: "micro", columns: ["contract", "premium"] }
++];
++
++export const toFlowPacketFocusRequest = (
++  packet: FlowPacket,
++  source: FlowPacketFocusRequest["source"] = "flow-packets"
++): FlowPacketFocusRequest =&gt; {
++  const optionContractId = getFlowPacketContractId(packet);
++  return {
++    packetId: packet.id,
++    memberTraceIds: packet.members,
++    ...(optionContractId ? { optionContractId } : {}),
++    source
++  };
++};
+
+diff --git a/apps/web/features/terminal/components/opra.tsx b/apps/web/features/terminal/components/opra.tsx
+--- a/apps/web/features/terminal/components/opra.tsx
++++ b/apps/web/features/terminal/components/opra.tsx
+@@
++import { FlowPacketsTape } from "../../flow-packets";
+@@
+ export const FlowPane = memo(({ state, limit, title = "Flow", className }: FlowPaneProps) =&gt; {
+-  const items = limit ? state.filteredFlow.slice(0, limit) : state.filteredFlow;
+-  const virtual = useTapeVirtualList(items, state.flowScroll.listRef, getTapeVirtualConfig("flow"));
+-  useVirtualHistoryGate(
+-    state.mode === "live" &amp;&amp; !limit,
+-    items.length,
+-    virtual.virtualItems.at(-1)?.index ?? -1,
+-    () =&gt; void state.liveSession.loadOlder("flow")
+-  );
++  const optionContractId =
++    state.selectedInstrument?.kind === "option-contract"
++      ? state.selectedInstrument.contractId
++      : null;
++  const scope = useMemo(
++    () =&gt; ({
++      tickers: state.activeTickers,
++      optionContractId
++    }),
++    [optionContractId, state.activeTickers]
++  );
++  const sourceOptions = useMemo(
++    () =&gt; ({ live: state.mode === "live", snapshotLimit: limit ?? undefined }),
++    [limit, state.mode]
++  );
+ 
+   return (
+-    &lt;Pane ... legacy inline flow table ... /&gt;
++    &lt;FlowPacketsTape
++      className={className}
++      filters={state.flowFilters}
++      rowHeight={limit ? 40 : 44}
++      scope={scope}
++      sourceOptions={sourceOptions}
++      template={limit ? "twoThirds" : "auto"}
++      title={title}
++    /&gt;
+   );
+ });
+
+diff --git a/apps/web/app/globals.css b/apps/web/app/globals.css
+--- a/apps/web/app/globals.css
++++ b/apps/web/app/globals.css
+@@
++.flow-packets-tape .durable-tape-row:has(.flow-packets-badge-stale),
++.flow-packets-tape .durable-tape-row:has(.flow-packets-badge-missing) {
++  box-shadow: inset 0 0 0 1px oklch(0.68 0.16 28 / 0.28);
++}
++
++.flow-packets-contract {
++  display: inline-flex;
++  min-width: 0;
++  align-items: center;
++  gap: 6px;
++}
++
++.flow-packets-badge-stale {
++  border-color: oklch(0.75 0.13 74 / 0.38);
++  background: var(--accent-soft);
++  color: oklch(0.83 0.1 74);
++}
++
++.flow-packets-badge-missing {
++  border-color: oklch(0.66 0.16 28 / 0.42);
++  background: var(--red-soft);
++  color: oklch(0.78 0.12 28);
++}
++
++.flow-packets-detail dl {
++  display: grid;
++  grid-template-columns: minmax(110px, 0.9fr) minmax(0, 1.5fr);
++  gap: 6px 12px;
++  margin: 0;
++}
+
+diff --git a/apps/web/features/flow-packets/flow-packets.test.ts b/apps/web/features/flow-packets/flow-packets.test.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/flow-packets/flow-packets.test.ts
+@@
++it("maps focus requests from packet members without terminal state", () =&gt; {
++  expect(toFlowPacketFocusRequest(makePacket())).toEqual({
++    packetId: "packet-1",
++    memberTraceIds: ["print-1", "print-2"],
++    optionContractId: "SPY-2026-06-19-500-C",
++    source: "flow-packets"
++  });
++});
++
++it("renders quality as explicit text labels", () =&gt; {
++  expect(getFlowPacketQualityLabel(makePacket())).toBe(
++    "Quote 75% | Inside 25% | Spr 0.05 | 42ms"
++  );
++});</pre>
+        </div>
+      </section>
+      <script type="text/plain" id="phase-diff">diff --git a/apps/web/features/flow-packets/types.ts b/apps/web/features/flow-packets/types.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/flow-packets/types.ts
+@@
++export type FlowPacketFocusRequest = {
++  packetId: string;
++  memberTraceIds: string[];
++  optionContractId?: string;
++  source: "options-tape" | "flow-packets" | "alerts";
++};
++
++export type OnPacketFocus = (request: FlowPacketFocusRequest) =&gt; void;
+
+diff --git a/apps/web/features/flow-packets/FlowPacketsTape.tsx b/apps/web/features/flow-packets/FlowPacketsTape.tsx
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/flow-packets/FlowPacketsTape.tsx
+@@
++    &lt;DurableTape
++      className={`flow-packets-tape ${className ?? ""}`.trim()}
++      columns={FLOW_PACKETS_TAPE_COLUMNS}
++      features={features}
++      filters={filters}
++      getCursor={getFlowPacketCursor}
++      getRowKey={getFlowPacketKey}
++      onActivate={(event) =&gt; onPacketFocus?.(toFlowPacketFocusRequest(event.item))}
++      renderHover={({ item }) =&gt;
++        renderFlowPacketsTapeHover(item, renderLinkedContext, onPacketFocus)
++      }
++      renderRow={({ item, columns }) =&gt; renderFlowPacketsTapeRow({ packet: item, columns, onPacketFocus })}
++      source={tapeSource}
++      template={template}
++      templates={FLOW_PACKETS_TAPE_TEMPLATES}
++    /&gt;
+
+diff --git a/apps/web/features/terminal/components/opra.tsx b/apps/web/features/terminal/components/opra.tsx
+--- a/apps/web/features/terminal/components/opra.tsx
++++ b/apps/web/features/terminal/components/opra.tsx
+@@
++    &lt;FlowPacketsTape
++      className={className}
++      filters={state.flowFilters}
++      rowHeight={limit ? 40 : 44}
++      scope={scope}
++      sourceOptions={sourceOptions}
++      template={limit ? "twoThirds" : "auto"}
++      title={title}
++    /&gt;
+</script>
+      <script type="module">
+        import React from "react";
+        import { createRoot } from "react-dom/client";
+        import { PatchDiff } from "@pierre/diffs/react";
+
+        const patch = document.getElementById("phase-diff")?.textContent ?? "";
+        const mount = document.getElementById("diff-rich");
+        const fallback = document.getElementById("diff-fallback");
+
+        try {
+          createRoot(mount).render(
+            React.createElement(PatchDiff, {
+              patch,
+              disableWorkerPool: true,
+              options: {
+                layout: "stacked",
+                lineNumbers: true,
+                wrap: true
+              }
+            })
+          );
+          mount.classList.add("is-ready");
+          fallback.hidden = true;
+        } catch (error) {
+          console.warn("PatchDiff render failed; leaving HTML fallback visible.", error);
+        }
+      </script>
+    </main>
+  </body>
+</html>
