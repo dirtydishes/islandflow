@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 
 import { NewsWire } from "../features/news-wire";
+import { OptionsTape } from "../features/options-tape";
 import { TerminalMarketChartSection } from "../features/terminal/chart-adapter";
 import {
   CommandDecisionLevels,
@@ -15,13 +16,12 @@ import {
   HomeReplayRail
 } from "../features/terminal/components/charts";
 import { renderTerminalDrawers } from "../features/terminal/components/drawers";
-import { FlowPane, OpraIntakeRail, OptionsPane } from "../features/terminal/components/opra";
+import { OpraIntakeRail, OptionsPane } from "../features/terminal/components/opra";
 import { FlowFilterPopover, PageFrame } from "../features/terminal/components/primitives";
 import { TerminalAppShell as TerminalFeatureAppShell } from "../features/terminal/shell";
 import { useTerminal } from "../features/terminal/state";
 
-export { getChartFlowMarkerItems } from "../features/terminal/charts/markers";
-export type { ChartFlowMarkerItem } from "../features/terminal/charts/markers";
+export type { TerminalMarketChartMarkerPayload } from "../features/terminal/chart-adapter";
 export {
   buildTerminalEquityOverlays,
   buildTerminalLowerPaneInput,
@@ -31,7 +31,8 @@ export {
   mapTerminalChartStatus,
   normalizeTerminalChartCandles
 } from "../features/terminal/chart-adapter";
-export type { TerminalMarketChartMarkerPayload } from "../features/terminal/chart-adapter";
+export type { ChartFlowMarkerItem } from "../features/terminal/charts/markers";
+export { getChartFlowMarkerItems } from "../features/terminal/charts/markers";
 export {
   getTapeVirtualConfig,
   isSyntheticAdminVisible,
@@ -84,14 +85,14 @@ export {
   smartMoneyToneForProfile,
   statusLabel
 } from "../features/terminal/format";
+export { getLiveSubscriptionResetChannels } from "../features/terminal/live";
 export {
-  NAV_ITEMS,
   getLiveManifest,
   getRouteFeatures,
   getTerminalNavCurrentHref,
+  NAV_ITEMS,
   normalizeTerminalPathname
 } from "../features/terminal/routes";
-export { getLiveSubscriptionResetChannels } from "../features/terminal/live";
 export {
   appendHistoryTail,
   composeTapeItems,
@@ -171,9 +172,27 @@ export function OptionsRoute() {
     <PageFrame title="OPRA Intake" eyebrow="Options" variant="options">
       <div className="opra-intake-shell">
         <OpraIntakeRail state={state} />
-        <div className="opra-intake-grid">
-          <OptionsPane state={state} title="OPRA Tape" className="opra-options-pane" />
-          <FlowPane state={state} title="Packet Fit" className="opra-flow-pane" />
+        <div className="opra-intake-grid opra-intake-grid-tape-first">
+          <OptionsTape
+            className="opra-options-tape"
+            decorByTraceId={state.classifierDecorByOptionTraceId}
+            filters={state.flowFilters}
+            flowPacketById={state.flowPacketMap}
+            focusedContractId={
+              state.selectedInstrument?.kind === "option-contract"
+                ? state.selectedInstrument.contractId
+                : null
+            }
+            nbboByContractId={state.nbboMap}
+            nbboByTraceId={state.historicalNbboByTraceId}
+            onClearFocus={() => state.setSelectedInstrument(null)}
+            onContractFocus={state.focusOptionContract}
+            onFiltersChange={state.setFlowFilters}
+            onPacketFocus={() => {}}
+            packetIdByOptionTraceId={state.packetIdByOptionTraceId}
+            prints={state.filteredOptions}
+            title="OPRA Tape"
+          />
         </div>
       </div>
     </PageFrame>

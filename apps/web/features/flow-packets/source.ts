@@ -7,7 +7,7 @@ import {
   parseLivePayload
 } from "@islandflow/types";
 
-import { mergeNewest, type DurableTapeCursor } from "../durable-tape";
+import { type DurableTapeCursor, mergeNewest } from "../durable-tape";
 import { filterFlowPackets, getFlowPacketCursor, getFlowPacketKey } from "./format";
 import type {
   FlowPacketsTapeFilters,
