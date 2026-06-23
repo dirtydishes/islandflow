@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Durable Tape Phase 02 Options Tape</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #0d141b;
+        --panel-2: #111820;
+        --line: rgba(230, 237, 244, 0.14);
+        --line-strong: rgba(245, 166, 35, 0.36);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --green: #25c17a;
+        --blue: #4da3ff;
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: linear-gradient(180deg, #0b1016 0%, var(--bg) 100%);
+        color: var(--text);
+        font: 15px/1.55 var(--sans);
+      }
+
+      main {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+
+      header {
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      .eyebrow,
+      h2,
+      .meta-label,
+      code,
+      pre {
+        font-family: var(--mono);
+      }
+
+      .eyebrow {
+        margin-bottom: 8px;
+        color: var(--accent);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 860px;
+        font-size: 2rem;
+        line-height: 1.08;
+        letter-spacing: 0;
+        text-wrap: balance;
+      }
+
+      .subtitle {
+        max-width: 78ch;
+        margin-top: 12px;
+        color: var(--muted);
+      }
+
+      .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1px;
+        margin-top: 18px;
+        border: 1px solid var(--line);
+        background: var(--line);
+      }
+
+      .meta-cell {
+        min-width: 0;
+        padding: 10px 12px;
+        background: var(--panel-2);
+      }
+
+      .meta-label {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--faint);
+        font-size: 0.66rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      section {
+        padding: 20px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      h2 {
+        margin-bottom: 10px;
+        color: var(--accent);
+        font-size: 0.9rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      p {
+        max-width: 82ch;
+      }
+
+      p + p {
+        margin-top: 10px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 7px;
+      }
+
+      code {
+        padding: 0.08rem 0.28rem;
+        border: 1px solid rgba(245, 166, 35, 0.18);
+        border-radius: 5px;
+        background: rgba(245, 166, 35, 0.1);
+        color: #ffe0a3;
+        font-size: 0.9em;
+      }
+
+      .status-ok {
+        color: var(--green);
+      }
+
+      .status-note {
+        color: var(--blue);
+      }
+
+      .diff-shell {
+        display: grid;
+        gap: 12px;
+      }
+
+      #rich-diff {
+        min-height: 32px;
+      }
+
+      #fallback-diff {
+        max-height: 560px;
+        overflow: auto;
+        margin: 0;
+        padding: 12px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--text);
+        font-size: 0.76rem;
+        line-height: 1.45;
+      }
+
+      .rich-diff-ready #fallback-diff {
+        display: none;
+      }
+
+      .diff-note {
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="eyebrow">Repository turn document</div>
+        <h1>Durable Tape Phase 02 Options Tape</h1>
+        <p class="subtitle">
+          Extracted a signal-first <code>OptionsTape</code> module and made it the primary
+          <code>/options</code> surface, with packet focus, contract focus, compact templates,
+          settings filters, hover evidence, and browser-verified no-horizontal-scroll behavior.
+        </p>
+        <div class="meta-grid" aria-label="Turn metadata">
+          <div class="meta-cell"><span class="meta-label">Branch</span>lavender/durable-tape-phase-02-options-tape</div>
+          <div class="meta-cell"><span class="meta-label">Beads</span>islandflow-h9c0.1</div>
+          <div class="meta-cell"><span class="meta-label">Phase</span>02 options tape module</div>
+          <div class="meta-cell"><span class="meta-label">Timestamp</span>2026-06-22</div>
+        </div>
+      </header>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          The new <code>apps/web/features/options-tape</code> module owns options contract
+          display, filter presets, responsive templates, row rendering, hover detail, history
+          loading, and the packet-focus callback type. The route now composes <code>OptionsTape</code>
+          as the single tape-first body of <code>/options</code>, while the terminal state remains
+          the live transport and support-context source.
+        </p>
+        <p>
+          Packet focus is represented as an exported domain callback:
+          <code>FlowPacketFocusRequest</code> and <code>OnPacketFocus</code> in
+          <code>apps/web/features/options-tape/types.ts</code>. It uses
+          <code>FlowPacket.id</code>, <code>FlowPacket.members</code> trace IDs, and
+          <code>features.option_contract_id</code> when available.
+        </p>
+      </section>
+
+      <section>
+        <h2>Scope Held</h2>
+        <ul>
+          <li>No flow-packets module rebuild, alert rebuild, classifier semantic change, ingestion change, or ClickHouse schema change.</li>
+          <li>Legacy terminal drawers are not opened by options row activation. Packet and contract scope stay inside the options tape.</li>
+          <li>The existing <code>/tape</code> compatibility redirect to <code>/options</code> is preserved.</li>
+          <li>Phase 03 still owns packet summary, packet detail, packet row rendering, and packet inspect surfaces.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Implementation Notes</h2>
+        <ul>
+          <li>Default filters are <code>view: "signal"</code>, sides <code>AA/A/MID</code>, calls plus puts, and stock security type.</li>
+          <li>Global signal columns are <code>TIME | CONTRACT | PX | SIZE | PREMIUM | SIDE | IV</code>.</li>
+          <li>Packet focus columns are <code>DT | TIME | PX | SIZE | PREMIUM | SIDE | SPOT</code>.</li>
+          <li>Contract focus columns are <code>TIME | PX | SIZE | PREMIUM | NBBO | SIDE | EXCH | IV</code>.</li>
+          <li>Settings include view, side presets, type presets, security presets, premium presets, custom premium, and reset.</li>
+          <li>Hover detail exposes raw contract ID, trace ID, exchange, conditions, NBBO, quote age, IV source, signal profile, reasons, and packet ID.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Reviewer Results</h2>
+        <ul>
+          <li><span class="status-note">diagnosed</span> Forgejo Validate run <code>#232</code> failed on <code>bun run fmt:check</code>. The options-tape files were not Biome-formatted in commit <code>c1ccd03</code>.</li>
+          <li><span class="status-ok">repaired</span> Ran the project formatter and kept the repair scoped to the new options-tape files.</li>
+          <li><span class="status-ok">repaired</span> Preserved uncontrolled row-click scope by treating <code>focusedContractId: null</code> as the explicit clear signal and <code>undefined</code> as local module ownership.</li>
+          <li><span class="status-ok">repaired</span> Kept later live <code>prints</code> updates filtered per active subscription query, so scroll-held queued counts cannot include rows outside the active scope or filter.</li>
+          <li><span class="status-ok">repaired</span> Packet and contract scopes now ignore broad signal/side/type/security filters. Packet focus shows the packet member prints, and <code>Show all</code> expands to all prints for the focused contract.</li>
+          <li><span class="status-note">follow-up</span> Filed <code>islandflow-lhhs</code> for Phase 03 to omit <code>optionContractId</code> when a packet lacks a real <code>features.option_contract_id</code>.</li>
+          <li><span class="status-note">follow-up</span> Filed <code>islandflow-m2m7</code> for the shared durable-tape empty-live-head history backfill gap.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Verification</h2>
+        <ul>
+          <li><span class="status-ok">pass</span> <code>bun run fmt:check</code>.</li>
+          <li><span class="status-ok">pass</span> <code>bun run lint</code>.</li>
+          <li><span class="status-ok">pass</span> <code>bun run typecheck</code>.</li>
+          <li><span class="status-ok">pass</span> <code>bun test apps/web/features/options-tape/options-tape.test.ts</code>: 8 tests passed.</li>
+          <li><span class="status-ok">pass</span> <code>bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code>: 94 tests passed.</li>
+          <li><span class="status-ok">pass</span> <code>bun test services/api/tests/live.test.ts packages/storage/tests/option-prints.test.ts</code>: 29 tests passed.</li>
+          <li><span class="status-ok">pass</span> <code>bun test</code>: 415 tests passed.</li>
+          <li><span class="status-ok">pass</span> <code>bun run check:public-api-routes</code>.</li>
+          <li><span class="status-ok">pass</span> <code>bun run check:docker-workspace</code>.</li>
+          <li><span class="status-ok">pass</span> <code>bun --cwd=apps/web run build</code>.</li>
+          <li><span class="status-ok">pass</span> Reviewer browser QA with <code>WEB_DEV_PORT=3100 NEXT_PUBLIC_API_URL=https://api.flow.deltaisland.io bun run dev:web</code>.</li>
+          <li><span class="status-ok">pass</span> Desktop browser QA: <code>/options</code> rendered 77 rows, global headers matched <code>TIME | CONTRACT | PX | SIZE | PREMIUM | SIDE | IV</code>, row activation produced packet focus with 7 rows and <code>DT | TIME | PX | SIZE | PREMIUM | SIDE | SPOT</code>, <code>Show all</code> expanded to contract focus with 12 rows and <code>TIME | PX | SIZE | PREMIUM | NBBO | SIDE | EXCH | IV</code>, <code>Clear</code> returned to global signal headers, and overflow X was 0.</li>
+          <li><span class="status-ok">pass</span> Mobile browser QA at 390x844: template stepped down to <code>CONTRACT | PREMIUM | SIDE</code>, rendered 77 rows, and overflow X was 0.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Beads And Follow Ups</h2>
+        <ul>
+          <li><code>islandflow-h9c0.1</code> was claimed for this implementation.</li>
+          <li><code>islandflow-h9c0.1</code> remains closed after reviewer repair.</li>
+          <li><code>islandflow-lhhs</code> tracks the Phase 03 packet-focus optional contract-id repair.</li>
+          <li><code>islandflow-m2m7</code> tracks shared durable-tape history backfill when the live head is empty.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Reviewer Focus</h2>
+        <ul>
+          <li>Packet focus stays a domain callback and does not import or mutate legacy terminal drawer/pane state.</li>
+          <li>Phase 03 has a focused follow-up for its display fallback leaking into callback payload semantics.</li>
+          <li>The only remaining reviewer risk is the shared empty-live-history gap recorded in <code>islandflow-m2m7</code>.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p class="diff-note">
+          The rich view below attempts to render with browser-side <code>PatchDiff</code> from
+          <code>@pierre/diffs/react</code>. The readable unified HTML fallback remains visible
+          unless the rich renderer succeeds.
+        </p>
+        <div class="diff-shell">
+          <div id="rich-diff" aria-label="Rich diff renderer"></div>
+          <pre id="fallback-diff"><code>diff --git a/apps/web/features/options-tape/types.ts b/apps/web/features/options-tape/types.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/options-tape/types.ts
+@@
++export type FlowPacketFocusRequest = {
++  packetId: string;
++  memberTraceIds: string[];
++  optionContractId?: string;
++  source: "options-tape" | "flow-packets" | "alerts";
++};
++export type OnPacketFocus = (request: FlowPacketFocusRequest) =&gt; void;
+
+diff --git a/apps/web/features/options-tape/columns.tsx b/apps/web/features/options-tape/columns.tsx
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/options-tape/columns.tsx
+@@
++export const OPTIONS_TAPE_TEMPLATES_BY_MODE = {
++  global: [
++    { id: "full", columns: ["time", "contract", "price", "size", "premium", "side", "iv"] },
++    { id: "oneThird", columns: ["contract", "premium", "side"] },
++    { id: "micro", columns: ["contract", "premium"] }
++  ],
++  packet: [
++    { id: "full", columns: ["dte", "time", "price", "size", "premium", "side", "spot"] },
++    { id: "micro", columns: ["premium", "side"] }
++  ],
++  contract: [
++    { id: "full", columns: ["time", "price", "size", "premium", "nbbo", "side", "exchange", "iv"] },
++    { id: "micro", columns: ["price", "premium"] }
++  ]
++};
+
+diff --git a/apps/web/features/options-tape/OptionsTape.tsx b/apps/web/features/options-tape/OptionsTape.tsx
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/options-tape/OptionsTape.tsx
+@@
++const packetRequestFromPrint = ({ print, packet, source }) =&gt; ({
++  packetId: packet.id,
++  memberTraceIds: packet.members,
++  optionContractId: getPacketContractId(packet) ?? print.option_contract_id,
++  source
++});
++const activatePrint = (event) =&gt; {
++  const { print, packet } = contextForPrint(event.item);
++  if (packet?.packet) {
++    setScope(getPacketFocusScope(print, packet.packet));
++    onContractFocus?.(print);
++    onPacketFocus?.(packetRequestFromPrint({ print, packet: packet.packet, source: "options-tape" }));
++    return;
++  }
++  setScope(getContractFocusScope(print));
++  onContractFocus?.(print);
++};
+
+diff --git a/apps/web/app/terminal.tsx b/apps/web/app/terminal.tsx
+--- a/apps/web/app/terminal.tsx
++++ b/apps/web/app/terminal.tsx
+@@
++import { OptionsTape } from "../features/options-tape";
+@@
+-          &lt;OptionsPane state={state} title="OPRA Tape" className="opra-options-pane" /&gt;
+-          &lt;FlowPane state={state} title="Packet Fit" className="opra-flow-pane" /&gt;
++          &lt;OptionsTape
++            decorByTraceId={state.classifierDecorByOptionTraceId}
++            filters={state.flowFilters}
++            flowPacketById={state.flowPacketMap}
++            nbboByContractId={state.nbboMap}
++            nbboByTraceId={state.historicalNbboByTraceId}
++            onClearFocus={() =&gt; state.setSelectedInstrument(null)}
++            onContractFocus={state.focusOptionContract}
++            onFiltersChange={state.setFlowFilters}
++            packetIdByOptionTraceId={state.packetIdByOptionTraceId}
++            prints={state.filteredOptions}
++          /&gt;
+
+diff --git a/apps/web/features/options-tape/options-tape.test.ts b/apps/web/features/options-tape/options-tape.test.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/options-tape/options-tape.test.ts
+@@
++it("steps down templates for narrow containers", () =&gt; {
++  const selection = selectDurableTapeTemplate({
++    columns: OPTIONS_TAPE_COLUMNS,
++    templates: OPTIONS_TAPE_TEMPLATES_BY_MODE.global,
++    containerWidth: 330,
++    requestedTemplate: "auto"
++  });
++  expect(selection.template.id).toBe("oneThird");
++});
++it("filters history pages to packet member trace ids", async () =&gt; {
++  const page = await loadOptionsTapeHistoryPage({
++    cursor: { ts: 2_000, seq: 2 },
++    scope: { optionContractId: "SPY-2026-06-22-555-C", packetMemberTraceIds: ["member-2"] },
++    filters: buildDefaultOptionsTapeFilters(),
++    options: { apiBaseUrl: "https://api.example.test", fetcher }
++  });
++  expect(page.items.map((print) =&gt; print.trace_id)).toEqual(["member-2"]);
++});
+</code></pre>
+        </div>
+      </section>
+    </main>
+
+    <script type="text/plain" id="patch-source">diff --git a/apps/web/features/options-tape/types.ts b/apps/web/features/options-tape/types.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/options-tape/types.ts
+@@
++export type FlowPacketFocusRequest = {
++  packetId: string;
++  memberTraceIds: string[];
++  optionContractId?: string;
++  source: "options-tape" | "flow-packets" | "alerts";
++};
++export type OnPacketFocus = (request: FlowPacketFocusRequest) => void;
+
+diff --git a/apps/web/features/options-tape/OptionsTape.tsx b/apps/web/features/options-tape/OptionsTape.tsx
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/options-tape/OptionsTape.tsx
+@@
++const activatePrint = (event) => {
++  const { print, packet } = contextForPrint(event.item);
++  if (packet?.packet) {
++    setScope(getPacketFocusScope(print, packet.packet));
++    onContractFocus?.(print);
++    onPacketFocus?.(packetRequestFromPrint({ print, packet: packet.packet, source: "options-tape" }));
++    return;
++  }
++  setScope(getContractFocusScope(print));
++  onContractFocus?.(print);
++};
+
+diff --git a/apps/web/app/terminal.tsx b/apps/web/app/terminal.tsx
+--- a/apps/web/app/terminal.tsx
++++ b/apps/web/app/terminal.tsx
+@@
++import { OptionsTape } from "../features/options-tape";
+@@
+-          <OptionsPane state={state} title="OPRA Tape" className="opra-options-pane" />
+-          <FlowPane state={state} title="Packet Fit" className="opra-flow-pane" />
++          <OptionsTape
++            filters={state.flowFilters}
++            flowPacketById={state.flowPacketMap}
++            onContractFocus={state.focusOptionContract}
++            onFiltersChange={state.setFlowFilters}
++            packetIdByOptionTraceId={state.packetIdByOptionTraceId}
++            prints={state.filteredOptions}
++          />
+</script>
+    <script type="module">
+      const source = document.getElementById("patch-source")?.textContent ?? "";
+      const target = document.getElementById("rich-diff");
+      try {
+        const React = await import("react");
+        const { createRoot } = await import("react-dom/client");
+        const { PatchDiff } = await import("@pierre/diffs/react");
+        createRoot(target).render(React.createElement(PatchDiff, { patch: source }));
+        document.documentElement.classList.add("rich-diff-ready");
+      } catch (error) {
+        target.textContent =
+          "Rich diff renderer unavailable in this static context; showing unified fallback.";
+      }
+    </script>
+  </body>
+</html>
