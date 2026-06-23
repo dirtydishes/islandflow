@@ -880,8 +880,16 @@ h3 {
   min-height: calc(100vh - var(--topbar-height) - 178px);
 }
 
+.opra-intake-grid-tape-first {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .opra-options-pane,
 .opra-flow-pane {
+  min-height: 620px;
+}
+
+.opra-options-tape {
   min-height: 620px;
 }
 
@@ -2845,6 +2853,283 @@ h3 {
 }
 
 .equities-tape-linked-context {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  color: var(--text-dim);
+}
+
+.options-tape-module {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.options-tape-control-row,
+.options-tape-scope-band {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--route-line);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 10px;
+  background: oklch(0.12 0.012 250 / 0.74);
+}
+
+.options-tape-control-row > div:first-child,
+.options-tape-scope-band > div:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.options-tape-control-row span,
+.options-tape-scope-band span,
+.options-tape-scope-band em,
+.options-tape-settings section > span,
+.options-tape-custom-premium span {
+  color: var(--text-faint);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.66rem;
+  font-style: normal;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.options-tape-control-row strong,
+.options-tape-scope-band strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.options-tape-scope-band {
+  border-top-color: oklch(0.78 0.12 74 / 0.36);
+  background:
+    linear-gradient(90deg, oklch(0.78 0.12 74 / 0.06), transparent 62%),
+    oklch(0.12 0.012 250 / 0.82);
+}
+
+.options-tape-scope-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.options-tape-scope-actions button,
+.options-tape-gear,
+.options-tape-settings-panel button {
+  min-height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 9px;
+  background: var(--bg-soft);
+  color: var(--text);
+  cursor: pointer;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.options-tape-scope-actions button:hover,
+.options-tape-gear:hover,
+.options-tape-settings-panel button:hover,
+.options-tape-settings-panel button.is-active {
+  border-color: var(--border-strong);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.options-tape-settings {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.options-tape-settings-panel {
+  position: fixed;
+  top: 124px;
+  right: 18px;
+  z-index: 60;
+  width: min(430px, calc(100vw - 36px));
+  max-height: calc(100vh - 148px);
+  overflow: auto;
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--border);
+  padding: 12px;
+  background: oklch(0.12 0.012 250 / 0.98);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.42);
+}
+
+.options-tape-settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+}
+
+.options-tape-settings-head strong {
+  color: var(--text);
+  font-size: 0.86rem;
+}
+
+.options-tape-settings section {
+  display: grid;
+  gap: 8px;
+}
+
+.options-tape-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.options-tape-chip-row-wide button {
+  flex: 1 1 88px;
+}
+
+.options-tape-custom-premium {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.options-tape-custom-premium input {
+  min-width: 0;
+  min-height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: oklch(0.09 0.01 250);
+  color: var(--text);
+  font-family: var(--font-mono), monospace;
+}
+
+.options-tape {
+  flex: 1 1 auto;
+}
+
+.options-tape .durable-tape-row {
+  background:
+    linear-gradient(
+      90deg,
+      rgba(
+        var(--classifier-rgb, 192, 200, 210),
+        calc(0.012 + var(--classifier-intensity, 0) * 0.06)
+      ),
+      transparent 64%
+    ),
+    transparent;
+}
+
+.options-tape .durable-tape-row:hover,
+.options-tape .durable-tape-row:focus-visible {
+  background:
+    linear-gradient(
+      90deg,
+      rgba(var(--classifier-rgb, 192, 200, 210), calc(0.02 + var(--classifier-intensity, 0) * 0.1)),
+      transparent 68%
+    ),
+    oklch(0.78 0.12 74 / 0.04);
+}
+
+.options-tape .durable-tape-row:has(.options-tape-cell-contract),
+.options-tape .durable-tape-row:has(.options-tape-side) {
+  cursor: pointer;
+}
+
+.options-tape-cell-contract {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.options-tape-cell-premium {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.options-tape-side {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.options-tape-side-aa,
+.options-tape-side-a {
+  border-color: rgba(37, 193, 122, 0.34);
+  background: var(--green-soft);
+  color: #98f0c0;
+}
+
+.options-tape-side-b,
+.options-tape-side-bb {
+  border-color: rgba(255, 107, 95, 0.34);
+  background: var(--red-soft);
+  color: #ffc3bd;
+}
+
+.options-tape-side-mid {
+  border-color: rgba(77, 163, 255, 0.26);
+  background: var(--blue-soft);
+  color: #bddcff;
+}
+
+.options-tape-hover-content {
+  display: grid;
+  gap: 8px;
+}
+
+.options-tape-hover-content dl {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+}
+
+.options-tape-hover-content dl div {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.options-tape-hover-content dt,
+.options-tape-hover-content dd {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.options-tape-hover-content dt {
+  color: var(--text-faint);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+}
+
+.options-tape-hover-content dd {
+  color: var(--text);
+}
+
+.options-tape-linked-context {
   border-top: 1px solid var(--border);
   padding-top: 8px;
   color: var(--text-dim);
