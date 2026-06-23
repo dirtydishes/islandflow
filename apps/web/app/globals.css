@@ -884,11 +884,6 @@ h3 {
   grid-template-columns: minmax(0, 1fr);
 }
 
-.opra-options-pane,
-.opra-flow-pane {
-  min-height: 620px;
-}
-
 .opra-options-tape {
   height: clamp(620px, calc(100vh - var(--topbar-height) - 178px), 820px);
   min-height: 620px;
@@ -4871,8 +4866,6 @@ h3 {
   .market-command-grid > .options-tape-module,
   .market-command-grid > .durable-tape,
   .market-command-chart,
-  .opra-options-pane,
-  .opra-flow-pane,
   .news-pane-full {
     min-height: 0;
   }

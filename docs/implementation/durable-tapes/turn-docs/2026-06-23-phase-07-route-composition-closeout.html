@@ -363,6 +363,45 @@
       </section>
 
       <section>
+        <h2>Reviewer Pass</h2>
+        <ul>
+          <li>
+            Finding disposition: no blocking behavioral or architectural findings. The route
+            composition follows the durable tape boundary: routes compose modules, domain modules
+            own detail surfaces, and shared durable tape owns scroll/history/template mechanics.
+          </li>
+          <li>
+            Repair: removed stale stylesheet selectors for deleted terminal-owned OPRA pane classes
+            (<code>.opra-options-pane</code> and <code>.opra-flow-pane</code>) so the closeout
+            does not leave dead terminal pane styling behind.
+          </li>
+          <li>
+            Reachability audit: <code>rg</code> found no remaining imports or class references for
+            <code>OptionsPane</code>, <code>FlowPane</code>, <code>NewsPane</code>,
+            <code>NewsControlRails</code>, the retired <code>data-table-*</code> hooks, or the
+            deleted OPRA pane classes.
+          </li>
+          <li>
+            Reviewer local gates were rerun after installing dependencies in the fresh review
+            worktree: focused route tests, live API tests, full <code>bun test</code>, format,
+            lint, typecheck, web build, and <code>git diff --check</code> passed.
+          </li>
+          <li>
+            Browser QA was not rerun after the reviewer repair because the changed selectors were
+            unreachable dead CSS. The worker desktop/mobile checks above remain the applicable
+            rendered-route evidence for <code>/</code>, <code>/options</code>, and
+            <code>/news</code>.
+          </li>
+          <li>
+            Forgejo CI observed before reviewer repair: Validate <code>#247</code> on
+            <code>43ad915</code> and Validate <code>#248</code> on <code>bc6d68c</code> were
+            green. The final reviewer-pushed head is verified after push and reported in the
+            orchestrator callback.
+          </li>
+        </ul>
+      </section>
+
+      <section>
         <h2>Known Follow-Ups</h2>
         <ul>
           <li><code>islandflow-5thp</code>: flow packet member lookup coverage.</li>
@@ -555,6 +594,29 @@ diff --git a/apps/web/app/globals.css b/apps/web/app/globals.css
 -.data-table-news {
 -  min-width: 1080px;
 -}
+
+diff --git a/apps/web/app/globals.css b/apps/web/app/globals.css
+--- a/apps/web/app/globals.css
++++ b/apps/web/app/globals.css
+@@
+-.opra-options-pane,
+-.opra-flow-pane {
+-  min-height: 620px;
+-}
+-
+ .opra-options-tape {
+   height: clamp(620px, calc(100vh - var(--topbar-height) - 178px), 820px);
+   min-height: 620px;
+ }
+@@
+   .market-command-grid &gt; .options-tape-module,
+   .market-command-grid &gt; .durable-tape,
+   .market-command-chart,
+-  .opra-options-pane,
+-  .opra-flow-pane,
+   .news-pane-full {
+     min-height: 0;
+   }
 </pre>
       </section>
     </main>
