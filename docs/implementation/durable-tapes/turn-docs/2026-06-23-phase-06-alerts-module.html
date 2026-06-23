@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Durable Tapes Phase 06: Alerts Module</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "../../../../node_modules/react/index.js",
+          "react-dom/client": "../../../../node_modules/react-dom/client.js",
+          "@pierre/diffs/react": "../../../../node_modules/@pierre/diffs/dist/react/index.js"
+        }
+      }
+    </script>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #111820;
+        --panel-2: #0d141b;
+        --border: rgba(255, 255, 255, 0.12);
+        --text: #e6edf4;
+        --dim: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --green: #25c17a;
+        --red: #ff6b5f;
+        --blue: #4da3ff;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          IBM Plex Sans,
+          Inter,
+          system-ui,
+          sans-serif;
+        line-height: 1.45;
+      }
+
+      main {
+        width: min(1160px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 32px 0 48px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        margin-bottom: 8px;
+        font-size: 1.8rem;
+        line-height: 1.15;
+      }
+
+      h2 {
+        margin: 0 0 12px;
+        font-size: 1rem;
+      }
+
+      h3 {
+        margin: 0 0 8px;
+        font-size: 0.86rem;
+      }
+
+      .meta {
+        color: var(--dim);
+        font-family:
+          IBM Plex Mono,
+          ui-monospace,
+          monospace;
+        font-size: 0.78rem;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 8px;
+        margin: 20px 0;
+      }
+
+      .cell,
+      section {
+        border: 1px solid var(--border);
+        background: var(--panel);
+      }
+
+      .cell {
+        padding: 10px 12px;
+      }
+
+      .label {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--faint);
+        font-family:
+          IBM Plex Mono,
+          ui-monospace,
+          monospace;
+        font-size: 0.66rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      section {
+        margin-top: 12px;
+        padding: 16px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 6px;
+      }
+
+      code,
+      pre {
+        font-family:
+          IBM Plex Mono,
+          ui-monospace,
+          monospace;
+      }
+
+      code {
+        color: #ffd994;
+      }
+
+      pre {
+        max-height: 520px;
+        overflow: auto;
+        border: 1px solid var(--border);
+        padding: 12px;
+        background: var(--panel-2);
+        color: var(--dim);
+        font-size: 0.75rem;
+        line-height: 1.5;
+        white-space: pre-wrap;
+      }
+
+      .status-pass {
+        color: var(--green);
+      }
+
+      .status-pending {
+        color: var(--accent);
+      }
+
+      .diff-rich {
+        display: none;
+        margin-top: 10px;
+      }
+
+      .rich-ok .diff-rich {
+        display: block;
+      }
+
+      .rich-ok .diff-fallback {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="meta">Islandflow durable-tapes implementation turn</p>
+      <h1>Phase 06: Alerts Module</h1>
+      <p class="meta">
+        Beads issue <code>islandflow-h9c0.7</code> · branch
+        <code>lavender/durable-tape-phase-06-alerts-module</code> · turn doc
+        <code>docs/implementation/durable-tapes/turn-docs/2026-06-23-phase-06-alerts-module.html</code>
+      </p>
+
+      <div class="grid">
+        <div class="cell">
+          <span class="label">PR state</span>
+          <span class="status-pass">open: https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/69</span>
+        </div>
+        <div class="cell">
+          <span class="label">Local gates</span>
+          <span class="status-pass">focused tests, route tests, lint, format, typecheck, build</span>
+        </div>
+        <div class="cell">
+          <span class="label">Browser QA</span>
+          <span class="status-pass">desktop 1440x900 and mobile 390x844 passed</span>
+        </div>
+      </div>
+
+      <section>
+        <h2>Implementation Notes</h2>
+        <ul>
+          <li>
+            Added <code>apps/web/features/alerts/</code> with <code>AlertsModule</code>,
+            alert columns/templates, array/history source helpers, evidence hydration, detail
+            rendering, and tests.
+          </li>
+          <li>
+            Moved alert context helpers behind the alerts module while keeping terminal exports as
+            compatibility re-exports for existing tests and callers.
+          </li>
+          <li>
+            Replaced the selected-alert terminal drawer path with
+            <code>AlertDetailDrawer</code>, so selected alert evidence loading is module-owned
+            instead of terminal global drawer state.
+          </li>
+          <li>
+            Added typed terminal adapters for alert packet focus, contract focus, and equity focus.
+            Packet focus seeds the options contract scope from member trace IDs; contract focus uses
+            the existing options focus callback; equity focus sets the equity instrument context.
+          </li>
+          <li>
+            Embedded <code>AlertsModule</code> in the dashboard event-context pane using the
+            phase one-third template. The existing smart-flow, dark, and news context rows remain
+            below the alert tape.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Verification</h2>
+        <ul>
+          <li><code>bun install</code> was required in this fresh worktree before tests resolved workspace packages.</li>
+          <li><code>bun test apps/web/features/alerts/alerts-module.test.ts</code> passed: 4 tests, 20 assertions.</li>
+          <li><code>bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code> passed: 94 tests, 209 assertions.</li>
+          <li><code>bun run fmt:check</code> passed.</li>
+          <li><code>bun run lint</code> passed.</li>
+          <li><code>bun run typecheck</code> passed.</li>
+          <li><code>bun --cwd=apps/web run build</code> passed.</li>
+          <li><code>git diff --check</code> passed.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Browser QA</h2>
+        <ul>
+          <li>
+            Ran <code>WEB_DEV_PORT=3100 NEXT_PUBLIC_API_URL=https://api.flow.deltaisland.io bun run dev:web</code>.
+          </li>
+          <li>
+            Desktop 1440x900: dashboard rendered 12 alert rows in the alert tape, opened the alert
+            detail drawer from a row, showed focus packet/contract/equity actions, hydrated flow
+            packet and evidence prints, used <code>overflow-wrap: anywhere</code> for long packet
+            text, and had no horizontal overflow.
+          </li>
+          <li>
+            Mobile 390x844: dashboard rendered 12 alert rows after responsive layout settled,
+            opened the detail drawer, showed all three focus actions, and had no horizontal
+            overflow.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Reviewer Findings And Repairs</h2>
+        <ul>
+          <li>
+            Removed the obsolete terminal-owned <code>AlertDrawer</code> and terminal
+            <code>AlertContextStatus</code>/<code>AlertContextBundle</code> types, leaving the
+            selected-alert drawer path owned by <code>apps/web/features/alerts</code>.
+          </li>
+          <li>
+            Repaired alert detail naming for alerts that have <code>primary_profile_id</code> but no
+            classifier hits. The helper now falls back to the alert profile family, with focused
+            test coverage.
+          </li>
+          <li>
+            Repaired detail evidence accounting by showing the count of hidden evidence prints when
+            more than six prints are attached.
+          </li>
+          <li>
+            Repaired a no-horizontal-scroll risk by allowing long packet IDs and ref strings in
+            alert detail paragraphs to wrap anywhere.
+          </li>
+          <li>
+            Callback contracts were reviewed and left intact: packet focus uses the Phase 03
+            <code>FlowPacketFocusRequest</code>, contract focus delegates through the existing
+            options focus path, and equity focus remains a typed alert adapter.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Reviewer Caveats</h2>
+        <ul>
+          <li>
+            Phase 06 does not add a standalone <code>/alerts</code> route; route composition is left
+            for Phase 07.
+          </li>
+          <li>
+            Alert detail can focus equity context from the inferred alert underlying, because alert
+            evidence currently resolves packet and option-print refs rather than equity print refs.
+          </li>
+          <li>
+            The terminal still prefetches visible dashboard alert evidence for hot-row support; the
+            selected alert drawer no longer depends on terminal-owned context status or selected
+            evidence state.
+          </li>
+        </ul>
+      </section>
+
+      <section id="diff-section">
+        <h2>Relevant Diff Snippets</h2>
+        <p class="meta">
+          The rich view below attempts browser-side <code>@pierre/diffs/react</code>
+          <code>PatchDiff</code>. The readable unified HTML fallback remains visible unless the
+          rich renderer succeeds.
+        </p>
+        <div id="diff-rich" class="diff-rich"></div>
+        <pre id="diff-source" class="diff-fallback">diff --git a/apps/web/features/alerts/index.ts b/apps/web/features/alerts/index.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/alerts/index.ts
+@@
++export * from "./AlertsModule";
++export * from "./columns";
++export * from "./evidence";
++export * from "./format";
++export * from "./source";
++export * from "./types";
+
+diff --git a/apps/web/features/alerts/AlertsModule.tsx b/apps/web/features/alerts/AlertsModule.tsx
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/alerts/AlertsModule.tsx
+@@
++        {hiddenEvidencePrintCount &gt; 0 ? (
++          &lt;p className="drawer-empty"&gt;+{hiddenEvidencePrintCount} more evidence prints.&lt;/p&gt;
++        ) : null}
++
++export const AlertDetailDrawer = ({
++  alert,
++  flowPacketById,
++  optionPrintByTraceId,
++  sourceOptions,
++  onClose,
++  ...callbacks
++}: AlertActionCallbacks & {
++  alert: AlertEvent;
++  flowPacketById?: ReadonlyMap&lt;string, FlowPacket&gt;;
++  optionPrintByTraceId?: ReadonlyMap&lt;string, OptionPrint&gt;;
++  sourceOptions?: AlertsModuleSourceOptions;
++  onClose: () =&gt; void;
++}) =&gt; {
++  const hydration = useAlertEvidenceHydration({
++    alert,
++    flowPacketById,
++    optionPrintByTraceId,
++    sourceOptions
++  });
++
++  return (
++    &lt;aside className="drawer alerts-detail-drawer"&gt;
++      &lt;div className="drawer-header"&gt;
++        ...
++      &lt;/div&gt;
++      &lt;AlertDetail alert={alert} hydration={hydration} callbacks={callbacks} /&gt;
++    &lt;/aside&gt;
++  );
++};
+
+diff --git a/apps/web/features/terminal/components/drawers.tsx b/apps/web/features/terminal/components/drawers.tsx
+--- a/apps/web/features/terminal/components/drawers.tsx
++++ b/apps/web/features/terminal/components/drawers.tsx
+@@
+-export const AlertDrawer = (...) =&gt; { ... }
+-
+-      &lt;AlertDrawer
++      &lt;AlertDetailDrawer
+         alert={state.selectedAlert}
+-        flowPacket={state.selectedFlowPacket}
+-        evidence={state.selectedEvidence}
+-        contextStatus={state.selectedAlertContextStatus}
++        flowPacketById={state.flowPacketMap}
++        optionPrintByTraceId={state.optionPrintMap}
++        onContractFocus={state.focusAlertContract}
++        onEquityFocus={state.focusAlertEquity}
++        onPacketFocus={state.focusFlowPacketRequest}
+         onClose={() =&gt; state.setSelectedAlert(null)}
+       /&gt;
+
+diff --git a/apps/web/features/terminal/state.tsx b/apps/web/features/terminal/state.tsx
+--- a/apps/web/features/terminal/state.tsx
++++ b/apps/web/features/terminal/state.tsx
+@@
+-  const [selectedAlertContextStatus, setSelectedAlertContextStatus] = useState&lt;AlertContextStatus&gt;(...)
+-  useEffect(() =&gt; {
+-    if (!selectedAlert) { ... }
+-    void fetch(buildApiUrl(buildAlertContextPath(selectedAlert.trace_id)), ...)
+-  }, [selectedAlert]);
+-  const selectedEvidence = useMemo(...)
+-  const selectedFlowPacket = useMemo(...)
++  const focusFlowPacketRequest = useCallback((request: FlowPacketFocusRequest) =&gt; {
++    if (!request.optionContractId) {
++      return;
++    }
++    const contractId = normalizeContractId(request.optionContractId);
++    const memberTraceIds = new Set(request.memberTraceIds);
++    const memberPrints = request.memberTraceIds
++      .map((traceId) =&gt; resolvedOptionPrintMap.get(traceId))
++      .filter((print): print is OptionPrint =&gt; Boolean(print));
++    const seedItems = composeTapeItems(memberPrints, filteredOptions.filter(...), []);
++    setOptionFocusSeed({ scopeKey, subscriptionKey, items: seedItems });
++    setSelectedInstrument({ kind: "option-contract", contractId, underlyingId });
++  }, [filteredOptions, resolvedOptionPrintMap]);
+
+diff --git a/apps/web/features/terminal/components/charts.tsx b/apps/web/features/terminal/components/charts.tsx
+--- a/apps/web/features/terminal/components/charts.tsx
++++ b/apps/web/features/terminal/components/charts.tsx
+@@
++      {state.filteredAlerts.length &gt; 0 ? (
++        &lt;AlertsModule
++          alerts={state.filteredAlerts.slice(0, 12)}
++          className="command-alerts-module"
++          flowPacketById={state.flowPacketMap}
++          optionPrintByTraceId={state.optionPrintMap}
++          selectedAlert={state.selectedAlert}
++          showDetail={false}
++          template="oneThird"
++          title="Alert Tape"
++        /&gt;
++      ) : null}
+</pre>
+      </section>
+    </main>
+    <script type="module">
+      const source = document.getElementById("diff-source")?.textContent ?? "";
+      const target = document.getElementById("diff-rich");
+      const section = document.getElementById("diff-section");
+      try {
+        const React = await import("react");
+        const { createRoot } = await import("react-dom/client");
+        const { PatchDiff } = await import("@pierre/diffs/react");
+        createRoot(target).render(React.createElement(PatchDiff, { patch: source }));
+        section.classList.add("rich-ok");
+      } catch (error) {
+        console.warn("PatchDiff render failed; leaving HTML fallback visible.", error);
+      }
+    </script>
+  </body>
+</html>
