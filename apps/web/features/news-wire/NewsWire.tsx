@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  createDurableTapeInitialHistoryCursor,
   DurableTape,
   type DurableTapeCursor,
   type DurableTapeHistoryPage,
@@ -169,6 +170,8 @@ const useArrayNewsWireSource = ({
         },
         unsubscribe: () => {}
       }),
+      getInitialHistoryCursor: () =>
+        historyEnabledRef.current ? createDurableTapeInitialHistoryCursor() : null,
       loadOlder: async (cursor: DurableTapeCursor): Promise<DurableTapeHistoryPage<NewsStory>> => {
         if (!historyEnabledRef.current) {
           return { items: [], nextCursor: null, exhausted: true };

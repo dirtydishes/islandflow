@@ -11,7 +11,12 @@ import {
 } from "react";
 
 import { resolveDurableTapeComponentFeatures } from "../feature-flags";
-import { appendHistoryTail, composeTapeItems, selectOlderHistoryCursor } from "../history";
+import {
+  appendHistoryTail,
+  composeTapeItems,
+  isSameDurableTapeCursor,
+  selectDurableTapeHistoryCursor
+} from "../history";
 import {
   createEmptyDurableTapeScrollHold,
   flushDurableTapeJumpToLive,
@@ -86,6 +91,7 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
   const listRef = useRef<HTMLDivElement | null>(null);
   const settingsTriggerRef = useRef<HTMLButtonElement | null>(null);
   const wasAtTopRef = useRef(true);
+  const initialHistoryLoadKeysRef = useRef(new Set<string>());
   const settingsDialogId = useId();
   const [isAtTop, setIsAtTop] = useState(true);
   const [historyItems, setHistoryItems] = useState<TItem[]>([]);
@@ -145,6 +151,7 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
     setHistoryLoading(false);
     setHistoryExhausted(false);
     setHistoryCursor(undefined);
+    initialHistoryLoadKeysRef.current.clear();
     setHovered(null);
     setScrollHold(createEmptyDurableTapeScrollHold<TItem>());
     wasAtTopRef.current = true;
@@ -185,6 +192,10 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
     return composeTapeItems([], scrollHold.visible, historyItems, itemAccessors);
   }, [historyItems, itemAccessors, scrollHold.visible]);
 
+  const initialHistoryCursor = useMemo(() => {
+    return source.getInitialHistoryCursor?.(query) ?? null;
+  }, [query, source]);
+
   const virtual = useDurableTapeVirtualList(items, listRef, {
     rowHeight,
     overscan,
@@ -192,41 +203,84 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
     getRowKey
   });
 
-  const loadOlder = useCallback(async () => {
-    if (!resolvedFeatures.clickhouseHistory || historyLoading || historyExhausted) {
-      return;
-    }
+  const loadOlder = useCallback(
+    async (cursorOverride?: DurableTapeCursor) => {
+      if (!resolvedFeatures.clickhouseHistory || historyLoading || historyExhausted) {
+        return;
+      }
 
-    const cursor = historyCursor ?? selectOlderHistoryCursor(items, getCursor);
-    if (!cursor) {
-      return;
-    }
+      const cursor =
+        cursorOverride ??
+        selectDurableTapeHistoryCursor({
+          currentCursor: historyCursor,
+          items,
+          getCursor,
+          initialCursor: initialHistoryCursor
+        });
+      if (!cursor) {
+        return;
+      }
 
-    setHistoryLoading(true);
-    try {
-      const page = await source.loadOlder(cursor, query);
-      setHistoryItems((current) =>
-        appendHistoryTail(current, page.items, scrollHold.visible, 0, itemAccessors)
-      );
-      setHistoryCursor(page.nextCursor ?? undefined);
-      setHistoryExhausted(page.exhausted === true || page.nextCursor === null);
-    } finally {
-      setHistoryLoading(false);
-    }
-  }, [
-    getCursor,
-    historyCursor,
-    historyExhausted,
-    historyLoading,
-    itemAccessors,
-    items,
-    query,
-    resolvedFeatures.clickhouseHistory,
-    scrollHold.visible,
-    source
-  ]);
+      setHistoryLoading(true);
+      try {
+        const page = await source.loadOlder(cursor, query);
+        const nextCursor = page.nextCursor ?? null;
+        const cursorStalled = nextCursor ? isSameDurableTapeCursor(nextCursor, cursor) : false;
+        setHistoryItems((current) =>
+          appendHistoryTail(current, page.items, scrollHold.visible, 0, itemAccessors)
+        );
+        setHistoryCursor(cursorStalled ? undefined : (nextCursor ?? undefined));
+        setHistoryExhausted(page.exhausted === true || nextCursor === null || cursorStalled);
+      } finally {
+        setHistoryLoading(false);
+      }
+    },
+    [
+      getCursor,
+      historyCursor,
+      historyExhausted,
+      historyLoading,
+      initialHistoryCursor,
+      itemAccessors,
+      items,
+      query,
+      resolvedFeatures.clickhouseHistory,
+      scrollHold.visible,
+      source
+    ]
+  );
 
   const historyLoadSignal = historyCursor ? `${historyCursor.ts}:${historyCursor.seq}` : undefined;
+  const initialHistoryLoadSignal = initialHistoryCursor
+    ? `${initialHistoryCursor.ts}:${initialHistoryCursor.seq}`
+    : undefined;
+
+  useEffect(() => {
+    if (
+      !resolvedFeatures.clickhouseHistory ||
+      historyLoading ||
+      historyExhausted ||
+      items.length > 0 ||
+      !initialHistoryCursor ||
+      !initialHistoryLoadSignal
+    ) {
+      return;
+    }
+
+    if (initialHistoryLoadKeysRef.current.has(initialHistoryLoadSignal)) {
+      return;
+    }
+    initialHistoryLoadKeysRef.current.add(initialHistoryLoadSignal);
+    void loadOlder(initialHistoryCursor);
+  }, [
+    historyExhausted,
+    historyLoading,
+    initialHistoryCursor,
+    initialHistoryLoadSignal,
+    items.length,
+    loadOlder,
+    resolvedFeatures.clickhouseHistory
+  ]);
 
   useDurableVirtualHistoryGate(
     resolvedFeatures.clickhouseHistory &&

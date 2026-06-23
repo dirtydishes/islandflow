@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Durable Tape Empty History Backfill</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #0d141b;
+        --panel-2: #111820;
+        --line: rgba(230, 237, 244, 0.14);
+        --line-strong: rgba(245, 166, 35, 0.36);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --green: #25c17a;
+        --blue: #4da3ff;
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: linear-gradient(180deg, #0b1016 0%, var(--bg) 100%);
+        color: var(--text);
+        font: 15px/1.55 var(--sans);
+      }
+
+      main {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+
+      header {
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      .eyebrow,
+      h2,
+      .meta-label,
+      code,
+      pre {
+        font-family: var(--mono);
+      }
+
+      .eyebrow {
+        margin-bottom: 8px;
+        color: var(--accent);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 900px;
+        font-size: 2rem;
+        line-height: 1.08;
+        letter-spacing: 0;
+        text-wrap: balance;
+      }
+
+      .subtitle {
+        max-width: 82ch;
+        margin-top: 12px;
+        color: var(--muted);
+      }
+
+      .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1px;
+        margin-top: 18px;
+        border: 1px solid var(--line);
+        background: var(--line);
+      }
+
+      .meta-cell {
+        min-width: 0;
+        padding: 10px 12px;
+        background: var(--panel-2);
+      }
+
+      .meta-label {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--faint);
+        font-size: 0.66rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      section {
+        padding: 20px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      h2 {
+        margin-bottom: 10px;
+        color: var(--accent);
+        font-size: 0.9rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      p {
+        max-width: 84ch;
+      }
+
+      p + p {
+        margin-top: 10px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 7px;
+      }
+
+      code {
+        padding: 0.08rem 0.28rem;
+        border: 1px solid rgba(245, 166, 35, 0.18);
+        border-radius: 5px;
+        background: rgba(245, 166, 35, 0.1);
+        color: #ffe0a3;
+        font-size: 0.9em;
+      }
+
+      .status-ok {
+        color: var(--green);
+      }
+
+      .status-note {
+        color: var(--blue);
+      }
+
+      .diff-shell {
+        display: grid;
+        gap: 12px;
+      }
+
+      #rich-diff {
+        min-height: 32px;
+      }
+
+      #fallback-diff {
+        max-height: 560px;
+        overflow: auto;
+        margin: 0;
+        padding: 12px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--text);
+        font-size: 0.76rem;
+        line-height: 1.45;
+      }
+
+      .rich-diff-ready #fallback-diff {
+        display: none;
+      }
+
+      .diff-note {
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="eyebrow">Repository turn document</div>
+        <h1>Durable Tape Empty History Backfill</h1>
+        <p class="subtitle">
+          Added a shared initial-history cursor path so durable tapes can request ClickHouse history
+          after a filter or scope change leaves the live head empty.
+        </p>
+        <div class="meta-grid" aria-label="Turn metadata">
+          <div class="meta-cell"><span class="meta-label">Branch</span>lavender/durable-tape-empty-history-backfill</div>
+          <div class="meta-cell"><span class="meta-label">Beads</span>islandflow-m2m7</div>
+          <div class="meta-cell"><span class="meta-label">Scope</span>shared durable-tape blocker</div>
+          <div class="meta-cell"><span class="meta-label">Timestamp</span>2026-06-23 EDT</div>
+        </div>
+      </header>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          <code>DurableTapeSource</code> now has an optional
+          <code>getInitialHistoryCursor(query)</code> hook. <code>DurableTape</code> uses it only
+          when the composed row stack is empty, so existing non-empty history paging still derives
+          cursors from visible rows and the virtual tail gate.
+        </p>
+        <p>
+          Options, flow packets, equities, and news wire default sources opt into the shared path
+          with a current-time history cursor. The adapters still use their existing
+          <code>loadOlder</code> implementations and filter semantics; no domain module cloned
+          history mechanics.
+        </p>
+      </section>
+
+      <section>
+        <h2>Behavior</h2>
+        <ul>
+          <li>Empty visible/live result sets can seed one initial history request after query or source reset.</li>
+          <li>Once rows exist, row-derived cursor paging, scroll hold, and jump-to-live behavior are unchanged.</li>
+          <li>Repeated <code>nextCursor</code> values are treated as exhausted at the shared layer to avoid loader loops.</li>
+          <li>Sources that do not provide <code>getInitialHistoryCursor</code> keep the previous default behavior.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Verification</h2>
+        <ul>
+          <li><span class="status-ok">pass</span> <code>bun test apps/web/features/durable-tape</code></li>
+          <li><span class="status-ok">pass</span> <code>bun test apps/web/features/options-tape/options-tape.test.ts apps/web/features/flow-packets/flow-packets.test.ts apps/web/features/news-wire/news-wire.test.ts apps/web/features/equities-tape/equities-tape.test.ts</code></li>
+          <li><span class="status-ok">pass</span> <code>bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code></li>
+          <li><span class="status-ok">pass</span> <code>bun run typecheck</code></li>
+          <li><span class="status-ok">pass</span> <code>bun run fmt:check</code></li>
+          <li><span class="status-ok">pass</span> <code>bun run lint</code></li>
+          <li><span class="status-ok">pass</span> <code>bun --cwd=apps/web run build</code></li>
+          <li><span class="status-ok">pass</span> <code>git diff --check</code></li>
+          <li><span class="status-note">not run</span> browser QA; this change is a shared data-loading path with no visual surface change.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <div class="diff-shell">
+          <p class="diff-note">
+            The rich renderer below uses browser-side <code>@pierre/diffs</code>. If it is not
+            available in this static context, the readable unified fallback remains visible.
+          </p>
+          <div id="rich-diff"></div>
+          <pre id="fallback-diff"><code>diff --git a/apps/web/features/durable-tape/types.ts b/apps/web/features/durable-tape/types.ts
+@@
+ export type DurableTapeSource&lt;TItem, TScope, TFilters&gt; = {
+   subscribe: (input: DurableTapeQuery&lt;TScope, TFilters&gt;) =&gt; DurableTapeSubscription&lt;TItem&gt;;
++  getInitialHistoryCursor?: (
++    input: DurableTapeQuery&lt;TScope, TFilters&gt;
++  ) =&gt; DurableTapeCursor | null | undefined;
+   loadOlder: (
+     cursor: DurableTapeCursor,
+     input: DurableTapeQuery&lt;TScope, TFilters&gt;
+   ) =&gt; Promise&lt;DurableTapeHistoryPage&lt;TItem&gt;&gt;;
+ };
+
+diff --git a/apps/web/features/durable-tape/history.ts b/apps/web/features/durable-tape/history.ts
+@@
++export const createDurableTapeInitialHistoryCursor = (now = Date.now()): DurableTapeCursor =&gt; ({
++  ts: Math.max(0, Math.floor(now)),
++  seq: Number.MAX_SAFE_INTEGER
++});
++
++export const selectDurableTapeHistoryCursor = &lt;TItem&gt;({
++  currentCursor,
++  items,
++  getCursor,
++  initialCursor
++}: {
++  currentCursor?: DurableTapeCursor | null;
++  items: readonly TItem[];
++  getCursor: (item: TItem) =&gt; DurableTapeCursor;
++  initialCursor?: DurableTapeCursor | null;
++}): DurableTapeCursor | null =&gt; {
++  if (currentCursor) return currentCursor;
++  const rowCursor = selectOlderHistoryCursor(items, getCursor);
++  if (rowCursor) return rowCursor;
++  return items.length === 0 ? (initialCursor ?? null) : null;
++};
+
+diff --git a/apps/web/features/durable-tape/components/DurableTape.tsx b/apps/web/features/durable-tape/components/DurableTape.tsx
+@@
++  const initialHistoryCursor = useMemo(() =&gt; {
++    return source.getInitialHistoryCursor?.(query) ?? null;
++  }, [query, source]);
+@@
+-    const cursor = historyCursor ?? selectOlderHistoryCursor(items, getCursor);
++    const cursor =
++      cursorOverride ??
++      selectDurableTapeHistoryCursor({
++        currentCursor: historyCursor,
++        items,
++        getCursor,
++        initialCursor: initialHistoryCursor
++      });
+@@
++        const nextCursor = page.nextCursor ?? null;
++        const cursorStalled = nextCursor ? isSameDurableTapeCursor(nextCursor, cursor) : false;
+@@
++  useEffect(() =&gt; {
++    if (
++      !resolvedFeatures.clickhouseHistory ||
++      historyLoading ||
++      historyExhausted ||
++      items.length &gt; 0 ||
++      !initialHistoryCursor ||
++      !initialHistoryLoadSignal
++    ) {
++      return;
++    }
++    if (initialHistoryLoadKeysRef.current.has(initialHistoryLoadSignal)) return;
++    initialHistoryLoadKeysRef.current.add(initialHistoryLoadSignal);
++    void loadOlder(initialHistoryCursor);
++  }, [historyExhausted, historyLoading, initialHistoryCursor, initialHistoryLoadSignal, items.length, loadOlder, resolvedFeatures.clickhouseHistory]);
+
+diff --git a/apps/web/features/options-tape/source.ts b/apps/web/features/options-tape/source.ts
+@@
++      getInitialHistoryCursor: () =&gt; createDurableTapeInitialHistoryCursor(),
+       loadOlder: (cursor, { scope, filters }) =&gt;
+         loadOptionsTapeHistoryPage({ cursor, scope, filters, options: optionsRef.current })
+
+diff --git a/apps/web/features/options-tape/options-tape.test.ts b/apps/web/features/options-tape/options-tape.test.ts
+@@
++  it("can seed filtered history from an empty live head cursor", async () =&gt; {
++    const page = await loadOptionsTapeHistoryPage({
++      cursor: createDurableTapeInitialHistoryCursor(2_500),
++      filters: { ...buildDefaultOptionsTapeFilters(), minNotional: 10_000 },
++      options: { apiBaseUrl: "https://api.example.test", fetcher }
++    });
++    expect(page.items.map((print) =&gt; print.trace_id)).toEqual(["older-match"]);
++  });</code></pre>
+        </div>
+      </section>
+    </main>
+
+    <script type="text/plain" id="patch-source">diff --git a/apps/web/features/durable-tape/types.ts b/apps/web/features/durable-tape/types.ts
+@@
+ export type DurableTapeSource<TItem, TScope, TFilters> = {
+   subscribe: (input: DurableTapeQuery<TScope, TFilters>) => DurableTapeSubscription<TItem>;
++  getInitialHistoryCursor?: (
++    input: DurableTapeQuery<TScope, TFilters>
++  ) => DurableTapeCursor | null | undefined;
+   loadOlder: (
+     cursor: DurableTapeCursor,
+     input: DurableTapeQuery<TScope, TFilters>
+   ) => Promise<DurableTapeHistoryPage<TItem>>;
+ };
+
+diff --git a/apps/web/features/durable-tape/components/DurableTape.tsx b/apps/web/features/durable-tape/components/DurableTape.tsx
+@@
++  const initialHistoryCursor = useMemo(() => {
++    return source.getInitialHistoryCursor?.(query) ?? null;
++  }, [query, source]);
+@@
++    void loadOlder(initialHistoryCursor);
+
+diff --git a/apps/web/features/options-tape/source.ts b/apps/web/features/options-tape/source.ts
+@@
++      getInitialHistoryCursor: () => createDurableTapeInitialHistoryCursor(),
+</script>
+    <script type="module">
+      const source = document.getElementById("patch-source")?.textContent ?? "";
+      const target = document.getElementById("rich-diff");
+      try {
+        const React = await import("react");
+        const { createRoot } = await import("react-dom/client");
+        const { PatchDiff } = await import("@pierre/diffs/react");
+        createRoot(target).render(React.createElement(PatchDiff, { patch: source }));
+        document.documentElement.classList.add("rich-diff-ready");
+      } catch (error) {
+        target.textContent =
+          "Rich diff renderer unavailable in this static context; showing unified fallback.";
+      }
+    </script>
+  </body>
+</html>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import type { OptionPrint } from "@islandflow/types";
 
-import { selectDurableTapeTemplate } from "../durable-tape";
+import { createDurableTapeInitialHistoryCursor, selectDurableTapeTemplate } from "../durable-tape";
 import {
   formatOptionsTapeContractLabel,
   formatOptionsTapeDteLabel,
@@ -161,6 +161,30 @@ describe("options tape helpers", () => {
     expect(requestedUrls[0]).toContain("/history/options?");
     expect(page.items.map((print) => print.trace_id)).toEqual(["member-2"]);
     expect(page.exhausted).toBe(true);
+  });
+
+  it("can seed filtered history from an empty live head cursor", async () => {
+    const requestedUrls: string[] = [];
+    const page = await loadOptionsTapeHistoryPage({
+      cursor: createDurableTapeInitialHistoryCursor(2_500),
+      filters: { ...buildDefaultOptionsTapeFilters(), minNotional: 10_000 },
+      options: {
+        apiBaseUrl: "https://api.example.test",
+        fetcher: async (url) => {
+          requestedUrls.push(url.toString());
+          return Response.json({
+            data: [makePrint({ trace_id: "older-match", seq: 7, ts: 2_000, notional: 50_000 })],
+            next_before: { ts: 2_000, seq: 7 }
+          });
+        }
+      }
+    });
+
+    expect(requestedUrls[0]).toContain("before_ts=2500");
+    expect(requestedUrls[0]).toContain(`before_seq=${Number.MAX_SAFE_INTEGER}`);
+    expect(requestedUrls[0]).toContain("min_notional=10000");
+    expect(page.items.map((print) => print.trace_id)).toEqual(["older-match"]);
+    expect(page.exhausted).toBe(false);
   });
 
   it("keeps broad filters out of packet and contract scopes", () => {

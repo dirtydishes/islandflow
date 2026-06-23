@@ -7,7 +7,11 @@ import {
   parseLivePayload
 } from "@islandflow/types";
 
-import { type DurableTapeCursor, mergeNewest } from "../durable-tape";
+import {
+  createDurableTapeInitialHistoryCursor,
+  type DurableTapeCursor,
+  mergeNewest
+} from "../durable-tape";
 import { filterFlowPackets, getFlowPacketCursor, getFlowPacketKey } from "./format";
 import type {
   FlowPacketsTapeFilters,
@@ -248,6 +252,7 @@ export const createFlowPacketsTapeSource = (options: FlowPacketsTapeSourceOption
       }
     };
   },
+  getInitialHistoryCursor: () => createDurableTapeInitialHistoryCursor(),
   loadOlder: (
     cursor: DurableTapeCursor,
     {

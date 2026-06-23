@@ -3,8 +3,11 @@ import { describe, expect, it } from "bun:test";
 import {
   appendHistoryTail,
   composeTapeItems,
+  createDurableTapeInitialHistoryCursor,
+  isSameDurableTapeCursor,
   mergeHeldTapeHistory,
   mergeNewestWithOverflow,
+  selectDurableTapeHistoryCursor,
   selectOlderHistoryCursor,
   selectOlderHistoryCursorFromSortable
 } from "./history";
@@ -103,5 +106,46 @@ describe("durable tape history composition", () => {
 
   it("returns null when no rows can supply a cursor", () => {
     expect(selectOlderHistoryCursor([], (item: never) => item)).toBeNull();
+  });
+
+  it("uses an initial source cursor when the live and history row stack is empty", () => {
+    const initialCursor = createDurableTapeInitialHistoryCursor(2_000);
+
+    expect(
+      selectDurableTapeHistoryCursor({
+        currentCursor: null,
+        items: [],
+        getCursor: (item: ReturnType<typeof makeItem>) => ({ ts: item.ts, seq: item.seq }),
+        initialCursor
+      })
+    ).toEqual({ ts: 2_000, seq: Number.MAX_SAFE_INTEGER });
+  });
+
+  it("prefers row and advanced cursors over the initial empty-head cursor", () => {
+    const initialCursor = createDurableTapeInitialHistoryCursor(2_000);
+    const items = [makeItem("existing", 3, 1_500)];
+
+    expect(
+      selectDurableTapeHistoryCursor({
+        currentCursor: null,
+        items,
+        getCursor: (item) => ({ ts: item.ts, seq: item.seq }),
+        initialCursor
+      })
+    ).toEqual({ ts: 1_500, seq: 3 });
+
+    expect(
+      selectDurableTapeHistoryCursor({
+        currentCursor: { ts: 900, seq: 2 },
+        items,
+        getCursor: (item) => ({ ts: item.ts, seq: item.seq }),
+        initialCursor
+      })
+    ).toEqual({ ts: 900, seq: 2 });
+  });
+
+  it("detects repeated history cursors", () => {
+    expect(isSameDurableTapeCursor({ ts: 1_000, seq: 4 }, { ts: 1_000, seq: 4 })).toBe(true);
+    expect(isSameDurableTapeCursor({ ts: 1_000, seq: 4 }, { ts: 1_000, seq: 3 })).toBe(false);
   });
 });

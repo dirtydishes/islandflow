@@ -6,7 +6,7 @@ import {
   parseLivePayload
 } from "@islandflow/types";
 
-import { mergeNewest } from "../durable-tape";
+import { createDurableTapeInitialHistoryCursor, mergeNewest } from "../durable-tape";
 import {
   filterEquityPrints,
   getEquitiesTapeHistoryParams,
@@ -222,6 +222,7 @@ export const createEquitiesTapeSource = (options: EquitiesTapeSourceOptions = {}
       }
     };
   },
+  getInitialHistoryCursor: () => createDurableTapeInitialHistoryCursor(),
   loadOlder: (
     cursor: { ts: number; seq: number },
     {

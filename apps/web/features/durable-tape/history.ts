@@ -9,6 +9,7 @@ import {
 import type { DurableTapeCursor, DurableTapeItemAccessors, DurableTapeSortableItem } from "./types";
 
 export const DURABLE_TAPE_DEFAULT_HOT_LIMIT = 500;
+export const DURABLE_TAPE_INITIAL_HISTORY_SEQ = Number.MAX_SAFE_INTEGER;
 
 const DEFAULT_SORTABLE_ACCESSORS: DurableTapeItemAccessors<DurableTapeSortableItem> = {
   getKey: getDurableTapeItemKey,
@@ -210,6 +211,39 @@ export const selectOlderHistoryCursor = <TItem>(
   }
 
   return oldest;
+};
+
+export const createDurableTapeInitialHistoryCursor = (now = Date.now()): DurableTapeCursor => ({
+  ts: Math.max(0, Math.floor(now)),
+  seq: DURABLE_TAPE_INITIAL_HISTORY_SEQ
+});
+
+export const isSameDurableTapeCursor = (
+  left: DurableTapeCursor,
+  right: DurableTapeCursor
+): boolean => left.ts === right.ts && left.seq === right.seq;
+
+export const selectDurableTapeHistoryCursor = <TItem>({
+  currentCursor,
+  items,
+  getCursor,
+  initialCursor
+}: {
+  currentCursor?: DurableTapeCursor | null;
+  items: readonly TItem[];
+  getCursor: (item: TItem) => DurableTapeCursor;
+  initialCursor?: DurableTapeCursor | null;
+}): DurableTapeCursor | null => {
+  if (currentCursor) {
+    return currentCursor;
+  }
+
+  const rowCursor = selectOlderHistoryCursor(items, getCursor);
+  if (rowCursor) {
+    return rowCursor;
+  }
+
+  return items.length === 0 ? (initialCursor ?? null) : null;
 };
 
 export const selectOlderHistoryCursorFromSortable = <TItem extends DurableTapeSortableItem>(
