@@ -1,7 +1,9 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { type ReactNode, useMemo } from "react";
 
+import { EquitiesTape, createStaticEquitiesTapeSource } from "../features/equities-tape";
+import { FlowPacketsTape, createStaticFlowPacketsTapeSource } from "../features/flow-packets";
 import { NewsWire } from "../features/news-wire";
 import { OptionsTape } from "../features/options-tape";
 import { TerminalMarketChartSection } from "../features/terminal/chart-adapter";
@@ -16,7 +18,7 @@ import {
   HomeReplayRail
 } from "../features/terminal/components/charts";
 import { renderTerminalDrawers } from "../features/terminal/components/drawers";
-import { OpraIntakeRail, OptionsPane } from "../features/terminal/components/opra";
+import { OpraIntakeRail } from "../features/terminal/components/opra";
 import { FlowFilterPopover, PageFrame } from "../features/terminal/components/primitives";
 import { TerminalAppShell as TerminalFeatureAppShell } from "../features/terminal/shell";
 import { useTerminal } from "../features/terminal/state";
@@ -118,6 +120,24 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
 
 export function OverviewRoute() {
   const state = useTerminal();
+  const flowSource = useMemo(
+    () => createStaticFlowPacketsTapeSource(state.filteredFlow),
+    [state.filteredFlow]
+  );
+  const equitiesSource = useMemo(
+    () => createStaticEquitiesTapeSource(state.filteredEquities),
+    [state.filteredEquities]
+  );
+  const compactTapeFeatures = useMemo(
+    () =>
+      [
+        "default",
+        { key: "clickhouseHistory", enabled: false },
+        { key: "settingsGear", enabled: false }
+      ] as const,
+    []
+  );
+
   return (
     <PageFrame title="Market Command" eyebrow="Dashboard" variant="dashboard">
       <div className="market-command-shell">
@@ -132,11 +152,47 @@ export function OverviewRoute() {
             className="market-command-chart"
           />
           <CommandDecisionLevels state={state} />
-          <OptionsPane
-            state={state}
-            limit={12}
+          <OptionsTape
+            className="command-contracts-tape"
+            decorByTraceId={state.classifierDecorByOptionTraceId}
+            features={compactTapeFeatures}
+            filters={state.flowFilters}
+            flowPacketById={state.flowPacketMap}
+            focusedContractId={
+              state.selectedInstrument?.kind === "option-contract"
+                ? state.selectedInstrument.contractId
+                : null
+            }
+            nbboByContractId={state.nbboMap}
+            nbboByTraceId={state.historicalNbboByTraceId}
+            onClearFocus={() => state.setSelectedInstrument(null)}
+            onContractFocus={state.focusOptionContract}
+            onFiltersChange={state.setFlowFilters}
+            onPacketFocus={state.focusFlowPacketRequest}
+            packetIdByOptionTraceId={state.packetIdByOptionTraceId}
+            prints={state.filteredOptions.slice(0, 36)}
+            rowHeight={34}
+            template="half"
             title="Recent Contracts"
-            className="command-contracts-pane"
+          />
+          <FlowPacketsTape
+            className="command-flow-tape"
+            features={compactTapeFeatures}
+            filters={state.flowFilters}
+            onPacketFocus={state.focusFlowPacketRequest}
+            rowHeight={40}
+            source={flowSource}
+            template="oneThird"
+            title="Flow Packets"
+          />
+          <EquitiesTape
+            className="command-equities-tape"
+            features={compactTapeFeatures}
+            onTickerFocus={(event) => state.focusEquityTicker(event.print)}
+            rowHeight={34}
+            source={equitiesSource}
+            template="oneThird"
+            title="Equities Tape"
           />
           <FeedHealthPane state={state} />
           <EventContextPane state={state} />
@@ -188,7 +244,7 @@ export function OptionsRoute() {
             onClearFocus={() => state.setSelectedInstrument(null)}
             onContractFocus={state.focusOptionContract}
             onFiltersChange={state.setFlowFilters}
-            onPacketFocus={() => {}}
+            onPacketFocus={state.focusFlowPacketRequest}
             packetIdByOptionTraceId={state.packetIdByOptionTraceId}
             prints={state.filteredOptions}
             title="OPRA Tape"

@@ -884,12 +884,8 @@ h3 {
   grid-template-columns: minmax(0, 1fr);
 }
 
-.opra-options-pane,
-.opra-flow-pane {
-  min-height: 620px;
-}
-
 .opra-options-tape {
+  height: clamp(620px, calc(100vh - var(--topbar-height) - 178px), 820px);
   min-height: 620px;
 }
 
@@ -1249,16 +1245,19 @@ h3 {
 
 .market-command-grid {
   display: grid;
-  grid-template-columns: minmax(420px, 1.14fr) minmax(420px, 1fr) minmax(300px, 0.78fr);
+  grid-template-columns: minmax(360px, 0.88fr) minmax(460px, 1.15fr) minmax(300px, 0.78fr);
   grid-template-areas:
     "priority chart levels"
     "contracts chart health"
-    "context replay health";
+    "flow chart health"
+    "equities context replay";
   gap: 8px;
   align-items: stretch;
 }
 
-.market-command-grid > .terminal-pane {
+.market-command-grid > .terminal-pane,
+.market-command-grid > .options-tape-module,
+.market-command-grid > .durable-tape {
   min-height: 0;
 }
 
@@ -1277,9 +1276,19 @@ h3 {
   min-height: 236px;
 }
 
-.command-contracts-pane {
+.command-contracts-tape {
   grid-area: contracts;
   min-height: 314px;
+}
+
+.command-flow-tape {
+  grid-area: flow;
+  min-height: 252px;
+}
+
+.command-equities-tape {
+  grid-area: equities;
+  min-height: 230px;
 }
 
 .command-feed-pane {
@@ -2346,18 +2355,6 @@ h3 {
   background: oklch(0.105 0.01 250);
 }
 
-.data-table-options {
-  min-width: 1280px;
-}
-
-.data-table-flow {
-  min-width: 1260px;
-}
-
-.data-table-news {
-  min-width: 1120px;
-}
-
 .data-table-head,
 .data-table-row {
   display: grid;
@@ -2410,28 +2407,6 @@ h3 {
   cursor: pointer;
 }
 
-.data-table-row-options {
-  height: 36px;
-}
-
-.data-table-row-flow {
-  height: 44px;
-}
-
-.data-table-row-news {
-  height: 52px;
-}
-
-.data-table-flow .data-table-body {
-  --tape-row-height: 44px;
-  --tape-row-double-height: 88px;
-}
-
-.data-table-news .data-table-body {
-  --tape-row-height: 52px;
-  --tape-row-double-height: 104px;
-}
-
 .data-table-row-classified {
   background:
     linear-gradient(
@@ -2463,36 +2438,6 @@ h3 {
 
 .data-table-row-warn {
   box-shadow: inset 0 0 0 1px oklch(0.68 0.16 28 / 0.32);
-}
-
-.data-table-options .data-table-head,
-.data-table-options .data-table-row {
-  grid-template-columns: minmax(72px, 0.8fr) minmax(50px, 0.55fr) minmax(64px, 0.7fr) minmax(
-      58px,
-      0.6fr
-    ) minmax(34px, 0.35fr) minmax(62px, 0.65fr) minmax(104px, 1fr) minmax(54px, 0.55fr) minmax(
-      66px,
-      0.7fr
-    ) minmax(48px, 0.5fr) minmax(42px, 0.45fr) minmax(92px, 0.9fr);
-}
-
-.data-table-flow .data-table-head,
-.data-table-flow .data-table-row {
-  grid-template-columns: minmax(148px, 1.1fr) minmax(180px, 1.4fr) minmax(62px, 0.45fr) minmax(
-      70px,
-      0.5fr
-    ) minmax(88px, 0.7fr) minmax(74px, 0.55fr) minmax(132px, 1fr) minmax(110px, 0.8fr) minmax(
-      210px,
-      1.6fr
-    );
-}
-
-.data-table-news .data-table-head,
-.data-table-news .data-table-row {
-  grid-template-columns: minmax(86px, 0.75fr) minmax(92px, 0.75fr) minmax(118px, 0.9fr) minmax(
-      80px,
-      0.65fr
-    ) minmax(320px, 2.2fr) minmax(260px, 1.6fr);
 }
 
 .data-table-cell {
@@ -4824,7 +4769,9 @@ h3 {
       "priority levels"
       "chart chart"
       "contracts health"
-      "context replay";
+      "flow health"
+      "equities context"
+      "replay replay";
   }
 
   .wire-control-rails {
@@ -4894,6 +4841,8 @@ h3 {
       "chart"
       "levels"
       "contracts"
+      "flow"
+      "equities"
       "health"
       "context"
       "replay";
@@ -4914,9 +4863,9 @@ h3 {
   }
 
   .market-command-grid > .terminal-pane,
+  .market-command-grid > .options-tape-module,
+  .market-command-grid > .durable-tape,
   .market-command-chart,
-  .opra-options-pane,
-  .opra-flow-pane,
   .news-pane-full {
     min-height: 0;
   }
@@ -5252,27 +5201,9 @@ h3 {
     scroll-snap-align: start;
   }
 
-  .data-table-options,
-  .data-table-flow,
-  .data-table-news {
-    min-width: 1080px;
-  }
-
   .data-table-head,
   .data-table-row {
     padding-inline: 8px;
-  }
-
-  .data-table-row-options {
-    height: 40px;
-  }
-
-  .data-table-row-flow {
-    height: 48px;
-  }
-
-  .data-table-row-news {
-    height: 56px;
   }
 
   .command-deck-grid .chart-surface {

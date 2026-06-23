@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Durable Tapes Phase 07: Route Composition And Closeout</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "../../../../node_modules/react/index.js",
+          "react-dom/client": "../../../../node_modules/react-dom/client.js",
+          "@pierre/diffs/react": "../../../../node_modules/@pierre/diffs/dist/react/index.js"
+        }
+      }
+    </script>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #111820;
+        --panel-2: #0d141b;
+        --border: rgba(255, 255, 255, 0.12);
+        --text: #e6edf4;
+        --dim: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --green: #25c17a;
+        --blue: #4da3ff;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          IBM Plex Sans,
+          Inter,
+          system-ui,
+          sans-serif;
+        line-height: 1.45;
+      }
+
+      main {
+        width: min(1160px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 32px 0 48px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        margin-bottom: 8px;
+        font-size: 1.8rem;
+        line-height: 1.15;
+      }
+
+      h2 {
+        margin: 0 0 12px;
+        font-size: 1rem;
+      }
+
+      h3 {
+        margin: 0 0 8px;
+        font-size: 0.86rem;
+      }
+
+      .meta {
+        color: var(--dim);
+        font-family:
+          IBM Plex Mono,
+          ui-monospace,
+          monospace;
+        font-size: 0.78rem;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 8px;
+        margin: 20px 0;
+      }
+
+      .cell,
+      section {
+        border: 1px solid var(--border);
+        background: var(--panel);
+      }
+
+      .cell {
+        padding: 10px 12px;
+      }
+
+      .label {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--faint);
+        font-family:
+          IBM Plex Mono,
+          ui-monospace,
+          monospace;
+        font-size: 0.66rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      section {
+        margin-top: 12px;
+        padding: 16px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 6px;
+      }
+
+      code,
+      pre {
+        font-family:
+          IBM Plex Mono,
+          ui-monospace,
+          monospace;
+      }
+
+      code {
+        color: #ffd994;
+      }
+
+      pre {
+        max-height: 520px;
+        overflow: auto;
+        border: 1px solid var(--border);
+        padding: 12px;
+        background: var(--panel-2);
+        color: var(--dim);
+        font-size: 0.75rem;
+        line-height: 1.5;
+        white-space: pre-wrap;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.86rem;
+      }
+
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 8px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--faint);
+        font-family:
+          IBM Plex Mono,
+          ui-monospace,
+          monospace;
+        font-size: 0.68rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .status-pass {
+        color: var(--green);
+      }
+
+      .status-pending {
+        color: var(--accent);
+      }
+
+      .status-info {
+        color: var(--blue);
+      }
+
+      .diff-rich {
+        display: none;
+        margin-top: 10px;
+      }
+
+      .rich-ok .diff-rich {
+        display: block;
+      }
+
+      .rich-ok .diff-fallback {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="meta">Islandflow durable-tapes implementation turn</p>
+      <h1>Phase 07: Route Composition And Closeout</h1>
+      <p class="meta">
+        Beads issue <code>islandflow-h9c0.6</code> · branch
+        <code>lavender/durable-tape-phase-07-route-closeout</code> · turn doc
+        <code>docs/implementation/durable-tapes/turn-docs/2026-06-23-phase-07-route-composition-closeout.html</code>
+      </p>
+
+      <div class="grid">
+        <div class="cell">
+          <span class="label">PR state</span>
+          <span class="status-pass">open: https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/70</span>
+        </div>
+        <div class="cell">
+          <span class="label">Local gates</span>
+          <span class="status-pass">required tests, full test suite, format, lint, typecheck, build</span>
+        </div>
+        <div class="cell">
+          <span class="label">Browser QA</span>
+          <span class="status-pass">dashboard, options, and news at desktop and mobile widths</span>
+        </div>
+      </div>
+
+      <section>
+        <h2>Implementation Notes</h2>
+        <ul>
+          <li>
+            Composed the dashboard from domain modules instead of terminal-specific tape panes:
+            <code>OptionsTape</code>, <code>FlowPacketsTape</code>, <code>EquitiesTape</code>, and
+            the existing <code>AlertsModule</code> now occupy explicit route grid areas.
+          </li>
+          <li>
+            Kept <code>/options</code> tape-first and connected option row packet focus to the
+            durable flow packet focus callback. <code>/tape</code> continues to redirect to
+            <code>/options</code>, and <code>/news</code> continues to use the extracted
+            <code>NewsWire</code> module.
+          </li>
+          <li>
+            Added <code>createStaticEquitiesTapeSource</code> so route/dashboard composition can
+            feed compact equities templates through the durable source contract without reaching
+            into terminal pane state.
+          </li>
+          <li>
+            Retired the legacy terminal-owned <code>OptionsPane</code>, <code>FlowPane</code>,
+            <code>NewsPane</code>, and news control rails after imports proved they were no longer
+            reachable from production routes.
+          </li>
+          <li>
+            Removed stale table sizing CSS that forced horizontal scrolling in the old terminal
+            panes, and gave the production <code>/options</code> tape a bounded height so virtual
+            scrolling, scroll hold, and jump-to-live are available inside the tape.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Verification</h2>
+        <ul>
+          <li><code>bun test apps/web/features/equities-tape/equities-tape.test.ts</code> passed: 8 tests.</li>
+          <li><code>bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code> passed: 94 tests.</li>
+          <li><code>bun test services/api/tests/live.test.ts</code> passed: 25 tests.</li>
+          <li><code>bun test</code> passed: 432 tests, 7089 assertions.</li>
+          <li><code>bun run fmt:check</code> passed.</li>
+          <li><code>bun run lint</code> passed.</li>
+          <li><code>bun run typecheck</code> passed.</li>
+          <li><code>bun --cwd=apps/web run build</code> passed.</li>
+          <li><code>git diff --check</code> passed.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Verification Matrix</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Surface</th>
+              <th>Desktop</th>
+              <th>Narrow/mobile</th>
+              <th>Live head</th>
+              <th>Scroll held</th>
+              <th>History gate</th>
+              <th>Hover/detail</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Options</td>
+              <td>Passed, no page or tape horizontal overflow.</td>
+              <td>Passed at 390x844, no horizontal overflow.</td>
+              <td>Jump control present and disabled at live head.</td>
+              <td>Wheel moved internal tape scroll to 480px.</td>
+              <td>Internal virtual body can scroll: 488px client over 7920px content.</td>
+              <td>Row click opened packet contract scope band; settings popout was fixed and unclipped.</td>
+            </tr>
+            <tr>
+              <td>Flow packets</td>
+              <td>Dashboard compact module rendered 433 rows without horizontal overflow.</td>
+              <td>Passed in responsive dashboard stack.</td>
+              <td>Jump control present through durable tape feature set.</td>
+              <td>Dashboard module remained stable while the page layout changed.</td>
+              <td>Compact source reports exhausted history by design.</td>
+              <td>Row click focused the packet contract in the dashboard context rail.</td>
+            </tr>
+            <tr>
+              <td>News</td>
+              <td>Passed, no page or tape horizontal overflow.</td>
+              <td>Passed at 390x844, no horizontal overflow.</td>
+              <td>Jump control present and disabled at live head.</td>
+              <td>Wheel moved internal tape scroll to 480px.</td>
+              <td>History gate/jump state changed after held scroll.</td>
+              <td>Row click opened news detail drawer within viewport bounds.</td>
+            </tr>
+            <tr>
+              <td>Equities</td>
+              <td>Dashboard compact module rendered 500 rows without horizontal overflow.</td>
+              <td>Passed in responsive dashboard stack.</td>
+              <td>Jump control present through durable tape feature set.</td>
+              <td>Dashboard module remained stable while the page layout changed.</td>
+              <td>Compact source reports exhausted history by design.</td>
+              <td>Row click exercised ticker focus callback without layout overflow.</td>
+            </tr>
+            <tr>
+              <td>Alerts</td>
+              <td>Dashboard alert tape rendered 12 rows without horizontal overflow.</td>
+              <td>Passed in responsive dashboard stack.</td>
+              <td>Jump control not applicable to current compact alert list.</td>
+              <td>N/A for compact alert list.</td>
+              <td>N/A for compact alert list.</td>
+              <td>Row click opened alert detail drawer; focus packet, contract, and equity actions were enabled.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Browser QA</h2>
+        <ul>
+          <li>
+            Ran <code>NEXT_PUBLIC_API_URL=https://api.flow.deltaisland.io bun run dev:web</code>
+            on <code>http://localhost:3000</code>.
+          </li>
+          <li>
+            Desktop 1280x720: <code>/</code>, <code>/options</code>, and <code>/news</code> had no
+            page-level horizontal overflow and no tape-level horizontal overflow.
+          </li>
+          <li>
+            Mobile 390x844: <code>/</code>, <code>/options</code>, and <code>/news</code> had no
+            page-level horizontal overflow and no tape-level horizontal overflow.
+          </li>
+          <li>
+            Settings gear on <code>/options</code> opened a fixed-position settings panel at
+            desktop and mobile widths without clipping inside the virtual scroller.
+          </li>
+          <li>
+            Detail checks covered options packet scope, news detail drawer, dashboard flow packet
+            focus, dashboard equities ticker focus callback, and alert detail actions.
+          </li>
+          <li>
+            Browser console errors were empty during the final layout and interaction checks.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Reviewer Pass</h2>
+        <ul>
+          <li>
+            Finding disposition: no blocking behavioral or architectural findings. The route
+            composition follows the durable tape boundary: routes compose modules, domain modules
+            own detail surfaces, and shared durable tape owns scroll/history/template mechanics.
+          </li>
+          <li>
+            Repair: removed stale stylesheet selectors for deleted terminal-owned OPRA pane classes
+            (<code>.opra-options-pane</code> and <code>.opra-flow-pane</code>) so the closeout
+            does not leave dead terminal pane styling behind.
+          </li>
+          <li>
+            Reachability audit: <code>rg</code> found no remaining imports or class references for
+            <code>OptionsPane</code>, <code>FlowPane</code>, <code>NewsPane</code>,
+            <code>NewsControlRails</code>, the retired <code>data-table-*</code> hooks, or the
+            deleted OPRA pane classes.
+          </li>
+          <li>
+            Reviewer local gates were rerun after installing dependencies in the fresh review
+            worktree: focused route tests, live API tests, full <code>bun test</code>, format,
+            lint, typecheck, web build, and <code>git diff --check</code> passed.
+          </li>
+          <li>
+            Browser QA was not rerun after the reviewer repair because the changed selectors were
+            unreachable dead CSS. The worker desktop/mobile checks above remain the applicable
+            rendered-route evidence for <code>/</code>, <code>/options</code>, and
+            <code>/news</code>.
+          </li>
+          <li>
+            Forgejo CI observed before reviewer repair: Validate <code>#247</code> on
+            <code>43ad915</code> and Validate <code>#248</code> on <code>bc6d68c</code> were
+            green. The final reviewer-pushed head is verified after push and reported in the
+            orchestrator callback.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Known Follow-Ups</h2>
+        <ul>
+          <li><code>islandflow-5thp</code>: flow packet member lookup coverage.</li>
+          <li><code>islandflow-lcrs</code>: flow history API route coverage.</li>
+          <li><code>islandflow-azga</code>: same-timestamp news cursor ordering.</li>
+          <li><code>islandflow-y5fv</code>: server-side equities venue/off-exchange filters.</li>
+          <li>No same-timestamp news pagination defect was reproduced during Phase 07 browser QA.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Reviewer Caveats</h2>
+        <ul>
+          <li>
+            Flow and equities are composed into the dashboard as compact route modules; Phase 07 did
+            not add standalone <code>/flow</code> or <code>/equities</code> routes.
+          </li>
+          <li>
+            The dashboard compact flow and equities sources intentionally disable ClickHouse
+            history and settings gear; standalone production routes can enable those features with
+            their live/history source options.
+          </li>
+          <li>
+            Automated hover synthesis in the in-app browser did not expose a stable hover overlay
+            for every tape, so detail verification relied on clickable detail/focus surfaces and
+            settings popout bounds.
+          </li>
+        </ul>
+      </section>
+
+      <section id="diff-section">
+        <h2>Relevant Diff Snippets</h2>
+        <p class="meta">
+          The rich view below attempts browser-side <code>@pierre/diffs/react</code>
+          <code>PatchDiff</code>. The readable unified HTML fallback remains visible unless the
+          rich renderer succeeds.
+        </p>
+        <div id="diff-rich" class="diff-rich"></div>
+        <pre id="diff-source" class="diff-fallback">diff --git a/apps/web/app/terminal.tsx b/apps/web/app/terminal.tsx
+--- a/apps/web/app/terminal.tsx
++++ b/apps/web/app/terminal.tsx
+@@
+-import { OpraIntakeRail, OptionsPane } from "../features/terminal/components/opra";
++import { OpraIntakeRail } from "../features/terminal/components/opra";
+@@
++  const flowSource = useMemo(
++    () =&gt; createStaticFlowPacketsTapeSource(state.filteredFlow),
++    [state.filteredFlow]
++  );
++  const equitiesSource = useMemo(
++    () =&gt; createStaticEquitiesTapeSource(state.filteredEquities),
++    [state.filteredEquities]
++  );
++  const compactTapeFeatures = useMemo(
++    () =&gt;
++      [
++        "default",
++        { key: "clickhouseHistory", enabled: false },
++        { key: "settingsGear", enabled: false }
++      ] as const,
++    []
++  );
+@@
+-          &lt;OptionsPane state={state} limit={12} /&gt;
++          &lt;OptionsTape
++            className="command-contracts-tape"
++            features={compactTapeFeatures}
++            onContractFocus={state.focusOptionContract}
++            onFilterIntent={state.handleOptionFilterIntent}
++            onPacketFocus={state.focusFlowPacketRequest}
++            prints={state.filteredOptions.slice(0, 36)}
++            rowHeight={34}
++            template="half"
++          /&gt;
++          &lt;FlowPacketsTape
++            className="command-flow-tape"
++            features={compactTapeFeatures}
++            onPacketFocus={state.focusFlowPacketRequest}
++            rowHeight={40}
++            source={flowSource}
++            template="oneThird"
++          /&gt;
++          &lt;EquitiesTape
++            className="command-equities-tape"
++            features={compactTapeFeatures}
++            onTickerFocus={state.focusEquityTicker}
++            rowHeight={34}
++            source={equitiesSource}
++            template="oneThird"
++          /&gt;
+@@
+         &lt;OptionsTape
+           onContractFocus={state.focusOptionContract}
+           onFilterIntent={state.handleOptionFilterIntent}
+-          onPacketFocus={() =&gt; undefined}
++          onPacketFocus={state.focusFlowPacketRequest}
+           prints={state.filteredOptions}
+         /&gt;
+
+diff --git a/apps/web/features/equities-tape/source.ts b/apps/web/features/equities-tape/source.ts
+--- a/apps/web/features/equities-tape/source.ts
++++ b/apps/web/features/equities-tape/source.ts
+@@
++const filterStaticEquityPrints = (
++  prints: readonly EquityPrint[],
++  scope: EquitiesTapeScope | undefined,
++  filters: DurableTapeFilterState
++) =&gt;
++  prints.filter((print) =&gt; {
++    if (!matchesEquitiesTapeScope(print, scope)) {
++      return false;
++    }
++    if (!filters.includeOffExchange && print.offExchange) {
++      return false;
++    }
++    if (filters.venues.size &gt; 0 && !filters.venues.has(print.venue)) {
++      return false;
++    }
++    return true;
++  });
++
++export const createStaticEquitiesTapeSource = (
++  prints: readonly EquityPrint[]
++): DurableTapeSource&lt;EquityPrint, EquitiesTapeScope, DurableTapeFilterState&gt; =&gt; ({
++  mode: "static",
++  subscribe: ({ scope, filters, onItems }) =&gt; {
++    onItems(filterStaticEquityPrints(prints, scope, filters), { reset: true });
++    return () =&gt; undefined;
++  },
++  loadOlder: async () =&gt; ({ items: [], exhausted: true })
++});
+
+diff --git a/apps/web/features/terminal/components/opra.tsx b/apps/web/features/terminal/components/opra.tsx
+--- a/apps/web/features/terminal/components/opra.tsx
++++ b/apps/web/features/terminal/components/opra.tsx
+@@
+-export function OptionsPane(...) { ... }
+-export function FlowPane(...) { ... }
++export function OpraIntakeRail({ state }: { state: TerminalState }) {
++  const activeFlowGroups = countActiveFlowFilterGroups(state.filters.flow);
++  return (
++    &lt;div className="opra-intake-rail"&gt;
++      &lt;FlowFilterPopover
++        filters={state.filters.flow}
++        onChange={state.setFlowFilters}
++        activeGroupCount={activeFlowGroups}
++      /&gt;
++      ...
++    &lt;/div&gt;
++  );
++}
+
+diff --git a/apps/web/features/terminal/components/news.tsx b/apps/web/features/terminal/components/news.tsx
+--- a/apps/web/features/terminal/components/news.tsx
++++ b/apps/web/features/terminal/components/news.tsx
+@@
+-export function NewsPane(...) { ... }
+-export function NewsControlRails(...) { ... }
++export const getNewsWireStatus = (state: TerminalState) =&gt; { ... };
++export const openNewsStory = (state: TerminalState, story: NewsItem) =&gt; { ... };
+
+diff --git a/apps/web/app/globals.css b/apps/web/app/globals.css
+--- a/apps/web/app/globals.css
++++ b/apps/web/app/globals.css
+@@
+ .opra-options-tape {
++  height: clamp(620px, calc(100vh - var(--topbar-height) - 178px), 820px);
+   min-height: 620px;
+ }
+@@
+   grid-template-areas:
+     "priority chart levels"
+     "contracts chart health"
+-    "context replay health";
++    "flow chart health"
++    "equities context replay";
+@@
++.command-flow-tape {
++  grid-area: flow;
++  min-height: 252px;
++}
++
++.command-equities-tape {
++  grid-area: equities;
++  min-height: 230px;
++}
+@@
+-.data-table-options,
+-.data-table-flow,
+-.data-table-news {
+-  min-width: 1080px;
+-}
+
+diff --git a/apps/web/app/globals.css b/apps/web/app/globals.css
+--- a/apps/web/app/globals.css
++++ b/apps/web/app/globals.css
+@@
+-.opra-options-pane,
+-.opra-flow-pane {
+-  min-height: 620px;
+-}
+-
+ .opra-options-tape {
+   height: clamp(620px, calc(100vh - var(--topbar-height) - 178px), 820px);
+   min-height: 620px;
+ }
+@@
+   .market-command-grid &gt; .options-tape-module,
+   .market-command-grid &gt; .durable-tape,
+   .market-command-chart,
+-  .opra-options-pane,
+-  .opra-flow-pane,
+   .news-pane-full {
+     min-height: 0;
+   }
+</pre>
+      </section>
+    </main>
+    <script type="module">
+      const source = document.getElementById("diff-source")?.textContent ?? "";
+      const target = document.getElementById("diff-rich");
+      const section = document.getElementById("diff-section");
+      try {
+        const React = await import("react");
+        const { createRoot } = await import("react-dom/client");
+        const { PatchDiff } = await import("@pierre/diffs/react");
+        createRoot(target).render(React.createElement(PatchDiff, { patch: source }));
+        section.classList.add("rich-ok");
+      } catch (error) {
+        console.warn("PatchDiff render failed; leaving HTML fallback visible.", error);
+      }
+    </script>
+  </body>
+</html>

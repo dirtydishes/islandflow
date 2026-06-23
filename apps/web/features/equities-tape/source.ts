@@ -6,7 +6,11 @@ import {
   parseLivePayload
 } from "@islandflow/types";
 
-import { createDurableTapeInitialHistoryCursor, mergeNewest } from "../durable-tape";
+import {
+  createDurableTapeInitialHistoryCursor,
+  type DurableTapeSource,
+  mergeNewest
+} from "../durable-tape";
 import {
   filterEquityPrints,
   getEquitiesTapeHistoryParams,
@@ -71,6 +75,25 @@ const parseHistoryResponse = async (response: Response): Promise<EquitiesTapeHis
     data: parseEquityPrints(payload.data ?? []),
     next_before: payload.next_before ?? null
   };
+};
+
+const matchesEquitiesTapeScope = (
+  print: EquityPrint,
+  scope?: NormalizedEquitiesTapeScope
+): boolean => {
+  if (!scope?.underlyingIds?.length) {
+    return true;
+  }
+  return scope.underlyingIds.includes(print.underlying_id.toUpperCase());
+};
+
+const filterStaticEquityPrints = (
+  prints: readonly EquityPrint[],
+  scope?: NormalizedEquitiesTapeScope,
+  filters?: NormalizedEquitiesTapeFilters
+): EquityPrint[] => {
+  const scoped = prints.filter((print) => matchesEquitiesTapeScope(print, scope));
+  return filterEquityPrints(scoped, filters);
 };
 
 export const loadEquitiesTapeHistoryPage = async ({
@@ -233,4 +256,18 @@ export const createEquitiesTapeSource = (options: EquitiesTapeSourceOptions = {}
       filters?: NormalizedEquitiesTapeFilters;
     }
   ) => loadEquitiesTapeHistoryPage({ cursor, scope, filters, options })
+});
+
+export const createStaticEquitiesTapeSource = (
+  prints: readonly EquityPrint[]
+): DurableTapeSource<EquityPrint, NormalizedEquitiesTapeScope, NormalizedEquitiesTapeFilters> => ({
+  subscribe: ({ scope, filters }) => ({
+    getSnapshot: () => filterStaticEquityPrints(prints, scope, filters),
+    listen: (listener) => {
+      listener(filterStaticEquityPrints(prints, scope, filters));
+      return () => {};
+    },
+    unsubscribe: () => {}
+  }),
+  loadOlder: async () => ({ items: [], nextCursor: null, exhausted: true })
 });
