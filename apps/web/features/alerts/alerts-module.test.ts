@@ -14,6 +14,7 @@ import {
   deriveAlertDirection,
   getAlertCursor,
   getAlertKey,
+  getAlertName,
   inferAlertUnderlying,
   normalizeAlertSeverity
 } from "./format";
@@ -106,6 +107,9 @@ describe("alerts module helpers", () => {
     expect(normalizeAlertSeverity(makeAlert({ severity: "custom", score: 90 }))).toBe("high");
     expect(deriveAlertDirection(makeAlert())).toBe("bullish");
     expect(deriveAlertDirection(makeAlert({ hits: [] }))).toBe("neutral");
+    expect(getAlertName(makeAlert({ hits: [], primary_profile_id: "event_driven" }))).toBe(
+      "Event Driven"
+    );
   });
 
   it("owns alert context paths and evidence resolution", () => {

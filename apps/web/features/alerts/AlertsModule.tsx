@@ -93,6 +93,7 @@ export const AlertDetail = ({
   const evidencePrints = hydration.evidence.filter(
     (item): item is Extract<AlertEvidenceItem, { kind: "print" }> => item.kind === "print"
   );
+  const hiddenEvidencePrintCount = Math.max(0, evidencePrints.length - 6);
   const unresolved = hydration.evidence.filter((item) => item.kind === "unknown");
   const actionPrint = getActionPrint(hydration.evidence);
   const packet = hydration.flowPacket;
@@ -107,7 +108,7 @@ export const AlertDetail = ({
       <div className="alerts-detail-head">
         <div>
           <span>Alert detail</span>
-          <h3>{primary ? humanizeAlertClassifierId(primary.classifier_id) : "Classifier alert"}</h3>
+          <h3>{getAlertName(alert)}</h3>
           <p>{formatAlertDateTime(alert.source_ts)}</p>
         </div>
         <div className="alerts-detail-score">
@@ -231,6 +232,9 @@ export const AlertDetail = ({
             ))}
           </div>
         )}
+        {hiddenEvidencePrintCount > 0 ? (
+          <p className="drawer-empty">+{hiddenEvidencePrintCount} more evidence prints.</p>
+        ) : null}
         {unresolved.length > 0 ? (
           <p className="drawer-empty">
             Unresolved refs:{" "}

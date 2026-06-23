@@ -137,7 +137,7 @@ export const getAlertCursor = (alert: AlertEvent) => ({
 });
 
 export const getAlertName = (alert: AlertEvent): string =>
-  humanizeAlertClassifierId(alert.hits[0]?.classifier_id);
+  humanizeAlertClassifierId(alert.hits[0]?.classifier_id ?? alert.primary_profile_id);
 
 export const getAlertKind = (alert: AlertEvent): string =>
   humanizeAlertClassifierId(alert.hits[0]?.classifier_id ?? alert.primary_profile_id);

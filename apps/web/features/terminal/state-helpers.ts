@@ -1,5 +1,4 @@
 import type {
-  AlertEvent,
   ClassifierHitEvent,
   EquityPrintJoin,
   FlowPacket,
@@ -149,20 +148,6 @@ export type EvidenceItem =
   | { kind: "flow"; id: string; packet: FlowPacket }
   | { kind: "print"; id: string; print: OptionPrint }
   | { kind: "unknown"; id: string };
-
-export type AlertContextBundle = {
-  alert: AlertEvent | null;
-  flow_packets: FlowPacket[];
-  option_prints: OptionPrint[];
-  missing_refs: string[];
-};
-
-export type AlertContextStatus = {
-  traceId: string | null;
-  loading: boolean;
-  missingRefs: string[];
-  error: string | null;
-};
 
 export type DarkEvidenceItem =
   | { kind: "join"; id: string; join: EquityPrintJoin }

@@ -3163,6 +3163,7 @@ h3 {
   color: var(--text-dim);
   font-size: 0.78rem;
   line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .alerts-detail-score {

@@ -228,7 +228,7 @@
         <h2>Verification</h2>
         <ul>
           <li><code>bun install</code> was required in this fresh worktree before tests resolved workspace packages.</li>
-          <li><code>bun test apps/web/features/alerts/alerts-module.test.ts</code> passed: 4 tests, 19 assertions.</li>
+          <li><code>bun test apps/web/features/alerts/alerts-module.test.ts</code> passed: 4 tests, 20 assertions.</li>
           <li><code>bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code> passed: 94 tests, 209 assertions.</li>
           <li><code>bun run fmt:check</code> passed.</li>
           <li><code>bun run lint</code> passed.</li>
@@ -247,12 +247,42 @@
           <li>
             Desktop 1440x900: dashboard rendered 12 alert rows in the alert tape, opened the alert
             detail drawer from a row, showed focus packet/contract/equity actions, hydrated flow
-            packet and evidence prints, and had no horizontal overflow.
+            packet and evidence prints, used <code>overflow-wrap: anywhere</code> for long packet
+            text, and had no horizontal overflow.
           </li>
           <li>
             Mobile 390x844: dashboard rendered 12 alert rows after responsive layout settled,
             opened the detail drawer, showed all three focus actions, and had no horizontal
             overflow.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Reviewer Findings And Repairs</h2>
+        <ul>
+          <li>
+            Removed the obsolete terminal-owned <code>AlertDrawer</code> and terminal
+            <code>AlertContextStatus</code>/<code>AlertContextBundle</code> types, leaving the
+            selected-alert drawer path owned by <code>apps/web/features/alerts</code>.
+          </li>
+          <li>
+            Repaired alert detail naming for alerts that have <code>primary_profile_id</code> but no
+            classifier hits. The helper now falls back to the alert profile family, with focused
+            test coverage.
+          </li>
+          <li>
+            Repaired detail evidence accounting by showing the count of hidden evidence prints when
+            more than six prints are attached.
+          </li>
+          <li>
+            Repaired a no-horizontal-scroll risk by allowing long packet IDs and ref strings in
+            alert detail paragraphs to wrap anywhere.
+          </li>
+          <li>
+            Callback contracts were reviewed and left intact: packet focus uses the Phase 03
+            <code>FlowPacketFocusRequest</code>, contract focus delegates through the existing
+            options focus path, and equity focus remains a typed alert adapter.
           </li>
         </ul>
       </section>
@@ -301,6 +331,10 @@ new file mode 100644
 --- /dev/null
 +++ b/apps/web/features/alerts/AlertsModule.tsx
 @@
++        {hiddenEvidencePrintCount &gt; 0 ? (
++          &lt;p className="drawer-empty"&gt;+{hiddenEvidencePrintCount} more evidence prints.&lt;/p&gt;
++        ) : null}
++
 +export const AlertDetailDrawer = ({
 +  alert,
 +  flowPacketById,
@@ -336,6 +370,8 @@ diff --git a/apps/web/features/terminal/components/drawers.tsx b/apps/web/featur
 --- a/apps/web/features/terminal/components/drawers.tsx
 +++ b/apps/web/features/terminal/components/drawers.tsx
 @@
+-export const AlertDrawer = (...) =&gt; { ... }
+-
 -      &lt;AlertDrawer
 +      &lt;AlertDetailDrawer
          alert={state.selectedAlert}
