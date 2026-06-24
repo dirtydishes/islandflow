@@ -307,7 +307,10 @@
             <tr>
               <td><code>bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code></td>
               <td class="status-ok">pass</td>
-              <td>98 tests passed, including the durable route manifest and legacy route coverage.</td>
+              <td>
+                99 tests passed, including durable route manifest coverage, legacy route coverage,
+                and reviewer coverage for durable-row scope resets.
+              </td>
             </tr>
             <tr>
               <td><code>bun --cwd=apps/web run build</code></td>
@@ -330,6 +333,62 @@
                 Hosted API is pre-Phase-05, so options and alerts used raw fallback. Alert detail
                 exposed severity, direction, refs, packet focus, contract focus, equity focus, and
                 evidence prints.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Reviewer Closeout</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Finding</th>
+              <th>Disposition</th>
+              <th>Evidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                The API row-composition helpers were embedded inside <code>services/api/src/live.ts</code>,
+                making an already-large live-state module own row semantics, cell formatting, evidence
+                summaries, and fanout orchestration at the same time.
+              </td>
+              <td class="status-ok">repaired</td>
+              <td>
+                Extracted the row composer into <code>services/api/src/durable-rows.ts</code>. The
+                live manager now owns cache windows and delegates snapshot/event composition through a
+                small interface.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                The durable-row live buffer was not reset when the scoped <code>durable-rows</code>
+                subscription key changed, so filtered or focused server rows could remain visible until
+                the next snapshot arrived.
+              </td>
+              <td class="status-ok">repaired</td>
+              <td>
+                Added <code>durable-rows</code> to the reset-channel set and covered the scope-change
+                behavior in <code>apps/web/app/terminal.test.ts</code>.
+              </td>
+            </tr>
+            <tr>
+              <td>Lane-specific row parsing still used the union row schema with explicit casts.</td>
+              <td class="status-ok">repaired</td>
+              <td>
+                Switched the composer to <code>DurableTapeOptionRowViewModelSchema</code> and
+                <code>DurableTapeAlertRowViewModelSchema</code> so parser output and return types agree.
+              </td>
+            </tr>
+            <tr>
+              <td>Remaining review findings</td>
+              <td class="status-ok">none blocking</td>
+              <td>
+                No remaining structural blocker was found after repairs. Production server-row smoke is
+                still Phase 06 scope because hosted API is pre-Phase-05.
               </td>
             </tr>
           </tbody>
@@ -441,7 +500,79 @@ diff --git a/apps/web/app/terminal.tsx b/apps/web/app/terminal.tsx
 +    return &lt;DurableTapeOptionRowsPane rows={pane.rowViewModels} /&gt;;
 +  }
 +
-+  return &lt;OptionsTape prints={pane.prints} decorByTraceId={pane.decorByTraceId} /&gt;;</pre>
++  return &lt;OptionsTape prints={pane.prints} decorByTraceId={pane.decorByTraceId} /&gt;;
+diff --git a/services/api/src/durable-rows.ts b/services/api/src/durable-rows.ts
+new file mode 100644
+--- /dev/null
++++ b/services/api/src/durable-rows.ts
+@@
++export type DurableRowCompositionContext = {
++  alerts: AlertEvent[];
++  flowPackets: FlowPacket[];
++  optionPrints: OptionPrint[];
++  nbbo: OptionNBBO[];
++  classifierHits: ClassifierHitEvent[];
++  smartMoney: SmartMoneyEvent[];
++};
++export const composeDurableRowSnapshot = (
++  subscription: DurableRowsSubscription,
++  context: DurableRowCompositionContext,
++  configuredLimit: number
++): FeedSnapshot&lt;unknown&gt; =&gt; {
++  /* rows are composed in the API boundary, outside LiveStateManager */
++};
++export const composeDurableRowsForEvent = (
++  subscription: DurableRowsSubscription,
++  channel: LiveChannel,
++  item: unknown,
++  context: DurableRowCompositionContext,
++  configuredLimit: number
++): DurableTapeRowViewModel[] =&gt; {
++  /* raw live events fan out as bounded composed row deltas */
++};
+diff --git a/services/api/src/live.ts b/services/api/src/live.ts
+--- a/services/api/src/live.ts
++++ b/services/api/src/live.ts
+@@
++  private getDurableRowSnapshot(subscription: DurableRowsSubscription): FeedSnapshot&lt;unknown&gt; {
++    return composeDurableRowSnapshot(
++      subscription,
++      this.getDurableRowCompositionContext(),
++      this.durableRowsConfiguredLimit()
++    );
++  }
+diff --git a/apps/web/features/terminal/live.ts b/apps/web/features/terminal/live.ts
+--- a/apps/web/features/terminal/live.ts
++++ b/apps/web/features/terminal/live.ts
+@@
++type LiveSubscriptionResetChannel =
++  | "options"
++  | "equities"
++  | "durable-rows"
++  | "equity-candles"
++  | "equity-overlay";
+@@
++    if (resetScopedChannels.has("durable-rows")) {
++      durableRowsRef.current = [];
++      durableRowsHistoryRef.current = [];
++      liveBuffers.durableRows.reset([]);
++      setDurableRows([]);
++      setDurableRowsHistory([]);
++    }
+diff --git a/apps/web/app/terminal.test.ts b/apps/web/app/terminal.test.ts
+--- a/apps/web/app/terminal.test.ts
++++ b/apps/web/app/terminal.test.ts
+@@
++  it("resets server-composed durable rows when their scope changes", () =&gt; {
++    const current = getLiveManifest("/durable-tapes", "SPY", 60_000, buildDefaultFlowFilters());
++    const next = getLiveManifest("/durable-tapes", "SPY", 60_000, buildDefaultFlowFilters(), {
++      underlying_ids: ["SPY"]
++    });
++    expect(Array.from(getLiveSubscriptionResetChannels(current, next)).sort()).toEqual([
++      "durable-rows",
++      "options"
++    ]);
++  });</pre>
         </div>
         <script type="text/plain" id="diff-source">diff --git a/packages/types/src/durable-tapes.ts b/packages/types/src/durable-tapes.ts
 new file mode 100644
@@ -524,7 +655,79 @@ diff --git a/apps/web/app/terminal.tsx b/apps/web/app/terminal.tsx
 +    return &lt;DurableTapeOptionRowsPane rows={pane.rowViewModels} /&gt;;
 +  }
 +
-+  return &lt;OptionsTape prints={pane.prints} decorByTraceId={pane.decorByTraceId} /&gt;;</script>
++  return &lt;OptionsTape prints={pane.prints} decorByTraceId={pane.decorByTraceId} /&gt;;
+diff --git a/services/api/src/durable-rows.ts b/services/api/src/durable-rows.ts
+new file mode 100644
+--- /dev/null
++++ b/services/api/src/durable-rows.ts
+@@
++export type DurableRowCompositionContext = {
++  alerts: AlertEvent[];
++  flowPackets: FlowPacket[];
++  optionPrints: OptionPrint[];
++  nbbo: OptionNBBO[];
++  classifierHits: ClassifierHitEvent[];
++  smartMoney: SmartMoneyEvent[];
++};
++export const composeDurableRowSnapshot = (
++  subscription: DurableRowsSubscription,
++  context: DurableRowCompositionContext,
++  configuredLimit: number
++): FeedSnapshot&lt;unknown&gt; =&gt; {
++  /* rows are composed in the API boundary, outside LiveStateManager */
++};
++export const composeDurableRowsForEvent = (
++  subscription: DurableRowsSubscription,
++  channel: LiveChannel,
++  item: unknown,
++  context: DurableRowCompositionContext,
++  configuredLimit: number
++): DurableTapeRowViewModel[] =&gt; {
++  /* raw live events fan out as bounded composed row deltas */
++};
+diff --git a/services/api/src/live.ts b/services/api/src/live.ts
+--- a/services/api/src/live.ts
++++ b/services/api/src/live.ts
+@@
++  private getDurableRowSnapshot(subscription: DurableRowsSubscription): FeedSnapshot&lt;unknown&gt; {
++    return composeDurableRowSnapshot(
++      subscription,
++      this.getDurableRowCompositionContext(),
++      this.durableRowsConfiguredLimit()
++    );
++  }
+diff --git a/apps/web/features/terminal/live.ts b/apps/web/features/terminal/live.ts
+--- a/apps/web/features/terminal/live.ts
++++ b/apps/web/features/terminal/live.ts
+@@
++type LiveSubscriptionResetChannel =
++  | "options"
++  | "equities"
++  | "durable-rows"
++  | "equity-candles"
++  | "equity-overlay";
+@@
++    if (resetScopedChannels.has("durable-rows")) {
++      durableRowsRef.current = [];
++      durableRowsHistoryRef.current = [];
++      liveBuffers.durableRows.reset([]);
++      setDurableRows([]);
++      setDurableRowsHistory([]);
++    }
+diff --git a/apps/web/app/terminal.test.ts b/apps/web/app/terminal.test.ts
+--- a/apps/web/app/terminal.test.ts
++++ b/apps/web/app/terminal.test.ts
+@@
++  it("resets server-composed durable rows when their scope changes", () =&gt; {
++    const current = getLiveManifest("/durable-tapes", "SPY", 60_000, buildDefaultFlowFilters());
++    const next = getLiveManifest("/durable-tapes", "SPY", 60_000, buildDefaultFlowFilters(), {
++      underlying_ids: ["SPY"]
++    });
++    expect(Array.from(getLiveSubscriptionResetChannels(current, next)).sort()).toEqual([
++      "durable-rows",
++      "options"
++    ]);
++  });</script>
       </section>
     </main>
     <script type="module">

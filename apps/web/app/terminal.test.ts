@@ -498,6 +498,18 @@ describe("live manifest", () => {
     ]);
     expect(Array.from(getLiveSubscriptionResetChannels(current, current))).toEqual([]);
   });
+
+  it("resets server-composed durable rows when their scope changes", () => {
+    const current = getLiveManifest("/durable-tapes", "SPY", 60_000, buildDefaultFlowFilters());
+    const next = getLiveManifest("/durable-tapes", "SPY", 60_000, buildDefaultFlowFilters(), {
+      underlying_ids: ["SPY"]
+    });
+
+    expect(Array.from(getLiveSubscriptionResetChannels(current, next)).sort()).toEqual([
+      "durable-rows",
+      "options"
+    ]);
+  });
 });
 
 describe("contract-focused option helpers", () => {
