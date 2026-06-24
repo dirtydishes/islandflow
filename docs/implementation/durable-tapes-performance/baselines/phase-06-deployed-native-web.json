@@ -1,0 +1,599 @@
+{
+  "schemaVersion": 1,
+  "probe": "durable-tapes-cdp",
+  "targetUrl": "https://flow.deltaisland.io/durable-tapes",
+  "startedAt": "2026-06-24T07:09:46.339Z",
+  "endedAt": "2026-06-24T07:13:16.601Z",
+  "durationMs": 180000,
+  "warmupMs": 30000,
+  "browser": {
+    "name": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "cdp": "launched"
+  },
+  "budgets": {
+    "profile": "durable-tapes-3m-v1",
+    "baseDurationMs": 180000,
+    "failOnBudget": true,
+    "passed": false,
+    "results": [
+      {
+        "name": "total network requests",
+        "actual": 9415,
+        "limit": 500,
+        "pass": false,
+        "unit": "requests"
+      },
+      {
+        "name": "/lookup/options-support requests",
+        "actual": 4268,
+        "limit": 150,
+        "pass": false,
+        "unit": "requests"
+      },
+      {
+        "name": "/option-prints/by-trace requests",
+        "actual": 2134,
+        "limit": 150,
+        "pass": false,
+        "unit": "requests"
+      },
+      {
+        "name": "aborted requests",
+        "actual": 7257,
+        "limit": 20,
+        "pass": false,
+        "unit": "requests"
+      },
+      {
+        "name": "aborted support/evidence requests",
+        "actual": 4256,
+        "limit": 8,
+        "pass": false,
+        "unit": "requests"
+      },
+      {
+        "name": "support/evidence error responses",
+        "actual": 0,
+        "limit": 20,
+        "pass": true,
+        "unit": "responses"
+      },
+      {
+        "name": "support/evidence HTML responses",
+        "actual": 0,
+        "limit": 0,
+        "pass": true,
+        "unit": "responses"
+      },
+      {
+        "name": "support/evidence non-JSON responses",
+        "actual": 0,
+        "limit": 0,
+        "pass": true,
+        "unit": "responses"
+      },
+      {
+        "name": "CDP TaskDuration delta",
+        "actual": 30.159837999999997,
+        "limit": 45,
+        "pass": true,
+        "unit": "seconds"
+      },
+      {
+        "name": "CDP ScriptDuration delta",
+        "actual": 26.961213,
+        "limit": 35,
+        "pass": true,
+        "unit": "seconds"
+      },
+      {
+        "name": "JSHeapUsedSize delta",
+        "actual": 51309752,
+        "limit": 131072000,
+        "pass": true,
+        "unit": "bytes"
+      },
+      {
+        "name": "DOM node count",
+        "actual": 1895,
+        "limit": 35000,
+        "pass": true,
+        "unit": "nodes"
+      },
+      {
+        "name": "visible durable pane count",
+        "actual": 5,
+        "limit": 5,
+        "pass": true,
+        "unit": "minimum panes"
+      },
+      {
+        "name": "visible durable row count",
+        "actual": 70,
+        "limit": 1,
+        "pass": true,
+        "unit": "minimum rows"
+      },
+      {
+        "name": "visible durable options row count",
+        "actual": 20,
+        "limit": 1,
+        "pass": true,
+        "unit": "minimum rows"
+      },
+      {
+        "name": "visible durable alerts row count",
+        "actual": 15,
+        "limit": 1,
+        "pass": true,
+        "unit": "minimum rows"
+      }
+    ]
+  },
+  "metrics": {
+    "totalNetworkRequestCount": 9415,
+    "optionsSupportRequestCount": 4268,
+    "optionPrintsByTraceRequestCount": 2134,
+    "abortedRequestCount": 7257,
+    "abortedEndpointRequestCount": 4256,
+    "supportEvidenceStatusDistribution": {
+      "optionsSupport": {
+        "200": 1,
+        "204": 985
+      },
+      "optionPrintsByTrace": {
+        "200": 10
+      }
+    },
+    "supportEvidenceOriginDistribution": {
+      "optionsSupport": {
+        "https://api.flow.deltaisland.io": 986
+      },
+      "optionPrintsByTrace": {
+        "https://api.flow.deltaisland.io": 10
+      }
+    },
+    "supportEvidenceContentTypeDistribution": {
+      "optionsSupport": {
+        "unknown": 985,
+        "application/json": 1
+      },
+      "optionPrintsByTrace": {
+        "application/json": 10
+      }
+    },
+    "supportEvidenceErrorResponses": 0,
+    "supportEvidenceHtmlResponseCount": 0,
+    "supportEvidenceNonJsonResponseCount": 0,
+    "supportEvidenceLatencyMs": {
+      "optionsSupport": {
+        "count": 1,
+        "min": 130.91799995163456,
+        "p50": 130.91799995163456,
+        "p95": 130.91799995163456,
+        "max": 130.91799995163456,
+        "avg": 130.91799995163456
+      },
+      "optionPrintsByTrace": {
+        "count": 10,
+        "min": 76.50899997679517,
+        "p50": 115.70300004677847,
+        "p95": 545.1319999992847,
+        "max": 545.1319999992847,
+        "avg": 188.1152999936603
+      }
+    },
+    "websocketFrameCount": 2661,
+    "websocketReceivedFrameCount": 2661,
+    "websocketSentFrameCount": 0,
+    "websocketBytes": 1758277,
+    "websocketReceivedBytes": 1758277,
+    "websocketSentBytes": 0,
+    "websocketErrorCount": 0,
+    "topRequests": [
+      {
+        "request": "GET https://api.flow.deltaisland.io/option-prints/by-trace",
+        "count": 2134
+      },
+      {
+        "request": "OPTIONS https://api.flow.deltaisland.io/lookup/options-support",
+        "count": 2134
+      },
+      {
+        "request": "POST https://api.flow.deltaisland.io/lookup/options-support",
+        "count": 2134
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AJPM-2026-06-25-70-P%3A1782285149173%3A1782285149173",
+        "count": 225
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AGEN-2026-08-08-170-P%3A1782285099965%3A1782285100015",
+        "count": 203
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3ATMUS-2026-07-22-400-P%3A1782285095961%3A1782285095961",
+        "count": 202
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AGEN-2026-08-08-STRUCT-straddle%3A1782285099500%3AGEN-2026-08-08-170-C%7CGEN-2026-08-08-170-P",
+        "count": 200
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AGEN-2026-08-08-STRUCT-straddle%3A1782285073500%3AGEN-2026-08-08-170-C%7CGEN-2026-08-08-170-P",
+        "count": 191
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3ATDY-2026-07-22-STRUCT-vertical%3A1782285152000%3ATDY-2026-07-22-280-C%7CTDY-2026-07-22-300-C",
+        "count": 191
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AAMZN-2026-07-08-250-P%3A1782285091934%3A1782285091934",
+        "count": 180
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3ALRCX-2026-06-24-32.5-C%3A1782285122041%3A1782285122046",
+        "count": 176
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3ATMUS-2026-07-22-400-P%3A1782285111004%3A1782285111004",
+        "count": 166
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3ATDY-2026-07-22-STRUCT-vertical%3A1782285168000%3ATDY-2026-07-22-280-C%7CTDY-2026-07-22-300-C",
+        "count": 159
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3ATDY-2026-08-08-STRUCT-vertical%3A1782285147000%3ATDY-2026-08-08-280-C%7CTDY-2026-08-08-300-C",
+        "count": 144
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AAAPL-2026-07-01-290-C%3A1782285123040%3A1782285123040",
+        "count": 143
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3ATDY-2026-07-22-280-C%3A1782285168228%3A1782285168248",
+        "count": 140
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3ABSX-2026-07-22-85-C%3A1782285114026%3A1782285114026",
+        "count": 133
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AGEN-2026-08-08-STRUCT-straddle%3A1782285146000%3AGEN-2026-08-08-170-C%7CGEN-2026-08-08-170-P",
+        "count": 117
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AGEN-2026-07-22-STRUCT-straddle%3A1782285135000%3AGEN-2026-07-22-170-C%7CGEN-2026-07-22-170-P",
+        "count": 114
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AJPM-2026-06-25-70-P%3A1782285050766%3A1782285050781",
+        "count": 50
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AADI-2026-07-22-67.5-P%3A1782285057799%3A1782285057799",
+        "count": 47
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3ATDY-2026-07-22-STRUCT-vertical%3A1782285192000%3ATDY-2026-07-22-280-C%7CTDY-2026-07-22-300-C",
+        "count": 34
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AGEN-2026-08-08-STRUCT-straddle%3A1782285029500%3AGEN-2026-08-08-170-C%7CGEN-2026-08-08-170-P",
+        "count": 23
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3ATDY-2026-08-08-STRUCT-vertical%3A1782285052500%3ATDY-2026-08-08-280-C%7CTDY-2026-08-08-300-C",
+        "count": 21
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AADI-2026-07-22-67.5-P%3A1782285039744%3A1782285039744",
+        "count": 19
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AGEN-2026-08-08-170-P%3A1782285023723%3A1782285023723",
+        "count": 11
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AGEN-2026-08-08-STRUCT-straddle%3A1782285023500%3AGEN-2026-08-08-170-C%7CGEN-2026-08-08-170-P",
+        "count": 11
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3ATDY-2026-07-22-STRUCT-vertical%3A1782285037500%3ATDY-2026-07-22-280-C%7CTDY-2026-07-22-300-C",
+        "count": 11
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AGEN-2026-08-08-STRUCT-straddle%3A1782285019500%3AGEN-2026-08-08-170-C%7CGEN-2026-08-08-170-P",
+        "count": 10
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3ATDY-2026-07-22-280-C%3A1782285037728%3A1782285037778",
+        "count": 10
+      }
+    ],
+    "endpointFailures": [],
+    "cdp": {
+      "start": {
+        "taskDurationSeconds": 4.630239,
+        "scriptDurationSeconds": 3.945062,
+        "jsHeapUsedSizeBytes": 51271100,
+        "domNodeCount": 1781
+      },
+      "end": {
+        "taskDurationSeconds": 34.790077,
+        "scriptDurationSeconds": 30.906275,
+        "jsHeapUsedSizeBytes": 102580852,
+        "domNodeCount": 1895
+      },
+      "delta": {
+        "taskDurationSeconds": 30.159837999999997,
+        "scriptDurationSeconds": 26.961213,
+        "jsHeapUsedSizeBytes": 51309752,
+        "domNodeCount": 1895
+      }
+    },
+    "sanity": {
+      "routePresent": true,
+      "pageTitle": "Durable Tapes",
+      "visibleDurablePaneCount": 5,
+      "visibleRowCount": 70,
+      "paneRows": [
+        {
+          "key": "options",
+          "title": "Options Tape",
+          "visible": true,
+          "rowCount": 20
+        },
+        {
+          "key": "flow",
+          "title": "Flow Packets",
+          "visible": true,
+          "rowCount": 20
+        },
+        {
+          "key": "equities",
+          "title": "Equities Tape",
+          "visible": true,
+          "rowCount": 15
+        },
+        {
+          "key": "alerts",
+          "title": "Alerts",
+          "visible": true,
+          "rowCount": 15
+        },
+        {
+          "key": "news",
+          "title": "News Wire",
+          "visible": true,
+          "rowCount": 0
+        }
+      ],
+      "bodyTextSample": "SKIP TO TERMINAL CONTENT MENU TICKER CLEAR REPLAY QA DURABLE TAPES VIEW signal prints SETTINGS OPTIONS TAPE ^ LIVE TIME CONTRACT PREMIUM SIDE 03:13:15 AM JNJ 8/8 510C $23.3K A 03:13:13 AM MSCI 7/8 370C $36.6K A 03:13:13 AM MSCI 7/8 370C $41.5K A 03:13:12 AM TDY 7/22 300C $22.7K A 03:13:12 AM TDY 7/22 280C $20.9K A 03:13:12 AM TDY 7/22 280C $22.7K A 03:13:12 AM TDY 7/22 300C $21.8K A 03:13:11 AM NVDA 6/25 290C $23.9K A 03:13:11 AM NVDA 6/25 290C $29.1K A 03:13:11 AM NVDA 6/25 290C $26.0K A 03:13:"
+    }
+  },
+  "warmupMetrics": {
+    "totalNetworkRequestCount": 1076,
+    "optionsSupportRequestCount": 642,
+    "optionPrintsByTraceRequestCount": 332,
+    "abortedRequestCount": 712,
+    "abortedEndpointRequestCount": 637,
+    "supportEvidenceStatusDistribution": {
+      "optionsSupport": {
+        "200": 1,
+        "204": 150
+      },
+      "optionPrintsByTrace": {
+        "200": 13
+      }
+    },
+    "supportEvidenceOriginDistribution": {
+      "optionsSupport": {
+        "https://api.flow.deltaisland.io": 151
+      },
+      "optionPrintsByTrace": {
+        "https://api.flow.deltaisland.io": 13
+      }
+    },
+    "supportEvidenceContentTypeDistribution": {
+      "optionsSupport": {
+        "unknown": 150,
+        "application/json": 1
+      },
+      "optionPrintsByTrace": {
+        "application/json": 13
+      }
+    },
+    "supportEvidenceErrorResponses": 0,
+    "supportEvidenceHtmlResponseCount": 0,
+    "supportEvidenceNonJsonResponseCount": 0,
+    "supportEvidenceLatencyMs": {
+      "optionsSupport": {
+        "count": 1,
+        "min": 372.71700002020225,
+        "p50": 372.71700002020225,
+        "p95": 372.71700002020225,
+        "max": 372.71700002020225,
+        "avg": 372.71700002020225
+      },
+      "optionPrintsByTrace": {
+        "count": 13,
+        "min": 47.46200004592538,
+        "p50": 122.76999995810911,
+        "p95": 324.61399998283014,
+        "max": 324.61399998283014,
+        "avg": 132.29707692069218
+      }
+    },
+    "websocketFrameCount": 501,
+    "websocketReceivedFrameCount": 500,
+    "websocketSentFrameCount": 1,
+    "websocketBytes": 4018995,
+    "websocketReceivedBytes": 4018435,
+    "websocketSentBytes": 560,
+    "websocketErrorCount": 0,
+    "topRequests": [
+      {
+        "request": "GET https://api.flow.deltaisland.io/option-prints/by-trace",
+        "count": 332
+      },
+      {
+        "request": "OPTIONS https://api.flow.deltaisland.io/lookup/options-support",
+        "count": 321
+      },
+      {
+        "request": "POST https://api.flow.deltaisland.io/lookup/options-support",
+        "count": 321
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AGEV-2026-08-08-STRUCT-straddle%3A1782284995500%3AGEV-2026-08-08-180-C%7CGEV-2026-08-08-180-P",
+        "count": 12
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3ATEL-2026-08-08-STRUCT-vertical%3A1782284988500%3ATEL-2026-08-08-300-C%7CTEL-2026-08-08-320-C",
+        "count": 12
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AIWM-2026-06-24-280-P%3A1782284991578%3A1782284991593",
+        "count": 11
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AGEV-2026-08-08-180-C%3A1782284995630%3A1782284995630",
+        "count": 10
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3ATEL-2026-08-08-STRUCT-vertical%3A1782284986500%3ATEL-2026-08-08-300-C%7CTEL-2026-08-08-320-C",
+        "count": 7
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AGEV-2026-08-08-STRUCT-straddle%3A1782284993500%3AGEV-2026-08-08-180-C%7CGEV-2026-08-08-180-P",
+        "count": 6
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AMSI-2026-07-22-195-C%3A1782284972517%3A1782284972517",
+        "count": 6
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3ATDY-2026-07-22-STRUCT-vertical%3A1782285001500%3ATDY-2026-07-22-280-C%7CTDY-2026-07-22-300-C",
+        "count": 6
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3ABSX-2026-08-08-82.5-P%3A1782285002632%3A1782285002632",
+        "count": 1
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AGEV-2026-08-08-180-P%3A1782284993611%3A1782284993611",
+        "count": 1
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AJCI-2026-06-25-140-P%3A1782284989553%3A1782284989573",
+        "count": 1
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AJCI-2026-06-25-140-P%3A1782284999632%3A1782284999637",
+        "count": 1
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AJPM-2026-06-25-70-P%3A1782285012664%3A1782285012689",
+        "count": 1
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AMETA-2026-07-08-260-P%3A1782284990571%3A1782284990576",
+        "count": 1
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AMSCI-2026-07-01-370-C%3A1782285008634%3A1782285008649",
+        "count": 1
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AMSI-2026-07-01-195-C%3A1782284997618%3A1782284997618",
+        "count": 1
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AMSI-2026-07-22-195-C%3A1782285009650%3A1782285009670",
+        "count": 1
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3ATDY-2026-07-22-280-C%3A1782285001644%3A1782285001664",
+        "count": 1
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3ATEL-2026-08-08-300-C%3A1782284986560%3A1782284986580",
+        "count": 1
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3ATEL-2026-08-08-320-C%3A1782284986555%3A1782284986575",
+        "count": 1
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AWDAY-2026-06-25-260-C%3A1782284992571%3A1782284992611",
+        "count": 1
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AWDAY-2026-06-25-260-C%3A1782284994617%3A1782284994642",
+        "count": 1
+      },
+      {
+        "request": "GET https://flow.deltaisland.io/_next/static/chunks/0~w.he59a6gni.js",
+        "count": 1
+      },
+      {
+        "request": "GET https://flow.deltaisland.io/_next/static/chunks/00infp1ksdl2r.css",
+        "count": 1
+      },
+      {
+        "request": "GET https://flow.deltaisland.io/_next/static/chunks/0d.4jn22m8at6.js",
+        "count": 1
+      },
+      {
+        "request": "GET https://flow.deltaisland.io/_next/static/chunks/0fnywxqicx-zn.js",
+        "count": 1
+      },
+      {
+        "request": "GET https://flow.deltaisland.io/_next/static/chunks/0h2xvijbs4u58.js",
+        "count": 1
+      }
+    ],
+    "endpointFailures": []
+  },
+  "initialSanity": {
+    "routePresent": true,
+    "pageTitle": "Durable Tapes",
+    "visibleDurablePaneCount": 5,
+    "visibleRowCount": 0,
+    "paneRows": [
+      {
+        "key": "options",
+        "title": "Options Tape",
+        "visible": true,
+        "rowCount": 0
+      },
+      {
+        "key": "flow",
+        "title": "Flow Packets",
+        "visible": true,
+        "rowCount": 0
+      },
+      {
+        "key": "equities",
+        "title": "Equities Tape",
+        "visible": true,
+        "rowCount": 0
+      },
+      {
+        "key": "alerts",
+        "title": "Alerts",
+        "visible": true,
+        "rowCount": 0
+      },
+      {
+        "key": "news",
+        "title": "News Wire",
+        "visible": true,
+        "rowCount": 0
+      }
+    ],
+    "bodyTextSample": "Skip to terminal content Menu TickerClear Replay QA Durable Tapes Viewsignal prints Settings Options Tape ^Live CONTRACTPREMIUM Flow Packets ^Live CONTRACTPREMIUM Equities Tape ^Live TICKERPX Alerts ^Live SYMBOLSTATE Wireconnectingwaiting Stories0all symbols Historyscroll gatelive only Sourceswaiting Symbolsunmapped Stateall0mapped0unmapped0updated0resetclear News Wire ^Live Headline Waiting for live news stories."
+  }
+}

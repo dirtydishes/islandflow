@@ -18,6 +18,26 @@ const parseBoundedInt = (
   return Math.max(min, Math.min(max, Math.floor(parsed)));
 };
 
+const parseBooleanFlag = (value: string | undefined, fallback: boolean): boolean => {
+  if (!value || value.trim().length === 0) {
+    return fallback;
+  }
+  switch (value.trim().toLowerCase()) {
+    case "1":
+    case "true":
+    case "yes":
+    case "on":
+      return true;
+    case "0":
+    case "false":
+    case "no":
+    case "off":
+      return false;
+    default:
+      return fallback;
+  }
+};
+
 export const LIVE_HOT_WINDOW = parseBoundedInt(
   process.env.NEXT_PUBLIC_LIVE_HOT_WINDOW,
   600,
@@ -31,6 +51,10 @@ export const LIVE_HOT_WINDOW_OPTIONS = parseBoundedInt(
   100000
 );
 export const LIVE_OPTIONS_HEAD_LIMIT = 100;
+export const DURABLE_TAPES_RAW_FALLBACK_ENABLED = parseBooleanFlag(
+  process.env.NEXT_PUBLIC_DURABLE_TAPES_RAW_FALLBACK,
+  false
+);
 export const LIVE_HISTORY_SOFT_CAP = parseBoundedInt(
   process.env.NEXT_PUBLIC_LIVE_HISTORY_SOFT_CAP,
   5000,
@@ -102,6 +126,10 @@ export const getTapeVirtualConfig = (pane: TapeVirtualPane): TapeVirtualListConf
 export const shouldIncludeEquitiesForDarkUnderlyingFallback = (): boolean => {
   return false;
 };
+
+export const isDurableTapesRawFallbackEnabled = (
+  value = process.env.NEXT_PUBLIC_DURABLE_TAPES_RAW_FALLBACK
+): boolean => parseBooleanFlag(value, false);
 
 export const isSyntheticAdminVisible = (value = process.env.NEXT_PUBLIC_SYNTHETIC_ADMIN): boolean =>
   value === "1";

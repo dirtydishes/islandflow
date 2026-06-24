@@ -39,6 +39,7 @@ const {
   buildTerminalLowerPaneInput,
   buildTerminalMarketChartHoverRowProvider,
   buildTerminalMarketChartMarkers,
+  buildDurableTapesRouteFeatures,
   buildOptionTapeQueryParams,
   classifierToneForFamily,
   collectAlertContextEvidence,
@@ -423,20 +424,19 @@ describe("live manifest", () => {
     ).toEqual(["news"]);
   });
 
-  it("subscribes /durable-tapes to every composed tape feed without chart feeds", () => {
+  it("subscribes /durable-tapes to server rows and non-decorated tape feeds by default", () => {
     const filters = buildDefaultFlowFilters();
     const manifest = getLiveManifest("/durable-tapes", "SPY", 60000, filters);
     const channels = manifest.map((subscription) => subscription.channel);
 
-    expect(channels).toEqual(["options", "durable-rows", "equities", "flow", "news", "alerts"]);
-    expect(manifest.find((subscription) => subscription.channel === "options")?.filters).toBe(
-      filters
-    );
+    expect(channels).toEqual(["durable-rows", "equities", "flow", "news"]);
     expect(manifest.find((subscription) => subscription.channel === "durable-rows")).toMatchObject({
       lanes: ["options", "alerts"],
       filters
     });
     expect(manifest.find((subscription) => subscription.channel === "flow")?.filters).toBe(filters);
+    expect(channels).not.toContain("options");
+    expect(channels).not.toContain("alerts");
     expect(channels).not.toContain("nbbo");
     expect(channels).not.toContain("classifier-hits");
     expect(channels).not.toContain("equity-candles");
@@ -498,10 +498,7 @@ describe("live manifest", () => {
       underlying_ids: ["SPY"]
     });
 
-    expect(Array.from(getLiveSubscriptionResetChannels(current, next)).sort()).toEqual([
-      "durable-rows",
-      "options"
-    ]);
+    expect(Array.from(getLiveSubscriptionResetChannels(current, next))).toEqual(["durable-rows"]);
   });
 });
 
@@ -688,11 +685,25 @@ describe("route feature map", () => {
     expect(features.showEquitiesPane).toBe(true);
     expect(features.showNewsPane).toBe(true);
     expect(features.showAlertsPane).toBe(true);
+    expect(features.options).toBe(false);
+    expect(features.alerts).toBe(false);
     expect(features.durableRows).toBe(true);
     expect(features.needsClassifierDecor).toBe(false);
     expect(features.needsAlertEvidencePrefetch).toBe(false);
     expect(features.showChartPane).toBe(false);
     expect(features.equityCandles).toBe(false);
+  });
+
+  it("can enable raw durable-tapes fallback subscriptions when explicitly requested", () => {
+    const features = buildDurableTapesRouteFeatures(true);
+
+    expect(features.options).toBe(true);
+    expect(features.alerts).toBe(true);
+    expect(features.durableRows).toBe(true);
+    expect(features.showOptionsPane).toBe(true);
+    expect(features.showAlertsPane).toBe(true);
+    expect(features.needsClassifierDecor).toBe(false);
+    expect(features.needsAlertEvidencePrefetch).toBe(false);
   });
 });
 

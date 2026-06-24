@@ -113,7 +113,8 @@ export {
   getRouteFeatures,
   getTerminalNavCurrentHref,
   NAV_ITEMS,
-  normalizeTerminalPathname
+  normalizeTerminalPathname,
+  buildDurableTapesRouteFeatures
 } from "../features/terminal/routes";
 export { shallowEqualTerminalSelection } from "../features/terminal/state";
 export {

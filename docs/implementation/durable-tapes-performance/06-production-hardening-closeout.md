@@ -50,6 +50,38 @@ Production verification:
 - Verify support/evidence endpoints respond from the expected host.
 - Record final numbers in the phase turn document and Beads closeout.
 
+## Implemented Guardrails
+
+- Browser/CDP probe reports now include support/evidence origin distribution, content-type distribution, HTML/non-JSON response counts, endpoint latency summaries, and options/alerts pane row sanity budgets.
+- Production smoke command:
+
+```bash
+bun run scripts/probes/durable-tapes-production-smoke.ts \
+  --output=docs/implementation/durable-tapes-performance/baselines/phase-06-production-smoke.json
+```
+
+- Durable-tapes raw options/alerts fallback is disabled by default. Set `NEXT_PUBLIC_DURABLE_TAPES_RAW_FALLBACK=1` only when an incident requires reverting to the raw options/alerts channels while server-composed durable rows are unavailable.
+- API latency visibility now includes `api.lookup.options_support_ms` for `/lookup/options-support`, matching the existing `/option-prints/by-trace` timing coverage.
+
+## 2026-06-24 Production Evidence
+
+Saved evidence:
+
+- `baselines/phase-06-production-smoke.json`
+- `baselines/phase-06-deployed-native-web.json`
+- `turn-docs/2026-06-24-phase-06-production-hardening-closeout.html`
+
+Current deployed native evidence is not good enough to close the phase:
+
+- Production smoke passes native web route, API origin routing, API health, and `/lookup/options-support` latency.
+- Production smoke fails durable-row websocket support because `wss://api.flow.deltaisland.io/ws/live` rejects `channel: "durable-rows"` with `invalid_union_discriminator`.
+- Production smoke fails the `/option-prints/by-trace` miss latency budget at 5635 ms against a 5000 ms smoke limit.
+- The 180s deployed CDP probe still fails request budgets: 9415 total network requests, 4268 `/lookup/options-support` requests, 2134 `/option-prints/by-trace` requests, and 4256 aborted support/evidence requests.
+
+Follow-up blocker: `islandflow-ze79.11`.
+
+Do not close `islandflow-ze79.7`, `islandflow-ba9q`, or `islandflow-ze79` until native API/web deployment includes durable-row live support and the saved smoke/probe evidence passes.
+
 ## Acceptance Criteria
 
 - Production smoke catches bad public API routing.
