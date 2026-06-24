@@ -29,6 +29,8 @@ bun test apps/web/scripts/dev-config.test.ts services/api/tests/cors.test.ts
 
 ## Implementation Subagents
 
+Run this phase through the full topology in `IMPLEMENT.md` when useful: selector agent, 6-10 read-only scout agents, one implementation worker, 3-6 review agents, and one lead reviewer. Use scouts to divide discovery before edits; keep one worker responsible for every scrubbed reference.
+
 The Phase 01 worker may use helper subagents to divide the scrub safely before editing.
 
 Good helper targets:

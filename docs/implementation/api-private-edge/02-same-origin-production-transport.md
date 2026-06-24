@@ -33,6 +33,8 @@ bun run scripts/probes/durable-tapes-production-smoke.ts --target=<production-ap
 
 ## Implementation Subagents
 
+Run this phase through the full topology in `IMPLEMENT.md` when useful: selector agent, 6-10 read-only scout agents, one implementation worker, 3-6 review agents, and one lead reviewer. Use scouts for transport inventory and reviewers for route-contract, frontend, and deployment checks after the PR.
+
 The Phase 02 worker may use helper subagents for parallel transport and edge-contract review.
 
 Good helper targets:

@@ -563,10 +563,48 @@
 
       <section id="subagents" aria-labelledby="subagents-title">
         <div class="section-head">
-          <div class="label">Worker-owned fanout</div>
-          <h2 id="subagents-title">Many helpers, one implementation owner</h2>
-          <p>Implementation workers may use bounded subagents when a phase has broad inspection, testing, or review surface. Helpers increase coverage; they do not split ownership.</p>
+          <div class="label">Implementation swarm topology</div>
+          <h2 id="subagents-title">Selector, scouts, worker, reviewers</h2>
+          <p>Broad phases can use many bounded helpers around one accountable implementation owner. Helpers increase coverage; they do not split ownership.</p>
         </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Stage</th>
+              <th>Delegation shape</th>
+              <th>Owner and exit</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Selector agent</td>
+              <td>Picks the next ready <code>islandflow-hnbk.*</code> issue from Beads after reading the implementation index and phase doc.</td>
+              <td>Reports the next ready task, dependency state, safe parallelism, and blocking contracts.</td>
+            </tr>
+            <tr>
+              <td>Scout swarm, 6-10 read-only agents</td>
+              <td>Inspects different slices in parallel: repo hostname/default inventory, web transport URL builders, API route and websocket inventory, NPM/deployment helper behavior, live server/env baseline, test coverage gaps, security/threat-model review, and docs/probe references.</td>
+              <td>Returns findings only. Scouts do not edit files, update Beads, create branches, commit, push, open PRs, or contact the orchestrator independently.</td>
+            </tr>
+            <tr>
+              <td>Single implementation worker</td>
+              <td>Owns the branch, edits, tests, commit, PR, Beads state, phase turn doc, and callback.</td>
+              <td>Uses scout outputs as inputs, resolves conflicts, and calls back once when complete, PR-ready, or genuinely blocked.</td>
+            </tr>
+            <tr>
+              <td>Review swarm, 3-6 agents</td>
+              <td>Runs bounded review after the PR or worker callback: security reviewer, deployment reviewer, frontend transport reviewer, API/rate-limit reviewer, docs/Beads reviewer, and CI/log reviewer.</td>
+              <td>Produces findings and safe repair recommendations without widening the phase.</td>
+            </tr>
+            <tr>
+              <td>One lead reviewer</td>
+              <td>Consolidates review-swarm findings, performs safe repairs, waits for CI/local gates, and updates the existing phase turn doc.</td>
+              <td>Calls back once when review, repairs, gates, Beads state, and push state are resolved.</td>
+            </tr>
+          </tbody>
+        </table>
+
         <div class="grid">
           <div class="panel">
             <h3>1. One owner</h3>

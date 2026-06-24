@@ -40,6 +40,8 @@ bun test services/api/tests
 
 ## Implementation Subagents
 
+Run this phase through the full topology in `IMPLEMENT.md` when useful: selector agent, 6-10 read-only scout agents, one implementation worker, 3-6 review agents, and one lead reviewer. Use scouts for route/security inventory and reviewers for threat model, API behavior, and log/metric privacy.
+
 The Phase 03 worker may use helper subagents to pressure-test the rate-limit design before implementation.
 
 Good helper targets:
