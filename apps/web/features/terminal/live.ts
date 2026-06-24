@@ -1109,12 +1109,15 @@ export const useLiveSession = (
     liveBuffers.chartCandles.reset([]);
     liveBuffers.chartOverlay.reset([]);
   };
-  const clearPendingEventBatches = (): void => {
-    pendingEventBatchesRef.current.clear();
+  const cancelScheduledEventFlush = (): void => {
     if (eventFlushHandleRef.current !== null) {
       cancelAnimationFrame(eventFlushHandleRef.current);
       eventFlushHandleRef.current = null;
     }
+  };
+  const clearPendingEventBatches = (): void => {
+    pendingEventBatchesRef.current.clear();
+    cancelScheduledEventFlush();
   };
   const replaceArrayState = <T>(
     setter: Dispatch<SetStateAction<T[]>>,
@@ -1452,7 +1455,7 @@ export const useLiveSession = (
     };
 
     const flushPendingEventBatches = () => {
-      eventFlushHandleRef.current = null;
+      cancelScheduledEventFlush();
       const batches = Array.from(pendingEventBatchesRef.current.values());
       pendingEventBatchesRef.current.clear();
       if (batches.length === 0) {
@@ -1509,6 +1512,7 @@ export const useLiveSession = (
         return;
       }
 
+      flushPendingEventBatches();
       const updateAt = Date.now();
       const applied = applySubscriptionItems(
         message.snapshot.subscription,

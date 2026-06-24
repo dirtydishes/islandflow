@@ -246,6 +246,10 @@
             <span class="meta-label">Follow-up</span>
             <code>islandflow-ze79.9</code>
           </div>
+          <div class="meta-cell">
+            <span class="meta-label">Review follow-up</span>
+            <code>islandflow-ze79.10</code>
+          </div>
         </div>
       </header>
 
@@ -362,6 +366,17 @@
           </thead>
           <tbody>
             <tr>
+              <td>
+                <code
+                  >bun x biome check apps/web/features/durable-tape/live-window-buffer.ts
+                  apps/web/features/durable-tape/live-window-buffer.test.ts
+                  apps/web/features/terminal/live.ts apps/web/features/terminal/tape.ts
+                  apps/web/features/durable-tape/index.ts</code
+                >
+              </td>
+              <td class="status-ok">pass</td>
+            </tr>
+            <tr>
               <td><code>bun test apps/web/features/durable-tape apps/web/features/terminal</code></td>
               <td class="status-ok">pass, 46 tests</td>
             </tr>
@@ -381,6 +396,28 @@
             </tr>
           </tbody>
         </table>
+      </section>
+
+      <section>
+        <h2>Reviewer Pass</h2>
+        <ul>
+          <li>
+            Thermo-nuclear review found one in-scope ordering issue: frame-batched event messages
+            could remain queued when a later websocket snapshot arrived, allowing older events to
+            apply after the snapshot instead of before it.
+          </li>
+          <li>
+            Repaired <code>useLiveSession</code> so snapshot handling first drains any pending
+            event batches and cancels the scheduled animation-frame flush. This preserves websocket
+            message order while keeping burst coalescing for ordinary event traffic.
+          </li>
+          <li>
+            Filed <code>islandflow-ze79.10</code> for the structural debt that remains out of this
+            phase's safe mechanics scope: extracting the oversized live-session channel registry,
+            buffer reset policy, and event batching policy out of
+            <code>apps/web/features/terminal/live.ts</code>.
+          </li>
+        </ul>
       </section>
 
       <section>
@@ -462,6 +499,8 @@ diff --git a/apps/web/features/terminal/live.ts b/apps/web/features/terminal/liv
 +  }
 +  scheduleEventFlush();
 +};
++// Snapshot messages drain queued events first so websocket order stays intact.
++flushPendingEventBatches();
 diff --git a/apps/web/features/durable-tape/live-window-buffer.test.ts b/apps/web/features/durable-tape/live-window-buffer.test.ts
 new file mode 100644
 --- /dev/null
@@ -546,6 +585,8 @@ diff --git a/apps/web/features/terminal/live.ts b/apps/web/features/terminal/liv
 +  }
 +  scheduleEventFlush();
 +};
++// Snapshot messages drain queued events first so websocket order stays intact.
++flushPendingEventBatches();
 diff --git a/apps/web/features/durable-tape/live-window-buffer.test.ts b/apps/web/features/durable-tape/live-window-buffer.test.ts
 new file mode 100644
 --- /dev/null
