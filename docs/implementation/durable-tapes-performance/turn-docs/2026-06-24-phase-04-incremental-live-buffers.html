@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Durable Tapes Performance Phase 04: Incremental Live Buffers</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "../../../../node_modules/react/index.js",
+          "react-dom/client": "../../../../node_modules/react-dom/client.js",
+          "@pierre/diffs/react": "../../../../node_modules/@pierre/diffs/dist/react/index.js"
+        }
+      }
+    </script>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #111820;
+        --panel-2: #0d141b;
+        --line: rgba(230, 237, 244, 0.14);
+        --line-strong: rgba(245, 166, 35, 0.36);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --green: #25c17a;
+        --red: #ff6b5f;
+        --blue: #4da3ff;
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: linear-gradient(180deg, #0b1016 0%, var(--bg) 100%);
+        color: var(--text);
+        font: 15px/1.55 var(--sans);
+      }
+
+      main {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+
+      header {
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 960px;
+        font-size: 2rem;
+        line-height: 1.08;
+        letter-spacing: 0;
+        text-wrap: balance;
+      }
+
+      h2,
+      .eyebrow,
+      .meta-label,
+      code,
+      pre,
+      table {
+        font-family: var(--mono);
+      }
+
+      h2 {
+        margin-bottom: 10px;
+        color: var(--accent);
+        font-size: 0.9rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .eyebrow {
+        margin-bottom: 8px;
+        color: var(--accent);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .subtitle {
+        max-width: 86ch;
+        margin-top: 12px;
+        color: var(--muted);
+      }
+
+      .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 1px;
+        margin-top: 18px;
+        border: 1px solid var(--line);
+        background: var(--line);
+      }
+
+      .meta-cell {
+        min-width: 0;
+        padding: 10px 12px;
+        background: var(--panel);
+      }
+
+      .meta-label {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--faint);
+        font-size: 0.66rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      section {
+        padding: 20px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      p + p {
+        margin-top: 10px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 7px;
+      }
+
+      code {
+        padding: 0.08rem 0.28rem;
+        border: 1px solid rgba(245, 166, 35, 0.18);
+        border-radius: 5px;
+        background: rgba(245, 166, 35, 0.1);
+        color: #ffe0a3;
+        font-size: 0.9em;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        font-size: 0.78rem;
+      }
+
+      th,
+      td {
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+      }
+
+      th {
+        color: var(--accent);
+        background: var(--panel-2);
+      }
+
+      td {
+        background: var(--panel);
+      }
+
+      .status-ok {
+        color: var(--green);
+      }
+
+      .status-note {
+        color: var(--blue);
+      }
+
+      .status-risk {
+        color: var(--red);
+      }
+
+      .diff-shell {
+        display: grid;
+        gap: 12px;
+      }
+
+      #rich-diff {
+        min-height: 32px;
+      }
+
+      #fallback-diff {
+        max-height: 620px;
+        overflow: auto;
+        margin: 0;
+        padding: 12px;
+        border: 1px solid var(--line);
+        background: var(--panel-2);
+        color: var(--text);
+        font-size: 0.76rem;
+        line-height: 1.45;
+      }
+
+      .rich-diff-ready #fallback-diff {
+        display: none;
+      }
+
+      .diff-note {
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="eyebrow">Phase 04 · June 24, 2026</div>
+        <h1>Incremental Live Buffers</h1>
+        <p class="subtitle">
+          Replaced the durable-tapes live-session hot update path with keyed bounded buffers and
+          frame-batched websocket event application. Snapshot resets still preserve the existing
+          cursor and reset behavior, while event batches now upsert into per-channel buffers before
+          updating React state.
+        </p>
+        <div class="meta-grid">
+          <div class="meta-cell">
+            <span class="meta-label">Beads issue</span>
+            <code>islandflow-ze79.5</code>
+          </div>
+          <div class="meta-cell">
+            <span class="meta-label">Branch</span>
+            <code>lavender/ze79-phase-04-incremental-live-buffers</code>
+          </div>
+          <div class="meta-cell">
+            <span class="meta-label">Probe output</span>
+            <code>baselines/phase-04-local-hosted-api.json</code>
+          </div>
+          <div class="meta-cell">
+            <span class="meta-label">Follow-up</span>
+            <code>islandflow-ze79.9</code>
+          </div>
+          <div class="meta-cell">
+            <span class="meta-label">Review follow-up</span>
+            <code>islandflow-ze79.10</code>
+          </div>
+        </div>
+      </header>
+
+      <section>
+        <h2>Implementation</h2>
+        <ul>
+          <li>
+            Added <code>createLiveWindowBuffer</code>, a keyed bounded window that hides duplicate
+            handling, ordered insertion, snapshot rebuilds, and overflow eviction.
+          </li>
+          <li>
+            Added parity tests covering insertion, duplicate update, out-of-order input, reset,
+            eviction, trim callbacks, and equal-cursor batch stability.
+          </li>
+          <li>
+            Replaced the durable-tapes live-session event path's
+            <code>mergeNewestWithOverflow</code> calls with per-channel buffers for options, NBBO,
+            equities, flow, alerts, news, inferred dark, chart, and evidence channels.
+          </li>
+          <li>
+            Batched websocket event messages by subscription until the next animation frame, then
+            applied each batch through the same buffers and committed last-event state once per
+            frame instead of once per message.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Probe Result</h2>
+        <p>
+          The hosted-API probe still exits red because <code>ScriptDuration</code> is above the 35s
+          budget, but the CPU profile improved from Phase 03. The remaining script miss is tracked
+          as <code>islandflow-ze79.9</code>.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Phase 03</th>
+              <th>Phase 04</th>
+              <th>Delta</th>
+              <th>Budget</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Total requests</td>
+              <td>322</td>
+              <td>372</td>
+              <td>+50</td>
+              <td class="status-ok">pass, limit 500</td>
+            </tr>
+            <tr>
+              <td>Support requests</td>
+              <td>80</td>
+              <td>96</td>
+              <td>+16</td>
+              <td class="status-ok">pass, limit 150</td>
+            </tr>
+            <tr>
+              <td>By-trace requests</td>
+              <td>122</td>
+              <td>132</td>
+              <td>+10</td>
+              <td class="status-ok">pass, limit 150</td>
+            </tr>
+            <tr>
+              <td>Aborted requests</td>
+              <td>0</td>
+              <td>0</td>
+              <td>0</td>
+              <td class="status-ok">pass, limit 20</td>
+            </tr>
+            <tr>
+              <td>TaskDuration</td>
+              <td>44.782346s</td>
+              <td>40.631954s</td>
+              <td>-4.150392s</td>
+              <td class="status-ok">pass, limit 45s</td>
+            </tr>
+            <tr>
+              <td>ScriptDuration</td>
+              <td>41.651870s</td>
+              <td>37.319653s</td>
+              <td>-4.332217s</td>
+              <td class="status-risk">fail, limit 35s</td>
+            </tr>
+            <tr>
+              <td>JS heap delta</td>
+              <td>30.9 MB</td>
+              <td>61.4 MB</td>
+              <td>+30.4 MB</td>
+              <td class="status-ok">pass, limit 128 MB</td>
+            </tr>
+            <tr>
+              <td>Visible panes / rows</td>
+              <td>5 / 70</td>
+              <td>5 / 70</td>
+              <td>unchanged</td>
+              <td class="status-ok">pass</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Quality Gates</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Gate</th>
+              <th>Result</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <code
+                  >bun x biome check apps/web/features/durable-tape/live-window-buffer.ts
+                  apps/web/features/durable-tape/live-window-buffer.test.ts
+                  apps/web/features/terminal/live.ts apps/web/features/terminal/tape.ts
+                  apps/web/features/durable-tape/index.ts</code
+                >
+              </td>
+              <td class="status-ok">pass</td>
+            </tr>
+            <tr>
+              <td><code>bun test apps/web/features/durable-tape apps/web/features/terminal</code></td>
+              <td class="status-ok">pass, 46 tests</td>
+            </tr>
+            <tr>
+              <td><code>bun test apps/web/app/terminal.test.ts</code></td>
+              <td class="status-ok">pass, 93 tests</td>
+            </tr>
+            <tr>
+              <td><code>bun --cwd=apps/web run build</code></td>
+              <td class="status-ok">pass</td>
+            </tr>
+            <tr>
+              <td><code>bun run scripts/probes/durable-tapes-perf.ts ...</code></td>
+              <td class="status-risk">
+                fail only on ScriptDuration, with TaskDuration and request budgets passing
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Reviewer Pass</h2>
+        <ul>
+          <li>
+            Thermo-nuclear review found one in-scope ordering issue: frame-batched event messages
+            could remain queued when a later websocket snapshot arrived, allowing older events to
+            apply after the snapshot instead of before it.
+          </li>
+          <li>
+            Repaired <code>useLiveSession</code> so snapshot handling first drains any pending
+            event batches and cancels the scheduled animation-frame flush. This preserves websocket
+            message order while keeping burst coalescing for ordinary event traffic.
+          </li>
+          <li>
+            Filed <code>islandflow-ze79.10</code> for the structural debt that remains out of this
+            phase's safe mechanics scope: extracting the oversized live-session channel registry,
+            buffer reset policy, and event batching policy out of
+            <code>apps/web/features/terminal/live.ts</code>.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p class="diff-note">
+          Focused excerpts are rendered with browser-side <code>PatchDiff</code> from
+          <code>@pierre/diffs/react</code>. The unified fallback remains visible if the rich
+          renderer cannot load.
+        </p>
+        <div class="diff-shell">
+          <div id="rich-diff"></div>
+          <pre id="fallback-diff">diff --git a/apps/web/features/durable-tape/live-window-buffer.ts b/apps/web/features/durable-tape/live-window-buffer.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/durable-tape/live-window-buffer.ts
+@@ -0,0 +1,34 @@
++export type LiveWindowSnapshot = {
++  items: unknown[];
++  evicted: unknown[];
++};
++
++export type LiveWindowBuffer = {
++  upsertMany(items): LiveWindowSnapshot;
++  reset(items): LiveWindowSnapshot;
++  getSnapshot(): LiveWindowSnapshot;
++};
++
++export function createLiveWindowBuffer(options = {}) {
++  const itemsByKey = new Map();
++  const orderedKeys = [];
++  let snapshotItems = [];
++  // Maintains keyed rows, ordered ids, duplicate handling, and bounded eviction.
++}
+diff --git a/apps/web/features/terminal/live.ts b/apps/web/features/terminal/live.ts
+--- a/apps/web/features/terminal/live.ts
++++ b/apps/web/features/terminal/live.ts
+@@ -35,7 +35,8 @@
+   appendHistoryTail,
+   composeTapeItems,
++  createLiveWindowBuffer,
+   mergeNewest,
+-  mergeNewestWithOverflow,
+ } from "./tape";
++import type { LiveWindowBuffer } from "../durable-tape";
+@@ -1042,6 +1065,15 @@
+   const subscribedKeysRef = useRef(new Set());
+   const subscribedMapRef = useRef(new Map());
++  const pendingEventBatchesRef = useRef(new Map());
++  const eventFlushHandleRef = useRef(null);
++  const liveBuffersRef = useRef(null);
++  if (liveBuffersRef.current === null) {
++    liveBuffersRef.current = {
++      options: createLiveWindowBuffer({ limit: LIVE_OPTIONS_HEAD_LIMIT, onTrim }),
++      flow: createLiveWindowBuffer({ limit: LIVE_HOT_WINDOW, onTrim })
++    };
++  }
+@@ -1205,14 +1301,7 @@
+-  const { kept, evicted } = mergeNewestWithOverflow(
+-    nextItems,
+-    ref.current,
+-    retentionLimit,
+-    (evictedCount) => incrementRetentionMetric("hotWindowEvictions", evictedCount)
+-  );
++  const { items: kept, evicted } = buffer.upsertMany(nextItems);
+   replaceArrayState(setter, ref, kept);
+@@ -1450,6 +1530,23 @@
++const queueEvent = (subscription, item) => {
++  const subscriptionKey = getLiveSubscriptionKey(subscription);
++  const current = pendingEventBatchesRef.current.get(subscriptionKey);
++  if (current) {
++    current.items.push(item);
++    current.updateAt = Date.now();
++  } else {
++    pendingEventBatchesRef.current.set(subscriptionKey, {
++      subscription,
++      items: [item],
++      updateAt: Date.now()
++    });
++  }
++  scheduleEventFlush();
++};
++// Snapshot messages drain queued events first so websocket order stays intact.
++flushPendingEventBatches();
+diff --git a/apps/web/features/durable-tape/live-window-buffer.test.ts b/apps/web/features/durable-tape/live-window-buffer.test.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/durable-tape/live-window-buffer.test.ts
+@@ -0,0 +1,12 @@
++describe("live window buffer", () => {
++  it("inserts newer rows without changing merge semantics", () => {});
++  it("uses incoming duplicate updates by key", () => {});
++  it("keeps out-of-order incoming rows in newest-first order", () => {});
++  it("resets from unsorted rows with the same bounded ordering as merge", () => {});
++  it("evicts overflow rows and reports trims", () => {});
++  it("preserves incoming batch order for equal cursors", () => {});
++});</pre>
+        </div>
+        <script type="text/plain" id="diff-source">diff --git a/apps/web/features/durable-tape/live-window-buffer.ts b/apps/web/features/durable-tape/live-window-buffer.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/durable-tape/live-window-buffer.ts
+@@ -0,0 +1,34 @@
++export type LiveWindowSnapshot = {
++  items: unknown[];
++  evicted: unknown[];
++};
++
++export type LiveWindowBuffer = {
++  upsertMany(items): LiveWindowSnapshot;
++  reset(items): LiveWindowSnapshot;
++  getSnapshot(): LiveWindowSnapshot;
++};
++
++export function createLiveWindowBuffer(options = {}) {
++  const itemsByKey = new Map();
++  const orderedKeys = [];
++  let snapshotItems = [];
++  // Maintains keyed rows, ordered ids, duplicate handling, and bounded eviction.
++}
+diff --git a/apps/web/features/terminal/live.ts b/apps/web/features/terminal/live.ts
+--- a/apps/web/features/terminal/live.ts
++++ b/apps/web/features/terminal/live.ts
+@@ -35,7 +35,8 @@
+   appendHistoryTail,
+   composeTapeItems,
++  createLiveWindowBuffer,
+   mergeNewest,
+-  mergeNewestWithOverflow,
+ } from "./tape";
++import type { LiveWindowBuffer } from "../durable-tape";
+@@ -1042,6 +1065,15 @@
+   const subscribedKeysRef = useRef(new Set());
+   const subscribedMapRef = useRef(new Map());
++  const pendingEventBatchesRef = useRef(new Map());
++  const eventFlushHandleRef = useRef(null);
++  const liveBuffersRef = useRef(null);
++  if (liveBuffersRef.current === null) {
++    liveBuffersRef.current = {
++      options: createLiveWindowBuffer({ limit: LIVE_OPTIONS_HEAD_LIMIT, onTrim }),
++      flow: createLiveWindowBuffer({ limit: LIVE_HOT_WINDOW, onTrim })
++    };
++  }
+@@ -1205,14 +1301,7 @@
+-  const { kept, evicted } = mergeNewestWithOverflow(
+-    nextItems,
+-    ref.current,
+-    retentionLimit,
+-    (evictedCount) => incrementRetentionMetric("hotWindowEvictions", evictedCount)
+-  );
++  const { items: kept, evicted } = buffer.upsertMany(nextItems);
+   replaceArrayState(setter, ref, kept);
+@@ -1450,6 +1530,23 @@
++const queueEvent = (subscription, item) => {
++  const subscriptionKey = getLiveSubscriptionKey(subscription);
++  const current = pendingEventBatchesRef.current.get(subscriptionKey);
++  if (current) {
++    current.items.push(item);
++    current.updateAt = Date.now();
++  } else {
++    pendingEventBatchesRef.current.set(subscriptionKey, {
++      subscription,
++      items: [item],
++      updateAt: Date.now()
++    });
++  }
++  scheduleEventFlush();
++};
++// Snapshot messages drain queued events first so websocket order stays intact.
++flushPendingEventBatches();
+diff --git a/apps/web/features/durable-tape/live-window-buffer.test.ts b/apps/web/features/durable-tape/live-window-buffer.test.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/durable-tape/live-window-buffer.test.ts
+@@ -0,0 +1,12 @@
++describe("live window buffer", () => {
++  it("inserts newer rows without changing merge semantics", () => {});
++  it("uses incoming duplicate updates by key", () => {});
++  it("keeps out-of-order incoming rows in newest-first order", () => {});
++  it("resets from unsorted rows with the same bounded ordering as merge", () => {});
++  it("evicts overflow rows and reports trims", () => {});
++  it("preserves incoming batch order for equal cursors", () => {});
++});</script>
+      </section>
+    </main>
+    <script type="module">
+      const target = document.getElementById("rich-diff");
+      const source = document.getElementById("diff-source")?.textContent ?? "";
+
+      try {
+        const [{ createElement }, { createRoot }, { PatchDiff }] = await Promise.all([
+          import("react"),
+          import("react-dom/client"),
+          import("@pierre/diffs/react")
+        ]);
+        createRoot(target).render(createElement(PatchDiff, { patch: source }));
+        document.body.classList.add("rich-diff-ready");
+      } catch (error) {
+        target.textContent = "Rich diff renderer unavailable; using fallback below.";
+        console.warn("PatchDiff render failed", error);
+      }
+    </script>
+  </body>
+</html>
