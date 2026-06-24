@@ -263,10 +263,7 @@ export const DurableTapeOptionRowsPane = ({
   const source = useStaticRowSource(rows);
 
   return (
-    <section
-      className={`options-tape-module ${className ?? ""}`.trim()}
-      data-row-source="server"
-    >
+    <section className={`options-tape-module ${className ?? ""}`.trim()} data-row-source="server">
       <DurableTape
         ariaLabel={title}
         className="options-tape options-tape-mode-global"
@@ -358,7 +355,9 @@ const ALERT_ROW_TEMPLATES: DurableTapeTemplate<AlertRowColumnId>[] = [
 ];
 
 const renderAlertStateCell = (row: DurableTapeAlertRowViewModel): ReactNode => (
-  <span className={`alerts-state alerts-state-${row.alert.severity} direction-${row.alert.direction}`}>
+  <span
+    className={`alerts-state alerts-state-${row.alert.severity} direction-${row.alert.direction}`}
+  >
     {row.alert.severity} / {row.alert.direction}
   </span>
 );
@@ -417,7 +416,9 @@ const renderAlertDetail = (row: DurableTapeAlertRowViewModel) => (
       {row.evidence.primary_packet ? (
         <div className="alerts-detail-row">
           <div>
-            <strong>{row.evidence.primary_packet.option_contract_id ?? row.evidence.primary_packet.id}</strong>
+            <strong>
+              {row.evidence.primary_packet.option_contract_id ?? row.evidence.primary_packet.id}
+            </strong>
             <span>{row.evidence.primary_packet.member_count} prints</span>
           </div>
           <p>{row.evidence.primary_packet.id}</p>

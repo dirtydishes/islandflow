@@ -1103,7 +1103,10 @@ const run = async () => {
 
     if (matchingSubscriptions.length === 0) {
       if (matchedDurableRowSubscriptions > 0) {
-        metrics.count("api.live.durable_row_subscription_match_count", matchedDurableRowSubscriptions);
+        metrics.count(
+          "api.live.durable_row_subscription_match_count",
+          matchedDurableRowSubscriptions
+        );
       }
       return;
     }
@@ -1162,7 +1165,10 @@ const run = async () => {
       metrics.count("api.live.subscription_match_count", matchedSubscriptions);
     }
     if (matchedDurableRowSubscriptions > 0) {
-      metrics.count("api.live.durable_row_subscription_match_count", matchedDurableRowSubscriptions);
+      metrics.count(
+        "api.live.durable_row_subscription_match_count",
+        matchedDurableRowSubscriptions
+      );
     }
   };
 

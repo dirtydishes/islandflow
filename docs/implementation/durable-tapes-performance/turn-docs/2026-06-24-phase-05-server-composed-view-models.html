@@ -300,6 +300,32 @@
           </thead>
           <tbody>
             <tr>
+              <td><code>bun run fmt:check</code></td>
+              <td class="status-ok">pass after reviewer repair</td>
+              <td>
+                Forgejo run #281 failed at this gate. Reviewer repair ran
+                <code>bun run fmt</code>, then verified Biome format check locally.
+              </td>
+            </tr>
+            <tr>
+              <td><code>bun run lint</code></td>
+              <td class="status-ok">pass</td>
+              <td>Biome lint completed with no fixes applied.</td>
+            </tr>
+            <tr>
+              <td><code>bun run typecheck</code></td>
+              <td class="status-ok">pass after reviewer repair</td>
+              <td>
+                Typecheck caught the derived <code>durable-rows</code> channel flowing through the
+                raw-channel freshness helper; reviewer repair narrowed that branch explicitly.
+              </td>
+            </tr>
+            <tr>
+              <td><code>bun test</code></td>
+              <td class="status-ok">pass</td>
+              <td>460 tests passed across 76 files.</td>
+            </tr>
+            <tr>
               <td><code>bun test packages/types services/api/tests packages/storage/tests</code></td>
               <td class="status-ok">pass</td>
               <td>100 tests passed across shared types, API tests, and storage tests.</td>
@@ -316,6 +342,16 @@
               <td><code>bun --cwd=apps/web run build</code></td>
               <td class="status-ok">pass</td>
               <td>Next.js production build completed successfully.</td>
+            </tr>
+            <tr>
+              <td><code>bun run check:public-api-routes</code></td>
+              <td class="status-ok">pass</td>
+              <td>Public route smoke checks passed for options history/replay/NBBO and live WS.</td>
+            </tr>
+            <tr>
+              <td><code>bun run check:docker-workspace</code></td>
+              <td class="status-ok">pass</td>
+              <td>Docker workspace snapshot is in sync.</td>
             </tr>
             <tr>
               <td>Hosted-API perf probe</td>
@@ -381,6 +417,18 @@
               <td>
                 Switched the composer to <code>DurableTapeOptionRowViewModelSchema</code> and
                 <code>DurableTapeAlertRowViewModelSchema</code> so parser output and return types agree.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                CI surfaced formatting drift and a derived-channel type boundary missed by the
+                narrower phase gates.
+              </td>
+              <td class="status-ok">repaired</td>
+              <td>
+                Ran the repo formatter on Phase 05 files and kept <code>durable-rows</code> out of
+                raw-channel freshness extraction by reading its row timestamp in the derived-channel
+                branch.
               </td>
             </tr>
             <tr>
@@ -541,6 +589,10 @@ diff --git a/services/api/src/live.ts b/services/api/src/live.ts
 +      this.durableRowsConfiguredLimit()
 +    );
 +  }
+@@
+-      channel === "equity-candles" || channel === "equity-overlay"
++      channel === "equity-candles" || channel === "equity-overlay" || channel === "durable-rows"
+         ? typeof (item as { ts?: unknown })?.ts === "number"
 diff --git a/apps/web/features/terminal/live.ts b/apps/web/features/terminal/live.ts
 --- a/apps/web/features/terminal/live.ts
 +++ b/apps/web/features/terminal/live.ts
@@ -696,6 +748,10 @@ diff --git a/services/api/src/live.ts b/services/api/src/live.ts
 +      this.durableRowsConfiguredLimit()
 +    );
 +  }
+@@
+-      channel === "equity-candles" || channel === "equity-overlay"
++      channel === "equity-candles" || channel === "equity-overlay" || channel === "durable-rows"
+         ? typeof (item as { ts?: unknown })?.ts === "number"
 diff --git a/apps/web/features/terminal/live.ts b/apps/web/features/terminal/live.ts
 --- a/apps/web/features/terminal/live.ts
 +++ b/apps/web/features/terminal/live.ts

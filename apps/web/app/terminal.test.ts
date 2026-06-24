@@ -428,14 +428,7 @@ describe("live manifest", () => {
     const manifest = getLiveManifest("/durable-tapes", "SPY", 60000, filters);
     const channels = manifest.map((subscription) => subscription.channel);
 
-    expect(channels).toEqual([
-      "options",
-      "durable-rows",
-      "equities",
-      "flow",
-      "news",
-      "alerts"
-    ]);
+    expect(channels).toEqual(["options", "durable-rows", "equities", "flow", "news", "alerts"]);
     expect(manifest.find((subscription) => subscription.channel === "options")?.filters).toBe(
       filters
     );

@@ -59,10 +59,7 @@ import {
 } from "./transport";
 import type { PausableTapeData, SortableItem, TapeMode, WsStatus } from "./types";
 
-const sendLiveSubscribeRequest = (
-  socket: WebSocket,
-  subscriptions: LiveSubscription[]
-): void => {
+const sendLiveSubscribeRequest = (socket: WebSocket, subscriptions: LiveSubscription[]): void => {
   const rawSubscriptions = subscriptions.filter(
     (subscription) => subscription.channel !== "durable-rows"
   );

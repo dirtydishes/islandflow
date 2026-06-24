@@ -115,9 +115,7 @@ export const DurableTapeOptionRowViewModelSchema = DurableTapeRowBaseSchema.exte
       .nullable()
   })
 });
-export type DurableTapeOptionRowViewModel = z.infer<
-  typeof DurableTapeOptionRowViewModelSchema
->;
+export type DurableTapeOptionRowViewModel = z.infer<typeof DurableTapeOptionRowViewModelSchema>;
 
 export const DurableTapeAlertRowViewModelSchema = DurableTapeRowBaseSchema.extend({
   lane: z.literal("alerts"),

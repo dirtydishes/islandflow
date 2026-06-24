@@ -723,11 +723,15 @@ export class LiveStateManager {
   private getDurableRowCompositionContext(): DurableRowCompositionContext {
     return {
       alerts: (this.genericItems.get("alerts") ?? []) as DurableRowCompositionContext["alerts"],
-      flowPackets: (this.genericItems.get("flow") ?? []) as DurableRowCompositionContext["flowPackets"],
-      optionPrints: (this.genericItems.get("options") ?? []) as DurableRowCompositionContext["optionPrints"],
+      flowPackets: (this.genericItems.get("flow") ??
+        []) as DurableRowCompositionContext["flowPackets"],
+      optionPrints: (this.genericItems.get("options") ??
+        []) as DurableRowCompositionContext["optionPrints"],
       nbbo: (this.genericItems.get("nbbo") ?? []) as DurableRowCompositionContext["nbbo"],
-      classifierHits: (this.genericItems.get("classifier-hits") ?? []) as DurableRowCompositionContext["classifierHits"],
-      smartMoney: (this.genericItems.get("smart-money") ?? []) as DurableRowCompositionContext["smartMoney"]
+      classifierHits: (this.genericItems.get("classifier-hits") ??
+        []) as DurableRowCompositionContext["classifierHits"],
+      smartMoney: (this.genericItems.get("smart-money") ??
+        []) as DurableRowCompositionContext["smartMoney"]
     };
   }
 
@@ -829,7 +833,7 @@ export class LiveStateManager {
     now = Date.now()
   ): void {
     const ts =
-      channel === "equity-candles" || channel === "equity-overlay"
+      channel === "equity-candles" || channel === "equity-overlay" || channel === "durable-rows"
         ? typeof (item as { ts?: unknown })?.ts === "number"
           ? ((item as { ts: number }).ts as number)
           : null

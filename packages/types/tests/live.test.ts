@@ -53,7 +53,9 @@ describe("live protocol types", () => {
         filters: { view: "signal", minNotional: 50000 },
         underlying_ids: ["SPY"]
       })
-    ).toBe('durable-rows|lanes:alerts,options|{"view":"signal","minNotional":50000}|underlyings:SPY');
+    ).toBe(
+      'durable-rows|lanes:alerts,options|{"view":"signal","minNotional":50000}|underlyings:SPY'
+    );
   });
 
   it("validates subscribe messages", () => {

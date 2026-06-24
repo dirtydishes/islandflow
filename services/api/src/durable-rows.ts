@@ -152,7 +152,11 @@ const buildNbboByContractId = (items: OptionNBBO[]): Map<string, OptionNBBO> => 
   const map = new Map<string, OptionNBBO>();
   for (const quote of items) {
     const existing = map.get(quote.option_contract_id);
-    if (!existing || quote.ts > existing.ts || (quote.ts === existing.ts && quote.seq > existing.seq)) {
+    if (
+      !existing ||
+      quote.ts > existing.ts ||
+      (quote.ts === existing.ts && quote.seq > existing.seq)
+    ) {
       map.set(quote.option_contract_id, quote);
     }
   }
@@ -235,7 +239,9 @@ const normalizeAlertSeverity = (alert: AlertEvent): "high" | "medium" | "low" =>
   return "low";
 };
 
-const normalizeDirection = (value: string | null | undefined): "bullish" | "bearish" | "neutral" => {
+const normalizeDirection = (
+  value: string | null | undefined
+): "bullish" | "bearish" | "neutral" => {
   const normalized = value?.toLowerCase();
   return normalized === "bullish" || normalized === "bearish" || normalized === "neutral"
     ? normalized
@@ -278,8 +284,11 @@ const matchesDurableOptionSubscription = (
   if (!subscription.underlying_ids?.length) {
     return true;
   }
-  const underlying = (print.underlying_id ?? extractUnderlyingFromContract(print.option_contract_id) ?? "")
-    .toUpperCase();
+  const underlying = (
+    print.underlying_id ??
+    extractUnderlyingFromContract(print.option_contract_id) ??
+    ""
+  ).toUpperCase();
   return subscription.underlying_ids.map((value) => value.toUpperCase()).includes(underlying);
 };
 
@@ -291,7 +300,9 @@ const matchesDurableAlertSubscription = (
     return true;
   }
   const symbol = row.symbol?.toUpperCase();
-  return Boolean(symbol && subscription.underlying_ids.map((value) => value.toUpperCase()).includes(symbol));
+  return Boolean(
+    symbol && subscription.underlying_ids.map((value) => value.toUpperCase()).includes(symbol)
+  );
 };
 
 const packetSummary = (packet: FlowPacket | null) => {
@@ -359,9 +370,12 @@ const buildDurableOptionRow = (
   const premium = getOptionPremium(print);
   const side = print.execution_nbbo_side ?? print.nbbo_side ?? null;
   const nbbo = resolveOptionNbbo(print, lookups.nbboByContractId);
-  const underlying = print.underlying_id ?? extractUnderlyingFromContract(print.option_contract_id) ?? undefined;
+  const underlying =
+    print.underlying_id ?? extractUnderlyingFromContract(print.option_contract_id) ?? undefined;
   const primarySmartMoneyScore =
-    smartMoney?.profile_scores.find((score) => score.profile_id === smartMoney.primary_profile_id) ??
+    smartMoney?.profile_scores.find(
+      (score) => score.profile_id === smartMoney.primary_profile_id
+    ) ??
     smartMoney?.profile_scores[0] ??
     null;
   const badges = [
@@ -372,7 +386,9 @@ const buildDurableOptionRow = (
           tone: side.startsWith("A") ? "bullish" : side.startsWith("B") ? "bearish" : "neutral"
         }
       : null,
-    print.signal_pass ? { kind: "signal", label: print.signal_profile ?? "signal", tone: "info" } : null,
+    print.signal_pass
+      ? { kind: "signal", label: print.signal_profile ?? "signal", tone: "info" }
+      : null,
     packet ? { kind: "packet", label: `${packet.members.length} prints`, tone: "neutral" } : null,
     smartMoney
       ? {
@@ -434,8 +450,11 @@ const buildDurableOptionRow = (
       execution: {
         iv: typeof print.execution_iv === "number" ? print.execution_iv : null,
         underlying_spot:
-          typeof print.execution_underlying_spot === "number" ? print.execution_underlying_spot : null,
-        quote_age_ms: typeof print.execution_nbbo_age_ms === "number" ? print.execution_nbbo_age_ms : null
+          typeof print.execution_underlying_spot === "number"
+            ? print.execution_underlying_spot
+            : null,
+        quote_age_ms:
+          typeof print.execution_nbbo_age_ms === "number" ? print.execution_nbbo_age_ms : null
       },
       nbbo
     },
@@ -504,7 +523,9 @@ const buildDurableAlertRow = (
   const underlying =
     (packetContract ? extractUnderlyingFromContract(packetContract) : null) ??
     firstPreviewPrint?.underlying_id ??
-    (firstPreviewPrint ? extractUnderlyingFromContract(firstPreviewPrint.option_contract_id) : null);
+    (firstPreviewPrint
+      ? extractUnderlyingFromContract(firstPreviewPrint.option_contract_id)
+      : null);
   const severity = normalizeAlertSeverity(alert);
   const direction = deriveAlertDirection(alert);
   const topHit = selectPrimaryAlertHit(alert.hits);
