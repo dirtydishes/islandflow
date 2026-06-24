@@ -1,0 +1,918 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>API Private Edge Phase 00 Baseline</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #111820;
+        --panel-2: #0b1016;
+        --panel-3: #0d141b;
+        --text: #e6edf4;
+        --dim: #90a0b2;
+        --faint: #6e7b8c;
+        --amber: #f5a623;
+        --amber-soft: #f5a6231f;
+        --green: #25c17a;
+        --red: #ff6b5f;
+        --blue: #4da3ff;
+        --border: #ffffff14;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.55 IBM Plex Sans, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      main {
+        width: min(1220px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 42px 0 72px;
+      }
+
+      header,
+      section {
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+        background: var(--panel);
+      }
+
+      header {
+        padding: 22px 0;
+      }
+
+      section {
+        margin-top: 18px;
+        padding: 18px 0;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        margin-bottom: 8px;
+        font: 700 1.65rem/1.15 IBM Plex Mono, ui-monospace, monospace;
+        letter-spacing: 0.02em;
+      }
+
+      h2 {
+        margin-bottom: 12px;
+        color: var(--amber);
+        font: 700 0.76rem/1.2 IBM Plex Mono, ui-monospace, monospace;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h3 {
+        margin: 16px 0 8px;
+        font: 700 0.86rem/1.2 IBM Plex Mono, ui-monospace, monospace;
+      }
+
+      p,
+      li,
+      td {
+        color: var(--dim);
+      }
+
+      p {
+        max-width: 88ch;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 1.2rem;
+      }
+
+      li {
+        margin: 6px 0;
+      }
+
+      code {
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 1px 5px;
+        background: #ffffff0a;
+        color: var(--text);
+        font-family: IBM Plex Mono, ui-monospace, monospace;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--panel-2);
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--border);
+        padding: 9px 10px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--text);
+        font: 700 0.72rem/1.2 IBM Plex Mono, ui-monospace, monospace;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .kicker {
+        margin-bottom: 10px;
+        color: var(--amber);
+        font: 700 0.72rem/1.2 IBM Plex Mono, ui-monospace, monospace;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .summary {
+        max-width: 86ch;
+      }
+
+      .evidence-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 12px;
+      }
+
+      .evidence {
+        border: 1px solid var(--border);
+        background: var(--panel-2);
+        padding: 12px;
+      }
+
+      .evidence strong {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--green);
+        font-family: IBM Plex Mono, ui-monospace, monospace;
+      }
+
+      .evidence strong.warn {
+        color: var(--red);
+      }
+
+      .evidence strong.note {
+        color: var(--blue);
+      }
+
+      .mono-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 8px 16px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .mono-list li {
+        margin: 0;
+      }
+
+      .status-ok {
+        color: var(--green);
+        font-family: IBM Plex Mono, ui-monospace, monospace;
+      }
+
+      .status-warn {
+        color: var(--red);
+        font-family: IBM Plex Mono, ui-monospace, monospace;
+      }
+
+      .status-note {
+        color: var(--blue);
+        font-family: IBM Plex Mono, ui-monospace, monospace;
+      }
+
+      .callout {
+        border: 1px solid var(--border);
+        background: var(--panel-3);
+        padding: 12px;
+      }
+
+      .callout p:last-child {
+        margin-bottom: 0;
+      }
+
+      @media (max-width: 700px) {
+        main {
+          width: min(100% - 24px, 1220px);
+          padding-top: 28px;
+        }
+
+        th,
+        td {
+          padding: 8px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="kicker">Turn documentation | June 24, 2026</div>
+        <h1>API Private Edge Phase 00 Baseline</h1>
+        <p class="summary">
+          Baseline for <code>islandflow-hnbk.1</code>. This phase records the
+          current public edge posture before private-edge changes: the hosted app
+          remains public, the raw API host is still reachable, production browser
+          artifacts still expose <code>&lt;raw-api-origin&gt;</code>, and the
+          same-origin app proxy matcher misses active browser routes. No runtime,
+          deployment, env, DNS, firewall, NPM, or product code behavior changed.
+        </p>
+      </header>
+
+      <section>
+        <h2>Scope And Sources</h2>
+        <div class="evidence-grid">
+          <div class="evidence">
+            <strong>phase</strong>
+            <p>
+              Read <code>IMPLEMENT.md</code> and
+              <code>00-baseline-edge-inventory.md</code>. The phase posture is
+              probe/docs-only and produces a durable baseline artifact.
+            </p>
+          </div>
+          <div class="evidence">
+            <strong>issue</strong>
+            <p>
+              <code>bd show islandflow-hnbk.1</code> reported
+              <code>IN_PROGRESS</code>, assigned to <code>dirtydishes</code>,
+              blocking <code>islandflow-hnbk.2</code>.
+            </p>
+          </div>
+          <div class="evidence">
+            <strong>style</strong>
+            <p>
+              The document follows the Islandflow product register: compact,
+              evidence-first, restrained, and operational. It intentionally omits
+              a rich diff block because Phase 00 has no code diff to render.
+            </p>
+          </div>
+          <div class="evidence">
+            <strong>redaction</strong>
+            <p>
+              Concrete production domains, env values, tokens, and public IPs are
+              redacted. Public origins are referred to only as
+              <code>&lt;production-app-origin&gt;</code>,
+              <code>&lt;raw-api-origin&gt;</code>, and
+              <code>&lt;internal-api-origin&gt;</code>.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Scout Fan-In Summary</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Slice</th>
+              <th>Resolved Finding</th>
+              <th>Follow-On Phase</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Repo defaults</td>
+              <td>
+                Active checked-in defaults and examples still teach
+                <code>&lt;raw-api-origin&gt;</code> or production app CORS as a
+                normal local/dev path. Historical turn docs and baselines also
+                contain concrete domains, but they are background evidence, not
+                active Phase 01 targets unless a later phase deliberately edits them.
+              </td>
+              <td>Phase 01</td>
+            </tr>
+            <tr>
+              <td>Web transport</td>
+              <td>
+                Browser URL builders already support same-origin when
+                <code>NEXT_PUBLIC_API_URL</code> is blank, but production env and
+                duplicate durable-tape builders can still force the raw API origin.
+                Server-only synthetic admin proxying currently reads the public
+                variable and needs an internal API variable.
+              </td>
+              <td>Phase 02</td>
+            </tr>
+            <tr>
+              <td>API routes</td>
+              <td>
+                The API has a broad REST and websocket surface in
+                <code>services/api/src/index.ts</code>. CORS applies to non-101
+                responses; no explicit websocket <code>Origin</code> gate was found.
+                Rate limiting is Phase 03 scope.
+              </td>
+              <td>Phase 02 and Phase 03</td>
+            </tr>
+            <tr>
+              <td>NPM edge</td>
+              <td>
+                The app-origin NPM matcher forwards only
+                <code>/ws</code>, <code>/replay</code>, <code>/prints</code>,
+                <code>/joins</code>, <code>/nbbo</code>, <code>/dark</code>,
+                <code>/flow</code>, <code>/candles</code>, and
+                <code>/history</code> to the API. It does not cover all browser-used
+                routes.
+              </td>
+              <td>Phase 02</td>
+            </tr>
+            <tr>
+              <td>Bundle and probes</td>
+              <td>
+                Existing local production artifacts contain
+                <code>&lt;raw-api-origin&gt;</code>, and production smoke tooling
+                accepts direct raw API success as a passing posture today. The public
+                route checker covers only a narrow route set.
+              </td>
+              <td>Phase 02</td>
+            </tr>
+            <tr>
+              <td>Live edge</td>
+              <td>
+                Live NPM, direct ports, process env key presence, and public route
+                probes match the orchestrator's corrected evidence. The server was
+                inspected locally; no SSH to another host was used.
+              </td>
+              <td>Phase 04 and Phase 05</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Live Baseline</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Probe</th>
+              <th>Result</th>
+              <th>Meaning</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>systemctl list-units</code></td>
+              <td>
+                <code>docker.service</code>, <code>islandflow-nats</code>, and
+                <code>islandflow-redis</code> active. <code>islandflow-clickhouse</code>
+                was in <code>activating auto-restart</code>.
+              </td>
+              <td>
+                Infrastructure is partially healthy, but ClickHouse was not stable
+                at the instant of the Phase 00 read.
+              </td>
+            </tr>
+            <tr>
+              <td><code>ss -ltnp</code></td>
+              <td>
+                Next listens on <code>0.0.0.0:3000</code>, API listens on
+                <code>0.0.0.0:4000</code>, NPM/openresty listens on public
+                <code>80/443</code>, NPM admin listens on <code>81</code>, and a
+                tailnet listener is present on <code>443</code>.
+              </td>
+              <td>
+                The app and API are reachable on host ports before NPM policy is
+                considered. Phase 04 must close raw public API exposure without
+                breaking the app-origin proxy.
+              </td>
+            </tr>
+            <tr>
+              <td><code>docker ps</code></td>
+              <td>
+                <code>nginx-proxy-manager</code> and <code>hermes-tailnet-proxy</code>
+                are running. Other unrelated containers were present and ignored.
+              </td>
+              <td>
+                NPM is the current public edge for the app and raw API hosts.
+              </td>
+            </tr>
+            <tr>
+              <td><code>ps</code></td>
+              <td>
+                Process supervisor children include <code>bun x next start -H 0.0.0.0 -p 3000</code>,
+                <code>bun services/api/src/index.ts</code>, ingest services,
+                compute, and candles.
+              </td>
+              <td>
+                The native app and API processes are the live upstreams behind NPM.
+              </td>
+            </tr>
+            <tr>
+              <td><code>/proc/&lt;pid&gt;/environ</code></td>
+              <td>
+                Redacted key presence confirmed for <code>NEXT_PUBLIC_API_URL</code>,
+                <code>API_CORS_ORIGINS</code>, and
+                <code>SYNTHETIC_ADMIN_TOKEN</code> in the Next and API process envs.
+              </td>
+              <td>
+                Production Next is currently configured with an API origin value.
+                Values and tokens were not recorded.
+              </td>
+            </tr>
+            <tr>
+              <td>NPM generated config</td>
+              <td>
+                Raw API proxy host forwards <code>location /</code> to
+                <code>172.18.0.1:4000</code>. App proxy host forwards
+                <code>location ~ ^/(ws|replay|prints|joins|nbbo|dark|flow|candles|history)/</code>
+                to <code>172.18.0.1:4000</code>, and <code>location /</code> to
+                <code>172.18.0.1:3000</code>.
+              </td>
+              <td>
+                Same-origin app API coverage is prefix-based and incomplete. Raw API
+                host still exposes the full API upstream.
+              </td>
+            </tr>
+            <tr>
+              <td>Host-header public probes</td>
+              <td>
+                <code>&lt;raw-api-origin&gt;/health</code> returned
+                <code>200 application/json</code>. <code>&lt;production-app-origin&gt;/prints/options</code>
+                returned <code>200 application/json</code>. <code>&lt;production-app-origin&gt;/lookup/options-support</code>
+                returned <code>404 text/html</code> from Next.
+              </td>
+              <td>
+                Covered app-origin API routes work. Missing matcher routes fall
+                through to the web app and fail as HTML.
+              </td>
+            </tr>
+            <tr>
+              <td>Direct port probes</td>
+              <td>
+                Public-address <code>:3000/</code> returned Next HTML
+                <code>200</code>. Public-address <code>:4000/health</code> returned
+                API JSON <code>200</code>.
+              </td>
+              <td>
+                Direct port reachability exists outside same-origin routing. This is
+                not changed in Phase 00.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>API And Route Inventory</h2>
+        <h3>Backend route families</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Family</th>
+              <th>Routes</th>
+              <th>Evidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Health and admin</td>
+              <td>
+                <code>/health</code>, <code>/admin/synthetic/status</code>,
+                <code>/admin/synthetic/control</code>
+              </td>
+              <td><code>services/api/src/index.ts:1457-1477</code></td>
+            </tr>
+            <tr>
+              <td>Current snapshots</td>
+              <td>
+                <code>/prints/options</code>, <code>/nbbo/options</code>,
+                <code>/prints/equities</code>, <code>/prints/equities/range</code>,
+                <code>/quotes/equities</code>, <code>/candles/equities</code>,
+                <code>/joins/equities</code>, <code>/dark/inferred</code>,
+                <code>/flow/packets</code>, <code>/flow/smart-money</code>,
+                <code>/flow/smart-flow</code>, <code>/flow/classifier-hits</code>,
+                <code>/flow/alerts</code>, <code>/news</code>
+              </td>
+              <td><code>services/api/src/index.ts:1510-1649</code></td>
+            </tr>
+            <tr>
+              <td>History</td>
+              <td>
+                <code>/history/options</code>, <code>/history/nbbo</code>,
+                <code>/history/equities</code>, <code>/history/equity-quotes</code>,
+                <code>/history/equity-joins</code>, <code>/history/flow</code>,
+                <code>/history/smart-money</code>, <code>/history/smart-flow</code>,
+                <code>/history/classifier-hits</code>, <code>/history/alerts</code>,
+                <code>/history/inferred-dark</code>, <code>/history/news</code>
+              </td>
+              <td><code>services/api/src/index.ts:1674-1793</code></td>
+            </tr>
+            <tr>
+              <td>Evidence and lookup</td>
+              <td>
+                <code>/flow/packets/:id</code>,
+                <code>/flow/alerts/:trace/context</code>,
+                <code>/option-prints/by-trace</code>,
+                <code>POST /lookup/options-support</code>,
+                <code>/equity-joins/by-id</code>
+              </td>
+              <td><code>services/api/src/index.ts:1818-1883</code></td>
+            </tr>
+            <tr>
+              <td>Replay</td>
+              <td>
+                <code>/replay/options</code>, <code>/replay/nbbo</code>,
+                <code>/replay/equities</code>, <code>/replay/equity-quotes</code>,
+                <code>/replay/equity-candles</code>, <code>/replay/equity-joins</code>,
+                <code>/replay/inferred-dark</code>, <code>/replay/flow</code>,
+                <code>/replay/smart-money</code>, <code>/replay/smart-flow</code>,
+                <code>/replay/classifier-hits</code>, <code>/replay/alerts</code>
+              </td>
+              <td><code>services/api/src/index.ts:1889-2022</code></td>
+            </tr>
+            <tr>
+              <td>Websocket upgrades</td>
+              <td>
+                <code>/ws/options</code>, <code>/ws/options-nbbo</code>,
+                <code>/ws/equities</code>, <code>/ws/equity-candles</code>,
+                <code>/ws/equity-quotes</code>, <code>/ws/equity-joins</code>,
+                <code>/ws/inferred-dark</code>, <code>/ws/flow</code>,
+                <code>/ws/classifier-hits</code>, <code>/ws/smart-money</code>,
+                <code>/ws/smart-flow</code>, <code>/ws/alerts</code>,
+                <code>/ws/live</code>
+              </td>
+              <td><code>services/api/src/index.ts:2030-2126</code></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>CORS and websocket notes</h3>
+        <ul>
+          <li>
+            Default CORS origins are defined in <code>services/api/src/cors.ts:1-6</code>
+            and applied through <code>API_CORS_ORIGINS</code> in
+            <code>services/api/src/index.ts:200-204</code>.
+          </li>
+          <li>
+            <code>withCorsHeaders</code> intentionally returns upgrade responses
+            unchanged at <code>services/api/src/cors.ts:51-53</code>. No explicit
+            websocket <code>Origin</code> authorization was found in Phase 00.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Same-Origin Coverage</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Route Prefix</th>
+              <th>Current App-Origin Matcher</th>
+              <th>Browser/API Use</th>
+              <th>Phase 02 State</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <code>/ws</code>, <code>/replay</code>, <code>/prints</code>,
+                <code>/joins</code>, <code>/nbbo</code>, <code>/dark</code>,
+                <code>/flow</code>, <code>/candles</code>, <code>/history</code>
+              </td>
+              <td><span class="status-ok">covered</span></td>
+              <td>
+                Terminal live socket, current prints, replay, NBBO, joins, inferred
+                dark, flow, chart candles, and durable history.
+              </td>
+              <td>Preserve and keep websocket upgrade behavior.</td>
+            </tr>
+            <tr>
+              <td><code>/option-prints</code></td>
+              <td><span class="status-warn">missing</span></td>
+              <td>
+                Browser evidence hydration uses
+                <code>/option-prints/by-trace</code> at
+                <code>apps/web/features/terminal/hydration-scheduler.ts:387</code>.
+              </td>
+              <td>Add to matcher and public route probes.</td>
+            </tr>
+            <tr>
+              <td><code>/lookup</code></td>
+              <td><span class="status-warn">missing</span></td>
+              <td>
+                Browser support lookup uses
+                <code>POST /lookup/options-support</code> at
+                <code>apps/web/features/terminal/hydration-scheduler.ts:603</code>.
+                Live app-origin probe returned Next HTML <code>404</code>.
+              </td>
+              <td>Add to matcher and make same-origin smoke fail on HTML fallthrough.</td>
+            </tr>
+            <tr>
+              <td><code>/equity-joins</code></td>
+              <td><span class="status-warn">missing</span></td>
+              <td>
+                Terminal state fetches <code>/equity-joins/by-id</code> at
+                <code>apps/web/features/terminal/state.tsx:763</code>.
+              </td>
+              <td>Add to matcher and route probes.</td>
+            </tr>
+            <tr>
+              <td><code>/quotes</code></td>
+              <td><span class="status-warn">missing</span></td>
+              <td>
+                Backend route exists at <code>services/api/src/index.ts:1564</code>;
+                websocket route exists for equity quotes. Phase 02 contract calls
+                out quotes coverage.
+              </td>
+              <td>Add to matcher if browser same-origin access is expected.</td>
+            </tr>
+            <tr>
+              <td><code>/news</code></td>
+              <td><span class="status-warn">missing</span></td>
+              <td>
+                Backend route exists at <code>services/api/src/index.ts:1649</code>.
+                Browser history uses <code>/history/news</code>, which is already
+                covered by <code>/history</code>.
+              </td>
+              <td>
+                Add if root <code>/news</code> must be public through app origin.
+                Use slash-or-end matching if root route coverage is required.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Bundle And Probe Exposure</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Surface</th>
+              <th>Evidence</th>
+              <th>Private-Edge Impact</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Current local production artifacts</td>
+              <td>
+                <code>rg -l</code> found <code>&lt;raw-api-origin&gt;</code> in
+                <code>apps/web/.next/static/chunks/08hkommo~9w~u.js</code> and
+                <code>apps/web/.next/server/chunks/ssr/_0.upord._.js</code>.
+              </td>
+              <td>
+                Current artifacts advertise the raw API origin. Phase 02 should make
+                production browser builds pass with blank <code>NEXT_PUBLIC_API_URL</code>
+                and fail smoke checks when the raw origin appears in public bundles.
+              </td>
+            </tr>
+            <tr>
+              <td>Production smoke script</td>
+              <td>
+                <code>scripts/probes/durable-tapes-production-smoke.ts:26-27</code>
+                defaults to the app target and raw API origin. It checks raw API
+                <code>/health</code>, raw <code>/ws/live</code>, raw support lookup,
+                and raw by-trace lookup around <code>:269-537</code>.
+              </td>
+              <td>
+                Phase 02 should invert the success posture: same-origin app routes
+                should be authoritative, raw API exposure should not be required for
+                browser smoke success, and bundle raw-origin exposure should fail.
+              </td>
+            </tr>
+            <tr>
+              <td>Public route checker</td>
+              <td>
+                <code>scripts/check-public-api-routes.ts:9-20</code> checks only
+                <code>/prints/options</code>, <code>/history/options</code>,
+                <code>/replay/options</code>, <code>/nbbo/options</code>, and
+                <code>/ws/live</code>.
+              </td>
+              <td>
+                Current checks can pass while <code>/lookup</code>,
+                <code>/option-prints</code>, <code>/equity-joins</code>,
+                <code>/quotes</code>, or <code>/news</code> are missing from the
+                app-origin matcher.
+              </td>
+            </tr>
+            <tr>
+              <td>Deploy verification</td>
+              <td>
+                <code>scripts/deploy.ts:1283-1300</code> runs the public route suite
+                for API scope unless fast mode or a separate public API health URL is
+                set.
+              </td>
+              <td>
+                Strengthening <code>scripts/check-public-api-routes.ts</code> will
+                make deploy verification cover the expanded same-origin contract.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Phase 01 Touch List</h2>
+        <p>
+          Phase 01 should remove active defaults and docs that teach raw public API
+          use as the normal production or hosted-dev path, while keeping product
+          behavior unchanged.
+        </p>
+        <ul class="mono-list">
+          <li><code>.env.example:72,74</code></li>
+          <li><code>README.md:207,210,278,281</code></li>
+          <li><code>docs/agents/prompts/LOOP.md:153</code></li>
+          <li><code>apps/web/scripts/dev-config.ts:1,32</code></li>
+          <li><code>apps/web/scripts/dev-config.test.ts:10,20,44</code></li>
+          <li><code>scripts/dev-desktop.ts:6,272</code></li>
+          <li><code>apps/desktop/README.md:28</code></li>
+          <li><code>services/api/src/cors.ts:1-2</code></li>
+          <li><code>services/api/src/index.ts:200</code></li>
+          <li><code>services/api/tests/cors.test.ts:12,23,36,57</code></li>
+          <li><code>apps/web/features/news-wire/news-wire.test.ts:110,115,131</code></li>
+          <li><code>scripts/check-public-api-routes.ts:20</code></li>
+          <li><code>deployment/native/full-rollback.sh:25-26</code></li>
+          <li><code>docs/implementation/durable-tapes-performance/IMPLEMENT.md:143,146</code></li>
+          <li><code>docs/implementation/durable-tapes-performance/00-perf-probe-guardrail.md:125</code></li>
+          <li><code>docs/implementation/durable-tapes-performance/02-option-prints-lookup-bounds.md:61</code></li>
+          <li><code>docs/implementation/durable-tapes-performance/plan.html:529</code></li>
+        </ul>
+        <div class="callout">
+          <p>
+            Legitimate exceptions found in Phase 00: desktop production app origin
+            allowlist/defaults in <code>apps/desktop/src/security.ts:1-4</code> and
+            tests; deploy helper public app target default in
+            <code>scripts/deploy.ts:47,143,1283,1300</code>; and NPM switch helper
+            live proxy host defaults in <code>deployment/native/switch-npm-edge.sh:7-8</code>.
+            These may remain direct app-origin constants unless later scope says
+            otherwise.
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2>Phase 02 Touch List</h2>
+        <p>
+          Phase 02 should make production browser transport same-origin by default,
+          move server-only proxying to <code>ISLANDFLOW_INTERNAL_API_URL</code>, and
+          complete app-origin route coverage before raw API closure.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Area</th>
+              <th>Exact Surfaces</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Generic browser transport</td>
+              <td>
+                <code>apps/web/features/terminal/transport.ts:96,116</code>.
+                Keeps explicit <code>NEXT_PUBLIC_API_URL</code> override, but blank
+                production value should use app-origin REST and websocket paths.
+              </td>
+            </tr>
+            <tr>
+              <td>Durable tape URL builders</td>
+              <td>
+                <code>apps/web/features/news-wire/history.ts:17</code>,
+                <code>apps/web/features/options-tape/source.ts:26</code>,
+                <code>apps/web/features/alerts/source.ts:28</code>,
+                <code>apps/web/features/flow-packets/source.ts:30</code>,
+                <code>apps/web/features/equities-tape/source.ts:34</code>.
+              </td>
+            </tr>
+            <tr>
+              <td>Synthetic admin proxy</td>
+              <td>
+                <code>apps/web/app/api/admin/synthetic/shared.ts:17</code> and
+                <code>apps/web/app/api/admin/synthetic/routes.test.ts:9,24</code>.
+                Server-side proxying should stop relying on public
+                <code>NEXT_PUBLIC_API_URL</code>.
+              </td>
+            </tr>
+            <tr>
+              <td>Browser-used missing routes</td>
+              <td>
+                <code>apps/web/features/terminal/hydration-scheduler.ts:387</code>
+                for <code>/option-prints/by-trace</code>,
+                <code>apps/web/features/terminal/hydration-scheduler.ts:603</code>
+                for <code>/lookup/options-support</code>, and
+                <code>apps/web/features/terminal/state.tsx:763</code> for
+                <code>/equity-joins/by-id</code>.
+              </td>
+            </tr>
+            <tr>
+              <td>Backend route contract</td>
+              <td>
+                Confirm same-origin route coverage for
+                <code>services/api/src/index.ts:1564</code> quotes,
+                <code>:1649</code> news, <code>:1818</code> option prints,
+                <code>:1846</code> lookup, and <code>:1883</code> equity joins.
+              </td>
+            </tr>
+            <tr>
+              <td>NPM matcher and docs</td>
+              <td>
+                <code>deployment/native/switch-npm-edge.sh:79</code>,
+                <code>deployment/docker/README.md:127,134,480</code>, and
+                <code>deployment/native/README.md:149,272</code>. Add
+                <code>quotes</code>, <code>news</code>, <code>lookup</code>,
+                <code>option-prints</code>, and <code>equity-joins</code> where
+                required.
+              </td>
+            </tr>
+            <tr>
+              <td>Production probes</td>
+              <td>
+                <code>scripts/check-public-api-routes.ts:9-20</code> and
+                <code>scripts/probes/durable-tapes-production-smoke.ts:26-27,455,501,512,530,537,551</code>.
+                Route probes should detect HTML fallthrough and raw-origin bundle
+                exposure.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Risks And Constraints</h2>
+        <ul>
+          <li>
+            Raw API host and direct port <code>4000</code> currently return API JSON.
+            Closing that exposure is Phase 04, after same-origin coverage and rate
+            limiting are in place.
+          </li>
+          <li>
+            The app-origin proxy matcher currently misses active browser routes. A
+            production build with blank <code>NEXT_PUBLIC_API_URL</code> would still
+            fail those flows until Phase 02 updates NPM and probes.
+          </li>
+          <li>
+            Websocket upgrades bypass the current CORS response path. Origin policy
+            and rate limiting should be assessed in Phase 03, with priority on
+            <code>/ws/live</code>, lookup, evidence, history, replay, candles, and
+            range routes.
+          </li>
+          <li>
+            Historical docs and baselines contain concrete production domains. Phase
+            01 should focus active surfaces first so the private-edge stream stays
+            reviewable and does not rewrite unrelated history.
+          </li>
+          <li>
+            Live ClickHouse was observed in auto-restart during the baseline. That
+            does not block the docs-only artifact, but later production probes should
+            account for backend health before interpreting market-data route results.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Validation Status</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Check</th>
+              <th>Status</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>bd show islandflow-hnbk.1</code></td>
+              <td><span class="status-ok">passed</span></td>
+              <td>Confirmed issue state, owner, acceptance criteria, and Phase 01 dependency.</td>
+            </tr>
+            <tr>
+              <td>Read-only live probes</td>
+              <td><span class="status-ok">passed</span></td>
+              <td>
+                Confirmed process, NPM route, host-header, direct-port, env key
+                presence, and bundle artifact evidence with secrets redacted.
+              </td>
+            </tr>
+            <tr>
+              <td><code>bun test</code> / build</td>
+              <td><span class="status-note">not run</span></td>
+              <td>
+                Not required for Phase 00 because this change creates only the
+                baseline document and Beads status updates. No runtime code changed.
+              </td>
+            </tr>
+            <tr>
+              <td><code>git diff --check</code></td>
+              <td><span class="status-note">pending at document creation</span></td>
+              <td>Run during closeout after this artifact was written.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+  </body>
+</html>
