@@ -32,6 +32,8 @@ Use `<production-app-origin>` and `<raw-api-origin>` variables for public probes
 
 ## Implementation Subagents
 
+Run this phase through the full topology in `IMPLEMENT.md` when useful: selector agent, 6-10 read-only scout agents, one implementation worker, 3-6 review agents, and one lead reviewer. Phase 00 is the best fit for the full scout swarm because it is inventory-heavy.
+
 The Phase 00 worker may use several read-only helper subagents because the work is inventory-heavy.
 
 Good helper targets:

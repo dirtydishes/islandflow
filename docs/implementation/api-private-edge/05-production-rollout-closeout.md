@@ -36,6 +36,8 @@ Use placeholders in committed docs and scripts; use local shell variables for li
 
 ## Implementation Subagents
 
+Run this phase through the full topology in `IMPLEMENT.md` when useful: selector agent, 6-10 read-only scout agents, one implementation worker, 3-6 review agents, and one lead reviewer. Use scouts for final verification breadth and reviewers for closeout, CI/log, docs, and Beads consistency.
+
 The Phase 05 worker may use helper subagents for final verification breadth, but there is still one rollout owner.
 
 Good helper targets:

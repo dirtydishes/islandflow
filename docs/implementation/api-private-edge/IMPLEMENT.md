@@ -96,6 +96,38 @@ Closeout:
 
 Keep one active implementation PR at a time unless a phase doc explicitly allows parallelism.
 
+## Implementation Swarm Topology
+
+Use this topology when the orchestrator wants broad inspection and review coverage for a phase. The numbers are target ranges for phases with enough surface area, not quotas for narrow edits.
+
+1. Selector agent: picks the next ready `islandflow-hnbk.*` issue.
+2. Scout swarm, 6-10 read-only agents: inspect different slices in parallel and report findings before implementation begins.
+3. Single implementation worker: owns the branch, edits, tests, commit, PR, Beads state, and callback. It uses scout outputs as inputs.
+4. Review swarm, 3-6 agents: run bounded review after the PR or worker completion callback.
+5. One lead reviewer: consolidates findings, performs safe repairs, waits for CI/local gates, updates the phase turn doc, and calls back once.
+
+Scout swarm slices:
+
+- repo hostname/default inventory.
+- web transport URL builders.
+- API route and websocket inventory.
+- NPM/deployment helper behavior.
+- live server/env baseline.
+- test coverage gaps.
+- security/threat-model review.
+- docs/probe references.
+
+Review swarm roles:
+
+- Security reviewer.
+- Deployment reviewer.
+- Frontend transport reviewer.
+- API/rate-limit reviewer.
+- Docs/Beads reviewer.
+- CI/log reviewer.
+
+Scout and review helpers must remain bounded. They may inspect, summarize, review, and propose; they do not mutate tracked files, update Beads, create or switch branches, commit, push, open PRs, contact the orchestrator independently, or make final scope decisions.
+
 ## Implementation Worker Subagents
 
 Implementation workers may use bounded helper subagents when a phase benefits from parallel inspection, test mapping, or specialized review. This is optional, not a quota. Do not spawn helpers just to make a narrow phase look busy.

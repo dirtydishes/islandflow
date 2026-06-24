@@ -34,6 +34,8 @@ Use shell variables for origins during live checks. Do not commit concrete produ
 
 ## Implementation Subagents
 
+Run this phase through the full topology in `IMPLEMENT.md` when useful: selector agent, 6-10 read-only scout agents, one implementation worker, 3-6 review agents, and one lead reviewer. Use scouts for NPM/live-edge state and reviewers for rollback, same-origin preservation, and deployment durability.
+
 The Phase 04 worker may use helper subagents for edge durability and rollback review.
 
 Good helper targets:
