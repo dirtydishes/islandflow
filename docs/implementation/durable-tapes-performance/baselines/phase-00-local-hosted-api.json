@@ -1,0 +1,491 @@
+{
+  "schemaVersion": 1,
+  "probe": "durable-tapes-cdp",
+  "targetUrl": "http://localhost:3100/durable-tapes",
+  "startedAt": "2026-06-24T01:31:45.948Z",
+  "endedAt": "2026-06-24T01:35:16.226Z",
+  "durationMs": 180000,
+  "warmupMs": 30000,
+  "browser": {
+    "name": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "cdp": "launched"
+  },
+  "budgets": {
+    "profile": "durable-tapes-3m-v1",
+    "baseDurationMs": 180000,
+    "failOnBudget": false,
+    "passed": false,
+    "results": [
+      {
+        "name": "total network requests",
+        "actual": 9853,
+        "limit": 500,
+        "pass": false,
+        "unit": "requests"
+      },
+      {
+        "name": "/lookup/options-support requests",
+        "actual": 3473,
+        "limit": 150,
+        "pass": false,
+        "unit": "requests"
+      },
+      {
+        "name": "/option-prints/by-trace requests",
+        "actual": 1737,
+        "limit": 150,
+        "pass": false,
+        "unit": "requests"
+      },
+      {
+        "name": "aborted requests",
+        "actual": 8117,
+        "limit": 20,
+        "pass": false,
+        "unit": "requests"
+      },
+      {
+        "name": "aborted support/evidence requests",
+        "actual": 3472,
+        "limit": 8,
+        "pass": false,
+        "unit": "requests"
+      },
+      {
+        "name": "support/evidence error responses",
+        "actual": 0,
+        "limit": 20,
+        "pass": true,
+        "unit": "responses"
+      },
+      {
+        "name": "CDP TaskDuration delta",
+        "actual": 59.055088,
+        "limit": 45,
+        "pass": false,
+        "unit": "seconds"
+      },
+      {
+        "name": "CDP ScriptDuration delta",
+        "actual": 55.225747000000005,
+        "limit": 35,
+        "pass": false,
+        "unit": "seconds"
+      },
+      {
+        "name": "JSHeapUsedSize delta",
+        "actual": 46455156,
+        "limit": 131072000,
+        "pass": true,
+        "unit": "bytes"
+      },
+      {
+        "name": "DOM node count",
+        "actual": 1824,
+        "limit": 35000,
+        "pass": true,
+        "unit": "nodes"
+      },
+      {
+        "name": "visible durable pane count",
+        "actual": 5,
+        "limit": 5,
+        "pass": true,
+        "unit": "minimum panes"
+      },
+      {
+        "name": "visible durable row count",
+        "actual": 70,
+        "limit": 1,
+        "pass": true,
+        "unit": "minimum rows"
+      }
+    ]
+  },
+  "metrics": {
+    "totalNetworkRequestCount": 9853,
+    "optionsSupportRequestCount": 3473,
+    "optionPrintsByTraceRequestCount": 1737,
+    "abortedRequestCount": 8117,
+    "abortedEndpointRequestCount": 3472,
+    "supportEvidenceStatusDistribution": {
+      "optionsSupport": {
+        "204": 1145
+      },
+      "optionPrintsByTrace": {}
+    },
+    "supportEvidenceErrorResponses": 0,
+    "websocketFrameCount": 2817,
+    "websocketReceivedFrameCount": 2775,
+    "websocketSentFrameCount": 42,
+    "websocketBytes": 1812154,
+    "websocketReceivedBytes": 1809250,
+    "websocketSentBytes": 2904,
+    "websocketErrorCount": 0,
+    "topRequests": [
+      {
+        "request": "GET https://api.flow.deltaisland.io/option-prints/by-trace",
+        "count": 1737
+      },
+      {
+        "request": "POST https://api.flow.deltaisland.io/lookup/options-support",
+        "count": 1737
+      },
+      {
+        "request": "OPTIONS https://api.flow.deltaisland.io/lookup/options-support",
+        "count": 1736
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AAFL-2026-06-25-135-C%3A1782264779071%3A1782264779071",
+        "count": 158
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3ADAL-2026-08-08-STRUCT-straddle%3A1782264774000%3ADAL-2026-08-08-490-C%7CDAL-2026-08-08-490-P",
+        "count": 157
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3ASNPS-2026-06-25-430-C%3A1782264891607%3A1782264891617",
+        "count": 156
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3ASNPS-2026-06-25-430-C%3A1782264891622%3A1782264891622",
+        "count": 153
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3APCG-2026-07-22-210-C%3A1782264810228%3A1782264810278",
+        "count": 148
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3APCG-2026-07-22-STRUCT-vertical%3A1782264810000%3APCG-2026-07-22-190-C%7CPCG-2026-07-22-210-C",
+        "count": 148
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AJBL-2026-07-22-110-C%3A1782264832325%3A1782264832325",
+        "count": 146
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3APCG-2026-07-22-STRUCT-vertical%3A1782264737500%3APCG-2026-07-22-190-C%7CPCG-2026-07-22-210-C",
+        "count": 146
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3APCG-2026-07-22-190-C%3A1782264810223%3A1782264810223",
+        "count": 145
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AALGN-2026-09-22-130-P%3A1782264773048%3A1782264773058",
+        "count": 144
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3ADAL-2026-08-08-STRUCT-straddle%3A1782264836000%3ADAL-2026-08-08-490-C%7CDAL-2026-08-08-490-P",
+        "count": 144
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3APCG-2026-07-22-STRUCT-vertical%3A1782264868000%3APCG-2026-07-22-190-C%7CPCG-2026-07-22-210-C",
+        "count": 134
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3APCG-2026-07-22-STRUCT-vertical%3A1782264768000%3APCG-2026-07-22-190-C%7CPCG-2026-07-22-210-C",
+        "count": 133
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3APCG-2026-08-08-STRUCT-vertical%3A1782264887500%3APCG-2026-08-08-190-C%7CPCG-2026-08-08-210-C",
+        "count": 132
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3APCG-2026-07-22-STRUCT-vertical%3A1782264862000%3APCG-2026-07-22-190-C%7CPCG-2026-07-22-210-C",
+        "count": 124
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3APCG-2026-07-22-210-C%3A1782264800169%3A1782264800199",
+        "count": 121
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3APH-2026-07-08-200-P%3A1782264856431%3A1782264856431",
+        "count": 119
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3APCG-2026-07-22-STRUCT-vertical%3A1782264798000%3APCG-2026-07-22-190-C%7CPCG-2026-07-22-210-C",
+        "count": 114
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3ADAL-2026-07-22-STRUCT-straddle%3A1782264857000%3ADAL-2026-07-22-490-C%7CDAL-2026-07-22-490-P",
+        "count": 113
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3APCG-2026-07-22-190-C%3A1782264737888%3A1782264737938",
+        "count": 113
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3APH-2026-07-01-200-P%3A1782264867490%3A1782264867490",
+        "count": 109
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AAMZN-2026-07-01-260-C%3A1782264792132%3A1782264792137",
+        "count": 107
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3APCG-2026-08-08-STRUCT-vertical%3A1782264873500%3APCG-2026-08-08-190-C%7CPCG-2026-08-08-210-C",
+        "count": 106
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AF-2026-06-24-95-P%3A1782264904666%3A1782264904666",
+        "count": 104
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3APCG-2026-07-22-STRUCT-vertical%3A1782264735500%3APCG-2026-07-22-190-C%7CPCG-2026-07-22-210-C",
+        "count": 103
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3ADAL-2026-08-08-STRUCT-straddle%3A1782264830000%3ADAL-2026-08-08-490-C%7CDAL-2026-08-08-490-P",
+        "count": 99
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3ADAL-2026-08-08-STRUCT-straddle%3A1782264846000%3ADAL-2026-08-08-490-C%7CDAL-2026-08-08-490-P",
+        "count": 99
+      }
+    ],
+    "endpointFailures": [],
+    "cdp": {
+      "start": {
+        "taskDurationSeconds": 9.794483,
+        "scriptDurationSeconds": 8.955526,
+        "jsHeapUsedSizeBytes": 38567188,
+        "domNodeCount": 1403
+      },
+      "end": {
+        "taskDurationSeconds": 68.849571,
+        "scriptDurationSeconds": 64.181273,
+        "jsHeapUsedSizeBytes": 85022344,
+        "domNodeCount": 1824
+      },
+      "delta": {
+        "taskDurationSeconds": 59.055088,
+        "scriptDurationSeconds": 55.225747000000005,
+        "jsHeapUsedSizeBytes": 46455156,
+        "domNodeCount": 1824
+      }
+    },
+    "sanity": {
+      "routePresent": true,
+      "pageTitle": "Durable Tapes",
+      "visibleDurablePaneCount": 5,
+      "visibleRowCount": 70,
+      "paneRows": [
+        {
+          "key": "options",
+          "title": "Options Tape",
+          "visible": true,
+          "rowCount": 20
+        },
+        {
+          "key": "flow",
+          "title": "Flow Packets",
+          "visible": true,
+          "rowCount": 20
+        },
+        {
+          "key": "equities",
+          "title": "Equities Tape",
+          "visible": true,
+          "rowCount": 15
+        },
+        {
+          "key": "alerts",
+          "title": "Alerts",
+          "visible": true,
+          "rowCount": 15
+        },
+        {
+          "key": "news",
+          "title": "News Wire",
+          "visible": true,
+          "rowCount": 0
+        }
+      ],
+      "bodyTextSample": "SKIP TO TERMINAL CONTENT MENU TICKER CLEAR REPLAY QA DURABLE TAPES VIEW signal prints SETTINGS OPTIONS TAPE ^ LIVE TIME CONTRACT PREMIUM SIDE 09:35:15 PM ES 8/8 350P $35.1K A 09:35:13 PM A 6/25 90C $29.8K A 09:35:12 PM F 6/24 95P $40.8K A 09:35:12 PM F 6/24 95P $36.3K A 09:35:12 PM F 6/24 95P $33.4K A 09:35:11 PM SYY 6/24 500C $19.8K A 09:35:09 PM F 6/25 95P $30.9K A 09:35:09 PM F 6/25 95P $36.3K A 09:35:07 PM TSLA 7/8 180C $16.0K A 09:35:07 PM TSLA 7/8 180C $18.8K A 09:35:07 PM TSLA 7/8 180C $1"
+    }
+  },
+  "warmupMetrics": {
+    "totalNetworkRequestCount": 1278,
+    "optionsSupportRequestCount": 671,
+    "optionPrintsByTraceRequestCount": 328,
+    "abortedRequestCount": 890,
+    "abortedEndpointRequestCount": 661,
+    "supportEvidenceStatusDistribution": {
+      "optionsSupport": {
+        "204": 233
+      },
+      "optionPrintsByTrace": {}
+    },
+    "supportEvidenceErrorResponses": 0,
+    "websocketFrameCount": 471,
+    "websocketReceivedFrameCount": 457,
+    "websocketSentFrameCount": 14,
+    "websocketBytes": 4189596,
+    "websocketReceivedBytes": 4184084,
+    "websocketSentBytes": 5512,
+    "websocketErrorCount": 0,
+    "topRequests": [
+      {
+        "request": "OPTIONS https://api.flow.deltaisland.io/lookup/options-support",
+        "count": 336
+      },
+      {
+        "request": "POST https://api.flow.deltaisland.io/lookup/options-support",
+        "count": 335
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/option-prints/by-trace",
+        "count": 328
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3ADAL-2026-08-08-STRUCT-straddle%3A1782264717500%3ADAL-2026-08-08-490-C%7CDAL-2026-08-08-490-P",
+        "count": 42
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3ALYB-2026-06-25-380-C%3A1782264722829%3A1782264722839",
+        "count": 39
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3ADAL-2026-07-22-STRUCT-straddle%3A1782264712500%3ADAL-2026-07-22-490-C%7CDAL-2026-07-22-490-P",
+        "count": 28
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3APCG-2026-07-22-STRUCT-vertical%3A1782264727500%3APCG-2026-07-22-190-C%7CPCG-2026-07-22-210-C",
+        "count": 24
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3APCG-2026-08-08-190-C%3A1782264732871%3A1782264732901",
+        "count": 23
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3APCG-2026-08-08-STRUCT-vertical%3A1782264732500%3APCG-2026-08-08-190-C%7CPCG-2026-08-08-210-C",
+        "count": 23
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3ADAL-2026-08-08-STRUCT-straddle%3A1782264697500%3ADAL-2026-08-08-490-C%7CDAL-2026-08-08-490-P",
+        "count": 18
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AFSLR-2026-07-22-180-C%3A1782264695751%3A1782264695756",
+        "count": 18
+      },
+      {
+        "request": "GET https://api.flow.deltaisland.io/flow/packets/flowpacket%3AQQQ-2026-06-24-185-C%3A1782264700781%3A1782264700781",
+        "count": 18
+      },
+      {
+        "request": "GET http://localhost:3100/_next/static/chunks/%5Broot-of-the-server%5D__0zkr370._.css",
+        "count": 1
+      },
+      {
+        "request": "GET http://localhost:3100/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0dauy44._.js",
+        "count": 1
+      },
+      {
+        "request": "GET http://localhost:3100/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0e4~77k._.js",
+        "count": 1
+      },
+      {
+        "request": "GET http://localhost:3100/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0yjw1oe._.js",
+        "count": 1
+      },
+      {
+        "request": "GET http://localhost:3100/_next/static/chunks/0-xh_zod_v3_0_4gl2q._.js",
+        "count": 1
+      },
+      {
+        "request": "GET http://localhost:3100/_next/static/chunks/0~ve_%40swc_helpers_cjs_097dtp9._.js",
+        "count": 1
+      },
+      {
+        "request": "GET http://localhost:3100/_next/static/chunks/041w_lightweight-charts_dist_lightweight-charts_development_mjs_0rsd_td._.js",
+        "count": 1
+      },
+      {
+        "request": "GET http://localhost:3100/_next/static/chunks/08s8_next_016aajd._.js",
+        "count": 1
+      },
+      {
+        "request": "GET http://localhost:3100/_next/static/chunks/08s8_next_dist_0qs8yzb._.js",
+        "count": 1
+      },
+      {
+        "request": "GET http://localhost:3100/_next/static/chunks/08s8_next_dist_client_0su~5rf._.js",
+        "count": 1
+      },
+      {
+        "request": "GET http://localhost:3100/_next/static/chunks/08s8_next_dist_client_components_builtin_global-error_137sf~c.js",
+        "count": 1
+      },
+      {
+        "request": "GET http://localhost:3100/_next/static/chunks/08s8_next_dist_compiled_05-p-vx._.js",
+        "count": 1
+      },
+      {
+        "request": "GET http://localhost:3100/_next/static/chunks/08s8_next_dist_compiled_next-devtools_index_11o91.a.js",
+        "count": 1
+      },
+      {
+        "request": "GET http://localhost:3100/_next/static/chunks/08s8_next_dist_compiled_react-dom_0ww4g4k._.js",
+        "count": 1
+      },
+      {
+        "request": "GET http://localhost:3100/_next/static/chunks/08s8_next_dist_compiled_react-server-dom-turbopack_0hnytrk._.js",
+        "count": 1
+      },
+      {
+        "request": "GET http://localhost:3100/_next/static/chunks/apps_web_0rqeker._.js",
+        "count": 1
+      },
+      {
+        "request": "GET http://localhost:3100/_next/static/chunks/apps_web_app_layout_tsx_08qhsnj._.js",
+        "count": 1
+      },
+      {
+        "request": "GET http://localhost:3100/_next/static/chunks/apps_web_app_terminal_tsx_0~dsc2l._.js",
+        "count": 1
+      }
+    ],
+    "endpointFailures": []
+  },
+  "initialSanity": {
+    "routePresent": true,
+    "pageTitle": "Durable Tapes",
+    "visibleDurablePaneCount": 5,
+    "visibleRowCount": 0,
+    "paneRows": [
+      {
+        "key": "options",
+        "title": "Options Tape",
+        "visible": true,
+        "rowCount": 0
+      },
+      {
+        "key": "flow",
+        "title": "Flow Packets",
+        "visible": true,
+        "rowCount": 0
+      },
+      {
+        "key": "equities",
+        "title": "Equities Tape",
+        "visible": true,
+        "rowCount": 0
+      },
+      {
+        "key": "alerts",
+        "title": "Alerts",
+        "visible": true,
+        "rowCount": 0
+      },
+      {
+        "key": "news",
+        "title": "News Wire",
+        "visible": true,
+        "rowCount": 0
+      }
+    ],
+    "bodyTextSample": "Skip to terminal content Menu TickerClear Replay QA Durable Tapes Viewsignal prints Settings Options Tape ^Live CONTRACTPREMIUM Flow Packets ^Live CONTRACTPREMIUM Equities Tape ^Live TICKERPX Alerts ^Live SYMBOLSTATE Wireconnectingwaiting Stories0all symbols Historyscroll gatelive only Sourceswaiting Symbolsunmapped Stateall0mapped0unmapped0updated0resetclear News Wire ^Live Headline Waiting for live news stories."
+  }
+}
