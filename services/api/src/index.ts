@@ -147,7 +147,7 @@ import {
   getOptionPrintTraceLookupErrorStatus,
   parseOptionPrintTraceLookupParams
 } from "./option-print-lookup";
-import { parseOptionPrintQuery } from "./option-queries";
+import { getOptionPrintQueryErrorStatus, parseOptionPrintQuery } from "./option-queries";
 import {
   fetchRecentSmartFlowExplainability,
   fetchSmartFlowExplainabilityAfter,
@@ -1476,7 +1476,7 @@ const run = async () => {
             const data = await fetchRecentOptionPrints(clickhouse, limit, source, storageFilters);
             return jsonResponse({ data });
           } catch (error) {
-            const status = error instanceof z.ZodError ? 400 : 503;
+            const status = getOptionPrintQueryErrorStatus(error);
             return jsonResponse(
               {
                 error: status === 400 ? "invalid options query" : "options query failed",
@@ -1649,12 +1649,14 @@ const run = async () => {
               buildHistoryResponse(data, (item) => ({ ts: item.ts, seq: item.seq }))
             );
           } catch (error) {
+            const status = getOptionPrintQueryErrorStatus(error);
             return jsonResponse(
               {
-                error: "invalid options history query",
+                error:
+                  status === 400 ? "invalid options history query" : "options history query failed",
                 detail: error instanceof Error ? error.message : String(error)
               },
-              400
+              status
             );
           }
         }
@@ -1853,12 +1855,14 @@ const run = async () => {
             const next = last ? { ts: last.ts, seq: last.seq } : null;
             return jsonResponse({ data, next });
           } catch (error) {
+            const status = getOptionPrintQueryErrorStatus(error);
             return jsonResponse(
               {
-                error: "invalid options replay query",
+                error:
+                  status === 400 ? "invalid options replay query" : "options replay query failed",
                 detail: error instanceof Error ? error.message : String(error)
               },
-              400
+              status
             );
           }
         }

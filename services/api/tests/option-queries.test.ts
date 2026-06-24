@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { parseOptionPrintQuery } from "../src/option-queries";
+import { z } from "zod";
+import { getOptionPrintQueryErrorStatus, parseOptionPrintQuery } from "../src/option-queries";
 
 describe("parseOptionPrintQuery", () => {
   it("keeps broad option flow filters for non-contract requests", () => {
@@ -55,5 +56,10 @@ describe("parseOptionPrintQuery", () => {
       },
       isContractDrilldown: true
     });
+  });
+
+  it("maps parse failures and storage failures to distinct route statuses", () => {
+    expect(getOptionPrintQueryErrorStatus(new z.ZodError([]))).toBe(400);
+    expect(getOptionPrintQueryErrorStatus(new Error("ClickHouse request timed out"))).toBe(503);
   });
 });

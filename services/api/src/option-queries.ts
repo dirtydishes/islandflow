@@ -105,3 +105,6 @@ export const parseOptionPrintQuery = (url: URL): ParsedOptionPrintQuery => {
     isContractDrilldown
   };
 };
+
+export const getOptionPrintQueryErrorStatus = (error: unknown): number =>
+  error instanceof z.ZodError ? 400 : 503;

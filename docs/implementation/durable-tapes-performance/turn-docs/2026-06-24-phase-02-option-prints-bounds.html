@@ -237,6 +237,11 @@
             Adds lightweight <code>api.option_prints.by_trace_ms</code> timing metrics tagged as
             hit, miss, invalid, or error.
           </li>
+          <li>
+            Reviewer repair keeps recent, history, and replay option-print route errors consistent:
+            parser failures stay <code>400</code>, while bounded storage/query failures return
+            <code>503</code> JSON.
+          </li>
         </ul>
       </section>
 
@@ -262,8 +267,9 @@
           <li><span class="status-ok">pass</span> <code>bun install</code></li>
           <li><span class="status-ok">pass</span> <code>bun test packages/storage/tests/option-prints.test.ts</code>: 7 tests, 43 assertions.</li>
           <li><span class="status-ok">pass</span> <code>bun test services/api/tests/option-print-lookup.test.ts</code>: 5 tests, 6 assertions.</li>
-          <li><span class="status-ok">pass</span> <code>bun test services/api/tests packages/storage/tests</code>: 82 tests, 260 assertions.</li>
-          <li><span class="status-ok">pass</span> <code>bun test</code>: 443 tests, 7575 assertions.</li>
+          <li><span class="status-ok">pass</span> <code>bun test services/api/tests/option-queries.test.ts services/api/tests/option-print-lookup.test.ts</code>: 8 tests, 10 assertions.</li>
+          <li><span class="status-ok">pass</span> <code>bun test services/api/tests packages/storage/tests</code>: 83 tests, 262 assertions.</li>
+          <li><span class="status-ok">pass</span> <code>bun test</code>: 444 tests, 7137 assertions.</li>
           <li><span class="status-ok">pass</span> <code>bun run fmt:check</code></li>
           <li><span class="status-ok">pass</span> <code>bun run lint</code></li>
           <li><span class="status-ok">pass</span> <code>bun run typecheck</code></li>
@@ -300,6 +306,31 @@
             <span class="status-note">deployed recovery pending</span>
             The public API route check targets the live deployment. This branch can only prove live
             public recovery after the API containing these bounds is deployed.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Reviewer Repair</h2>
+        <ul>
+          <li>
+            <span class="status-risk">finding repaired</span>
+            <code>services/api/src/index.ts:1652</code> and
+            <code>services/api/src/index.ts:1858</code> previously caught bounded
+            option-print history/replay storage failures as <code>400 invalid ... query</code>.
+            That made server-side ClickHouse timeouts look like client input errors after this PR
+            intentionally put timeouts on those reads.
+          </li>
+          <li>
+            Moved the status decision behind <code>getOptionPrintQueryErrorStatus</code> in
+            <code>services/api/src/option-queries.ts:109</code>, the same module that owns
+            option-print query parsing. Recent, history, and replay routes now share the same
+            boundary: Zod parse failures return <code>400</code>; storage/query failures return
+            <code>503</code>.
+          </li>
+          <li>
+            Added focused coverage in <code>services/api/tests/option-queries.test.ts:61</code>
+            so the parser-vs-storage status split stays explicit.
           </li>
         </ul>
       </section>
@@ -418,6 +449,21 @@ diff --git a/services/api/src/index.ts b/services/api/src/index.ts
 +          }
          }
 
+diff --git a/services/api/src/option-queries.ts b/services/api/src/option-queries.ts
+@@
++export const getOptionPrintQueryErrorStatus = (error: unknown): number =&gt;
++  error instanceof z.ZodError ? 400 : 503;
+
+diff --git a/services/api/src/index.ts b/services/api/src/index.ts
+@@
+-                error: "invalid options history query",
++                error:
++                  status === 400 ? "invalid options history query" : "options history query failed",
+@@
+-                error: "invalid options replay query",
++                error:
++                  status === 400 ? "invalid options replay query" : "options replay query failed",
+
 diff --git a/packages/storage/tests/option-prints.test.ts b/packages/storage/tests/option-prints.test.ts
 @@
 +  it("returns an empty trace lookup without querying ClickHouse", async () =&gt; {
@@ -479,6 +525,21 @@ diff --git a/services/api/src/index.ts b/services/api/src/index.ts
 +          const traceIds = parseOptionPrintTraceLookupParams(url);
 +          const data = await fetchOptionPrintsByTraceIds(clickhouse, traceIds);
 +          return jsonResponse({ data });
+
+diff --git a/services/api/src/option-queries.ts b/services/api/src/option-queries.ts
+@@
++export const getOptionPrintQueryErrorStatus = (error: unknown): number =>
++  error instanceof z.ZodError ? 400 : 503;
+
+diff --git a/services/api/src/index.ts b/services/api/src/index.ts
+@@
+-                error: "invalid options history query",
++                error:
++                  status === 400 ? "invalid options history query" : "options history query failed",
+@@
+-                error: "invalid options replay query",
++                error:
++                  status === 400 ? "invalid options replay query" : "options replay query failed",
 </script>
     <script type="module">
       const source = document.getElementById("patch-source")?.textContent ?? "";
