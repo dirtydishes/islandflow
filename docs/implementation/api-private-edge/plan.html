@@ -381,6 +381,7 @@
         <a href="#decisions">Decisions</a>
         <a href="#phases">Phases</a>
         <a href="#loop">Agent Loop</a>
+        <a href="#subagents">Subagents</a>
         <a href="#interfaces">Interfaces</a>
         <a href="#verification">Verification</a>
       </div>
@@ -555,6 +556,67 @@
               <td>Orchestrator</td>
               <td>Selector result, worker callback, reviewer callback, Forgejo state, and Beads state.</td>
               <td>Merges or routes blockers, pushes Beads and git state, verifies branch status, then reruns selector.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="subagents" aria-labelledby="subagents-title">
+        <div class="section-head">
+          <div class="label">Worker-owned fanout</div>
+          <h2 id="subagents-title">Many helpers, one implementation owner</h2>
+          <p>Implementation workers may use bounded subagents when a phase has broad inspection, testing, or review surface. Helpers increase coverage; they do not split ownership.</p>
+        </div>
+        <div class="grid">
+          <div class="panel">
+            <h3>1. One owner</h3>
+            <p>The implementation worker owns the branch, edits, Beads state, commit, PR state, phase turn doc, and final callback.</p>
+          </div>
+          <div class="panel">
+            <h3>2. Bounded helpers</h3>
+            <p>The worker may launch helper subagents when useful. Broad inventory phases can use a scout swarm; narrow phases can use none.</p>
+          </div>
+          <div class="panel">
+            <h3>3. Allowed helper work</h3>
+            <p>Helpers may inspect, inventory, run focused checks, review risk, map test gaps, and propose patches or follow-ups.</p>
+          </div>
+          <div class="panel">
+            <h3>4. Hard limits</h3>
+            <p>Helpers must not mutate tracked files, update Beads, create branches, commit, push, open PRs, contact the orchestrator, or make final scope decisions.</p>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Phase</th>
+              <th>Useful helper targets</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>00 Baseline</td>
+              <td>Live edge inventory, repo hostname inventory, same-origin route coverage, bundle and probe exposure checks.</td>
+            </tr>
+            <tr>
+              <td>01 Scrub</td>
+              <td>Active docs, env examples, dev scripts, tests, probes, and product-constant exceptions.</td>
+            </tr>
+            <tr>
+              <td>02 Transport</td>
+              <td>URL builders, server-only proxy config, deployment route matcher coverage, smoke probe behavior.</td>
+            </tr>
+            <tr>
+              <td>03 Rate limits</td>
+              <td>Route categories, forwarded-IP handling, rejection metrics, logging privacy, API test matrix.</td>
+            </tr>
+            <tr>
+              <td>04 Host closure</td>
+              <td>NPM durability, generated config regeneration, same-origin preservation, rollback path review.</td>
+            </tr>
+            <tr>
+              <td>05 Closeout</td>
+              <td>Live verification matrix, raw-host closure checks, bundle exposure audit, Beads and Forgejo closeout.</td>
             </tr>
           </tbody>
         </table>

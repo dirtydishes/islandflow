@@ -32,6 +32,19 @@ curl -sS -o /dev/null -w "%{http_code}\\n" --max-time 5 <raw-api-origin>/health
 
 Use shell variables for origins during live checks. Do not commit concrete production domains into docs or scripts.
 
+## Implementation Subagents
+
+The Phase 04 worker may use helper subagents for edge durability and rollback review.
+
+Good helper targets:
+
+- NPM database state and helper-script behavior.
+- Generated config regeneration risks.
+- Same-origin app route preservation.
+- Rollback and reopen procedure audit.
+
+Helpers may inspect and propose. The worker owns any deployment-helper edits, live-change sequencing, Beads state, and the final callback.
+
 ## Out Of Scope
 
 - DNS provider changes unless raw-host closure cannot be made durable at NPM.

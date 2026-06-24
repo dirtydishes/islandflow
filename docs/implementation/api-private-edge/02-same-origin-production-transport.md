@@ -31,6 +31,19 @@ bun --cwd=apps/web run build
 bun run scripts/probes/durable-tapes-production-smoke.ts --target=<production-app-origin>/durable-tapes --api-origin=<internal-or-placeholder-origin>
 ```
 
+## Implementation Subagents
+
+The Phase 02 worker may use helper subagents for parallel transport and edge-contract review.
+
+Good helper targets:
+
+- Browser REST and websocket URL builders.
+- Server-only proxy config and synthetic admin proxy behavior.
+- Deployment helper and NPM route matcher coverage.
+- Production smoke probe and bundle-hostname checks.
+
+Helpers may propose specific edits or tests, but the worker owns the transport contract, branch, Beads updates, commit, PR state, and final callback.
+
 ## Out Of Scope
 
 - Raw API host closure.

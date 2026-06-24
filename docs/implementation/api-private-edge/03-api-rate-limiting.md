@@ -38,6 +38,19 @@ bd show islandflow-hnbk.4
 bun test services/api/tests
 ```
 
+## Implementation Subagents
+
+The Phase 03 worker may use helper subagents to pressure-test the rate-limit design before implementation.
+
+Good helper targets:
+
+- API route categorization and bucket assignment.
+- Forwarded-IP and proxy-header behavior.
+- Metrics/logging shape and privacy review.
+- Focused API test matrix.
+
+Helpers must not choose final limits, mutate Beads, or implement independent patches. The worker owns the final env contract and any follow-up issues.
+
 ## Out Of Scope
 
 - Full login/session auth.

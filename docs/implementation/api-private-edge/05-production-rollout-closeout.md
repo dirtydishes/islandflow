@@ -34,6 +34,19 @@ ssh di 'curl -fsS <internal-api-origin>/health'
 
 Use placeholders in committed docs and scripts; use local shell variables for live origins during the rollout.
 
+## Implementation Subagents
+
+The Phase 05 worker may use helper subagents for final verification breadth, but there is still one rollout owner.
+
+Good helper targets:
+
+- Live app-origin REST and websocket verification.
+- Raw-host closure and direct-port reachability checks.
+- Bundle exposure and docs consistency audit.
+- Beads, Forgejo, CI, and final status closeout audit.
+
+Helpers must not perform live mutations independently. The worker owns rollout sequencing, deployment commands, issue closeout, pushes, and the final handoff.
+
 ## Out Of Scope
 
 - New authentication product work.
