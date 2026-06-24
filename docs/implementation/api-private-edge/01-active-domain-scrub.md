@@ -27,6 +27,19 @@ rg -n "NEXT_PUBLIC_API_URL|API_CORS_ORIGINS|DEFAULT_REMOTE_API_URL|DEPLOY_PUBLIC
 bun test apps/web/scripts/dev-config.test.ts services/api/tests/cors.test.ts
 ```
 
+## Implementation Subagents
+
+The Phase 01 worker may use helper subagents to divide the scrub safely before editing.
+
+Good helper targets:
+
+- Active docs and agent-prompt references.
+- Env examples and deployment docs.
+- Web/dev scripts and probe defaults.
+- Tests and product-constant exceptions.
+
+Helpers return candidate paths, rationale, and risk notes. The worker owns all edits, decides which references are active versus historical, updates Beads, and performs the final callback.
+
 ## Out Of Scope
 
 - Changing production transport behavior.

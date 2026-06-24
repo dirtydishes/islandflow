@@ -30,6 +30,19 @@ ssh di 'ss -ltnp 2>/dev/null | grep -E ":(80|443|3000|4000)\\b" || true'
 
 Use `<production-app-origin>` and `<raw-api-origin>` variables for public probes. Do not commit concrete production domains while recording the baseline.
 
+## Implementation Subagents
+
+The Phase 00 worker may use several read-only helper subagents because the work is inventory-heavy.
+
+Good helper targets:
+
+- Live server and NPM edge inventory.
+- Repo hostname/default inventory.
+- Same-origin route coverage audit.
+- Bundle and probe exposure checks.
+
+The worker still owns the baseline synthesis, Beads state, turn document, and final callback. Helpers must not change server state, edit files, update Beads, or commit.
+
 ## Out Of Scope
 
 - Editing docs or code.

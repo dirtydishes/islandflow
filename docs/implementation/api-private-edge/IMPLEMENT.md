@@ -96,6 +96,41 @@ Closeout:
 
 Keep one active implementation PR at a time unless a phase doc explicitly allows parallelism.
 
+## Implementation Worker Subagents
+
+Implementation workers may use bounded helper subagents when a phase benefits from parallel inspection, test mapping, or specialized review. This is optional, not a quota. Do not spawn helpers just to make a narrow phase look busy.
+
+Worker-owned fanout model:
+
+1. One implementation owner remains accountable for the phase.
+2. The worker may launch bounded helper subagents when useful.
+3. Helpers may inspect, inventory, test, review, model risk, and propose patches or follow-ups.
+4. Helpers must not mutate tracked files, update Beads, create or switch branches, commit, push, create PRs, contact the orchestrator, or make final scope decisions.
+
+Fan-in requirements:
+
+- The worker must read every helper result before editing or calling back.
+- Conflicting helper findings must be resolved by the worker, not by another helper.
+- Helper output should be summarized in the worker callback only when it changed implementation choices, test coverage, or residual risk.
+- If helper work exposes out-of-scope defects, the worker files focused follow-up Beads issues instead of widening the phase.
+
+Good implementation helper targets:
+
+- Phase 00: live edge inventory, repo hostname/default inventory, same-origin route coverage, bundle/probe exposure checks.
+- Phase 01: active docs/examples inventory, dev-script/default config review, test fixture scan, product-constant exception audit.
+- Phase 02: web transport builders, server-only proxy config, deployment route matcher coverage, production smoke probe behavior.
+- Phase 03: rate-limit design review, API route categorization, forwarded-IP handling, rejection metrics/logging, focused test gaps.
+- Phase 04: NPM database/helper durability, generated-config regeneration behavior, rollback path review, same-origin preservation checks.
+- Phase 05: rollout checklist audit, live verification matrix, Beads/Forgejo closeout audit, final docs consistency.
+
+Do not delegate:
+
+- Reading or interpreting required skill instructions.
+- Deciding the public/private API posture.
+- Owning the implementation branch or PR.
+- Closing phase issues or the epic.
+- Final deployment decisions.
+
 ## Quality Gates
 
 Use phase-specific gates first. Common gates:
