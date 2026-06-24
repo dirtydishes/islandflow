@@ -31,7 +31,8 @@ import {
   useRef,
   useState
 } from "react";
-
+import type { AlertContractFocusRequest, AlertEquityFocusRequest } from "../alerts";
+import type { FlowPacketFocusRequest } from "../flow-packets";
 import { sortBySourceTime } from "./charts/markers";
 import {
   CANDLE_INTERVALS,
@@ -50,8 +51,6 @@ import {
   prunePinnedEntries,
   resolveAlertFlowPacket
 } from "./evidence";
-import type { AlertContractFocusRequest, AlertEquityFocusRequest } from "../alerts";
-import type { FlowPacketFocusRequest } from "../flow-packets";
 import {
   buildDefaultFlowFilters,
   buildOptionTapeQueryParams,
@@ -63,24 +62,30 @@ import {
   shouldShowEquitiesSilentFeedWarning
 } from "./filters";
 import { formatOptionContractLabel, selectPrimaryClassifierHit } from "./format";
+import {
+  type OptionSupportNbboContext,
+  stableHydrationKey,
+  stableOptionSupportNbboKey,
+  terminalHydrationScheduler
+} from "./hydration-scheduler";
 import { toStaticTapeState, useLiveSession, usePausableTapeView, useTape } from "./live";
 import { getLiveManifest, getRouteFeatures } from "./routes";
 import { useListScroll, useScrollAnchor } from "./scroll";
 import {
   buildClassifierDecor,
   buildSmartMoneyDecor,
+  type ClassifierDecor,
+  type DarkEvidenceItem,
   EMPTY_CLASSIFIER_DECOR_BY_OPTION_TRACE_ID,
   EMPTY_CLASSIFIER_HITS_BY_PACKET_ID,
   EMPTY_PACKET_ID_BY_OPTION_TRACE_ID,
+  type EvidenceItem,
   extractUnderlying,
   inferDarkUnderlying,
   normalizeContractId,
   normalizeJoinRefCandidates,
   resolveJoinFromRef,
-  upsertPinnedEntries,
-  type ClassifierDecor,
-  type DarkEvidenceItem,
-  type EvidenceItem
+  upsertPinnedEntries
 } from "./state-helpers";
 import {
   composeTapeItems,
@@ -107,87 +112,6 @@ const EMPTY_SMART_FLOW_EXPLAINABILITY: SmartFlowExplainabilityProjection[] = [];
 const EMPTY_SMART_MONEY_EVENTS: SmartMoneyEvent[] = [];
 const EMPTY_INFERRED_DARK_EVENTS: InferredDarkEvent[] = [];
 const EMPTY_NEWS_STORIES: NewsStory[] = [];
-
-const OPTION_PRINT_LOOKUP_BATCH_SIZE = 100;
-const FLOW_PACKET_LOOKUP_BATCH_SIZE = 12;
-
-const isAbortLikeError = (error: unknown): boolean => {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "name" in error &&
-    (error as { name?: unknown }).name === "AbortError"
-  );
-};
-
-const uniqueNonEmpty = (items: string[]): string[] => {
-  return Array.from(new Set(items.map((item) => item.trim()).filter(Boolean)));
-};
-
-const chunkItems = <T,>(items: T[], size: number): T[][] => {
-  const chunks: T[][] = [];
-  for (let index = 0; index < items.length; index += size) {
-    chunks.push(items.slice(index, index + size));
-  }
-  return chunks;
-};
-
-const fetchFlowPacketsByIds = async (
-  packetIds: string[],
-  signal?: AbortSignal
-): Promise<FlowPacket[]> => {
-  const packets: FlowPacket[] = [];
-  for (const batch of chunkItems(uniqueNonEmpty(packetIds), FLOW_PACKET_LOOKUP_BATCH_SIZE)) {
-    if (signal?.aborted) {
-      break;
-    }
-    const batchPackets = await Promise.all(
-      batch.map(async (packetId) => {
-        const response = await fetch(buildApiUrl(`/flow/packets/${encodeURIComponent(packetId)}`), {
-          signal
-        });
-        if (!response.ok) {
-          throw new Error(await readErrorDetail(response));
-        }
-        const payload = (await response.json()) as { data?: FlowPacket | null };
-        return payload.data ?? null;
-      })
-    );
-    for (const packet of batchPackets) {
-      if (packet) {
-        packets.push(packet);
-      }
-    }
-  }
-  return packets;
-};
-
-const fetchOptionPrintsByTraceIds = async (
-  traceIds: string[],
-  signal?: AbortSignal
-): Promise<OptionPrint[]> => {
-  const prints: OptionPrint[] = [];
-  for (const batch of chunkItems(uniqueNonEmpty(traceIds), OPTION_PRINT_LOOKUP_BATCH_SIZE)) {
-    if (signal?.aborted) {
-      break;
-    }
-    const url = new URL(buildApiUrl("/option-prints/by-trace"));
-    for (const traceId of batch) {
-      url.searchParams.append("trace_id", traceId);
-    }
-    const response = await fetch(url.toString(), { signal });
-    if (!response.ok) {
-      throw new Error(await readErrorDetail(response));
-    }
-    const payload = (await response.json()) as { data?: OptionPrint[] };
-    for (const item of payload.data ?? []) {
-      if (item?.trace_id) {
-        prints.push(item);
-      }
-    }
-  }
-  return prints;
-};
 
 export const useTerminalState = () => {
   const pathname = nextNavigation.usePathname();
@@ -965,13 +889,13 @@ export const useTerminalState = () => {
     routeFeatures.needsClassifierDecor
   ]);
 
-  useEffect(() => {
+  const optionSupportHydrationInput = useMemo(() => {
+    const traceIds: string[] = [];
+    const nbboContext: OptionSupportNbboContext[] = [];
     if (!routeFeatures.needsClassifierDecor || mode !== "live" || optionsFeed.items.length === 0) {
-      return;
+      return { traceIds, nbboContext };
     }
 
-    const traceIds: string[] = [];
-    const nbboContext: Array<{ trace_id: string; option_contract_id: string; ts: number }> = [];
     for (const print of optionsFeed.items.slice(0, 1000)) {
       if (!print.trace_id || classifierDecorByOptionTraceId.has(print.trace_id)) {
         continue;
@@ -999,40 +923,38 @@ export const useTerminalState = () => {
     const uniqueNbboContext = Array.from(
       new Map(nbboContext.map((item) => [item.trace_id, item])).values()
     ).slice(0, 250);
+    return { traceIds: uniqueTraceIds, nbboContext: uniqueNbboContext };
+  }, [
+    mode,
+    optionsFeed.items,
+    classifierDecorByOptionTraceId,
+    packetIdByOptionTraceId,
+    historicalNbboByTraceId,
+    routeFeatures.needsClassifierDecor
+  ]);
+
+  const optionSupportTraceKey = stableHydrationKey(optionSupportHydrationInput.traceIds);
+  const optionSupportNbboKey = stableOptionSupportNbboKey(optionSupportHydrationInput.nbboContext);
+
+  useEffect(() => {
+    if (!routeFeatures.needsClassifierDecor || mode !== "live") {
+      return;
+    }
+
+    const uniqueTraceIds = optionSupportHydrationInput.traceIds;
+    const uniqueNbboContext = optionSupportHydrationInput.nbboContext;
     if (uniqueTraceIds.length === 0 && uniqueNbboContext.length === 0) {
       return;
     }
 
-    let cancelled = false;
-    const abort = new AbortController();
-    void fetch(buildApiUrl("/lookup/options-support"), {
-      method: "POST",
-      signal: abort.signal,
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        trace_ids: uniqueTraceIds,
-        nbbo_context: uniqueNbboContext
-      })
-    })
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error(await readErrorDetail(response));
-        }
-        const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
-        if (!contentType.includes("application/json")) {
-          throw new Error(
-            `Unexpected content type from /lookup/options-support: ${contentType || "unknown"}`
-          );
-        }
-        return response.json() as Promise<{
-          packets?: FlowPacket[];
-          smart_money?: SmartMoneyEvent[];
-          classifier_hits?: ClassifierHitEvent[];
-          nbbo_by_trace_id?: Record<string, OptionNBBO | null>;
-        }>;
+    let active = true;
+    void terminalHydrationScheduler
+      .requestOptionSupport({
+        traceIds: uniqueTraceIds,
+        nbboContext: uniqueNbboContext
       })
       .then((payload) => {
-        if (cancelled) {
+        if (!active) {
           return;
         }
         const now = Date.now();
@@ -1046,26 +968,26 @@ export const useTerminalState = () => {
         if (packetMap.size > 0) {
           setPinnedFlowPacketMap((prev) => upsertPinnedEntries(prev, packetMap, now));
         }
-        if (payload.smart_money?.length) {
-          const filtered = payload.smart_money.filter((item): item is SmartMoneyEvent =>
+        if (payload.smartMoney.length) {
+          const filtered = payload.smartMoney.filter((item): item is SmartMoneyEvent =>
             Boolean(item && item.trace_id)
           );
           setOptionSupportSmartMoney((prev) =>
             mergeNewest(filtered, prev, PINNED_EVIDENCE_MAX_ITEMS)
           );
         }
-        if (payload.classifier_hits?.length) {
-          const filtered = payload.classifier_hits.filter((item): item is ClassifierHitEvent =>
+        if (payload.classifierHits.length) {
+          const filtered = payload.classifierHits.filter((item): item is ClassifierHitEvent =>
             Boolean(item && item.trace_id)
           );
           setOptionSupportClassifierHits((prev) =>
             mergeNewest(filtered, prev, PINNED_EVIDENCE_MAX_ITEMS)
           );
         }
-        if (payload.nbbo_by_trace_id) {
+        if (Object.keys(payload.nbboByTraceId).length > 0) {
           setHistoricalNbboByTraceId((prev) => {
             const next = new Map(prev);
-            for (const [traceId, quote] of Object.entries(payload.nbbo_by_trace_id ?? {})) {
+            for (const [traceId, quote] of Object.entries(payload.nbboByTraceId)) {
               next.set(traceId, quote);
             }
             return next;
@@ -1073,24 +995,16 @@ export const useTerminalState = () => {
         }
       })
       .catch((error) => {
-        if (cancelled || abort.signal.aborted || isAbortLikeError(error)) {
+        if (!active) {
           return;
         }
         console.warn("Failed to hydrate option row support", error);
       });
 
     return () => {
-      cancelled = true;
-      abort.abort();
+      active = false;
     };
-  }, [
-    mode,
-    optionsFeed.items,
-    classifierDecorByOptionTraceId,
-    packetIdByOptionTraceId,
-    historicalNbboByTraceId,
-    routeFeatures.needsClassifierDecor
-  ]);
+  }, [mode, optionSupportNbboKey, optionSupportTraceKey, routeFeatures.needsClassifierDecor]);
 
   const selectedClassifierPacketId = useMemo(() => {
     if (!selectedClassifierHit) {
@@ -1099,34 +1013,46 @@ export const useTerminalState = () => {
     return extractPacketIdFromClassifierHitTrace(selectedClassifierHit.trace_id);
   }, [extractPacketIdFromClassifierHitTrace, selectedClassifierHit]);
 
+  const selectedClassifierMissingPacketIds = useMemo(
+    () =>
+      selectedClassifierPacketId && !resolvedFlowPacketMap.has(selectedClassifierPacketId)
+        ? [selectedClassifierPacketId]
+        : [],
+    [resolvedFlowPacketMap, selectedClassifierPacketId]
+  );
+  const selectedClassifierMissingPacketKey = stableHydrationKey(selectedClassifierMissingPacketIds);
+
   useEffect(() => {
-    if (!selectedClassifierPacketId || mode !== "live") {
+    if (mode !== "live" || selectedClassifierMissingPacketIds.length === 0) {
       return;
     }
 
-    if (!resolvedFlowPacketMap.has(selectedClassifierPacketId)) {
-      incrementRetentionMetric("pinnedFetchMisses", 1);
-      void fetch(buildApiUrl(`/flow/packets/${encodeURIComponent(selectedClassifierPacketId)}`))
-        .then(async (response) => {
-          if (!response.ok) {
-            throw new Error(await readErrorDetail(response));
-          }
-          return response.json();
-        })
-        .then((payload: { data?: FlowPacket | null }) => {
-          if (!payload.data) {
-            return;
-          }
-          const now = Date.now();
-          const next = new Map<string, FlowPacket>([[payload.data.id, payload.data]]);
-          setPinnedFlowPacketMap((prev) => upsertPinnedEntries(prev, next, now));
-        })
-        .catch((error) => {
-          incrementRetentionMetric("pinnedFetchFailures", 1);
-          console.warn("Failed to fetch classifier flow packet", error);
-        });
-    }
-  }, [selectedClassifierPacketId, mode, resolvedFlowPacketMap]);
+    let active = true;
+    incrementRetentionMetric("pinnedFetchMisses", selectedClassifierMissingPacketIds.length);
+    void terminalHydrationScheduler
+      .requestFlowPackets(selectedClassifierMissingPacketIds)
+      .then(({ packets }) => {
+        if (!active || packets.length === 0) {
+          return;
+        }
+        const next = new Map<string, FlowPacket>();
+        for (const packet of packets) {
+          next.set(packet.id, packet);
+        }
+        setPinnedFlowPacketMap((prev) => upsertPinnedEntries(prev, next, Date.now()));
+      })
+      .catch((error) => {
+        if (!active) {
+          return;
+        }
+        incrementRetentionMetric("pinnedFetchFailures", 1);
+        console.warn("Failed to fetch classifier flow packet", error);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [mode, selectedClassifierMissingPacketKey]);
 
   const selectedClassifierFlowPacket = useMemo(() => {
     if (!selectedClassifierPacketId) {
@@ -1191,19 +1117,31 @@ export const useTerminalState = () => {
     });
   }, [resolvedFlowPacketMap, resolvedOptionPrintMap, selectedSmartFlowRefs]);
 
+  const selectedSmartFlowMissingPacketIds = useMemo(
+    () => selectedSmartFlowPacketRefs.filter((id) => !resolvedFlowPacketMap.has(id)),
+    [resolvedFlowPacketMap, selectedSmartFlowPacketRefs]
+  );
+  const selectedSmartFlowMissingPacketKey = stableHydrationKey(selectedSmartFlowMissingPacketIds);
+  const selectedSmartFlowMissingPrintIds = useMemo(
+    () => selectedSmartFlowPrintRefs.filter((id) => !resolvedOptionPrintMap.has(id)),
+    [resolvedOptionPrintMap, selectedSmartFlowPrintRefs]
+  );
+  const selectedSmartFlowMissingPrintKey = stableHydrationKey(selectedSmartFlowMissingPrintIds);
+
   useEffect(() => {
     if (!selectedSmartFlowProjection || mode !== "live") {
       return;
     }
 
-    const abort = new AbortController();
-    const missingPacketIds = selectedSmartFlowPacketRefs.filter(
-      (id) => !resolvedFlowPacketMap.has(id)
-    );
-    if (missingPacketIds.length > 0) {
-      incrementRetentionMetric("pinnedFetchMisses", missingPacketIds.length);
-      void fetchFlowPacketsByIds(missingPacketIds, abort.signal)
-        .then((packets) => {
+    let active = true;
+    if (selectedSmartFlowMissingPacketIds.length > 0) {
+      incrementRetentionMetric("pinnedFetchMisses", selectedSmartFlowMissingPacketIds.length);
+      void terminalHydrationScheduler
+        .requestFlowPackets(selectedSmartFlowMissingPacketIds)
+        .then(({ packets }) => {
+          if (!active) {
+            return;
+          }
           const next = new Map<string, FlowPacket>();
           for (const packet of packets) {
             next.set(packet.id, packet);
@@ -1213,7 +1151,7 @@ export const useTerminalState = () => {
           }
         })
         .catch((error) => {
-          if (abort.signal.aborted || isAbortLikeError(error)) {
+          if (!active) {
             return;
           }
           incrementRetentionMetric("pinnedFetchFailures", 1);
@@ -1221,13 +1159,14 @@ export const useTerminalState = () => {
         });
     }
 
-    const missingPrintIds = selectedSmartFlowPrintRefs.filter(
-      (id) => !resolvedOptionPrintMap.has(id)
-    );
-    if (missingPrintIds.length > 0) {
-      incrementRetentionMetric("pinnedFetchMisses", missingPrintIds.length);
-      void fetchOptionPrintsByTraceIds(missingPrintIds, abort.signal)
-        .then((prints) => {
+    if (selectedSmartFlowMissingPrintIds.length > 0) {
+      incrementRetentionMetric("pinnedFetchMisses", selectedSmartFlowMissingPrintIds.length);
+      void terminalHydrationScheduler
+        .requestOptionPrints(selectedSmartFlowMissingPrintIds)
+        .then(({ prints }) => {
+          if (!active) {
+            return;
+          }
           const next = new Map<string, OptionPrint>();
           for (const item of prints) {
             next.set(item.trace_id, item);
@@ -1237,7 +1176,7 @@ export const useTerminalState = () => {
           }
         })
         .catch((error) => {
-          if (abort.signal.aborted || isAbortLikeError(error)) {
+          if (!active) {
             return;
           }
           incrementRetentionMetric("pinnedFetchFailures", 1);
@@ -1245,13 +1184,13 @@ export const useTerminalState = () => {
         });
     }
 
-    return () => abort.abort();
+    return () => {
+      active = false;
+    };
   }, [
     mode,
-    resolvedFlowPacketMap,
-    resolvedOptionPrintMap,
-    selectedSmartFlowPacketRefs,
-    selectedSmartFlowPrintRefs,
+    selectedSmartFlowMissingPacketKey,
+    selectedSmartFlowMissingPrintKey,
     selectedSmartFlowProjection
   ]);
 
@@ -1273,19 +1212,35 @@ export const useTerminalState = () => {
     });
   }, [resolvedOptionPrintMap, selectedSmartMoneyEvent]);
 
+  const selectedSmartMoneyMissingPacketIds = useMemo(
+    () =>
+      (selectedSmartMoneyEvent?.packet_ids ?? []).filter((id) => !resolvedFlowPacketMap.has(id)),
+    [resolvedFlowPacketMap, selectedSmartMoneyEvent]
+  );
+  const selectedSmartMoneyMissingPacketKey = stableHydrationKey(selectedSmartMoneyMissingPacketIds);
+  const selectedSmartMoneyMissingPrintIds = useMemo(
+    () =>
+      (selectedSmartMoneyEvent?.member_print_ids ?? []).filter(
+        (id) => !resolvedOptionPrintMap.has(id)
+      ),
+    [resolvedOptionPrintMap, selectedSmartMoneyEvent]
+  );
+  const selectedSmartMoneyMissingPrintKey = stableHydrationKey(selectedSmartMoneyMissingPrintIds);
+
   useEffect(() => {
     if (!selectedSmartMoneyEvent || mode !== "live") {
       return;
     }
 
-    const abort = new AbortController();
-    const missingPacketIds = selectedSmartMoneyEvent.packet_ids.filter(
-      (id) => !resolvedFlowPacketMap.has(id)
-    );
-    if (missingPacketIds.length > 0) {
-      incrementRetentionMetric("pinnedFetchMisses", missingPacketIds.length);
-      void fetchFlowPacketsByIds(missingPacketIds, abort.signal)
-        .then((packets) => {
+    let active = true;
+    if (selectedSmartMoneyMissingPacketIds.length > 0) {
+      incrementRetentionMetric("pinnedFetchMisses", selectedSmartMoneyMissingPacketIds.length);
+      void terminalHydrationScheduler
+        .requestFlowPackets(selectedSmartMoneyMissingPacketIds)
+        .then(({ packets }) => {
+          if (!active) {
+            return;
+          }
           const next = new Map<string, FlowPacket>();
           for (const packet of packets) {
             next.set(packet.id, packet);
@@ -1295,7 +1250,7 @@ export const useTerminalState = () => {
           }
         })
         .catch((error) => {
-          if (abort.signal.aborted || isAbortLikeError(error)) {
+          if (!active) {
             return;
           }
           incrementRetentionMetric("pinnedFetchFailures", 1);
@@ -1303,13 +1258,14 @@ export const useTerminalState = () => {
         });
     }
 
-    const missingPrintIds = selectedSmartMoneyEvent.member_print_ids.filter(
-      (id) => !resolvedOptionPrintMap.has(id)
-    );
-    if (missingPrintIds.length > 0) {
-      incrementRetentionMetric("pinnedFetchMisses", missingPrintIds.length);
-      void fetchOptionPrintsByTraceIds(missingPrintIds, abort.signal)
-        .then((prints) => {
+    if (selectedSmartMoneyMissingPrintIds.length > 0) {
+      incrementRetentionMetric("pinnedFetchMisses", selectedSmartMoneyMissingPrintIds.length);
+      void terminalHydrationScheduler
+        .requestOptionPrints(selectedSmartMoneyMissingPrintIds)
+        .then(({ prints }) => {
+          if (!active) {
+            return;
+          }
           const next = new Map<string, OptionPrint>();
           for (const item of prints) {
             next.set(item.trace_id, item);
@@ -1319,7 +1275,7 @@ export const useTerminalState = () => {
           }
         })
         .catch((error) => {
-          if (abort.signal.aborted || isAbortLikeError(error)) {
+          if (!active) {
             return;
           }
           incrementRetentionMetric("pinnedFetchFailures", 1);
@@ -1327,8 +1283,15 @@ export const useTerminalState = () => {
         });
     }
 
-    return () => abort.abort();
-  }, [mode, resolvedFlowPacketMap, resolvedOptionPrintMap, selectedSmartMoneyEvent]);
+    return () => {
+      active = false;
+    };
+  }, [
+    mode,
+    selectedSmartMoneyEvent,
+    selectedSmartMoneyMissingPacketKey,
+    selectedSmartMoneyMissingPrintKey
+  ]);
 
   const inferAlertUnderlying = useCallback(
     (alert: AlertEvent): string | null => {
@@ -1697,28 +1660,52 @@ export const useTerminalState = () => {
         refs.add(id);
       }
     }
-    return refs;
+    return Array.from(refs).sort();
   }, [visibleAlerts]);
+
+  const visibleAlertMissingPacketIds = useMemo(() => {
+    if (!routeFeatures.needsAlertEvidencePrefetch || mode !== "live") {
+      return [];
+    }
+    const visiblePacketIds = visibleAlerts.flatMap((alert) => getAlertFlowPacketRefs(alert));
+    return Array.from(new Set(visiblePacketIds)).filter((id) => !resolvedFlowPacketMap.has(id));
+  }, [mode, resolvedFlowPacketMap, routeFeatures.needsAlertEvidencePrefetch, visibleAlerts]);
+  const visibleAlertMissingPacketKey = stableHydrationKey(visibleAlertMissingPacketIds);
+
+  const visibleAlertMissingPrintIds = useMemo(() => {
+    if (!routeFeatures.needsAlertEvidencePrefetch || mode !== "live") {
+      return [];
+    }
+    return visibleAlertEvidenceRefs.filter(
+      (id) => !resolvedFlowPacketMap.has(id) && !resolvedOptionPrintMap.has(id)
+    );
+  }, [
+    mode,
+    resolvedFlowPacketMap,
+    resolvedOptionPrintMap,
+    routeFeatures.needsAlertEvidencePrefetch,
+    visibleAlertEvidenceRefs
+  ]);
+  const visibleAlertMissingPrintKey = stableHydrationKey(visibleAlertMissingPrintIds);
 
   useEffect(() => {
     if (
       !routeFeatures.needsAlertEvidencePrefetch ||
       mode !== "live" ||
-      visibleAlerts.length === 0
+      (visibleAlertMissingPacketIds.length === 0 && visibleAlertMissingPrintIds.length === 0)
     ) {
       return;
     }
 
-    const abort = new AbortController();
-    const visiblePacketIds = visibleAlerts.flatMap((alert) => getAlertFlowPacketRefs(alert));
-    const missingPacketIds = Array.from(new Set(visiblePacketIds)).filter(
-      (id) => !resolvedFlowPacketMap.has(id)
-    );
-
-    if (missingPacketIds.length > 0) {
-      incrementRetentionMetric("pinnedFetchMisses", missingPacketIds.length);
-      void fetchFlowPacketsByIds(missingPacketIds, abort.signal)
-        .then((packets) => {
+    let active = true;
+    if (visibleAlertMissingPacketIds.length > 0) {
+      incrementRetentionMetric("pinnedFetchMisses", visibleAlertMissingPacketIds.length);
+      void terminalHydrationScheduler
+        .requestFlowPackets(visibleAlertMissingPacketIds)
+        .then(({ packets }) => {
+          if (!active) {
+            return;
+          }
           const next = new Map<string, FlowPacket>();
           for (const packet of packets) {
             next.set(packet.id, packet);
@@ -1729,7 +1716,7 @@ export const useTerminalState = () => {
           }
         })
         .catch((error) => {
-          if (abort.signal.aborted || isAbortLikeError(error)) {
+          if (!active) {
             return;
           }
           incrementRetentionMetric("pinnedFetchFailures", 1);
@@ -1737,13 +1724,14 @@ export const useTerminalState = () => {
         });
     }
 
-    const missingPrintIds = Array.from(visibleAlertEvidenceRefs).filter(
-      (id) => !resolvedFlowPacketMap.has(id) && !resolvedOptionPrintMap.has(id)
-    );
-    if (missingPrintIds.length > 0) {
-      incrementRetentionMetric("pinnedFetchMisses", missingPrintIds.length);
-      void fetchOptionPrintsByTraceIds(missingPrintIds, abort.signal)
-        .then((prints) => {
+    if (visibleAlertMissingPrintIds.length > 0) {
+      incrementRetentionMetric("pinnedFetchMisses", visibleAlertMissingPrintIds.length);
+      void terminalHydrationScheduler
+        .requestOptionPrints(visibleAlertMissingPrintIds)
+        .then(({ prints }) => {
+          if (!active) {
+            return;
+          }
           const next = new Map<string, OptionPrint>();
           for (const item of prints) {
             next.set(item.trace_id, item);
@@ -1754,7 +1742,7 @@ export const useTerminalState = () => {
           }
         })
         .catch((error) => {
-          if (abort.signal.aborted || isAbortLikeError(error)) {
+          if (!active) {
             return;
           }
           incrementRetentionMetric("pinnedFetchFailures", 1);
@@ -1762,13 +1750,13 @@ export const useTerminalState = () => {
         });
     }
 
-    return () => abort.abort();
+    return () => {
+      active = false;
+    };
   }, [
     mode,
-    visibleAlerts,
-    visibleAlertEvidenceRefs,
-    resolvedFlowPacketMap,
-    resolvedOptionPrintMap,
+    visibleAlertMissingPacketKey,
+    visibleAlertMissingPrintKey,
     routeFeatures.needsAlertEvidencePrefetch
   ]);
 
