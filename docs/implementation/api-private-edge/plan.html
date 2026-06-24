@@ -549,8 +549,8 @@
             </tr>
             <tr>
               <td>Reviewer</td>
-              <td>PR URL, branch, worker callback, full phase doc, existing turn doc, and orchestrator thread ID.</td>
-              <td>Calls back only after review, repairs, CI/local gates, Beads updates, and push state are resolved.</td>
+              <td>PR URL, branch, worker callback, full phase doc, existing turn doc, orchestrator thread ID, and <code>thermo-nuclear-code-quality-review</code>.</td>
+              <td>Calls back only after review, repairs, CI/local gates, Beads updates, push state, and the thermo-nuclear review bar are resolved.</td>
             </tr>
             <tr>
               <td>Orchestrator</td>
@@ -594,13 +594,13 @@
             </tr>
             <tr>
               <td>Review swarm, 3-6 agents</td>
-              <td>Runs bounded review after the PR or worker callback: security reviewer, deployment reviewer, frontend transport reviewer, API/rate-limit reviewer, docs/Beads reviewer, and CI/log reviewer.</td>
-              <td>Produces findings and safe repair recommendations without widening the phase.</td>
+              <td>Runs bounded review after the PR or worker callback: security reviewer, deployment reviewer, frontend transport reviewer, API/rate-limit reviewer, docs/Beads reviewer, and CI/log reviewer. Every reviewer must use <code>thermo-nuclear-code-quality-review</code>.</td>
+              <td>Produces findings and safe repair recommendations without widening the phase. Structural maintainability regressions are presumptive blockers.</td>
             </tr>
             <tr>
               <td>One lead reviewer</td>
-              <td>Consolidates review-swarm findings, performs safe repairs, waits for CI/local gates, and updates the existing phase turn doc.</td>
-              <td>Calls back once when review, repairs, gates, Beads state, and push state are resolved.</td>
+              <td>Consolidates review-swarm findings, applies the thermo-nuclear approval bar, performs safe repairs, waits for CI/local gates, and updates the existing phase turn doc.</td>
+              <td>Calls back once when review, repairs, gates, Beads state, push state, and the thermo-nuclear review bar are resolved.</td>
             </tr>
           </tbody>
         </table>
@@ -621,6 +621,10 @@
           <div class="panel">
             <h3>4. Hard limits</h3>
             <p>Helpers must not mutate tracked files, update Beads, create branches, commit, push, open PRs, contact the orchestrator, or make final scope decisions.</p>
+          </div>
+          <div class="panel">
+            <h3>Thermo review gate</h3>
+            <p>Reviewers must use <code>thermo-nuclear-code-quality-review</code> and push for structural simplification, code-judo moves, clean boundaries, and decomposition before approval.</p>
           </div>
         </div>
 

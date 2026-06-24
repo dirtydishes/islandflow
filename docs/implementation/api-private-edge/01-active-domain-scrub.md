@@ -31,6 +31,8 @@ bun test apps/web/scripts/dev-config.test.ts services/api/tests/cors.test.ts
 
 Run this phase through the full topology in `IMPLEMENT.md` when useful: selector agent, 6-10 read-only scout agents, one implementation worker, 3-6 review agents, and one lead reviewer. Use scouts to divide discovery before edits; keep one worker responsible for every scrubbed reference.
 
+Every review agent and the lead reviewer must use the `thermo-nuclear-code-quality-review` skill before reviewing this phase.
+
 The Phase 01 worker may use helper subagents to divide the scrub safely before editing.
 
 Good helper targets:

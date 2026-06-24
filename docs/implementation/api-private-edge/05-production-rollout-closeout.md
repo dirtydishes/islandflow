@@ -38,6 +38,8 @@ Use placeholders in committed docs and scripts; use local shell variables for li
 
 Run this phase through the full topology in `IMPLEMENT.md` when useful: selector agent, 6-10 read-only scout agents, one implementation worker, 3-6 review agents, and one lead reviewer. Use scouts for final verification breadth and reviewers for closeout, CI/log, docs, and Beads consistency.
 
+Every review agent and the lead reviewer must use the `thermo-nuclear-code-quality-review` skill before reviewing this phase.
+
 The Phase 05 worker may use helper subagents for final verification breadth, but there is still one rollout owner.
 
 Good helper targets:

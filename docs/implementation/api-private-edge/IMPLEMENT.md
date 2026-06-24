@@ -77,8 +77,10 @@ Reviewer handoff:
 
 - Create a separate reviewer thread after the worker reports completion or opens the assigned PR.
 - Use `xhigh` reasoning for the reviewer unless the orchestrator says otherwise.
-- Pass the reviewer the full phase doc, this `IMPLEMENT.md`, PR URL, branch, worker callback summary, orchestrator thread ID, and existing turn-doc path.
-- The reviewer uses a real code-review stance: findings first, ordered by severity, with file/line references.
+- Pass the reviewer the full phase doc, this `IMPLEMENT.md`, PR URL, branch, worker callback summary, orchestrator thread ID, existing turn-doc path, and the required `thermo-nuclear-code-quality-review` skill.
+- The reviewer must read and apply `thermo-nuclear-code-quality-review` before reviewing. In this environment the skill lives at `/Users/kell/.agents/skills/thermo-nuclear-code-quality-review/SKILL.md`.
+- The reviewer uses a thermo-nuclear code-review stance: findings first, ordered by severity, with file/line references, and a structural simplification bar instead of rubber-stamp approval.
+- Treat structural maintainability regressions, missed code-judo simplifications, spaghetti branching, unjustified file-size growth, wrong-layer logic, and unnecessary wrappers/casts as presumptive blockers unless clearly justified.
 - The reviewer owns CI verification, including after reviewer repair commits.
 - If repair is safe and in scope, the reviewer may repair on the same branch/PR.
 - If a real issue is out of scope, the reviewer files a focused follow-up Beads issue instead of widening the PR.
@@ -125,6 +127,8 @@ Review swarm roles:
 - API/rate-limit reviewer.
 - Docs/Beads reviewer.
 - CI/log reviewer.
+
+Every review-swarm member and the lead reviewer must use the `thermo-nuclear-code-quality-review` skill. The lead reviewer enforces the skill's approval bar before calling back: no clear structural regression, no obvious missed simplification, no unjustified 1k-line file crossing, no avoidable spaghetti branching, no wrong-layer leakage, and no unnecessary abstraction or cast churn.
 
 Scout and review helpers must remain bounded. They may inspect, summarize, review, and propose; they do not mutate tracked files, update Beads, create or switch branches, commit, push, open PRs, contact the orchestrator independently, or make final scope decisions.
 
