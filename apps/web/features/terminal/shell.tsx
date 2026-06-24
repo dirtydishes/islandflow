@@ -504,7 +504,45 @@ function SyntheticControlDock() {
   );
 }
 
-export type TerminalDrawersRenderer = (state: TerminalState) => ReactNode;
+type TerminalDrawerClosedState = {
+  selectedAlert: null;
+  selectedClassifierHit: null;
+  selectedDarkEvent: null;
+  selectedNewsStory: null;
+  selectedSmartFlowProjection: null;
+  selectedSmartMoneyEvent: null;
+};
+
+type TerminalDrawerOpenState = Pick<
+  TerminalState,
+  | "flowPacketMap"
+  | "focusAlertContract"
+  | "focusAlertEquity"
+  | "focusFlowPacketRequest"
+  | "optionPrintMap"
+  | "selectedAlert"
+  | "selectedClassifierEvidence"
+  | "selectedClassifierFlowPacket"
+  | "selectedClassifierHit"
+  | "selectedDarkEvent"
+  | "selectedDarkEvidence"
+  | "selectedDarkUnderlying"
+  | "selectedNewsStory"
+  | "selectedSmartFlowEvidence"
+  | "selectedSmartFlowProjection"
+  | "selectedSmartMoneyEvent"
+  | "selectedSmartMoneyEvidence"
+  | "selectedSmartMoneyFlowPacket"
+  | "setSelectedAlert"
+  | "setSelectedClassifierHit"
+  | "setSelectedDarkEvent"
+  | "setSelectedNewsStory"
+  | "setSelectedSmartFlowProjection"
+  | "setSelectedSmartMoneyEvent"
+>;
+
+export type TerminalDrawerState = TerminalDrawerClosedState | TerminalDrawerOpenState;
+export type TerminalDrawersRenderer = (state: TerminalDrawerState) => ReactNode;
 
 type TerminalAppShellProps = {
   children: ReactNode;
@@ -513,7 +551,7 @@ type TerminalAppShellProps = {
 
 type TerminalChromeProps = TerminalAppShellProps;
 
-const EMPTY_TERMINAL_DRAWER_STATE = {
+const EMPTY_TERMINAL_DRAWER_STATE: TerminalDrawerClosedState = {
   selectedAlert: null,
   selectedNewsStory: null,
   selectedClassifierHit: null,
@@ -522,7 +560,7 @@ const EMPTY_TERMINAL_DRAWER_STATE = {
   selectedDarkEvent: null
 };
 
-const selectTerminalDrawerState = (state: TerminalState): Partial<TerminalState> => {
+const selectTerminalDrawerState = (state: TerminalState): TerminalDrawerState => {
   if (
     !state.selectedAlert &&
     !state.selectedNewsStory &&
@@ -568,7 +606,7 @@ const TerminalDrawersOutlet = memo(function TerminalDrawersOutlet({
   renderDrawers?: TerminalDrawersRenderer;
 }) {
   const drawerState = useTerminalSelector(selectTerminalDrawerState, shallowEqualTerminalSelection);
-  return renderDrawers ? renderDrawers(drawerState as TerminalState) : null;
+  return renderDrawers ? renderDrawers(drawerState) : null;
 });
 
 export function TerminalAppShell({ children, renderDrawers }: TerminalAppShellProps) {

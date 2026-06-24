@@ -263,6 +263,11 @@
             Moved closed terminal drawers behind their own selector so the shell no longer renders
             drawer JSX against the full state on every live tick.
           </li>
+          <li>
+            Reviewer repair tightened the drawer renderer boundary to a typed
+            <code>TerminalDrawerState</code> union instead of casting a partial selection back to
+            <code>TerminalState</code>.
+          </li>
         </ul>
       </section>
 
@@ -274,6 +279,7 @@
           <li><span class="status-ok">pass</span> <code>bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code>: 98 tests, 232 assertions.</li>
           <li><span class="status-ok">pass</span> <code>bun test apps/web/features/terminal apps/web/features/durable-tape</code>: 40 tests, 92 assertions.</li>
           <li><span class="status-ok">pass</span> <code>bun --cwd=apps/web run build</code></li>
+          <li><span class="status-ok">pass</span> reviewer rerun of the two test gates, web build, and scoped Biome check after the drawer-state type repair.</li>
           <li>
             <span class="status-risk">red probe</span>
             <code>bun run scripts/probes/durable-tapes-perf.ts --target=http://localhost:3100/durable-tapes --warmup=30s --duration=180s --output=docs/implementation/durable-tapes-performance/baselines/phase-03-local-hosted-api.json</code>
@@ -326,6 +332,24 @@
             <span class="status-note">news quietness</span>
             The hosted API run had no visible news rows. The aggregate row sanity still passed with
             70 visible rows across the other panes, matching the Phase 00 and Phase 01 captures.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Reviewer Pass</h2>
+        <ul>
+          <li>
+            <span class="status-ok">repair</span>
+            Replaced the drawer selector's <code>Partial&lt;TerminalState&gt;</code> plus
+            <code>as TerminalState</code> cast with explicit closed/open drawer state types. This
+            keeps the pane-scoped optimization while making the narrowed contract visible to
+            TypeScript.
+          </li>
+          <li>
+            <span class="status-note">finding</span>
+            No remaining Phase 03 structural blocker was found after the repair. The residual CPU
+            budget miss stays owned by Phase 04 incremental live buffers.
           </li>
         </ul>
       </section>
@@ -432,6 +456,26 @@ diff --git a/apps/web/features/terminal/shell.tsx b/apps/web/features/terminal/s
 @@
 -        {renderDrawers ? renderDrawers(state) : null}
 +        &lt;TerminalDrawersOutlet renderDrawers={renderDrawers} /&gt;
+@@
+-export type TerminalDrawersRenderer = (state: TerminalState) =&gt; ReactNode;
++type TerminalDrawerClosedState = {
++  selectedAlert: null;
++  selectedClassifierHit: null;
++  selectedDarkEvent: null;
++  selectedNewsStory: null;
++  selectedSmartFlowProjection: null;
++  selectedSmartMoneyEvent: null;
++};
++
++type TerminalDrawerOpenState = Pick&lt;TerminalState, "selectedAlert" | "selectedNewsStory" | "selectedClassifierHit" | "selectedSmartFlowProjection" | "selectedSmartMoneyEvent" | "selectedDarkEvent" | "flowPacketMap" | "optionPrintMap"&gt;;
++export type TerminalDrawerState = TerminalDrawerClosedState | TerminalDrawerOpenState;
++export type TerminalDrawersRenderer = (state: TerminalDrawerState) =&gt; ReactNode;
+@@
+-const selectTerminalDrawerState = (state: TerminalState): Partial&lt;TerminalState&gt; =&gt; {
++const selectTerminalDrawerState = (state: TerminalState): TerminalDrawerState =&gt; {
+@@
+-  return renderDrawers ? renderDrawers(drawerState as TerminalState) : null;
++  return renderDrawers ? renderDrawers(drawerState) : null;
 
 diff --git a/apps/web/app/terminal.test.ts b/apps/web/app/terminal.test.ts
 @@
@@ -542,6 +586,26 @@ diff --git a/apps/web/features/terminal/shell.tsx b/apps/web/features/terminal/s
 @@
 -        {renderDrawers ? renderDrawers(state) : null}
 +        <TerminalDrawersOutlet renderDrawers={renderDrawers} />
+@@
+-export type TerminalDrawersRenderer = (state: TerminalState) => ReactNode;
++type TerminalDrawerClosedState = {
++  selectedAlert: null;
++  selectedClassifierHit: null;
++  selectedDarkEvent: null;
++  selectedNewsStory: null;
++  selectedSmartFlowProjection: null;
++  selectedSmartMoneyEvent: null;
++};
++
++type TerminalDrawerOpenState = Pick<TerminalState, "selectedAlert" | "selectedNewsStory" | "selectedClassifierHit" | "selectedSmartFlowProjection" | "selectedSmartMoneyEvent" | "selectedDarkEvent" | "flowPacketMap" | "optionPrintMap">;
++export type TerminalDrawerState = TerminalDrawerClosedState | TerminalDrawerOpenState;
++export type TerminalDrawersRenderer = (state: TerminalDrawerState) => ReactNode;
+@@
+-const selectTerminalDrawerState = (state: TerminalState): Partial<TerminalState> => {
++const selectTerminalDrawerState = (state: TerminalState): TerminalDrawerState => {
+@@
+-  return renderDrawers ? renderDrawers(drawerState as TerminalState) : null;
++  return renderDrawers ? renderDrawers(drawerState) : null;
 
 diff --git a/apps/web/app/terminal.test.ts b/apps/web/app/terminal.test.ts
 @@
