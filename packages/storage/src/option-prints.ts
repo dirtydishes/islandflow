@@ -1,6 +1,10 @@
 import type { OptionPrint } from "@islandflow/types";
 
 export const OPTION_PRINTS_TABLE = "option_prints";
+export const OPTION_PRINT_TRACE_LOOKUP_MAX_IDS = 100;
+export const OPTION_PRINT_TRACE_ID_MAX_LENGTH = 512;
+export const OPTION_PRINT_QUERY_MAX_EXECUTION_SECONDS = 2;
+export const OPTION_PRINT_QUERY_TIMEOUT_MS = 2_500;
 
 export const optionPrintsTableDDL = (): string => {
   return `
@@ -41,7 +45,8 @@ CREATE TABLE IF NOT EXISTS ${OPTION_PRINTS_TABLE} (
   is_etf Nullable(Bool),
   signal_pass Nullable(Bool),
   signal_reasons Array(String) DEFAULT [],
-  signal_profile Nullable(String)
+  signal_profile Nullable(String),
+  INDEX idx_option_prints_trace_id trace_id TYPE bloom_filter(0.01) GRANULARITY 1
 )
 ENGINE = MergeTree
 ORDER BY (ts, option_contract_id)
@@ -76,7 +81,8 @@ export const optionPrintsTableMigrations = (): string[] => {
     `ALTER TABLE ${OPTION_PRINTS_TABLE} ADD COLUMN IF NOT EXISTS is_etf Nullable(Bool)`,
     `ALTER TABLE ${OPTION_PRINTS_TABLE} ADD COLUMN IF NOT EXISTS signal_pass Nullable(Bool)`,
     `ALTER TABLE ${OPTION_PRINTS_TABLE} ADD COLUMN IF NOT EXISTS signal_reasons Array(String) DEFAULT []`,
-    `ALTER TABLE ${OPTION_PRINTS_TABLE} ADD COLUMN IF NOT EXISTS signal_profile Nullable(String)`
+    `ALTER TABLE ${OPTION_PRINTS_TABLE} ADD COLUMN IF NOT EXISTS signal_profile Nullable(String)`,
+    `ALTER TABLE ${OPTION_PRINTS_TABLE} ADD INDEX IF NOT EXISTS idx_option_prints_trace_id trace_id TYPE bloom_filter(0.01) GRANULARITY 1`
   ];
 };
 

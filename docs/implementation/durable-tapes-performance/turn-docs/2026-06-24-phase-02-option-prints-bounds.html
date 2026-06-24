@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Durable Tapes Performance Phase 02: Option Prints Bounds</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "../../../../node_modules/react/index.js",
+          "react-dom/client": "../../../../node_modules/react-dom/client.js",
+          "@pierre/diffs/react": "../../../../node_modules/@pierre/diffs/dist/react/index.js"
+        }
+      }
+    </script>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #111820;
+        --panel-2: #0d141b;
+        --line: rgba(230, 237, 244, 0.14);
+        --line-strong: rgba(245, 166, 35, 0.36);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --green: #25c17a;
+        --red: #ff6b5f;
+        --blue: #4da3ff;
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: linear-gradient(180deg, #0b1016 0%, var(--bg) 100%);
+        color: var(--text);
+        font: 15px/1.55 var(--sans);
+      }
+
+      main {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+
+      header {
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 920px;
+        font-size: 2rem;
+        line-height: 1.08;
+        letter-spacing: 0;
+        text-wrap: balance;
+      }
+
+      h2,
+      .eyebrow,
+      .meta-label,
+      code,
+      pre {
+        font-family: var(--mono);
+      }
+
+      h2 {
+        margin-bottom: 10px;
+        color: var(--accent);
+        font-size: 0.9rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .eyebrow {
+        margin-bottom: 8px;
+        color: var(--accent);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .subtitle {
+        max-width: 84ch;
+        margin-top: 12px;
+        color: var(--muted);
+      }
+
+      .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 1px;
+        margin-top: 18px;
+        border: 1px solid var(--line);
+        background: var(--line);
+      }
+
+      .meta-cell {
+        min-width: 0;
+        padding: 10px 12px;
+        background: var(--panel);
+      }
+
+      .meta-label {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--faint);
+        font-size: 0.66rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      section {
+        padding: 20px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      p + p {
+        margin-top: 10px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 7px;
+      }
+
+      code {
+        padding: 0.08rem 0.28rem;
+        border: 1px solid rgba(245, 166, 35, 0.18);
+        border-radius: 5px;
+        background: rgba(245, 166, 35, 0.1);
+        color: #ffe0a3;
+        font-size: 0.9em;
+      }
+
+      .status-ok {
+        color: var(--green);
+      }
+
+      .status-note {
+        color: var(--blue);
+      }
+
+      .status-risk {
+        color: var(--red);
+      }
+
+      .diff-shell {
+        display: grid;
+        gap: 12px;
+      }
+
+      #rich-diff {
+        min-height: 32px;
+      }
+
+      #fallback-diff {
+        max-height: 620px;
+        overflow: auto;
+        margin: 0;
+        padding: 12px;
+        border: 1px solid var(--line);
+        background: var(--panel-2);
+        color: var(--text);
+        font-size: 0.76rem;
+        line-height: 1.45;
+      }
+
+      .rich-diff-ready #fallback-diff {
+        display: none;
+      }
+
+      .diff-note {
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="eyebrow">Repository turn document</div>
+        <h1>Durable Tapes Performance Phase 02: Option Prints Bounds</h1>
+        <p class="subtitle">
+          Bounded option-print storage queries and API lookup validation so recent option-print
+          requests and trace-id misses return JSON errors or empty data quickly instead of holding
+          API workers until the proxy times out.
+        </p>
+        <div class="meta-grid" aria-label="Turn metadata">
+          <div class="meta-cell"><span class="meta-label">Branch</span>lavender/ze79-phase-02-option-prints-bounds</div>
+          <div class="meta-cell"><span class="meta-label">Beads</span>islandflow-ze79.3</div>
+          <div class="meta-cell"><span class="meta-label">Scope</span>API/storage only</div>
+          <div class="meta-cell"><span class="meta-label">Timestamp</span>2026-06-24</div>
+        </div>
+      </header>
+
+      <section>
+        <h2>Summary</h2>
+        <ul>
+          <li>
+            Added bounded ClickHouse query settings and client-side request/body read timeouts for
+            option-print recent, replay, history, and by-trace storage reads.
+          </li>
+          <li>
+            Validates <code>/option-prints/by-trace</code> request batches at the API boundary:
+            empty requests return <code>[]</code>, oversized unique batches return <code>400</code>,
+            overlong or control-character trace IDs return <code>400</code>, and storage failures
+            return bounded <code>503</code> JSON.
+          </li>
+          <li>
+            Dedupes and caps storage trace lookups defensively even when called outside the public
+            route, while filtering blank and overlong IDs before building SQL.
+          </li>
+          <li>
+            Adds a ClickHouse trace-id bloom skipping index to the option-prints DDL and migration
+            path so new table parts have a trace-optimized lookup aid without adding a new frontend
+            contract.
+          </li>
+          <li>
+            Adds lightweight <code>api.option_prints.by_trace_ms</code> timing metrics tagged as
+            hit, miss, invalid, or error.
+          </li>
+          <li>
+            Reviewer repair keeps recent, history, and replay option-print route errors consistent:
+            parser failures stay <code>400</code>, while bounded storage/query failures return
+            <code>503</code> JSON.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Diagnosis</h2>
+        <p>
+          The table definition orders <code>option_prints</code> by <code>(ts, option_contract_id)</code>,
+          while <code>/option-prints/by-trace</code> looked up by <code>trace_id IN (...)</code>.
+          That means a miss has no primary-key help. The public route failure on
+          <code>/prints/options?view=signal&amp;limit=1</code> is the adjacent recent-query side of
+          the same storage family: the route had no query timeout or request timeout, so a slow
+          ClickHouse read could outlive the public proxy.
+        </p>
+        <p>
+          This PR intentionally keeps the fix in API/storage. It does not change durable-tapes
+          rendering, hydration scheduling, or any frontend retry behavior.
+        </p>
+      </section>
+
+      <section>
+        <h2>Verification</h2>
+        <ul>
+          <li><span class="status-ok">pass</span> <code>bun install</code></li>
+          <li><span class="status-ok">pass</span> <code>bun test packages/storage/tests/option-prints.test.ts</code>: 7 tests, 43 assertions.</li>
+          <li><span class="status-ok">pass</span> <code>bun test services/api/tests/option-print-lookup.test.ts</code>: 5 tests, 6 assertions.</li>
+          <li><span class="status-ok">pass</span> <code>bun test services/api/tests/option-queries.test.ts services/api/tests/option-print-lookup.test.ts</code>: 8 tests, 10 assertions.</li>
+          <li><span class="status-ok">pass</span> <code>bun test services/api/tests packages/storage/tests</code>: 83 tests, 262 assertions.</li>
+          <li><span class="status-ok">pass</span> <code>bun test</code>: 444 tests, 7137 assertions.</li>
+          <li><span class="status-ok">pass</span> <code>bun run fmt:check</code></li>
+          <li><span class="status-ok">pass</span> <code>bun run lint</code></li>
+          <li><span class="status-ok">pass</span> <code>bun run typecheck</code></li>
+          <li><span class="status-ok">pass</span> <code>bun --cwd=apps/web run build</code></li>
+          <li><span class="status-ok">pass</span> <code>bun run check:docker-workspace</code></li>
+          <li><span class="status-ok">pass</span> <code>git diff --check</code></li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>API Probes</h2>
+        <ul>
+          <li>
+            <span class="status-risk">baseline red</span>
+            <code>curl -sS -m 5 https://api.flow.deltaisland.io/prints/options?view=signal&amp;limit=1</code>
+            timed out after 5.005 seconds with zero bytes.
+          </li>
+          <li>
+            <span class="status-risk">baseline red</span>
+            <code>curl -sS -m 5 https://api.flow.deltaisland.io/option-prints/by-trace?trace_id=missing-probe</code>
+            timed out after 5.003 seconds with zero bytes.
+          </li>
+          <li>
+            <span class="status-note">not run locally</span>
+            <code>curl -sS -m 3 http://127.0.0.1:4000/health</code> could not connect because no
+            local API was listening.
+          </li>
+          <li>
+            <span class="status-note">infra unavailable</span>
+            local API startup was not attempted because Docker/OrbStack was unavailable:
+            <code>docker ps</code> could not connect to the daemon socket.
+          </li>
+          <li>
+            <span class="status-note">deployed recovery pending</span>
+            The public API route check targets the live deployment. This branch can only prove live
+            public recovery after the API containing these bounds is deployed.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Reviewer Repair</h2>
+        <ul>
+          <li>
+            <span class="status-risk">finding repaired</span>
+            <code>services/api/src/index.ts:1652</code> and
+            <code>services/api/src/index.ts:1858</code> previously caught bounded
+            option-print history/replay storage failures as <code>400 invalid ... query</code>.
+            That made server-side ClickHouse timeouts look like client input errors after this PR
+            intentionally put timeouts on those reads.
+          </li>
+          <li>
+            Moved the status decision behind <code>getOptionPrintQueryErrorStatus</code> in
+            <code>services/api/src/option-queries.ts:109</code>, the same module that owns
+            option-print query parsing. Recent, history, and replay routes now share the same
+            boundary: Zod parse failures return <code>400</code>; storage/query failures return
+            <code>503</code>.
+          </li>
+          <li>
+            Added focused coverage in <code>services/api/tests/option-queries.test.ts:61</code>
+            so the parser-vs-storage status split stays explicit.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Known Risks</h2>
+        <ul>
+          <li>
+            The trace-id skipping index is added for new table parts. Existing parts may still need
+            ClickHouse materialization or a dedicated projection/table if trace misses remain slow
+            after deployment, but the request and query timeouts now bound the failure mode.
+            Follow-up: <code>islandflow-ze79.8</code>.
+          </li>
+          <li>
+            If the production ClickHouse version rejects <code>ADD INDEX IF NOT EXISTS</code>, the
+            migration will need a version-specific follow-up. The local tests verify generated DDL,
+            not a live migration against the production server.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <div class="diff-shell">
+          <p class="diff-note">
+            The rich renderer below uses browser-side <code>@pierre/diffs</code>. If it is not
+            available in this static context, the readable unified fallback remains visible.
+          </p>
+          <div id="rich-diff"></div>
+          <pre id="fallback-diff"><code>diff --git a/packages/storage/src/option-prints.ts b/packages/storage/src/option-prints.ts
+@@
+ export const OPTION_PRINTS_TABLE = "option_prints";
++export const OPTION_PRINT_TRACE_LOOKUP_MAX_IDS = 100;
++export const OPTION_PRINT_TRACE_ID_MAX_LENGTH = 512;
++export const OPTION_PRINT_QUERY_MAX_EXECUTION_SECONDS = 2;
++export const OPTION_PRINT_QUERY_TIMEOUT_MS = 2_500;
+@@
+-  signal_profile Nullable(String)
++  signal_profile Nullable(String),
++  INDEX idx_option_prints_trace_id trace_id TYPE bloom_filter(0.01) GRANULARITY 1
+ )
+ ENGINE = MergeTree
+ ORDER BY (ts, option_contract_id)
+@@
++    `ALTER TABLE ${OPTION_PRINTS_TABLE} ADD INDEX IF NOT EXISTS idx_option_prints_trace_id trace_id TYPE bloom_filter(0.01) GRANULARITY 1`
+
+diff --git a/packages/storage/src/clickhouse.ts b/packages/storage/src/clickhouse.ts
+@@
++export type ClickHouseQueryParams = {
++  query: string;
++  format: ClickHouseQueryFormat;
++  settings?: ClickHouseQuerySettings;
++  timeoutMs?: number;
++};
+@@
++const readResponseText = async (response: Response, timeoutMs?: number): Promise&lt;string&gt; =&gt; {
++  return await Promise.race([
++    response.text(),
++    new Promise&lt;string&gt;((_, reject) =&gt; {
++      timeout = setTimeout(() =&gt; {
++        void response.body?.cancel();
++        reject(new Error(`ClickHouse response timed out after ${timeoutMs}ms`));
++      }, timeoutMs);
++    })
++  ]);
++};
+@@
++const OPTION_PRINT_QUERY_SETTINGS: ClickHouseQuerySettings = {
++  max_execution_time: OPTION_PRINT_QUERY_MAX_EXECUTION_SECONDS
++};
++const OPTION_PRINT_QUERY_BOUNDS = {
++  settings: OPTION_PRINT_QUERY_SETTINGS,
++  timeoutMs: OPTION_PRINT_QUERY_TIMEOUT_MS
++};
+@@
+-  const ids = Array.from(new Set(traceIds.map((id) =&gt; id.trim()).filter(Boolean)));
++  const ids = normalizeOptionPrintTraceLookupIds(traceIds);
+@@
+     query: `SELECT * FROM ${OPTION_PRINTS_TABLE} WHERE trace_id IN (${buildStringList(ids)}) ORDER BY ts DESC, seq DESC LIMIT ${clampLookupLimit(ids.length)}`,
+-    format: "JSONEachRow"
++    format: "JSONEachRow",
++    ...OPTION_PRINT_QUERY_BOUNDS
+   });
+
+diff --git a/services/api/src/option-print-lookup.ts b/services/api/src/option-print-lookup.ts
+new file mode 100644
+@@
++export const parseOptionPrintTraceLookupParams = (url: URL): string[] =&gt; {
++  const traceIds = Array.from(
++    new Set(url.searchParams.getAll("trace_id").map((id) =&gt; id.trim()).filter(Boolean))
++  );
++  if (traceIds.length &gt; OPTION_PRINT_TRACE_LOOKUP_MAX_IDS) {
++    throw new OptionPrintTraceLookupValidationError("too many trace_id parameters");
++  }
++  return traceIds;
++};
+
+diff --git a/services/api/src/index.ts b/services/api/src/index.ts
+@@
+         if (req.method === "GET" &amp;&amp; url.pathname === "/option-prints/by-trace") {
+-          const traceIds = url.searchParams.getAll("trace_id");
+-          const data = await fetchOptionPrintsByTraceIds(clickhouse, traceIds);
+-          return jsonResponse({ data });
++          const startedAt = Date.now();
++          try {
++            const traceIds = parseOptionPrintTraceLookupParams(url);
++            const data = await fetchOptionPrintsByTraceIds(clickhouse, traceIds);
++            metrics.timing("api.option_prints.by_trace_ms", Date.now() - startedAt, {
++              status: "ok",
++              result: data.length &gt; 0 ? "hit" : "miss"
++            });
++            return jsonResponse({ data });
++          } catch (error) {
++            const status = getOptionPrintTraceLookupErrorStatus(error);
++            return jsonResponse({ error: status === 400 ? "invalid option print trace lookup" : "option print trace lookup failed", detail: getErrorMessage(error) }, status);
++          }
+         }
+
+diff --git a/services/api/src/option-queries.ts b/services/api/src/option-queries.ts
+@@
++export const getOptionPrintQueryErrorStatus = (error: unknown): number =&gt;
++  error instanceof z.ZodError ? 400 : 503;
+
+diff --git a/services/api/src/index.ts b/services/api/src/index.ts
+@@
+-                error: "invalid options history query",
++                error:
++                  status === 400 ? "invalid options history query" : "options history query failed",
+@@
+-                error: "invalid options replay query",
++                error:
++                  status === 400 ? "invalid options replay query" : "options replay query failed",
+
+diff --git a/packages/storage/tests/option-prints.test.ts b/packages/storage/tests/option-prints.test.ts
+@@
++  it("returns an empty trace lookup without querying ClickHouse", async () =&gt; {
++    await expect(fetchOptionPrintsByTraceIds(client, ["", "   "])).resolves.toEqual([]);
++    expect(queries).toHaveLength(0);
++  });
++  it("dedupes, caps, and bounds trace lookup queries", async () =&gt; {
++    expect(queries[0]?.settings?.max_execution_time).toBe(2);
++    expect(queries[0]?.timeoutMs).toBe(OPTION_PRINT_QUERY_TIMEOUT_MS);
++  });</code></pre>
+        </div>
+      </section>
+    </main>
+
+    <script type="text/plain" id="patch-source">diff --git a/packages/storage/src/option-prints.ts b/packages/storage/src/option-prints.ts
+@@
+ export const OPTION_PRINTS_TABLE = "option_prints";
++export const OPTION_PRINT_TRACE_LOOKUP_MAX_IDS = 100;
++export const OPTION_PRINT_TRACE_ID_MAX_LENGTH = 512;
++export const OPTION_PRINT_QUERY_MAX_EXECUTION_SECONDS = 2;
++export const OPTION_PRINT_QUERY_TIMEOUT_MS = 2_500;
+@@
+-  signal_profile Nullable(String)
++  signal_profile Nullable(String),
++  INDEX idx_option_prints_trace_id trace_id TYPE bloom_filter(0.01) GRANULARITY 1
+ )
+
+diff --git a/packages/storage/src/clickhouse.ts b/packages/storage/src/clickhouse.ts
+@@
++export type ClickHouseQueryParams = {
++  query: string;
++  format: ClickHouseQueryFormat;
++  settings?: ClickHouseQuerySettings;
++  timeoutMs?: number;
++};
+@@
++const OPTION_PRINT_QUERY_SETTINGS: ClickHouseQuerySettings = {
++  max_execution_time: OPTION_PRINT_QUERY_MAX_EXECUTION_SECONDS
++};
+@@
+-  const ids = Array.from(new Set(traceIds.map((id) => id.trim()).filter(Boolean)));
++  const ids = normalizeOptionPrintTraceLookupIds(traceIds);
+
+diff --git a/services/api/src/option-print-lookup.ts b/services/api/src/option-print-lookup.ts
+new file mode 100644
+@@
++export const parseOptionPrintTraceLookupParams = (url: URL): string[] => {
++  const traceIds = Array.from(
++    new Set(url.searchParams.getAll("trace_id").map((id) => id.trim()).filter(Boolean))
++  );
++  return traceIds;
++};
+
+diff --git a/services/api/src/index.ts b/services/api/src/index.ts
+@@
+-          const traceIds = url.searchParams.getAll("trace_id");
+-          const data = await fetchOptionPrintsByTraceIds(clickhouse, traceIds);
+-          return jsonResponse({ data });
++          const traceIds = parseOptionPrintTraceLookupParams(url);
++          const data = await fetchOptionPrintsByTraceIds(clickhouse, traceIds);
++          return jsonResponse({ data });
+
+diff --git a/services/api/src/option-queries.ts b/services/api/src/option-queries.ts
+@@
++export const getOptionPrintQueryErrorStatus = (error: unknown): number =>
++  error instanceof z.ZodError ? 400 : 503;
+
+diff --git a/services/api/src/index.ts b/services/api/src/index.ts
+@@
+-                error: "invalid options history query",
++                error:
++                  status === 400 ? "invalid options history query" : "options history query failed",
+@@
+-                error: "invalid options replay query",
++                error:
++                  status === 400 ? "invalid options replay query" : "options replay query failed",
+</script>
+    <script type="module">
+      const source = document.getElementById("patch-source")?.textContent ?? "";
+      const target = document.getElementById("rich-diff");
+      try {
+        const React = await import("react");
+        const { createRoot } = await import("react-dom/client");
+        const { PatchDiff } = await import("@pierre/diffs/react");
+        createRoot(target).render(React.createElement(PatchDiff, { patch: source }));
+        document.documentElement.classList.add("rich-diff-ready");
+      } catch (error) {
+        target.textContent =
+          "Rich diff renderer unavailable in this static context; showing unified fallback.";
+      }
+    </script>
+  </body>
+</html>
