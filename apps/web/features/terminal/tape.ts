@@ -4,6 +4,7 @@ import {
   appendHistoryTail,
   buildDurableTapeItemKey,
   composeTapeItems,
+  createLiveWindowBuffer,
   extractDurableTapeSortSeq,
   extractDurableTapeSortTs,
   findAnchorRestoreIndex,
@@ -46,6 +47,7 @@ export const getTapeItemKey = getDurableTapeItemKey;
 export {
   appendHistoryTail,
   composeTapeItems,
+  createLiveWindowBuffer,
   findAnchorRestoreIndex,
   mergeHeldTapeHistory,
   mergeNewest,
