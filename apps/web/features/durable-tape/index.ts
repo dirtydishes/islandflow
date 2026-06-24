@@ -8,6 +8,7 @@ export * from "./feature-flags";
 export * from "./history";
 export * from "./keys";
 export * from "./live-window-buffer";
+export * from "./row-view-models";
 export * from "./scroll-hold";
 export * from "./templates";
 export * from "./types";

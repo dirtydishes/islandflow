@@ -7,6 +7,7 @@ import { createStaticEquitiesTapeSource, EquitiesTape } from "../features/equiti
 import { createStaticFlowPacketsTapeSource, FlowPacketsTape } from "../features/flow-packets";
 import { NewsWire } from "../features/news-wire";
 import { OptionsTape } from "../features/options-tape";
+import { DurableTapeAlertRowsPane, DurableTapeOptionRowsPane } from "../features/durable-tape";
 import { TerminalMarketChartSection } from "../features/terminal/chart-adapter";
 import {
   CommandDecisionLevels,
@@ -232,6 +233,20 @@ export function OverviewRoute() {
 const DurableTapesOptionsPane = memo(function DurableTapesOptionsPane() {
   const pane = useTerminalSelector(selectDurableTapesOptionsPane, shallowEqualTerminalSelection);
 
+  if (pane.useRowViewModels) {
+    return (
+      <DurableTapeOptionRowsPane
+        className="durable-tapes-options"
+        features={DURABLE_TAPES_ROUTE_FEATURES}
+        onContractFocus={pane.onContractFocus}
+        onPacketFocus={pane.onPacketFocus}
+        rows={pane.rowViewModels}
+        rowHeight={34}
+        title="Options Tape"
+      />
+    );
+  }
+
   return (
     <OptionsTape
       className="durable-tapes-options"
@@ -289,6 +304,18 @@ const DurableTapesEquitiesPane = memo(function DurableTapesEquitiesPane() {
 
 const DurableTapesAlertsPane = memo(function DurableTapesAlertsPane() {
   const pane = useTerminalSelector(selectDurableTapesAlertsPane, shallowEqualTerminalSelection);
+
+  if (pane.useRowViewModels) {
+    return (
+      <DurableTapeAlertRowsPane
+        className="durable-tapes-alerts"
+        features={DURABLE_TAPES_ROUTE_FEATURES}
+        rows={pane.rowViewModels}
+        rowHeight={36}
+        title="Alerts"
+      />
+    );
+  }
 
   return (
     <AlertsModule

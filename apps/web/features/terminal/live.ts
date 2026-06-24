@@ -2,6 +2,7 @@ import type {
   AlertEvent,
   ClassifierHitEvent,
   Cursor,
+  DurableTapeRowViewModel,
   EquityCandle,
   EquityPrint,
   EquityPrintJoin,
@@ -57,6 +58,22 @@ import {
   type StreamMessage
 } from "./transport";
 import type { PausableTapeData, SortableItem, TapeMode, WsStatus } from "./types";
+
+const sendLiveSubscribeRequest = (socket: WebSocket, subscriptions: LiveSubscription[]): void => {
+  const rawSubscriptions = subscriptions.filter(
+    (subscription) => subscription.channel !== "durable-rows"
+  );
+  const durableRowSubscriptions = subscriptions.filter(
+    (subscription) => subscription.channel === "durable-rows"
+  );
+
+  if (rawSubscriptions.length > 0) {
+    socket.send(JSON.stringify({ op: "subscribe", subscriptions: rawSubscriptions }));
+  }
+  for (const durableRowSubscription of durableRowSubscriptions) {
+    socket.send(JSON.stringify({ op: "subscribe", subscriptions: [durableRowSubscription] }));
+  }
+};
 
 export type TapeState<T> = {
   status: WsStatus;
@@ -888,6 +905,7 @@ export type LiveSessionState = {
   smartMoneyHistory: SmartMoneyEvent[];
   classifierHitsHistory: ClassifierHitEvent[];
   alertsHistory: AlertEvent[];
+  durableRowsHistory: DurableTapeRowViewModel[];
   newsHistory: NewsStory[];
   inferredDarkHistory: InferredDarkEvent[];
   options: OptionPrint[];
@@ -900,6 +918,7 @@ export type LiveSessionState = {
   smartMoney: SmartMoneyEvent[];
   classifierHits: ClassifierHitEvent[];
   alerts: AlertEvent[];
+  durableRows: DurableTapeRowViewModel[];
   news: NewsStory[];
   inferredDark: InferredDarkEvent[];
   chartCandles: EquityCandle[];
@@ -926,7 +945,12 @@ export const LIVE_HISTORY_ENDPOINTS: Partial<Record<LiveSubscription["channel"],
   "inferred-dark": "/history/inferred-dark"
 };
 
-type LiveSubscriptionResetChannel = "options" | "equities" | "equity-candles" | "equity-overlay";
+type LiveSubscriptionResetChannel =
+  | "options"
+  | "equities"
+  | "durable-rows"
+  | "equity-candles"
+  | "equity-overlay";
 
 type PendingLiveEventBatch = {
   subscription: LiveSubscription;
@@ -963,6 +987,7 @@ export const getLiveSubscriptionResetChannels = (
     if (
       subscription.channel === "options" ||
       subscription.channel === "equities" ||
+      subscription.channel === "durable-rows" ||
       subscription.channel === "equity-candles" ||
       subscription.channel === "equity-overlay"
     ) {
@@ -1002,6 +1027,7 @@ export const useLiveSession = (
   const [smartMoney, setSmartMoney] = useState<SmartMoneyEvent[]>([]);
   const [classifierHits, setClassifierHits] = useState<ClassifierHitEvent[]>([]);
   const [alerts, setAlerts] = useState<AlertEvent[]>([]);
+  const [durableRows, setDurableRows] = useState<DurableTapeRowViewModel[]>([]);
   const [news, setNews] = useState<NewsStory[]>([]);
   const [inferredDark, setInferredDark] = useState<InferredDarkEvent[]>([]);
   const [optionsHistory, setOptionsHistory] = useState<OptionPrint[]>([]);
@@ -1013,6 +1039,7 @@ export const useLiveSession = (
   const [smartMoneyHistory, setSmartMoneyHistory] = useState<SmartMoneyEvent[]>([]);
   const [classifierHitsHistory, setClassifierHitsHistory] = useState<ClassifierHitEvent[]>([]);
   const [alertsHistory, setAlertsHistory] = useState<AlertEvent[]>([]);
+  const [durableRowsHistory, setDurableRowsHistory] = useState<DurableTapeRowViewModel[]>([]);
   const [newsHistory, setNewsHistory] = useState<NewsStory[]>([]);
   const [inferredDarkHistory, setInferredDarkHistory] = useState<InferredDarkEvent[]>([]);
   const [chartCandles, setChartCandles] = useState<EquityCandle[]>([]);
@@ -1027,6 +1054,7 @@ export const useLiveSession = (
   const smartMoneyRef = useRef<SmartMoneyEvent[]>([]);
   const classifierHitsRef = useRef<ClassifierHitEvent[]>([]);
   const alertsRef = useRef<AlertEvent[]>([]);
+  const durableRowsRef = useRef<DurableTapeRowViewModel[]>([]);
   const newsRef = useRef<NewsStory[]>([]);
   const inferredDarkRef = useRef<InferredDarkEvent[]>([]);
   const chartCandlesRef = useRef<EquityCandle[]>([]);
@@ -1042,6 +1070,7 @@ export const useLiveSession = (
     smartMoney: LiveWindowBuffer<SmartMoneyEvent>;
     classifierHits: LiveWindowBuffer<ClassifierHitEvent>;
     alerts: LiveWindowBuffer<AlertEvent>;
+    durableRows: LiveWindowBuffer<DurableTapeRowViewModel>;
     news: LiveWindowBuffer<NewsStory>;
     inferredDark: LiveWindowBuffer<InferredDarkEvent>;
     chartCandles: LiveWindowBuffer<EquityCandle>;
@@ -1056,6 +1085,7 @@ export const useLiveSession = (
   const smartMoneyHistoryRef = useRef<SmartMoneyEvent[]>([]);
   const classifierHitsHistoryRef = useRef<ClassifierHitEvent[]>([]);
   const alertsHistoryRef = useRef<AlertEvent[]>([]);
+  const durableRowsHistoryRef = useRef<DurableTapeRowViewModel[]>([]);
   const newsHistoryRef = useRef<NewsStory[]>([]);
   const inferredDarkHistoryRef = useRef<InferredDarkEvent[]>([]);
   const socketRef = useRef<WebSocket | null>(null);
@@ -1086,6 +1116,10 @@ export const useLiveSession = (
         onTrim
       }),
       alerts: createLiveWindowBuffer<AlertEvent>({ limit: LIVE_HOT_WINDOW, onTrim }),
+      durableRows: createLiveWindowBuffer<DurableTapeRowViewModel>({
+        limit: LIVE_OPTIONS_HEAD_LIMIT,
+        onTrim
+      }),
       news: createLiveWindowBuffer<NewsStory>({ limit: LIVE_OPTIONS_HEAD_LIMIT, onTrim }),
       inferredDark: createLiveWindowBuffer<InferredDarkEvent>({ limit: LIVE_HOT_WINDOW, onTrim }),
       chartCandles: createLiveWindowBuffer<EquityCandle>({ limit: LIVE_HOT_WINDOW, onTrim }),
@@ -1104,6 +1138,7 @@ export const useLiveSession = (
     liveBuffers.smartMoney.reset([]);
     liveBuffers.classifierHits.reset([]);
     liveBuffers.alerts.reset([]);
+    liveBuffers.durableRows.reset([]);
     liveBuffers.news.reset([]);
     liveBuffers.inferredDark.reset([]);
     liveBuffers.chartCandles.reset([]);
@@ -1165,6 +1200,7 @@ export const useLiveSession = (
       setSmartMoney([]);
       setClassifierHits([]);
       setAlerts([]);
+      setDurableRows([]);
       setNews([]);
       setInferredDark([]);
       setOptionsHistory([]);
@@ -1176,6 +1212,7 @@ export const useLiveSession = (
       setSmartMoneyHistory([]);
       setClassifierHitsHistory([]);
       setAlertsHistory([]);
+      setDurableRowsHistory([]);
       setNewsHistory([]);
       setInferredDarkHistory([]);
       setChartCandles([]);
@@ -1190,6 +1227,7 @@ export const useLiveSession = (
       smartMoneyRef.current = [];
       classifierHitsRef.current = [];
       alertsRef.current = [];
+      durableRowsRef.current = [];
       newsRef.current = [];
       inferredDarkRef.current = [];
       chartCandlesRef.current = [];
@@ -1205,6 +1243,7 @@ export const useLiveSession = (
       smartMoneyHistoryRef.current = [];
       classifierHitsHistoryRef.current = [];
       alertsHistoryRef.current = [];
+      durableRowsHistoryRef.current = [];
       newsHistoryRef.current = [];
       inferredDarkHistoryRef.current = [];
       subscribedKeysRef.current = new Set();
@@ -1242,7 +1281,7 @@ export const useLiveSession = (
         socket.send(JSON.stringify({ op: "unsubscribe", subscriptions: toUnsubscribe }));
       }
       if (toSubscribe.length > 0) {
-        socket.send(JSON.stringify({ op: "subscribe", subscriptions: toSubscribe }));
+        sendLiveSubscribeRequest(socket, toSubscribe);
       }
       subscribedKeysRef.current = nextKeys;
       subscribedMapRef.current = nextMap;
@@ -1403,6 +1442,19 @@ export const useLiveSession = (
             setter: setAlertsHistory,
             ref: alertsHistoryRef
           });
+          break;
+        case "durable-rows":
+          mergeItems(
+            setDurableRows,
+            durableRowsRef,
+            liveBuffers.durableRows,
+            items as DurableTapeRowViewModel[],
+            {
+              setter: setDurableRowsHistory,
+              ref: durableRowsHistoryRef,
+              cap: LIVE_HISTORY_SOFT_CAP
+            }
+          );
           break;
         case "news":
           mergeItems(setNews, newsRef, liveBuffers.news, items as NewsStory[], {
@@ -1652,6 +1704,13 @@ export const useLiveSession = (
       setEquities([]);
       setEquitiesHistory([]);
     }
+    if (resetScopedChannels.has("durable-rows")) {
+      durableRowsRef.current = [];
+      durableRowsHistoryRef.current = [];
+      liveBuffers.durableRows.reset([]);
+      setDurableRows([]);
+      setDurableRowsHistory([]);
+    }
     if (resetScopedChannels.has("equity-candles")) {
       chartCandlesRef.current = [];
       liveBuffers.chartCandles.reset([]);
@@ -1695,7 +1754,7 @@ export const useLiveSession = (
       }
     }
     if (toSubscribe.length > 0) {
-      socket.send(JSON.stringify({ op: "subscribe", subscriptions: toSubscribe }));
+      sendLiveSubscribeRequest(socket, toSubscribe);
     }
     subscribedKeysRef.current = nextKeys;
     subscribedMapRef.current = nextMap;
@@ -1838,6 +1897,7 @@ export const useLiveSession = (
     smartMoneyHistory,
     classifierHitsHistory,
     alertsHistory,
+    durableRowsHistory,
     newsHistory,
     inferredDarkHistory,
     options,
@@ -1850,6 +1910,7 @@ export const useLiveSession = (
     smartMoney,
     classifierHits,
     alerts,
+    durableRows,
     news,
     inferredDark,
     chartCandles,

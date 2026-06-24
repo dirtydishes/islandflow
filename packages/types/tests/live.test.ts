@@ -46,6 +46,16 @@ describe("live protocol types", () => {
     expect(getSubscriptionKey({ channel: "equity-overlay", underlying_id: "SPY" })).toBe(
       "equity-overlay|SPY"
     );
+    expect(
+      getSubscriptionKey({
+        channel: "durable-rows",
+        lanes: ["alerts", "options"],
+        filters: { view: "signal", minNotional: 50000 },
+        underlying_ids: ["SPY"]
+      })
+    ).toBe(
+      'durable-rows|lanes:alerts,options|{"view":"signal","minNotional":50000}|underlyings:SPY'
+    );
   });
 
   it("validates subscribe messages", () => {
@@ -54,13 +64,14 @@ describe("live protocol types", () => {
       subscriptions: [
         { channel: "flow", filters: { nbboSides: ["AA", "A"], minNotional: 50000 } },
         { channel: "smart-flow", snapshot_limit: 25 },
+        { channel: "durable-rows", lanes: ["options", "alerts"], snapshot_limit: 100 },
         { channel: "news", snapshot_limit: 100 },
         { channel: "equity-candles", underlying_id: "SPY", interval_ms: 60000 }
       ]
     });
 
     expect(parsed.op).toBe("subscribe");
-    expect(parsed.subscriptions).toHaveLength(4);
+    expect(parsed.subscriptions).toHaveLength(5);
   });
 
   it("validates snapshot and event server messages", () => {
@@ -76,24 +87,49 @@ describe("live protocol types", () => {
     });
     const event = LiveServerMessageSchema.parse({
       op: "event",
-      subscription: { channel: "news" },
+      subscription: { channel: "durable-rows", lanes: ["alerts"] },
       item: {
+        id: "alerts:alert-1:1",
+        lane: "alerts",
+        source: "server",
+        ts: 100,
         source_ts: 100,
         ingest_ts: 101,
         seq: 1,
-        trace_id: "alpaca:1",
-        story_id: 1,
-        provider: "alpaca",
-        source: "Benzinga",
-        headline: "TSLA rises",
-        summary: "",
-        content_html: "<p>TSLA rises</p>",
-        url: "https://example.com/story",
-        published_ts: 100,
-        updated_ts: 100,
-        provider_symbols: ["TSLA"],
-        resolved_symbols: ["TSLA"],
-        symbol_resolution: "provider"
+        symbol: "SPY",
+        cells: {
+          time: "00:00:00",
+          symbol: "SPY",
+          kind: "Large Call",
+          score: 91,
+          state: "high / bullish"
+        },
+        badges: [{ kind: "severity", label: "high", tone: "high" }],
+        alert: {
+          trace_id: "alert-1",
+          primary_label: "Large Call",
+          primary_profile_id: null,
+          score: 91,
+          severity: "high",
+          direction: "bullish",
+          hit_count: 1,
+          top_hit: {
+            classifier_id: "large_call",
+            label: "Large Call",
+            direction: "bullish",
+            confidence: 0.91,
+            explanation: "large premium"
+          }
+        },
+        evidence: {
+          total_refs: 1,
+          flow_packet_refs: ["flowpacket:1"],
+          option_print_refs: [],
+          unresolved_refs: [],
+          underlying_id: "SPY",
+          primary_packet: null,
+          preview_prints: []
+        }
       },
       watermark: cursor
     });

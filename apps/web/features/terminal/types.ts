@@ -15,6 +15,7 @@ export type RouteFeatures = {
   flow: boolean;
   news: boolean;
   alerts: boolean;
+  durableRows: boolean;
   smartMoney: boolean;
   classifierHits: boolean;
   inferredDark: boolean;

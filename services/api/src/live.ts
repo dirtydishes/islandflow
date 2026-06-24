@@ -39,7 +39,6 @@ import {
   matchesOptionPrintFilters,
   type NewsStory,
   NewsStorySchema,
-  type OptionFlowFilters,
   OptionNBBOSchema,
   type OptionPrint,
   OptionPrintSchema,
@@ -47,6 +46,12 @@ import {
   SmartMoneyEventSchema
 } from "@islandflow/types";
 import type { RedisClientType } from "redis";
+import {
+  composeDurableRowSnapshot,
+  composeDurableRowsForEvent,
+  type DurableRowCompositionContext,
+  type DurableRowsSubscription
+} from "./durable-rows";
 import { fetchRecentSmartFlowExplainability, smartFlowCursor } from "./smart-flow";
 
 const CURSOR_HASH_KEY = "live:cursors";
@@ -245,6 +250,7 @@ const extractFreshnessTs = (channel: LiveGenericChannel, item: any): number | nu
       return typeof item.ts === "number" ? item.ts : null;
     case "flow":
     case "smart-flow":
+    case "smart-money":
     case "classifier-hits":
     case "alerts":
     case "inferred-dark":
@@ -474,6 +480,9 @@ export const isLiveItemFresh = (
 
 export const shouldFanoutLiveEvent = (channel: LiveChannel, item: unknown): boolean => {
   if (channel === "equity-candles" || channel === "equity-overlay") {
+    return true;
+  }
+  if (channel === "durable-rows") {
     return true;
   }
   return isWithinLiveFeedLookback(channel, item);
@@ -711,6 +720,47 @@ export class LiveStateManager {
     };
   }
 
+  private getDurableRowCompositionContext(): DurableRowCompositionContext {
+    return {
+      alerts: (this.genericItems.get("alerts") ?? []) as DurableRowCompositionContext["alerts"],
+      flowPackets: (this.genericItems.get("flow") ??
+        []) as DurableRowCompositionContext["flowPackets"],
+      optionPrints: (this.genericItems.get("options") ??
+        []) as DurableRowCompositionContext["optionPrints"],
+      nbbo: (this.genericItems.get("nbbo") ?? []) as DurableRowCompositionContext["nbbo"],
+      classifierHits: (this.genericItems.get("classifier-hits") ??
+        []) as DurableRowCompositionContext["classifierHits"],
+      smartMoney: (this.genericItems.get("smart-money") ??
+        []) as DurableRowCompositionContext["smartMoney"]
+    };
+  }
+
+  private durableRowsConfiguredLimit(): number {
+    return Math.max(this.config.limits.options, this.config.limits.alerts);
+  }
+
+  private getDurableRowSnapshot(subscription: DurableRowsSubscription): FeedSnapshot<unknown> {
+    return composeDurableRowSnapshot(
+      subscription,
+      this.getDurableRowCompositionContext(),
+      this.durableRowsConfiguredLimit()
+    );
+  }
+
+  composeDurableRowsForEvent(
+    subscription: DurableRowsSubscription,
+    channel: LiveChannel,
+    item: unknown
+  ) {
+    return composeDurableRowsForEvent(
+      subscription,
+      channel,
+      item,
+      this.getDurableRowCompositionContext(),
+      this.durableRowsConfiguredLimit()
+    );
+  }
+
   async flushRedisWrites(): Promise<void> {
     if (!this.redis?.isOpen) {
       return;
@@ -783,7 +833,7 @@ export class LiveStateManager {
     now = Date.now()
   ): void {
     const ts =
-      channel === "equity-candles" || channel === "equity-overlay"
+      channel === "equity-candles" || channel === "equity-overlay" || channel === "durable-rows"
         ? typeof (item as { ts?: unknown })?.ts === "number"
           ? ((item as { ts: number }).ts as number)
           : null
@@ -985,6 +1035,9 @@ export class LiveStateManager {
           next_before: nextBeforeForItems(items, (entry) => ({ ts: entry.ts, seq: entry.seq }))
         };
       }
+      case "durable-rows": {
+        return this.getDurableRowSnapshot(subscription);
+      }
       default: {
         const config = this.generic[subscription.channel];
         this.stats.genericCacheSnapshots += 1;
@@ -1062,6 +1115,8 @@ export class LiveStateManager {
         this.queueRedisWrite(key, cursorField, nextState.items, CHART_LIMITS.overlay, cursor);
         return cursor;
       }
+      case "durable-rows":
+        return null;
       default: {
         const config = this.generic[channel];
         const parsed = config.parse(item);

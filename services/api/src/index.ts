@@ -1065,6 +1065,33 @@ const run = async () => {
       return;
     }
 
+    let matchedDurableRowSubscriptions = 0;
+    const durableRowSubscriptions = [...subscriptionDefinitions.entries()].filter(
+      (entry): entry is [string, Extract<LiveSubscription, { channel: "durable-rows" }>] =>
+        entry[1].channel === "durable-rows"
+    );
+    for (const [key, candidate] of durableRowSubscriptions) {
+      const sockets = subscriptionSockets.get(key);
+      if (!sockets || sockets.size === 0) {
+        continue;
+      }
+      const rows = liveState.composeDurableRowsForEvent(candidate, ingestChannel, item);
+      if (rows.length === 0) {
+        continue;
+      }
+      matchedDurableRowSubscriptions += 1;
+      for (const row of rows) {
+        for (const socket of sockets) {
+          sendLiveMessage(socket, {
+            op: "event",
+            subscription: candidate,
+            item: row,
+            watermark: { ts: row.ts, seq: row.seq }
+          });
+        }
+      }
+    }
+
     const matchingSubscriptions =
       subscription.channel === "options" ||
       subscription.channel === "flow" ||
@@ -1075,6 +1102,12 @@ const run = async () => {
         : [[getSubscriptionKey(subscription), subscription] as const];
 
     if (matchingSubscriptions.length === 0) {
+      if (matchedDurableRowSubscriptions > 0) {
+        metrics.count(
+          "api.live.durable_row_subscription_match_count",
+          matchedDurableRowSubscriptions
+        );
+      }
       return;
     }
 
@@ -1130,6 +1163,12 @@ const run = async () => {
 
     if (matchedSubscriptions > 0) {
       metrics.count("api.live.subscription_match_count", matchedSubscriptions);
+    }
+    if (matchedDurableRowSubscriptions > 0) {
+      metrics.count(
+        "api.live.durable_row_subscription_match_count",
+        matchedDurableRowSubscriptions
+      );
     }
   };
 

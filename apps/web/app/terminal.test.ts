@@ -163,7 +163,10 @@ describe("durable tapes pane selectors", () => {
       classifierDecorByOptionTraceId: new Map(),
       clearSelectedAlert: noop,
       clearSelectedInstrument: noop,
+      durableRows: { status: "connected" },
       filteredAlerts: alerts,
+      filteredDurableAlertRows: [],
+      filteredDurableOptionRows: [],
       filteredEquities: equityPrints,
       filteredFlow: flowPackets,
       filteredNews: newsStories,
@@ -425,19 +428,17 @@ describe("live manifest", () => {
     const manifest = getLiveManifest("/durable-tapes", "SPY", 60000, filters);
     const channels = manifest.map((subscription) => subscription.channel);
 
-    expect(channels).toEqual([
-      "options",
-      "nbbo",
-      "equities",
-      "flow",
-      "news",
-      "alerts",
-      "classifier-hits"
-    ]);
+    expect(channels).toEqual(["options", "durable-rows", "equities", "flow", "news", "alerts"]);
     expect(manifest.find((subscription) => subscription.channel === "options")?.filters).toBe(
       filters
     );
+    expect(manifest.find((subscription) => subscription.channel === "durable-rows")).toMatchObject({
+      lanes: ["options", "alerts"],
+      filters
+    });
     expect(manifest.find((subscription) => subscription.channel === "flow")?.filters).toBe(filters);
+    expect(channels).not.toContain("nbbo");
+    expect(channels).not.toContain("classifier-hits");
     expect(channels).not.toContain("equity-candles");
     expect(channels).not.toContain("equity-overlay");
   });
@@ -489,6 +490,18 @@ describe("live manifest", () => {
       "equity-candles"
     ]);
     expect(Array.from(getLiveSubscriptionResetChannels(current, current))).toEqual([]);
+  });
+
+  it("resets server-composed durable rows when their scope changes", () => {
+    const current = getLiveManifest("/durable-tapes", "SPY", 60_000, buildDefaultFlowFilters());
+    const next = getLiveManifest("/durable-tapes", "SPY", 60_000, buildDefaultFlowFilters(), {
+      underlying_ids: ["SPY"]
+    });
+
+    expect(Array.from(getLiveSubscriptionResetChannels(current, next)).sort()).toEqual([
+      "durable-rows",
+      "options"
+    ]);
   });
 });
 
@@ -675,8 +688,9 @@ describe("route feature map", () => {
     expect(features.showEquitiesPane).toBe(true);
     expect(features.showNewsPane).toBe(true);
     expect(features.showAlertsPane).toBe(true);
-    expect(features.needsClassifierDecor).toBe(true);
-    expect(features.needsAlertEvidencePrefetch).toBe(true);
+    expect(features.durableRows).toBe(true);
+    expect(features.needsClassifierDecor).toBe(false);
+    expect(features.needsAlertEvidencePrefetch).toBe(false);
     expect(features.showChartPane).toBe(false);
     expect(features.equityCandles).toBe(false);
   });

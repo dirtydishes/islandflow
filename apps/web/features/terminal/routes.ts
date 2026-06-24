@@ -33,6 +33,7 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         flow: true,
         news: false,
         alerts: false,
+        durableRows: false,
         smartMoney: false,
         classifierHits: false,
         inferredDark: false,
@@ -58,6 +59,7 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         flow: false,
         news: true,
         alerts: false,
+        durableRows: false,
         smartMoney: false,
         classifierHits: false,
         inferredDark: false,
@@ -78,13 +80,14 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
     case DURABLE_TAPES_PATH:
       return {
         options: true,
-        nbbo: true,
+        nbbo: false,
         equities: true,
         flow: true,
         news: true,
         alerts: true,
+        durableRows: true,
         smartMoney: false,
-        classifierHits: true,
+        classifierHits: false,
         inferredDark: false,
         equityJoins: false,
         equityCandles: false,
@@ -96,8 +99,8 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         showAlertsPane: true,
         showDarkPane: false,
         showChartPane: false,
-        needsClassifierDecor: true,
-        needsAlertEvidencePrefetch: true,
+        needsClassifierDecor: false,
+        needsAlertEvidencePrefetch: false,
         needsDarkUnderlying: false
       };
     case "/":
@@ -109,6 +112,7 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         flow: true,
         news: true,
         alerts: true,
+        durableRows: false,
         smartMoney: true,
         classifierHits: false,
         inferredDark: true,
@@ -144,12 +148,17 @@ export const appendLiveScopeParams = (
   subscription: LiveSubscription
 ): void => {
   if (
-    (subscription.channel === "options" || subscription.channel === "equities") &&
+    (subscription.channel === "options" ||
+      subscription.channel === "equities" ||
+      subscription.channel === "durable-rows") &&
     subscription.underlying_ids?.length
   ) {
     params.set("underlying_ids", subscription.underlying_ids.join(","));
   }
-  if (subscription.channel === "options" && subscription.option_contract_id) {
+  if (
+    (subscription.channel === "options" || subscription.channel === "durable-rows") &&
+    subscription.option_contract_id
+  ) {
     params.set("option_contract_id", subscription.option_contract_id);
   }
 };
@@ -185,6 +194,15 @@ export const getLiveManifest = (
         optionScope?.option_contract_id && optionPrintFilters === undefined
           ? undefined
           : (optionPrintFilters ?? flowFilters),
+      ...optionScope,
+      snapshot_limit: LIVE_OPTIONS_HEAD_LIMIT
+    });
+  }
+  if (features.durableRows) {
+    subscriptions.push({
+      channel: "durable-rows",
+      lanes: ["options", "alerts"],
+      filters: optionPrintFilters ?? flowFilters,
       ...optionScope,
       snapshot_limit: LIVE_OPTIONS_HEAD_LIMIT
     });

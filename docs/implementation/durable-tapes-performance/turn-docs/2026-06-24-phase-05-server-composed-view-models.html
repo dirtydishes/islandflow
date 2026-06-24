@@ -1,0 +1,807 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Durable Tapes Performance Phase 05: Server-Composed View Models</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "../../../../node_modules/react/index.js",
+          "react-dom/client": "../../../../node_modules/react-dom/client.js",
+          "@pierre/diffs/react": "../../../../node_modules/@pierre/diffs/dist/react/index.js"
+        }
+      }
+    </script>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #111820;
+        --panel-2: #0d141b;
+        --line: rgba(230, 237, 244, 0.14);
+        --line-strong: rgba(245, 166, 35, 0.36);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --green: #25c17a;
+        --red: #ff6b5f;
+        --blue: #4da3ff;
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: linear-gradient(180deg, #0b1016 0%, var(--bg) 100%);
+        color: var(--text);
+        font: 15px/1.55 var(--sans);
+      }
+
+      main {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+
+      header {
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 980px;
+        font-size: 2rem;
+        line-height: 1.08;
+        letter-spacing: 0;
+        text-wrap: balance;
+      }
+
+      h2,
+      .eyebrow,
+      .meta-label,
+      code,
+      pre,
+      table {
+        font-family: var(--mono);
+      }
+
+      h2 {
+        margin-bottom: 10px;
+        color: var(--accent);
+        font-size: 0.9rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .eyebrow {
+        margin-bottom: 8px;
+        color: var(--accent);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .subtitle {
+        max-width: 88ch;
+        margin-top: 12px;
+        color: var(--muted);
+      }
+
+      .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 1px;
+        margin-top: 18px;
+        border: 1px solid var(--line);
+        background: var(--line);
+      }
+
+      .meta-cell {
+        min-width: 0;
+        padding: 10px 12px;
+        background: var(--panel);
+      }
+
+      .meta-label {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--faint);
+        font-size: 0.66rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      section {
+        padding: 20px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      p + p {
+        margin-top: 10px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 7px;
+      }
+
+      code {
+        padding: 0.08rem 0.28rem;
+        border: 1px solid rgba(245, 166, 35, 0.18);
+        border-radius: 5px;
+        background: rgba(245, 166, 35, 0.1);
+        color: #ffe0a3;
+        font-size: 0.9em;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        font-size: 0.78rem;
+      }
+
+      th,
+      td {
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--accent);
+        background: var(--panel-2);
+      }
+
+      td {
+        background: var(--panel);
+      }
+
+      .status-ok {
+        color: var(--green);
+      }
+
+      .status-note {
+        color: var(--blue);
+      }
+
+      .status-risk {
+        color: var(--red);
+      }
+
+      .diff-shell {
+        display: grid;
+        gap: 12px;
+      }
+
+      #rich-diff {
+        min-height: 32px;
+      }
+
+      #fallback-diff {
+        max-height: 620px;
+        overflow: auto;
+        margin: 0;
+        padding: 12px;
+        border: 1px solid var(--line);
+        background: var(--panel-2);
+        color: var(--text);
+        font-size: 0.76rem;
+        line-height: 1.45;
+      }
+
+      .rich-diff-ready #fallback-diff {
+        display: none;
+      }
+
+      .diff-note {
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">Phase 05 evidence record</p>
+        <h1>Server-composed durable-tape row view models</h1>
+        <p class="subtitle">
+          Phase 05 introduces a typed row model for the busiest durable-tape lanes, composes option
+          support and alert evidence summaries in the API process, and lets the web route consume
+          composed rows when available while keeping the raw rendering fallback explicit.
+        </p>
+        <div class="meta-grid">
+          <div class="meta-cell">
+            <span class="meta-label">Issue</span>
+            <code>islandflow-ze79.6</code>
+          </div>
+          <div class="meta-cell">
+            <span class="meta-label">Branch</span>
+            <code>lavender/ze79-phase-05-server-composed-view-models</code>
+          </div>
+          <div class="meta-cell">
+            <span class="meta-label">Probe Output</span>
+            <code>baselines/phase-05-local-hosted-api.json</code>
+          </div>
+          <div class="meta-cell">
+            <span class="meta-label">Delivery Path</span>
+            Websocket <code>durable-rows</code> snapshot and deltas
+          </div>
+        </div>
+      </header>
+
+      <section>
+        <h2>Scope</h2>
+        <ul>
+          <li>
+            Added shared option and alert durable row view-model schemas in <code>packages/types</code>
+            with typed cells, badges, support summaries, evidence summaries, and drilldown refs.
+          </li>
+          <li>
+            Added the live <code>durable-rows</code> subscription channel with lane, filter,
+            underlying, contract, and snapshot limit support.
+          </li>
+          <li>
+            Composed option print support and alert evidence server-side from cached API live
+            windows, including bounded snapshot/event composition.
+          </li>
+          <li>
+            Migrated the durable-tapes options and alerts panes to server rows when present, with
+            dense raw panes left as the hosted-API fallback.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Contract Notes</h2>
+        <p>
+          The contract is lane-specific rather than a generic display blob. Option rows carry
+          contract, execution, NBBO, signal, packet, classifier, smart-money, cells, badges, and
+          drilldown refs. Alert rows carry alert identity, severity, direction, evidence counts,
+          primary packet preview, option-print previews, unresolved refs, cells, badges, and
+          drilldown refs.
+        </p>
+        <p>
+          The web route never needs packet, NBBO, classifier, or trace joins for normal
+          server-row rendering. When the hosted API rejects <code>durable-rows</code>, the client
+          sends the new subscription separately so older backends do not reject the raw durable
+          subscriptions in the same batch.
+        </p>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Gate</th>
+              <th>Result</th>
+              <th>Evidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>bun run fmt:check</code></td>
+              <td class="status-ok">pass after reviewer repair</td>
+              <td>
+                Forgejo run #281 failed at this gate. Reviewer repair ran
+                <code>bun run fmt</code>, then verified Biome format check locally.
+              </td>
+            </tr>
+            <tr>
+              <td><code>bun run lint</code></td>
+              <td class="status-ok">pass</td>
+              <td>Biome lint completed with no fixes applied.</td>
+            </tr>
+            <tr>
+              <td><code>bun run typecheck</code></td>
+              <td class="status-ok">pass after reviewer repair</td>
+              <td>
+                Typecheck caught the derived <code>durable-rows</code> channel flowing through the
+                raw-channel freshness helper; reviewer repair narrowed that branch explicitly.
+              </td>
+            </tr>
+            <tr>
+              <td><code>bun test</code></td>
+              <td class="status-ok">pass</td>
+              <td>460 tests passed across 76 files.</td>
+            </tr>
+            <tr>
+              <td><code>bun test packages/types services/api/tests packages/storage/tests</code></td>
+              <td class="status-ok">pass</td>
+              <td>100 tests passed across shared types, API tests, and storage tests.</td>
+            </tr>
+            <tr>
+              <td><code>bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code></td>
+              <td class="status-ok">pass</td>
+              <td>
+                99 tests passed, including durable route manifest coverage, legacy route coverage,
+                and reviewer coverage for durable-row scope resets.
+              </td>
+            </tr>
+            <tr>
+              <td><code>bun --cwd=apps/web run build</code></td>
+              <td class="status-ok">pass</td>
+              <td>Next.js production build completed successfully.</td>
+            </tr>
+            <tr>
+              <td><code>bun run check:public-api-routes</code></td>
+              <td class="status-ok">pass</td>
+              <td>Public route smoke checks passed for options history/replay/NBBO and live WS.</td>
+            </tr>
+            <tr>
+              <td><code>bun run check:docker-workspace</code></td>
+              <td class="status-ok">pass</td>
+              <td>Docker workspace snapshot is in sync.</td>
+            </tr>
+            <tr>
+              <td>Hosted-API perf probe</td>
+              <td class="status-ok">pass</td>
+              <td>
+                32 requests, 0 support lookups, 0 by-trace lookups, 1 abort, TaskDuration
+                19.491s, ScriptDuration 18.118s, 5 panes, 70 visible rows.
+              </td>
+            </tr>
+            <tr>
+              <td>Browser QA</td>
+              <td class="status-note">pass with hosted fallback</td>
+              <td>
+                Options 19 rows, flow 20 rows, equities 15 rows, alerts 20 rows, news 30 rows.
+                Hosted API is pre-Phase-05, so options and alerts used raw fallback. Alert detail
+                exposed severity, direction, refs, packet focus, contract focus, equity focus, and
+                evidence prints.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Reviewer Closeout</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Finding</th>
+              <th>Disposition</th>
+              <th>Evidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                The API row-composition helpers were embedded inside <code>services/api/src/live.ts</code>,
+                making an already-large live-state module own row semantics, cell formatting, evidence
+                summaries, and fanout orchestration at the same time.
+              </td>
+              <td class="status-ok">repaired</td>
+              <td>
+                Extracted the row composer into <code>services/api/src/durable-rows.ts</code>. The
+                live manager now owns cache windows and delegates snapshot/event composition through a
+                small interface.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                The durable-row live buffer was not reset when the scoped <code>durable-rows</code>
+                subscription key changed, so filtered or focused server rows could remain visible until
+                the next snapshot arrived.
+              </td>
+              <td class="status-ok">repaired</td>
+              <td>
+                Added <code>durable-rows</code> to the reset-channel set and covered the scope-change
+                behavior in <code>apps/web/app/terminal.test.ts</code>.
+              </td>
+            </tr>
+            <tr>
+              <td>Lane-specific row parsing still used the union row schema with explicit casts.</td>
+              <td class="status-ok">repaired</td>
+              <td>
+                Switched the composer to <code>DurableTapeOptionRowViewModelSchema</code> and
+                <code>DurableTapeAlertRowViewModelSchema</code> so parser output and return types agree.
+              </td>
+            </tr>
+            <tr>
+              <td>
+                CI surfaced formatting drift and a derived-channel type boundary missed by the
+                narrower phase gates.
+              </td>
+              <td class="status-ok">repaired</td>
+              <td>
+                Ran the repo formatter on Phase 05 files and kept <code>durable-rows</code> out of
+                raw-channel freshness extraction by reading its row timestamp in the derived-channel
+                branch.
+              </td>
+            </tr>
+            <tr>
+              <td>Remaining review findings</td>
+              <td class="status-ok">none blocking</td>
+              <td>
+                No remaining structural blocker was found after repairs. Production server-row smoke is
+                still Phase 06 scope because hosted API is pre-Phase-05.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Risks</h2>
+        <ul>
+          <li>
+            The hosted API used for the required probe does not yet accept <code>durable-rows</code>.
+            This PR verifies server-row composition through API tests and verifies browser fallback
+            against hosted data. A deployed backend probe should confirm <code>data-row-source="server"</code>
+            after rollout.
+          </li>
+          <li>
+            The server composition is bounded to the options and alerts lanes for Phase 05. Flow,
+            equities, and news remain on their existing durable pane paths.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <div class="diff-shell">
+          <p class="diff-note">
+            The browser-side PatchDiff renderer is used when available. The plain unified diff below
+            remains visible if the rich renderer cannot load.
+          </p>
+          <div id="rich-diff" aria-label="Rich diff"></div>
+          <pre id="fallback-diff">diff --git a/packages/types/src/durable-tapes.ts b/packages/types/src/durable-tapes.ts
+new file mode 100644
+--- /dev/null
++++ b/packages/types/src/durable-tapes.ts
+@@
++export const DurableTapeOptionRowViewModelSchema = DurableTapeBaseRowViewModelSchema.extend({
++  lane: z.literal("options"),
++  option: DurableTapeOptionRowOptionSchema,
++  support: DurableTapeOptionRowSupportSchema,
++  cells: DurableTapeOptionRowCellsSchema
++});
++
++export const DurableTapeAlertRowViewModelSchema = DurableTapeBaseRowViewModelSchema.extend({
++  lane: z.literal("alerts"),
++  alert: DurableTapeAlertRowAlertSchema,
++  evidence: DurableTapeAlertRowEvidenceSchema,
++  cells: DurableTapeAlertRowCellsSchema
++});
++
++export const DurableTapeRowViewModelSchema = z.discriminatedUnion("lane", [
++  DurableTapeOptionRowViewModelSchema,
++  DurableTapeAlertRowViewModelSchema
++]);
+diff --git a/packages/types/src/live.ts b/packages/types/src/live.ts
+--- a/packages/types/src/live.ts
++++ b/packages/types/src/live.ts
+@@
++  "durable-rows",
+@@
++  z.object({
++    channel: z.literal("durable-rows"),
++    lanes: z.array(DurableTapeComposedLaneSchema).min(1).max(2).optional(),
++    filters: OptionFlowFiltersSchema.optional(),
++    underlying_ids: z.array(z.string().min(1)).optional(),
++    option_contract_id: z.string().min(1).optional(),
++    snapshot_limit: z.number().int().positive().optional()
++  }),
+@@
++  "durable-rows": DurableTapeRowViewModelSchema,
+diff --git a/services/api/src/live.ts b/services/api/src/live.ts
+--- a/services/api/src/live.ts
++++ b/services/api/src/live.ts
+@@
++  getDurableRowSnapshot(subscription: LiveSubscription): DurableTapeRowViewModel[] {
++    const context = this.getDurableRowCompositionContext(subscription);
++    return composeDurableRowSnapshot(subscription, context);
++  }
++
++  composeDurableRowsForEvent(
++    event: NormalizedEvent,
++    subscription: LiveSubscription
++  ): DurableTapeRowViewModel[] {
++    const context = this.getDurableRowCompositionContext(subscription);
++    return composeDurableRowsForEvent(event, subscription, context);
++  }
+diff --git a/apps/web/features/terminal/live.ts b/apps/web/features/terminal/live.ts
+--- a/apps/web/features/terminal/live.ts
++++ b/apps/web/features/terminal/live.ts
+@@
++const sendLiveSubscribeRequest = (socket: WebSocket, subscriptions: LiveSubscription[]): void => {
++  const rawSubscriptions = subscriptions.filter((subscription) => subscription.channel !== "durable-rows");
++  const durableRowSubscriptions = subscriptions.filter((subscription) => subscription.channel === "durable-rows");
++  if (rawSubscriptions.length > 0) {
++    socket.send(JSON.stringify({ op: "subscribe", subscriptions: rawSubscriptions }));
++  }
++  for (const durableRowSubscription of durableRowSubscriptions) {
++    socket.send(JSON.stringify({ op: "subscribe", subscriptions: [durableRowSubscription] }));
++  }
++};
+@@
++        case "durable-rows":
++          mergeItems(setDurableRows, durableRowsRef, liveBuffers.durableRows, items as DurableTapeRowViewModel[]);
++          break;
+diff --git a/apps/web/app/terminal.tsx b/apps/web/app/terminal.tsx
+--- a/apps/web/app/terminal.tsx
++++ b/apps/web/app/terminal.tsx
+@@
++  if (pane.useRowViewModels) {
++    return &lt;DurableTapeOptionRowsPane rows={pane.rowViewModels} /&gt;;
++  }
++
++  return &lt;OptionsTape prints={pane.prints} decorByTraceId={pane.decorByTraceId} /&gt;;
+diff --git a/services/api/src/durable-rows.ts b/services/api/src/durable-rows.ts
+new file mode 100644
+--- /dev/null
++++ b/services/api/src/durable-rows.ts
+@@
++export type DurableRowCompositionContext = {
++  alerts: AlertEvent[];
++  flowPackets: FlowPacket[];
++  optionPrints: OptionPrint[];
++  nbbo: OptionNBBO[];
++  classifierHits: ClassifierHitEvent[];
++  smartMoney: SmartMoneyEvent[];
++};
++export const composeDurableRowSnapshot = (
++  subscription: DurableRowsSubscription,
++  context: DurableRowCompositionContext,
++  configuredLimit: number
++): FeedSnapshot&lt;unknown&gt; =&gt; {
++  /* rows are composed in the API boundary, outside LiveStateManager */
++};
++export const composeDurableRowsForEvent = (
++  subscription: DurableRowsSubscription,
++  channel: LiveChannel,
++  item: unknown,
++  context: DurableRowCompositionContext,
++  configuredLimit: number
++): DurableTapeRowViewModel[] =&gt; {
++  /* raw live events fan out as bounded composed row deltas */
++};
+diff --git a/services/api/src/live.ts b/services/api/src/live.ts
+--- a/services/api/src/live.ts
++++ b/services/api/src/live.ts
+@@
++  private getDurableRowSnapshot(subscription: DurableRowsSubscription): FeedSnapshot&lt;unknown&gt; {
++    return composeDurableRowSnapshot(
++      subscription,
++      this.getDurableRowCompositionContext(),
++      this.durableRowsConfiguredLimit()
++    );
++  }
+@@
+-      channel === "equity-candles" || channel === "equity-overlay"
++      channel === "equity-candles" || channel === "equity-overlay" || channel === "durable-rows"
+         ? typeof (item as { ts?: unknown })?.ts === "number"
+diff --git a/apps/web/features/terminal/live.ts b/apps/web/features/terminal/live.ts
+--- a/apps/web/features/terminal/live.ts
++++ b/apps/web/features/terminal/live.ts
+@@
++type LiveSubscriptionResetChannel =
++  | "options"
++  | "equities"
++  | "durable-rows"
++  | "equity-candles"
++  | "equity-overlay";
+@@
++    if (resetScopedChannels.has("durable-rows")) {
++      durableRowsRef.current = [];
++      durableRowsHistoryRef.current = [];
++      liveBuffers.durableRows.reset([]);
++      setDurableRows([]);
++      setDurableRowsHistory([]);
++    }
+diff --git a/apps/web/app/terminal.test.ts b/apps/web/app/terminal.test.ts
+--- a/apps/web/app/terminal.test.ts
++++ b/apps/web/app/terminal.test.ts
+@@
++  it("resets server-composed durable rows when their scope changes", () =&gt; {
++    const current = getLiveManifest("/durable-tapes", "SPY", 60_000, buildDefaultFlowFilters());
++    const next = getLiveManifest("/durable-tapes", "SPY", 60_000, buildDefaultFlowFilters(), {
++      underlying_ids: ["SPY"]
++    });
++    expect(Array.from(getLiveSubscriptionResetChannels(current, next)).sort()).toEqual([
++      "durable-rows",
++      "options"
++    ]);
++  });</pre>
+        </div>
+        <script type="text/plain" id="diff-source">diff --git a/packages/types/src/durable-tapes.ts b/packages/types/src/durable-tapes.ts
+new file mode 100644
+--- /dev/null
++++ b/packages/types/src/durable-tapes.ts
+@@
++export const DurableTapeOptionRowViewModelSchema = DurableTapeBaseRowViewModelSchema.extend({
++  lane: z.literal("options"),
++  option: DurableTapeOptionRowOptionSchema,
++  support: DurableTapeOptionRowSupportSchema,
++  cells: DurableTapeOptionRowCellsSchema
++});
++
++export const DurableTapeAlertRowViewModelSchema = DurableTapeBaseRowViewModelSchema.extend({
++  lane: z.literal("alerts"),
++  alert: DurableTapeAlertRowAlertSchema,
++  evidence: DurableTapeAlertRowEvidenceSchema,
++  cells: DurableTapeAlertRowCellsSchema
++});
++
++export const DurableTapeRowViewModelSchema = z.discriminatedUnion("lane", [
++  DurableTapeOptionRowViewModelSchema,
++  DurableTapeAlertRowViewModelSchema
++]);
+diff --git a/packages/types/src/live.ts b/packages/types/src/live.ts
+--- a/packages/types/src/live.ts
++++ b/packages/types/src/live.ts
+@@
++  "durable-rows",
+@@
++  z.object({
++    channel: z.literal("durable-rows"),
++    lanes: z.array(DurableTapeComposedLaneSchema).min(1).max(2).optional(),
++    filters: OptionFlowFiltersSchema.optional(),
++    underlying_ids: z.array(z.string().min(1)).optional(),
++    option_contract_id: z.string().min(1).optional(),
++    snapshot_limit: z.number().int().positive().optional()
++  }),
+@@
++  "durable-rows": DurableTapeRowViewModelSchema,
+diff --git a/services/api/src/live.ts b/services/api/src/live.ts
+--- a/services/api/src/live.ts
++++ b/services/api/src/live.ts
+@@
++  getDurableRowSnapshot(subscription: LiveSubscription): DurableTapeRowViewModel[] {
++    const context = this.getDurableRowCompositionContext(subscription);
++    return composeDurableRowSnapshot(subscription, context);
++  }
++
++  composeDurableRowsForEvent(
++    event: NormalizedEvent,
++    subscription: LiveSubscription
++  ): DurableTapeRowViewModel[] {
++    const context = this.getDurableRowCompositionContext(subscription);
++    return composeDurableRowsForEvent(event, subscription, context);
++  }
+diff --git a/apps/web/features/terminal/live.ts b/apps/web/features/terminal/live.ts
+--- a/apps/web/features/terminal/live.ts
++++ b/apps/web/features/terminal/live.ts
+@@
++const sendLiveSubscribeRequest = (socket: WebSocket, subscriptions: LiveSubscription[]): void => {
++  const rawSubscriptions = subscriptions.filter((subscription) => subscription.channel !== "durable-rows");
++  const durableRowSubscriptions = subscriptions.filter((subscription) => subscription.channel === "durable-rows");
++  if (rawSubscriptions.length > 0) {
++    socket.send(JSON.stringify({ op: "subscribe", subscriptions: rawSubscriptions }));
++  }
++  for (const durableRowSubscription of durableRowSubscriptions) {
++    socket.send(JSON.stringify({ op: "subscribe", subscriptions: [durableRowSubscription] }));
++  }
++};
+@@
++        case "durable-rows":
++          mergeItems(setDurableRows, durableRowsRef, liveBuffers.durableRows, items as DurableTapeRowViewModel[]);
++          break;
+diff --git a/apps/web/app/terminal.tsx b/apps/web/app/terminal.tsx
+--- a/apps/web/app/terminal.tsx
++++ b/apps/web/app/terminal.tsx
+@@
++  if (pane.useRowViewModels) {
++    return &lt;DurableTapeOptionRowsPane rows={pane.rowViewModels} /&gt;;
++  }
++
++  return &lt;OptionsTape prints={pane.prints} decorByTraceId={pane.decorByTraceId} /&gt;;
+diff --git a/services/api/src/durable-rows.ts b/services/api/src/durable-rows.ts
+new file mode 100644
+--- /dev/null
++++ b/services/api/src/durable-rows.ts
+@@
++export type DurableRowCompositionContext = {
++  alerts: AlertEvent[];
++  flowPackets: FlowPacket[];
++  optionPrints: OptionPrint[];
++  nbbo: OptionNBBO[];
++  classifierHits: ClassifierHitEvent[];
++  smartMoney: SmartMoneyEvent[];
++};
++export const composeDurableRowSnapshot = (
++  subscription: DurableRowsSubscription,
++  context: DurableRowCompositionContext,
++  configuredLimit: number
++): FeedSnapshot&lt;unknown&gt; =&gt; {
++  /* rows are composed in the API boundary, outside LiveStateManager */
++};
++export const composeDurableRowsForEvent = (
++  subscription: DurableRowsSubscription,
++  channel: LiveChannel,
++  item: unknown,
++  context: DurableRowCompositionContext,
++  configuredLimit: number
++): DurableTapeRowViewModel[] =&gt; {
++  /* raw live events fan out as bounded composed row deltas */
++};
+diff --git a/services/api/src/live.ts b/services/api/src/live.ts
+--- a/services/api/src/live.ts
++++ b/services/api/src/live.ts
+@@
++  private getDurableRowSnapshot(subscription: DurableRowsSubscription): FeedSnapshot&lt;unknown&gt; {
++    return composeDurableRowSnapshot(
++      subscription,
++      this.getDurableRowCompositionContext(),
++      this.durableRowsConfiguredLimit()
++    );
++  }
+@@
+-      channel === "equity-candles" || channel === "equity-overlay"
++      channel === "equity-candles" || channel === "equity-overlay" || channel === "durable-rows"
+         ? typeof (item as { ts?: unknown })?.ts === "number"
+diff --git a/apps/web/features/terminal/live.ts b/apps/web/features/terminal/live.ts
+--- a/apps/web/features/terminal/live.ts
++++ b/apps/web/features/terminal/live.ts
+@@
++type LiveSubscriptionResetChannel =
++  | "options"
++  | "equities"
++  | "durable-rows"
++  | "equity-candles"
++  | "equity-overlay";
+@@
++    if (resetScopedChannels.has("durable-rows")) {
++      durableRowsRef.current = [];
++      durableRowsHistoryRef.current = [];
++      liveBuffers.durableRows.reset([]);
++      setDurableRows([]);
++      setDurableRowsHistory([]);
++    }
+diff --git a/apps/web/app/terminal.test.ts b/apps/web/app/terminal.test.ts
+--- a/apps/web/app/terminal.test.ts
++++ b/apps/web/app/terminal.test.ts
+@@
++  it("resets server-composed durable rows when their scope changes", () =&gt; {
++    const current = getLiveManifest("/durable-tapes", "SPY", 60_000, buildDefaultFlowFilters());
++    const next = getLiveManifest("/durable-tapes", "SPY", 60_000, buildDefaultFlowFilters(), {
++      underlying_ids: ["SPY"]
++    });
++    expect(Array.from(getLiveSubscriptionResetChannels(current, next)).sort()).toEqual([
++      "durable-rows",
++      "options"
++    ]);
++  });</script>
+      </section>
+    </main>
+    <script type="module">
+      const target = document.getElementById("rich-diff");
+      const source = document.getElementById("diff-source")?.textContent ?? "";
+
+      try {
+        const [{ createElement }, { createRoot }, { PatchDiff }] = await Promise.all([
+          import("react"),
+          import("react-dom/client"),
+          import("@pierre/diffs/react")
+        ]);
+        createRoot(target).render(createElement(PatchDiff, { patch: source }));
+        document.body.classList.add("rich-diff-ready");
+      } catch (error) {
+        target.textContent = "Rich diff renderer unavailable; using fallback below.";
+        console.warn("PatchDiff render failed", error);
+      }
+    </script>
+  </body>
+</html>

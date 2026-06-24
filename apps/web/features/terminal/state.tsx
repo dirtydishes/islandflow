@@ -3,6 +3,9 @@
 import type {
   AlertEvent,
   ClassifierHitEvent,
+  DurableTapeAlertRowViewModel,
+  DurableTapeOptionRowViewModel,
+  DurableTapeRowViewModel,
   EquityPrint,
   EquityPrintJoin,
   FlowPacket,
@@ -113,6 +116,8 @@ const EMPTY_SMART_FLOW_EXPLAINABILITY: SmartFlowExplainabilityProjection[] = [];
 const EMPTY_SMART_MONEY_EVENTS: SmartMoneyEvent[] = [];
 const EMPTY_INFERRED_DARK_EVENTS: InferredDarkEvent[] = [];
 const EMPTY_NEWS_STORIES: NewsStory[] = [];
+const EMPTY_DURABLE_OPTION_ROWS: DurableTapeOptionRowViewModel[] = [];
+const EMPTY_DURABLE_ALERT_ROWS: DurableTapeAlertRowViewModel[] = [];
 
 const EMPTY_OPTION_PRINT_MAP = new Map<string, OptionPrint>();
 const EMPTY_FLOW_PACKET_MAP = new Map<string, FlowPacket>();
@@ -223,6 +228,7 @@ export const useTerminalState = () => {
   const equityJoinsLastUpdate = liveSession.lastEventByChannel["equity-joins"] ?? null;
   const flowLastUpdate = liveSession.lastEventByChannel.flow ?? null;
   const alertsLastUpdate = liveSession.lastEventByChannel.alerts ?? null;
+  const durableRowsLastUpdate = liveSession.lastEventByChannel["durable-rows"] ?? null;
   const classifierHitsLastUpdate = liveSession.lastEventByChannel["classifier-hits"] ?? null;
   const smartFlowLastUpdate = liveSession.lastEventByChannel["smart-flow"] ?? null;
   const smartMoneyLastUpdate = liveSession.lastEventByChannel["smart-money"] ?? null;
@@ -554,6 +560,10 @@ export const useTerminalState = () => {
     () => composeTapeItems([], liveSession.alerts, liveSession.alertsHistory),
     [liveSession.alerts, liveSession.alertsHistory]
   );
+  const liveDurableRowItems = useMemo(
+    () => composeTapeItems([], liveSession.durableRows, liveSession.durableRowsHistory),
+    [liveSession.durableRows, liveSession.durableRowsHistory]
+  );
   const liveClassifierHitItems = useMemo(
     () => composeTapeItems([], liveSession.classifierHits, liveSession.classifierHitsHistory),
     [liveSession.classifierHits, liveSession.classifierHitsHistory]
@@ -592,6 +602,10 @@ export const useTerminalState = () => {
     mode === "live"
       ? toStaticTapeState(liveSession.status, liveAlertItems, alertsLastUpdate)
       : alerts;
+  const durableRowsFeed =
+    mode === "live"
+      ? toStaticTapeState(liveSession.status, liveDurableRowItems, durableRowsLastUpdate)
+      : toStaticTapeState<DurableTapeRowViewModel>("disconnected", [], null);
   const classifierHitsFeed =
     mode === "live"
       ? toStaticTapeState(liveSession.status, liveClassifierHitItems, classifierHitsLastUpdate)
@@ -1669,6 +1683,32 @@ export const useTerminalState = () => {
     routeFeatures.needsAlertEvidencePrefetch
   ]);
 
+  const filteredDurableOptionRows = useMemo(() => {
+    if (!routeFeatures.durableRows) {
+      return EMPTY_DURABLE_OPTION_ROWS;
+    }
+    const rows = durableRowsFeed.items.filter(
+      (row): row is DurableTapeOptionRowViewModel => row.lane === "options"
+    );
+    if (tickerSet.size === 0) {
+      return rows;
+    }
+    return rows.filter((row) => matchesTicker(row.symbol ?? row.option.underlying_id ?? null));
+  }, [durableRowsFeed.items, matchesTicker, routeFeatures.durableRows, tickerSet]);
+
+  const filteredDurableAlertRows = useMemo(() => {
+    if (!routeFeatures.durableRows) {
+      return EMPTY_DURABLE_ALERT_ROWS;
+    }
+    const rows = durableRowsFeed.items.filter(
+      (row): row is DurableTapeAlertRowViewModel => row.lane === "alerts"
+    );
+    if (tickerSet.size === 0) {
+      return rows;
+    }
+    return rows.filter((row) => matchesTicker(row.symbol ?? row.evidence.underlying_id));
+  }, [durableRowsFeed.items, matchesTicker, routeFeatures.durableRows, tickerSet]);
+
   const filteredNews = useMemo(() => {
     if (!routeFeatures.news && !routeFeatures.showNewsPane) {
       return EMPTY_NEWS_STORIES;
@@ -2088,6 +2128,9 @@ export const useTerminalState = () => {
     if (routeFeatures.alerts || routeFeatures.showAlertsPane) {
       updates.push(alertsFeed.lastUpdate);
     }
+    if (routeFeatures.durableRows) {
+      updates.push(durableRowsFeed.lastUpdate);
+    }
     if (routeFeatures.smartMoney || routeFeatures.showChartPane) {
       updates.push(smartFlowFeed.lastUpdate);
       updates.push(smartMoneyFeed.lastUpdate);
@@ -2111,6 +2154,7 @@ export const useTerminalState = () => {
     routeFeatures.showNewsPane,
     routeFeatures.alerts,
     routeFeatures.showAlertsPane,
+    routeFeatures.durableRows,
     routeFeatures.smartMoney,
     routeFeatures.showChartPane,
     routeFeatures.classifierHits,
@@ -2120,6 +2164,7 @@ export const useTerminalState = () => {
     flowFeed.lastUpdate,
     newsFeed.lastUpdate,
     alertsFeed.lastUpdate,
+    durableRowsFeed.lastUpdate,
     smartMoneyFeed.lastUpdate,
     smartFlowFeed.lastUpdate,
     classifierHitsFeed.lastUpdate
@@ -2167,6 +2212,7 @@ export const useTerminalState = () => {
     news: newsFeed,
     flow: flowFeed,
     alerts: alertsFeed,
+    durableRows: durableRowsFeed,
     smartFlow: smartFlowFeed,
     smartMoney: smartMoneyFeed,
     classifierHits: classifierHitsFeed,
@@ -2200,6 +2246,8 @@ export const useTerminalState = () => {
     filteredNews,
     filteredFlow,
     filteredAlerts,
+    filteredDurableOptionRows,
+    filteredDurableAlertRows,
     filteredSmartFlowProjections,
     filteredSmartMoneyEvents,
     filteredClassifierHits,
