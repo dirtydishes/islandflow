@@ -30,9 +30,13 @@ import type {
 } from "@islandflow/types";
 import {
   normalizeOptionPrint,
+  OPTION_PRINT_QUERY_MAX_EXECUTION_SECONDS,
+  OPTION_PRINT_QUERY_TIMEOUT_MS,
   optionPrintsTableDDL,
   optionPrintsTableMigrations,
-  OPTION_PRINTS_TABLE
+  OPTION_PRINTS_TABLE,
+  OPTION_PRINT_TRACE_ID_MAX_LENGTH,
+  OPTION_PRINT_TRACE_LOOKUP_MAX_IDS
 } from "./option-prints";
 import { normalizeOptionNBBO, optionNBBOTableDDL, OPTION_NBBO_TABLE } from "./option-nbbo";
 import { equityPrintsTableDDL, EQUITY_PRINTS_TABLE, normalizeEquityPrint } from "./equity-prints";
@@ -96,6 +100,15 @@ export type ClickHouseOptions = {
 
 type ClickHouseQueryFormat = "JSONEachRow";
 
+export type ClickHouseQuerySettings = Record<string, string | number | boolean>;
+
+export type ClickHouseQueryParams = {
+  query: string;
+  format: ClickHouseQueryFormat;
+  settings?: ClickHouseQuerySettings;
+  timeoutMs?: number;
+};
+
 type ClickHouseQueryResult = {
   json<T>(): Promise<T>;
 };
@@ -107,7 +120,7 @@ export type ClickHouseClient = {
     values: unknown[];
     format: ClickHouseQueryFormat;
   }): Promise<void>;
-  query(params: { query: string; format: ClickHouseQueryFormat }): Promise<ClickHouseQueryResult>;
+  query(params: ClickHouseQueryParams): Promise<ClickHouseQueryResult>;
   ping(): Promise<{ success: boolean; error?: Error }>;
   close(): Promise<void>;
 };
@@ -139,22 +152,74 @@ const buildHeaders = (options: ClickHouseOptions, hasBody: boolean): Headers => 
   return headers;
 };
 
+const readResponseText = async (response: Response, timeoutMs?: number): Promise<string> => {
+  if (!timeoutMs) {
+    return response.text();
+  }
+
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      response.text(),
+      new Promise<string>((_, reject) => {
+        timeout = setTimeout(() => {
+          void response.body?.cancel();
+          reject(new Error(`ClickHouse response timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+      })
+    ]);
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  }
+};
+
 const executeClickHouse = async (
   options: ClickHouseOptions,
   query: string,
-  body?: string
+  body?: string,
+  settings?: ClickHouseQuerySettings,
+  timeoutMs?: number
 ): Promise<Response> => {
   const url = buildBaseUrl(options);
   url.searchParams.set("query", query);
+  if (settings) {
+    for (const [key, value] of Object.entries(settings)) {
+      url.searchParams.set(key, String(value));
+    }
+  }
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: buildHeaders(options, body !== undefined),
-    body
-  });
+  const controller = timeoutMs ? new AbortController() : null;
+  const timeout = controller
+    ? setTimeout(() => {
+        controller.abort();
+      }, timeoutMs)
+    : null;
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: buildHeaders(options, body !== undefined),
+      body,
+      signal: controller?.signal
+    });
+  } catch (error) {
+    if (controller?.signal.aborted) {
+      throw new Error(`ClickHouse request timed out after ${timeoutMs}ms`);
+    }
+    throw error;
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  }
 
   if (!response.ok) {
-    const message = (await response.text()).trim() || `${response.status} ${response.statusText}`;
+    const message =
+      (await readResponseText(response, timeoutMs)).trim() ||
+      `${response.status} ${response.statusText}`;
     throw new Error(message);
   }
 
@@ -188,11 +253,17 @@ export const createClickHouseClient = (options: ClickHouseOptions): ClickHouseCl
       await executeClickHouse(options, `INSERT INTO ${table} FORMAT ${format}`, body);
     },
 
-    async query({ query, format }) {
-      const response = await executeClickHouse(options, `${query} FORMAT ${format}`);
+    async query({ query, format, settings, timeoutMs }) {
+      const response = await executeClickHouse(
+        options,
+        `${query} FORMAT ${format}`,
+        undefined,
+        settings,
+        timeoutMs
+      );
       return {
         async json<T>() {
-          const text = await response.text();
+          const text = await readResponseText(response, timeoutMs);
           return parseJsonEachRow<T>(text);
         }
       };
@@ -673,6 +744,35 @@ const buildBeforeTupleCondition = (
   return `(${tsColumn}, ${seqColumn}) < (${clampCursor(beforeTs)}, ${clampCursor(beforeSeq)})`;
 };
 
+const OPTION_PRINT_QUERY_SETTINGS: ClickHouseQuerySettings = {
+  max_execution_time: OPTION_PRINT_QUERY_MAX_EXECUTION_SECONDS
+};
+
+const OPTION_PRINT_QUERY_BOUNDS = {
+  settings: OPTION_PRINT_QUERY_SETTINGS,
+  timeoutMs: OPTION_PRINT_QUERY_TIMEOUT_MS
+};
+
+const normalizeOptionPrintTraceLookupIds = (traceIds: string[]): string[] => {
+  const seen = new Set<string>();
+  const ids: string[] = [];
+
+  for (const rawId of traceIds) {
+    const id = rawId.trim();
+    if (!id || id.length > OPTION_PRINT_TRACE_ID_MAX_LENGTH || seen.has(id)) {
+      continue;
+    }
+
+    seen.add(id);
+    ids.push(id);
+    if (ids.length >= OPTION_PRINT_TRACE_LOOKUP_MAX_IDS) {
+      break;
+    }
+  }
+
+  return ids;
+};
+
 const normalizeNumericFields = (
   row: Record<string, unknown>,
   fields: string[]
@@ -1054,7 +1154,8 @@ export const fetchRecentOptionPrints = async (
   const whereClause = conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")}` : "";
   const result = await client.query({
     query: `SELECT * FROM ${OPTION_PRINTS_TABLE}${whereClause} ORDER BY ts DESC, seq DESC LIMIT ${safeLimit}`,
-    format: "JSONEachRow"
+    format: "JSONEachRow",
+    ...OPTION_PRINT_QUERY_BOUNDS
   });
 
   const rows = await result.json<unknown[]>();
@@ -1395,7 +1496,8 @@ export const fetchOptionPrintsAfter = async (
 
   const result = await client.query({
     query: `SELECT * FROM ${OPTION_PRINTS_TABLE} WHERE ${conditions.join(" AND ")} ORDER BY ts ASC, seq ASC LIMIT ${safeLimit}`,
-    format: "JSONEachRow"
+    format: "JSONEachRow",
+    ...OPTION_PRINT_QUERY_BOUNDS
   });
 
   const rows = await result.json<unknown[]>();
@@ -1712,7 +1814,8 @@ export const fetchOptionPrintsBefore = async (
 
   const result = await client.query({
     query: `SELECT * FROM ${OPTION_PRINTS_TABLE} WHERE ${conditions.join(" AND ")} ORDER BY ts DESC, seq DESC LIMIT ${safeLimit}`,
-    format: "JSONEachRow"
+    format: "JSONEachRow",
+    ...OPTION_PRINT_QUERY_BOUNDS
   });
 
   const rows = await result.json<unknown[]>();
@@ -2049,14 +2152,15 @@ export const fetchOptionPrintsByTraceIds = async (
   client: ClickHouseClient,
   traceIds: string[]
 ): Promise<OptionPrint[]> => {
-  const ids = Array.from(new Set(traceIds.map((id) => id.trim()).filter(Boolean)));
+  const ids = normalizeOptionPrintTraceLookupIds(traceIds);
   if (ids.length === 0) {
     return [];
   }
 
   const result = await client.query({
     query: `SELECT * FROM ${OPTION_PRINTS_TABLE} WHERE trace_id IN (${buildStringList(ids)}) ORDER BY ts DESC, seq DESC LIMIT ${clampLookupLimit(ids.length)}`,
-    format: "JSONEachRow"
+    format: "JSONEachRow",
+    ...OPTION_PRINT_QUERY_BOUNDS
   });
 
   const rows = await result.json<unknown[]>();

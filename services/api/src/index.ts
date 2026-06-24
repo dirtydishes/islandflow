@@ -143,6 +143,10 @@ import {
   resolveLiveStateConfig,
   shouldFanoutLiveEvent
 } from "./live";
+import {
+  getOptionPrintTraceLookupErrorStatus,
+  parseOptionPrintTraceLookupParams
+} from "./option-print-lookup";
 import { parseOptionPrintQuery } from "./option-queries";
 import {
   fetchRecentSmartFlowExplainability,
@@ -1472,12 +1476,13 @@ const run = async () => {
             const data = await fetchRecentOptionPrints(clickhouse, limit, source, storageFilters);
             return jsonResponse({ data });
           } catch (error) {
+            const status = error instanceof z.ZodError ? 400 : 503;
             return jsonResponse(
               {
-                error: "invalid options query",
+                error: status === 400 ? "invalid options query" : "options query failed",
                 detail: error instanceof Error ? error.message : String(error)
               },
-              400
+              status
             );
           }
         }
@@ -1770,9 +1775,31 @@ const run = async () => {
         }
 
         if (req.method === "GET" && url.pathname === "/option-prints/by-trace") {
-          const traceIds = url.searchParams.getAll("trace_id");
-          const data = await fetchOptionPrintsByTraceIds(clickhouse, traceIds);
-          return jsonResponse({ data });
+          const startedAt = Date.now();
+          try {
+            const traceIds = parseOptionPrintTraceLookupParams(url);
+            const data = await fetchOptionPrintsByTraceIds(clickhouse, traceIds);
+            metrics.timing("api.option_prints.by_trace_ms", Date.now() - startedAt, {
+              status: "ok",
+              result: data.length > 0 ? "hit" : "miss"
+            });
+            return jsonResponse({ data });
+          } catch (error) {
+            const status = getOptionPrintTraceLookupErrorStatus(error);
+            metrics.timing("api.option_prints.by_trace_ms", Date.now() - startedAt, {
+              status: status === 400 ? "invalid" : "error"
+            });
+            return jsonResponse(
+              {
+                error:
+                  status === 400
+                    ? "invalid option print trace lookup"
+                    : "option print trace lookup failed",
+                detail: getErrorMessage(error)
+              },
+              status
+            );
+          }
         }
 
         if (req.method === "POST" && url.pathname === "/lookup/options-support") {
