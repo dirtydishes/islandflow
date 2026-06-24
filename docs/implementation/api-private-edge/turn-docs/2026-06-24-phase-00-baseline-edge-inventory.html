@@ -197,6 +197,38 @@
         font-family: IBM Plex Mono, ui-monospace, monospace;
       }
 
+      .diff-card {
+        border: 1px solid var(--border);
+        background: #070b10;
+      }
+
+      .diff-mount {
+        display: none;
+      }
+
+      .diff-card.rendered .diff-mount {
+        display: block;
+      }
+
+      .diff-card.rendered .diff-fallback {
+        display: none;
+      }
+
+      .diff-fallback {
+        margin: 0;
+        padding: 12px;
+        overflow-x: auto;
+        background: #05080c;
+        color: var(--text);
+        font: 0.78rem/1.45 IBM Plex Mono, ui-monospace, monospace;
+      }
+
+      .diff-fallback code {
+        border: 0;
+        padding: 0;
+        background: transparent;
+      }
+
       .callout {
         border: 1px solid var(--border);
         background: var(--panel-3);
@@ -258,8 +290,9 @@
             <strong>style</strong>
             <p>
               The document follows the Islandflow product register: compact,
-              evidence-first, restrained, and operational. It intentionally omits
-              a rich diff block because Phase 00 has no code diff to render.
+              evidence-first, restrained, and operational. The relevant diff section
+              includes a standard unified fallback and attempts browser-side
+              <code>PatchDiff</code> rendering.
             </p>
           </div>
           <div class="evidence">
@@ -379,15 +412,15 @@
             <tr>
               <td><code>ss -ltnp</code></td>
               <td>
-                Next listens on <code>0.0.0.0:3000</code>, API listens on
-                <code>0.0.0.0:4000</code>, NPM/openresty listens on public
-                <code>80/443</code>, NPM admin listens on <code>81</code>, and a
-                tailnet listener is present on <code>443</code>.
+                Next and API listen on all host interfaces at their native service
+                ports. NPM/openresty listens on public web ports, and the NPM admin
+                plane is also bound on the host.
               </td>
               <td>
                 The app and API are reachable on host ports before NPM policy is
                 considered. Phase 04 must close raw public API exposure without
-                breaking the app-origin proxy.
+                breaking the app-origin proxy. The admin plane must be treated as
+                protected infrastructure and verified separately from app/API routing.
               </td>
             </tr>
             <tr>
@@ -403,9 +436,8 @@
             <tr>
               <td><code>ps</code></td>
               <td>
-                Process supervisor children include <code>bun x next start -H 0.0.0.0 -p 3000</code>,
-                <code>bun services/api/src/index.ts</code>, ingest services,
-                compute, and candles.
+                Process supervisor children include the native Next server, API,
+                ingest services, compute, and candles.
               </td>
               <td>
                 The native app and API processes are the live upstreams behind NPM.
@@ -426,11 +458,10 @@
             <tr>
               <td>NPM generated config</td>
               <td>
-                Raw API proxy host forwards <code>location /</code> to
-                <code>172.18.0.1:4000</code>. App proxy host forwards
+                Raw API proxy host forwards all paths to the API upstream. App proxy
+                host forwards
                 <code>location ~ ^/(ws|replay|prints|joins|nbbo|dark|flow|candles|history)/</code>
-                to <code>172.18.0.1:4000</code>, and <code>location /</code> to
-                <code>172.18.0.1:3000</code>.
+                to the API upstream, while non-matching paths go to the web upstream.
               </td>
               <td>
                 Same-origin app API coverage is prefix-based and incomplete. Raw API
@@ -453,9 +484,8 @@
             <tr>
               <td>Direct port probes</td>
               <td>
-                Public-address <code>:3000/</code> returned Next HTML
-                <code>200</code>. Public-address <code>:4000/health</code> returned
-                API JSON <code>200</code>.
+                Public direct app and API service ports responded successfully: app
+                HTML at the web service port and API JSON at the API service port.
               </td>
               <td>
                 Direct port reachability exists outside same-origin routing. This is
@@ -628,7 +658,10 @@
                 websocket route exists for equity quotes. Phase 02 contract calls
                 out quotes coverage.
               </td>
-              <td>Add to matcher if browser same-origin access is expected.</td>
+              <td>
+                Add to matcher and route probes. Phase 02 explicitly requires this
+                prefix even if current browser call sites are limited.
+              </td>
             </tr>
             <tr>
               <td><code>/news</code></td>
@@ -639,8 +672,9 @@
                 covered by <code>/history</code>.
               </td>
               <td>
-                Add if root <code>/news</code> must be public through app origin.
-                Use slash-or-end matching if root route coverage is required.
+                Add to matcher and route probes. Phase 02 explicitly requires this
+                prefix. Use slash-or-end matching so root <code>/news</code> does not
+                fall through to the web app.
               </td>
             </tr>
           </tbody>
@@ -659,11 +693,13 @@
           </thead>
           <tbody>
             <tr>
-              <td>Current local production artifacts</td>
+              <td>Deployed and local browser bundle exposure</td>
               <td>
-                <code>rg -l</code> found <code>&lt;raw-api-origin&gt;</code> in
-                <code>apps/web/.next/static/chunks/08hkommo~9w~u.js</code> and
-                <code>apps/web/.next/server/chunks/ssr/_0.upord._.js</code>.
+                Deployed smoke scan of <code>&lt;production-app-origin&gt;/durable-tapes</code>
+                reported <code>bundleApiOriginPresent: true</code> and identified a
+                public <code>_next/static/chunks</code> browser chunk containing
+                <code>&lt;raw-api-origin&gt;</code>. Local artifacts also contain the
+                same raw-origin marker in public and server chunks.
               </td>
               <td>
                 Current artifacts advertise the raw API origin. Phase 02 should make
@@ -785,7 +821,10 @@
                 <code>apps/web/features/options-tape/source.ts:26</code>,
                 <code>apps/web/features/alerts/source.ts:28</code>,
                 <code>apps/web/features/flow-packets/source.ts:30</code>,
-                <code>apps/web/features/equities-tape/source.ts:34</code>.
+                <code>apps/web/features/flow-packets/source.ts:48</code>,
+                <code>apps/web/features/equities-tape/source.ts:34</code>, and
+                <code>apps/web/features/equities-tape/source.ts:52</code>. Phase 02
+                must cover both REST and websocket builders.
               </td>
             </tr>
             <tr>
@@ -861,6 +900,11 @@
             range routes.
           </li>
           <li>
+            NPM admin is bound on the host. This baseline did not change or test
+            admin-plane access control; treat that as protected infrastructure during
+            deployment phases.
+          </li>
+          <li>
             Historical docs and baselines contain concrete production domains. Phase
             01 should focus active surfaces first so the private-edge stream stays
             reviewable and does not rewrite unrelated history.
@@ -907,12 +951,62 @@
             </tr>
             <tr>
               <td><code>git diff --check</code></td>
-              <td><span class="status-note">pending at document creation</span></td>
-              <td>Run during closeout after this artifact was written.</td>
+              <td><span class="status-ok">passed</span></td>
+              <td>
+                Passed for the worker commit and rerun after reviewer repair updates.
+              </td>
             </tr>
           </tbody>
         </table>
       </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p>
+          This section keeps the standard HTML unified diff visible by default. If
+          browser module loading succeeds, the same patch is rendered with
+          <code>PatchDiff</code> from browser-side <code>@pierre/diffs/react</code>.
+        </p>
+        <div class="diff-card" data-patch-diff>
+          <div class="diff-mount" aria-label="Rendered diff"></div>
+          <pre class="diff-fallback"><code>diff --git a/docs/implementation/api-private-edge/turn-docs/2026-06-24-phase-00-baseline-edge-inventory.html b/docs/implementation/api-private-edge/turn-docs/2026-06-24-phase-00-baseline-edge-inventory.html
+new file mode 100644
+--- /dev/null
++++ b/docs/implementation/api-private-edge/turn-docs/2026-06-24-phase-00-baseline-edge-inventory.html
+@@
++&lt;h1&gt;Phase 00: Baseline API Edge Exposure&lt;/h1&gt;
++&lt;p&gt;
++  Baseline for islandflow-hnbk.1. This phase records the current public
++  edge posture before private-edge changes, using placeholders for production
++  origins and redacting env values, tokens, and public IPs.
++&lt;/p&gt;
+@@
++&lt;h2&gt;Validation Status&lt;/h2&gt;
++&lt;td&gt;No Bun tests/builds were required because this change creates only the
++baseline document and Beads status updates. No runtime code changed.&lt;/td&gt;
+diff --git a/.beads/issues.jsonl b/.beads/issues.jsonl
+@@
+-{&quot;id&quot;:&quot;islandflow-hnbk.1&quot;,&quot;status&quot;:&quot;open&quot;,...}
++{&quot;id&quot;:&quot;islandflow-hnbk.1&quot;,&quot;status&quot;:&quot;closed&quot;,&quot;close_reason&quot;:&quot;Phase 00 baseline artifact records the current private-edge exposure baseline...&quot;,...}</code></pre>
+        </div>
+      </section>
     </main>
+    <script type="module">
+      import React from "https://esm.sh/react@19";
+      import { createRoot } from "https://esm.sh/react-dom@19/client";
+      import { PatchDiff } from "https://esm.sh/@pierre/diffs@1.2.2/react?deps=react@19,react-dom@19";
+
+      for (const card of document.querySelectorAll("[data-patch-diff]")) {
+        const source = card.querySelector(".diff-fallback code");
+        const target = card.querySelector(".diff-mount");
+        if (!source || !target) continue;
+        try {
+          createRoot(target).render(React.createElement(PatchDiff, { patch: source.textContent || "" }));
+          card.classList.add("rendered");
+        } catch (error) {
+          console.warn("Rich diff renderer failed; keeping HTML fallback.", error);
+        }
+      }
+    </script>
   </body>
 </html>
