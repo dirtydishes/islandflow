@@ -78,6 +78,8 @@ bun run scripts/probes/durable-tapes-perf.ts \
 
 The script launches a local Chrome/Chromium browser when available. If the agent environment cannot find Chrome, start a browser manually with `--remote-debugging-port=<port>` and pass `--cdp-url=http://127.0.0.1:<port>`. `CHROME_PATH` or `--browser-path` can also point at a specific Chrome/Chromium executable.
 
+The executable entrypoint remains `scripts/probes/durable-tapes-perf.ts`. Supporting modules live under `scripts/probes/durable-tapes-perf/` so CLI parsing, Chrome/CDP lifecycle, metric collection, budget evaluation, and run orchestration stay independently reviewable.
+
 The default `durable-tapes-3m-v1` budget profile is intentionally red-capable for the known storm:
 
 | Metric | 3-minute budget |

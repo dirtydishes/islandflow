@@ -220,7 +220,19 @@
           <li>Defined the <code>durable-tapes-3m-v1</code> budgets that fail on the current request storm while still requiring five visible durable panes and live row sanity.</li>
           <li>Recorded baseline JSON artifacts for local web against the hosted API and the deployed web route.</li>
           <li>Updated the phase spec and implementation index with the command, browser fallback, budget profile, and baseline summary.</li>
+          <li>Reviewer repair split the original 1,028-line probe entrypoint into focused modules under <code>scripts/probes/durable-tapes-perf/</code> while keeping the public command unchanged.</li>
         </ul>
+      </section>
+
+      <section>
+        <h2>Reviewer Repair</h2>
+        <p>
+          The thermo-nuclear review flagged the initial probe file as avoidable
+          file sprawl. The repair keeps Phase 00 behavior and the agent-facing command
+          intact, but separates CLI parsing, Chrome/CDP lifecycle, metric collection,
+          budget evaluation, and run orchestration into smaller files. No product
+          runtime code changed.
+        </p>
       </section>
 
       <section>
@@ -274,8 +286,23 @@
         <div class="grid">
           <div class="check">
             <strong>Pass</strong>
-            <code>bun x biome check scripts/probes/durable-tapes-perf.ts</code>
-            <p>Probe file passes Biome after formatting.</p>
+            <code>bun x biome check scripts/probes/durable-tapes-perf.ts scripts/probes/durable-tapes-perf</code>
+            <p>Probe entrypoint and support modules pass Biome after reviewer repair.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun run fmt:check</code>
+            <p>Repository formatting check passed after the module split.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun run lint</code>
+            <p>Repository lint passed after the module split.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun run typecheck</code>
+            <p>All workspace TypeScript projects typechecked successfully.</p>
           </div>
           <div class="check">
             <strong>Pass</strong>
@@ -284,8 +311,23 @@
           </div>
           <div class="check">
             <strong>Pass</strong>
+            <code>bun test</code>
+            <p>Full suite passed with 435 tests.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
             <code>bun --cwd=apps/web run build</code>
             <p>Next production build completed successfully.</p>
+          </div>
+          <div class="check">
+            <strong>Pass</strong>
+            <code>bun run check:docker-workspace</code>
+            <p>Docker workspace snapshot is in sync.</p>
+          </div>
+          <div class="check">
+            <strong class="warn">Expected red</strong>
+            <code>bun run scripts/probes/durable-tapes-perf.ts --target=http://localhost:3100/durable-tapes --warmup=0s --duration=2s --no-fail-on-budget</code>
+            <p>Reviewer smoke verified the refactored entrypoint still launches Chrome, records metrics, writes JSON, and sees 5 panes / 70 rows.</p>
           </div>
           <div class="check">
             <strong class="warn">Expected red</strong>
@@ -297,6 +339,11 @@
             <code>bun run scripts/probes/durable-tapes-perf.ts --target=https://flow.deltaisland.io/durable-tapes --warmup=30s --duration=180s</code>
             <p>Deployed browser probe reproduced the same storm profile without production mutation.</p>
           </div>
+          <div class="check">
+            <strong class="warn">External failure</strong>
+            <code>bun run check:public-api-routes</code>
+            <p>The public-route checker returned non-JSON HTML for <code>/prints/options</code>; direct API smoke returned OpenResty 502 HTML. This is tracked outside Phase 00.</p>
+          </div>
         </div>
       </section>
 
@@ -306,6 +353,7 @@
           <li>The hard row budget is aggregate because individual live channels can be quiet. The report still records per-pane rows for reviewer judgment.</li>
           <li>Budgets are tuned to catch the current failure mode, not to prove final low-power device readiness. Later phases should adjust them only with fresh evidence.</li>
           <li>The probe depends on Chrome/Chromium or an externally supplied CDP endpoint; the phase doc records the fallback path.</li>
+          <li>Public deployed API routing remains an external verification risk already represented by <code>islandflow-ba9q</code>, <code>islandflow-sz8</code>, and <code>islandflow-fl5</code>.</li>
         </ul>
       </section>
 
@@ -323,7 +371,19 @@ new file mode 100644
 --- /dev/null
 +++ b/scripts/probes/durable-tapes-perf.ts
 @@
-+const THREE_MINUTE_BUDGETS = {
++import { runDurableTapesPerfProbe } from "./durable-tapes-perf/runner";
++
++runDurableTapesPerfProbe().catch((error) =&gt; {
++  console.error(error instanceof Error ? error.message : String(error));
++  process.exit(1);
++});
+
+diff --git a/scripts/probes/durable-tapes-perf/constants.ts b/scripts/probes/durable-tapes-perf/constants.ts
+new file mode 100644
+--- /dev/null
++++ b/scripts/probes/durable-tapes-perf/constants.ts
+@@
++export const THREE_MINUTE_BUDGETS = {
 +  maxTotalNetworkRequests: 500,
 +  maxOptionsSupportRequests: 150,
 +  maxOptionPrintsByTraceRequests: 150,
@@ -335,8 +395,13 @@ new file mode 100644
 +  maxJsHeapUsedSizeDeltaBytes: 125 * 1024 * 1024,
 +  maxDomNodeCount: 35_000
 +};
+
+diff --git a/scripts/probes/durable-tapes-perf/collector.ts b/scripts/probes/durable-tapes-perf/collector.ts
+new file mode 100644
+--- /dev/null
++++ b/scripts/probes/durable-tapes-perf/collector.ts
 @@
-+const attachCollectors = (client: CdpClient, getWindow: () =&gt; MetricWindow): void =&gt; {
++export const attachCollectors = (client: CdpClient, getWindow: () =&gt; MetricWindow): void =&gt; {
 +  client.on("Network.requestWillBeSent", (params) =&gt; {
 +    const event = params as {
 +      requestId: string;
@@ -369,7 +434,7 @@ new file mode 100644
 +  });
 +};
 @@
-+const evaluateSanity = async (client: CdpClient): Promise&lt;SanitySnapshot&gt; =&gt; {
++export const evaluateSanity = async (client: CdpClient): Promise&lt;SanitySnapshot&gt; =&gt; {
 +  const expression = String.raw`
 +(() =&gt; {
 +  const paneSpecs = [
@@ -399,6 +464,9 @@ new file mode 100644
 +    returnByValue: true,
 +    awaitPromise: true
 +  });
++  if (!result.result.value) {
++    throw new Error("Sanity evaluation returned no value.");
++  }
 +  return result.result.value;
 +};
 
@@ -426,7 +494,19 @@ new file mode 100644
 --- /dev/null
 +++ b/scripts/probes/durable-tapes-perf.ts
 @@
-+const THREE_MINUTE_BUDGETS = {
++import { runDurableTapesPerfProbe } from "./durable-tapes-perf/runner";
++
++runDurableTapesPerfProbe().catch((error) => {
++  console.error(error instanceof Error ? error.message : String(error));
++  process.exit(1);
++});
+
+diff --git a/scripts/probes/durable-tapes-perf/constants.ts b/scripts/probes/durable-tapes-perf/constants.ts
+new file mode 100644
+--- /dev/null
++++ b/scripts/probes/durable-tapes-perf/constants.ts
+@@
++export const THREE_MINUTE_BUDGETS = {
 +  maxTotalNetworkRequests: 500,
 +  maxOptionsSupportRequests: 150,
 +  maxOptionPrintsByTraceRequests: 150,
@@ -438,8 +518,13 @@ new file mode 100644
 +  maxJsHeapUsedSizeDeltaBytes: 125 * 1024 * 1024,
 +  maxDomNodeCount: 35_000
 +};
+
+diff --git a/scripts/probes/durable-tapes-perf/collector.ts b/scripts/probes/durable-tapes-perf/collector.ts
+new file mode 100644
+--- /dev/null
++++ b/scripts/probes/durable-tapes-perf/collector.ts
 @@
-+const attachCollectors = (client: CdpClient, getWindow: () => MetricWindow): void => {
++export const attachCollectors = (client: CdpClient, getWindow: () => MetricWindow): void => {
 +  client.on("Network.requestWillBeSent", (params) => {
 +    const event = params as {
 +      requestId: string;
@@ -454,12 +539,21 @@ new file mode 100644
 +    if (endpoint === "optionPrintsByTrace") {
 +      window.optionPrintsByTraceRequestCount += 1;
 +    }
++    window.requestsById.set(event.requestId, {
++      url: event.request.url,
++      method: event.request.method,
++      endpoint
++    });
 +  });
 +  client.on("Network.loadingFailed", (params) => {
 +    const event = params as { requestId: string; canceled?: boolean; errorText?: string };
 +    const isAbort = event.canceled === true || event.errorText === "net::ERR_ABORTED";
 +    if (!isAbort) return;
-+    getWindow().abortedRequestCount += 1;
++    const window = getWindow();
++    window.abortedRequestCount += 1;
++    if (window.requestsById.get(event.requestId)?.endpoint) {
++      window.abortedEndpointRequestCount += 1;
++    }
 +  });
 +};
 
