@@ -7,6 +7,7 @@ export * from "./components/DurableTapeSettingsPopover";
 export * from "./feature-flags";
 export * from "./history";
 export * from "./keys";
+export * from "./live-window-buffer";
 export * from "./scroll-hold";
 export * from "./templates";
 export * from "./types";
