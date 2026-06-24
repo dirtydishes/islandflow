@@ -50,6 +50,38 @@ Production verification:
 - Verify support/evidence endpoints respond from the expected host.
 - Record final numbers in the phase turn document and Beads closeout.
 
+## Implemented Guardrails
+
+- Browser/CDP probe reports now include support/evidence origin distribution, content-type distribution, HTML/non-JSON response counts, endpoint latency summaries, and options/alerts pane row sanity budgets.
+- Production smoke treats browser REST routing as valid only when the deployed bundle contains the intended API origin or both same-origin support and by-trace proxy endpoints return bounded JSON responses.
+- Production smoke command:
+
+```bash
+bun run scripts/probes/durable-tapes-production-smoke.ts \
+  --output=docs/implementation/durable-tapes-performance/baselines/phase-06-production-smoke.json
+```
+
+- Durable-tapes raw options/alerts fallback is disabled by default. Set `NEXT_PUBLIC_DURABLE_TAPES_RAW_FALLBACK=1` only when an incident requires reverting to the raw options/alerts channels while server-composed durable rows are unavailable.
+- API latency visibility now includes `api.lookup.options_support_ms` for `/lookup/options-support`, matching the existing `/option-prints/by-trace` timing coverage.
+
+## 2026-06-24 Production Evidence
+
+Saved evidence:
+
+- `baselines/phase-06-production-smoke.json`
+- `baselines/phase-06-deployed-native-web.json`
+- `turn-docs/2026-06-24-phase-06-production-hardening-closeout.html`
+
+Current deployed native evidence is good enough for Phase 06 review:
+
+- Native web/API were redeployed from `lavender/ze79-phase-06-production-hardening-closeout` with the narrow `web,api` native scope.
+- Production smoke passes native web route, browser API-origin routing, API health, durable-row websocket snapshot, `/lookup/options-support` latency, and `/option-prints/by-trace` miss latency.
+- The durable-row websocket check against `wss://api.flow.deltaisland.io/ws/live` returned a 10-row snapshot.
+- The 30s warmup plus 180s deployed CDP probe passes request, script/task, heap, DOM, pane, options-row, and alerts-row budgets: 0 total measured network requests, 0 support/evidence requests, 0 aborted requests, 15.25s task duration, 11.24s script duration, 68 visible rows, 20 options rows, and 13 alerts rows.
+- Explicit public support/evidence endpoint checks returned JSON from `X-Served-By: api.flow.deltaisland.io`.
+
+Deployment blocker `islandflow-ze79.11` is resolved by the saved smoke/probe evidence. `islandflow-ze79.7` is ready for review. Close `islandflow-ba9q` only with the same production evidence attached, and close `islandflow-ze79` after Phase 06 review/merge confirms the epic closeout state.
+
 ## Acceptance Criteria
 
 - Production smoke catches bad public API routing.

@@ -1,0 +1,402 @@
+{
+  "schemaVersion": 1,
+  "probe": "durable-tapes-cdp",
+  "targetUrl": "https://flow.deltaisland.io/durable-tapes",
+  "startedAt": "2026-06-24T07:29:16.631Z",
+  "endedAt": "2026-06-24T07:32:46.892Z",
+  "durationMs": 180000,
+  "warmupMs": 30000,
+  "browser": {
+    "name": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "cdp": "launched"
+  },
+  "budgets": {
+    "profile": "durable-tapes-3m-v1",
+    "baseDurationMs": 180000,
+    "failOnBudget": true,
+    "passed": true,
+    "results": [
+      {
+        "name": "total network requests",
+        "actual": 0,
+        "limit": 500,
+        "pass": true,
+        "unit": "requests"
+      },
+      {
+        "name": "/lookup/options-support requests",
+        "actual": 0,
+        "limit": 150,
+        "pass": true,
+        "unit": "requests"
+      },
+      {
+        "name": "/option-prints/by-trace requests",
+        "actual": 0,
+        "limit": 150,
+        "pass": true,
+        "unit": "requests"
+      },
+      {
+        "name": "aborted requests",
+        "actual": 0,
+        "limit": 20,
+        "pass": true,
+        "unit": "requests"
+      },
+      {
+        "name": "aborted support/evidence requests",
+        "actual": 0,
+        "limit": 8,
+        "pass": true,
+        "unit": "requests"
+      },
+      {
+        "name": "support/evidence error responses",
+        "actual": 0,
+        "limit": 20,
+        "pass": true,
+        "unit": "responses"
+      },
+      {
+        "name": "support/evidence HTML responses",
+        "actual": 0,
+        "limit": 0,
+        "pass": true,
+        "unit": "responses"
+      },
+      {
+        "name": "support/evidence non-JSON responses",
+        "actual": 0,
+        "limit": 0,
+        "pass": true,
+        "unit": "responses"
+      },
+      {
+        "name": "CDP TaskDuration delta",
+        "actual": 15.253243000000001,
+        "limit": 45,
+        "pass": true,
+        "unit": "seconds"
+      },
+      {
+        "name": "CDP ScriptDuration delta",
+        "actual": 11.235234,
+        "limit": 35,
+        "pass": true,
+        "unit": "seconds"
+      },
+      {
+        "name": "JSHeapUsedSize delta",
+        "actual": -826300,
+        "limit": 131072000,
+        "pass": true,
+        "unit": "bytes"
+      },
+      {
+        "name": "DOM node count",
+        "actual": 1074,
+        "limit": 35000,
+        "pass": true,
+        "unit": "nodes"
+      },
+      {
+        "name": "visible durable pane count",
+        "actual": 5,
+        "limit": 5,
+        "pass": true,
+        "unit": "minimum panes"
+      },
+      {
+        "name": "visible durable row count",
+        "actual": 68,
+        "limit": 1,
+        "pass": true,
+        "unit": "minimum rows"
+      },
+      {
+        "name": "visible durable options row count",
+        "actual": 20,
+        "limit": 1,
+        "pass": true,
+        "unit": "minimum rows"
+      },
+      {
+        "name": "visible durable alerts row count",
+        "actual": 13,
+        "limit": 1,
+        "pass": true,
+        "unit": "minimum rows"
+      }
+    ]
+  },
+  "metrics": {
+    "totalNetworkRequestCount": 0,
+    "optionsSupportRequestCount": 0,
+    "optionPrintsByTraceRequestCount": 0,
+    "abortedRequestCount": 0,
+    "abortedEndpointRequestCount": 0,
+    "supportEvidenceStatusDistribution": {
+      "optionsSupport": {},
+      "optionPrintsByTrace": {}
+    },
+    "supportEvidenceOriginDistribution": {
+      "optionsSupport": {},
+      "optionPrintsByTrace": {}
+    },
+    "supportEvidenceContentTypeDistribution": {
+      "optionsSupport": {},
+      "optionPrintsByTrace": {}
+    },
+    "supportEvidenceErrorResponses": 0,
+    "supportEvidenceHtmlResponseCount": 0,
+    "supportEvidenceNonJsonResponseCount": 0,
+    "supportEvidenceLatencyMs": {
+      "optionsSupport": {
+        "count": 0,
+        "min": null,
+        "p50": null,
+        "p95": null,
+        "max": null,
+        "avg": null
+      },
+      "optionPrintsByTrace": {
+        "count": 0,
+        "min": null,
+        "p50": null,
+        "p95": null,
+        "max": null,
+        "avg": null
+      }
+    },
+    "websocketFrameCount": 12928,
+    "websocketReceivedFrameCount": 12928,
+    "websocketSentFrameCount": 0,
+    "websocketBytes": 32801948,
+    "websocketReceivedBytes": 32801948,
+    "websocketSentBytes": 0,
+    "websocketErrorCount": 0,
+    "topRequests": [],
+    "endpointFailures": [],
+    "cdp": {
+      "start": {
+        "taskDurationSeconds": 1.976025,
+        "scriptDurationSeconds": 1.374737,
+        "jsHeapUsedSizeBytes": 19260740,
+        "domNodeCount": 1535
+      },
+      "end": {
+        "taskDurationSeconds": 17.229268,
+        "scriptDurationSeconds": 12.609971,
+        "jsHeapUsedSizeBytes": 18434440,
+        "domNodeCount": 1074
+      },
+      "delta": {
+        "taskDurationSeconds": 15.253243000000001,
+        "scriptDurationSeconds": 11.235234,
+        "jsHeapUsedSizeBytes": -826300,
+        "domNodeCount": 1074
+      }
+    },
+    "sanity": {
+      "routePresent": true,
+      "pageTitle": "Durable Tapes",
+      "visibleDurablePaneCount": 5,
+      "visibleRowCount": 68,
+      "paneRows": [
+        {
+          "key": "options",
+          "title": "Options Tape",
+          "visible": true,
+          "rowCount": 20
+        },
+        {
+          "key": "flow",
+          "title": "Flow Packets",
+          "visible": true,
+          "rowCount": 20
+        },
+        {
+          "key": "equities",
+          "title": "Equities Tape",
+          "visible": true,
+          "rowCount": 15
+        },
+        {
+          "key": "alerts",
+          "title": "Alerts",
+          "visible": true,
+          "rowCount": 13
+        },
+        {
+          "key": "news",
+          "title": "News Wire",
+          "visible": true,
+          "rowCount": 0
+        }
+      ],
+      "bodyTextSample": "SKIP TO TERMINAL CONTENT MENU TICKER CLEAR REPLAY QA DURABLE TAPES OPTIONS TAPE ^ LIVE TIME CONTRACT PREMIUM SIDE 07:32:46 AMZN-2026-07-08-260-C $49k A 07:32:44 ETN-2026-08-23-140-C $57k A 07:32:43 NCLH-2026-07-01-360-P $18k A 07:32:43 NCLH-2026-07-01-360-P $15k A 07:32:43 NCLH-2026-07-01-360-P $14k A 07:32:42 PCG-2026-07-08-200-P $49k AA 07:32:41 CRM-2026-06-24-55-P $38k A 07:32:41 CRM-2026-06-24-55-P $37k A 07:32:41 CRM-2026-06-24-55-P $32k A 07:32:40 WYNN-2026-06-25-430-C $25k AA 07:32:40 WYN"
+    }
+  },
+  "warmupMetrics": {
+    "totalNetworkRequestCount": 18,
+    "optionsSupportRequestCount": 0,
+    "optionPrintsByTraceRequestCount": 0,
+    "abortedRequestCount": 0,
+    "abortedEndpointRequestCount": 0,
+    "supportEvidenceStatusDistribution": {
+      "optionsSupport": {},
+      "optionPrintsByTrace": {}
+    },
+    "supportEvidenceOriginDistribution": {
+      "optionsSupport": {},
+      "optionPrintsByTrace": {}
+    },
+    "supportEvidenceContentTypeDistribution": {
+      "optionsSupport": {},
+      "optionPrintsByTrace": {}
+    },
+    "supportEvidenceErrorResponses": 0,
+    "supportEvidenceHtmlResponseCount": 0,
+    "supportEvidenceNonJsonResponseCount": 0,
+    "supportEvidenceLatencyMs": {
+      "optionsSupport": {
+        "count": 0,
+        "min": null,
+        "p50": null,
+        "p95": null,
+        "max": null,
+        "avg": null
+      },
+      "optionPrintsByTrace": {
+        "count": 0,
+        "min": null,
+        "p50": null,
+        "p95": null,
+        "max": null,
+        "avg": null
+      }
+    },
+    "websocketFrameCount": 1812,
+    "websocketReceivedFrameCount": 1810,
+    "websocketSentFrameCount": 2,
+    "websocketBytes": 7756174,
+    "websocketReceivedBytes": 7755677,
+    "websocketSentBytes": 497,
+    "websocketErrorCount": 0,
+    "topRequests": [
+      {
+        "request": "GET https://flow.deltaisland.io/_next/static/chunks/0_6~242j-s~x4.js",
+        "count": 1
+      },
+      {
+        "request": "GET https://flow.deltaisland.io/_next/static/chunks/0~w.he59a6gni.js",
+        "count": 1
+      },
+      {
+        "request": "GET https://flow.deltaisland.io/_next/static/chunks/00infp1ksdl2r.css",
+        "count": 1
+      },
+      {
+        "request": "GET https://flow.deltaisland.io/_next/static/chunks/0d.4jn22m8at6.js",
+        "count": 1
+      },
+      {
+        "request": "GET https://flow.deltaisland.io/_next/static/chunks/0fnywxqicx-zn.js",
+        "count": 1
+      },
+      {
+        "request": "GET https://flow.deltaisland.io/_next/static/chunks/0h2xvijbs4u58.js",
+        "count": 1
+      },
+      {
+        "request": "GET https://flow.deltaisland.io/_next/static/chunks/0kpgvo9tqz~zv.js",
+        "count": 1
+      },
+      {
+        "request": "GET https://flow.deltaisland.io/_next/static/chunks/0rrubg6-o2b81.js",
+        "count": 1
+      },
+      {
+        "request": "GET https://flow.deltaisland.io/_next/static/chunks/135hn5o8is48u.css",
+        "count": 1
+      },
+      {
+        "request": "GET https://flow.deltaisland.io/_next/static/chunks/turbopack-16-8v0vz1~od-.js",
+        "count": 1
+      },
+      {
+        "request": "GET https://flow.deltaisland.io/_next/static/media/03fc1b4a8d284b5e-s.p.09.f.n_ccld80.woff2",
+        "count": 1
+      },
+      {
+        "request": "GET https://flow.deltaisland.io/_next/static/media/267e21d860473425-s.p.0jurrqcqb.qgk.woff2",
+        "count": 1
+      },
+      {
+        "request": "GET https://flow.deltaisland.io/_next/static/media/99e609270109b47d-s.p.16-z~2sp29ex6.woff2",
+        "count": 1
+      },
+      {
+        "request": "GET https://flow.deltaisland.io/_next/static/media/d1c1cf16c8e6bc75-s.p.0tn6w1pbv~luf.woff2",
+        "count": 1
+      },
+      {
+        "request": "GET https://flow.deltaisland.io/_next/static/media/effe91970fc4db64-s.p.07ig5l8azj~hy.woff2",
+        "count": 1
+      },
+      {
+        "request": "GET https://flow.deltaisland.io/durable-tapes",
+        "count": 1
+      },
+      {
+        "request": "GET https://flow.deltaisland.io/favicon.ico",
+        "count": 1
+      },
+      {
+        "request": "GET https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447",
+        "count": 1
+      }
+    ],
+    "endpointFailures": []
+  },
+  "initialSanity": {
+    "routePresent": true,
+    "pageTitle": "Durable Tapes",
+    "visibleDurablePaneCount": 5,
+    "visibleRowCount": 0,
+    "paneRows": [
+      {
+        "key": "options",
+        "title": "Options Tape",
+        "visible": true,
+        "rowCount": 0
+      },
+      {
+        "key": "flow",
+        "title": "Flow Packets",
+        "visible": true,
+        "rowCount": 0
+      },
+      {
+        "key": "equities",
+        "title": "Equities Tape",
+        "visible": true,
+        "rowCount": 0
+      },
+      {
+        "key": "alerts",
+        "title": "Alerts",
+        "visible": true,
+        "rowCount": 0
+      },
+      {
+        "key": "news",
+        "title": "News Wire",
+        "visible": true,
+        "rowCount": 0
+      }
+    ],
+    "bodyTextSample": "Skip to terminal content Menu TickerClear Replay QA Durable Tapes Viewsignal prints Settings Options Tape ^Live CONTRACTPREMIUM Flow Packets ^Live CONTRACTPREMIUM Equities Tape ^Live TICKERPX Alerts ^Live SYMBOLSTATE Wireconnectingwaiting Stories0all symbols Historyscroll gatelive only Sourceswaiting Symbolsunmapped Stateall0mapped0unmapped0updated0resetclear News Wire ^Live Headline Waiting for live news stories."
+  }
+}

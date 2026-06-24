@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Durable Tapes Performance Phase 06: Production Hardening Closeout</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "../../../../node_modules/react/index.js",
+          "react-dom/client": "../../../../node_modules/react-dom/client.js",
+          "@pierre/diffs/react": "../../../../node_modules/@pierre/diffs/dist/react/index.js"
+        }
+      }
+    </script>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #111820;
+        --panel-2: #0d141b;
+        --line: rgba(230, 237, 244, 0.14);
+        --line-strong: rgba(245, 166, 35, 0.36);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --green: #25c17a;
+        --red: #ff6b5f;
+        --blue: #4da3ff;
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: linear-gradient(180deg, #0b1016 0%, var(--bg) 100%);
+        color: var(--text);
+        font: 15px/1.55 var(--sans);
+      }
+
+      main {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+
+      header {
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 980px;
+        font-size: 2rem;
+        line-height: 1.08;
+        letter-spacing: 0;
+        text-wrap: balance;
+      }
+
+      h2,
+      .eyebrow,
+      .meta-label,
+      code,
+      pre,
+      table {
+        font-family: var(--mono);
+      }
+
+      h2 {
+        margin-bottom: 10px;
+        color: var(--accent);
+        font-size: 0.9rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .eyebrow {
+        margin-bottom: 8px;
+        color: var(--accent);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .subtitle {
+        max-width: 88ch;
+        margin-top: 12px;
+        color: var(--muted);
+      }
+
+      .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 1px;
+        margin-top: 18px;
+        border: 1px solid var(--line);
+        background: var(--line);
+      }
+
+      .meta-cell {
+        min-width: 0;
+        padding: 10px 12px;
+        background: var(--panel);
+      }
+
+      .meta-label {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--faint);
+        font-size: 0.66rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      section {
+        padding: 20px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      p + p {
+        margin-top: 10px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 7px;
+      }
+
+      code {
+        padding: 0.08rem 0.28rem;
+        border: 1px solid rgba(245, 166, 35, 0.18);
+        border-radius: 5px;
+        background: rgba(245, 166, 35, 0.1);
+        color: #ffe0a3;
+        font-size: 0.9em;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        border: 1px solid var(--line);
+        font-size: 0.78rem;
+      }
+
+      th,
+      td {
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--accent);
+        background: var(--panel-2);
+      }
+
+      td {
+        background: var(--panel);
+      }
+
+      .status-ok {
+        color: var(--green);
+      }
+
+      .status-note {
+        color: var(--blue);
+      }
+
+      .status-risk {
+        color: var(--red);
+      }
+
+      .diff-shell {
+        display: grid;
+        gap: 12px;
+      }
+
+      #rich-diff {
+        min-height: 32px;
+      }
+
+      #fallback-diff {
+        max-height: 620px;
+        overflow: auto;
+        margin: 0;
+        padding: 12px;
+        border: 1px solid var(--line);
+        background: var(--panel-2);
+        color: var(--text);
+        font-size: 0.76rem;
+        line-height: 1.45;
+      }
+
+      .rich-diff-ready #fallback-diff {
+        display: none;
+      }
+
+      .diff-note,
+      .note {
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">Phase 06 / durable-tapes performance</p>
+        <h1>Production hardening and closeout guardrails</h1>
+        <p class="subtitle">
+          This turn adds repeatable production smoke checks, richer browser-probe observability,
+          API latency timing, and a hardened durable-tapes fallback flag. Source guardrails are in
+          place, the native web/API deployment has been refreshed, and deployed closeout evidence
+          now passes the Phase 06 budgets.
+        </p>
+        <div class="meta-grid">
+          <div class="meta-cell">
+            <span class="meta-label">Branch</span>
+            <code>lavender/ze79-phase-06-production-hardening-closeout</code>
+          </div>
+          <div class="meta-cell">
+            <span class="meta-label">Beads Issue</span>
+            <code>islandflow-ze79.7</code>
+          </div>
+          <div class="meta-cell">
+            <span class="meta-label">Status</span>
+            <span class="status-ok">deployed evidence pass</span>
+          </div>
+          <div class="meta-cell">
+            <span class="meta-label">Resolved Blocker</span>
+            <code>islandflow-ze79.11</code>
+          </div>
+        </div>
+      </header>
+
+      <section>
+        <h2>What Changed</h2>
+        <ul>
+          <li>
+            Added <code>scripts/probes/durable-tapes-production-smoke.ts</code> for deployed web
+            route, public API routing, API health, durable-row websocket, support lookup, and
+            by-trace miss latency checks. The routing fallback now requires both same-origin REST
+            proxy paths to return bounded JSON if the public bundle omits the API origin.
+          </li>
+          <li>
+            Extended the CDP browser probe with support/evidence origin and content-type
+            distributions, HTML/non-JSON counters, latency summaries, and options/alerts pane row
+            budgets.
+          </li>
+          <li>
+            Added <code>api.lookup.options_support_ms</code> timing around
+            <code>/lookup/options-support</code>.
+          </li>
+          <li>
+            Hardened <code>/durable-tapes</code> so raw options/alerts fallback channels are off by
+            default. Set <code>NEXT_PUBLIC_DURABLE_TAPES_RAW_FALLBACK=1</code> to opt back in during
+            an incident.
+          </li>
+          <li>
+            Updated the native deploy path so web production builds load the repo-root
+            <code>.env</code> for build-time <code>NEXT_PUBLIC_*</code> values, then restore generated
+            <code>next-env.d.ts</code> churn so the live checkout remains clean.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Verification</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Gate</th>
+              <th>Status</th>
+              <th>Evidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code></td>
+              <td class="status-ok">pass</td>
+              <td>100 tests, 247 expectations.</td>
+            </tr>
+            <tr>
+              <td><code>bun test services/api/tests packages/storage/tests</code></td>
+              <td class="status-ok">pass</td>
+              <td>84 tests, 269 expectations.</td>
+            </tr>
+            <tr>
+              <td><code>bun --cwd=apps/web run build</code></td>
+              <td class="status-ok">pass</td>
+              <td>Next production build completed. Generated <code>next-env.d.ts</code> route-type churn was restored.</td>
+            </tr>
+            <tr>
+              <td><code>phase-06-production-smoke.json</code></td>
+              <td class="status-ok">pass on deployed native</td>
+              <td>
+                Bundle references <code>https://api.flow.deltaisland.io</code>; same-origin support
+                and by-trace fallback checks were skipped because the API origin is present; API
+                health passed in 54 ms; durable-row websocket snapshot returned 10 rows in 224 ms;
+                support lookup passed in 16 ms; by-trace miss lookup passed in 104 ms.
+              </td>
+            </tr>
+            <tr>
+              <td><code>phase-06-deployed-native-web.json</code></td>
+              <td class="status-ok">pass on deployed native</td>
+              <td>
+                30s warmup plus 180s measurement: 0 total measured network requests, 0 support
+                requests, 0 by-trace requests, 0 aborted requests, task duration 15.25s, script
+                duration 11.24s, 68 visible rows, 20 options rows, and 13 alerts rows.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Production Reading</h2>
+        <p>
+          The deployment used the existing Phase 06 branch and the narrow native
+          <code>web,api</code> scope. Native web and API units restarted successfully, public web and
+          API health returned 200, and the web bundle now contains the expected public API origin.
+        </p>
+        <p>
+          The old web-host HTML routing failure is absent in the saved evidence. Explicit public
+          checks for <code>/lookup/options-support</code> and <code>/option-prints/by-trace</code>
+          returned JSON from <code>X-Served-By: api.flow.deltaisland.io</code>, and the CDP probe
+          observed zero support/evidence HTML or non-JSON data responses.
+        </p>
+        <p>
+          Known operational risk: the deploy wrapper's native infra check still exits non-zero
+          because <code>islandflow-clickhouse.service</code> is in an activating loop, even though
+          <code>http://127.0.0.1:8123/ping</code>, native web health, native API health, production
+          smoke, and the deployed browser probe all passed. Track that as follow-up infrastructure
+          hygiene rather than as a Phase 06 durable-tapes blocker.
+        </p>
+      </section>
+
+      <section>
+        <h2>Reviewer Finding And Repair</h2>
+        <p>
+          <span class="status-risk">P1 repaired:</span> the initial production smoke accepted a
+          same-origin fallback after checking only <code>/lookup/options-support</code>. That left a
+          bad deployment path where <code>/option-prints/by-trace</code> could still return web-host
+          HTML while the browser routing gate passed.
+        </p>
+        <p>
+          The repair keeps the direct probe shape but closes the routing hole: when the bundle does
+          not contain the intended API origin, the smoke now requires both same-origin support lookup
+          and same-origin by-trace miss lookup to return JSON within the endpoint latency budget.
+          The deployed rerun still uses API-origin routing and passes.
+        </p>
+        <p>
+          Thermo-nuclear structural review found no remaining Phase 06 blocker: the new smoke path is
+          a bounded standalone guardrail, the CDP probe extends the existing metric model instead of
+          adding a parallel one, and no PR-touched file crosses the 1k-line threshold because of this
+          branch.
+        </p>
+      </section>
+
+      <section>
+        <h2>Beads State</h2>
+        <ul>
+          <li><code>islandflow-ze79.11</code> is resolved by the native web/API rollout and green smoke/probe artifacts.</li>
+          <li><code>islandflow-ze79.7</code> has implementation, deployment, reviewer repair, and final production evidence ready for merge closeout.</li>
+          <li><code>islandflow-ba9q</code> should close only after PR #78 is merged with this production evidence attached.</li>
+          <li><code>islandflow-ze79</code> should close after Phase 06 merge confirms the epic closeout state.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <div class="diff-shell">
+          <p class="diff-note">
+            The rich renderer uses <code>@pierre/diffs/react</code>. The unified fallback remains
+            visible if the browser-side renderer cannot load.
+          </p>
+          <div id="rich-diff"></div>
+          <pre id="fallback-diff">diff --git a/apps/web/features/terminal/config.ts b/apps/web/features/terminal/config.ts
+--- a/apps/web/features/terminal/config.ts
++++ b/apps/web/features/terminal/config.ts
+@@
++const parseBooleanFlag = (value: string | undefined, fallback: boolean): boolean =&gt; {
++  if (!value || value.trim().length === 0) return fallback;
++  switch (value.trim().toLowerCase()) {
++    case "1":
++    case "true":
++    case "yes":
++    case "on":
++      return true;
++    case "0":
++    case "false":
++    case "no":
++    case "off":
++      return false;
++    default:
++      return fallback;
++  }
++};
++export const DURABLE_TAPES_RAW_FALLBACK_ENABLED = parseBooleanFlag(
++  process.env.NEXT_PUBLIC_DURABLE_TAPES_RAW_FALLBACK,
++  false
++);
+diff --git a/apps/web/features/terminal/routes.ts b/apps/web/features/terminal/routes.ts
+--- a/apps/web/features/terminal/routes.ts
++++ b/apps/web/features/terminal/routes.ts
+@@
++export const buildDurableTapesRouteFeatures = (
++  rawFallbackEnabled = DURABLE_TAPES_RAW_FALLBACK_ENABLED
++): RouteFeatures =&gt; ({
++  options: rawFallbackEnabled,
++  alerts: rawFallbackEnabled,
++  durableRows: true,
++  needsClassifierDecor: false,
++  needsAlertEvidencePrefetch: false
++});
+@@
+-    case DURABLE_TAPES_PATH:
+-      return { options: true, alerts: true, durableRows: true, ... };
++    case DURABLE_TAPES_PATH:
++      return buildDurableTapesRouteFeatures();
+diff --git a/scripts/probes/durable-tapes-perf/budgets.ts b/scripts/probes/durable-tapes-perf/budgets.ts
+--- a/scripts/probes/durable-tapes-perf/budgets.ts
++++ b/scripts/probes/durable-tapes-perf/budgets.ts
+@@
++    {
++      name: "support/evidence HTML responses",
++      actual: metrics.supportEvidenceHtmlResponseCount,
++      limit: 0,
++      pass: metrics.supportEvidenceHtmlResponseCount === 0,
++      unit: "responses"
++    },
++    {
++      name: "visible durable options row count",
++      actual: visibleOptionRows,
++      limit: 1,
++      pass: visibleOptionRows &gt;= 1,
++      unit: "minimum rows"
++    },
++    {
++      name: "visible durable alerts row count",
++      actual: visibleAlertRows,
++      limit: 1,
++      pass: visibleAlertRows &gt;= 1,
++      unit: "minimum rows"
++    }
+diff --git a/services/api/src/index.ts b/services/api/src/index.ts
+--- a/services/api/src/index.ts
++++ b/services/api/src/index.ts
+@@
+         if (req.method === "POST" &amp;&amp; url.pathname === "/lookup/options-support") {
++          const startedAt = Date.now();
+           try {
+             const body = optionsSupportLookupSchema.parse(await readJsonBody(req));
+@@
++            metrics.timing("api.lookup.options_support_ms", Date.now() - startedAt, {
++              status: "ok",
++              trace_id_count: String(body.trace_ids.length),
++              nbbo_context_count: String(body.nbbo_context.length)
++            });
+diff --git a/scripts/probes/durable-tapes-production-smoke.ts b/scripts/probes/durable-tapes-production-smoke.ts
+--- /dev/null
++++ b/scripts/probes/durable-tapes-production-smoke.ts
+@@
++// Checks deployed web route, API origin routing, /health,
++// durable-rows websocket snapshot support, options-support latency,
++// and option-prints/by-trace miss latency.
++const DEFAULT_WEB_TARGET = "https://flow.deltaisland.io/durable-tapes";
++const DEFAULT_API_ORIGIN = "https://api.flow.deltaisland.io";
++const optionPrintsMissUrl = (origin, prefix) =&gt; {
++  const url = new URL("/option-prints/by-trace", origin);
++  url.searchParams.set("trace_id", `${prefix}-${Date.now()}`);
++  return url.toString();
++};
++sameOriginProxyValid = sameOriginSupportProxyValid &amp;&amp; sameOriginEvidenceProxyValid;
+diff --git a/scripts/deploy.ts b/scripts/deploy.ts
+--- a/scripts/deploy.ts
++++ b/scripts/deploy.ts
+@@
++      buildSteps.push(
++        // Native web builds run from apps/web, but public build-time env lives in the repo root.
++        `bun --env-file=${shellEscape(`${REMOTE_REPO}/.env`)} --cwd=apps/web run build`,
++        // Next rewrites this generated file for the production distDir. Keep the live checkout clean.
++        "git restore --source=HEAD -- apps/web/next-env.d.ts"
++      );</pre>
+        </div>
+      </section>
+    </main>
+    <script type="module">
+      const target = document.getElementById("rich-diff");
+      const source = document.getElementById("fallback-diff")?.textContent ?? "";
+
+      try {
+        const [{ createElement }, { createRoot }, { PatchDiff }] = await Promise.all([
+          import("react"),
+          import("react-dom/client"),
+          import("@pierre/diffs/react")
+        ]);
+        createRoot(target).render(createElement(PatchDiff, { patch: source }));
+        document.body.classList.add("rich-diff-ready");
+      } catch (error) {
+        target.textContent = "Rich diff renderer unavailable; using fallback below.";
+        console.warn("PatchDiff render failed", error);
+      }
+    </script>
+  </body>
+</html>
