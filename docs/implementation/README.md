@@ -1,6 +1,6 @@
 # Implementation Phase Plans
 
-This directory is the active planning layer for the synthetic market-data and smart-money/smart-flow architecture work.
+This directory is the active planning layer for implementation streams that need durable phase docs and Beads-backed execution.
 
 The architecture reviews in `docs/plans/` and research reports in `docs/research-docs/` are background guidance. Future implementation work should use the current phase document and matching Beads issue as the active scope. If a phase document and an older architecture review or research report disagree, pause and update the phase document or Beads issue before writing code.
 
@@ -44,6 +44,7 @@ Research reports provide rationale and useful constraints. They do not add activ
 | Reusable market chart | `islandflow-mloi` - Plan reusable lightweight-charts market chart module | `docs/implementation/lightweight-charts/IMPLEMENT.md` |
 | Durable tape modules | `islandflow-h9c0` - Plan durable reusable tape modules | `docs/implementation/durable-tapes/IMPLEMENT.md` |
 | Durable-tapes performance hardening | `islandflow-ze79` - Durable-tapes performance hardening | `docs/implementation/durable-tapes-performance/IMPLEMENT.md` |
+| API private edge hardening | `islandflow-hnbk` - Make public Islandflow API private behind the hosted UI | `docs/implementation/api-private-edge/IMPLEMENT.md` |
 
 ## Dependency Order
 
