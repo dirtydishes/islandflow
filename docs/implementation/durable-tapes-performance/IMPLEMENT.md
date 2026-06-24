@@ -144,9 +144,16 @@ Browser/perf phases should run the Phase 00 probe against local web with hosted 
 
 ```bash
 WEB_DEV_PORT=3100 NEXT_PUBLIC_API_URL=https://api.flow.deltaisland.io bun run dev:web
+bun run scripts/probes/durable-tapes-perf.ts \
+  --target=http://localhost:3100/durable-tapes \
+  --warmup=30s \
+  --duration=180s \
+  --output=docs/implementation/durable-tapes-performance/baselines/<phase>-local-hosted-api.json
 ```
 
 Production verification must use the native deployed route only when explicitly required by the phase and must not mutate production except through the assigned deploy step.
+
+The Phase 00 baseline and budget profile are recorded in [`00-perf-probe-guardrail.md`](./00-perf-probe-guardrail.md). Omit `--no-fail-on-budget` for gate runs; include it only when intentionally recording a red baseline without failing the shell session.
 
 ## PR Guidance
 
