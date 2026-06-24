@@ -1142,7 +1142,9 @@ function remoteNativeRollout(
     if (piecesIncludeWeb(pieces)) {
       buildSteps.push(
         // Native web builds run from apps/web, but public build-time env lives in the repo root.
-        `bun --env-file=${shellEscape(`${REMOTE_REPO}/.env`)} --cwd=apps/web run build`
+        `bun --env-file=${shellEscape(`${REMOTE_REPO}/.env`)} --cwd=apps/web run build`,
+        // Next rewrites this generated file for the production distDir. Keep the live checkout clean.
+        "git restore --source=HEAD -- apps/web/next-env.d.ts"
       );
     }
   }

@@ -227,7 +227,8 @@
         <p class="subtitle">
           This turn adds repeatable production smoke checks, richer browser-probe observability,
           API latency timing, and a hardened durable-tapes fallback flag. Source guardrails are in
-          place; deployed closeout remains blocked by native API/web state.
+          place, the native web/API deployment has been refreshed, and deployed closeout evidence
+          now passes the Phase 06 budgets.
         </p>
         <div class="meta-grid">
           <div class="meta-cell">
@@ -240,10 +241,10 @@
           </div>
           <div class="meta-cell">
             <span class="meta-label">Status</span>
-            <span class="status-risk">blocked by deployed native evidence</span>
+            <span class="status-ok">deployed evidence pass</span>
           </div>
           <div class="meta-cell">
-            <span class="meta-label">Follow-up Blocker</span>
+            <span class="meta-label">Resolved Blocker</span>
             <code>islandflow-ze79.11</code>
           </div>
         </div>
@@ -270,6 +271,11 @@
             Hardened <code>/durable-tapes</code> so raw options/alerts fallback channels are off by
             default. Set <code>NEXT_PUBLIC_DURABLE_TAPES_RAW_FALLBACK=1</code> to opt back in during
             an incident.
+          </li>
+          <li>
+            Updated the native deploy path so web production builds load the repo-root
+            <code>.env</code> for build-time <code>NEXT_PUBLIC_*</code> values, then restore generated
+            <code>next-env.d.ts</code> churn so the live checkout remains clean.
           </li>
         </ul>
       </section>
@@ -302,19 +308,20 @@
             </tr>
             <tr>
               <td><code>phase-06-production-smoke.json</code></td>
-              <td class="status-risk">fail on deployed native</td>
+              <td class="status-ok">pass on deployed native</td>
               <td>
-                Web route, API origin routing, API health, and support lookup passed. Durable-row
-                websocket failed with <code>invalid_union_discriminator</code>; by-trace miss took
-                5635 ms against the 5000 ms smoke budget.
+                Bundle references <code>https://api.flow.deltaisland.io</code>; API health passed in
+                58 ms; durable-row websocket snapshot returned 10 rows in 263 ms; support lookup
+                passed in 21 ms; by-trace miss lookup passed in 169 ms.
               </td>
             </tr>
             <tr>
               <td><code>phase-06-deployed-native-web.json</code></td>
-              <td class="status-risk">fail on deployed native</td>
+              <td class="status-ok">pass on deployed native</td>
               <td>
-                9415 total requests, 4268 support requests, 2134 by-trace requests, and 4256
-                aborted support/evidence requests over the 180s measurement window.
+                30s warmup plus 180s measurement: 0 total measured network requests, 0 support
+                requests, 0 by-trace requests, 0 aborted requests, task duration 15.25s, script
+                duration 11.24s, 68 visible rows, 20 options rows, and 13 alerts rows.
               </td>
             </tr>
           </tbody>
@@ -324,24 +331,32 @@
       <section>
         <h2>Production Reading</h2>
         <p>
-          The old web-host HTML routing failure is not present in the latest deployed evidence:
-          support/evidence requests target <code>https://api.flow.deltaisland.io</code>, and the
-          CDP probe observed zero support/evidence HTML or non-JSON data responses.
+          The deployment used the existing Phase 06 branch and the narrow native
+          <code>web,api</code> scope. Native web and API units restarted successfully, public web and
+          API health returned 200, and the web bundle now contains the expected public API origin.
         </p>
         <p>
-          The production route is still not closeable. The deployed web/API pair is still emitting a
-          raw support/evidence request storm, and the API host does not yet accept the
-          <code>durable-rows</code> live subscription needed by the hardened server-row default.
+          The old web-host HTML routing failure is absent in the saved evidence. Explicit public
+          checks for <code>/lookup/options-support</code> and <code>/option-prints/by-trace</code>
+          returned JSON from <code>X-Served-By: api.flow.deltaisland.io</code>, and the CDP probe
+          observed zero support/evidence HTML or non-JSON data responses.
+        </p>
+        <p>
+          Known operational risk: the deploy wrapper's native infra check still exits non-zero
+          because <code>islandflow-clickhouse.service</code> is in an activating loop, even though
+          <code>http://127.0.0.1:8123/ping</code>, native web health, native API health, production
+          smoke, and the deployed browser probe all passed. Track that as follow-up infrastructure
+          hygiene rather than as a Phase 06 durable-tapes blocker.
         </p>
       </section>
 
       <section>
         <h2>Beads State</h2>
         <ul>
-          <li><code>islandflow-ze79.7</code> remains in progress and now depends on <code>islandflow-ze79.11</code>.</li>
-          <li><code>islandflow-ze79.11</code> was filed as the focused deployment/probe blocker.</li>
-          <li><code>islandflow-ba9q</code> remains open because deployed user-facing meltdown evidence is still red.</li>
-          <li><code>islandflow-ze79</code> remains open because not all children have evidence-backed closeout.</li>
+          <li><code>islandflow-ze79.11</code> is resolved by the native web/API rollout and green smoke/probe artifacts.</li>
+          <li><code>islandflow-ze79.7</code> has implementation, deployment, and final production evidence ready for review.</li>
+          <li><code>islandflow-ba9q</code> can close with the request-storm evidence fixed in production.</li>
+          <li><code>islandflow-ze79</code> can close after Phase 06 review/merge confirms the epic closeout state.</li>
         </ul>
       </section>
 
@@ -443,7 +458,17 @@ diff --git a/scripts/probes/durable-tapes-production-smoke.ts b/scripts/probes/d
 +// durable-rows websocket snapshot support, options-support latency,
 +// and option-prints/by-trace miss latency.
 +const DEFAULT_WEB_TARGET = "https://flow.deltaisland.io/durable-tapes";
-+const DEFAULT_API_ORIGIN = "https://api.flow.deltaisland.io";</pre>
++const DEFAULT_API_ORIGIN = "https://api.flow.deltaisland.io";
+diff --git a/scripts/deploy.ts b/scripts/deploy.ts
+--- a/scripts/deploy.ts
++++ b/scripts/deploy.ts
+@@
++      buildSteps.push(
++        // Native web builds run from apps/web, but public build-time env lives in the repo root.
++        `bun --env-file=${shellEscape(`${REMOTE_REPO}/.env`)} --cwd=apps/web run build`,
++        // Next rewrites this generated file for the production distDir. Keep the live checkout clean.
++        "git restore --source=HEAD -- apps/web/next-env.d.ts"
++      );</pre>
         </div>
       </section>
     </main>

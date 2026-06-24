@@ -71,16 +71,15 @@ Saved evidence:
 - `baselines/phase-06-deployed-native-web.json`
 - `turn-docs/2026-06-24-phase-06-production-hardening-closeout.html`
 
-Current deployed native evidence is not good enough to close the phase:
+Current deployed native evidence is good enough for Phase 06 review:
 
-- Production smoke passes native web route, API origin routing, API health, and `/lookup/options-support` latency.
-- Production smoke fails durable-row websocket support because `wss://api.flow.deltaisland.io/ws/live` rejects `channel: "durable-rows"` with `invalid_union_discriminator`.
-- Production smoke fails the `/option-prints/by-trace` miss latency budget at 5635 ms against a 5000 ms smoke limit.
-- The 180s deployed CDP probe still fails request budgets: 9415 total network requests, 4268 `/lookup/options-support` requests, 2134 `/option-prints/by-trace` requests, and 4256 aborted support/evidence requests.
+- Native web/API were redeployed from `lavender/ze79-phase-06-production-hardening-closeout` with the narrow `web,api` native scope.
+- Production smoke passes native web route, browser API-origin routing, API health, durable-row websocket snapshot, `/lookup/options-support` latency, and `/option-prints/by-trace` miss latency.
+- The durable-row websocket check against `wss://api.flow.deltaisland.io/ws/live` returned a 10-row snapshot.
+- The 30s warmup plus 180s deployed CDP probe passes request, script/task, heap, DOM, pane, options-row, and alerts-row budgets: 0 total measured network requests, 0 support/evidence requests, 0 aborted requests, 15.25s task duration, 11.24s script duration, 68 visible rows, 20 options rows, and 13 alerts rows.
+- Explicit public support/evidence endpoint checks returned JSON from `X-Served-By: api.flow.deltaisland.io`.
 
-Follow-up blocker: `islandflow-ze79.11`.
-
-Do not close `islandflow-ze79.7`, `islandflow-ba9q`, or `islandflow-ze79` until native API/web deployment includes durable-row live support and the saved smoke/probe evidence passes.
+Deployment blocker `islandflow-ze79.11` is resolved by the saved smoke/probe evidence. `islandflow-ze79.7` is ready for review. Close `islandflow-ba9q` only with the same production evidence attached, and close `islandflow-ze79` after Phase 06 review/merge confirms the epic closeout state.
 
 ## Acceptance Criteria
 

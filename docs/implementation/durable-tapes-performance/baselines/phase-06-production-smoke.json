@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "probe": "durable-tapes-production-smoke",
-  "startedAt": "2026-06-24T07:09:09.831Z",
-  "endedAt": "2026-06-24T07:09:16.028Z",
+  "startedAt": "2026-06-24T07:28:55.384Z",
+  "endedAt": "2026-06-24T07:28:56.449Z",
   "webTarget": "https://flow.deltaisland.io/durable-tapes",
   "webOrigin": "https://flow.deltaisland.io",
   "apiOrigin": "https://api.flow.deltaisland.io",
@@ -10,20 +10,20 @@
   "maxEndpointLatencyMs": 5000,
   "routing": {
     "bundleApiOriginPresent": true,
-    "matchedScriptUrl": "https://flow.deltaisland.io/_next/static/chunks/14abrna.23z2h.js",
+    "matchedScriptUrl": "https://flow.deltaisland.io/_next/static/chunks/0_6~242j-s~x4.js",
     "scannedScriptCount": 6,
     "scriptTagCount": 10,
     "sameOriginProxyChecked": false,
     "sameOriginProxyValid": false
   },
-  "passed": false,
+  "passed": true,
   "checks": [
     {
       "name": "native web route",
       "status": "pass",
       "url": "https://flow.deltaisland.io/durable-tapes",
       "statusCode": 200,
-      "latencyMs": 208.10737500000002,
+      "latencyMs": 366.6295,
       "contentType": "text/html; charset=utf-8",
       "detail": "origin https://flow.deltaisland.io"
     },
@@ -42,32 +42,31 @@
       "status": "pass",
       "url": "https://api.flow.deltaisland.io/health",
       "statusCode": 200,
-      "latencyMs": 80.72833300000002,
+      "latencyMs": 57.87037500000008,
       "contentType": "application/json"
     },
     {
       "name": "durable rows websocket snapshot",
-      "status": "fail",
+      "status": "pass",
       "url": "wss://api.flow.deltaisland.io/ws/live",
-      "latencyMs": 80.57675000000006,
-      "detail": "[\n  {\n    \"code\": \"invalid_union_discriminator\",\n    \"options\": [\n      \"options\",\n      \"flow\",\n      \"smart-money\",\n      \"smart-flow\",\n      \"nbbo\",\n      \"equity-quotes\",\n      \"equity-joins\",\n      \"classifier-hits\",\n      \"alerts\",\n      \"inferred-dark\",\n      \"news\",\n      \"equities\",\n      \"equity-candles\",\n      \"equity-overlay\"\n    ],\n    \"path\": [\n      \"subscriptions\",\n      0,\n      \"channel\"\n    ],\n    \"message\": \"Invalid discriminator value. Expected 'options' | 'flow' | 'smart-money' | 'smart-flow' | 'nbbo' | 'equity-quotes' | 'equity-joins' | 'classifier-hits' | 'alerts' | 'inferred-dark' | 'news' | 'equities' | 'equity-candles' | 'equity-overlay'\"\n  }\n]"
+      "latencyMs": 262.54729199999997,
+      "detail": "snapshot rows 10"
     },
     {
       "name": "options support lookup latency",
       "status": "pass",
       "url": "https://api.flow.deltaisland.io/lookup/options-support",
       "statusCode": 200,
-      "latencyMs": 16.889583000000016,
+      "latencyMs": 20.824416999999926,
       "contentType": "application/json"
     },
     {
       "name": "option prints miss lookup latency",
-      "status": "fail",
-      "url": "https://api.flow.deltaisland.io/option-prints/by-trace?trace_id=phase06-smoke-miss-1782284950392",
+      "status": "pass",
+      "url": "https://api.flow.deltaisland.io/option-prints/by-trace?trace_id=phase06-smoke-miss-1782286136279",
       "statusCode": 200,
-      "latencyMs": 5634.524958,
-      "contentType": "application/json",
-      "detail": "latency exceeded 5000ms"
+      "latencyMs": 169.29704099999992,
+      "contentType": "application/json"
     }
   ]
 }
