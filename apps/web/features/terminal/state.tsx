@@ -29,7 +29,8 @@ import {
   useLayoutEffect,
   useMemo,
   useRef,
-  useState
+  useState,
+  useSyncExternalStore
 } from "react";
 import type { AlertContractFocusRequest, AlertEquityFocusRequest } from "../alerts";
 import type { FlowPacketFocusRequest } from "../flow-packets";
@@ -112,6 +113,15 @@ const EMPTY_SMART_FLOW_EXPLAINABILITY: SmartFlowExplainabilityProjection[] = [];
 const EMPTY_SMART_MONEY_EVENTS: SmartMoneyEvent[] = [];
 const EMPTY_INFERRED_DARK_EVENTS: InferredDarkEvent[] = [];
 const EMPTY_NEWS_STORIES: NewsStory[] = [];
+
+const EMPTY_OPTION_PRINT_MAP = new Map<string, OptionPrint>();
+const EMPTY_FLOW_PACKET_MAP = new Map<string, FlowPacket>();
+
+const useLatestRef = <T,>(value: T) => {
+  const ref = useRef(value);
+  ref.current = value;
+  return ref;
+};
 
 export const useTerminalState = () => {
   const pathname = nextNavigation.usePathname();
@@ -207,6 +217,17 @@ export const useTerminalState = () => {
     ]
   );
   const liveSession = useLiveSession(mode === "live", pathname, liveManifest);
+  const optionsLastUpdate = liveSession.lastEventByChannel.options ?? null;
+  const nbboLastUpdate = liveSession.lastEventByChannel.nbbo ?? null;
+  const equitiesLastUpdate = liveSession.lastEventByChannel.equities ?? null;
+  const equityJoinsLastUpdate = liveSession.lastEventByChannel["equity-joins"] ?? null;
+  const flowLastUpdate = liveSession.lastEventByChannel.flow ?? null;
+  const alertsLastUpdate = liveSession.lastEventByChannel.alerts ?? null;
+  const classifierHitsLastUpdate = liveSession.lastEventByChannel["classifier-hits"] ?? null;
+  const smartFlowLastUpdate = liveSession.lastEventByChannel["smart-flow"] ?? null;
+  const smartMoneyLastUpdate = liveSession.lastEventByChannel["smart-money"] ?? null;
+  const inferredDarkLastUpdate = liveSession.lastEventByChannel["inferred-dark"] ?? null;
+  const newsLastUpdate = liveSession.lastEventByChannel.news ?? null;
   const currentOptionSubscription = useMemo(
     () =>
       liveManifest.find(
@@ -460,7 +481,7 @@ export const useTerminalState = () => {
     sourceStatus: optionsChannelStatus,
     sourceItems: liveSession.options,
     historyTail: liveSession.optionsHistory,
-    lastUpdate: liveSession.lastUpdate,
+    lastUpdate: optionsLastUpdate,
     retentionLimit: LIVE_OPTIONS_HEAD_LIMIT,
     captureScroll: optionsAnchor.capture,
     onNewItems: optionsScroll.onNewItems,
@@ -472,7 +493,7 @@ export const useTerminalState = () => {
     sourceStatus: equitiesChannelStatus,
     sourceItems: liveSession.equities,
     historyTail: liveSession.equitiesHistory,
-    lastUpdate: liveSession.lastUpdate,
+    lastUpdate: equitiesLastUpdate,
     captureScroll: equitiesAnchor.capture,
     onNewItems: equitiesScroll.onNewItems,
     shouldHold: () => !equitiesScroll.isAtTopRef.current,
@@ -483,7 +504,7 @@ export const useTerminalState = () => {
     sourceStatus: flowChannelStatus,
     sourceItems: liveSession.flow,
     historyTail: liveSession.flowHistory,
-    lastUpdate: liveSession.lastUpdate,
+    lastUpdate: flowLastUpdate,
     captureScroll: flowAnchor.capture,
     onNewItems: flowScroll.onNewItems,
     shouldHold: () => !flowScroll.isAtTopRef.current,
@@ -494,7 +515,7 @@ export const useTerminalState = () => {
     sourceStatus: liveSession.status,
     sourceItems: liveSession.news,
     historyTail: liveSession.newsHistory,
-    lastUpdate: liveSession.lastUpdate,
+    lastUpdate: newsLastUpdate,
     retentionLimit: LIVE_OPTIONS_HEAD_LIMIT,
     captureScroll: newsAnchor.capture,
     onNewItems: newsScroll.onNewItems,
@@ -521,66 +542,71 @@ export const useTerminalState = () => {
     [equityFocusScopeKey, equityFocusSeed, liveEquities.historyItems, liveEquities.liveItems]
   );
 
+  const liveNbboItems = useMemo(
+    () => composeTapeItems([], liveSession.nbbo, liveSession.nbboHistory),
+    [liveSession.nbbo, liveSession.nbboHistory]
+  );
+  const liveEquityJoinItems = useMemo(
+    () => composeTapeItems([], liveSession.equityJoins, liveSession.equityJoinsHistory),
+    [liveSession.equityJoins, liveSession.equityJoinsHistory]
+  );
+  const liveAlertItems = useMemo(
+    () => composeTapeItems([], liveSession.alerts, liveSession.alertsHistory),
+    [liveSession.alerts, liveSession.alertsHistory]
+  );
+  const liveClassifierHitItems = useMemo(
+    () => composeTapeItems([], liveSession.classifierHits, liveSession.classifierHitsHistory),
+    [liveSession.classifierHits, liveSession.classifierHitsHistory]
+  );
+  const liveSmartFlowItems = useMemo(
+    () => composeTapeItems([], liveSession.smartFlow, liveSession.smartFlowHistory),
+    [liveSession.smartFlow, liveSession.smartFlowHistory]
+  );
+  const liveSmartMoneyItems = useMemo(
+    () => composeTapeItems([], liveSession.smartMoney, liveSession.smartMoneyHistory),
+    [liveSession.smartMoney, liveSession.smartMoneyHistory]
+  );
+  const liveInferredDarkItems = useMemo(
+    () => composeTapeItems([], liveSession.inferredDark, liveSession.inferredDarkHistory),
+    [liveSession.inferredDark, liveSession.inferredDarkHistory]
+  );
+
   const optionsFeed = mode === "live" ? { ...liveOptions, items: seededLiveOptionsItems } : options;
   const nbboFeed =
     mode === "live"
       ? toStaticTapeState(
           getHotChannelFeedStatus(liveSession.status, liveSession.channelHealth.nbbo),
-          composeTapeItems([], liveSession.nbbo, liveSession.nbboHistory),
-          liveSession.lastUpdate
+          liveNbboItems,
+          nbboLastUpdate
         )
       : nbbo;
   const equitiesFeed =
     mode === "live" ? { ...liveEquities, items: seededLiveEquitiesItems } : equities;
   const equityJoinsFeed =
     mode === "live"
-      ? toStaticTapeState(
-          liveSession.status,
-          composeTapeItems([], liveSession.equityJoins, liveSession.equityJoinsHistory),
-          liveSession.lastUpdate
-        )
+      ? toStaticTapeState(liveSession.status, liveEquityJoinItems, equityJoinsLastUpdate)
       : equityJoins;
   const flowFeed = mode === "live" ? liveFlow : flow;
   const newsFeed = mode === "live" ? liveNews : toStaticTapeState("disconnected", [], null);
   const alertsFeed =
     mode === "live"
-      ? toStaticTapeState(
-          liveSession.status,
-          composeTapeItems([], liveSession.alerts, liveSession.alertsHistory),
-          liveSession.lastUpdate
-        )
+      ? toStaticTapeState(liveSession.status, liveAlertItems, alertsLastUpdate)
       : alerts;
   const classifierHitsFeed =
     mode === "live"
-      ? toStaticTapeState(
-          liveSession.status,
-          composeTapeItems([], liveSession.classifierHits, liveSession.classifierHitsHistory),
-          liveSession.lastUpdate
-        )
+      ? toStaticTapeState(liveSession.status, liveClassifierHitItems, classifierHitsLastUpdate)
       : classifierHits;
   const smartFlowFeed =
     mode === "live"
-      ? toStaticTapeState(
-          liveSession.status,
-          composeTapeItems([], liveSession.smartFlow, liveSession.smartFlowHistory),
-          liveSession.lastUpdate
-        )
+      ? toStaticTapeState(liveSession.status, liveSmartFlowItems, smartFlowLastUpdate)
       : smartFlow;
   const smartMoneyFeed =
     mode === "live"
-      ? toStaticTapeState(
-          liveSession.status,
-          composeTapeItems([], liveSession.smartMoney, liveSession.smartMoneyHistory),
-          liveSession.lastUpdate
-        )
+      ? toStaticTapeState(liveSession.status, liveSmartMoneyItems, smartMoneyLastUpdate)
       : smartMoney;
   const inferredDarkFeed =
     mode === "live"
-      ? toStaticTapeState(
-          liveSession.status,
-          composeTapeItems([], liveSession.inferredDark, liveSession.inferredDarkHistory),
-          liveSession.lastUpdate
-        )
+      ? toStaticTapeState(liveSession.status, liveInferredDarkItems, inferredDarkLastUpdate)
       : inferredDark;
 
   useLayoutEffect(() => {
@@ -1363,6 +1389,10 @@ export const useTerminalState = () => {
     return equitiesFeed.items.filter((print) => matchesTicker(print.underlying_id));
   }, [equitiesFeed.items, matchesTicker, tickerSet, instrumentUnderlying]);
 
+  const filteredOptionsRef = useLatestRef(filteredOptions);
+  const filteredEquitiesRef = useLatestRef(filteredEquities);
+  const resolvedOptionPrintMapRef = useLatestRef(resolvedOptionPrintMap);
+
   useEffect(() => {
     if (!optionFocusSeed) {
       return;
@@ -1422,7 +1452,7 @@ export const useTerminalState = () => {
       });
       const seedItems = composeTapeItems(
         [print],
-        filteredOptions.filter(
+        filteredOptionsRef.current.filter(
           (candidate) => normalizeContractId(candidate.option_contract_id) === contractId
         ),
         []
@@ -1440,7 +1470,7 @@ export const useTerminalState = () => {
         underlyingId
       });
     },
-    [filteredOptions]
+    [filteredOptionsRef]
   );
 
   const focusEquityTicker = useCallback(
@@ -1449,7 +1479,7 @@ export const useTerminalState = () => {
       const scopeKey = `equity:${underlyingId}`;
       const seedItems = composeTapeItems(
         [print],
-        filteredEquities.filter(
+        filteredEquitiesRef.current.filter(
           (candidate) => candidate.underlying_id.toUpperCase() === underlyingId
         ),
         []
@@ -1465,7 +1495,7 @@ export const useTerminalState = () => {
         underlyingId
       });
     },
-    [filteredEquities]
+    [filteredEquitiesRef]
   );
 
   const focusFlowPacketRequest = useCallback(
@@ -1484,11 +1514,11 @@ export const useTerminalState = () => {
       });
       const memberTraceIds = new Set(request.memberTraceIds);
       const memberPrints = request.memberTraceIds
-        .map((traceId) => resolvedOptionPrintMap.get(traceId))
+        .map((traceId) => resolvedOptionPrintMapRef.current.get(traceId))
         .filter((print): print is OptionPrint => Boolean(print));
       const seedItems = composeTapeItems(
         memberPrints,
-        filteredOptions.filter(
+        filteredOptionsRef.current.filter(
           (candidate) =>
             normalizeContractId(candidate.option_contract_id) === contractId &&
             (memberTraceIds.size === 0 || memberTraceIds.has(candidate.trace_id))
@@ -1509,7 +1539,7 @@ export const useTerminalState = () => {
         underlyingId
       });
     },
-    [filteredOptions, resolvedOptionPrintMap]
+    [filteredOptionsRef, resolvedOptionPrintMapRef]
   );
 
   const focusAlertContract = useCallback(
@@ -1523,7 +1553,7 @@ export const useTerminalState = () => {
     (request: AlertEquityFocusRequest) => {
       const underlyingId = request.underlyingId.toUpperCase();
       const scopeKey = `equity:${underlyingId}`;
-      const seedItems = filteredEquities.filter(
+      const seedItems = filteredEquitiesRef.current.filter(
         (candidate) => candidate.underlying_id.toUpperCase() === underlyingId
       );
       setEquityFocusSeed({ scopeKey, items: seedItems });
@@ -1538,8 +1568,16 @@ export const useTerminalState = () => {
         underlyingId
       });
     },
-    [filteredEquities]
+    [filteredEquitiesRef]
   );
+
+  const clearSelectedInstrument = useCallback(() => {
+    setSelectedInstrument(null);
+  }, []);
+
+  const clearSelectedAlert = useCallback(() => {
+    setSelectedAlert(null);
+  }, []);
 
   const equitiesSilentWarning = shouldShowEquitiesSilentFeedWarning({
     wsStatus: liveSession.status,
@@ -2106,6 +2144,7 @@ export const useTerminalState = () => {
     setSelectedSmartMoneyEvent,
     selectedInstrument,
     setSelectedInstrument,
+    clearSelectedInstrument,
     selectedInstrumentLabel,
     filterInput,
     setFilterInput,
@@ -2172,6 +2211,7 @@ export const useTerminalState = () => {
     focusFlowPacketRequest,
     focusAlertContract,
     focusAlertEquity,
+    clearSelectedAlert,
     openFromSmartFlowProjection,
     openFromSmartMoneyEvent,
     openFromClassifierHit,
@@ -2187,12 +2227,110 @@ export const useTerminalState = () => {
 
 export type TerminalState = ReturnType<typeof useTerminalState>;
 
-export const TerminalContext = createContext<TerminalState | null>(null);
+type TerminalSelector<T> = (state: TerminalState) => T;
+type TerminalSelectorEquality<T> = (left: T, right: T) => boolean;
+
+type TerminalStateStore = {
+  getSnapshot: () => TerminalState;
+  setSnapshot: (state: TerminalState) => void;
+  subscribe: (listener: () => void) => () => void;
+};
+
+const createTerminalStateStore = (initialState: TerminalState): TerminalStateStore => {
+  let snapshot = initialState;
+  const listeners = new Set<() => void>();
+
+  return {
+    getSnapshot: () => snapshot,
+    setSnapshot: (state) => {
+      if (Object.is(snapshot, state)) {
+        return;
+      }
+      snapshot = state;
+      for (const listener of listeners) {
+        listener();
+      }
+    },
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    }
+  };
+};
+
+export const TerminalContext = createContext<TerminalStateStore | null>(null);
+export const TerminalStateStoreContext = TerminalContext;
+
+export const useTerminalStateStore = (state: TerminalState): TerminalStateStore => {
+  const storeRef = useRef<TerminalStateStore | null>(null);
+  if (!storeRef.current) {
+    storeRef.current = createTerminalStateStore(state);
+  }
+
+  useLayoutEffect(() => {
+    storeRef.current?.setSnapshot(state);
+  }, [state]);
+
+  return storeRef.current;
+};
 
 export const useTerminal = (): TerminalState => {
-  const value = useContext(TerminalContext);
-  if (!value) {
+  const store = useContext(TerminalContext);
+  if (!store) {
     throw new Error("Terminal context missing");
   }
-  return value;
+  return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
 };
+
+export const shallowEqualTerminalSelection = <T extends Record<string, unknown>>(
+  left: T,
+  right: T
+): boolean => {
+  if (Object.is(left, right)) {
+    return true;
+  }
+
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+
+  for (const key of leftKeys) {
+    if (!Object.hasOwn(right, key) || !Object.is(left[key], right[key])) {
+      return false;
+    }
+  }
+  return true;
+};
+
+export const useTerminalSelector = <T,>(
+  selector: TerminalSelector<T>,
+  isEqual: TerminalSelectorEquality<T> = Object.is
+): T => {
+  const store = useContext(TerminalStateStoreContext);
+  if (!store) {
+    throw new Error("Terminal state store missing");
+  }
+
+  const selectedRef = useRef<T | null>(null);
+  const hasSelectedRef = useRef(false);
+  const selectorRef = useLatestRef(selector);
+  const equalityRef = useLatestRef(isEqual);
+
+  const getSelectedSnapshot = useCallback(() => {
+    const next = selectorRef.current(store.getSnapshot());
+    if (hasSelectedRef.current && equalityRef.current(selectedRef.current as T, next)) {
+      return selectedRef.current as T;
+    }
+    selectedRef.current = next;
+    hasSelectedRef.current = true;
+    return next;
+  }, [equalityRef, selectorRef, store]);
+
+  return useSyncExternalStore(store.subscribe, getSelectedSnapshot, getSelectedSnapshot);
+};
+
+export { EMPTY_FLOW_PACKET_MAP, EMPTY_OPTION_PRINT_MAP };

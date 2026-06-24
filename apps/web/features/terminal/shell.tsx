@@ -8,12 +8,20 @@ import type {
 } from "@islandflow/types";
 import Link from "next/link";
 import * as nextNavigation from "next/navigation";
-import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { memo, type ReactNode, useEffect, useId, useRef, useState } from "react";
 
 import { isSyntheticAdminVisible } from "./config";
-import { TICKER_FILTER_INPUT_MAX_LENGTH, normalizeTickerFilterInput } from "./filters";
-import { NAV_ITEMS, getTerminalNavCurrentHref } from "./routes";
-import { TerminalContext, type TerminalState, useTerminal, useTerminalState } from "./state";
+import { normalizeTickerFilterInput, TICKER_FILTER_INPUT_MAX_LENGTH } from "./filters";
+import { getTerminalNavCurrentHref, NAV_ITEMS } from "./routes";
+import {
+  shallowEqualTerminalSelection,
+  TerminalContext,
+  type TerminalState,
+  useTerminal,
+  useTerminalSelector,
+  useTerminalState,
+  useTerminalStateStore
+} from "./state";
 
 const formatTime = (ts: number): string => {
   return new Date(ts).toLocaleTimeString();
@@ -505,6 +513,64 @@ type TerminalAppShellProps = {
 
 type TerminalChromeProps = TerminalAppShellProps;
 
+const EMPTY_TERMINAL_DRAWER_STATE = {
+  selectedAlert: null,
+  selectedNewsStory: null,
+  selectedClassifierHit: null,
+  selectedSmartFlowProjection: null,
+  selectedSmartMoneyEvent: null,
+  selectedDarkEvent: null
+};
+
+const selectTerminalDrawerState = (state: TerminalState): Partial<TerminalState> => {
+  if (
+    !state.selectedAlert &&
+    !state.selectedNewsStory &&
+    !state.selectedClassifierHit &&
+    !state.selectedSmartFlowProjection &&
+    !state.selectedSmartMoneyEvent &&
+    !state.selectedDarkEvent
+  ) {
+    return EMPTY_TERMINAL_DRAWER_STATE;
+  }
+
+  return {
+    flowPacketMap: state.flowPacketMap,
+    focusAlertContract: state.focusAlertContract,
+    focusAlertEquity: state.focusAlertEquity,
+    focusFlowPacketRequest: state.focusFlowPacketRequest,
+    optionPrintMap: state.optionPrintMap,
+    selectedAlert: state.selectedAlert,
+    selectedClassifierEvidence: state.selectedClassifierEvidence,
+    selectedClassifierFlowPacket: state.selectedClassifierFlowPacket,
+    selectedClassifierHit: state.selectedClassifierHit,
+    selectedDarkEvent: state.selectedDarkEvent,
+    selectedDarkEvidence: state.selectedDarkEvidence,
+    selectedDarkUnderlying: state.selectedDarkUnderlying,
+    selectedNewsStory: state.selectedNewsStory,
+    selectedSmartFlowEvidence: state.selectedSmartFlowEvidence,
+    selectedSmartFlowProjection: state.selectedSmartFlowProjection,
+    selectedSmartMoneyEvent: state.selectedSmartMoneyEvent,
+    selectedSmartMoneyEvidence: state.selectedSmartMoneyEvidence,
+    selectedSmartMoneyFlowPacket: state.selectedSmartMoneyFlowPacket,
+    setSelectedAlert: state.setSelectedAlert,
+    setSelectedClassifierHit: state.setSelectedClassifierHit,
+    setSelectedDarkEvent: state.setSelectedDarkEvent,
+    setSelectedNewsStory: state.setSelectedNewsStory,
+    setSelectedSmartFlowProjection: state.setSelectedSmartFlowProjection,
+    setSelectedSmartMoneyEvent: state.setSelectedSmartMoneyEvent
+  };
+};
+
+const TerminalDrawersOutlet = memo(function TerminalDrawersOutlet({
+  renderDrawers
+}: {
+  renderDrawers?: TerminalDrawersRenderer;
+}) {
+  const drawerState = useTerminalSelector(selectTerminalDrawerState, shallowEqualTerminalSelection);
+  return renderDrawers ? renderDrawers(drawerState as TerminalState) : null;
+});
+
 export function TerminalAppShell({ children, renderDrawers }: TerminalAppShellProps) {
   const pathname = nextNavigation.usePathname();
 
@@ -524,6 +590,7 @@ export function TerminalAppShell({ children, renderDrawers }: TerminalAppShellPr
 
 function TerminalChrome({ children, renderDrawers }: TerminalChromeProps) {
   const state = useTerminalState();
+  const terminalStore = useTerminalStateStore(state);
   const pathname = nextNavigation.usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const tickerFieldId = useId();
@@ -552,7 +619,7 @@ function TerminalChrome({ children, renderDrawers }: TerminalChromeProps) {
   }, [drawerOpen]);
 
   return (
-    <TerminalContext.Provider value={state}>
+    <TerminalContext.Provider value={terminalStore}>
       <div className="terminal-shell">
         <a className="skip-link" href="#terminal-content">
           Skip to terminal content
@@ -693,7 +760,7 @@ function TerminalChrome({ children, renderDrawers }: TerminalChromeProps) {
         ) : null}
 
         <SyntheticControlDock />
-        {renderDrawers ? renderDrawers(state) : null}
+        <TerminalDrawersOutlet renderDrawers={renderDrawers} />
       </div>
     </TerminalContext.Provider>
   );
