@@ -128,6 +128,36 @@ describe("HydrationScheduler", () => {
     expect(requestCount).toBe(2);
   });
 
+  it("fetches flow packets with bounded parallelism", async () => {
+    const started: string[] = [];
+    const releases: Array<() => void> = [];
+    const scheduler = new HydrationScheduler({
+      batchDelayMs: 0,
+      flowPacketBatchSize: 2,
+      fetcher: async (input) => {
+        const url = new URL(String(input));
+        const packetId = decodeURIComponent(url.pathname.split("/").at(-1) ?? "");
+        started.push(packetId);
+        await new Promise<void>((resolve) => {
+          releases.push(resolve);
+        });
+        return jsonResponse({ data: makeFlowPacket(packetId, []) });
+      }
+    });
+
+    const request = scheduler.requestFlowPackets(["flowpacket:1", "flowpacket:2"]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(started).toEqual(["flowpacket:1", "flowpacket:2"]);
+    for (const release of releases) {
+      release();
+    }
+    await expect(request).resolves.toMatchObject({
+      missingPacketIds: [],
+      packets: [{ id: "flowpacket:1" }, { id: "flowpacket:2" }]
+    });
+  });
+
   it("batches option support requests and serves repeated traces from cache", async () => {
     const packet = makeFlowPacket("flowpacket:SPY-2026-06-26-500-C:1", ["print:1"]);
     const smartMoney = {
@@ -181,5 +211,58 @@ describe("HydrationScheduler", () => {
 
     await scheduler.requestOptionSupport({ traceIds: ["print:1"] });
     expect(requestCount).toBe(1);
+  });
+
+  it("keeps option support nbbo hits on the positive ttl and misses on the negative ttl", async () => {
+    let now = 0;
+    let requestCount = 0;
+    const quote = {
+      option_contract_id: "SPY-2026-06-26-500-C",
+      bid: 1,
+      ask: 1.1,
+      bid_size: 10,
+      ask_size: 12,
+      ts: 1,
+      source_ts: 1
+    } as any;
+    const scheduler = new HydrationScheduler({
+      batchDelayMs: 0,
+      positiveTtlMs: 100,
+      negativeTtlMs: 10,
+      now: () => now,
+      fetcher: async (_input, init) => {
+        requestCount += 1;
+        const body = JSON.parse(String(init?.body ?? "{}")) as {
+          nbbo_context?: Array<{ trace_id: string }>;
+        };
+        const traceIds = new Set((body.nbbo_context ?? []).map((item) => item.trace_id));
+        return jsonResponse({
+          nbbo_by_trace_id: traceIds.has("hit") ? { hit: quote } : {}
+        });
+      }
+    });
+
+    await expect(
+      scheduler.requestOptionSupport({
+        nbboContext: [
+          { trace_id: "hit", option_contract_id: "SPY", ts: 1 },
+          { trace_id: "miss", option_contract_id: "SPY", ts: 1 }
+        ]
+      })
+    ).resolves.toMatchObject({
+      nbboByTraceId: { hit: quote, miss: null }
+    });
+    expect(requestCount).toBe(1);
+
+    now = 11;
+    await scheduler.requestOptionSupport({
+      nbboContext: [{ trace_id: "hit", option_contract_id: "SPY", ts: 1 }]
+    });
+    expect(requestCount).toBe(1);
+
+    await scheduler.requestOptionSupport({
+      nbboContext: [{ trace_id: "miss", option_contract_id: "SPY", ts: 1 }]
+    });
+    expect(requestCount).toBe(2);
   });
 });

@@ -56,6 +56,7 @@ export type HydrationSchedulerConfig = {
   batchDelayMs?: number;
   supportBatchDelayMs?: number;
   optionPrintBatchSize?: number;
+  flowPacketBatchSize?: number;
   positiveTtlMs?: number;
   negativeTtlMs?: number;
   maxEntries?: number;
@@ -66,6 +67,7 @@ export type HydrationSchedulerConfig = {
 const DEFAULT_BATCH_DELAY_MS = 25;
 const DEFAULT_SUPPORT_BATCH_DELAY_MS = 3_000;
 const DEFAULT_OPTION_PRINT_BATCH_SIZE = 100;
+const DEFAULT_FLOW_PACKET_BATCH_SIZE = 12;
 const DEFAULT_POSITIVE_TTL_MS = 5 * 60_000;
 const DEFAULT_NEGATIVE_TTL_MS = 30_000;
 const DEFAULT_MAX_ENTRIES = 2_000;
@@ -179,6 +181,7 @@ export class HydrationScheduler {
   private readonly batchDelayMs: number;
   private readonly supportBatchDelayMs: number;
   private readonly optionPrintBatchSize: number;
+  private readonly flowPacketBatchSize: number;
   private readonly backoffBaseMs: number;
   private readonly backoffMaxMs: number;
 
@@ -190,7 +193,8 @@ export class HydrationScheduler {
   private readonly supportTraceMisses: TtlCache<true>;
   private readonly supportSmartMoneyByPacketId: TtlCache<SmartMoneyEvent>;
   private readonly supportClassifierHitsByPacketId: TtlCache<ClassifierHitEvent[]>;
-  private readonly supportNbboByTraceId: TtlCache<OptionNBBO | null>;
+  private readonly supportNbboByTraceId: TtlCache<OptionNBBO>;
+  private readonly supportNbboMisses: TtlCache<true>;
 
   private readonly backoff = new Map<EndpointName, { failureCount: number; until: number }>();
 
@@ -217,6 +221,7 @@ export class HydrationScheduler {
     this.supportBatchDelayMs =
       config.supportBatchDelayMs ?? config.batchDelayMs ?? DEFAULT_SUPPORT_BATCH_DELAY_MS;
     this.optionPrintBatchSize = config.optionPrintBatchSize ?? DEFAULT_OPTION_PRINT_BATCH_SIZE;
+    this.flowPacketBatchSize = config.flowPacketBatchSize ?? DEFAULT_FLOW_PACKET_BATCH_SIZE;
     this.backoffBaseMs = config.backoffBaseMs ?? DEFAULT_BACKOFF_BASE_MS;
     this.backoffMaxMs = config.backoffMaxMs ?? DEFAULT_BACKOFF_MAX_MS;
 
@@ -232,7 +237,8 @@ export class HydrationScheduler {
     this.supportTraceMisses = new TtlCache(maxEntries, negativeTtlMs, this.now);
     this.supportSmartMoneyByPacketId = new TtlCache(maxEntries, positiveTtlMs, this.now);
     this.supportClassifierHitsByPacketId = new TtlCache(maxEntries, positiveTtlMs, this.now);
-    this.supportNbboByTraceId = new TtlCache(maxEntries, negativeTtlMs, this.now);
+    this.supportNbboByTraceId = new TtlCache(maxEntries, positiveTtlMs, this.now);
+    this.supportNbboMisses = new TtlCache(maxEntries, negativeTtlMs, this.now);
   }
 
   async requestOptionSupport(input: OptionSupportRequest): Promise<OptionSupportResult> {
@@ -290,6 +296,7 @@ export class HydrationScheduler {
     this.supportSmartMoneyByPacketId.clear();
     this.supportClassifierHitsByPacketId.clear();
     this.supportNbboByTraceId.clear();
+    this.supportNbboMisses.clear();
     this.backoff.clear();
   }
 
@@ -425,25 +432,49 @@ export class HydrationScheduler {
     const ids = Array.from(this.pendingFlowPacketIds);
     this.pendingFlowPacketIds.clear();
 
-    for (const packetId of ids) {
+    for (let index = 0; index < ids.length; index += this.flowPacketBatchSize) {
+      const batch = ids.slice(index, index + this.flowPacketBatchSize);
       if (this.isBackedOff("flowPackets")) {
-        this.settleFlowPacket(packetId);
+        this.settleFlowPackets(batch);
         continue;
       }
 
-      try {
-        const packet = await this.fetchFlowPacket(packetId);
-        if (packet) {
-          this.cacheFlowPacket(packet);
-        } else {
-          this.flowPacketMisses.set(packetId, true);
+      const results = await Promise.all(
+        batch.map(async (packetId) => {
+          try {
+            return { packetId, packet: await this.fetchFlowPacket(packetId) };
+          } catch (error) {
+            return { packetId, error };
+          }
+        })
+      );
+
+      let failed = false;
+      for (const result of results) {
+        if ("error" in result) {
+          failed = true;
+          this.settleFlowPacket(result.packetId, result.error);
+          continue;
         }
-        this.recordEndpointSuccess("flowPackets");
-        this.settleFlowPacket(packetId);
-      } catch (error) {
-        this.recordEndpointFailure("flowPackets");
-        this.settleFlowPacket(packetId, error);
+        if (result.packet) {
+          this.cacheFlowPacket(result.packet);
+        } else {
+          this.flowPacketMisses.set(result.packetId, true);
+        }
+        this.settleFlowPacket(result.packetId);
       }
+
+      if (failed) {
+        this.recordEndpointFailure("flowPackets");
+      } else {
+        this.recordEndpointSuccess("flowPackets");
+      }
+    }
+  }
+
+  private settleFlowPackets(ids: string[], error?: unknown): void {
+    for (const id of ids) {
+      this.settleFlowPacket(id, error);
     }
   }
 
@@ -486,7 +517,11 @@ export class HydrationScheduler {
   }
 
   private queueSupportNbbo(context: OptionSupportNbboContext): Promise<void> {
-    if (this.supportNbboByTraceId.has(context.trace_id) || this.isBackedOff("optionSupport")) {
+    if (
+      this.supportNbboByTraceId.has(context.trace_id) ||
+      this.supportNbboMisses.has(context.trace_id) ||
+      this.isBackedOff("optionSupport")
+    ) {
       return Promise.resolve();
     }
     return this.queueSupportKey(supportNbboKey(context.trace_id), () => {
@@ -626,11 +661,15 @@ export class HydrationScheduler {
 
     const nbboByTraceId = payload.nbbo_by_trace_id ?? {};
     for (const [traceId, quote] of Object.entries(nbboByTraceId)) {
-      this.supportNbboByTraceId.set(traceId, quote);
+      if (quote) {
+        this.supportNbboByTraceId.set(traceId, quote);
+      } else {
+        this.supportNbboMisses.set(traceId, true);
+      }
     }
     for (const context of requestedNbboContext) {
       if (!(context.trace_id in nbboByTraceId)) {
-        this.supportNbboByTraceId.set(context.trace_id, null);
+        this.supportNbboMisses.set(context.trace_id, true);
       }
     }
 
@@ -682,6 +721,8 @@ export class HydrationScheduler {
       const entry = this.supportNbboByTraceId.getEntry(context.trace_id);
       if (entry) {
         nbboByTraceId[context.trace_id] = entry.value;
+      } else if (this.supportNbboMisses.has(context.trace_id)) {
+        nbboByTraceId[context.trace_id] = null;
       }
     }
 

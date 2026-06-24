@@ -274,7 +274,8 @@
           </li>
           <li>
             <code>apps/web/features/terminal/hydration-scheduler.test.ts</code>: coverage for
-            sorted keys, batching, in-flight reuse, negative cache expiry, and endpoint backoff.
+            sorted keys, batching, in-flight reuse, bounded flow-packet parallelism, NBBO cache TTL
+            boundaries, negative cache expiry, and endpoint backoff.
           </li>
           <li>
             <code>docs/implementation/durable-tapes-performance/baselines/phase-01-before-local-hosted-api.json</code>
@@ -302,6 +303,11 @@
             print/packet evidence hydration on the short scheduler window for selected drawers.
           </li>
           <li>
+            Reviewer repair kept independent flow-packet lookups bounded-parallel inside each
+            scheduler flush and split real NBBO quotes from null/missing NBBO entries, so hits use
+            the positive TTL while misses use the short negative TTL.
+          </li>
+          <li>
             Replaced effect dependencies on live arrays, resolved maps, and fresh Sets with stable
             sorted missing-id summary keys for the network effects.
           </li>
@@ -313,17 +319,17 @@
         <div class="metric-grid">
           <div class="metric-cell">
             <span class="meta-label">Total requests</span>
-            <span class="metric-value ok">11,059 -> 380</span>
+            <span class="metric-value ok">11,059 -> 346</span>
             <span class="metric-delta">Phase 00 budget: pass after</span>
           </div>
           <div class="metric-cell">
             <span class="meta-label">Options support</span>
-            <span class="metric-value ok">3,672 -> 96</span>
+            <span class="metric-value ok">3,672 -> 82</span>
             <span class="metric-delta">POST plus CORS preflight, budget pass after</span>
           </div>
           <div class="metric-cell">
             <span class="meta-label">By-trace prints</span>
-            <span class="metric-value ok">1,836 -> 121</span>
+            <span class="metric-value ok">1,836 -> 126</span>
             <span class="metric-delta">budget pass after</span>
           </div>
           <div class="metric-cell">
@@ -354,8 +360,8 @@
             </tr>
             <tr>
               <td><code>phase-01-after-local-hosted-api.json</code></td>
-              <td>96</td>
-              <td>121</td>
+              <td>82</td>
+              <td>126</td>
               <td>0 total / 0 endpoint</td>
               <td>5 / 70</td>
               <td class="warn">fail only on CDP task/script time</td>
@@ -368,7 +374,7 @@
         <h2>Verification</h2>
         <ul>
           <li><code>bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code>: pass, 97 tests.</li>
-          <li><code>bun test apps/web/features/terminal apps/web/features/durable-tape</code>: pass, 38 tests.</li>
+          <li><code>bun test apps/web/features/terminal apps/web/features/durable-tape</code>: pass, 40 tests.</li>
           <li><code>bun --cwd=apps/web run build</code>: pass.</li>
           <li>
             Phase 00 before probe: ran with <code>--no-fail-on-budget</code> to record the red
@@ -376,7 +382,30 @@
           </li>
           <li>
             Phase 00 after probe: request, abort, heap, DOM, pane, and row budgets pass; shell exits
-            nonzero because CDP task/script budgets remain red.
+            nonzero because CDP task/script budgets remain red. Reviewer rerun after repair recorded
+            total=346, support=82, by-trace=126, aborted=0, endpoint-aborts=0, panes=5, rows=70.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Reviewer Repair</h2>
+        <ul>
+          <li>
+            Thermo-nuclear review found no need to redesign the Phase 01 scheduler boundary, but did
+            find two in-scope quality issues inside the scheduler implementation.
+          </li>
+          <li>
+            <code>requestFlowPackets</code> now preserves the previous bounded-parallel fetch shape
+            for independent packet IDs instead of serializing every packet lookup inside one flush.
+          </li>
+          <li>
+            Option-support NBBO cache ownership is now explicit: real quotes are positive cached,
+            while null and absent quotes live in the expiring miss cache.
+          </li>
+          <li>
+            Added focused scheduler tests for the bounded flow-packet fetch path and the split NBBO
+            hit/miss TTL behavior.
           </li>
         </ul>
       </section>
@@ -386,7 +415,8 @@
         <ul>
           <li>
             The after probe still reports <code>TaskDuration</code> 61.54s and
-            <code>ScriptDuration</code> 57.37s against 45s / 35s budgets. The support/evidence
+            <code>ScriptDuration</code> 57.37s against 45s / 35s budgets. The reviewer rerun
+            reported <code>TaskDuration</code> 60.31s and <code>ScriptDuration</code> 56.59s. The support/evidence
             storm is materially bounded, but broader live recomputation remains for the downstream
             pane-scoped state and live-buffer phases, especially <code>islandflow-ze79.4</code>.
           </li>
@@ -415,6 +445,7 @@ new file mode 100644
 +};
 +const DEFAULT_BATCH_DELAY_MS = 25;
 +const DEFAULT_SUPPORT_BATCH_DELAY_MS = 3_000;
++const DEFAULT_FLOW_PACKET_BATCH_SIZE = 12;
 +const DEFAULT_NEGATIVE_TTL_MS = 30_000;
 +const DEFAULT_MAX_ENTRIES = 2_000;
 +export const stableHydrationKey = (ids) =&gt; normalizeHydrationIds(ids).join("\n");
@@ -432,6 +463,14 @@ new file mode 100644
 +    const ids = normalizeHydrationIds(traceIds);
 +    await Promise.all(ids.map((traceId) =&gt; this.queueOptionPrint(traceId)));
 +    return { prints, missingTraceIds };
++  }
++  private async flushFlowPackets(): Promise&lt;void&gt; {
++    const results = await Promise.all(batch.map((packetId) =&gt; this.fetchFlowPacket(packetId)));
++    settleAndCacheFlowPacketResults(results);
++  }
++  private cacheOptionSupportPayload(payload, requestedTraceIds, requestedNbboContext): void {
++    this.supportNbboByTraceId.set(realQuoteTraceId, quote);
++    this.supportNbboMisses.set(nullOrMissingTraceId, true);
 +  }
 +}
 +export const terminalHydrationScheduler = new HydrationScheduler();
@@ -494,7 +533,9 @@ new file mode 100644
 +it("batches duplicate option print lookups and reuses in-flight work", async () =&gt; { ... });
 +it("negative-caches empty option print lookups until the miss ttl expires", async () =&gt; { ... });
 +it("backs off failed option print endpoints instead of spinning", async () =&gt; { ... });
-+it("batches option support requests and serves repeated traces from cache", async () =&gt; { ... });</code></pre>
++it("fetches flow packets with bounded parallelism", async () =&gt; { ... });
++it("batches option support requests and serves repeated traces from cache", async () =&gt; { ... });
++it("keeps option support nbbo hits on the positive ttl and misses on the negative ttl", async () =&gt; { ... });</code></pre>
         </div>
       </section>
     </main>
@@ -509,6 +550,7 @@ new file mode 100644
 +};
 +const DEFAULT_BATCH_DELAY_MS = 25;
 +const DEFAULT_SUPPORT_BATCH_DELAY_MS = 3_000;
++const DEFAULT_FLOW_PACKET_BATCH_SIZE = 12;
 +const DEFAULT_NEGATIVE_TTL_MS = 30_000;
 +const DEFAULT_MAX_ENTRIES = 2_000;
 +export const stableHydrationKey = (ids) => normalizeHydrationIds(ids).join("\n");
@@ -526,6 +568,14 @@ new file mode 100644
 +    const ids = normalizeHydrationIds(traceIds);
 +    await Promise.all(ids.map((traceId) => this.queueOptionPrint(traceId)));
 +    return { prints, missingTraceIds };
++  }
++  private async flushFlowPackets(): Promise<void> {
++    const results = await Promise.all(batch.map((packetId) => this.fetchFlowPacket(packetId)));
++    settleAndCacheFlowPacketResults(results);
++  }
++  private cacheOptionSupportPayload(payload, requestedTraceIds, requestedNbboContext): void {
++    this.supportNbboByTraceId.set(realQuoteTraceId, quote);
++    this.supportNbboMisses.set(nullOrMissingTraceId, true);
 +  }
 +}
 +export const terminalHydrationScheduler = new HydrationScheduler();
@@ -588,7 +638,9 @@ new file mode 100644
 +it("batches duplicate option print lookups and reuses in-flight work", async () => { ... });
 +it("negative-caches empty option print lookups until the miss ttl expires", async () => { ... });
 +it("backs off failed option print endpoints instead of spinning", async () => { ... });
-+it("batches option support requests and serves repeated traces from cache", async () => { ... });</script>
++it("fetches flow packets with bounded parallelism", async () => { ... });
++it("batches option support requests and serves repeated traces from cache", async () => { ... });
++it("keeps option support nbbo hits on the positive ttl and misses on the negative ttl", async () => { ... });</script>
     <script type="module">
       const source = document.getElementById("patch-source")?.textContent ?? "";
       const target = document.getElementById("rich-diff");
