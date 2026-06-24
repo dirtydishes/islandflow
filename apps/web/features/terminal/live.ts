@@ -21,22 +21,26 @@ import type {
 import { getSubscriptionKey as getLiveSubscriptionKey } from "@islandflow/types";
 import type { Dispatch, SetStateAction } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { LiveWindowBuffer } from "../durable-tape";
 import {
   LIVE_HISTORY_BATCH,
   LIVE_HISTORY_SOFT_CAP,
   LIVE_HOT_WINDOW,
-  LIVE_OPTIONS_HEAD_LIMIT,
   LIVE_SESSION_HOT_CHANNELS,
   LIVE_SESSION_IDLE_CHECK_MS,
   LIVE_SESSION_IDLE_RECONNECT_MS
 } from "./config";
 import { appendOptionFlowFilters, shouldRetainLiveSnapshotHistory } from "./filters";
+import {
+  createLiveSessionChannelBufferRegistry,
+  createLiveSessionEventBatcher,
+  getLiveSubscriptionResetChannels,
+  type LiveSessionChannelBufferRegistry,
+  type LiveSessionEventBatcher
+} from "./live-session-state";
 import { appendLiveScopeParams } from "./routes";
 import {
   appendHistoryTail,
   composeTapeItems,
-  createLiveWindowBuffer,
   EMPTY_PAUSABLE_TAPE,
   extractSortTs,
   flushPausableTapeData,
@@ -58,6 +62,8 @@ import {
   type StreamMessage
 } from "./transport";
 import type { PausableTapeData, SortableItem, TapeMode, WsStatus } from "./types";
+
+export { getLiveSubscriptionResetChannels } from "./live-session-state";
 
 const sendLiveSubscribeRequest = (socket: WebSocket, subscriptions: LiveSubscription[]): void => {
   const rawSubscriptions = subscriptions.filter(
@@ -945,58 +951,6 @@ export const LIVE_HISTORY_ENDPOINTS: Partial<Record<LiveSubscription["channel"],
   "inferred-dark": "/history/inferred-dark"
 };
 
-type LiveSubscriptionResetChannel =
-  | "options"
-  | "equities"
-  | "durable-rows"
-  | "equity-candles"
-  | "equity-overlay";
-
-type PendingLiveEventBatch = {
-  subscription: LiveSubscription;
-  items: unknown[];
-  updateAt: number;
-};
-
-export const getLiveSubscriptionResetChannels = (
-  currentSubscriptions: Iterable<LiveSubscription>,
-  nextSubscriptions: LiveSubscription[]
-): Set<LiveSubscriptionResetChannel> => {
-  const currentMap = new Map(
-    Array.from(currentSubscriptions, (subscription) => [
-      getLiveSubscriptionKey(subscription),
-      subscription
-    ])
-  );
-  const nextMap = new Map(
-    nextSubscriptions.map((subscription) => [getLiveSubscriptionKey(subscription), subscription])
-  );
-  const nextKeys = new Set(nextMap.keys());
-  const currentKeys = new Set(currentMap.keys());
-  const changedSubscriptions = [
-    ...Array.from(currentKeys)
-      .filter((key) => !nextKeys.has(key))
-      .map((key) => currentMap.get(key) ?? null),
-    ...Array.from(nextKeys)
-      .filter((key) => !currentKeys.has(key))
-      .map((key) => nextMap.get(key) ?? null)
-  ].filter((subscription): subscription is LiveSubscription => subscription !== null);
-
-  const resetChannels = new Set<LiveSubscriptionResetChannel>();
-  for (const subscription of changedSubscriptions) {
-    if (
-      subscription.channel === "options" ||
-      subscription.channel === "equities" ||
-      subscription.channel === "durable-rows" ||
-      subscription.channel === "equity-candles" ||
-      subscription.channel === "equity-overlay"
-    ) {
-      resetChannels.add(subscription.channel);
-    }
-  }
-  return resetChannels;
-};
-
 export const useLiveSession = (
   enabled: boolean,
   _pathname: string,
@@ -1059,23 +1013,7 @@ export const useLiveSession = (
   const inferredDarkRef = useRef<InferredDarkEvent[]>([]);
   const chartCandlesRef = useRef<EquityCandle[]>([]);
   const chartOverlayRef = useRef<EquityPrint[]>([]);
-  const liveBuffersRef = useRef<{
-    options: LiveWindowBuffer<OptionPrint>;
-    nbbo: LiveWindowBuffer<OptionNBBO>;
-    equities: LiveWindowBuffer<EquityPrint>;
-    equityQuotes: LiveWindowBuffer<EquityQuote>;
-    equityJoins: LiveWindowBuffer<EquityPrintJoin>;
-    flow: LiveWindowBuffer<FlowPacket>;
-    smartFlow: LiveWindowBuffer<SmartFlowExplainabilityProjection>;
-    smartMoney: LiveWindowBuffer<SmartMoneyEvent>;
-    classifierHits: LiveWindowBuffer<ClassifierHitEvent>;
-    alerts: LiveWindowBuffer<AlertEvent>;
-    durableRows: LiveWindowBuffer<DurableTapeRowViewModel>;
-    news: LiveWindowBuffer<NewsStory>;
-    inferredDark: LiveWindowBuffer<InferredDarkEvent>;
-    chartCandles: LiveWindowBuffer<EquityCandle>;
-    chartOverlay: LiveWindowBuffer<EquityPrint>;
-  } | null>(null);
+  const liveBuffersRef = useRef<LiveSessionChannelBufferRegistry | null>(null);
   const optionsHistoryRef = useRef<OptionPrint[]>([]);
   const nbboHistoryRef = useRef<OptionNBBO[]>([]);
   const equitiesHistoryRef = useRef<EquityPrint[]>([]);
@@ -1095,64 +1033,16 @@ export const useLiveSession = (
   const lastEventAtRef = useRef<number | null>(null);
   const subscribedKeysRef = useRef<Set<string>>(new Set());
   const subscribedMapRef = useRef<Map<string, LiveSubscription>>(new Map());
-  const pendingEventBatchesRef = useRef<Map<string, PendingLiveEventBatch>>(new Map());
-  const eventFlushHandleRef = useRef<number | null>(null);
+  const liveEventBatcherRef = useRef<LiveSessionEventBatcher | null>(null);
   if (liveBuffersRef.current === null) {
-    const onTrim = (evicted: number) => incrementRetentionMetric("hotWindowEvictions", evicted);
-    liveBuffersRef.current = {
-      options: createLiveWindowBuffer<OptionPrint>({ limit: LIVE_OPTIONS_HEAD_LIMIT, onTrim }),
-      nbbo: createLiveWindowBuffer<OptionNBBO>({ limit: LIVE_HOT_WINDOW, onTrim }),
-      equities: createLiveWindowBuffer<EquityPrint>({ limit: LIVE_HOT_WINDOW, onTrim }),
-      equityQuotes: createLiveWindowBuffer<EquityQuote>({ limit: LIVE_HOT_WINDOW, onTrim }),
-      equityJoins: createLiveWindowBuffer<EquityPrintJoin>({ limit: LIVE_HOT_WINDOW, onTrim }),
-      flow: createLiveWindowBuffer<FlowPacket>({ limit: LIVE_HOT_WINDOW, onTrim }),
-      smartFlow: createLiveWindowBuffer<SmartFlowExplainabilityProjection>({
-        limit: LIVE_HOT_WINDOW,
-        onTrim
-      }),
-      smartMoney: createLiveWindowBuffer<SmartMoneyEvent>({ limit: LIVE_HOT_WINDOW, onTrim }),
-      classifierHits: createLiveWindowBuffer<ClassifierHitEvent>({
-        limit: LIVE_HOT_WINDOW,
-        onTrim
-      }),
-      alerts: createLiveWindowBuffer<AlertEvent>({ limit: LIVE_HOT_WINDOW, onTrim }),
-      durableRows: createLiveWindowBuffer<DurableTapeRowViewModel>({
-        limit: LIVE_OPTIONS_HEAD_LIMIT,
-        onTrim
-      }),
-      news: createLiveWindowBuffer<NewsStory>({ limit: LIVE_OPTIONS_HEAD_LIMIT, onTrim }),
-      inferredDark: createLiveWindowBuffer<InferredDarkEvent>({ limit: LIVE_HOT_WINDOW, onTrim }),
-      chartCandles: createLiveWindowBuffer<EquityCandle>({ limit: LIVE_HOT_WINDOW, onTrim }),
-      chartOverlay: createLiveWindowBuffer<EquityPrint>({ limit: LIVE_HOT_WINDOW, onTrim })
-    };
+    liveBuffersRef.current = createLiveSessionChannelBufferRegistry();
   }
   const liveBuffers = liveBuffersRef.current;
   const resetLiveBuffers = (): void => {
-    liveBuffers.options.reset([]);
-    liveBuffers.nbbo.reset([]);
-    liveBuffers.equities.reset([]);
-    liveBuffers.equityQuotes.reset([]);
-    liveBuffers.equityJoins.reset([]);
-    liveBuffers.flow.reset([]);
-    liveBuffers.smartFlow.reset([]);
-    liveBuffers.smartMoney.reset([]);
-    liveBuffers.classifierHits.reset([]);
-    liveBuffers.alerts.reset([]);
-    liveBuffers.durableRows.reset([]);
-    liveBuffers.news.reset([]);
-    liveBuffers.inferredDark.reset([]);
-    liveBuffers.chartCandles.reset([]);
-    liveBuffers.chartOverlay.reset([]);
-  };
-  const cancelScheduledEventFlush = (): void => {
-    if (eventFlushHandleRef.current !== null) {
-      cancelAnimationFrame(eventFlushHandleRef.current);
-      eventFlushHandleRef.current = null;
-    }
+    liveBuffers.resetAll();
   };
   const clearPendingEventBatches = (): void => {
-    pendingEventBatchesRef.current.clear();
-    cancelScheduledEventFlush();
+    liveEventBatcherRef.current?.clear();
   };
   const replaceArrayState = <T>(
     setter: Dispatch<SetStateAction<T[]>>,
@@ -1324,9 +1214,9 @@ export const useLiveSession = (
       const subscriptionKey = getLiveSubscriptionKey(subscription);
 
       const mergeItems = <T extends SortableItem>(
+        channel: LiveSubscription["channel"],
         setter: Dispatch<SetStateAction<T[]>>,
         ref: { current: T[] },
-        buffer: LiveWindowBuffer<T>,
         nextItems: T[],
         history?: {
           setter: Dispatch<SetStateAction<T[]>>;
@@ -1336,18 +1226,18 @@ export const useLiveSession = (
       ) => {
         if (isSnapshot) {
           const next = shouldRetainLiveSnapshotHistory(
-            subscription.channel,
+            channel,
             true,
             nextItems.length,
             ref.current.length
           )
             ? ref.current
             : nextItems;
-          replaceArrayState(setter, ref, buffer.reset(next).items);
+          replaceArrayState(setter, ref, liveBuffers.resetSubscriptionItems(channel, next).items);
           return;
         }
 
-        const { items: kept, evicted } = buffer.upsertMany(nextItems);
+        const { items: kept, evicted } = liveBuffers.upsertSubscriptionItems(channel, nextItems);
         replaceArrayState(setter, ref, kept);
         if (history && evicted.length > 0) {
           mergeHistoryState(history.setter, history.ref, evicted, kept, history.cap);
@@ -1356,56 +1246,45 @@ export const useLiveSession = (
 
       switch (subscription.channel) {
         case "options":
-          mergeItems(setOptions, optionsRef, liveBuffers.options, items as OptionPrint[], {
+          mergeItems("options", setOptions, optionsRef, items as OptionPrint[], {
             setter: setOptionsHistory,
             ref: optionsHistoryRef,
             cap: getLiveHistoryRetentionCap(subscription)
           });
           break;
         case "nbbo":
-          mergeItems(setNbbo, nbboRef, liveBuffers.nbbo, items as OptionNBBO[], {
+          mergeItems("nbbo", setNbbo, nbboRef, items as OptionNBBO[], {
             setter: setNbboHistory,
             ref: nbboHistoryRef
           });
           break;
         case "equities":
-          mergeItems(setEquities, equitiesRef, liveBuffers.equities, items as EquityPrint[], {
+          mergeItems("equities", setEquities, equitiesRef, items as EquityPrint[], {
             setter: setEquitiesHistory,
             ref: equitiesHistoryRef,
             cap: getLiveHistoryRetentionCap(subscription)
           });
           break;
         case "equity-quotes":
-          mergeItems(
-            setEquityQuotes,
-            equityQuotesRef,
-            liveBuffers.equityQuotes,
-            items as EquityQuote[]
-          );
+          mergeItems("equity-quotes", setEquityQuotes, equityQuotesRef, items as EquityQuote[]);
           break;
         case "equity-joins":
-          mergeItems(
-            setEquityJoins,
-            equityJoinsRef,
-            liveBuffers.equityJoins,
-            items as EquityPrintJoin[],
-            {
-              setter: setEquityJoinsHistory,
-              ref: equityJoinsHistoryRef
-            }
-          );
+          mergeItems("equity-joins", setEquityJoins, equityJoinsRef, items as EquityPrintJoin[], {
+            setter: setEquityJoinsHistory,
+            ref: equityJoinsHistoryRef
+          });
           break;
         case "flow":
-          mergeItems(setFlow, flowRef, liveBuffers.flow, items as FlowPacket[], {
+          mergeItems("flow", setFlow, flowRef, items as FlowPacket[], {
             setter: setFlowHistory,
             ref: flowHistoryRef
           });
           break;
         case "smart-flow":
           mergeItems(
+            "smart-flow",
             setSmartFlow,
             smartFlowRef,
-            liveBuffers.smartFlow,
             items as SmartFlowExplainabilityProjection[],
             {
               setter: setSmartFlowHistory,
@@ -1414,22 +1293,16 @@ export const useLiveSession = (
           );
           break;
         case "smart-money":
-          mergeItems(
-            setSmartMoney,
-            smartMoneyRef,
-            liveBuffers.smartMoney,
-            items as SmartMoneyEvent[],
-            {
-              setter: setSmartMoneyHistory,
-              ref: smartMoneyHistoryRef
-            }
-          );
+          mergeItems("smart-money", setSmartMoney, smartMoneyRef, items as SmartMoneyEvent[], {
+            setter: setSmartMoneyHistory,
+            ref: smartMoneyHistoryRef
+          });
           break;
         case "classifier-hits":
           mergeItems(
+            "classifier-hits",
             setClassifierHits,
             classifierHitsRef,
-            liveBuffers.classifierHits,
             items as ClassifierHitEvent[],
             {
               setter: setClassifierHitsHistory,
@@ -1438,16 +1311,16 @@ export const useLiveSession = (
           );
           break;
         case "alerts":
-          mergeItems(setAlerts, alertsRef, liveBuffers.alerts, items as AlertEvent[], {
+          mergeItems("alerts", setAlerts, alertsRef, items as AlertEvent[], {
             setter: setAlertsHistory,
             ref: alertsHistoryRef
           });
           break;
         case "durable-rows":
           mergeItems(
+            "durable-rows",
             setDurableRows,
             durableRowsRef,
-            liveBuffers.durableRows,
             items as DurableTapeRowViewModel[],
             {
               setter: setDurableRowsHistory,
@@ -1457,16 +1330,16 @@ export const useLiveSession = (
           );
           break;
         case "news":
-          mergeItems(setNews, newsRef, liveBuffers.news, items as NewsStory[], {
+          mergeItems("news", setNews, newsRef, items as NewsStory[], {
             setter: setNewsHistory,
             ref: newsHistoryRef
           });
           break;
         case "inferred-dark":
           mergeItems(
+            "inferred-dark",
             setInferredDark,
             inferredDarkRef,
-            liveBuffers.inferredDark,
             items as InferredDarkEvent[],
             {
               setter: setInferredDarkHistory,
@@ -1475,20 +1348,10 @@ export const useLiveSession = (
           );
           break;
         case "equity-candles":
-          mergeItems(
-            setChartCandles,
-            chartCandlesRef,
-            liveBuffers.chartCandles,
-            items as EquityCandle[]
-          );
+          mergeItems("equity-candles", setChartCandles, chartCandlesRef, items as EquityCandle[]);
           break;
         case "equity-overlay":
-          mergeItems(
-            setChartOverlay,
-            chartOverlayRef,
-            liveBuffers.chartOverlay,
-            items as EquityPrint[]
-          );
+          mergeItems("equity-overlay", setChartOverlay, chartOverlayRef, items as EquityPrint[]);
           break;
       }
 
@@ -1506,48 +1369,13 @@ export const useLiveSession = (
       return items.length > 0;
     };
 
-    const flushPendingEventBatches = () => {
-      cancelScheduledEventFlush();
-      const batches = Array.from(pendingEventBatchesRef.current.values());
-      pendingEventBatchesRef.current.clear();
-      if (batches.length === 0) {
-        return;
-      }
-
-      const lastEvents = new Map<LiveSubscription["channel"], number>();
-      for (const batch of batches) {
-        const applied = applySubscriptionItems(batch.subscription, batch.items, false);
-        if (applied) {
-          const current = lastEvents.get(batch.subscription.channel) ?? 0;
-          lastEvents.set(batch.subscription.channel, Math.max(current, batch.updateAt));
-        }
-      }
-      commitLastEventUpdates(lastEvents);
-    };
-
-    const scheduleEventFlush = () => {
-      if (eventFlushHandleRef.current !== null) {
-        return;
-      }
-      eventFlushHandleRef.current = requestAnimationFrame(flushPendingEventBatches);
-    };
-
-    const queueEvent = (subscription: LiveSubscription, item: unknown) => {
-      const subscriptionKey = getLiveSubscriptionKey(subscription);
-      const updateAt = Date.now();
-      const current = pendingEventBatchesRef.current.get(subscriptionKey);
-      if (current) {
-        current.items.push(item);
-        current.updateAt = updateAt;
-      } else {
-        pendingEventBatchesRef.current.set(subscriptionKey, {
-          subscription,
-          items: [item],
-          updateAt
-        });
-      }
-      scheduleEventFlush();
-    };
+    const liveEventBatcher = createLiveSessionEventBatcher({
+      applyBatch: (batch) => applySubscriptionItems(batch.subscription, batch.items, false),
+      cancelFlush: (handle) => cancelAnimationFrame(handle),
+      onFlush: commitLastEventUpdates,
+      scheduleFlush: (flush) => requestAnimationFrame(flush)
+    });
+    liveEventBatcherRef.current = liveEventBatcher;
 
     const handleMessage = (message: LiveServerMessage) => {
       if (message.op === "ready" || message.op === "heartbeat") {
@@ -1560,11 +1388,11 @@ export const useLiveSession = (
       }
 
       if (message.op === "event") {
-        queueEvent(message.subscription, message.item);
+        liveEventBatcher.queueEvent(message.subscription, message.item);
         return;
       }
 
-      flushPendingEventBatches();
+      liveEventBatcher.drainQueuedEventsBeforeSnapshot();
       const updateAt = Date.now();
       const applied = applySubscriptionItems(
         message.snapshot.subscription,
@@ -1662,6 +1490,9 @@ export const useLiveSession = (
     return () => {
       active = false;
       clearPendingEventBatches();
+      if (liveEventBatcherRef.current === liveEventBatcher) {
+        liveEventBatcherRef.current = null;
+      }
       if (idleWatchdogRef.current !== null) {
         window.clearInterval(idleWatchdogRef.current);
         idleWatchdogRef.current = null;
@@ -1690,35 +1521,33 @@ export const useLiveSession = (
       subscribedMapRef.current.values(),
       manifest
     );
+    if (resetScopedChannels.size > 0) {
+      liveBuffers.resetSubscriptionChannels(resetScopedChannels);
+    }
     if (resetScopedChannels.has("options")) {
       optionsRef.current = [];
       optionsHistoryRef.current = [];
-      liveBuffers.options.reset([]);
       setOptions([]);
       setOptionsHistory([]);
     }
     if (resetScopedChannels.has("equities")) {
       equitiesRef.current = [];
       equitiesHistoryRef.current = [];
-      liveBuffers.equities.reset([]);
       setEquities([]);
       setEquitiesHistory([]);
     }
     if (resetScopedChannels.has("durable-rows")) {
       durableRowsRef.current = [];
       durableRowsHistoryRef.current = [];
-      liveBuffers.durableRows.reset([]);
       setDurableRows([]);
       setDurableRowsHistory([]);
     }
     if (resetScopedChannels.has("equity-candles")) {
       chartCandlesRef.current = [];
-      liveBuffers.chartCandles.reset([]);
       setChartCandles([]);
     }
     if (resetScopedChannels.has("equity-overlay")) {
       chartOverlayRef.current = [];
-      liveBuffers.chartOverlay.reset([]);
       setChartOverlay([]);
     }
     if (resetScopedChannels.size > 0) {
