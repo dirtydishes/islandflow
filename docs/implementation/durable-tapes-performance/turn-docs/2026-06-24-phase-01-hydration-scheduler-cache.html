@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Durable Tapes Performance Phase 01: Hydration Scheduler</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "../../../../node_modules/react/index.js",
+          "react-dom/client": "../../../../node_modules/react-dom/client.js",
+          "@pierre/diffs/react": "../../../../node_modules/@pierre/diffs/dist/react/index.js"
+        }
+      }
+    </script>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #111820;
+        --panel-2: #0d141b;
+        --line: rgba(230, 237, 244, 0.14);
+        --line-strong: rgba(245, 166, 35, 0.36);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --green: #25c17a;
+        --red: #ff6b5f;
+        --blue: #4da3ff;
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: linear-gradient(180deg, #0b1016 0%, var(--bg) 100%);
+        color: var(--text);
+        font: 15px/1.55 var(--sans);
+      }
+
+      main {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+
+      header {
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      section {
+        padding: 20px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 920px;
+        font-size: 2rem;
+        line-height: 1.08;
+        letter-spacing: 0;
+        text-wrap: balance;
+      }
+
+      h2,
+      .eyebrow,
+      .meta-label,
+      code,
+      pre {
+        font-family: var(--mono);
+      }
+
+      h2 {
+        margin-bottom: 10px;
+        color: var(--accent);
+        font-size: 0.9rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .eyebrow {
+        margin-bottom: 8px;
+        color: var(--accent);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .subtitle {
+        max-width: 84ch;
+        margin-top: 12px;
+        color: var(--muted);
+      }
+
+      .meta-grid,
+      .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 1px;
+        margin-top: 18px;
+        border: 1px solid var(--line);
+        background: var(--line);
+      }
+
+      .meta-cell,
+      .metric-cell {
+        min-width: 0;
+        padding: 10px 12px;
+        background: var(--panel);
+      }
+
+      .meta-label {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--faint);
+        font-size: 0.66rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .metric-value {
+        display: block;
+        color: var(--text);
+        font: 700 1.25rem/1.15 var(--mono);
+      }
+
+      .metric-delta {
+        color: var(--muted);
+        font-size: 0.84rem;
+      }
+
+      .ok {
+        color: var(--green);
+      }
+
+      .warn {
+        color: var(--red);
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li {
+        margin: 7px 0;
+        color: var(--muted);
+      }
+
+      code {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 1px 5px;
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--text);
+      }
+
+      table {
+        width: 100%;
+        margin-top: 12px;
+        border-collapse: collapse;
+        background: var(--panel-2);
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 9px 10px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--text);
+        font: 700 0.72rem/1.2 var(--mono);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      td {
+        color: var(--muted);
+      }
+
+      .diff-shell {
+        margin-top: 12px;
+        border: 1px solid var(--line);
+        background: var(--panel-2);
+      }
+
+      .diff-note {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--line);
+        color: var(--muted);
+      }
+
+      #rich-diff {
+        min-height: 48px;
+      }
+
+      pre {
+        margin: 0;
+        overflow-x: auto;
+        padding: 14px;
+        color: var(--text);
+        font-size: 0.78rem;
+        line-height: 1.45;
+      }
+
+      .rich-diff-ready #fallback-diff {
+        display: none;
+      }
+
+      @media (max-width: 720px) {
+        main {
+          width: min(100% - 20px, 1180px);
+          padding-top: 24px;
+        }
+
+        h1 {
+          font-size: 1.55rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">Phase 01 / Durable Tapes Performance</p>
+        <h1>Shared Hydration Scheduler And Caches</h1>
+        <p class="subtitle">
+          This pass centralizes terminal support/evidence hydration so live updates stop aborting
+          and restarting the same lookups while preserving the existing durable pane content.
+        </p>
+        <div class="meta-grid">
+          <div class="meta-cell">
+            <span class="meta-label">Beads issue</span>
+            <code>islandflow-ze79.2</code>
+          </div>
+          <div class="meta-cell">
+            <span class="meta-label">Branch</span>
+            <code>lavender/ze79-phase-01-hydration-scheduler</code>
+          </div>
+          <div class="meta-cell">
+            <span class="meta-label">Scope</span>
+            frontend request behavior only
+          </div>
+        </div>
+      </header>
+
+      <section>
+        <h2>Changed Files</h2>
+        <ul>
+          <li>
+            <code>apps/web/features/terminal/hydration-scheduler.ts</code>: new shared scheduler
+            for option support, option print, and flow-packet hydration.
+          </li>
+          <li>
+            <code>apps/web/features/terminal/state.tsx</code>: options support, selected
+            smart-flow, selected smart-money, selected classifier, and visible alert evidence
+            effects now depend on stable missing-id keys and call the scheduler.
+          </li>
+          <li>
+            <code>apps/web/features/terminal/hydration-scheduler.test.ts</code>: coverage for
+            sorted keys, batching, in-flight reuse, negative cache expiry, and endpoint backoff.
+          </li>
+          <li>
+            <code>docs/implementation/durable-tapes-performance/baselines/phase-01-before-local-hosted-api.json</code>
+            and
+            <code>docs/implementation/durable-tapes-performance/baselines/phase-01-after-local-hosted-api.json</code>:
+            before/after Phase 00 probe captures.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Implementation Notes</h2>
+        <ul>
+          <li>
+            Added a module-level <code>HydrationScheduler</code> with TTL-bound positive caches,
+            short negative caches, max-size eviction, per-endpoint backoff, and in-flight reuse.
+          </li>
+          <li>
+            Removed component-owned abort controllers from shared-worthy support/evidence lookups.
+            React cleanup now only prevents stale component state writes; it does not cancel shared
+            fetches other callers can reuse.
+          </li>
+          <li>
+            Batched <code>/lookup/options-support</code> on a 3-second support window and kept
+            print/packet evidence hydration on the short scheduler window for selected drawers.
+          </li>
+          <li>
+            Replaced effect dependencies on live arrays, resolved maps, and fresh Sets with stable
+            sorted missing-id summary keys for the network effects.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Probe Results</h2>
+        <div class="metric-grid">
+          <div class="metric-cell">
+            <span class="meta-label">Total requests</span>
+            <span class="metric-value ok">11,059 -> 380</span>
+            <span class="metric-delta">Phase 00 budget: pass after</span>
+          </div>
+          <div class="metric-cell">
+            <span class="meta-label">Options support</span>
+            <span class="metric-value ok">3,672 -> 96</span>
+            <span class="metric-delta">POST plus CORS preflight, budget pass after</span>
+          </div>
+          <div class="metric-cell">
+            <span class="meta-label">By-trace prints</span>
+            <span class="metric-value ok">1,836 -> 121</span>
+            <span class="metric-delta">budget pass after</span>
+          </div>
+          <div class="metric-cell">
+            <span class="meta-label">Endpoint aborts</span>
+            <span class="metric-value ok">3,670 -> 0</span>
+            <span class="metric-delta">budget pass after</span>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Capture</th>
+              <th>Support</th>
+              <th>By-trace</th>
+              <th>Aborts</th>
+              <th>Panes / rows</th>
+              <th>Budget verdict</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>phase-01-before-local-hosted-api.json</code></td>
+              <td>3,672</td>
+              <td>1,836</td>
+              <td>9,221 total / 3,670 endpoint</td>
+              <td>5 / 70</td>
+              <td class="warn">fail, expected baseline storm</td>
+            </tr>
+            <tr>
+              <td><code>phase-01-after-local-hosted-api.json</code></td>
+              <td>96</td>
+              <td>121</td>
+              <td>0 total / 0 endpoint</td>
+              <td>5 / 70</td>
+              <td class="warn">fail only on CDP task/script time</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Verification</h2>
+        <ul>
+          <li><code>bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code>: pass, 97 tests.</li>
+          <li><code>bun test apps/web/features/terminal apps/web/features/durable-tape</code>: pass, 38 tests.</li>
+          <li><code>bun --cwd=apps/web run build</code>: pass.</li>
+          <li>
+            Phase 00 before probe: ran with <code>--no-fail-on-budget</code> to record the red
+            baseline.
+          </li>
+          <li>
+            Phase 00 after probe: request, abort, heap, DOM, pane, and row budgets pass; shell exits
+            nonzero because CDP task/script budgets remain red.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Known Risks</h2>
+        <ul>
+          <li>
+            The after probe still reports <code>TaskDuration</code> 61.54s and
+            <code>ScriptDuration</code> 57.37s against 45s / 35s budgets. The support/evidence
+            storm is materially bounded, but broader live recomputation remains for the downstream
+            pane-scoped state and live-buffer phases, especially <code>islandflow-ze79.4</code>.
+          </li>
+          <li>
+            The support scheduler intentionally waits up to 3 seconds to batch row support. Selected
+            drawer evidence remains on the short window, so inspection behavior stays responsive.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <div class="diff-shell">
+          <p class="diff-note">
+            The rich renderer below uses browser-side <code>@pierre/diffs</code>. If it is not
+            available in this static context, the readable unified fallback remains visible.
+          </p>
+          <div id="rich-diff"></div>
+          <pre id="fallback-diff"><code>diff --git a/apps/web/features/terminal/hydration-scheduler.ts b/apps/web/features/terminal/hydration-scheduler.ts
+new file mode 100644
+@@
++export type HydrationScheduler = {
++  requestOptionSupport(input: OptionSupportRequest): Promise&lt;OptionSupportResult&gt;;
++  requestOptionPrints(traceIds: string[]): Promise&lt;OptionPrintLookupResult&gt;;
++  requestFlowPackets(packetIds: string[]): Promise&lt;FlowPacketLookupResult&gt;;
++};
++const DEFAULT_BATCH_DELAY_MS = 25;
++const DEFAULT_SUPPORT_BATCH_DELAY_MS = 3_000;
++const DEFAULT_NEGATIVE_TTL_MS = 30_000;
++const DEFAULT_MAX_ENTRIES = 2_000;
++export const stableHydrationKey = (ids) =&gt; normalizeHydrationIds(ids).join("\n");
++export class HydrationScheduler {
++  async requestOptionSupport(input: OptionSupportRequest): Promise&lt;OptionSupportResult&gt; {
++    const traceIds = normalizeHydrationIds(input.traceIds ?? []);
++    const nbboContext = normalizeNbboContext(input.nbboContext ?? []);
++    await Promise.all([
++      ...traceIds.map((traceId) =&gt; this.queueSupportTrace(traceId)),
++      ...nbboContext.map((context) =&gt; this.queueSupportNbbo(context))
++    ]);
++    return this.collectOptionSupportResult(traceIds, nbboContext);
++  }
++  async requestOptionPrints(traceIds: string[]): Promise&lt;OptionPrintLookupResult&gt; {
++    const ids = normalizeHydrationIds(traceIds);
++    await Promise.all(ids.map((traceId) =&gt; this.queueOptionPrint(traceId)));
++    return { prints, missingTraceIds };
++  }
++}
++export const terminalHydrationScheduler = new HydrationScheduler();
+
+diff --git a/apps/web/features/terminal/state.tsx b/apps/web/features/terminal/state.tsx
+@@
+-const fetchOptionPrintsByTraceIds = async (traceIds, signal) =&gt; { ... };
+-const fetchFlowPacketsByIds = async (packetIds, signal) =&gt; { ... };
++import {
++  stableHydrationKey,
++  stableOptionSupportNbboKey,
++  terminalHydrationScheduler
++} from "./hydration-scheduler";
+@@
++const optionSupportTraceKey = stableHydrationKey(optionSupportHydrationInput.traceIds);
++const optionSupportNbboKey = stableOptionSupportNbboKey(optionSupportHydrationInput.nbboContext);
+ useEffect(() =&gt; {
+-  const abort = new AbortController();
+-  void fetch(buildApiUrl("/lookup/options-support"), { signal: abort.signal, ... });
+-  return () =&gt; abort.abort();
++  let active = true;
++  void terminalHydrationScheduler
++    .requestOptionSupport({
++      traceIds: optionSupportHydrationInput.traceIds,
++      nbboContext: optionSupportHydrationInput.nbboContext
++    })
++    .then((payload) =&gt; {
++      if (!active) return;
++      setPinnedFlowPacketMap((prev) =&gt; upsertPinnedEntries(prev, packetMap, Date.now()));
++      setHistoricalNbboByTraceId((prev) =&gt; {
++        const next = new Map(prev);
++        for (const [traceId, quote] of Object.entries(payload.nbboByTraceId)) {
++          next.set(traceId, quote);
++        }
++        return next;
++      });
++    });
++  return () =&gt; {
++    active = false;
++  };
+ }, [
+-  optionsFeed.items,
+-  classifierDecorByOptionTraceId,
+-  packetIdByOptionTraceId,
+-  historicalNbboByTraceId
++  optionSupportTraceKey,
++  optionSupportNbboKey
+ ]);
+@@
++const selectedSmartFlowMissingPrintKey = stableHydrationKey(selectedSmartFlowMissingPrintIds);
++void terminalHydrationScheduler.requestOptionPrints(selectedSmartFlowMissingPrintIds);
++const selectedSmartMoneyMissingPacketKey = stableHydrationKey(selectedSmartMoneyMissingPacketIds);
++void terminalHydrationScheduler.requestFlowPackets(selectedSmartMoneyMissingPacketIds);
++const visibleAlertMissingPrintKey = stableHydrationKey(visibleAlertMissingPrintIds);
++void terminalHydrationScheduler.requestOptionPrints(visibleAlertMissingPrintIds);
+
+diff --git a/apps/web/features/terminal/hydration-scheduler.test.ts b/apps/web/features/terminal/hydration-scheduler.test.ts
+new file mode 100644
+@@
++it("batches duplicate option print lookups and reuses in-flight work", async () =&gt; { ... });
++it("negative-caches empty option print lookups until the miss ttl expires", async () =&gt; { ... });
++it("backs off failed option print endpoints instead of spinning", async () =&gt; { ... });
++it("batches option support requests and serves repeated traces from cache", async () =&gt; { ... });</code></pre>
+        </div>
+      </section>
+    </main>
+
+    <script type="text/plain" id="patch-source">diff --git a/apps/web/features/terminal/hydration-scheduler.ts b/apps/web/features/terminal/hydration-scheduler.ts
+new file mode 100644
+@@
++export type HydrationScheduler = {
++  requestOptionSupport(input: OptionSupportRequest): Promise<OptionSupportResult>;
++  requestOptionPrints(traceIds: string[]): Promise<OptionPrintLookupResult>;
++  requestFlowPackets(packetIds: string[]): Promise<FlowPacketLookupResult>;
++};
++const DEFAULT_BATCH_DELAY_MS = 25;
++const DEFAULT_SUPPORT_BATCH_DELAY_MS = 3_000;
++const DEFAULT_NEGATIVE_TTL_MS = 30_000;
++const DEFAULT_MAX_ENTRIES = 2_000;
++export const stableHydrationKey = (ids) => normalizeHydrationIds(ids).join("\n");
++export class HydrationScheduler {
++  async requestOptionSupport(input: OptionSupportRequest): Promise<OptionSupportResult> {
++    const traceIds = normalizeHydrationIds(input.traceIds ?? []);
++    const nbboContext = normalizeNbboContext(input.nbboContext ?? []);
++    await Promise.all([
++      ...traceIds.map((traceId) => this.queueSupportTrace(traceId)),
++      ...nbboContext.map((context) => this.queueSupportNbbo(context))
++    ]);
++    return this.collectOptionSupportResult(traceIds, nbboContext);
++  }
++  async requestOptionPrints(traceIds: string[]): Promise<OptionPrintLookupResult> {
++    const ids = normalizeHydrationIds(traceIds);
++    await Promise.all(ids.map((traceId) => this.queueOptionPrint(traceId)));
++    return { prints, missingTraceIds };
++  }
++}
++export const terminalHydrationScheduler = new HydrationScheduler();
+
+diff --git a/apps/web/features/terminal/state.tsx b/apps/web/features/terminal/state.tsx
+@@
+-const fetchOptionPrintsByTraceIds = async (traceIds, signal) => { ... };
+-const fetchFlowPacketsByIds = async (packetIds, signal) => { ... };
++import {
++  stableHydrationKey,
++  stableOptionSupportNbboKey,
++  terminalHydrationScheduler
++} from "./hydration-scheduler";
+@@
++const optionSupportTraceKey = stableHydrationKey(optionSupportHydrationInput.traceIds);
++const optionSupportNbboKey = stableOptionSupportNbboKey(optionSupportHydrationInput.nbboContext);
+ useEffect(() => {
+-  const abort = new AbortController();
+-  void fetch(buildApiUrl("/lookup/options-support"), { signal: abort.signal, ... });
+-  return () => abort.abort();
++  let active = true;
++  void terminalHydrationScheduler
++    .requestOptionSupport({
++      traceIds: optionSupportHydrationInput.traceIds,
++      nbboContext: optionSupportHydrationInput.nbboContext
++    })
++    .then((payload) => {
++      if (!active) return;
++      setPinnedFlowPacketMap((prev) => upsertPinnedEntries(prev, packetMap, Date.now()));
++      setHistoricalNbboByTraceId((prev) => {
++        const next = new Map(prev);
++        for (const [traceId, quote] of Object.entries(payload.nbboByTraceId)) {
++          next.set(traceId, quote);
++        }
++        return next;
++      });
++    });
++  return () => {
++    active = false;
++  };
+ }, [
+-  optionsFeed.items,
+-  classifierDecorByOptionTraceId,
+-  packetIdByOptionTraceId,
+-  historicalNbboByTraceId
++  optionSupportTraceKey,
++  optionSupportNbboKey
+ ]);
+@@
++const selectedSmartFlowMissingPrintKey = stableHydrationKey(selectedSmartFlowMissingPrintIds);
++void terminalHydrationScheduler.requestOptionPrints(selectedSmartFlowMissingPrintIds);
++const selectedSmartMoneyMissingPacketKey = stableHydrationKey(selectedSmartMoneyMissingPacketIds);
++void terminalHydrationScheduler.requestFlowPackets(selectedSmartMoneyMissingPacketIds);
++const visibleAlertMissingPrintKey = stableHydrationKey(visibleAlertMissingPrintIds);
++void terminalHydrationScheduler.requestOptionPrints(visibleAlertMissingPrintIds);
+
+diff --git a/apps/web/features/terminal/hydration-scheduler.test.ts b/apps/web/features/terminal/hydration-scheduler.test.ts
+new file mode 100644
+@@
++it("batches duplicate option print lookups and reuses in-flight work", async () => { ... });
++it("negative-caches empty option print lookups until the miss ttl expires", async () => { ... });
++it("backs off failed option print endpoints instead of spinning", async () => { ... });
++it("batches option support requests and serves repeated traces from cache", async () => { ... });</script>
+    <script type="module">
+      const source = document.getElementById("patch-source")?.textContent ?? "";
+      const target = document.getElementById("rich-diff");
+      try {
+        const React = await import("react");
+        const { createRoot } = await import("react-dom/client");
+        const { PatchDiff } = await import("@pierre/diffs/react");
+        createRoot(target).render(React.createElement(PatchDiff, { patch: source }));
+        document.documentElement.classList.add("rich-diff-ready");
+      } catch (error) {
+        target.textContent =
+          "Rich diff renderer unavailable in this static context; showing unified fallback.";
+      }
+    </script>
+  </body>
+</html>
