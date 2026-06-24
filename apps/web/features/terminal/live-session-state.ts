@@ -90,10 +90,6 @@ const LIVE_SUBSCRIPTION_BUFFER_CHANNELS = {
 
 export type LiveSessionChannelBufferRegistry = {
   resetAll: () => void;
-  resetSubscriptionChannel: <TItem extends SortableItem>(
-    channel: LiveSubscription["channel"],
-    items?: readonly TItem[]
-  ) => LiveWindowSnapshot<TItem>;
   resetSubscriptionChannels: (channels: Iterable<LiveSubscription["channel"]>) => void;
   upsertSubscriptionItems: <TItem extends SortableItem>(
     channel: LiveSubscription["channel"],
@@ -102,9 +98,6 @@ export type LiveSessionChannelBufferRegistry = {
   resetSubscriptionItems: <TItem extends SortableItem>(
     channel: LiveSubscription["channel"],
     items: readonly TItem[]
-  ) => LiveWindowSnapshot<TItem>;
-  getSubscriptionSnapshot: <TItem extends SortableItem>(
-    channel: LiveSubscription["channel"]
   ) => LiveWindowSnapshot<TItem>;
 };
 
@@ -172,12 +165,6 @@ export const createLiveSessionChannelBufferRegistry = (
         getBuffer(channel).reset([]);
       }
     },
-    resetSubscriptionChannel<TItem extends SortableItem>(
-      channel: LiveSubscription["channel"],
-      items?: readonly TItem[]
-    ) {
-      return getBuffer<TItem>(channel).reset(items ?? []);
-    },
     upsertSubscriptionItems<TItem extends SortableItem>(
       channel: LiveSubscription["channel"],
       items: readonly TItem[]
@@ -189,9 +176,6 @@ export const createLiveSessionChannelBufferRegistry = (
       items: readonly TItem[]
     ) {
       return getBuffer<TItem>(channel).reset(items);
-    },
-    getSubscriptionSnapshot<TItem extends SortableItem>(channel: LiveSubscription["channel"]) {
-      return getBuffer<TItem>(channel).getSnapshot();
     }
   };
 };

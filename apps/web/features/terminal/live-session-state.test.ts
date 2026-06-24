@@ -59,9 +59,28 @@ describe("live session channel buffer registry", () => {
       ["older", 200]
     ]);
 
-    registry.resetSubscriptionChannel("options");
+    const reset = registry.resetSubscriptionItems("options", []);
 
-    expect(registry.getSubscriptionSnapshot("options").items).toEqual([]);
+    expect(reset.items).toEqual([]);
+  });
+
+  it("resets the scoped channels used by subscription changes", () => {
+    const registry = createLiveSessionChannelBufferRegistry();
+    registry.upsertSubscriptionItems("options", [makeItem("opt", 1, 100)]);
+    registry.upsertSubscriptionItems("flow", [makeItem("flow", 1, 100)]);
+
+    registry.resetSubscriptionChannels(["options"]);
+
+    expect(
+      registry
+        .upsertSubscriptionItems("options", [makeItem("fresh-opt", 2, 200)])
+        .items.map((item) => item.trace_id)
+    ).toEqual(["fresh-opt"]);
+    expect(
+      registry
+        .upsertSubscriptionItems("flow", [makeItem("fresh-flow", 2, 200)])
+        .items.map((item) => item.trace_id)
+    ).toEqual(["fresh-flow", "flow"]);
   });
 
   it("detects live-session channels that need scoped resets", () => {
