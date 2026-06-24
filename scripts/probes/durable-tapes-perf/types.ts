@@ -39,6 +39,25 @@ export type RequestRecord = {
   url: string;
   method: string;
   endpoint: EndpointKind | null;
+  startedAtSeconds?: number;
+};
+
+export type EndpointLatencySummary = {
+  count: number;
+  min: number | null;
+  p50: number | null;
+  p95: number | null;
+  max: number | null;
+  avg: number | null;
+};
+
+export type EndpointFailure = {
+  endpoint: EndpointKind;
+  status: number;
+  method: string;
+  url: string;
+  origin: string | null;
+  contentType: string | null;
 };
 
 export type MetricWindow = {
@@ -49,6 +68,11 @@ export type MetricWindow = {
   abortedRequestCount: number;
   abortedEndpointRequestCount: number;
   supportEvidenceStatusDistribution: Record<EndpointKind, Record<string, number>>;
+  supportEvidenceOriginDistribution: Record<EndpointKind, Record<string, number>>;
+  supportEvidenceContentTypeDistribution: Record<EndpointKind, Record<string, number>>;
+  supportEvidenceHtmlResponseCount: number;
+  supportEvidenceNonJsonResponseCount: number;
+  endpointResponseLatenciesMs: Record<EndpointKind, number[]>;
   websocketFrameCount: number;
   websocketReceivedFrameCount: number;
   websocketSentFrameCount: number;
@@ -57,7 +81,7 @@ export type MetricWindow = {
   websocketSentBytes: number;
   websocketErrorCount: number;
   topRequestCounts: Map<string, number>;
-  endpointFailures: Array<{ endpoint: EndpointKind; status: number; method: string; url: string }>;
+  endpointFailures: EndpointFailure[];
   requestsById: Map<string, RequestRecord>;
 };
 
@@ -68,7 +92,12 @@ export type SerializedMetricWindow = {
   abortedRequestCount: number;
   abortedEndpointRequestCount: number;
   supportEvidenceStatusDistribution: Record<EndpointKind, Record<string, number>>;
+  supportEvidenceOriginDistribution: Record<EndpointKind, Record<string, number>>;
+  supportEvidenceContentTypeDistribution: Record<EndpointKind, Record<string, number>>;
   supportEvidenceErrorResponses: number;
+  supportEvidenceHtmlResponseCount: number;
+  supportEvidenceNonJsonResponseCount: number;
+  supportEvidenceLatencyMs: Record<EndpointKind, EndpointLatencySummary>;
   websocketFrameCount: number;
   websocketReceivedFrameCount: number;
   websocketSentFrameCount: number;
@@ -77,7 +106,7 @@ export type SerializedMetricWindow = {
   websocketSentBytes: number;
   websocketErrorCount: number;
   topRequests: Array<{ request: string; count: number }>;
-  endpointFailures: Array<{ endpoint: EndpointKind; status: number; method: string; url: string }>;
+  endpointFailures: EndpointFailure[];
 };
 
 export type SanitySnapshot = {

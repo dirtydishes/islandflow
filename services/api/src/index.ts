@@ -1844,6 +1844,7 @@ const run = async () => {
         }
 
         if (req.method === "POST" && url.pathname === "/lookup/options-support") {
+          const startedAt = Date.now();
           try {
             const body = optionsSupportLookupSchema.parse(await readJsonBody(req));
             const packets = await fetchFlowPacketsByMemberTraceIds(clickhouse, body.trace_ids);
@@ -1853,6 +1854,11 @@ const run = async () => {
               fetchClassifierHitsByPacketIds(clickhouse, packetIds),
               fetchNearestOptionNBBOForPrints(clickhouse, body.nbbo_context)
             ]);
+            metrics.timing("api.lookup.options_support_ms", Date.now() - startedAt, {
+              status: "ok",
+              trace_id_count: String(body.trace_ids.length),
+              nbbo_context_count: String(body.nbbo_context.length)
+            });
             return jsonResponse({
               packets,
               smart_money: smartMoney,
@@ -1861,6 +1867,9 @@ const run = async () => {
               nbbo_by_trace_id: nbboByTraceId
             });
           } catch (error) {
+            metrics.timing("api.lookup.options_support_ms", Date.now() - startedAt, {
+              status: error instanceof z.ZodError ? "invalid" : "error"
+            });
             return jsonResponse(
               {
                 error: "invalid options support lookup",

@@ -1,7 +1,12 @@
 import type { LiveSubscription, OptionFlowFilters } from "@islandflow/types";
 import { getSubscriptionKey as getLiveSubscriptionKey } from "@islandflow/types";
 import { normalizeTimeframeIntervalMs } from "../market-chart";
-import { LIVE_HOT_WINDOW, LIVE_OPTIONS_HEAD_LIMIT, SUPPORTED_CANDLE_INTERVAL_MS } from "./config";
+import {
+  DURABLE_TAPES_RAW_FALLBACK_ENABLED,
+  LIVE_HOT_WINDOW,
+  LIVE_OPTIONS_HEAD_LIMIT,
+  SUPPORTED_CANDLE_INTERVAL_MS
+} from "./config";
 import type { EquityScope, OptionScope, RouteFeatures } from "./types";
 
 const CANONICAL_OPTIONS_PATH = "/options";
@@ -20,6 +25,34 @@ export const normalizeTerminalPathname = (pathname: string): string => {
   }
   return KNOWN_TERMINAL_PATHS.has(pathname) ? pathname : "/";
 };
+
+export const buildDurableTapesRouteFeatures = (
+  rawFallbackEnabled = DURABLE_TAPES_RAW_FALLBACK_ENABLED
+): RouteFeatures => ({
+  options: rawFallbackEnabled,
+  nbbo: false,
+  equities: true,
+  flow: true,
+  news: true,
+  alerts: rawFallbackEnabled,
+  durableRows: true,
+  smartMoney: false,
+  classifierHits: false,
+  inferredDark: false,
+  equityJoins: false,
+  equityCandles: false,
+  equityOverlay: false,
+  showOptionsPane: true,
+  showEquitiesPane: true,
+  showFlowPane: true,
+  showNewsPane: true,
+  showAlertsPane: true,
+  showDarkPane: false,
+  showChartPane: false,
+  needsClassifierDecor: false,
+  needsAlertEvidencePrefetch: false,
+  needsDarkUnderlying: false
+});
 
 export const getRouteFeatures = (pathname: string): RouteFeatures => {
   const normalizedPath = normalizeTerminalPathname(pathname);
@@ -78,31 +111,7 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         needsDarkUnderlying: false
       };
     case DURABLE_TAPES_PATH:
-      return {
-        options: true,
-        nbbo: false,
-        equities: true,
-        flow: true,
-        news: true,
-        alerts: true,
-        durableRows: true,
-        smartMoney: false,
-        classifierHits: false,
-        inferredDark: false,
-        equityJoins: false,
-        equityCandles: false,
-        equityOverlay: false,
-        showOptionsPane: true,
-        showEquitiesPane: true,
-        showFlowPane: true,
-        showNewsPane: true,
-        showAlertsPane: true,
-        showDarkPane: false,
-        showChartPane: false,
-        needsClassifierDecor: false,
-        needsAlertEvidencePrefetch: false,
-        needsDarkUnderlying: false
-      };
+      return buildDurableTapesRouteFeatures();
     case "/":
     default:
       return {

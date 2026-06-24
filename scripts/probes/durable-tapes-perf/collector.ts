@@ -1,7 +1,13 @@
 import type { CdpClient } from "./cdp";
 import { DEFAULT_MIN_VISIBLE_PANES } from "./constants";
 import { sleep } from "./time";
-import type { EndpointKind, MetricWindow, SanitySnapshot, SerializedMetricWindow } from "./types";
+import type {
+  EndpointKind,
+  EndpointLatencySummary,
+  MetricWindow,
+  SanitySnapshot,
+  SerializedMetricWindow
+} from "./types";
 
 export const createMetricWindow = (label: MetricWindow["label"]): MetricWindow => ({
   label,
@@ -13,6 +19,20 @@ export const createMetricWindow = (label: MetricWindow["label"]): MetricWindow =
   supportEvidenceStatusDistribution: {
     optionsSupport: {},
     optionPrintsByTrace: {}
+  },
+  supportEvidenceOriginDistribution: {
+    optionsSupport: {},
+    optionPrintsByTrace: {}
+  },
+  supportEvidenceContentTypeDistribution: {
+    optionsSupport: {},
+    optionPrintsByTrace: {}
+  },
+  supportEvidenceHtmlResponseCount: 0,
+  supportEvidenceNonJsonResponseCount: 0,
+  endpointResponseLatenciesMs: {
+    optionsSupport: [],
+    optionPrintsByTrace: []
   },
   websocketFrameCount: 0,
   websocketReceivedFrameCount: 0,
@@ -55,6 +75,23 @@ const countStatus = (distribution: Record<string, number>, status: number): void
   distribution[key] = (distribution[key] ?? 0) + 1;
 };
 
+const countValue = (distribution: Record<string, number>, value: string): void => {
+  distribution[value] = (distribution[value] ?? 0) + 1;
+};
+
+const getOrigin = (rawUrl: string): string | null => {
+  try {
+    return new URL(rawUrl).origin;
+  } catch {
+    return null;
+  }
+};
+
+const normalizeContentType = (mimeType?: string): string => {
+  const normalized = mimeType?.trim().toLowerCase() ?? "";
+  return normalized.length > 0 ? normalized : "unknown";
+};
+
 const countTopRequest = (window: MetricWindow, rawUrl: string, method: string): void => {
   const key = requestKey(rawUrl, method);
   window.topRequestCounts.set(key, (window.topRequestCounts.get(key) ?? 0) + 1);
@@ -71,6 +108,7 @@ export const attachCollectors = (client: CdpClient, getWindow: () => MetricWindo
   client.on("Network.requestWillBeSent", (params) => {
     const event = params as {
       requestId: string;
+      timestamp?: number;
       request: { url: string; method: string };
     };
     const endpoint = classifyEndpoint(event.request.url);
@@ -85,7 +123,8 @@ export const attachCollectors = (client: CdpClient, getWindow: () => MetricWindo
     window.requestsById.set(event.requestId, {
       url: event.request.url,
       method: event.request.method,
-      endpoint
+      endpoint,
+      startedAtSeconds: event.timestamp
     });
     countTopRequest(window, event.request.url, event.request.method);
   });
@@ -93,7 +132,8 @@ export const attachCollectors = (client: CdpClient, getWindow: () => MetricWindo
   client.on("Network.responseReceived", (params) => {
     const event = params as {
       requestId: string;
-      response: { status: number; url: string };
+      timestamp?: number;
+      response: { status: number; url: string; mimeType?: string };
     };
     const window = getWindow();
     const request = window.requestsById.get(event.requestId);
@@ -101,13 +141,39 @@ export const attachCollectors = (client: CdpClient, getWindow: () => MetricWindo
     if (!endpoint) {
       return;
     }
+    const method = request?.method ?? "GET";
+    const origin = getOrigin(event.response.url);
+    const contentType = normalizeContentType(event.response.mimeType);
+    const isEndpointDataResponse = method !== "OPTIONS" && event.response.status !== 204;
+
     countStatus(window.supportEvidenceStatusDistribution[endpoint], event.response.status);
-    if (event.response.status >= 400) {
+    countValue(window.supportEvidenceOriginDistribution[endpoint], origin ?? "unknown");
+    countValue(window.supportEvidenceContentTypeDistribution[endpoint], contentType);
+
+    if (isEndpointDataResponse && contentType.includes("html")) {
+      window.supportEvidenceHtmlResponseCount += 1;
+    }
+    if (isEndpointDataResponse && !contentType.includes("json")) {
+      window.supportEvidenceNonJsonResponseCount += 1;
+    }
+    if (
+      isEndpointDataResponse &&
+      typeof event.timestamp === "number" &&
+      typeof request?.startedAtSeconds === "number"
+    ) {
+      window.endpointResponseLatenciesMs[endpoint].push(
+        Math.max(0, (event.timestamp - request.startedAtSeconds) * 1000)
+      );
+    }
+
+    if (event.response.status >= 400 || (isEndpointDataResponse && contentType.includes("html"))) {
       window.endpointFailures.push({
         endpoint,
         status: event.response.status,
-        method: request?.method ?? "GET",
-        url: event.response.url
+        method,
+        url: event.response.url,
+        origin,
+        contentType
       });
     }
   });
@@ -243,6 +309,38 @@ const endpointErrorCount = (window: MetricWindow): number =>
     );
   }, 0);
 
+const percentile = (values: number[], ratio: number): number | null => {
+  if (values.length === 0) {
+    return null;
+  }
+  const index = Math.min(values.length - 1, Math.max(0, Math.ceil(values.length * ratio) - 1));
+  return values[index] ?? null;
+};
+
+const latencySummary = (values: number[]): EndpointLatencySummary => {
+  if (values.length === 0) {
+    return {
+      count: 0,
+      min: null,
+      p50: null,
+      p95: null,
+      max: null,
+      avg: null
+    };
+  }
+
+  const sorted = [...values].sort((left, right) => left - right);
+  const sum = sorted.reduce((total, value) => total + value, 0);
+  return {
+    count: sorted.length,
+    min: sorted[0] ?? null,
+    p50: percentile(sorted, 0.5),
+    p95: percentile(sorted, 0.95),
+    max: sorted.at(-1) ?? null,
+    avg: sum / sorted.length
+  };
+};
+
 export const serializeMetricWindow = (window: MetricWindow): SerializedMetricWindow => ({
   totalNetworkRequestCount: window.totalNetworkRequestCount,
   optionsSupportRequestCount: window.optionsSupportRequestCount,
@@ -250,7 +348,15 @@ export const serializeMetricWindow = (window: MetricWindow): SerializedMetricWin
   abortedRequestCount: window.abortedRequestCount,
   abortedEndpointRequestCount: window.abortedEndpointRequestCount,
   supportEvidenceStatusDistribution: window.supportEvidenceStatusDistribution,
+  supportEvidenceOriginDistribution: window.supportEvidenceOriginDistribution,
+  supportEvidenceContentTypeDistribution: window.supportEvidenceContentTypeDistribution,
   supportEvidenceErrorResponses: endpointErrorCount(window),
+  supportEvidenceHtmlResponseCount: window.supportEvidenceHtmlResponseCount,
+  supportEvidenceNonJsonResponseCount: window.supportEvidenceNonJsonResponseCount,
+  supportEvidenceLatencyMs: {
+    optionsSupport: latencySummary(window.endpointResponseLatenciesMs.optionsSupport),
+    optionPrintsByTrace: latencySummary(window.endpointResponseLatenciesMs.optionPrintsByTrace)
+  },
   websocketFrameCount: window.websocketFrameCount,
   websocketReceivedFrameCount: window.websocketReceivedFrameCount,
   websocketSentFrameCount: window.websocketSentFrameCount,

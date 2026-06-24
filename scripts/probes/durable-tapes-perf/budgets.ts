@@ -9,6 +9,8 @@ type BudgetMetrics = Pick<
   | "abortedRequestCount"
   | "abortedEndpointRequestCount"
   | "supportEvidenceErrorResponses"
+  | "supportEvidenceHtmlResponseCount"
+  | "supportEvidenceNonJsonResponseCount"
 > & {
   taskDurationDeltaSeconds: number | null;
   scriptDurationDeltaSeconds: number | null;
@@ -65,6 +67,9 @@ export const evaluateBudgets = ({
   );
 
   const valueOrInfinity = (value: number | null) => value ?? Number.POSITIVE_INFINITY;
+  const paneRows = new Map(sanity.paneRows.map((pane) => [pane.key, pane.rowCount]));
+  const visibleOptionRows = paneRows.get("options") ?? 0;
+  const visibleAlertRows = paneRows.get("alerts") ?? 0;
 
   return [
     {
@@ -110,6 +115,20 @@ export const evaluateBudgets = ({
       unit: "responses"
     },
     {
+      name: "support/evidence HTML responses",
+      actual: metrics.supportEvidenceHtmlResponseCount,
+      limit: 0,
+      pass: metrics.supportEvidenceHtmlResponseCount === 0,
+      unit: "responses"
+    },
+    {
+      name: "support/evidence non-JSON responses",
+      actual: metrics.supportEvidenceNonJsonResponseCount,
+      limit: 0,
+      pass: metrics.supportEvidenceNonJsonResponseCount === 0,
+      unit: "responses"
+    },
+    {
       name: "CDP TaskDuration delta",
       actual: valueOrInfinity(metrics.taskDurationDeltaSeconds),
       limit: taskBudget,
@@ -149,6 +168,20 @@ export const evaluateBudgets = ({
       actual: sanity.visibleRowCount,
       limit: minVisibleRows,
       pass: sanity.visibleRowCount >= minVisibleRows,
+      unit: "minimum rows"
+    },
+    {
+      name: "visible durable options row count",
+      actual: visibleOptionRows,
+      limit: 1,
+      pass: visibleOptionRows >= 1,
+      unit: "minimum rows"
+    },
+    {
+      name: "visible durable alerts row count",
+      actual: visibleAlertRows,
+      limit: 1,
+      pass: visibleAlertRows >= 1,
       unit: "minimum rows"
     }
   ];
