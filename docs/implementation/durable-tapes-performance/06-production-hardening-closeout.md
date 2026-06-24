@@ -53,6 +53,7 @@ Production verification:
 ## Implemented Guardrails
 
 - Browser/CDP probe reports now include support/evidence origin distribution, content-type distribution, HTML/non-JSON response counts, endpoint latency summaries, and options/alerts pane row sanity budgets.
+- Production smoke treats browser REST routing as valid only when the deployed bundle contains the intended API origin or both same-origin support and by-trace proxy endpoints return bounded JSON responses.
 - Production smoke command:
 
 ```bash

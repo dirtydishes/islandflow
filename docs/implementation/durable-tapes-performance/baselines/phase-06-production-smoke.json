@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "probe": "durable-tapes-production-smoke",
-  "startedAt": "2026-06-24T07:28:55.384Z",
-  "endedAt": "2026-06-24T07:28:56.449Z",
+  "startedAt": "2026-06-24T07:50:48.238Z",
+  "endedAt": "2026-06-24T07:50:48.904Z",
   "webTarget": "https://flow.deltaisland.io/durable-tapes",
   "webOrigin": "https://flow.deltaisland.io",
   "apiOrigin": "https://api.flow.deltaisland.io",
@@ -14,7 +14,9 @@
     "scannedScriptCount": 6,
     "scriptTagCount": 10,
     "sameOriginProxyChecked": false,
-    "sameOriginProxyValid": false
+    "sameOriginProxyValid": false,
+    "sameOriginSupportProxyValid": false,
+    "sameOriginEvidenceProxyValid": false
   },
   "passed": true,
   "checks": [
@@ -23,12 +25,17 @@
       "status": "pass",
       "url": "https://flow.deltaisland.io/durable-tapes",
       "statusCode": 200,
-      "latencyMs": 366.6295,
+      "latencyMs": 123.316917,
       "contentType": "text/html; charset=utf-8",
       "detail": "origin https://flow.deltaisland.io"
     },
     {
       "name": "same-origin support proxy fallback",
+      "status": "skip",
+      "detail": "public bundle contains the expected API origin"
+    },
+    {
+      "name": "same-origin by-trace proxy fallback",
       "status": "skip",
       "detail": "public bundle contains the expected API origin"
     },
@@ -42,14 +49,14 @@
       "status": "pass",
       "url": "https://api.flow.deltaisland.io/health",
       "statusCode": 200,
-      "latencyMs": 57.87037500000008,
+      "latencyMs": 54.232500000000016,
       "contentType": "application/json"
     },
     {
       "name": "durable rows websocket snapshot",
       "status": "pass",
       "url": "wss://api.flow.deltaisland.io/ws/live",
-      "latencyMs": 262.54729199999997,
+      "latencyMs": 223.62145900000002,
       "detail": "snapshot rows 10"
     },
     {
@@ -57,15 +64,15 @@
       "status": "pass",
       "url": "https://api.flow.deltaisland.io/lookup/options-support",
       "statusCode": 200,
-      "latencyMs": 20.824416999999926,
+      "latencyMs": 16.013791999999967,
       "contentType": "application/json"
     },
     {
       "name": "option prints miss lookup latency",
       "status": "pass",
-      "url": "https://api.flow.deltaisland.io/option-prints/by-trace?trace_id=phase06-smoke-miss-1782286136279",
+      "url": "https://api.flow.deltaisland.io/option-prints/by-trace?trace_id=phase06-smoke-miss-1782287448800",
       "statusCode": 200,
-      "latencyMs": 169.29704099999992,
+      "latencyMs": 103.80645800000002,
       "contentType": "application/json"
     }
   ]

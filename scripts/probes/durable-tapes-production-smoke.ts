@@ -132,6 +132,15 @@ const isHtmlResponse = (contentType: string, body: string): boolean => {
 const isJsonResponse = (contentType: string): boolean =>
   contentType.toLowerCase().includes("application/json");
 
+const validateOptionPrintMissJson = (body: string): string | null => {
+  try {
+    const payload = JSON.parse(body) as { data?: unknown[] };
+    return Array.isArray(payload.data) ? null : "miss lookup JSON omitted data array";
+  } catch {
+    return "miss lookup response is not valid JSON";
+  }
+};
+
 const requestText = async (
   url: string,
   timeoutMs: number,
@@ -259,6 +268,12 @@ const scanBundleForApiOrigin = async (
 const websocketUrlForApiOrigin = (apiOrigin: string): string => {
   const url = new URL("/ws/live", apiOrigin);
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  return url.toString();
+};
+
+const optionPrintsMissUrl = (origin: string, prefix: string): string => {
+  const url = new URL("/option-prints/by-trace", origin);
+  url.searchParams.set("trace_id", `${prefix}-${Date.now()}`);
   return url.toString();
 };
 
@@ -441,6 +456,8 @@ const run = async (): Promise<void> => {
 
   let sameOriginProxyValid = false;
   let sameOriginProxyChecked = false;
+  let sameOriginSupportProxyValid = false;
+  let sameOriginEvidenceProxyValid = false;
   if (!bundleScan.found) {
     sameOriginProxyChecked = true;
     const sameOriginSupportUrl = new URL("/lookup/options-support", webOrigin).toString();
@@ -456,10 +473,26 @@ const run = async (): Promise<void> => {
         body: JSON.stringify({ trace_ids: [], nbbo_context: [] })
       }
     });
-    sameOriginProxyValid = sameOriginCheck.ok;
+    sameOriginSupportProxyValid = sameOriginCheck.ok;
+    const sameOriginEvidenceCheck = await fetchEndpointCheck({
+      checks,
+      name: "same-origin by-trace proxy fallback",
+      url: optionPrintsMissUrl(webOrigin, "phase06-same-origin-smoke-miss"),
+      timeoutMs: options.timeoutMs,
+      maxLatencyMs: options.maxEndpointLatencyMs,
+      init: { headers: { accept: "application/json" } },
+      validate: validateOptionPrintMissJson
+    });
+    sameOriginEvidenceProxyValid = sameOriginEvidenceCheck.ok;
+    sameOriginProxyValid = sameOriginSupportProxyValid && sameOriginEvidenceProxyValid;
   } else {
     pushCheck(checks, {
       name: "same-origin support proxy fallback",
+      status: "skip",
+      detail: "public bundle contains the expected API origin"
+    });
+    pushCheck(checks, {
+      name: "same-origin by-trace proxy fallback",
       status: "skip",
       detail: "public bundle contains the expected API origin"
     });
@@ -515,23 +548,14 @@ const run = async (): Promise<void> => {
     }
   });
 
-  const evidenceUrl = new URL("/option-prints/by-trace", options.apiOrigin);
-  evidenceUrl.searchParams.set("trace_id", `phase06-smoke-miss-${Date.now()}`);
   await fetchEndpointCheck({
     checks,
     name: "option prints miss lookup latency",
-    url: evidenceUrl.toString(),
+    url: optionPrintsMissUrl(options.apiOrigin, "phase06-smoke-miss"),
     timeoutMs: options.timeoutMs,
     maxLatencyMs: options.maxEndpointLatencyMs,
     init: { headers: { accept: "application/json" } },
-    validate: (body) => {
-      try {
-        const payload = JSON.parse(body) as { data?: unknown[] };
-        return Array.isArray(payload.data) ? null : "miss lookup JSON omitted data array";
-      } catch {
-        return "miss lookup response is not valid JSON";
-      }
-    }
+    validate: validateOptionPrintMissJson
   });
 
   const endedAt = new Date().toISOString();
@@ -552,7 +576,9 @@ const run = async (): Promise<void> => {
       scannedScriptCount: bundleScan.scannedScriptCount,
       scriptTagCount: scriptUrls.length,
       sameOriginProxyChecked,
-      sameOriginProxyValid
+      sameOriginProxyValid,
+      sameOriginSupportProxyValid,
+      sameOriginEvidenceProxyValid
     },
     passed,
     checks

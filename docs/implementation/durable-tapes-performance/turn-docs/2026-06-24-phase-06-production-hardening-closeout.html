@@ -256,7 +256,8 @@
           <li>
             Added <code>scripts/probes/durable-tapes-production-smoke.ts</code> for deployed web
             route, public API routing, API health, durable-row websocket, support lookup, and
-            by-trace miss latency checks.
+            by-trace miss latency checks. The routing fallback now requires both same-origin REST
+            proxy paths to return bounded JSON if the public bundle omits the API origin.
           </li>
           <li>
             Extended the CDP browser probe with support/evidence origin and content-type
@@ -310,9 +311,10 @@
               <td><code>phase-06-production-smoke.json</code></td>
               <td class="status-ok">pass on deployed native</td>
               <td>
-                Bundle references <code>https://api.flow.deltaisland.io</code>; API health passed in
-                58 ms; durable-row websocket snapshot returned 10 rows in 263 ms; support lookup
-                passed in 21 ms; by-trace miss lookup passed in 169 ms.
+                Bundle references <code>https://api.flow.deltaisland.io</code>; same-origin support
+                and by-trace fallback checks were skipped because the API origin is present; API
+                health passed in 54 ms; durable-row websocket snapshot returned 10 rows in 224 ms;
+                support lookup passed in 16 ms; by-trace miss lookup passed in 104 ms.
               </td>
             </tr>
             <tr>
@@ -351,12 +353,34 @@
       </section>
 
       <section>
+        <h2>Reviewer Finding And Repair</h2>
+        <p>
+          <span class="status-risk">P1 repaired:</span> the initial production smoke accepted a
+          same-origin fallback after checking only <code>/lookup/options-support</code>. That left a
+          bad deployment path where <code>/option-prints/by-trace</code> could still return web-host
+          HTML while the browser routing gate passed.
+        </p>
+        <p>
+          The repair keeps the direct probe shape but closes the routing hole: when the bundle does
+          not contain the intended API origin, the smoke now requires both same-origin support lookup
+          and same-origin by-trace miss lookup to return JSON within the endpoint latency budget.
+          The deployed rerun still uses API-origin routing and passes.
+        </p>
+        <p>
+          Thermo-nuclear structural review found no remaining Phase 06 blocker: the new smoke path is
+          a bounded standalone guardrail, the CDP probe extends the existing metric model instead of
+          adding a parallel one, and no PR-touched file crosses the 1k-line threshold because of this
+          branch.
+        </p>
+      </section>
+
+      <section>
         <h2>Beads State</h2>
         <ul>
           <li><code>islandflow-ze79.11</code> is resolved by the native web/API rollout and green smoke/probe artifacts.</li>
-          <li><code>islandflow-ze79.7</code> has implementation, deployment, and final production evidence ready for review.</li>
-          <li><code>islandflow-ba9q</code> can close with the request-storm evidence fixed in production.</li>
-          <li><code>islandflow-ze79</code> can close after Phase 06 review/merge confirms the epic closeout state.</li>
+          <li><code>islandflow-ze79.7</code> has implementation, deployment, reviewer repair, and final production evidence ready for merge closeout.</li>
+          <li><code>islandflow-ba9q</code> should close only after PR #78 is merged with this production evidence attached.</li>
+          <li><code>islandflow-ze79</code> should close after Phase 06 merge confirms the epic closeout state.</li>
         </ul>
       </section>
 
@@ -459,6 +483,12 @@ diff --git a/scripts/probes/durable-tapes-production-smoke.ts b/scripts/probes/d
 +// and option-prints/by-trace miss latency.
 +const DEFAULT_WEB_TARGET = "https://flow.deltaisland.io/durable-tapes";
 +const DEFAULT_API_ORIGIN = "https://api.flow.deltaisland.io";
++const optionPrintsMissUrl = (origin, prefix) =&gt; {
++  const url = new URL("/option-prints/by-trace", origin);
++  url.searchParams.set("trace_id", `${prefix}-${Date.now()}`);
++  return url.toString();
++};
++sameOriginProxyValid = sameOriginSupportProxyValid &amp;&amp; sameOriginEvidenceProxyValid;
 diff --git a/scripts/deploy.ts b/scripts/deploy.ts
 --- a/scripts/deploy.ts
 +++ b/scripts/deploy.ts
