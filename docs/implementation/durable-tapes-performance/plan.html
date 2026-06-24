@@ -1,0 +1,537 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Durable-Tapes Performance Hardening Plan</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #172026;
+        --muted: #5d6972;
+        --line: #d8dee3;
+        --panel: #f6f8f9;
+        --accent: #126a72;
+        --accent-2: #8a4b16;
+        --ok: #1f7a4d;
+        --warn: #9a5a00;
+        --bad: #9b2c2c;
+        --bg: #ffffff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: var(--bg);
+        font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      header {
+        border-bottom: 1px solid var(--line);
+        background: #eef4f4;
+      }
+
+      .wrap {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 32px 24px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0 0 12px;
+        line-height: 1.15;
+      }
+
+      h1 {
+        max-width: 900px;
+        font-size: 42px;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        margin-top: 8px;
+        font-size: 26px;
+      }
+
+      h3 {
+        font-size: 18px;
+      }
+
+      p {
+        margin: 0 0 14px;
+      }
+
+      a {
+        color: var(--accent);
+      }
+
+      code {
+        padding: 1px 4px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        background: #fff;
+        font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      pre {
+        overflow: auto;
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #101820;
+        color: #eef7f7;
+        font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      .lede {
+        max-width: 860px;
+        color: var(--muted);
+        font-size: 18px;
+      }
+
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 18px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        padding: 4px 10px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: #fff;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      nav {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        border-bottom: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(8px);
+      }
+
+      nav .wrap {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        padding-top: 12px;
+        padding-bottom: 12px;
+      }
+
+      nav a {
+        color: var(--muted);
+        font-size: 13px;
+        text-decoration: none;
+      }
+
+      section {
+        border-bottom: 1px solid var(--line);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 16px;
+      }
+
+      .phase {
+        display: grid;
+        grid-template-columns: 120px minmax(0, 1fr);
+        gap: 18px;
+        padding: 22px 0;
+        border-top: 1px solid var(--line);
+      }
+
+      .phase:first-child {
+        border-top: 0;
+      }
+
+      .num {
+        color: var(--accent);
+        font: 700 28px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      .meta {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 12px 0 0;
+      }
+
+      th,
+      td {
+        padding: 10px;
+        border-top: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--muted);
+        font-size: 12px;
+        text-transform: uppercase;
+      }
+
+      ul {
+        margin: 8px 0 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 4px;
+      }
+
+      .status {
+        font-weight: 700;
+      }
+
+      .ok {
+        color: var(--ok);
+      }
+
+      .warn {
+        color: var(--warn);
+      }
+
+      .bad {
+        color: var(--bad);
+      }
+
+      @media (max-width: 760px) {
+        h1 {
+          font-size: 32px;
+        }
+
+        .grid,
+        .phase {
+          grid-template-columns: 1fr;
+        }
+
+        .wrap {
+          padding: 24px 16px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="wrap">
+        <h1>Durable-Tapes Performance Hardening</h1>
+        <p class="lede">
+          A staged repair plan for making <code>/durable-tapes</code> usable on low-power clients by stopping
+          frontend request storms, bounding lookup endpoints, reducing React invalidation, replacing hot merge/sort
+          windows, and moving row decoration server-side.
+        </p>
+        <div class="chips">
+          <span class="chip">Epic: islandflow-ze79</span>
+          <span class="chip">Source bug: islandflow-ba9q</span>
+          <span class="chip">Index: IMPLEMENT.md</span>
+          <span class="chip">Loop: selector -> worker -> reviewer -> closeout</span>
+        </div>
+      </div>
+    </header>
+
+    <nav>
+      <div class="wrap">
+        <a href="#diagnosis">Diagnosis</a>
+        <a href="#phases">Phases</a>
+        <a href="#loop">Agent Loop</a>
+        <a href="#pr">PR Guidance</a>
+        <a href="#subagents">Subagents</a>
+        <a href="#quality">Quality Gates</a>
+      </div>
+    </nav>
+
+    <section id="diagnosis">
+      <div class="wrap">
+        <h2>Diagnosis</h2>
+        <div class="grid">
+          <div class="panel">
+            <h3>What is melting the browser</h3>
+            <p>
+              The websocket volume is not large enough by itself to explain the meltdown. The expensive part is
+              multiplier work after each live update: repeated scans, repeated support/evidence fetches, aborted
+              requests, broad React recomputation, and full-window live row merging.
+            </p>
+          </div>
+          <div class="panel">
+            <h3>What must change</h3>
+            <p>
+              The client should stop asking the same support questions repeatedly, the API must return quickly on
+              lookup misses, panes should subscribe to smaller slices, hot buffers should update incrementally, and
+              the server should eventually send rows that are already decorated enough to render.
+            </p>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Symptom</th>
+              <th>Likely cause</th>
+              <th>Repair lane</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Hundreds of support/evidence requests in under a minute</td>
+              <td>Effects keyed to changing live arrays/maps/Sets and no shared in-flight cache</td>
+              <td>Phase 01</td>
+            </tr>
+            <tr>
+              <td><code>/option-prints/by-trace</code> hangs on a miss</td>
+              <td>Unbounded or poorly indexed ClickHouse lookup path</td>
+              <td>Phase 02</td>
+            </tr>
+            <tr>
+              <td>Unrelated panes wake up on live messages</td>
+              <td>Terminal-era shared state invalidates broad derived work</td>
+              <td>Phase 03</td>
+            </tr>
+            <tr>
+              <td>Repeated per-event window rebuilds</td>
+              <td>Merge/dedupe/sort/slice in hot live paths</td>
+              <td>Phase 04</td>
+            </tr>
+            <tr>
+              <td>Every client repeats market-data joins</td>
+              <td>Browser receives raw ingredients instead of durable row view models</td>
+              <td>Phase 05</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="phases">
+      <div class="wrap">
+        <h2>Phases</h2>
+
+        <div class="phase">
+          <div>
+            <div class="num">00</div>
+            <div class="meta">islandflow-ze79.1</div>
+          </div>
+          <div>
+            <h3>Perf Probe And Budgets</h3>
+            <p>
+              Build the red-capable browser/CDP probe before changing behavior. It records request counts, aborted
+              requests, websocket volume, script/task duration, heap growth, DOM sanity, and visible pane rows.
+            </p>
+            <p class="meta">Doc: <a href="./00-perf-probe-guardrail.md">00-perf-probe-guardrail.md</a></p>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div>
+            <div class="num">01</div>
+            <div class="meta">islandflow-ze79.2</div>
+          </div>
+          <div>
+            <h3>Hydration Scheduler And Caches</h3>
+            <p>
+              Batch and dedupe missing trace IDs, reuse in-flight lookups, negative-cache misses, and key effects by
+              stable missing-id summaries instead of whole live arrays or maps.
+            </p>
+            <p class="meta">Depends on Phase 00. Doc: <a href="./01-hydration-scheduler-cache.md">01-hydration-scheduler-cache.md</a></p>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div>
+            <div class="num">02</div>
+            <div class="meta">islandflow-ze79.3</div>
+          </div>
+          <div>
+            <h3>Bound Option-Prints By-Trace Lookup</h3>
+            <p>
+              Make the API endpoint safe for hits and misses with caps, fast empty returns, query bounds, tests, and
+              latency evidence. Missing trace IDs should not hang the API.
+            </p>
+            <p class="meta">Depends on Phase 00. Doc: <a href="./02-option-prints-lookup-bounds.md">02-option-prints-lookup-bounds.md</a></p>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div>
+            <div class="num">03</div>
+            <div class="meta">islandflow-ze79.4</div>
+          </div>
+          <div>
+            <h3>Pane-Scoped Live State</h3>
+            <p>
+              Split live data access so options, alerts, flow, equities, and news subscribe to only the state slices
+              they render. Shared hydration caches should not force broad terminal context invalidation.
+            </p>
+            <p class="meta">Depends on Phases 01 and 02. Doc: <a href="./03-pane-scoped-live-state.md">03-pane-scoped-live-state.md</a></p>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div>
+            <div class="num">04</div>
+            <div class="meta">islandflow-ze79.5</div>
+          </div>
+          <div>
+            <h3>Incremental Live Buffers</h3>
+            <p>
+              Replace whole-window merge/dedupe/sort/slice work with keyed incremental buffers that preserve ordering,
+              dedupe, reset, and eviction semantics.
+            </p>
+            <p class="meta">Depends on Phase 03. Doc: <a href="./04-incremental-live-buffers.md">04-incremental-live-buffers.md</a></p>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div>
+            <div class="num">05</div>
+            <div class="meta">islandflow-ze79.6</div>
+          </div>
+          <div>
+            <h3>Server-Composed Row View Models</h3>
+            <p>
+              Move support hydration and alert evidence decoration server-side so clients receive ready-to-render row
+              models or coarse decorated deltas instead of reconstructing market relationships per user.
+            </p>
+            <p class="meta">Depends on Phases 02 and 04. Doc: <a href="./05-server-composed-view-models.md">05-server-composed-view-models.md</a></p>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div>
+            <div class="num">06</div>
+            <div class="meta">islandflow-ze79.7</div>
+          </div>
+          <div>
+            <h3>Production Hardening And Closeout</h3>
+            <p>
+              Add production smoke checks, request-rate/latency guardrails, fallback flags, final deployed probes, and
+              Beads closeout evidence.
+            </p>
+            <p class="meta">Depends on Phase 05. Doc: <a href="./06-production-hardening-closeout.md">06-production-hardening-closeout.md</a></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="loop">
+      <div class="wrap">
+        <h2>Agent Loop</h2>
+        <div class="grid">
+          <div class="panel">
+            <h3>Selector</h3>
+            <p>
+              Read <code>IMPLEMENT.md</code>, run <code>bd prime</code>, <code>bd ready</code>, and
+              <code>bd show</code>. Report the next ready phase, dependency state, linked phase doc, and safe
+              parallelism. Do not select from memory.
+            </p>
+          </div>
+          <div class="panel">
+            <h3>Worker</h3>
+            <p>
+              Receive the full phase doc, issue ID, quality gates, branch/PR posture, turn-doc location, and
+              orchestrator thread ID. Keep the PR phase-bounded and call back once when PR-ready or blocked.
+            </p>
+          </div>
+          <div class="panel">
+            <h3>Reviewer</h3>
+            <p>
+              Review with findings first. Repair in scope when safe, update the existing phase turn doc, verify CI
+              after any repair commit, and call back only when the review state is resolved.
+            </p>
+          </div>
+          <div class="panel">
+            <h3>Closeout</h3>
+            <p>
+              Merge only after reviewer callback and green CI. Sync Beads, push Forgejo, verify clean status, then
+              rerun selector until the epic is complete.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="pr">
+      <div class="wrap">
+        <h2>PR Guidance</h2>
+        <ul>
+          <li>Keep one active implementation PR at a time unless Phase 01 and Phase 02 are intentionally parallel after Phase 00.</li>
+          <li>Do not create branches unless the orchestrator explicitly assigns one.</li>
+          <li>Keep Phase 01 focused on frontend scheduler/cache behavior.</li>
+          <li>Keep Phase 02 focused on API/storage lookup bounds.</li>
+          <li>Do not mix server-composed row models into pane-state or buffer phases.</li>
+          <li>Split Phase 05 into child issues if the row-model contract becomes too large for one review.</li>
+          <li>File follow-up Beads issues for adjacent cleanup instead of widening scope.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="subagents">
+      <div class="wrap">
+        <h2>Subagent Delegation</h2>
+        <div class="grid">
+          <div class="panel">
+            <h3>Good tasks</h3>
+            <ul>
+              <li>Inventory support/evidence lookup call sites.</li>
+              <li>Review storage tests and API miss behavior.</li>
+              <li>Run the perf probe and summarize deltas.</li>
+              <li>Audit pane subscription invalidation.</li>
+              <li>Compare row-model contract alternatives.</li>
+            </ul>
+          </div>
+          <div class="panel">
+            <h3>Do not delegate</h3>
+            <ul>
+              <li>Public scheduler interface decisions.</li>
+              <li>Server row-model contract decisions.</li>
+              <li>Beads dependency changes.</li>
+              <li>Branch, PR, commit, push, merge, or closeout ownership.</li>
+              <li>Reading or interpreting skill instructions.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="quality">
+      <div class="wrap">
+        <h2>Quality Gates</h2>
+        <p>Use phase-specific gates first. Common gates are:</p>
+        <pre><code>bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts
+bun test apps/web/features/terminal apps/web/features/durable-tape
+bun test services/api/tests packages/storage/tests
+bun --cwd=apps/web run build</code></pre>
+        <p>For web-only browser QA, use hosted API unless the phase says otherwise:</p>
+        <pre><code>WEB_DEV_PORT=3100 NEXT_PUBLIC_API_URL=https://api.flow.deltaisland.io bun run dev:web</code></pre>
+        <p>
+          Final production closeout must include deployed native probe evidence and should close
+          <code>islandflow-ba9q</code> only after the user-facing meltdown is fixed.
+        </p>
+      </div>
+    </section>
+  </body>
+</html>
