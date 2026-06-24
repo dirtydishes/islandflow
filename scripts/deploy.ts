@@ -1140,7 +1140,10 @@ function remoteNativeRollout(
   if (!noBuild) {
     buildSteps.push("bun install --frozen-lockfile");
     if (piecesIncludeWeb(pieces)) {
-      buildSteps.push("bun --cwd=apps/web run build");
+      buildSteps.push(
+        // Native web builds run from apps/web, but public build-time env lives in the repo root.
+        `bun --env-file=${shellEscape(`${REMOTE_REPO}/.env`)} --cwd=apps/web run build`
+      );
     }
   }
 
