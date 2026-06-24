@@ -1,98 +1,152 @@
 ![Islandflow logo](assets/logo.png)
 
-![Status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-b91c1c?style=for-the-badge)
+![Status: pre-pre-alpha](https://img.shields.io/badge/status-pre--pre--alpha-b91c1c?style=for-the-badge)
 
-# Real-Time Options Flow & Off-Exchange Analysis
+# Islandflow
 
-> **Pre-alpha warning** This project is in an early pre-alpha state. It will not perform consistently or as expected, and APIs, behavior, and data contracts may change without notice.
+> **Pre-pre-alpha: not ready for use.** Islandflow is exploratory personal research software. It has been gutted and rebuilt several times over the past couple months as the market-data model, service boundaries, replay assumptions, realtime transport, storage contracts, and UI architecture became clearer.
+>
+> This is my long-running "magnum opus" project and an intentionally ambitious learning experience. I had never dealt with many of these market-data, event-sourcing, replay, realtime UI, deployment, and service-boundary problems before, so the project has evolved through repeated rebuilding instead of premature polish.
+>
+> The current priority is a rock-solid foundation: event contracts, shared modules, essential services, storage boundaries, replay paths, live transport, and durable UI primitives. UI/UX polish and actual usability are deliberately secondary until the core system is trustworthy.
+>
+> Expect broken workflows, missing docs, unstable APIs, unstable data contracts, synthetic/local-development defaults, incomplete deployment paths, and more major rewrites. This README describes the current repository direction and foundation surfaces, not a usable product.
 
-Islandflow is a Bun + TypeScript monorepo for a personal-use, event-sourced market microstructure research platform focused on:
+Islandflow is being rebuilt as a Bun + TypeScript monorepo for event-sourced market microstructure research. The long-term product idea is an evidence-first terminal for serious individual traders and researchers: options flow, equity prints, inferred dark/off-exchange signals, news, chart context, alerts, and deterministic replay in one inspectable system.
 
-- multi-source options/equities/news ingest (synthetic + live adapters),
-- deterministic parent-event reconstruction over prints, quotes, and NBBO,
-- explainable participant-style flow classification (not a single binary "smart money" flag),
-- evidence-linked alerts, packet drilldowns, and context hydration,
-- real-time + historical + replay delivery over REST and WebSocket,
-- terminal-style inspection UI for tape, signals, charts, and news.
+This is personal research software, not financial advice, not a trading system, and not a redistribution-ready market-data product.
 
-In its current state, Islandflow acts as an event-sourced intelligence layer on top of raw market microstructure events. Services publish and consume through NATS/JetStream, persist both raw and derived events in ClickHouse, and expose low-latency live feeds plus cursor-based history/replay APIs for research and operator workflows.
+## Current Direction
 
-## Current Implementation Status
+Islandflow is a foundation for an event-sourced intelligence layer over raw market events.
 
-Implemented now:
+```text
+ingest adapters
+  -> NATS JetStream subjects
+  -> compute, candles, replay, API consumers
+  -> ClickHouse durable storage + Redis hot/rolling caches
+  -> REST, cursor history, replay APIs, and WebSocket live feeds
+  -> Next.js terminal UI and experimental Electron shell
+```
 
-- Bun workspaces with shared packages for schemas, bus, config, observability, and ClickHouse access.
-- Infra orchestration via Docker Compose for local NATS JetStream, ClickHouse, and Redis.
-- Options ingest service with synthetic, Alpaca options, IBKR bridge, and Databento historical replay adapters.
-- Equities ingest service with synthetic and Alpaca equities trades/quotes adapters.
-- News ingest service for Alpaca news backfill and websocket publication.
-- Compute service for deterministic parent-event reconstruction, flow packets, NBBO quality features, rolling baselines, smart-money profile scoring, compatibility classifier hits, alerts, inferred dark-style events, and equity print-to-quote joins.
-- Candles service for server-side equity candle aggregation, ClickHouse persistence, optional Redis hot cache, and NATS publication.
-- Replay service for deterministic ClickHouse-to-NATS republishing with multi-stream merge, stable tie-break ordering, speed, start, and end controls.
-- API service with REST endpoints, cursor pagination, replay/history endpoints, live hot-cache hydration, and WebSocket channels for options, NBBO, equities, quotes, joins, flow, classifier hits, alerts, smart-money events, inferred dark, candles, and news.
-- Next.js web app upgraded to Next.js `16.2.6`, React `19.2.0`, and React DOM `19.2.0`.
-- Evidence-centric terminal UI, live/replay controls, chart-focused routes, news view, profile-aware smart-money display, and alert-context hydration.
-- Thin Electron desktop shell in `apps/desktop` that can wrap the hosted app or local web UI.
-- Refdata + EOD enricher service entrypoints are present, with refdata able to validate or refresh the event-calendar cache.
+The system is currently focused on:
 
-Planned / not yet complete:
+- canonical event schemas for options, NBBO, equities, equity quotes, news, derived flow, alerts, candles, inferred-dark events, and live transport;
+- deterministic synthetic market data and fixture generation for repeatable testing;
+- compute services that reconstruct parent events, flow packets, smart-flow/smart-money hypotheses, alerts, and equity print-to-quote joins;
+- server-side candle aggregation and replayable historical streams;
+- cursor-based API surfaces for live, history, and replay workflows;
+- reusable durable tape modules for options, flow packets, equities, alerts, and news;
+- a restrained terminal-style UI built for evidence, density, and eventual operator workflows;
+- deployment paths for the current VPS, with Docker as the supported runtime and native Bun/systemd as an experimental cutover path.
 
-- production-grade licensed feed integrations and entitlement workflow,
-- richer refdata/corp-action enrichment,
-- secure deployment/auth hardening,
-- native deployment unit templates and rollback helpers,
-- signed/notarized desktop distribution and richer desktop-native features,
-- deeper calibration workflows from `PLAN.md` and `SMART_MONEY_REBUILD_PLAN.md`.
+## How It Has Evolved
 
-## Core Principles
+Islandflow started as a much more direct options-flow and market-dashboard idea. As the project hit real complexity, it became clear that the hard part was not simply drawing a better tape or chart; it was building trustworthy foundations for event semantics, replay, storage, realtime delivery, provider adapters, and explainable signal generation.
 
-- **Explainability first**: inferred outputs are evidence-backed and human-readable.
-- **Event sourcing**: raw and derived events persist to support replay.
-- **Determinism**: replay behavior tracks live pipeline logic.
-- **Microstructure awareness**: bounded joins, confidence scoring, and explicit uncertainty.
-- **Taxonomy over folklore**: "smart money" is modeled as participant-style hypotheses, not a single binary label.
-- **Bun-first tooling**: runtime, package management, scripts, and tests use Bun.
+That learning changed the project. Early assumptions were replaced by a deeper event-sourced architecture, synthetic fixtures, shared contracts, durable tape modules, smarter live-state boundaries, and more deliberate deployment paths. The current rebuild is the result of that evolution: less focused on appearing usable quickly, more focused on becoming reliable enough that future usability work has something solid underneath it.
 
-## How Print Classification Works (Current Approach)
+## What Exists Today
 
-Islandflow follows the same high-level philosophy captured in [`smartmoney.md`](smartmoney.md): the tape is informative but noisy, and a useful classifier should model multiple participant-style hypotheses instead of forcing every print into one "smart money" bucket.
+These are active construction areas, not stable product features.
 
-Current flow in the compute pipeline:
+| Area | Current state |
+| --- | --- |
+| Runtime | Bun workspaces across `apps/*`, `services/*`, and `packages/*`. |
+| Local infra | Docker Compose for NATS JetStream, ClickHouse, and Redis. |
+| Shared packages | Types, bus helpers, config parsing, observability facade, ClickHouse storage/query helpers, synthetic market fixtures/profiles. |
+| Options ingest | Synthetic, Alpaca options, Databento sidecar replay, and IBKR sidecar bridge paths. |
+| Equities ingest | Synthetic and Alpaca equities trades/quotes paths. |
+| News ingest | Alpaca news backfill and websocket publication. |
+| Compute | Parent-event reconstruction, flow packets, smart-flow/smart-money scoring, classifier compatibility events, alerts, rolling stats, inferred-dark signals, and equity joins. |
+| Candles | Server-side equity OHLC aggregation, ClickHouse persistence, optional Redis cache, and NATS publication. |
+| Replay | ClickHouse and synthetic-fixture replay paths with ordered multi-stream publication controls. |
+| API | REST endpoints, cursor history/replay endpoints, live cache hydration, synthetic controls, and WebSocket live channels. |
+| Web | Next.js 16 + React 19 terminal shell, market chart module, durable tape modules, route-specific surfaces, and internal QA routes. |
+| Desktop | Thin Electron wrapper around the hosted or local web app. No bundled backend yet. |
+| Deployment | Docker VPS stack is the supported path. Native Bun/systemd deployment assets exist but are experimental and scope-gated. |
 
-1. **Ingest + normalize** options prints, NBBO, equity prints/quotes, and news into shared schemas.
-2. **Reconstruct parent events** from child prints using bounded clustering windows, quote alignment, and structure-aware packet planning.
-3. **Compute evidence features** such as aggressor side vs NBBO, premium/notional concentration, burst timing, quote freshness/coverage, DTE/moneyness context, and cross-signal linkage.
-4. **Score profile hypotheses** including `institutional_directional`, `retail_whale`, `event_driven`, `vol_seller`, `arbitrage`, and `hedge_reactive`, with reason codes and confidence bands.
-5. **Emit explainable artifacts** (`FlowPacket`, `SmartMoneyEvent`, `ClassifierHitEvent`, `AlertEvent`, inferred-dark events) for both live fanout and historical replay.
+## What Is Still Not Ready
 
-Important behavior:
+- Stable public APIs, stable event contracts, or durable compatibility promises.
+- Production-grade licensed feed entitlement and provider operations.
+- Auth, secure multi-user deployment, or public SaaS hardening.
+- Reliable end-to-end user workflows.
+- UI/UX polish around real daily usage.
+- Signed/notarized desktop distribution or desktop-native features.
+- Complete refdata/corporate-action enrichment.
+- Fully calibrated smart-flow scoring against real historical outcomes.
+- A clean "install and use this" path for anyone other than the repo owner.
 
-- The classifier can **abstain** when evidence is weak.
-- Suppression guards reduce known false positives (stale/missing quote context, special/complex print ambiguity, hedge-reactive or parity-like structure confusion).
-- Compatibility endpoints remain available while newer smart-money semantics are first-class.
+## Monorepo Layout
 
-## Smart-Money Classification Taxonomy
+| Path | Purpose |
+| --- | --- |
+| `apps/web` | Next.js web app and terminal UI. |
+| `apps/desktop` | Electron shell that wraps the hosted or local web app. |
+| `services/api` | REST, history/replay, live cache, websocket, and synthetic-control gateway. |
+| `services/compute` | Parent-event reconstruction, flow packets, smart-flow/smart-money, alerts, inferred-dark, and equity joins. |
+| `services/candles` | Equity candle aggregation and publication. |
+| `services/ingest-options` | Options print/NBBO ingest adapters. |
+| `services/ingest-equities` | Equity trade/quote ingest adapters. |
+| `services/ingest-news` | News backfill and websocket ingest. |
+| `services/replay` | Deterministic historical/synthetic replay publisher. |
+| `services/refdata` | Event-calendar validation/provider refresh scaffolding. |
+| `services/eod-enricher` | Scaffold service for future enrichment work. |
+| `packages/types` | Shared event, live transport, durable tape, smart-flow, and synthetic-market types. |
+| `packages/bus` | NATS/JetStream subjects, streams, reconciliation, and synthetic-control helpers. |
+| `packages/storage` | ClickHouse DDL, row transforms, and query builders. |
+| `packages/config` | Shared environment parsing. |
+| `packages/observability` | Logger and metrics facade. |
+| `packages/synthetic-market` | Deterministic synthetic scenarios, fixtures, manifests, and demo load profiles. |
+| `deployment/docker` | Supported VPS Docker Compose runtime. |
+| `deployment/native` | Experimental Bun + systemd native runtime and cutover helpers. |
+| `docs/implementation` | Active phase plans and execution docs. |
+| `docs/plans` and `docs/research-docs` | Background architecture reviews and research notes. |
 
-Islandflow now emits first-class `SmartMoneyEvent` records instead of treating old classifier hits as the final semantic object. `FlowPacket` remains the clustering bridge, while smart-money events carry typed features, profile scores, confidence bands, directions, reason codes, abstention state, and suppression reasons.
+## API Surface
 
-Public profile IDs:
+The API is intentionally not stable yet, but the current gateway exposes these families:
 
-| Profile ID | Meaning | Common evidence |
-| --- | --- | --- |
-| `institutional_directional` | Large directional parent flow with stronger institutional-style conviction. | premium, size, sweep/burst behavior, aggressor imbalance, quote quality, not short-dated retail-chase context |
-| `retail_whale` | Large retail-style speculative bursts, often short-dated or attention-driven. | short-dated OTM concentration, burst prints, IV shock, lower premium than institutional blocks |
-| `event_driven` | Flow aligned to known upcoming events. | event-calendar proximity, expiry after event, pre-event concentration, spread/IV pressure |
-| `vol_seller` | Premium-selling or short-volatility structure evidence. | sell-side premium, straddles/strangles, neutral direction |
-| `arbitrage` | Multi-leg or symmetric structures with low directional exposure. | matched leg symmetry, same-size legs, near-flat directional bias |
-| `hedge_reactive` | Hedge or dealer-reaction style flow around short-dated ATM/gamma context. | 0-2 DTE, near-ATM contracts, underlying move linkage, size |
+- Health: `GET /health`
+- Current/live cache reads: `/prints/options`, `/prints/equities`, `/prints/equities/range`, `/candles/equities`, `/flow/packets`, `/flow/smart-money`, `/flow/smart-flow`, `/flow/classifier-hits`, `/flow/alerts`, `/news`
+- Cursor history: `/history/options`, `/history/nbbo`, `/history/equities`, `/history/equity-quotes`, `/history/equity-joins`, `/history/flow`, `/history/smart-money`, `/history/smart-flow`, `/history/classifier-hits`, `/history/alerts`, `/history/inferred-dark`, `/history/news`
+- Replay reads: `/replay/options`, `/replay/nbbo`, `/replay/equities`, `/replay/equity-quotes`, `/replay/equity-candles`, `/replay/equity-joins`, `/replay/inferred-dark`, `/replay/flow`, `/replay/smart-money`, `/replay/smart-flow`, `/replay/classifier-hits`, `/replay/alerts`
+- Detail hydration: `/flow/packets/:id`, `/flow/alerts/:traceId/context`
+- WebSockets: `/ws/live` plus channel-specific sockets for options, NBBO, equities, candles, quotes, joins, inferred-dark, flow, classifier hits, smart-money, smart-flow, and alerts
 
-Compatibility surfaces remain in place:
+Option print reads support signal/raw views and filter parameters used by the terminal UI. These contracts are evolving with the durable-tapes and performance work.
 
-- `ClassifierHitEvent` is derived from `SmartMoneyEvent.primary_profile_id`.
-- `AlertEvent` may include `primary_profile_id` and `profile_scores`.
-- Legacy classifier and alert endpoints still work.
+## Web Surfaces
 
-Primary smart-money access paths:
+Current routes are implementation and validation surfaces, not finished product flows.
+
+| Route | Current purpose |
+| --- | --- |
+| `/` | Main terminal composition surface. |
+| `/options` | Options-focused durable tape route. |
+| `/durable-tapes` | Internal route for composing and stress-testing durable tape modules. |
+| `/news` | News-focused route. |
+| `/charts` | Chart-focused route. |
+| `/signals` | Signal-oriented route. |
+| `/tape` | Tape-oriented route. |
+| `/replay` | Legacy alias that currently maps back to the main terminal behavior. |
+| `/mock*` | Design/mock exploration surfaces. |
+
+The durable UI direction is dense, restrained, evidence-first, and stable under live update pressure. It should feel like an instrument panel, not a promotional trading app.
+
+## Smart-Flow And Smart-Money Direction
+
+Islandflow is moving away from a single binary "smart money" label. The current direction separates:
+
+- facts: observed prints, quotes, timestamps, sizes, prices, venue/provider metadata;
+- evidence: NBBO alignment, premium/notional concentration, quote freshness, burst timing, moneyness/DTE context, event proximity, cross-signal linkage;
+- hypotheses: participant-style interpretations such as institutional directional flow, retail whale activity, event-driven positioning, volatility selling, arbitrage-like structures, and hedge-reactive activity;
+- confidence and abstention: explicit uncertainty when evidence is weak, stale, missing, or ambiguous.
+
+Current smart-money compatibility surfaces remain, but newer smart-flow work is trying to make the data model more honest and inspectable.
+
+Primary smart-money paths today:
 
 ```text
 /flow/smart-money
@@ -101,30 +155,22 @@ Primary smart-money access paths:
 /ws/smart-money
 ```
 
-The classifier intentionally abstains when evidence is weak or quote context is stale/missing. Suppression guards cover stale quotes, complex/special prints, retail-frenzy directional confusion, hedge-reactive short-dated ATM contexts, and arbitrage symmetry.
+Smart-flow paths are being developed alongside them:
 
-## Monorepo Layout
+```text
+/flow/smart-flow
+/history/smart-flow
+/replay/smart-flow
+/ws/smart-flow
+```
 
-- `apps/web` — Next.js UI shell/routes.
-- `apps/desktop` — Electron desktop shell that loads the hosted or local Islandflow app.
-- `services/ingest-options` — options print/NBBO ingest adapters.
-- `services/ingest-equities` — equity print/quote ingest adapters.
-- `services/ingest-news` — Alpaca news backfill and websocket ingest.
-- `services/compute` — parent-event reconstruction, flow packets, smart-money scoring, alerts, inferred dark.
-- `services/candles` — server-side candle aggregation + cache.
-- `services/replay` — ClickHouse to NATS replay streamer.
-- `services/api` — REST + WebSocket gateway.
-- `services/refdata` — event-calendar validation/provider refresh scaffolding.
-- `services/eod-enricher` — scaffold service.
-- `packages/types` — shared event schemas/types.
-- `packages/storage` — ClickHouse tables/queries.
-- `packages/bus` — NATS/JetStream helpers.
-- `packages/config` — env parsing.
-- `packages/observability` — logger + metrics facade.
-- `deployment/docker` — supported VPS Docker Compose runtime.
-- `deployment/native` — experimental host-native Bun + systemd deployment notes.
+## Local Development
 
-## Build and Run
+Prerequisites:
+
+- Bun
+- Docker and Docker Compose for local NATS, ClickHouse, and Redis
+- Provider credentials only if you leave synthetic mode
 
 Install dependencies:
 
@@ -132,37 +178,19 @@ Install dependencies:
 bun install
 ```
 
-Start infrastructure only:
-
-```bash
-bun run dev:infra
-```
-
-Create env file:
+Create local configuration:
 
 ```bash
 cp .env.example .env
 ```
 
-Start infra + all services + web:
+Run the full local stack:
 
 ```bash
 bun run dev
 ```
 
-Start services only, assuming infra is already running:
-
-```bash
-bun run dev:services
-```
-
-Start web only:
-
-```bash
-bun run dev:web
-```
-
-Recommended fast iteration loop:
+Or run each layer separately:
 
 ```bash
 bun run dev:infra
@@ -170,327 +198,184 @@ bun run dev:services
 bun run dev:web
 ```
 
-This keeps Docker in the local workflow where it helps most, for NATS, ClickHouse, and Redis, while keeping the app services in native Bun/Next.js loops.
-
-## CI
-
-Forgejo Actions under `.forgejo/workflows` are the canonical CI path for this repository.
-
-The baseline workflow lives at `.forgejo/workflows/ci.yml` and runs on:
-
-- pull requests,
-- pushes to `main`,
-- manual dispatches from the Forgejo Actions UI.
-
-The fast `validate` job is intentionally limited to checks that already have good local signal:
-
-- `bun install --frozen-lockfile`
-- `bun test`
-- `bun run check:docker-workspace`
-- `bun --cwd=apps/web run build`
-
-Runner expectations:
-
-- Provide an `ubuntu-latest` label backed by Docker, for example `ubuntu-latest:docker://node:20-bookworm`.
-- An optional alias such as `docker:docker://node:20-bookworm` is fine for future explicit targeting, but the baseline workflow only requires `ubuntu-latest`.
-- The backing image must include Node.js because the checkout action is Node-based.
-
-What this CI path does not cover yet:
-
-- Docker image builds under `deployment/docker`
-- NATS, Redis, or ClickHouse service-container integration coverage
-- deployment, release, or coverage-reporting workflows
-
-To rerun or troubleshoot a job in Forgejo:
-
-- Open the repository's `Actions` tab.
-- Select the `CI` workflow.
-- Use `Run workflow` for a manual dispatch, or open an existing run and use the rerun action from that run page.
-
-## Deployment Workflow
-
-Docker remains the supported and recommended path for the current VPS.
+Stop local infra:
 
 ```bash
-./deploy main
+bun run dev:infra:down
+```
+
+Fast web-only iteration against the hosted API is often useful:
+
+```bash
+WEB_DEV_PORT=3100 NEXT_PUBLIC_API_URL=https://api.flow.deltaisland.io bun run dev:web
+```
+
+The default local posture is synthetic market data. Real provider modes require credentials and are not the safest first path.
+
+## Configuration
+
+All runtime configuration flows through `.env`. Start with `.env.example`; do not treat this README as the complete source of configuration truth.
+
+Important groups:
+
+- Infra: `NATS_URL`, `CLICKHOUSE_URL`, `CLICKHOUSE_DATABASE`, `REDIS_URL`
+- Options ingest: `OPTIONS_INGEST_ADAPTER=synthetic|alpaca|databento|ibkr`
+- Equities ingest: `EQUITIES_INGEST_ADAPTER=synthetic|alpaca`
+- Provider credentials: Alpaca, Databento, IBKR, Alpha Vantage
+- Synthetic controls: `SYNTHETIC_CONTROL_ENABLED`, `SYNTHETIC_ADMIN_TOKEN`, `NEXT_PUBLIC_SYNTHETIC_ADMIN`
+- API/web: `API_PORT`, `API_CORS_ORIGINS`, `NEXT_PUBLIC_API_URL`, live retention limits
+- Compute: NBBO freshness, rolling windows, classifier/smart-flow thresholds, cache sizes
+- Replay: `REPLAY_ENABLED`, `REPLAY_STREAMS`, `REPLAY_START_TS`, `REPLAY_END_TS`, `REPLAY_SPEED`
+- Deployment: Docker and native runtime variables under `deployment/docker/.env.example` and `deployment/native`
+
+Python dependencies are only needed for the IBKR and Databento sidecars under `services/ingest-options/py`.
+
+## Common Commands
+
+| Command | Purpose |
+| --- | --- |
+| `bun run dev` | Start local infra, services, and web through the repo dev runner. |
+| `bun run dev:infra` | Start local Docker infra only. |
+| `bun run dev:services` | Start backend services against already-running infra. |
+| `bun run dev:web` | Start the Next.js web app. |
+| `bun run dev:desktop` | Start Electron against local web. |
+| `bun run dev:desktop:remote` | Start Electron against the hosted app. |
+| `bun run synthetic:fixture` | Generate deterministic synthetic fixture data. |
+| `bun test` | Run the Bun test suite. |
+| `bun run fmt:check` | Check formatting. |
+| `bun run lint` | Run Biome lint. |
+| `bun run typecheck` | Run workspace typechecks. |
+| `bun --cwd=apps/web run build` | Build the web app. |
+| `bun run check:public-api-routes` | Validate public API route coverage expectations. |
+| `bun run check:docker-workspace` | Validate the Docker workspace snapshot. |
+
+## Validation
+
+Local validation should scale with the change. The full CI-shaped gate is:
+
+```bash
+bun install --frozen-lockfile
+bun run fmt:check
+bun run lint
+bun run typecheck
+bun test
+bun run check:public-api-routes
+bun run check:docker-workspace
+bun --cwd=apps/web run build
+```
+
+Forgejo Actions runs the same broad validation on pull requests, pushes to `main`, and manual workflow dispatches.
+
+Focused examples:
+
+```bash
+bun test services/compute/tests
+bun test services/api/tests packages/storage/tests
+bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts
+bun test apps/web/features/durable-tape apps/web/features/terminal
+```
+
+Durable-tapes performance work has a dedicated probe:
+
+```bash
+WEB_DEV_PORT=3100 NEXT_PUBLIC_API_URL=https://api.flow.deltaisland.io bun run dev:web
+bun run scripts/probes/durable-tapes-perf.ts \
+  --target=http://localhost:3100/durable-tapes \
+  --warmup=30s \
+  --duration=180s \
+  --output=docs/implementation/durable-tapes-performance/baselines/local-hosted-api.json
+```
+
+## Deployment
+
+Forgejo is the canonical remote:
+
+```text
+https://git.dirtydishes.dev/dirtydishes/islandflow
+```
+
+The default production-like runtime is Docker:
+
+```bash
 ./deploy main --runtime docker
-./deploy current-branch
 ./deploy current-branch --runtime docker
 ```
 
+Use `./deploy` with no arguments for the guided deploy prompt.
+
 Important deployment notes:
 
-- Run the deploy helper from the local repo checkout, not from the VPS shell.
-- Do not run the repo-root `docker-compose.yml` on the VPS. It is local infra only and can create duplicate exposed NATS, ClickHouse, and Redis containers on the server.
-- The Docker stack lives in `deployment/docker` and is separate from local development infra.
-- Partial deploys are supported with `--web-only`, `--api-only`, `--services-only`, `--workers-only`, `--fast`, `--no-build`, and `--force-recreate`.
-- `--fast` defaults to a services-only Docker rollout when no explicit scope is provided and trims public API route-suite verification while preserving remote service health checks.
-- `./deploy current-branch` requires a clean local working tree and pushes the branch before moving the server checkout.
-- The helper has Forgejo-aware remote resolution for deployments and branch pushes.
-- When run from `/home/delta/islandflow` on the VPS itself, `./deploy` can execute locally instead of SSHing back into the same server.
-- Native deployment is opt-in and experimental:
+- The repo-root `docker-compose.yml` is local development infra only.
+- The VPS Docker stack lives in `deployment/docker`.
+- Docker is the supported runtime and rollback path.
+- Native Bun/systemd deployment assets live in `deployment/native` and are experimental/scope-gated.
+- Do not let Docker and native services own the same Islandflow worker/API scope at the same time; durable JetStream consumers make that unsafe.
+- When Docker workspace dependencies change, run `bun run sync:docker-workspace` and `bun run check:docker-workspace`.
 
-```bash
-./deploy main --runtime native
-./deploy current-branch --runtime native
-```
-
-Native deployment expects Bun, systemd units, host-reachable infra, and deliberate reverse-proxy changes. Native deploys are intended primarily for worker-only fast iteration until the public edge is cut over deliberately.
-
-Read more:
+Read:
 
 - `deployment/docker/README.md`
 - `deployment/native/README.md`
 
 ## Desktop Shell
 
-Islandflow includes a thin Electron desktop shell in `apps/desktop`.
+The Electron app in `apps/desktop` is a thin shell. It can load:
 
-What it is:
+- local web UI during development;
+- hosted `https://flow.deltaisland.io`;
+- trusted Islandflow app origins configured through `ISLANDFLOW_DESKTOP_START_URL`.
 
-- a macOS-first wrapper around the hosted app at `https://flow.deltaisland.io`,
-- a native app window plus packaging/distribution shell,
-- a way to run the existing web UI inside Electron without local backend services.
+It does not bundle backend services, local infra, auto-updates, signing, notarization, native notifications, or desktop-specific product features yet.
 
-What it is not yet:
-
-- a bundled backend runtime,
-- a packaged local Next.js frontend,
-- a desktop feature layer with notifications, preferences, auto-updates, signing, or notarization.
-
-Run the desktop shell against a local web UI:
+Commands:
 
 ```bash
 bun run dev:desktop
-```
-
-Run the desktop shell directly against the hosted app:
-
-```bash
 bun run dev:desktop:remote
-```
-
-Package the desktop shell:
-
-```bash
 bun run package:desktop
 bun run make:desktop
 ```
 
-Desktop-specific environment:
+## Planning And Work Tracking
 
-- `ISLANDFLOW_DESKTOP_START_URL` is only used by the Electron shell and is restricted to trusted Islandflow app origins.
-- `NEXT_PUBLIC_API_URL` remains the web app API/WebSocket origin control and usually points at `https://api.flow.deltaisland.io` when developing local UI inside Electron.
-
-## Environment Configuration
-
-All runtime configuration comes from `.env`.
-
-### Core infrastructure
-
-| Variable | Default | What it controls |
-| --- | --- | --- |
-| `NATS_URL` | `nats://127.0.0.1:4222` | JetStream broker address used by all services. |
-| `CLICKHOUSE_URL` | `http://127.0.0.1:8123` | ClickHouse HTTP endpoint for reads/writes. |
-| `CLICKHOUSE_DATABASE` | `default` | ClickHouse database/schema name. |
-| `REDIS_URL` | `redis://127.0.0.1:6379` | Redis endpoint for rolling stats, live caches, and candle cache. |
-
-### Ingest selection and synthetic behavior
-
-| Variable | Default | What it controls |
-| --- | --- | --- |
-| `OPTIONS_INGEST_ADAPTER` | `synthetic` | Options ingest source: `synthetic`, `alpaca`, `ibkr`, or `databento`. |
-| `EQUITIES_INGEST_ADAPTER` | `synthetic` | Equities ingest source: `synthetic` or `alpaca`. |
-| `EMIT_INTERVAL_MS` | `1000` | Emit cadence for synthetic ingest adapters. |
-| `SYNTHETIC_MARKET_MODE` | `realistic` | Legacy load alias used before the hosted control is changed: `realistic` -> `steady`, `active` -> `active`, `firehose` -> `firehose`. |
-| `SYNTHETIC_OPTIONS_MODE` | empty | Options-only legacy load alias override. |
-| `SYNTHETIC_EQUITIES_MODE` | empty | Equities-only legacy load alias override. |
-| `SYNTHETIC_CONTROL_ENABLED` | `false` | Enables the protected synthetic admin API when both hosted ingest adapters are synthetic. |
-| `SYNTHETIC_ADMIN_TOKEN` | empty | Bearer token required by the API and web proxy for synthetic admin requests. |
-| `NEXT_PUBLIC_SYNTHETIC_ADMIN` | `0` | Shows the internal synthetic control drawer in the web app when set to `1`. |
-
-Named demo profiles live in `@islandflow/synthetic-market/profiles`. The default `market-command` profile cycles deterministic scenario runs such as `phase03-a`, `phase03-b`, `phase03-f`, and `phase03-g`. Load profiles change playback cadence and repeated run count only: `steady` emits one run per base interval, `active` halves the interval, and `firehose` uses a quarter interval with two named runs per tick.
-
-### Alpaca and news configuration
-
-| Variable | Default | What it controls |
-| --- | --- | --- |
-| `ALPACA_API_KEY` | empty | Legacy single-token fallback kept for older Alpaca setups. Prefer explicit key ID + secret vars for current Alpaca auth. |
-| `ALPACA_API_KEY_ID` | empty | Preferred Alpaca key ID used for market-data REST and websocket auth. |
-| `ALPACA_KEY_ID` | empty | Alternate name accepted for the Alpaca key ID. |
-| `ALPACA_API_SECRET_KEY` | empty | Preferred Alpaca secret key paired with `ALPACA_API_KEY_ID`. |
-| `ALPACA_SECRET_KEY` | empty | Alternate name accepted for the Alpaca secret key. |
-| `ALPACA_REST_URL` | `https://data.alpaca.markets` | Alpaca REST base URL. |
-| `ALPACA_WS_BASE_URL` | `wss://stream.data.alpaca.markets/v1beta1` for options, `wss://stream.data.alpaca.markets` for equities/news | Alpaca websocket base URL. |
-| `ALPACA_FEED` | `indicative` | Options feed tier: `indicative` or `opra`. |
-| `ALPACA_UNDERLYINGS` | `SPY,NVDA,AAPL` | Comma-separated symbols targeted by Alpaca ingest. |
-| `ALPACA_STRIKES_PER_SIDE` | `8` | Contracts selected per side of spot for Alpaca options chain sampling. |
-| `ALPACA_MAX_DTE_DAYS` | `30` | Max days-to-expiry included for Alpaca options contract selection. |
-| `ALPACA_MONEYNESS_PCT` | `0.06` | Primary moneyness filter for Alpaca options contract selection. |
-| `ALPACA_MONEYNESS_FALLBACK_PCT` | `0.1` | Wider fallback moneyness filter if candidate set is too sparse. |
-| `ALPACA_MAX_QUOTES` | `200` | Upper bound on selected Alpaca options contracts/quotes per cycle. |
-| `ALPACA_EQUITIES_FEED` | `iex` | Alpaca equities feed: `iex` or `sip`. |
-| `ALPACA_NEWS_BACKFILL_LIMIT` | `50` | Alpaca news stories fetched on startup, capped at 50 by the Alpaca News API. |
-| `ALPACA_NEWS_WEBSOCKET_PATH` | `/v1beta1/news` | Alpaca news websocket path. |
-
-### Databento replay adapter configuration
-
-| Variable | Default | What it controls |
-| --- | --- | --- |
-| `DATABENTO_API_KEY` | empty | Databento API key. Required when `OPTIONS_INGEST_ADAPTER=databento`. |
-| `DATABENTO_DATASET` | `OPRA.PILLAR` | Databento dataset name. |
-| `DATABENTO_SCHEMA` | `trades` | Databento schema for options trade records. |
-| `DATABENTO_NBBO_SCHEMA` | `tbbo` | Databento schema for options NBBO records. |
-| `DATABENTO_START` | empty | Required replay start timestamp/string passed to sidecar. |
-| `DATABENTO_END` | empty | Optional replay end timestamp/string. |
-| `DATABENTO_SYMBOLS` | `ALL` | Symbol selection forwarded to Databento sidecar query. |
-| `DATABENTO_STYPE_IN` | `raw_symbol` | Databento input symbology type. |
-| `DATABENTO_STYPE_OUT` | `raw_symbol` | Databento output symbology type. |
-| `DATABENTO_LIMIT` | `0` | Max Databento records, where `0` means no explicit limit. |
-| `DATABENTO_PRICE_SCALE` | `1` | Multiplier applied to decoded prices from sidecar output. |
-| `DATABENTO_PYTHON_BIN` | `python3` | Python executable used to run Databento sidecar script. |
-
-### IBKR options adapter configuration
-
-| Variable | Default | What it controls |
-| --- | --- | --- |
-| `IBKR_HOST` | `127.0.0.1` | TWS/Gateway host for IBKR bridge. |
-| `IBKR_PORT` | `7497` | TWS/Gateway port for IBKR bridge. |
-| `IBKR_CLIENT_ID` | `0` | IBKR client id used by the bridge connection. |
-| `IBKR_SYMBOL` | `SPY` | Underlying symbol requested from IBKR. |
-| `IBKR_EXPIRY` | `20250117` | Option expiry requested from IBKR. |
-| `IBKR_STRIKE` | `450` | Strike requested from IBKR. |
-| `IBKR_RIGHT` | `C` | Option side: `C` or `P`. |
-| `IBKR_EXCHANGE` | `SMART` | IBKR exchange routing code. |
-| `IBKR_CURRENCY` | `USD` | Contract currency. |
-| `IBKR_PYTHON_BIN` | `python3` | Python executable used for IBKR sidecar. |
-
-### Options signal filtering
-
-| Variable | Default | What it controls |
-| --- | --- | --- |
-| `OPTIONS_SIGNAL_MODE` | `smart-money` | Signal pass policy: `smart-money`, `balanced`, or `all`. |
-| `OPTIONS_SIGNAL_MIN_NOTIONAL` | `10000` | Base minimum notional for most signal candidates. |
-| `OPTIONS_SIGNAL_ETF_MIN_NOTIONAL` | `50000` | ETF-specific minimum notional for signal inclusion. |
-| `OPTIONS_SIGNAL_BID_SIDE_MIN_NOTIONAL` | `25000` | Minimum notional for bid-side or sweep/ISO thresholds. |
-| `OPTIONS_SIGNAL_MID_MIN_NOTIONAL` | `20000` | Minimum notional for non-sweep/non-ISO `MID` prints. |
-| `OPTIONS_SIGNAL_NBBO_MAX_AGE_MS` | `1500` | NBBO freshness threshold used during signal classification. |
-| `OPTIONS_SIGNAL_ETF_UNDERLYINGS` | `SPY,QQQ,IWM,DIA,TLT,GLD,SLV,XLF,XLE,XLV,XLI,XLP,XLU,XLY,SMH,ARKK` | ETF underlyings treated specially by signal filters. |
-
-Default `smart-money` policy rejects lower-information prints and keeps higher-confidence, higher-notional, sweep-style flow. `balanced` lowers thresholds. `all` bypasses filtering.
-
-### Compute, classifier, and dark-inference configuration
-
-| Variable | Default | What it controls |
-| --- | --- | --- |
-| `CLUSTER_WINDOW_MS` | `500` | Time window used to cluster nearby option prints into packet candidates. |
-| `COMPUTE_DELIVER_POLICY` | `new` | Consumer start policy for compute subscriptions. |
-| `COMPUTE_CONSUMER_RESET` | `false` | Resets durable consumer position for compute on startup when true. |
-| `NBBO_MAX_AGE_MS` | `1000` | Max NBBO age accepted when enriching option prints in compute. |
-| `ROLLING_WINDOW_SIZE` | `50` | Number of observations retained per rolling metric key. |
-| `ROLLING_TTL_SEC` | `86400` | Redis TTL for rolling metric keys. |
-| `EQUITY_QUOTE_MAX_AGE_MS` | `1000` | Max quote staleness when joining equity prints for inference. |
-| `DARK_INFER_WINDOW_MS` | `60000` | Sliding window length for dark-style inference accumulation. |
-| `DARK_INFER_COOLDOWN_MS` | `30000` | Cooldown before repeated dark inferences for same symbol/pattern. |
-| `SMART_MONEY_EVENT_CALENDAR_PATH` | empty | Optional JSON event-calendar file used by compute. |
-| `REFDATA_EVENT_CALENDAR_PATH` | empty | Optional JSON event-calendar path for refdata; falls back to `SMART_MONEY_EVENT_CALENDAR_PATH`. |
-| `REFDATA_EVENT_CALENDAR_PROVIDER` | empty | Set to `alpha_vantage` to refresh event-calendar cache from Alpha Vantage. |
-| `ALPHA_VANTAGE_API_KEY` | empty | Alpha Vantage key for provider-backed event-calendar refresh. |
-
-### API, live cache, and web client
-
-| Variable | Default | What it controls |
-| --- | --- | --- |
-| `API_PORT` | `4000` | API service listen port. |
-| `REST_DEFAULT_LIMIT` | `200` | Default REST record count. |
-| `API_DELIVER_POLICY` | `new` | JetStream consumer start policy used by API live subscribers. |
-| `API_CONSUMER_RESET` | `false` | Resets/recreates API live durable consumers on startup when true. |
-| `API_CORS_ORIGINS` | `https://flow.deltaisland.io,http://127.0.0.1:3000,http://localhost:3000,http://127.0.0.1:3100,http://localhost:3100` | Comma-separated browser origins allowed to call the API directly; local web and desktop-local dev rely on these headers. |
-| `LIVE_LIMIT_DEFAULT` | `1000` | Optional generic live cache depth default. |
-| `LIVE_LIMIT_FLOW` | `500` | Live cache depth for flow packet events unless overridden. |
-| `LIVE_LIMIT_SMART_MONEY` | `300` | Live cache depth for smart-money events unless overridden. |
-| `LIVE_LIMIT_OPTIONS` | `1000` | Live cache depth for options channel unless overridden. |
-| `LIVE_LIMIT_ALERTS` | `300` | Live cache depth for alerts channel unless overridden. |
-| `LIVE_LIMIT_NEWS` | `100` | Live cache depth for news channel unless overridden. |
-| `NEXT_PUBLIC_API_URL` | `https://api.flow.deltaisland.io` for local web dev, auto-detected in browser when unset by other runners | Explicit base URL for API/WS calls from the web app. |
-| `NEXT_PUBLIC_LIVE_HOT_WINDOW` | `600` | Max hot-window items retained for non-options live streams in UI state. |
-| `NEXT_PUBLIC_LIVE_HOT_WINDOW_OPTIONS` | `1200` | Dedicated max hot-window items retained for options prints. |
-| `NEXT_PUBLIC_NBBO_MAX_AGE_MS` | `1000` | Frontend NBBO staleness threshold. |
-| `NEXT_PUBLIC_FLOW_FILTER_PRESET` | `smart-money` | Default flow filter preset: `smart-money`, `balanced`, or `all`. |
-| `NEXT_ALLOWED_DEV_ORIGINS` | empty, plus auto-detected local IPv4 addresses | Optional comma-separated extra hostnames/IPs allowed to load Next.js dev resources when local browser tooling reaches the dev server through a nonstandard local interface. |
-
-### Replay and testing controls
-
-| Variable | Default | What it controls |
-| --- | --- | --- |
-| `REPLAY_ENABLED` | `false` | Starts replay service in `bun run dev` when truthy. |
-| `REPLAY_SOURCE` | `clickhouse` | Replay backing source: `clickhouse` for materialized rows or `synthetic_fixture` for infra-free synthetic fixture replay. |
-| `REPLAY_SYNTHETIC_FIXTURE_DIR` | empty | Synthetic fixture directory containing `manifest.json` and sidecars when `REPLAY_SOURCE=synthetic_fixture`. |
-| `REPLAY_SYNTHETIC_MANIFEST_PATH` | empty | Direct synthetic fixture manifest path; takes precedence over `REPLAY_SYNTHETIC_FIXTURE_DIR`. |
-| `REPLAY_SYNTHETIC_SOURCE_ID` | `synthetic_market` | Synthetic source selector used to verify fixture provenance before replay. |
-| `REPLAY_SYNTHETIC_RUN_ID` | empty | Optional synthetic run selector; when set, the fixture run must match before replay starts. |
-| `REPLAY_STREAMS` | `options,nbbo,equities,equity-quotes` | Replay stream selection. |
-| `REPLAY_START_TS` | `0` | Replay lower-bound timestamp. |
-| `REPLAY_END_TS` | `0` | Replay upper-bound timestamp. |
-| `REPLAY_SPEED` | `1` | Replay speed multiplier. |
-| `REPLAY_BATCH_SIZE` | `200` | Batch fetch size per stream. |
-| `REPLAY_LOG_EVERY` | `1000` | Progress log interval. |
-| `TESTING_MODE` | `false` | Enables ingest publish throttling for deterministic/lower-volume test runs. |
-| `TESTING_THROTTLE_MS` | `200` | Minimum delay between emitted events while `TESTING_MODE=true`. |
-
-## Quick Notes
-
-- Python dependencies are required only for IBKR/Databento sidecars: `services/ingest-options/py/requirements.txt`.
-- Candle construction is server-side; the client consumes prebuilt OHLC events.
-- Option prints persist as enriched raw rows and can be queried as `view=signal` or `view=raw`.
-- The default Tape page options/packets posture is stock-only, hides `B` / `BB`, keeps calls and puts visible, and applies in-memory min-notional controls immediately.
-- Live retention uses ClickHouse for durable server history, Redis for bounded hot cache, and browser state for rendering windows/preferences.
-- Alert and drawer evidence is pinned and hydrated by id/trace so details remain inspectable after hot-window eviction.
-- Firehose readiness keeps raw ingest for storage/replay, routes default compute/UI through filtered signals, and keeps subscription contracts ready for server-side selective delivery.
-- This repository is for personal, non-redistributed usage.
-
-## Useful Examples
-
-Realistic local demo:
+Implementation work is tracked with Beads:
 
 ```bash
-SYNTHETIC_MARKET_MODE=realistic \
-OPTIONS_SIGNAL_MODE=smart-money \
-bun run dev
+bd prime
+bd ready
+bd show <issue-id>
+bd update <issue-id> --claim
 ```
 
-Active deterministic demo:
+Active implementation plans live under `docs/implementation`:
 
-```bash
-SYNTHETIC_MARKET_MODE=active bun run dev
-```
+| Stream | Entry point |
+| --- | --- |
+| Synthetic market data | `docs/implementation/synthetic-market-data/00-roadmap.md` |
+| Smart money / smart flow | `docs/implementation/smart-money/00-roadmap.md` |
+| Reusable market chart | `docs/implementation/lightweight-charts/IMPLEMENT.md` |
+| Durable tape modules | `docs/implementation/durable-tapes/IMPLEMENT.md` |
+| Durable-tapes performance hardening | `docs/implementation/durable-tapes-performance/IMPLEMENT.md` |
 
-Firehose stress test:
+Planning precedence for implementation work:
 
-```bash
-SYNTHETIC_MARKET_MODE=firehose \
-NEXT_PUBLIC_LIVE_HOT_WINDOW=2000 \
-bun run dev
-```
+1. Current Beads issue
+2. Referenced phase document under `docs/implementation`
+3. Architecture plan under `docs/plans`
+4. Research report under `docs/research-docs`
 
-Hosted demo profile controls:
+The product/design north star is in `PRODUCT.md`: precise, composed, forensic, evidence before impression, utility over theater, stable under volatility, and explicit about data semantics.
 
-```bash
-SYNTHETIC_CONTROL_ENABLED=true \
-SYNTHETIC_ADMIN_TOKEN=dev-token \
-NEXT_PUBLIC_SYNTHETIC_ADMIN=1 \
-NEXT_PUBLIC_API_URL=http://127.0.0.1:4000 \
-OPTIONS_INGEST_ADAPTER=synthetic \
-EQUITIES_INGEST_ADAPTER=synthetic \
-bun run dev
-```
+## Current Philosophy
 
-Open the synthetic control drawer in the terminal UI to select `Market Command`, `Event Response`, `Quiet Range`, or `Stress Tape`, then choose `Steady`, `Active`, or `Firehose` load.
+The codebase is finally moving toward the shape it probably needed from the start:
 
-Show raw options flow for debugging:
+- contracts before screens;
+- deterministic fixtures before demos;
+- replay before confidence;
+- evidence before labels;
+- small shared modules before repeated UI surfaces;
+- explicit uncertainty before pretend precision;
+- operationally boring services before polish.
 
-```text
-/prints/options?view=raw&security=all
-/history/options?view=raw&security=all&before_ts=<ts>&before_seq=<seq>
-/replay/options?view=raw&security=all&after_ts=<ts>&after_seq=<seq>
-```
+That is why the project may look more rebuilt than "iterated." The goal is not to preserve early assumptions. The goal is to learn from them and make the foundation strong enough that the eventual product can be useful without being fragile.
