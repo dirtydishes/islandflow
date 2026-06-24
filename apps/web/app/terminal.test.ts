@@ -97,6 +97,12 @@ const {
   getAlertFlowPacketRefs,
   normalizeTerminalPathname,
   resolveAlertFlowPacket,
+  selectDurableTapesAlertsPane,
+  selectDurableTapesEquitiesPane,
+  selectDurableTapesFlowPane,
+  selectDurableTapesNewsPane,
+  selectDurableTapesOptionsPane,
+  shallowEqualTerminalSelection,
   statusLabel,
   toggleFilterValue
 } = await import("./terminal");
@@ -136,6 +142,91 @@ const makeAlert = (overrides: Record<string, unknown> = {}) =>
     hits: [],
     ...overrides
   }) as any;
+
+describe("durable tapes pane selectors", () => {
+  it("keeps unrelated pane selections stable for an options-only update", () => {
+    const noop = () => {};
+    const filters = buildDefaultFlowFilters();
+    const flowPackets: any[] = [];
+    const equityPrints: any[] = [];
+    const alerts: any[] = [];
+    const newsStories: any[] = [];
+    const activeTickers = ["SPY"];
+    const newsFeed = {
+      status: "connected",
+      lastUpdate: 1_000
+    };
+    const basePrint = makeOptionPrint({ trace_id: "opt-base" });
+    const nextPrint = makeOptionPrint({ trace_id: "opt-next", seq: 2, ts: 2_000 });
+    const baseState = {
+      activeTickers,
+      classifierDecorByOptionTraceId: new Map(),
+      clearSelectedAlert: noop,
+      clearSelectedInstrument: noop,
+      filteredAlerts: alerts,
+      filteredEquities: equityPrints,
+      filteredFlow: flowPackets,
+      filteredNews: newsStories,
+      filteredOptions: [basePrint],
+      flowFilters: filters,
+      flowPacketMap: new Map(),
+      focusAlertContract: noop,
+      focusAlertEquity: noop,
+      focusEquityTicker: noop,
+      focusFlowPacketRequest: noop,
+      focusOptionContract: noop,
+      historicalNbboByTraceId: new Map(),
+      mode: "live",
+      nbboMap: new Map(),
+      news: newsFeed,
+      optionPrintMap: new Map([[basePrint.trace_id, basePrint]]),
+      packetIdByOptionTraceId: new Map(),
+      selectedAlert: null,
+      selectedInstrument: null,
+      setFlowFilters: noop,
+      setSelectedAlert: noop
+    } as any;
+    const nextState = {
+      ...baseState,
+      filteredOptions: [nextPrint, basePrint],
+      optionPrintMap: new Map([
+        [basePrint.trace_id, basePrint],
+        [nextPrint.trace_id, nextPrint]
+      ])
+    } as any;
+
+    expect(
+      shallowEqualTerminalSelection(
+        selectDurableTapesOptionsPane(baseState),
+        selectDurableTapesOptionsPane(nextState)
+      )
+    ).toBe(false);
+    expect(
+      shallowEqualTerminalSelection(
+        selectDurableTapesFlowPane(baseState),
+        selectDurableTapesFlowPane(nextState)
+      )
+    ).toBe(true);
+    expect(
+      shallowEqualTerminalSelection(
+        selectDurableTapesEquitiesPane(baseState),
+        selectDurableTapesEquitiesPane(nextState)
+      )
+    ).toBe(true);
+    expect(
+      shallowEqualTerminalSelection(
+        selectDurableTapesAlertsPane(baseState),
+        selectDurableTapesAlertsPane(nextState)
+      )
+    ).toBe(true);
+    expect(
+      shallowEqualTerminalSelection(
+        selectDurableTapesNewsPane(baseState),
+        selectDurableTapesNewsPane(nextState)
+      )
+    ).toBe(true);
+  });
+});
 
 describe("pinned evidence pruning", () => {
   it("returns the existing map when no entries need pruning", () => {

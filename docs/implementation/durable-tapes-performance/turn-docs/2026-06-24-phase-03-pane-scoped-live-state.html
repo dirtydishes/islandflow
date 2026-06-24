@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Durable Tapes Performance Phase 03: Pane-Scoped Live State</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "../../../../node_modules/react/index.js",
+          "react-dom/client": "../../../../node_modules/react-dom/client.js",
+          "@pierre/diffs/react": "../../../../node_modules/@pierre/diffs/dist/react/index.js"
+        }
+      }
+    </script>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #111820;
+        --panel-2: #0d141b;
+        --line: rgba(230, 237, 244, 0.14);
+        --line-strong: rgba(245, 166, 35, 0.36);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --green: #25c17a;
+        --red: #ff6b5f;
+        --blue: #4da3ff;
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: linear-gradient(180deg, #0b1016 0%, var(--bg) 100%);
+        color: var(--text);
+        font: 15px/1.55 var(--sans);
+      }
+
+      main {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+
+      header {
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 920px;
+        font-size: 2rem;
+        line-height: 1.08;
+        letter-spacing: 0;
+        text-wrap: balance;
+      }
+
+      h2,
+      .eyebrow,
+      .meta-label,
+      code,
+      pre,
+      table {
+        font-family: var(--mono);
+      }
+
+      h2 {
+        margin-bottom: 10px;
+        color: var(--accent);
+        font-size: 0.9rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .eyebrow {
+        margin-bottom: 8px;
+        color: var(--accent);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .subtitle {
+        max-width: 84ch;
+        margin-top: 12px;
+        color: var(--muted);
+      }
+
+      .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 1px;
+        margin-top: 18px;
+        border: 1px solid var(--line);
+        background: var(--line);
+      }
+
+      .meta-cell {
+        min-width: 0;
+        padding: 10px 12px;
+        background: var(--panel);
+      }
+
+      .meta-label {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--faint);
+        font-size: 0.66rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      section {
+        padding: 20px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      p + p {
+        margin-top: 10px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 7px;
+      }
+
+      code {
+        padding: 0.08rem 0.28rem;
+        border: 1px solid rgba(245, 166, 35, 0.18);
+        border-radius: 5px;
+        background: rgba(245, 166, 35, 0.1);
+        color: #ffe0a3;
+        font-size: 0.9em;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        font-size: 0.78rem;
+      }
+
+      th,
+      td {
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+      }
+
+      th {
+        color: var(--accent);
+        background: var(--panel-2);
+      }
+
+      td {
+        background: var(--panel);
+      }
+
+      .status-ok {
+        color: var(--green);
+      }
+
+      .status-note {
+        color: var(--blue);
+      }
+
+      .status-risk {
+        color: var(--red);
+      }
+
+      .diff-shell {
+        display: grid;
+        gap: 12px;
+      }
+
+      #rich-diff {
+        min-height: 32px;
+      }
+
+      #fallback-diff {
+        max-height: 620px;
+        overflow: auto;
+        margin: 0;
+        padding: 12px;
+        border: 1px solid var(--line);
+        background: var(--panel-2);
+        color: var(--text);
+        font-size: 0.76rem;
+        line-height: 1.45;
+      }
+
+      .rich-diff-ready #fallback-diff {
+        display: none;
+      }
+
+      .diff-note {
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="eyebrow">Repository turn document</div>
+        <h1>Durable Tapes Performance Phase 03: Pane-Scoped Live State</h1>
+        <p class="subtitle">
+          Split the durable-tapes route away from one broad terminal state consumer and routed each
+          pane through a stable terminal store selector. The route keeps one live websocket, keeps
+          the shared hydration scheduler, and preserves the existing pane UI.
+        </p>
+        <div class="meta-grid" aria-label="Turn metadata">
+          <div class="meta-cell"><span class="meta-label">Branch</span>lavender/ze79-phase-03-pane-scoped-live-state</div>
+          <div class="meta-cell"><span class="meta-label">Beads</span>islandflow-ze79.4</div>
+          <div class="meta-cell"><span class="meta-label">Scope</span>frontend state architecture</div>
+          <div class="meta-cell"><span class="meta-label">Timestamp</span>2026-06-24</div>
+        </div>
+      </header>
+
+      <section>
+        <h2>Summary</h2>
+        <ul>
+          <li>
+            Added a stable terminal state store and <code>useTerminalSelector</code> so route
+            children can subscribe to selected slices instead of the whole terminal context value.
+          </li>
+          <li>
+            Moved <code>/durable-tapes</code> into five memoized pane adapters:
+            options, flow, equities, alerts, and news.
+          </li>
+          <li>
+            Kept flow and equities on static array-backed sources fed by the existing shared
+            <code>/ws/live</code> session, avoiding duplicate websocket connections.
+          </li>
+          <li>
+            Made live feed timestamps channel-scoped and memoized static composed live feeds so
+            unrelated channel updates do not manufacture new pane props.
+          </li>
+          <li>
+            Kept alert evidence maps empty while no alert detail is selected, so options print map
+            churn does not wake the alert pane in its normal closed-detail state.
+          </li>
+          <li>
+            Moved closed terminal drawers behind their own selector so the shell no longer renders
+            drawer JSX against the full state on every live tick.
+          </li>
+          <li>
+            Reviewer repair tightened the drawer renderer boundary to a typed
+            <code>TerminalDrawerState</code> union instead of casting a partial selection back to
+            <code>TerminalState</code>.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Verification</h2>
+        <ul>
+          <li><span class="status-ok">pass</span> <code>bun install --frozen-lockfile</code></li>
+          <li><span class="status-ok">pass</span> <code>bunx biome check --write apps/web/app/terminal.tsx apps/web/app/terminal.test.ts apps/web/features/terminal/state.tsx apps/web/features/terminal/shell.tsx apps/web/features/terminal/pane-state.ts</code></li>
+          <li><span class="status-ok">pass</span> <code>bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts</code>: 98 tests, 232 assertions.</li>
+          <li><span class="status-ok">pass</span> <code>bun test apps/web/features/terminal apps/web/features/durable-tape</code>: 40 tests, 92 assertions.</li>
+          <li><span class="status-ok">pass</span> <code>bun --cwd=apps/web run build</code></li>
+          <li><span class="status-ok">pass</span> reviewer rerun of the two test gates, web build, and scoped Biome check after the drawer-state type repair.</li>
+          <li>
+            <span class="status-risk">red probe</span>
+            <code>bun run scripts/probes/durable-tapes-perf.ts --target=http://localhost:3100/durable-tapes --warmup=30s --duration=180s --output=docs/implementation/durable-tapes-performance/baselines/phase-03-local-hosted-api.json</code>
+            wrote the required report but failed the script CPU budget.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Probe Result</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Phase 00</th>
+              <th>Phase 01 After</th>
+              <th>Phase 03 Final</th>
+              <th>Budget</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Total requests</td><td>9,853</td><td>346</td><td>322</td><td class="status-ok">pass, &lt;= 500</td></tr>
+            <tr><td>Options support requests</td><td>3,473</td><td>82</td><td>80</td><td class="status-ok">pass, &lt;= 150</td></tr>
+            <tr><td>By-trace requests</td><td>1,737</td><td>126</td><td>122</td><td class="status-ok">pass, &lt;= 150</td></tr>
+            <tr><td>Aborted requests</td><td>8,117</td><td>0</td><td>0</td><td class="status-ok">pass, &lt;= 20</td></tr>
+            <tr><td>TaskDuration delta</td><td>59.1s</td><td>60.3s</td><td>44.8s</td><td class="status-ok">pass, &lt;= 45s</td></tr>
+            <tr><td>ScriptDuration delta</td><td>55.2s</td><td>56.6s</td><td>41.7s</td><td class="status-risk">fail, &lt;= 35s</td></tr>
+            <tr><td>Heap delta</td><td>44.3 MiB</td><td>-45.3 MiB</td><td>29.5 MiB</td><td class="status-ok">pass, &lt;= 125 MiB</td></tr>
+            <tr><td>Pane rows</td><td>70</td><td>70</td><td>70</td><td class="status-ok">pass, &gt;= 1</td></tr>
+          </tbody>
+        </table>
+        <p>
+          Final pane sanity: options 20 rows, flow 20 rows, equities 15 rows, alerts 15 rows, news
+          0 rows, five visible panes. The route is not blank. The residual red budget is script
+          CPU, not request fanout, abort churn, heap, or pane rendering.
+        </p>
+      </section>
+
+      <section>
+        <h2>Known Risks</h2>
+        <ul>
+          <li>
+            <span class="status-risk">residual CPU</span>
+            The final Phase 03 probe still reports <code>ScriptDuration</code> 41.65s against the
+            35s budget. This phase reduced broad state wakeups and cut script time versus the
+            Phase 01 after-baseline, but hot-row update mechanics remain in scope for Phase 04
+            incremental live buffers.
+          </li>
+          <li>
+            <span class="status-note">news quietness</span>
+            The hosted API run had no visible news rows. The aggregate row sanity still passed with
+            70 visible rows across the other panes, matching the Phase 00 and Phase 01 captures.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Reviewer Pass</h2>
+        <ul>
+          <li>
+            <span class="status-ok">repair</span>
+            Replaced the drawer selector's <code>Partial&lt;TerminalState&gt;</code> plus
+            <code>as TerminalState</code> cast with explicit closed/open drawer state types. This
+            keeps the pane-scoped optimization while making the narrowed contract visible to
+            TypeScript.
+          </li>
+          <li>
+            <span class="status-note">finding</span>
+            No remaining Phase 03 structural blocker was found after the repair. The residual CPU
+            budget miss stays owned by Phase 04 incremental live buffers.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <div class="diff-shell">
+          <p class="diff-note">
+            The rich renderer below uses browser-side <code>@pierre/diffs</code>. If it is not
+            available in this static context, the readable unified fallback remains visible.
+          </p>
+          <div id="rich-diff"></div>
+          <pre id="fallback-diff"><code>diff --git a/apps/web/features/terminal/state.tsx b/apps/web/features/terminal/state.tsx
+@@
++export const useTerminalSelector = &lt;T,&gt;(
++  selector: TerminalSelector&lt;T&gt;,
++  isEqual: TerminalSelectorEquality&lt;T&gt; = Object.is
++): T =&gt; {
++  const store = useContext(TerminalStateStoreContext);
++  const getSelectedSnapshot = useCallback(() =&gt; {
++    const next = selectorRef.current(store.getSnapshot());
++    if (hasSelectedRef.current &amp;&amp; equalityRef.current(selectedRef.current as T, next)) {
++      return selectedRef.current as T;
++    }
++    selectedRef.current = next;
++    hasSelectedRef.current = true;
++    return next;
++  }, [equalityRef, selectorRef, store]);
++  return useSyncExternalStore(store.subscribe, getSelectedSnapshot, getSelectedSnapshot);
++};
+@@
+-    lastUpdate: liveSession.lastUpdate,
++    lastUpdate: optionsLastUpdate,
+@@
++  const liveAlertItems = useMemo(
++    () =&gt; composeTapeItems([], liveSession.alerts, liveSession.alertsHistory),
++    [liveSession.alerts, liveSession.alertsHistory]
++  );
+@@
+-      ? toStaticTapeState(
+-          liveSession.status,
+-          composeTapeItems([], liveSession.alerts, liveSession.alertsHistory),
+-          liveSession.lastUpdate
+-        )
++      ? toStaticTapeState(liveSession.status, liveAlertItems, alertsLastUpdate)
+       : alerts;
+@@
+-        filteredOptions.filter(
++        filteredOptionsRef.current.filter(
+@@
+-        .map((traceId) =&gt; resolvedOptionPrintMap.get(traceId))
++        .map((traceId) =&gt; resolvedOptionPrintMapRef.current.get(traceId))
+
+diff --git a/apps/web/features/terminal/pane-state.ts b/apps/web/features/terminal/pane-state.ts
+new file mode 100644
+@@
++export const selectDurableTapesOptionsPane = (state: TerminalState) =&gt; ({
++  decorByTraceId: state.classifierDecorByOptionTraceId,
++  filters: state.flowFilters,
++  flowPacketById: state.flowPacketMap,
++  prints: state.filteredOptions
++});
++
++export const selectDurableTapesAlertsPane = (state: TerminalState) =&gt; {
++  const selectedAlert = state.selectedAlert;
++  return {
++    alerts: state.filteredAlerts,
++    flowPacketById: selectedAlert ? state.flowPacketMap : EMPTY_FLOW_PACKET_MAP,
++    optionPrintByTraceId: selectedAlert ? state.optionPrintMap : EMPTY_OPTION_PRINT_MAP,
++    selectedAlert
++  };
++};
+
+diff --git a/apps/web/app/terminal.tsx b/apps/web/app/terminal.tsx
+@@
+-export function DurableTapesExampleRoute() {
+-  const state = useTerminal();
++const DurableTapesFlowPane = memo(function DurableTapesFlowPane() {
++  const pane = useTerminalSelector(selectDurableTapesFlowPane, shallowEqualTerminalSelection);
++  const source = useMemo(() =&gt; createStaticFlowPacketsTapeSource(pane.packets), [pane.packets]);
++  return (
++    &lt;FlowPacketsTape
++      className="durable-tapes-flow"
++      filters={pane.filters}
++      onPacketFocus={pane.onPacketFocus}
++      source={source}
++      title="Flow Packets"
++    /&gt;
++  );
++});
+@@
++          &lt;DurableTapesOptionsPane /&gt;
++          &lt;DurableTapesFlowPane /&gt;
++          &lt;DurableTapesEquitiesPane /&gt;
++          &lt;DurableTapesAlertsPane /&gt;
++          &lt;DurableTapesNewsPane /&gt;
+
+diff --git a/apps/web/features/terminal/shell.tsx b/apps/web/features/terminal/shell.tsx
+@@
++const TerminalDrawersOutlet = memo(function TerminalDrawersOutlet({ renderDrawers }) {
++  const drawerState = useTerminalSelector(selectTerminalDrawerState, shallowEqualTerminalSelection);
++  return renderDrawers ? &lt;&gt;{renderDrawers(drawerState as TerminalState)}&lt;/&gt; : null;
++});
+@@
+-        {renderDrawers ? renderDrawers(state) : null}
++        &lt;TerminalDrawersOutlet renderDrawers={renderDrawers} /&gt;
+@@
+-export type TerminalDrawersRenderer = (state: TerminalState) =&gt; ReactNode;
++type TerminalDrawerClosedState = {
++  selectedAlert: null;
++  selectedClassifierHit: null;
++  selectedDarkEvent: null;
++  selectedNewsStory: null;
++  selectedSmartFlowProjection: null;
++  selectedSmartMoneyEvent: null;
++};
++
++type TerminalDrawerOpenState = Pick&lt;TerminalState, "selectedAlert" | "selectedNewsStory" | "selectedClassifierHit" | "selectedSmartFlowProjection" | "selectedSmartMoneyEvent" | "selectedDarkEvent" | "flowPacketMap" | "optionPrintMap"&gt;;
++export type TerminalDrawerState = TerminalDrawerClosedState | TerminalDrawerOpenState;
++export type TerminalDrawersRenderer = (state: TerminalDrawerState) =&gt; ReactNode;
+@@
+-const selectTerminalDrawerState = (state: TerminalState): Partial&lt;TerminalState&gt; =&gt; {
++const selectTerminalDrawerState = (state: TerminalState): TerminalDrawerState =&gt; {
+@@
+-  return renderDrawers ? renderDrawers(drawerState as TerminalState) : null;
++  return renderDrawers ? renderDrawers(drawerState) : null;
+
+diff --git a/apps/web/app/terminal.test.ts b/apps/web/app/terminal.test.ts
+@@
++describe("durable tapes pane selectors", () =&gt; {
++  it("keeps unrelated pane selections stable for an options-only update", () =&gt; {
++    expect(shallowEqualTerminalSelection(selectDurableTapesFlowPane(baseState), selectDurableTapesFlowPane(nextState))).toBe(true);
++    expect(shallowEqualTerminalSelection(selectDurableTapesEquitiesPane(baseState), selectDurableTapesEquitiesPane(nextState))).toBe(true);
++    expect(shallowEqualTerminalSelection(selectDurableTapesAlertsPane(baseState), selectDurableTapesAlertsPane(nextState))).toBe(true);
++    expect(shallowEqualTerminalSelection(selectDurableTapesNewsPane(baseState), selectDurableTapesNewsPane(nextState))).toBe(true);
++  });
++});
+</code></pre>
+        </div>
+      </section>
+    </main>
+
+    <script type="text/plain" id="patch-source">diff --git a/apps/web/features/terminal/state.tsx b/apps/web/features/terminal/state.tsx
+@@
++export const useTerminalSelector = <T,>(
++  selector: TerminalSelector<T>,
++  isEqual: TerminalSelectorEquality<T> = Object.is
++): T => {
++  const store = useContext(TerminalStateStoreContext);
++  const getSelectedSnapshot = useCallback(() => {
++    const next = selectorRef.current(store.getSnapshot());
++    if (hasSelectedRef.current && equalityRef.current(selectedRef.current as T, next)) {
++      return selectedRef.current as T;
++    }
++    selectedRef.current = next;
++    hasSelectedRef.current = true;
++    return next;
++  }, [equalityRef, selectorRef, store]);
++  return useSyncExternalStore(store.subscribe, getSelectedSnapshot, getSelectedSnapshot);
++};
+@@
+-    lastUpdate: liveSession.lastUpdate,
++    lastUpdate: optionsLastUpdate,
+@@
++  const liveAlertItems = useMemo(
++    () => composeTapeItems([], liveSession.alerts, liveSession.alertsHistory),
++    [liveSession.alerts, liveSession.alertsHistory]
++  );
+@@
+-      ? toStaticTapeState(
+-          liveSession.status,
+-          composeTapeItems([], liveSession.alerts, liveSession.alertsHistory),
+-          liveSession.lastUpdate
+-        )
++      ? toStaticTapeState(liveSession.status, liveAlertItems, alertsLastUpdate)
+       : alerts;
+@@
+-        filteredOptions.filter(
++        filteredOptionsRef.current.filter(
+@@
+-        .map((traceId) => resolvedOptionPrintMap.get(traceId))
++        .map((traceId) => resolvedOptionPrintMapRef.current.get(traceId))
+
+diff --git a/apps/web/features/terminal/pane-state.ts b/apps/web/features/terminal/pane-state.ts
+new file mode 100644
+@@
++export const selectDurableTapesOptionsPane = (state: TerminalState) => ({
++  decorByTraceId: state.classifierDecorByOptionTraceId,
++  filters: state.flowFilters,
++  flowPacketById: state.flowPacketMap,
++  prints: state.filteredOptions
++});
++
++export const selectDurableTapesAlertsPane = (state: TerminalState) => {
++  const selectedAlert = state.selectedAlert;
++  return {
++    alerts: state.filteredAlerts,
++    flowPacketById: selectedAlert ? state.flowPacketMap : EMPTY_FLOW_PACKET_MAP,
++    optionPrintByTraceId: selectedAlert ? state.optionPrintMap : EMPTY_OPTION_PRINT_MAP,
++    selectedAlert
++  };
++};
+
+diff --git a/apps/web/app/terminal.tsx b/apps/web/app/terminal.tsx
+@@
+-export function DurableTapesExampleRoute() {
+-  const state = useTerminal();
++const DurableTapesFlowPane = memo(function DurableTapesFlowPane() {
++  const pane = useTerminalSelector(selectDurableTapesFlowPane, shallowEqualTerminalSelection);
++  const source = useMemo(() => createStaticFlowPacketsTapeSource(pane.packets), [pane.packets]);
++  return (
++    <FlowPacketsTape
++      className="durable-tapes-flow"
++      filters={pane.filters}
++      onPacketFocus={pane.onPacketFocus}
++      source={source}
++      title="Flow Packets"
++    />
++  );
++});
+@@
++          <DurableTapesOptionsPane />
++          <DurableTapesFlowPane />
++          <DurableTapesEquitiesPane />
++          <DurableTapesAlertsPane />
++          <DurableTapesNewsPane />
+
+diff --git a/apps/web/features/terminal/shell.tsx b/apps/web/features/terminal/shell.tsx
+@@
++const TerminalDrawersOutlet = memo(function TerminalDrawersOutlet({ renderDrawers }) {
++  const drawerState = useTerminalSelector(selectTerminalDrawerState, shallowEqualTerminalSelection);
++  return renderDrawers ? <>{renderDrawers(drawerState as TerminalState)}</> : null;
++});
+@@
+-        {renderDrawers ? renderDrawers(state) : null}
++        <TerminalDrawersOutlet renderDrawers={renderDrawers} />
+@@
+-export type TerminalDrawersRenderer = (state: TerminalState) => ReactNode;
++type TerminalDrawerClosedState = {
++  selectedAlert: null;
++  selectedClassifierHit: null;
++  selectedDarkEvent: null;
++  selectedNewsStory: null;
++  selectedSmartFlowProjection: null;
++  selectedSmartMoneyEvent: null;
++};
++
++type TerminalDrawerOpenState = Pick<TerminalState, "selectedAlert" | "selectedNewsStory" | "selectedClassifierHit" | "selectedSmartFlowProjection" | "selectedSmartMoneyEvent" | "selectedDarkEvent" | "flowPacketMap" | "optionPrintMap">;
++export type TerminalDrawerState = TerminalDrawerClosedState | TerminalDrawerOpenState;
++export type TerminalDrawersRenderer = (state: TerminalDrawerState) => ReactNode;
+@@
+-const selectTerminalDrawerState = (state: TerminalState): Partial<TerminalState> => {
++const selectTerminalDrawerState = (state: TerminalState): TerminalDrawerState => {
+@@
+-  return renderDrawers ? renderDrawers(drawerState as TerminalState) : null;
++  return renderDrawers ? renderDrawers(drawerState) : null;
+
+diff --git a/apps/web/app/terminal.test.ts b/apps/web/app/terminal.test.ts
+@@
++describe("durable tapes pane selectors", () => {
++  it("keeps unrelated pane selections stable for an options-only update", () => {
++    expect(shallowEqualTerminalSelection(selectDurableTapesFlowPane(baseState), selectDurableTapesFlowPane(nextState))).toBe(true);
++    expect(shallowEqualTerminalSelection(selectDurableTapesEquitiesPane(baseState), selectDurableTapesEquitiesPane(nextState))).toBe(true);
++    expect(shallowEqualTerminalSelection(selectDurableTapesAlertsPane(baseState), selectDurableTapesAlertsPane(nextState))).toBe(true);
++    expect(shallowEqualTerminalSelection(selectDurableTapesNewsPane(baseState), selectDurableTapesNewsPane(nextState))).toBe(true);
++  });
++});
+</script>
+    <script type="module">
+      const target = document.getElementById("rich-diff");
+      const source = document.getElementById("patch-source")?.textContent ?? "";
+      try {
+        const React = await import("react");
+        const { createRoot } = await import("react-dom/client");
+        const { PatchDiff } = await import("@pierre/diffs/react");
+        createRoot(target).render(React.createElement(PatchDiff, { patch: source }));
+        document.documentElement.classList.add("rich-diff-ready");
+      } catch (error) {
+        target.textContent =
+          "Rich diff renderer unavailable in this static context; showing unified fallback.";
+        console.warn(error);
+      }
+    </script>
+  </body>
+</html>
