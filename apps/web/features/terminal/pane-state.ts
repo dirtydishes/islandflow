@@ -16,7 +16,10 @@ export const selectDurableTapesOptionsPane = (state: TerminalState) => ({
   onFiltersChange: state.setFlowFilters,
   onPacketFocus: state.focusFlowPacketRequest,
   packetIdByOptionTraceId: state.packetIdByOptionTraceId,
-  prints: state.filteredOptions
+  prints: state.filteredOptions,
+  rowViewModels: state.filteredDurableOptionRows,
+  rowViewModelStatus: state.durableRows.status,
+  useRowViewModels: state.mode === "live" && state.filteredDurableOptionRows.length > 0
 });
 
 export const selectDurableTapesFlowPane = (state: TerminalState) => ({
@@ -41,7 +44,10 @@ export const selectDurableTapesAlertsPane = (state: TerminalState) => {
     onPacketFocus: state.focusFlowPacketRequest,
     onSelectAlert: state.setSelectedAlert,
     optionPrintByTraceId: selectedAlert ? state.optionPrintMap : EMPTY_OPTION_PRINT_MAP,
-    selectedAlert
+    rowViewModels: state.filteredDurableAlertRows,
+    rowViewModelStatus: state.durableRows.status,
+    selectedAlert,
+    useRowViewModels: state.mode === "live" && state.filteredDurableAlertRows.length > 0
   };
 };
 

@@ -1,4 +1,5 @@
 export * from "./events";
+export * from "./durable-tapes";
 export * from "./live";
 export * from "./options-flow";
 export * from "./smart-flow";

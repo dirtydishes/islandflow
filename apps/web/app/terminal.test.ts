@@ -163,7 +163,10 @@ describe("durable tapes pane selectors", () => {
       classifierDecorByOptionTraceId: new Map(),
       clearSelectedAlert: noop,
       clearSelectedInstrument: noop,
+      durableRows: { status: "connected" },
       filteredAlerts: alerts,
+      filteredDurableAlertRows: [],
+      filteredDurableOptionRows: [],
       filteredEquities: equityPrints,
       filteredFlow: flowPackets,
       filteredNews: newsStories,
@@ -427,17 +430,22 @@ describe("live manifest", () => {
 
     expect(channels).toEqual([
       "options",
-      "nbbo",
+      "durable-rows",
       "equities",
       "flow",
       "news",
-      "alerts",
-      "classifier-hits"
+      "alerts"
     ]);
     expect(manifest.find((subscription) => subscription.channel === "options")?.filters).toBe(
       filters
     );
+    expect(manifest.find((subscription) => subscription.channel === "durable-rows")).toMatchObject({
+      lanes: ["options", "alerts"],
+      filters
+    });
     expect(manifest.find((subscription) => subscription.channel === "flow")?.filters).toBe(filters);
+    expect(channels).not.toContain("nbbo");
+    expect(channels).not.toContain("classifier-hits");
     expect(channels).not.toContain("equity-candles");
     expect(channels).not.toContain("equity-overlay");
   });
@@ -675,8 +683,9 @@ describe("route feature map", () => {
     expect(features.showEquitiesPane).toBe(true);
     expect(features.showNewsPane).toBe(true);
     expect(features.showAlertsPane).toBe(true);
-    expect(features.needsClassifierDecor).toBe(true);
-    expect(features.needsAlertEvidencePrefetch).toBe(true);
+    expect(features.durableRows).toBe(true);
+    expect(features.needsClassifierDecor).toBe(false);
+    expect(features.needsAlertEvidencePrefetch).toBe(false);
     expect(features.showChartPane).toBe(false);
     expect(features.equityCandles).toBe(false);
   });

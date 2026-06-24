@@ -309,6 +309,104 @@ describe("LiveStateManager", () => {
     ]);
   });
 
+  it("composes durable option and alert row models from cached live windows", async () => {
+    const now = Date.now();
+    const manager = new LiveStateManager(makeClickHouse(), null);
+    const optionPrint = {
+      source_ts: now + 5,
+      ingest_ts: now + 6,
+      seq: 8,
+      trace_id: "print:7",
+      ts: now + 5,
+      option_contract_id: "SPY-2025-01-17-450-C",
+      underlying_id: "SPY",
+      option_type: "call",
+      price: 1.25,
+      size: 10,
+      exchange: "X",
+      notional: 12_500,
+      nbbo_side: "A",
+      signal_pass: true,
+      signal_reasons: ["large_print"],
+      signal_profile: "balanced",
+      execution_nbbo_bid: 1.2,
+      execution_nbbo_ask: 1.3,
+      execution_nbbo_mid: 1.25,
+      execution_nbbo_age_ms: 12,
+      execution_underlying_spot: 450.1
+    };
+    const flowPacket = {
+      source_ts: now,
+      ingest_ts: now + 1,
+      seq: 7,
+      trace_id: "flowpacket:7",
+      id: "flowpacket:7",
+      members: ["print:7"],
+      features: {
+        option_contract_id: "SPY-2025-01-17-450-C"
+      },
+      join_quality: {}
+    };
+    const classifierHit = {
+      source_ts: now + 10,
+      ingest_ts: now + 11,
+      seq: 9,
+      trace_id: "classifier:flowpacket:7",
+      classifier_id: "large_call",
+      confidence: 0.91,
+      direction: "bullish",
+      explanations: ["large premium"]
+    };
+    const smartMoney = makeSmartMoneyEvent(now + 12);
+    const alert = {
+      source_ts: now + 20,
+      ingest_ts: now + 21,
+      seq: 10,
+      trace_id: "alert:flowpacket:7",
+      score: 91,
+      severity: "high",
+      primary_profile_id: "institutional_directional",
+      hits: [
+        {
+          classifier_id: "large_call",
+          confidence: 0.91,
+          direction: "bullish",
+          explanations: ["large premium"]
+        }
+      ],
+      evidence_refs: ["flowpacket:7", "print:7"]
+    };
+
+    await manager.ingest("flow", flowPacket);
+    await manager.ingest("options", optionPrint);
+    await manager.ingest("classifier-hits", classifierHit);
+    await manager.ingest("smart-money", smartMoney);
+    await manager.ingest("alerts", alert);
+
+    const snapshot = await manager.getSnapshot({
+      channel: "durable-rows",
+      lanes: ["options", "alerts"],
+      snapshot_limit: 10
+    });
+    const rows = snapshot.items as Array<Record<string, any>>;
+    const optionRow = rows.find((row) => row.lane === "options");
+    const alertRow = rows.find((row) => row.lane === "alerts");
+
+    expect(optionRow?.support.packet.id).toBe("flowpacket:7");
+    expect(optionRow?.support.smart_money.profile_id).toBe("institutional_directional");
+    expect(optionRow?.option.nbbo.source).toBe("print");
+    expect(alertRow?.evidence.primary_packet.id).toBe("flowpacket:7");
+    expect(alertRow?.evidence.preview_prints[0]?.trace_id).toBe("print:7");
+
+    const deltaRows = manager.composeDurableRowsForEvent(
+      { channel: "durable-rows", lanes: ["options"], snapshot_limit: 10 },
+      "classifier-hits",
+      classifierHit
+    );
+    expect(deltaRows).toHaveLength(1);
+    expect((deltaRows[0] as any).support.classifier.classifier_id).toBe("large_call");
+  });
+
   it("reorders out-of-order live events without dropping newest-first semantics", async () => {
     const now = Date.now();
     const manager = new LiveStateManager(makeClickHouse(), null, {

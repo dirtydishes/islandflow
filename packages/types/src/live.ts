@@ -13,6 +13,10 @@ import {
   OptionPrintSchema,
   SmartMoneyEventSchema
 } from "./events";
+import {
+  DurableTapeComposedLaneSchema,
+  DurableTapeRowViewModelSchema
+} from "./durable-tapes";
 import { OptionFlowFiltersSchema, optionFlowFilterKey } from "./options-flow";
 import { SmartFlowExplainabilityProjectionSchema } from "./smart-flow";
 
@@ -51,6 +55,7 @@ export const LiveChannelSchema = z.enum([
   "alerts",
   "inferred-dark",
   "news",
+  "durable-rows",
   "equity-candles",
   "equity-overlay"
 ]);
@@ -110,6 +115,14 @@ export const LiveSubscriptionSchema = z.discriminatedUnion("channel", [
     snapshot_limit: z.number().int().positive().optional()
   }),
   z.object({
+    channel: z.literal("durable-rows"),
+    lanes: z.array(DurableTapeComposedLaneSchema).min(1).max(2).optional(),
+    filters: OptionFlowFiltersSchema.optional(),
+    underlying_ids: z.array(z.string().min(1)).optional(),
+    option_contract_id: z.string().min(1).optional(),
+    snapshot_limit: z.number().int().positive().optional()
+  }),
+  z.object({
     channel: z.literal("equities"),
     underlying_ids: z.array(z.string().min(1)).optional(),
     snapshot_limit: z.number().int().positive().optional()
@@ -140,6 +153,7 @@ const livePayloadSchemas = {
   alerts: AlertEventSchema,
   "inferred-dark": InferredDarkEventSchema,
   news: NewsStorySchema,
+  "durable-rows": DurableTapeRowViewModelSchema,
   "equity-candles": EquityCandleSchema,
   "equity-overlay": EquityPrintSchema
 } as const;
@@ -252,6 +266,18 @@ export const getSubscriptionKey = (subscription: LiveSubscription): string => {
         ? `|underlyings:${[...subscription.underlying_ids].sort().join(",")}`
         : "";
       return `${subscription.channel}${underlyings}`;
+    }
+    case "durable-rows": {
+      const lanes = subscription.lanes?.length
+        ? `|lanes:${[...subscription.lanes].sort().join(",")}`
+        : "";
+      const underlyings = subscription.underlying_ids?.length
+        ? `|underlyings:${[...subscription.underlying_ids].sort().join(",")}`
+        : "";
+      const contract = subscription.option_contract_id
+        ? `|contract:${subscription.option_contract_id}`
+        : "";
+      return `${subscription.channel}${lanes}|${optionFlowFilterKey(subscription.filters)}${underlyings}${contract}`;
     }
     case "equity-candles":
       return `${subscription.channel}|${subscription.underlying_id}|${subscription.interval_ms}`;
