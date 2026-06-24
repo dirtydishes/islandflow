@@ -49,8 +49,7 @@ export function createLiveWindowBuffer<TItem>(
 export function createLiveWindowBuffer<TItem>(
   options: LiveWindowBufferOptions<TItem> = {}
 ): LiveWindowBuffer<TItem> {
-  const accessors =
-    options.accessors ?? (DEFAULT_ACCESSORS as DurableTapeItemAccessors<TItem>);
+  const accessors = options.accessors ?? (DEFAULT_ACCESSORS as DurableTapeItemAccessors<TItem>);
   const limit = normalizeLimit(options.limit);
   const itemsByKey = new Map<string, TItem>();
   const orderedKeys: string[] = [];

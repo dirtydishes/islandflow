@@ -20,6 +20,7 @@ import type {
 import { getSubscriptionKey as getLiveSubscriptionKey } from "@islandflow/types";
 import type { Dispatch, SetStateAction } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { LiveWindowBuffer } from "../durable-tape";
 import {
   LIVE_HISTORY_BATCH,
   LIVE_HISTORY_SOFT_CAP,
@@ -32,10 +33,10 @@ import {
 import { appendOptionFlowFilters, shouldRetainLiveSnapshotHistory } from "./filters";
 import { appendLiveScopeParams } from "./routes";
 import {
-  EMPTY_PAUSABLE_TAPE,
   appendHistoryTail,
   composeTapeItems,
   createLiveWindowBuffer,
+  EMPTY_PAUSABLE_TAPE,
   extractSortTs,
   flushPausableTapeData,
   getLiveHistoryRetentionCap,
@@ -45,15 +46,14 @@ import {
   projectPausableTapeState,
   reducePausableTapeData
 } from "./tape";
-import type { LiveWindowBuffer } from "../durable-tape";
 import {
   buildApiUrl,
   buildWsUrl,
   extractTracePrefix,
-  readErrorDetail,
   type MessageType,
   type ReplayCursor,
   type ReplayResponse,
+  readErrorDetail,
   type StreamMessage
 } from "./transport";
 import type { PausableTapeData, SortableItem, TapeMode, WsStatus } from "./types";
