@@ -124,14 +124,14 @@ Supported routing modes:
    - Build web with `NEXT_PUBLIC_API_URL=` (empty).
    - Point `app.<domain>` at the web host port.
    - Proxy these API routes from the app origin to the API host port:
-     - `/ws/*`, `/replay/*`, `/prints/*`, `/joins/*`, `/nbbo/*`, `/dark/*`, `/flow/*`, `/candles/*`, `/history/*`
+     - `/ws/*`, `/replay/*`, `/prints/*`, `/joins/*`, `/nbbo/*`, `/quotes/*`, `/dark/*`, `/flow/*`, `/candles/*`, `/history/*`, `/news/*`, `/lookup/*`, `/option-prints/*`, `/equity-joins/*`
 
 Enable websocket support on whichever host serves `/ws/*`.
 
 For the current live Nginx Proxy Manager setup behind `<production-app-origin>`, keep the API location regex durable in the proxy host advanced config or API, not by hand-editing generated files under `/data/nginx/proxy_host/`. The route matcher should include history:
 
 ```nginx
-^/(ws|replay|prints|joins|nbbo|dark|flow|candles|history)/
+^/(ws|replay|prints|joins|nbbo|quotes|dark|flow|candles|history|news|lookup|option-prints|equity-joins)(/|$)
 ```
 
 ## Replay service

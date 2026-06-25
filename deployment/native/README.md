@@ -146,7 +146,7 @@ This validates:
 The edge switch helper updates the Nginx Proxy Manager database entries for `<production-app-origin-host>` and `<raw-api-origin-host>`, preserving the same-origin Islandflow API location matcher:
 
 ```nginx
-^/(ws|replay|prints|joins|nbbo|dark|flow|candles|history)/
+^/(ws|replay|prints|joins|nbbo|quotes|dark|flow|candles|history|news|lookup|option-prints|equity-joins)(/|$)
 ```
 
 For native cutover, the helper targets the NPM bridge gateway IP by default, not `host.docker.internal`. NPM generates `proxy_pass` with a runtime-resolved `$server` variable, so Docker's `/etc/hosts` alias is not sufficient for these proxy hosts. On the current VPS that native target resolves to `172.18.0.1`, which reaches the host-native `3000` and `4000` listeners from the NPM container.

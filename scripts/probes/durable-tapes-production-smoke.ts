@@ -34,7 +34,7 @@ Usage:
 
 Options:
   --web-target <url>             Deployed durable-tapes URL, e.g. <production-app-origin>/durable-tapes.
-  --api-origin <origin>          Expected explicit API origin, e.g. <raw-api-origin>.
+  --api-origin <origin>          Raw or internal API origin that must not appear in the browser bundle.
   --timeout <duration>           Per-request timeout. Default: 10s
   --max-endpoint-latency <ms>    Support/evidence latency budget. Default: 5000ms
   --output <path>                Write JSON report to this path.
@@ -114,7 +114,7 @@ const parseArgs = (args: string[]): SmokeOptions => {
     throw new Error("Missing --web-target <production-app-origin>/durable-tapes");
   }
   if (!options.apiOrigin) {
-    throw new Error("Missing --api-origin <raw-api-origin>");
+    throw new Error("Missing --api-origin <raw-api-origin-or-internal-origin>");
   }
 
   new URL(options.webTarget);
@@ -298,16 +298,16 @@ const websocketDataToText = async (data: unknown): Promise<string> => {
 
 const checkDurableRowsWebSocket = async ({
   checks,
-  apiOrigin,
+  origin,
   timeoutMs,
   maxLatencyMs
 }: {
   checks: SmokeCheck[];
-  apiOrigin: string;
+  origin: string;
   timeoutMs: number;
   maxLatencyMs: number;
 }): Promise<void> => {
-  const url = websocketUrlForApiOrigin(apiOrigin);
+  const url = websocketUrlForApiOrigin(origin);
   const startedAt = performance.now();
 
   await new Promise<void>((resolve) => {
@@ -457,59 +457,50 @@ const run = async (): Promise<void> => {
   const scriptUrls = webHtml ? extractScriptUrls(webHtml, options.webTarget) : [];
   const bundleScan = await scanBundleForApiOrigin(scriptUrls, options.apiOrigin, options.timeoutMs);
 
-  let sameOriginProxyValid = false;
-  let sameOriginProxyChecked = false;
-  let sameOriginSupportProxyValid = false;
-  let sameOriginEvidenceProxyValid = false;
-  if (!bundleScan.found) {
-    sameOriginProxyChecked = true;
-    const sameOriginSupportUrl = new URL("/lookup/options-support", webOrigin).toString();
-    const sameOriginCheck = await fetchEndpointCheck({
-      checks,
-      name: "same-origin support proxy fallback",
-      url: sameOriginSupportUrl,
-      timeoutMs: options.timeoutMs,
-      maxLatencyMs: options.maxEndpointLatencyMs,
-      init: {
-        method: "POST",
-        headers: { accept: "application/json", "content-type": "application/json" },
-        body: JSON.stringify({ trace_ids: [], nbbo_context: [] })
-      }
-    });
-    sameOriginSupportProxyValid = sameOriginCheck.ok;
-    const sameOriginEvidenceCheck = await fetchEndpointCheck({
-      checks,
-      name: "same-origin by-trace proxy fallback",
-      url: optionPrintsMissUrl(webOrigin, "phase06-same-origin-smoke-miss"),
-      timeoutMs: options.timeoutMs,
-      maxLatencyMs: options.maxEndpointLatencyMs,
-      init: { headers: { accept: "application/json" } },
-      validate: validateOptionPrintMissJson
-    });
-    sameOriginEvidenceProxyValid = sameOriginEvidenceCheck.ok;
-    sameOriginProxyValid = sameOriginSupportProxyValid && sameOriginEvidenceProxyValid;
-  } else {
-    pushCheck(checks, {
-      name: "same-origin support proxy fallback",
-      status: "skip",
-      detail: "public bundle contains the expected API origin"
-    });
-    pushCheck(checks, {
-      name: "same-origin by-trace proxy fallback",
-      status: "skip",
-      detail: "public bundle contains the expected API origin"
-    });
-  }
+  pushCheck(checks, {
+    name: "browser bundle raw API origin exposure",
+    status: bundleScan.found ? "fail" : "pass",
+    url: bundleScan.matchedScriptUrl ?? undefined,
+    detail: bundleScan.found
+      ? `browser bundle references ${options.apiOrigin}`
+      : `scanned ${bundleScan.scannedScriptCount}/${scriptUrls.length} scripts`
+  });
 
-  const routingOk = bundleScan.found || sameOriginProxyValid;
+  const sameOriginSupportUrl = new URL("/lookup/options-support", webOrigin).toString();
+  const sameOriginCheck = await fetchEndpointCheck({
+    checks,
+    name: "same-origin support proxy",
+    url: sameOriginSupportUrl,
+    timeoutMs: options.timeoutMs,
+    maxLatencyMs: options.maxEndpointLatencyMs,
+    init: {
+      method: "POST",
+      headers: { accept: "application/json", "content-type": "application/json" },
+      body: JSON.stringify({ trace_ids: [], nbbo_context: [] })
+    }
+  });
+  const sameOriginSupportProxyValid = sameOriginCheck.ok;
+  const sameOriginEvidenceCheck = await fetchEndpointCheck({
+    checks,
+    name: "same-origin by-trace proxy",
+    url: optionPrintsMissUrl(webOrigin, "phase02-same-origin-smoke-miss"),
+    timeoutMs: options.timeoutMs,
+    maxLatencyMs: options.maxEndpointLatencyMs,
+    init: { headers: { accept: "application/json" } },
+    validate: validateOptionPrintMissJson
+  });
+  const sameOriginEvidenceProxyValid = sameOriginEvidenceCheck.ok;
+  const sameOriginProxyValid = sameOriginSupportProxyValid && sameOriginEvidenceProxyValid;
+
+  const routingOk = !bundleScan.found && sameOriginProxyValid;
   pushCheck(checks, {
     name: "browser REST routing",
     status: routingOk ? "pass" : "fail",
-    detail: bundleScan.found
-      ? `bundle references ${options.apiOrigin}`
-      : sameOriginProxyChecked
-        ? "expected API origin missing from bundle and same-origin proxy check failed"
-        : "expected API origin missing from bundle"
+    detail: routingOk
+      ? "raw API origin absent from bundle and same-origin REST proxy checks passed"
+      : bundleScan.found
+        ? `raw API origin ${options.apiOrigin} leaked into browser bundle`
+        : "same-origin proxy check failed"
   });
 
   const healthUrl = new URL("/health", options.apiOrigin).toString();
@@ -532,7 +523,7 @@ const run = async (): Promise<void> => {
 
   await checkDurableRowsWebSocket({
     checks,
-    apiOrigin: options.apiOrigin,
+    origin: webOrigin,
     timeoutMs: options.timeoutMs,
     maxLatencyMs: options.maxEndpointLatencyMs
   });
@@ -578,7 +569,7 @@ const run = async (): Promise<void> => {
       matchedScriptUrl: bundleScan.matchedScriptUrl,
       scannedScriptCount: bundleScan.scannedScriptCount,
       scriptTagCount: scriptUrls.length,
-      sameOriginProxyChecked,
+      sameOriginProxyChecked: true,
       sameOriginProxyValid,
       sameOriginSupportProxyValid,
       sameOriginEvidenceProxyValid

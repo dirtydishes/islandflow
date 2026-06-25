@@ -1,4 +1,4 @@
-import { LOCAL_HOSTS } from "./config";
+import { buildBrowserApiUrl, buildBrowserWsUrl } from "../api-transport";
 
 export type MessageType =
   | "option-print"
@@ -94,42 +94,9 @@ export const extractReplaySource = <T>(item: T): string | null => {
 };
 
 export const buildWsUrl = (path: string): string => {
-  const envBase = process.env.NEXT_PUBLIC_API_URL;
-
-  if (envBase) {
-    const url = new URL(envBase);
-    url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-    url.pathname = path;
-    url.search = "";
-    url.hash = "";
-    return url.toString();
-  }
-
-  const { protocol, hostname } = window.location;
-  const wsProtocol = protocol === "https:" ? "wss" : "ws";
-  const isLocal = LOCAL_HOSTS.has(hostname);
-  const host = isLocal ? `${hostname}:4000` : window.location.host;
-
-  return `${wsProtocol}://${host}${path}`;
+  return buildBrowserWsUrl(path);
 };
 
 export const buildApiUrl = (path: string): string => {
-  const envBase = process.env.NEXT_PUBLIC_API_URL;
-
-  if (envBase) {
-    const url = new URL(envBase);
-    const secure = url.protocol === "https:" || url.protocol === "wss:";
-    url.protocol = secure ? "https:" : "http:";
-    url.pathname = path;
-    url.search = "";
-    url.hash = "";
-    return url.toString();
-  }
-
-  const { protocol, hostname } = window.location;
-  const httpProtocol = protocol === "https:" ? "https" : "http";
-  const isLocal = LOCAL_HOSTS.has(hostname);
-  const host = isLocal ? `${hostname}:4000` : window.location.host;
-
-  return `${httpProtocol}://${host}${path}`;
+  return buildBrowserApiUrl(path);
 };
