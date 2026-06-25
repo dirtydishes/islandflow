@@ -28,7 +28,7 @@ Make production browser traffic use the app origin for REST and websocket calls 
 bd show islandflow-hnbk.3
 bun test apps/web/features/terminal apps/web/features/news-wire apps/web/app/api/admin/synthetic
 bun --cwd=apps/web run build
-bun run scripts/probes/durable-tapes-production-smoke.ts --target=<production-app-origin>/durable-tapes --api-origin=<internal-or-placeholder-origin>
+bun run scripts/probes/durable-tapes-production-smoke.ts --web-target=<production-app-origin>/durable-tapes --api-origin=<internal-or-placeholder-origin>
 ```
 
 ## Implementation Subagents
