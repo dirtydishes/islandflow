@@ -107,12 +107,12 @@ describe("news wire helpers", () => {
     const cursor = getNewsStoryCursor(makeStory({ published_ts: 123_456, seq: 9 }));
     const url = buildNewsWireHistoryUrl({
       cursor,
-      buildApiUrl: (path) => `https://api.flow.deltaisland.io${path}`
+      buildApiUrl: (path) => `https://api.example.test${path}`
     });
 
     expect(cursor).toEqual({ ts: 123_456, seq: 9 });
     expect(url).toBe(
-      `https://api.flow.deltaisland.io${NEWS_WIRE_HISTORY_ENDPOINT}?before_ts=123456&before_seq=9&limit=${NEWS_WIRE_HISTORY_BATCH}`
+      `https://api.example.test${NEWS_WIRE_HISTORY_ENDPOINT}?before_ts=123456&before_seq=9&limit=${NEWS_WIRE_HISTORY_BATCH}`
     );
   });
 
@@ -128,7 +128,7 @@ describe("news wire helpers", () => {
     const page = await fetchNewsWireHistoryPage({
       cursor: { ts: 1_000, seq: 10 },
       filters: { symbols: ["AAPL"] },
-      buildApiUrl: (path) => `https://api.flow.deltaisland.io${path}`,
+      buildApiUrl: (path) => `https://api.example.test${path}`,
       fetcher: async (url) => {
         requestedUrls.push(url);
         if (requestedUrls.length === 1) {

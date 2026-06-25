@@ -23,8 +23,6 @@ type SmokeOptions = {
   outputPath?: string;
 };
 
-const DEFAULT_WEB_TARGET = "https://flow.deltaisland.io/durable-tapes";
-const DEFAULT_API_ORIGIN = "https://api.flow.deltaisland.io";
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_MAX_ENDPOINT_LATENCY_MS = 5_000;
 
@@ -35,8 +33,8 @@ Usage:
   bun run scripts/probes/durable-tapes-production-smoke.ts [options]
 
 Options:
-  --web-target <url>             Deployed durable-tapes URL. Default: ${DEFAULT_WEB_TARGET}
-  --api-origin <origin>          Expected public API origin. Default: ${DEFAULT_API_ORIGIN}
+  --web-target <url>             Deployed durable-tapes URL, e.g. <production-app-origin>/durable-tapes.
+  --api-origin <origin>          Expected explicit API origin, e.g. <raw-api-origin>.
   --timeout <duration>           Per-request timeout. Default: 10s
   --max-endpoint-latency <ms>    Support/evidence latency budget. Default: 5000ms
   --output <path>                Write JSON report to this path.
@@ -80,9 +78,7 @@ const readOptionValue = (args: string[], index: number, option: string): [string
 const normalizeOrigin = (value: string): string => new URL(value).origin;
 
 const parseArgs = (args: string[]): SmokeOptions => {
-  const options: SmokeOptions = {
-    webTarget: DEFAULT_WEB_TARGET,
-    apiOrigin: DEFAULT_API_ORIGIN,
+  const options: Partial<SmokeOptions> = {
     timeoutMs: DEFAULT_TIMEOUT_MS,
     maxEndpointLatencyMs: DEFAULT_MAX_ENDPOINT_LATENCY_MS
   };
@@ -114,9 +110,16 @@ const parseArgs = (args: string[]): SmokeOptions => {
     }
   }
 
+  if (!options.webTarget) {
+    throw new Error("Missing --web-target <production-app-origin>/durable-tapes");
+  }
+  if (!options.apiOrigin) {
+    throw new Error("Missing --api-origin <raw-api-origin>");
+  }
+
   new URL(options.webTarget);
   options.apiOrigin = normalizeOrigin(options.apiOrigin);
-  return options;
+  return options as SmokeOptions;
 };
 
 const isHtmlResponse = (contentType: string, body: string): boolean => {

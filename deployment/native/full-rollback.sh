@@ -22,6 +22,6 @@ echo "Restarting Docker Islandflow runtime."
   docker compose up -d web api compute candles ingest-options ingest-equities ingest-news
 )
 
-curl -I -fksS "${DEPLOY_PUBLIC_APP_URL:-https://flow.deltaisland.io}" >/dev/null
-curl -fksS "${DEPLOY_PUBLIC_API_HEALTH_URL:-https://api.flow.deltaisland.io/health}" >/dev/null
+curl -I -fksS "${DEPLOY_PUBLIC_APP_URL:?Set DEPLOY_PUBLIC_APP_URL to <production-app-origin>}" >/dev/null
+curl -fksS "${DEPLOY_PUBLIC_API_HEALTH_URL:?Set DEPLOY_PUBLIC_API_HEALTH_URL to <raw-api-origin>/health}" >/dev/null
 echo "Rollback validation passed."

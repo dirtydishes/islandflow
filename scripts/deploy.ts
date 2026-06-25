@@ -44,7 +44,7 @@ const SSH_OPTIONS = ["-i", SSH_KEY, "-o", "IdentitiesOnly=yes", "-o", "BatchMode
 const ALLOWED_REMOTE_UNTRACKED = new Set([
   "deployment/docker/signal-cli-0.14.3-Linux-native.tar.gz"
 ]);
-const PUBLIC_APP_URL = process.env.DEPLOY_PUBLIC_APP_URL?.trim() || "https://flow.deltaisland.io";
+const PUBLIC_APP_URL = process.env.DEPLOY_PUBLIC_APP_URL?.trim() || null;
 const PUBLIC_API_HEALTH_URL = process.env.DEPLOY_PUBLIC_API_HEALTH_URL?.trim() || null;
 const DEPLOY_GIT_REMOTE_OVERRIDE = process.env.DEPLOY_GIT_REMOTE?.trim() || null;
 const DEPLOY_NATIVE_EDGE_READY = process.env.DEPLOY_NATIVE_EDGE_READY?.trim() === "1";
@@ -140,7 +140,7 @@ Environment:
   DEPLOY_GIT_REMOTE                Override git remote used for deploy fetch/pull/push (auto-detected by default).
   DEPLOY_SSH_KEY_PATH              Override the SSH key used for remote execution.
   DEPLOY_FORCE_SSH                 Set to 1 to force SSH even when running from the live server checkout.
-  DEPLOY_PUBLIC_APP_URL             Override the public app URL (default: https://flow.deltaisland.io).
+  DEPLOY_PUBLIC_APP_URL             Public app URL for deploy verification, e.g. <production-app-origin>.
   DEPLOY_PUBLIC_API_HEALTH_URL      Optional separate public API health URL for two-origin deployments.
   DEPLOY_NATIVE_EDGE_READY          Set to 1 to allow native rollouts that include the public web or API edge.
   DEPLOY_NATIVE_SYSTEMCTL_PREFIX    Override systemctl invocation for native rollouts (default: sudo -n systemctl).
@@ -1279,8 +1279,15 @@ function remoteVerification(runtime: DeployRuntime, pieces: DeployPiece[], fast:
 
 function publicVerification(pieces: DeployPiece[], fast: boolean): void {
   section("Public Verification");
+  const needsPublicAppUrl =
+    piecesIncludeWeb(pieces) || (piecesIncludeApi(pieces) && !fast && !PUBLIC_API_HEALTH_URL);
+  if (needsPublicAppUrl && !PUBLIC_APP_URL) {
+    throw new Error("Set DEPLOY_PUBLIC_APP_URL=<production-app-origin> for public verification.");
+  }
+  const publicAppUrl = PUBLIC_APP_URL ?? "";
+
   if (piecesIncludeWeb(pieces)) {
-    runChecked("curl", ["-I", "-fksS", PUBLIC_APP_URL]);
+    runChecked("curl", ["-I", "-fksS", publicAppUrl]);
   } else {
     console.log("[deploy] Skipping public app HEAD check because web scope is not included.");
   }
@@ -1297,7 +1304,7 @@ function publicVerification(pieces: DeployPiece[], fast: boolean): void {
       );
       return;
     }
-    runChecked("bun", ["run", "scripts/check-public-api-routes.ts", PUBLIC_APP_URL]);
+    runChecked("bun", ["run", "scripts/check-public-api-routes.ts", publicAppUrl]);
   }
 }
 

@@ -9,18 +9,18 @@ import {
 
 describe("api cors helpers", () => {
   const allowedOrigins = parseCorsAllowedOrigins(
-    "https://flow.deltaisland.io, http://127.0.0.1:3000/, http://localhost:3100"
+    "https://app.example.test, http://127.0.0.1:3000/, http://localhost:3100"
   );
 
   it("normalizes configured origins", () => {
-    expect(allowedOrigins.has("https://flow.deltaisland.io")).toBe(true);
+    expect(allowedOrigins.has("https://app.example.test")).toBe(true);
     expect(allowedOrigins.has("http://127.0.0.1:3000")).toBe(true);
     expect(allowedOrigins.has("http://localhost:3100")).toBe(true);
     expect(allowedOrigins.has("http://127.0.0.1:3000/")).toBe(false);
   });
 
   it("reflects allowed browser origins", () => {
-    const req = new Request("https://api.flow.deltaisland.io/prints/options", {
+    const req = new Request("https://api.example.test/prints/options", {
       headers: {
         origin: "http://127.0.0.1:3000"
       }
@@ -29,11 +29,11 @@ describe("api cors helpers", () => {
     expect(resolveCorsOrigin(req, allowedOrigins)).toBe("http://127.0.0.1:3000");
   });
 
-  it("keeps the hosted-backend web QA fallback port in default origins", () => {
+  it("keeps the alternate local web dev port in default origins", () => {
     const defaultOrigins = parseCorsAllowedOrigins(DEFAULT_API_CORS_ORIGINS);
 
     for (const origin of ["http://127.0.0.1:3100", "http://localhost:3100"]) {
-      const req = new Request("https://api.flow.deltaisland.io/history/news", {
+      const req = new Request("https://api.example.test/history/news", {
         headers: {
           origin
         }
@@ -44,7 +44,7 @@ describe("api cors helpers", () => {
   });
 
   it("does not reflect unknown origins", () => {
-    const req = new Request("https://api.flow.deltaisland.io/prints/options", {
+    const req = new Request("https://api.example.test/prints/options", {
       headers: {
         origin: "http://evil.example"
       }
@@ -54,9 +54,9 @@ describe("api cors helpers", () => {
   });
 
   it("adds cors headers to normal responses for allowed origins", async () => {
-    const req = new Request("https://api.flow.deltaisland.io/health", {
+    const req = new Request("https://api.example.test/health", {
       headers: {
-        origin: "https://flow.deltaisland.io"
+        origin: "https://app.example.test"
       }
     });
     const response = withCorsHeaders(
@@ -69,14 +69,14 @@ describe("api cors helpers", () => {
       allowedOrigins
     );
 
-    expect(response.headers.get("access-control-allow-origin")).toBe("https://flow.deltaisland.io");
+    expect(response.headers.get("access-control-allow-origin")).toBe("https://app.example.test");
     expect(response.headers.get("vary")).toBe("Origin");
     expect(response.headers.get("content-type")).toBe("application/json");
     expect(await response.json()).toEqual({ status: "ok" });
   });
 
   it("answers preflight requests for allowed origins", () => {
-    const req = new Request("https://api.flow.deltaisland.io/lookup/options-support", {
+    const req = new Request("https://api.example.test/lookup/options-support", {
       method: "OPTIONS",
       headers: {
         origin: "http://localhost:3100",

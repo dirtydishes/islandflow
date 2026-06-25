@@ -1,3 +1,4 @@
+// Product trust-policy constant for the hosted app shell. This is not an API default.
 export const DESKTOP_PRODUCTION_URL = "https://flow.deltaisland.io";
 export const DESKTOP_LOCAL_DEV_URL = "http://127.0.0.1:3000";
 

@@ -1,5 +1,4 @@
 export const DEFAULT_API_CORS_ORIGINS = [
-  "https://flow.deltaisland.io",
   "http://127.0.0.1:3000",
   "http://localhost:3000",
   "http://127.0.0.1:3100",

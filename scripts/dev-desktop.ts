@@ -2,8 +2,8 @@ import net from "node:net";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-const DESKTOP_REMOTE_URL = "https://flow.deltaisland.io";
-const DESKTOP_REMOTE_API_URL = "https://api.flow.deltaisland.io";
+const DESKTOP_REMOTE_URL = Bun.env.ISLANDFLOW_DESKTOP_REMOTE_URL?.trim() || "";
+const DESKTOP_LOCAL_API_URL = "http://127.0.0.1:4000";
 const DESKTOP_LOCAL_URL = "http://127.0.0.1:3000";
 const WEB_PORT = 3000;
 
@@ -269,10 +269,17 @@ if (!remoteMode) {
     cmd: ["bun", "run", "dev"],
     cwd: "apps/web",
     env: {
-      NEXT_PUBLIC_API_URL: Bun.env.NEXT_PUBLIC_API_URL ?? DESKTOP_REMOTE_API_URL
+      NEXT_PUBLIC_API_URL: Bun.env.NEXT_PUBLIC_API_URL ?? DESKTOP_LOCAL_API_URL
     }
   });
   await waitForWebPort();
+}
+
+if (remoteMode && !DESKTOP_REMOTE_URL) {
+  console.error(
+    "[dev:desktop] Set ISLANDFLOW_DESKTOP_REMOTE_URL=<production-app-origin> for remote mode."
+  );
+  process.exit(1);
 }
 
 spawnChild({

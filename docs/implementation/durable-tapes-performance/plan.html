@@ -525,8 +525,8 @@
 bun test apps/web/features/terminal apps/web/features/durable-tape
 bun test services/api/tests packages/storage/tests
 bun --cwd=apps/web run build</code></pre>
-        <p>For web-only browser QA, use hosted API unless the phase says otherwise:</p>
-        <pre><code>WEB_DEV_PORT=3100 NEXT_PUBLIC_API_URL=https://api.flow.deltaisland.io bun run dev:web</code></pre>
+        <p>For web-only browser QA, use the local API unless the phase says otherwise:</p>
+        <pre><code>bun run dev:web</code></pre>
         <p>
           Final production closeout must include deployed native probe evidence and should close
           <code>islandflow-ba9q</code> only after the user-facing meltdown is fixed.
