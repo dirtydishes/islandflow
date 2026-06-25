@@ -229,7 +229,8 @@ Important groups:
 - Equities ingest: `EQUITIES_INGEST_ADAPTER=synthetic|alpaca`
 - Provider credentials: Alpaca, Databento, IBKR, Alpha Vantage
 - Synthetic controls: `SYNTHETIC_CONTROL_ENABLED`, `SYNTHETIC_ADMIN_TOKEN`, `NEXT_PUBLIC_SYNTHETIC_ADMIN`
-- API/web: `API_PORT`, `API_CORS_ORIGINS`, `NEXT_PUBLIC_API_URL`, live retention limits
+- API/web: `API_PORT`, `API_HOST`, `API_CORS_ORIGINS`, `NEXT_PUBLIC_API_URL`, `ISLANDFLOW_INTERNAL_API_URL`, live retention limits
+- API edge safety: `API_RATE_LIMIT_ENABLED`, `API_RATE_LIMIT_WINDOW_MS`, `API_RATE_LIMIT_REST_MAX`, `API_RATE_LIMIT_LOOKUP_MAX`, `API_RATE_LIMIT_WS_MAX`
 - Compute: NBBO freshness, rolling windows, classifier/smart-flow thresholds, cache sizes
 - Replay: `REPLAY_ENABLED`, `REPLAY_STREAMS`, `REPLAY_START_TS`, `REPLAY_END_TS`, `REPLAY_SPEED`
 - Deployment: Docker and native runtime variables under `deployment/docker/.env.example` and `deployment/native`
@@ -308,6 +309,69 @@ The default production-like runtime is Docker:
 ```
 
 Use `./deploy` with no arguments for the guided deploy prompt.
+
+### Private-edge API deployment
+
+After the private-edge cutover, the hosted app is the public product surface. The API still runs, but browsers should reach it through same-origin routes on `<production-app-origin>`, not through `<raw-api-origin>`.
+
+The configuration split is:
+
+- `NEXT_PUBLIC_API_URL=` stays empty for production web builds. This makes browser REST and websocket clients use same-origin paths such as `<production-app-origin>/prints/options` and `<production-app-origin>/ws/live`.
+- `ISLANDFLOW_INTERNAL_API_URL=<internal-api-origin>` is server-only. Next.js route handlers use it when they need to call the backend API directly.
+- `API_HOST=<internal-api-bind-host>` should bind the API only where the edge can reach it. For the current native Nginx Proxy Manager deployment, this is the host-side bridge address used by the NPM container.
+- `API_CORS_ORIGINS` can include `<production-app-origin>` and local dev origins. It is not the thing that makes the API private; edge closure and bind address do that.
+- `API_RATE_LIMIT_ENABLED=1` and the matching limit values should be enabled in production once the edge forwards `X-Forwarded-For` or `X-Real-IP`.
+
+For the current VPS deployment, native systemd is the active runtime. The API is added to the public app by keeping the native API service running and making Nginx Proxy Manager route API path prefixes from the app proxy host to the internal API origin:
+
+```bash
+systemctl --user status islandflow-web islandflow-api
+curl -fsS <internal-api-origin>/health
+
+export ISLANDFLOW_APP_DOMAIN=<production-app-origin-host>
+export ISLANDFLOW_API_DOMAIN=<raw-api-origin-host>
+./deployment/native/switch-npm-edge.sh native --raw-api=closed
+```
+
+That switch keeps `<raw-api-origin>` closed and installs the same-origin matcher on the app host for:
+
+```text
+/(ws|replay|prints|joins|nbbo|quotes|dark|flow|candles|history|news|lookup|option-prints|equity-joins)(/|$)
+```
+
+Then deploy native web/API changes with the edge guardrail acknowledged:
+
+```bash
+export DEPLOY_NATIVE_SYSTEMCTL_PREFIX="systemctl --user"
+export DEPLOY_NATIVE_EDGE_READY=1
+./deploy main --runtime native --pieces api,web
+```
+
+If only `.env` values changed and no `NEXT_PUBLIC_*` value changed, restarting the relevant units is enough:
+
+```bash
+systemctl --user restart islandflow-api islandflow-web
+```
+
+If `NEXT_PUBLIC_API_URL` changed, rebuild and redeploy the web app because it is a Next.js build-time value:
+
+```bash
+export DEPLOY_NATIVE_SYSTEMCTL_PREFIX="systemctl --user"
+export DEPLOY_NATIVE_EDGE_READY=1
+./deploy main --runtime native --web-only
+```
+
+Verify the private-edge posture from the server and from the public edge:
+
+```bash
+curl -fsS <internal-api-origin>/health
+bun run scripts/check-public-api-routes.ts <production-app-origin>
+curl -sS -o /dev/null -w "%{http_code}\n" --max-time 5 <raw-api-origin>/health
+```
+
+The first two checks should pass. The raw API check should not return healthy API JSON; closed, timeout, 404-style, 403, 410, 421, or 502 behavior is acceptable after cutover.
+
+For Docker rollback, keep the same public posture: `NEXT_PUBLIC_API_URL=` remains empty, `ISLANDFLOW_INTERNAL_API_URL=http://api:4000`, and `./deployment/native/switch-npm-edge.sh docker --raw-api=closed` retargets same-origin app routes to the Docker `api` service without reopening the raw API host.
 
 Important deployment notes:
 
