@@ -14,7 +14,7 @@ export const isSyntheticAdminFeatureEnabled = (
 export const getSyntheticAdminProxyConfig = (
   env: Record<string, string | undefined> = process.env
 ): { apiBaseUrl: string; token: string } | null => {
-  const apiBaseUrl = env.NEXT_PUBLIC_API_URL?.trim();
+  const apiBaseUrl = env.ISLANDFLOW_INTERNAL_API_URL?.trim();
   const token = env.SYNTHETIC_ADMIN_TOKEN?.trim();
   if (!apiBaseUrl || !token) {
     return null;

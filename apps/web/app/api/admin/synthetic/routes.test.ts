@@ -6,7 +6,8 @@ const originalFetch = globalThis.fetch;
 describe("synthetic admin proxy helpers", () => {
   beforeEach(() => {
     process.env.NEXT_PUBLIC_SYNTHETIC_ADMIN = "1";
-    process.env.NEXT_PUBLIC_API_URL = "http://127.0.0.1:4000";
+    delete process.env.NEXT_PUBLIC_API_URL;
+    process.env.ISLANDFLOW_INTERNAL_API_URL = "http://127.0.0.1:4000";
     process.env.SYNTHETIC_ADMIN_TOKEN = "secret-token";
   });
 
@@ -24,6 +25,13 @@ describe("synthetic admin proxy helpers", () => {
       apiBaseUrl: "http://127.0.0.1:4000",
       token: "secret-token"
     });
+  });
+
+  it("does not use NEXT_PUBLIC_API_URL for server proxy config", () => {
+    delete process.env.ISLANDFLOW_INTERNAL_API_URL;
+    process.env.NEXT_PUBLIC_API_URL = "https://api.example.test";
+
+    expect(getSyntheticAdminProxyConfig()).toBeNull();
   });
 
   it("proxies status requests with the backend admin token", async () => {

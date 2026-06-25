@@ -6,6 +6,7 @@ import {
   parseLivePayload
 } from "@islandflow/types";
 
+import { buildBrowserApiUrl, buildBrowserWsUrl } from "../api-transport";
 import {
   createDurableTapeInitialHistoryCursor,
   type DurableTapeSource,
@@ -27,43 +28,13 @@ import type {
 const DEFAULT_HISTORY_PAGE_SIZE = 200;
 const DEFAULT_SNAPSHOT_LIMIT = 200;
 const DEFAULT_MAX_FILTERED_HISTORY_PAGES = 6;
-const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
-
-const getEnvApiBase = (): string | undefined => process.env.NEXT_PUBLIC_API_URL;
 
 export const buildEquitiesTapeApiUrl = (path: string, apiBaseUrl?: string): string => {
-  const base = apiBaseUrl ?? getEnvApiBase();
-  if (base) {
-    const url = new URL(base);
-    const secure = url.protocol === "https:" || url.protocol === "wss:";
-    url.protocol = secure ? "https:" : "http:";
-    url.pathname = path;
-    url.search = "";
-    url.hash = "";
-    return url.toString();
-  }
-
-  const { protocol, hostname } = window.location;
-  const isLocal = LOCAL_HOSTS.has(hostname);
-  const host = isLocal ? `${hostname}:4000` : window.location.host;
-  return `${protocol === "https:" ? "https" : "http"}://${host}${path}`;
+  return buildBrowserApiUrl(path, apiBaseUrl);
 };
 
 export const buildEquitiesTapeWsUrl = (path: string, wsBaseUrl?: string): string => {
-  const base = wsBaseUrl ?? getEnvApiBase();
-  if (base) {
-    const url = new URL(base);
-    url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-    url.pathname = path;
-    url.search = "";
-    url.hash = "";
-    return url.toString();
-  }
-
-  const { protocol, hostname } = window.location;
-  const isLocal = LOCAL_HOSTS.has(hostname);
-  const host = isLocal ? `${hostname}:4000` : window.location.host;
-  return `${protocol === "https:" ? "wss" : "ws"}://${host}${path}`;
+  return buildBrowserWsUrl(path, wsBaseUrl);
 };
 
 const parseEquityPrints = (items: unknown[]): EquityPrint[] =>

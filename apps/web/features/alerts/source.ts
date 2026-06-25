@@ -4,6 +4,7 @@ import type { AlertEvent } from "@islandflow/types";
 import { AlertEventSchema } from "@islandflow/types";
 import { useEffect, useMemo, useRef } from "react";
 
+import { buildBrowserApiUrl } from "../api-transport";
 import {
   createDurableTapeInitialHistoryCursor,
   type DurableTapeCursor,
@@ -21,26 +22,9 @@ import type {
 
 const DEFAULT_HISTORY_PAGE_SIZE = 160;
 const DEFAULT_MAX_FILTERED_HISTORY_PAGES = 5;
-const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
-
-const getEnvApiBase = (): string | undefined => process.env.NEXT_PUBLIC_API_URL;
 
 export const buildAlertsApiUrl = (path: string, apiBaseUrl?: string): string => {
-  const base = apiBaseUrl ?? getEnvApiBase();
-  if (base) {
-    const url = new URL(base);
-    const secure = url.protocol === "https:" || url.protocol === "wss:";
-    url.protocol = secure ? "https:" : "http:";
-    url.pathname = path;
-    url.search = "";
-    url.hash = "";
-    return url.toString();
-  }
-
-  const { protocol, hostname } = window.location;
-  const isLocal = LOCAL_HOSTS.has(hostname);
-  const host = isLocal ? `${hostname}:4000` : window.location.host;
-  return `${protocol === "https:" ? "https" : "http"}://${host}${path}`;
+  return buildBrowserApiUrl(path, apiBaseUrl);
 };
 
 const parseAlerts = (items: unknown[]): AlertEvent[] => AlertEventSchema.array().parse(items);

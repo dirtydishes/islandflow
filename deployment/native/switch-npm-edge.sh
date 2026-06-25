@@ -76,7 +76,7 @@ db_path, target, app_domain, api_domain, native_host, docker_web_host, docker_ap
 web_host = native_host if target == "native" else docker_web_host
 api_host = native_host if target == "native" else docker_api_host
 
-advanced_config = f"""location ~ ^/(ws|replay|prints|joins|nbbo|dark|flow|candles|history)/ {{
+advanced_config = f"""location ~ ^/(ws|replay|prints|joins|nbbo|quotes|dark|flow|candles|history|news|lookup|option-prints|equity-joins)(/|$) {{
   set $forward_scheme http;
   set $server         "{api_host}";
   set $port           {api_port};

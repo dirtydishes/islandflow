@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>API Private Edge Phase 02 Same-Origin Production Transport</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #07090c;
+        --panel: #101820;
+        --panel-2: #0b1117;
+        --text: #e8eef5;
+        --dim: #9aa9b8;
+        --green: #31c27c;
+        --amber: #f0a83a;
+        --red: #ff6b5f;
+        --blue: #62a8ff;
+        --border: #ffffff18;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.55 ui-sans-serif, system-ui, sans-serif;
+      }
+
+      main {
+        width: min(1180px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 40px 0 72px;
+      }
+
+      header,
+      section {
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+        background: var(--panel);
+        padding: 20px 0;
+      }
+
+      section {
+        margin-top: 18px;
+      }
+
+      h1,
+      h2,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        margin-bottom: 8px;
+        font: 700 1.65rem/1.15 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      h2 {
+        margin-bottom: 12px;
+        color: var(--amber);
+        font: 700 0.78rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      p,
+      li,
+      td {
+        color: var(--dim);
+      }
+
+      code {
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 1px 5px;
+        background: #ffffff0a;
+        color: var(--text);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--panel-2);
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--border);
+        padding: 9px 10px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--text);
+        font: 700 0.72rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .kicker {
+        margin-bottom: 10px;
+        color: var(--amber);
+        font: 700 0.72rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 12px;
+      }
+
+      .tile {
+        border: 1px solid var(--border);
+        background: var(--panel-2);
+        padding: 12px;
+      }
+
+      .ok {
+        color: var(--green);
+      }
+
+      .warn {
+        color: var(--red);
+      }
+
+      .note {
+        color: var(--blue);
+      }
+
+      pre {
+        overflow-x: auto;
+        margin: 0;
+        border: 1px solid var(--border);
+        background: #05080c;
+        padding: 12px;
+        color: var(--text);
+        font: 0.78rem/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .diff-card {
+        border: 1px solid var(--border);
+        background: #070b10;
+      }
+
+      .diff-mount {
+        display: none;
+      }
+
+      .diff-card.rendered .diff-mount {
+        display: block;
+      }
+
+      .diff-card.rendered .diff-fallback {
+        display: none;
+      }
+
+      .diff-fallback {
+        border: 0;
+      }
+
+      .diff-fallback code {
+        border: 0;
+        padding: 0;
+        background: transparent;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="kicker">Turn documentation | June 25, 2026</div>
+        <h1>API Private Edge Phase 02 Same-Origin Production Transport</h1>
+        <p>
+          Phase 02 for <code>islandflow-hnbk.3</code> switches production browser
+          REST and websocket defaults to app-origin paths while keeping local
+          development on the local API and preserving <code>NEXT_PUBLIC_API_URL</code>
+          as an explicit override.
+        </p>
+      </header>
+
+      <section>
+        <h2>Outcome</h2>
+        <div class="grid">
+          <div class="tile">
+            <strong class="ok">Browser transport</strong>
+            <p>
+              Added a shared web transport helper and moved terminal, options,
+              equities, flow packet, alerts, and news builders onto one
+              same-origin/local/override contract.
+            </p>
+          </div>
+          <div class="tile">
+            <strong class="ok">Server-only API origin</strong>
+            <p>
+              Synthetic admin route proxy configuration now reads
+              <code>ISLANDFLOW_INTERNAL_API_URL</code> instead of
+              <code>NEXT_PUBLIC_API_URL</code>.
+            </p>
+          </div>
+          <div class="tile">
+            <strong class="ok">Edge matcher</strong>
+            <p>
+              NPM same-origin matcher and public route checks now cover
+              <code>ws</code>, <code>replay</code>, <code>prints</code>,
+              <code>joins</code>, <code>nbbo</code>, <code>quotes</code>,
+              <code>dark</code>, <code>flow</code>, <code>candles</code>,
+              <code>history</code>, <code>news</code>, <code>lookup</code>,
+              <code>option-prints</code>, and <code>equity-joins</code>.
+            </p>
+          </div>
+          <div class="tile">
+            <strong class="ok">Probe posture</strong>
+            <p>
+              Durable-tapes production smoke now fails if the scanned browser
+              bundle contains the supplied raw or internal API origin.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Changed Files</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Area</th>
+              <th>Files</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Browser transport</td>
+              <td>
+                <code>apps/web/features/api-transport.ts</code>,
+                <code>apps/web/features/api-transport.test.ts</code>,
+                <code>apps/web/features/terminal/transport.ts</code>,
+                <code>apps/web/features/*/source.ts</code>,
+                <code>apps/web/features/news-wire/history.ts</code>
+              </td>
+            </tr>
+            <tr>
+              <td>Server proxy env</td>
+              <td>
+                <code>apps/web/app/api/admin/synthetic/shared.ts</code>,
+                <code>apps/web/app/api/admin/synthetic/routes.test.ts</code>,
+                <code>.env.example</code>,
+                <code>deployment/docker/.env.example</code>
+              </td>
+            </tr>
+            <tr>
+              <td>Deploy and probes</td>
+              <td>
+                <code>deployment/native/switch-npm-edge.sh</code>,
+                <code>deployment/native/README.md</code>,
+                <code>deployment/docker/README.md</code>,
+                <code>scripts/check-public-api-routes.ts</code>,
+                <code>scripts/probes/durable-tapes-production-smoke.ts</code>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Command</th>
+              <th>Result</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="ok">pass</td>
+              <td>
+                <code>bun test apps/web/features/api-transport.test.ts apps/web/features/terminal apps/web/features/news-wire apps/web/app/api/admin/synthetic</code>
+              </td>
+              <td>30 tests passed.</td>
+            </tr>
+            <tr>
+              <td class="ok">pass</td>
+              <td>
+                <code>bun test apps/web/features/options-tape apps/web/features/equities-tape apps/web/features/flow-packets apps/web/features/alerts</code>
+              </td>
+              <td>28 nearby feature tests passed for the modules moved onto the shared transport helper.</td>
+            </tr>
+            <tr>
+              <td class="ok">pass</td>
+              <td>
+                <code>bun --cwd=apps/web run build</code>
+              </td>
+              <td>Production web build completed.</td>
+            </tr>
+            <tr>
+              <td class="ok">pass</td>
+              <td><code>bun run scripts/probes/durable-tapes-production-smoke.ts --help</code></td>
+              <td>Probe CLI parses and documents the new raw-origin exposure check.</td>
+            </tr>
+            <tr>
+              <td class="ok">pass</td>
+              <td><code>git diff --check</code></td>
+              <td>No whitespace errors in the patch.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Helper Fan-In</h2>
+        <ul>
+          <li>Browser transport helper identified duplicated REST/WS builders and a <code>wss:</code> override downgrade gap.</li>
+          <li>Server proxy helper confirmed synthetic admin routes were the only Next route handlers reading public API config.</li>
+          <li>Deployment helper identified the missing NPM prefixes and the need for <code>(/|$)</code> exact-prefix matching.</li>
+          <li>Probe helper confirmed the production smoke previously passed when the raw API origin was embedded in the browser bundle.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p>
+          This section keeps the standard HTML unified diff visible by default.
+          If browser module loading succeeds, the same patch is rendered with
+          <code>PatchDiff</code> from browser-side <code>@pierre/diffs/react</code>.
+        </p>
+        <div class="diff-card" data-patch-diff>
+          <div class="diff-mount" aria-label="Rendered diff"></div>
+          <pre class="diff-fallback"><code>diff --git a/apps/web/features/api-transport.ts b/apps/web/features/api-transport.ts
+new file mode 100644
++const DEFAULT_LOCAL_API_ORIGIN = "http://127.0.0.1:4000";
++const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
++...
++export const buildBrowserApiUrl = (path: string, apiBaseUrl?: string): string =&gt;
++  normalizeUrl(path, "http", apiBaseUrl);
++
++export const buildBrowserWsUrl = (path: string, wsBaseUrl?: string): string =&gt;
++  normalizeUrl(path, "ws", wsBaseUrl);
+
+diff --git a/apps/web/app/api/admin/synthetic/shared.ts b/apps/web/app/api/admin/synthetic/shared.ts
+-  const apiBaseUrl = env.NEXT_PUBLIC_API_URL?.trim();
++  const apiBaseUrl = env.ISLANDFLOW_INTERNAL_API_URL?.trim();
+
+diff --git a/deployment/native/switch-npm-edge.sh b/deployment/native/switch-npm-edge.sh
+-advanced_config = f"""location ~ ^/(ws|replay|prints|joins|nbbo|dark|flow|candles|history)/ {{
++advanced_config = f"""location ~ ^/(ws|replay|prints|joins|nbbo|quotes|dark|flow|candles|history|news|lookup|option-prints|equity-joins)(/|$) {{
+
+diff --git a/scripts/probes/durable-tapes-production-smoke.ts b/scripts/probes/durable-tapes-production-smoke.ts
++  pushCheck(checks, {
++    name: "browser bundle raw API origin exposure",
++    status: bundleScan.found ? "fail" : "pass",
++    url: bundleScan.matchedScriptUrl ?? undefined,
++    detail: bundleScan.found
++      ? `browser bundle references ${options.apiOrigin}`
++      : `scanned ${bundleScan.scannedScriptCount}/${scriptUrls.length} scripts`
++  });
++
++  const routingOk = !bundleScan.found &amp;&amp; sameOriginProxyValid;</code></pre>
+        </div>
+      </section>
+
+      <section>
+        <h2>Risks</h2>
+        <ul>
+          <li>The raw API host intentionally remains open for Phase 04.</li>
+          <li>Live public route verification was not run because this worker was not given a production app origin.</li>
+          <li>NPM database mutation helper changes are source-reviewed and covered by command/build checks, not executed against production.</li>
+        </ul>
+      </section>
+    </main>
+    <script type="module">
+      import React from "https://esm.sh/react@19";
+      import { createRoot } from "https://esm.sh/react-dom@19/client";
+      import { PatchDiff } from "https://esm.sh/@pierre/diffs@1.2.2/react?deps=react@19,react-dom@19";
+
+      for (const card of document.querySelectorAll("[data-patch-diff]")) {
+        const source = card.querySelector(".diff-fallback code");
+        const target = card.querySelector(".diff-mount");
+        if (!source || !target) continue;
+        try {
+          createRoot(target).render(React.createElement(PatchDiff, { patch: source.textContent || "" }));
+          card.classList.add("rendered");
+        } catch (error) {
+          console.warn("Rich diff renderer failed; keeping HTML fallback.", error);
+        }
+      }
+    </script>
+  </body>
+</html>

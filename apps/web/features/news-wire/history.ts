@@ -1,5 +1,6 @@
 import type { NewsStory } from "@islandflow/types";
 
+import { buildBrowserApiUrl } from "../api-transport";
 import type { DurableTapeCursor, DurableTapeHistoryPage } from "../durable-tape";
 import { filterNewsStories, type NewsWireFilters } from "./filters";
 
@@ -15,26 +16,7 @@ export type NewsWireHistoryFetcher = (url: string) => Promise<Response>;
 export type NewsWireApiUrlBuilder = (path: string) => string;
 
 export const buildNewsWireApiUrl: NewsWireApiUrlBuilder = (path) => {
-  const envBase = process.env.NEXT_PUBLIC_API_URL;
-  if (envBase) {
-    const url = new URL(envBase);
-    const secure = url.protocol === "https:" || url.protocol === "wss:";
-    url.protocol = secure ? "https:" : "http:";
-    url.pathname = path;
-    url.search = "";
-    url.hash = "";
-    return url.toString();
-  }
-
-  if (typeof window === "undefined") {
-    return `http://127.0.0.1:4000${path}`;
-  }
-
-  const { protocol, hostname } = window.location;
-  const httpProtocol = protocol === "https:" ? "https" : "http";
-  const localHosts = new Set(["localhost", "127.0.0.1", "::1"]);
-  const host = localHosts.has(hostname) ? `${hostname}:4000` : window.location.host;
-  return `${httpProtocol}://${host}${path}`;
+  return buildBrowserApiUrl(path);
 };
 
 export const buildNewsWireHistoryUrl = ({
