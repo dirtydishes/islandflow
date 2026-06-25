@@ -293,6 +293,73 @@
       </section>
 
       <section>
+        <h2>Reviewer Addendum</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Area</th>
+              <th>Result</th>
+              <th>Evidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Thermo-nuclear review</td>
+              <td class="ok">pass</td>
+              <td>
+                No blocking findings. The limiter stays in a focused API module, avoids
+                growing the route table with quota state, does not push a touched file
+                across a new 1k-line boundary, and keeps request-specific values out of
+                rejection telemetry.
+              </td>
+            </tr>
+            <tr>
+              <td>Reviewer repairs</td>
+              <td class="ok">none</td>
+              <td>
+                No Phase 03 code repair was needed. Reviewer changed only this turn
+                document to record the review, local gates, Forgejo CI, and readiness
+                state.
+              </td>
+            </tr>
+            <tr>
+              <td>Local gates</td>
+              <td class="ok">pass</td>
+              <td>
+                Reviewer reran <code>bun run fmt:check</code>,
+                <code>bun run lint</code>, <code>bun run typecheck</code>,
+                <code>bun test services/api/tests</code>,
+                <code>bun --cwd=apps/web run build</code>,
+                <code>bunx biome check services/api/src/rate-limit.ts services/api/tests/rate-limit.test.ts services/api/src/index.ts .env.example deployment/native/README.md</code>,
+                and <code>git diff --check</code>. The focused Biome command checked
+                the TypeScript inputs and skipped the non-code files.
+              </td>
+            </tr>
+            <tr>
+              <td>Forgejo CI</td>
+              <td class="ok">green</td>
+              <td>
+                Head <code>0c3373570a59977249f388c09ba87370de95ef64</code> has
+                aggregate commit status <code>success</code>; context
+                <code>CI / Validate (pull_request)</code> completed successfully in
+                <code>1m33s</code> for run <code>319</code>.
+              </td>
+            </tr>
+            <tr>
+              <td>Beads and push state</td>
+              <td class="ok">ready</td>
+              <td>
+                <code>islandflow-hnbk.4</code> remains closed. Reviewer will push this
+                documentation addendum, run <code>bd dolt push</code>, and verify the
+                branch is up to date with
+                <code>forgejo/lavender/api-private-edge-phase-03-rate-limiting</code>.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
         <h2>Helper Fan-In</h2>
         <ul>
           <li>Route categorization helper mapped ordinary reads, lookup/detail routes, admin routes, health, preflight, and websocket upgrades.</li>
