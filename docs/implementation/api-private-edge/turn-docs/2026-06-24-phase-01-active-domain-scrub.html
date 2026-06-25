@@ -396,7 +396,11 @@
                 The orchestrator supplied the local Forgejo action log, which showed
                 <code>bun run fmt:check</code> failed on a long
                 <code>scripts/check-public-api-routes.ts</code> error string. Reviewer
-                applied the Biome formatting repair and reran local gates.
+                applied the Biome formatting repair. The next CI run reached the
+                public-route step and failed because the workflow still invoked the
+                route probe without <code>DEPLOY_PUBLIC_APP_URL</code>. Reviewer
+                updated CI to assert the new Phase 01 fail-fast contract instead
+                of restoring a concrete production default.
               </td>
             </tr>
           </tbody>
@@ -440,7 +444,7 @@
                 Reviewer reran <code>bun run fmt:check</code>, the focused Bun
                 tests, web production build, durable-tapes smoke help and fail-fast
                 checks, public route fail-fast check, native shell syntax check,
-                and <code>git diff --check</code>.
+                Docker workspace snapshot check, and <code>git diff --check</code>.
               </td>
             </tr>
             <tr>
@@ -448,7 +452,7 @@
               <td><span class="status-warn">awaiting repaired CI</span></td>
               <td>
                 PR #80 is open, non-draft, and Forgejo reports it mergeable.
-                Reviewer repair is ready for Forgejo validation after push.
+                Reviewer repairs are ready for Forgejo validation after push.
               </td>
             </tr>
           </tbody>

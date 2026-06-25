@@ -49,7 +49,14 @@ jobs:
         run: ~/.bun/bin/bun test
 
       - name: Check public API routes
-        run: ~/.bun/bin/bun run check:public-api-routes
+        run: |
+          set -euo pipefail
+          if ~/.bun/bin/bun run check:public-api-routes >/tmp/public-api-routes.log 2>&1; then
+            echo "check:public-api-routes unexpectedly passed without DEPLOY_PUBLIC_APP_URL" >&2
+            cat /tmp/public-api-routes.log >&2
+            exit 1
+          fi
+          grep -F "DEPLOY_PUBLIC_APP_URL=<production-app-origin>" /tmp/public-api-routes.log
 
       - name: Check Docker workspace snapshot
         run: ~/.bun/bin/bun run check:docker-workspace
