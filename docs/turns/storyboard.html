@@ -227,6 +227,44 @@
         color: oklch(0.93 0.014 250);
       }
 
+      .milestone {
+        display: grid;
+        grid-template-columns: minmax(190px, 0.55fr) minmax(0, 1fr);
+        gap: 18px;
+        padding: 22px 0;
+        border-top: 1px solid oklch(0.72 0.012 250 / 0.14);
+      }
+
+      .milestone:first-of-type {
+        border-top: 0;
+      }
+
+      .milestone h3 {
+        margin-bottom: 10px;
+        font-size: 1.1rem;
+      }
+
+      .milestone p {
+        max-width: 82ch;
+        color: oklch(0.78 0.018 250);
+        text-wrap: pretty;
+      }
+
+      .milestone-points {
+        margin: 12px 0 0;
+        padding-left: 18px;
+        color: oklch(0.78 0.018 250);
+      }
+
+      .milestone-points li + li {
+        margin-top: 7px;
+      }
+
+      .milestone-side {
+        color: oklch(0.7 0.018 250);
+        font-size: 0.9rem;
+      }
+
       .doc-strip {
         display: flex;
         flex-wrap: wrap;
@@ -424,6 +462,8 @@
       <nav aria-label="Storyboard sections">
         <div class="nav-row">
           <a class="chip" href="#story">Read the story</a>
+          <a class="chip" href="#implementation">Implementation</a>
+          <a class="chip" href="#phase-detail">Phase detail</a>
           <a class="chip" href="#twists">Twists</a>
           <a class="chip" href="#timeline">Timeline</a>
           <a class="chip" href="#epics">Epics</a>
@@ -433,7 +473,7 @@
 
       <section id="story">
         <h2>The Story Arc</h2>
-        <p class="section-intro">The turn docs describe a project that kept discovering where its source of truth needed to move. At first the work was mostly about making the terminal usable. Then the deployment path became the thing to stabilize. Then Beads epics and implementation phase docs became the operating board for multi-PR streams. Only after that did the product surface absorb synthetic data, smart-flow, terminal extraction, charting, durable tape modules, performance budgets, and private-edge hardening.</p>
+        <p class="section-intro">The turn docs describe a project where I kept discovering where the source of truth needed to move. At first the work was mostly about making the terminal usable. Then the deployment path became the thing to stabilize. Then Beads epics and implementation phase docs became my operating board for multi-PR streams. Only after that did the product surface absorb synthetic data, smart-flow, terminal extraction, charting, durable tape modules, performance budgets, and private-edge hardening.</p>
 
         <div class="phase">
           <div>
@@ -442,7 +482,7 @@
           </div>
           <div class="phase-copy">
             <h3>The terminal got hardened before it got ambitious.</h3>
-            <p>First, we decided the terminal had to behave like an operator surface instead of a fragile demo. The early turns tightened responsiveness, keyboard behavior, constrained-width layout, and visual intensity. Then, after that hardening branch met main, conflict work preserved both the new terminal coverage and the ticker parsing already present on main.</p>
+            <p>First, I decided the terminal had to behave like an operator surface instead of a fragile demo. The early turns tightened responsiveness, keyboard behavior, constrained-width layout, and visual intensity. Then, after that hardening branch met main, conflict work preserved both the new terminal coverage and the ticker parsing already present on main.</p>
             <p>The important decision was restraint: quiet the chrome, keep the dark evidence-console identity, and let live data carry the weight. That choice becomes the visual baseline for the rest of the folder.</p>
             <div class="doc-strip">
               <a class="doc-link" href="2026-05-14-harden-terminal-view.html">harden terminal</a>
@@ -461,7 +501,7 @@
           <div class="phase-copy">
             <h3>The product could not move faster than the deploy path.</h3>
             <p>Then, the deployment story took over. Docker was declared the default VPS path, but the repo still needed native units, fast deploy modes, workspace snapshot checks, remote resolution that did not assume <code>origin</code>, and warnings for stale compose stacks. Each fix exposed another edge: frozen lockfile drift, missing history routes, NPM routing, systemd readiness, and remote precheck assumptions.</p>
-            <p>Then came the bigger infrastructure fork: native public edge cutover. The docs show it as a practical detour, not a rewrite for its own sake. The team added units, fallback scripts, firewall and proxy adjustments, and a safer path for worker-only iteration. Then the news ingest service forced another repair, because native templates, Alpaca auth, backfill limits, and websocket fanout all had to agree.</p>
+            <p>Then came the bigger infrastructure fork: native public edge cutover. The docs show it as a practical detour, not a rewrite for its own sake. I added units, fallback scripts, firewall and proxy adjustments, and a safer path for worker-only iteration. Then the news ingest service forced another repair, because native templates, Alpaca auth, backfill limits, and websocket fanout all had to agree.</p>
             <div class="doc-strip">
               <a class="doc-link" href="2026-05-15-dual-runtime-deploy-workflow.html">dual runtime</a>
               <a class="doc-link" href="2026-05-15-deploy-preflight-docker-workspace-check.html">docker preflight</a>
@@ -520,7 +560,7 @@
           <div class="phase-copy">
             <h3>The UI stopped being a home page and became route-specific instrumentation.</h3>
             <p>Then, the surface changed shape. Tape became Options, the web rail moved into a top-left drawer, and the home page became a command deck. The mock route sequence started as exploration, but it became the decisive design process: first four different dashboard directions, then four no-card routes, then four dense operational studies.</p>
-            <p>The turn docs show the selection pressure clearly. The team refined the command deck header, rejected generic card composition, and eventually rebuilt production Dashboard, Options, and News around mock9 through mock12. Then local development had to catch up: hosted API defaults, CORS preflight, desktop workflows, and terminal evidence text all had to support the new hosted shape.</p>
+            <p>The turn docs show the selection pressure clearly. I refined the command deck header, rejected generic card composition, and eventually rebuilt production Dashboard, Options, and News around mock9 through mock12. Then local development had to catch up: hosted API defaults, CORS preflight, desktop workflows, and terminal evidence text all had to support the new hosted shape.</p>
             <div class="doc-strip">
               <a class="doc-link" href="2026-05-23-rename-tape-options-drawer.html">tape to options</a>
               <a class="doc-link" href="2026-05-28-redesign-home-command-deck.html">command deck</a>
@@ -562,7 +602,7 @@
           </div>
           <div class="phase-copy">
             <h3>terminal.tsx stopped being the terminal.</h3>
-            <p>Then we faced the file that had been absorbing too much of the product. The terminal-refactor epic <code>islandflow-e30y</code> turned <code>apps/web/app/terminal.tsx</code> from an 11,107-line route-and-terminal implementation into a 159-line compatibility facade. The point was not aesthetic cleanup. It was to make future terminal, chart, and tape work survivable.</p>
+            <p>Then I faced the file that had been absorbing too much of the product. The terminal-refactor epic <code>islandflow-e30y</code> turned <code>apps/web/app/terminal.tsx</code> from an 11,107-line route-and-terminal implementation into a 159-line compatibility facade. The point was not aesthetic cleanup. It was to make future terminal, chart, and tape work survivable.</p>
             <p>The six phases were deliberately mechanical: extract pure helpers first, then data hooks, then state and shell, then rendered UI groups, then retired route code, then final verification. The compatibility facade stayed intact until cleanup proved what could be removed. The refactor created 21 focused terminal feature modules while preserving supported routes, <code>/tape</code> compatibility, replay data mode, mock bypasses, and smart-money fallback behavior.</p>
             <div class="doc-strip">
               <a class="doc-link" href="../implementation/terminal-refactor/00-roadmap.md">terminal roadmap</a>
@@ -655,6 +695,569 @@
               <a class="doc-link" href="../implementation/api-private-edge/05-production-rollout-closeout.md">rollout</a>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section id="implementation">
+        <h2>Implementation Milestones</h2>
+        <p class="section-intro">The implementation folders are not side notes. They are the serious phase plans that let me keep large work reviewable: each stream had a Beads epic, phase documents, dependency rules, turn docs or closeout evidence, and a clear definition of what was inside or outside the phase.</p>
+
+        <div class="milestone">
+          <div>
+            <p class="phase-kicker">Synthetic market data</p>
+            <div class="phase-window"><code>islandflow-259</code>, phases 01 to 05 complete</div>
+            <p class="milestone-side">Future historical calibration remains open by design.</p>
+          </div>
+          <div>
+            <h3>I made synthetic data deterministic before I let it drive demos.</h3>
+            <p>The synthetic epic started as a planning correction: I did not want demos, fixtures, or smart-flow tests built on ambient runtime randomness. The roadmap in <a href="../implementation/synthetic-market-data/00-roadmap.md">synthetic-market-data/00-roadmap.md</a> made the order explicit. First came a deterministic spine, then manifests and fixtures, then scenarios and labels, then replay integration, then demo and load profiles. Historical calibration stayed future work so the MVP could move without needing paid or brittle historical data first.</p>
+            <p>Phase 01 created <code>@islandflow/synthetic-market</code> as a reusable package that emits canonical <code>EquityQuote</code>, <code>EquityPrint</code>, <code>OptionNBBO</code>, and <code>OptionPrint</code> event wrappers. I kept provenance keyed by trace id instead of embedding generator metadata into the raw event payloads. Fixed seed and profile inputs produce stable batches, and the generator avoids <code>Date.now()</code> and <code>Math.random()</code> while generating events.</p>
+            <p>Phase 02 turned that generator into durable artifacts: fixture files, run manifests, replay plans, event hashes, hash-verified loaders, and a Bun CLI. Phase 03 added named scenarios, separate labels, and expected-output sidecars for positive alerts, no-alert cases, suppressions, required evidence, forbidden evidence, and false-positive checks. Phase 04 made replay select synthetic source and run ids, then compare derived smart-flow output signatures. Phase 05 exposed named demo and load profiles so live synthetic emitters could consume fixture-backed scenarios instead of inventing new semantics at runtime.</p>
+            <ul class="milestone-points">
+              <li>I treated emitted market events as canonical product data, not as synthetic-only pipeline records.</li>
+              <li>I kept hidden labels separate from emitted events so tests could know truth without teaching the runtime impossible facts.</li>
+              <li>I accepted review repairs that tightened ordering around concrete <code>trace_id</code> keys, because replay determinism depends on stable identifiers.</li>
+              <li>I left <code>islandflow-259.6</code> open for historical calibration because that work tunes realism, while phases 01 to 05 establish repeatable behavior.</li>
+            </ul>
+            <div class="doc-strip">
+              <a class="doc-link" href="../implementation/synthetic-market-data/01-deterministic-spine.md">phase 01</a>
+              <a class="doc-link" href="../implementation/synthetic-market-data/02-manifests-fixtures-cli.md">phase 02</a>
+              <a class="doc-link" href="../implementation/synthetic-market-data/03-scenarios-labels-expected-outputs.md">phase 03</a>
+              <a class="doc-link" href="../implementation/synthetic-market-data/04-replay-integration.md">phase 04</a>
+              <a class="doc-link" href="../implementation/synthetic-market-data/05-demo-load-profiles.md">phase 05</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="milestone">
+          <div>
+            <p class="phase-kicker">Smart-flow</p>
+            <div class="phase-window"><code>islandflow-zxh</code>, phases 01 to 05 complete</div>
+            <p class="milestone-side">Future calibration remains open after the MVP explanation pipeline.</p>
+          </div>
+          <div>
+            <h3>I rebuilt smart-money into an evidence and abstention system.</h3>
+            <p>The smart-flow roadmap in <a href="../implementation/smart-money/00-roadmap.md">smart-money/00-roadmap.md</a> chose a careful path: keep the useful working stack, but rebuild the domain model around observations, facts, evidence clusters, cautious hypotheses, confidence, alternatives, abstention, replay evaluation, and user-facing projections. That choice mattered because the old smart-money surface could sound more certain than the data justified.</p>
+            <p>Phase 01 introduced the canonical contract family in <code>packages/types/src/smart-flow.ts</code>. Phase 02 split evidence work into eligibility facts and deterministic clustering, preserving fact ids and raw evidence refs so later projections could explain themselves. Phase 03 converted clusters into score vectors, alternatives, penalties, confidence, conviction, and explicit abstention reasons. Phase 04 made replay golden tests the acceptance gate, rebuilding smart-flow outputs from raw synthetic fixtures instead of relying on precomputed answers. Phase 05 then exposed the projection through API, websocket, terminal UI, and chart markers.</p>
+            <p>The important story here is that I stopped treating classification as the only valuable output. A good abstention, with reasons, became a first-class product result. The UI work followed that posture: tables, drawers, command context, priority rows, and chart markers prefer smart-flow projections, while legacy smart-money remains compatibility fallback when no projection is available.</p>
+            <ul class="milestone-points">
+              <li>I made evidence quality, confidence, conviction, alternatives, and why-not signals explicit instead of burying them under one label.</li>
+              <li>I used synthetic scenarios to validate both positive and negative cases, including unexpected extra alerts and false positives.</li>
+              <li>I split phase 05 into API/websocket surfaces, UI explainability, and chart-marker migration so the presentation layer could be reviewed in manageable slices.</li>
+              <li>I left <code>islandflow-zxh.6</code> open because calibration should tune a proven pipeline, not compensate for a vague one.</li>
+            </ul>
+            <div class="doc-strip">
+              <a class="doc-link" href="../implementation/smart-money/01-contracts-vocabulary.md">contracts</a>
+              <a class="doc-link" href="../implementation/smart-money/02-evidence-clustering-features.md">evidence</a>
+              <a class="doc-link" href="../implementation/smart-money/03-hypothesis-scoring-abstention.md">scoring</a>
+              <a class="doc-link" href="../implementation/smart-money/04-replay-evaluation-golden-tests.md">golden tests</a>
+              <a class="doc-link" href="../implementation/smart-money/05-api-ui-explainability.md">explainability</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="milestone">
+          <div>
+            <p class="phase-kicker">Terminal refactor</p>
+            <div class="phase-window"><code>islandflow-e30y</code>, 6 of 6 complete</div>
+            <p class="milestone-side">Closed with <code>terminal.tsx</code> reduced from 11,107 lines to 159.</p>
+          </div>
+          <div>
+            <h3>I turned the terminal file into a compatibility facade.</h3>
+            <p>The terminal refactor is one of the biggest milestones in the folder and it deserves more than a ledger link. The roadmap in <a href="../implementation/terminal-refactor/00-roadmap.md">terminal-refactor/00-roadmap.md</a> exists because <code>apps/web/app/terminal.tsx</code> had become an 11k-line file holding routes, shell, hooks, panes, drawers, formatting, scroll behavior, chart helpers, and compatibility exports. I needed a staged refactor that preserved runtime behavior while moving ownership into feature modules.</p>
+            <p>I kept <code>terminal.tsx</code> as the public facade until the cleanup phase. That meant existing imports for <code>TerminalAppShell</code>, <code>OverviewRoute</code>, <code>OptionsRoute</code>, <code>NewsRoute</code>, <code>NAV_ITEMS</code>, and helper exports stayed reachable while internals moved. Phase 01 extracted pure config, route, format, filter, tape, evidence, and marker helpers. Phase 02 extracted scroll, virtual-list, tape, live stream, replay transport, and session hooks. Phase 03 moved terminal state, context, shell, nav drawer, topbar, metrics, and synthetic controls. Phase 04 moved rendered primitives, OPRA panes, news panes, dashboard/chart components, drawers, and UI helpers. Phase 05 removed retired route exports and unreachable pane code only after import searches proved what was dead. Phase 06 ran the full verification and publishing gate.</p>
+            <p>The closeout in <a href="terminal-refactor.html">docs/turns/terminal-refactor.html</a> records the outcome: 21 focused feature modules under <code>apps/web/features/terminal</code>, all six phase PRs merged, all phase issues closed, and final validation through Forgejo. The review fixes were important too: one phase fixed stale implementation-board status metadata, another narrowed accidental facade export widening, and cleanup explicitly retained <code>/tape</code>, replay data mode, mock bypasses, and smart-money fallback behavior.</p>
+            <ul class="milestone-points">
+              <li>I did not let the refactor become a behavior rewrite. I moved ownership first, then retired code after reachability was obvious.</li>
+              <li>I preserved compatibility exports so route files and tests could continue importing through <code>./terminal</code>.</li>
+              <li>I used Beads and Forgejo PRs as phase gates: PR #49 through PR #54 closed scaffold, hooks, shell, UI, cleanup, and final verification.</li>
+              <li>I treated this as the enabling milestone for later chart and tape work, because those streams needed clean module boundaries.</li>
+            </ul>
+            <div class="doc-strip">
+              <a class="doc-link" href="../implementation/terminal-refactor/01-scaffold-pure-utilities.md">phase 01</a>
+              <a class="doc-link" href="../implementation/terminal-refactor/02-data-hooks.md">phase 02</a>
+              <a class="doc-link" href="../implementation/terminal-refactor/03-state-shell.md">phase 03</a>
+              <a class="doc-link" href="../implementation/terminal-refactor/04-ui-components.md">phase 04</a>
+              <a class="doc-link" href="../implementation/terminal-refactor/05-cleanup-retired-code.md">phase 05</a>
+              <a class="doc-link" href="../implementation/terminal-refactor/06-final-verification.md">phase 06</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="milestone">
+          <div>
+            <p class="phase-kicker">Reusable charts</p>
+            <div class="phase-window"><code>islandflow-mloi</code>, 6 of 6 complete</div>
+            <p class="milestone-side">Closed with a reusable <code>market-chart</code> module.</p>
+          </div>
+          <div>
+            <h3>I pulled the dashboard chart out of terminal ownership.</h3>
+            <p>The lightweight-charts epic started from a specific design and architecture problem: the dashboard chart was too coupled to terminal state, live fetching, overlays, pane chrome, callbacks, and marker construction. The implementation guide in <a href="../implementation/lightweight-charts/IMPLEMENT.md">lightweight-charts/IMPLEMENT.md</a> set the goal: create a reusable chart module that can be embedded in dashboard, replay, full-chart, and future symbol pages without importing terminal state.</p>
+            <p>Phase 01 created <code>apps/web/features/market-chart</code>, upgraded <code>lightweight-charts</code> to 5.2.0, defined normalized candle types, lower-pane foundations, marker payloads, hover snapshots, settings namespaces, layout presets, theme defaults, pure transforms, and v5 lifecycle hooks. Phase 02 made timeframes first-class with 1m, 5m, and 15m defaults plus favorites and persistence. Phase 03 replaced the dashboard chart through a terminal adapter rather than letting the reusable module learn terminal state. Phase 04 added chart settings and lower-pane modes. Phase 05 added the compact crosshair readout, rounded lower-pane bars, responsive tooltip hardening, and terminal-owned flow context wiring. Phase 06 verified the stream and filed stale invalid-ticker chart state as a separate issue.</p>
+            <ul class="milestone-points">
+              <li>I kept the module uncarded and visually aligned with the terminal system, because chart evidence belongs inside the operating board.</li>
+              <li>I established extension points for price renderers, lower panes, overlays, markers, toolbar actions, settings sections, hover rows, and layout presets.</li>
+              <li>I kept smart-flow copy and legacy smart-money compatibility in the terminal adapter rather than contaminating the reusable chart module.</li>
+              <li>I treated hover as evidence access: OHLC, volume, trade count, option notional, and smart-flow context had to be inspectable without jumping to another pane.</li>
+            </ul>
+            <div class="doc-strip">
+              <a class="doc-link" href="../implementation/lightweight-charts/01-chart-foundation.md">foundation</a>
+              <a class="doc-link" href="../implementation/lightweight-charts/02-timeframes-candles.md">timeframes</a>
+              <a class="doc-link" href="../implementation/lightweight-charts/03-dashboard-replacement.md">dashboard adapter</a>
+              <a class="doc-link" href="../implementation/lightweight-charts/04-settings-lower-pane.md">settings</a>
+              <a class="doc-link" href="../implementation/lightweight-charts/05-hover-readout-visual-hardening.md">hover</a>
+              <a class="doc-link" href="../implementation/lightweight-charts/06-final-verification.md">verification</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="milestone">
+          <div>
+            <p class="phase-kicker">Durable tape modules</p>
+            <div class="phase-window"><code>islandflow-h9c0</code>, 10 of 10 complete</div>
+            <p class="milestone-side">Closed after route composition and module-family verification.</p>
+          </div>
+          <div>
+            <h3>I turned tape behavior into reusable product modules.</h3>
+            <p>The durable-tapes plan in <a href="../implementation/durable-tapes/IMPLEMENT.md">durable-tapes/IMPLEMENT.md</a> was the answer to a growing composition problem. Options, flow packets, news, equities, and alerts all needed hot-cache plus ClickHouse history behavior, scroll hold, virtualization, responsive templates, hover/focus affordances, and row identity. Keeping that logic terminal-attached would have made every future route a copy of the old terminal file problem.</p>
+            <p>Phase 01 created <code>apps/web/features/durable-tape</code> as the shared foundation: resolver, template selection, column helpers, row keys, hot/history composition, cursor selection, scroll-hold reducer, TanStack virtual list wrapper, and flat tape primitives. Phase 02 extracted <code>OptionsTape</code> and made it the main <code>/options</code> body. Phase 03 created <code>FlowPacketsTape</code> with packet focus callbacks. Phase 04 extracted <code>NewsWire</code> with live-first history, source/symbol filters, and responsive headline templates. Phase 05 added <code>EquitiesTape</code> with ticker scope, venue/off-exchange filtering, callbacks, and live/history sources. Phase 06 rebuilt alerts as a durable module with alert rows, detail, evidence hydration, and links to packet/options/equity modules. Phase 07 composed the route family and closed the stream.</p>
+            <p>Two extra turns matter here: the web dev port CORS QA made local/browser verification practical, and the empty-history backfill added <code>getInitialHistoryCursor</code> so empty tapes could still page into history instead of waiting for visible rows to supply a cursor.</p>
+            <ul class="milestone-points">
+              <li>I used callbacks as the module boundary: modules can link to each other without owning each other's UI or terminal state.</li>
+              <li>I kept domain joins, chart overlays, and route composition outside the tape packages when they did not belong to the reusable module.</li>
+              <li>I preserved scroll-stable history behavior while extracting the module family, because investigation workflow was already a known product requirement.</li>
+              <li>I added the hidden durable-tapes example route so I could inspect Options, Flow Packets, Equities, News, and Alerts together.</li>
+            </ul>
+            <div class="doc-strip">
+              <a class="doc-link" href="../implementation/durable-tapes/turn-docs/2026-06-22-phase-01-shared-foundation.html">foundation turn</a>
+              <a class="doc-link" href="../implementation/durable-tapes/turn-docs/2026-06-22-phase-02-options-tape.html">options turn</a>
+              <a class="doc-link" href="../implementation/durable-tapes/turn-docs/2026-06-22-phase-03-flow-packets.html">flow turn</a>
+              <a class="doc-link" href="../implementation/durable-tapes/turn-docs/2026-06-22-phase-04-news-wire.html">news turn</a>
+              <a class="doc-link" href="../implementation/durable-tapes/turn-docs/2026-06-22-phase-05-equities-tape.html">equities turn</a>
+              <a class="doc-link" href="../implementation/durable-tapes/turn-docs/2026-06-23-phase-06-alerts-module.html">alerts turn</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="milestone">
+          <div>
+            <p class="phase-kicker">Durable-tapes performance</p>
+            <div class="phase-window"><code>islandflow-ze79</code>, 11 of 11 complete</div>
+            <p class="milestone-side">Closed after deployed smoke and CDP probe evidence went green.</p>
+          </div>
+          <div>
+            <h3>I measured the request storm before I tried to fix it.</h3>
+            <p>The performance epic was a serious incident stream. The module family was useful, but <code>/durable-tapes</code> was not viable on low-power clients until I could prove request counts, aborts, script time, and task time were bounded. Phase 00 created <code>scripts/probes/durable-tapes-perf.ts</code> and then split it into focused probe modules after review found the initial probe too monolithic. The baseline numbers were intentionally ugly: local hosted-API runs showed thousands of total requests, support lookups, by-trace calls, and aborts while still rendering five panes and 70 rows.</p>
+            <p>Phase 01 introduced a shared hydration scheduler and caches. The probe moved from roughly eleven thousand total requests to a few hundred, with endpoint aborts eliminated, while CPU remained red for later phases. Phase 02 bounded option-print by-trace lookups with validation, caps, query settings, read timeouts, and JSON error behavior. Phase 03 added a stable terminal store and pane-scoped selectors so route children did not subscribe to the whole terminal context. Phase 04 added keyed incremental live buffers and animation-frame batching, then review repaired snapshot ordering. Phase 05 moved expensive options support hydration and alert evidence decoration server-side through durable row view models. Phase 06 added production smoke checks, latency budgets, fallback flag verification, API-origin routing checks, and deployed CDP probe evidence.</p>
+            <p>The closeout notes are important because this stream had a real blocker: source guardrails were implemented while deployed production evidence was still red. I did not close the epic until the resolver refreshed native web/API, production smoke passed, and the deployed 30s warmup/180s CDP probe showed zero measured support/evidence requests in the window with acceptable task and script duration. The remaining native ClickHouse systemd health mismatch became a separate follow-up, not hidden in the performance closeout.</p>
+            <ul class="milestone-points">
+              <li>I made performance observable before optimizing, then carried the same probe through before and after evidence.</li>
+              <li>I reduced the browser storm in stages: cache shared lookups, bound misses, scope subscriptions, update live rows incrementally, then move decorated rows server-side.</li>
+              <li>I required production smoke to prove same-origin routing, durable-row websocket snapshots, options-support latency, and by-trace miss latency.</li>
+              <li>I let thermo-nuclear review force structural repairs, including probe modularization and API durable-row composition extraction.</li>
+            </ul>
+            <div class="doc-strip">
+              <a class="doc-link" href="../implementation/durable-tapes-performance/turn-docs/2026-06-24-phase-00-perf-probe.html">probe turn</a>
+              <a class="doc-link" href="../implementation/durable-tapes-performance/turn-docs/2026-06-24-phase-01-hydration-scheduler-cache.html">cache turn</a>
+              <a class="doc-link" href="../implementation/durable-tapes-performance/turn-docs/2026-06-24-phase-03-pane-scoped-live-state.html">selector turn</a>
+              <a class="doc-link" href="../implementation/durable-tapes-performance/turn-docs/2026-06-24-phase-04-incremental-live-buffers.html">buffer turn</a>
+              <a class="doc-link" href="../implementation/durable-tapes-performance/turn-docs/2026-06-24-phase-05-server-composed-view-models.html">server row turn</a>
+              <a class="doc-link" href="../implementation/durable-tapes-performance/turn-docs/2026-06-24-phase-06-production-hardening-closeout.html">closeout turn</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="milestone">
+          <div>
+            <p class="phase-kicker">API private edge</p>
+            <div class="phase-window"><code>islandflow-hnbk</code>, closed</div>
+            <p class="milestone-side">Closed after live same-origin access worked and raw direct access was shut.</p>
+          </div>
+          <div>
+            <h3>I narrowed the public product surface to the hosted UI.</h3>
+            <p>The API private-edge stream was not a cosmetic deployment change. It changed the posture of the hosted product. The epic described the intended end state: the hosted UI remains public, production browser traffic uses same-origin API and websocket paths, active docs and defaults stop advertising concrete production API domains, and the raw API host becomes private infrastructure rather than a public product surface.</p>
+            <p>Phase 00 recorded the baseline: raw API host reachability, same-origin route gaps, bundle exposure, NPM route state, relevant env posture, and direct port behavior. Phase 01 scrubbed active defaults and examples so local development falls back to local hosts or explicit placeholders, not the hosted API. Phase 02 switched production browser URL builders to same-origin transport and added a server-only internal API URL for Next route handlers. Phase 03 added env-gated rate limiting with separate REST, lookup, and websocket buckets, forwarded-IP handling, JSON <code>429</code> responses, and coarse telemetry. Phase 04 closed the raw public API host through durable NPM/deploy state while preserving app-origin routes and operational server-local access. Phase 05 rolled it out live and proved the final state: blank production <code>NEXT_PUBLIC_API_URL</code>, configured internal API origin, rate limits enabled, app-origin REST and websocket checks passing, raw host closed, public port 4000 unreachable, and no raw origin required by the production bundle.</p>
+            <p>This stream also refined my agent workflow. The implementation guide required selector, worker, reviewer, and closeout roles, and the reviewer contract said CI stayed with the reviewer until green. It is the clearest example in the repo of Beads, implementation docs, turn docs, review discipline, live verification, and follow-up filing all working together.</p>
+            <ul class="milestone-points">
+              <li>I separated product publicness from infrastructure reachability: the app is public, the raw API host is not the product.</li>
+              <li>I made same-origin browser transport the default production behavior while preserving explicit local and operator-controlled overrides.</li>
+              <li>I added rate limiting before closing the raw host so the public app-origin paths had abuse bounds.</li>
+              <li>I filed <code>islandflow-od61</code> for automating native private API bind-host selection instead of folding that future deployment hardening into phase 05.</li>
+            </ul>
+            <div class="doc-strip">
+              <a class="doc-link" href="../implementation/api-private-edge/turn-docs/2026-06-24-phase-00-baseline-edge-inventory.html">baseline turn</a>
+              <a class="doc-link" href="../implementation/api-private-edge/turn-docs/2026-06-24-phase-01-active-domain-scrub.html">scrub turn</a>
+              <a class="doc-link" href="../implementation/api-private-edge/turn-docs/2026-06-25-phase-02-same-origin-production-transport.html">same-origin turn</a>
+              <a class="doc-link" href="../implementation/api-private-edge/turn-docs/2026-06-25-phase-03-api-rate-limiting.html">rate turn</a>
+              <a class="doc-link" href="../implementation/api-private-edge/turn-docs/2026-06-25-phase-04-raw-api-host-closure.html">closure turn</a>
+              <a class="doc-link" href="../implementation/api-private-edge/turn-docs/2026-06-25-phase-05-production-rollout-closeout.html">rollout turn</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="phase-detail">
+        <h2>Phase Detail Ledger</h2>
+        <p class="section-intro">This is the deeper implementation record. The high-level story says what happened; this ledger says what I changed phase by phase, what each phase unlocked, and what evidence or follow-up kept the stream honest.</p>
+
+        <h3>Synthetic Market Data, <code>islandflow-259</code></h3>
+        <div class="ledger">
+          <table>
+            <thead>
+              <tr>
+                <th>Phase</th>
+                <th>What I built</th>
+                <th>Why it mattered</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>01</td>
+                <td>I added the deterministic synthetic package, stable seed/profile normalization, canonical event wrappers, sorted replay ordering, and provenance keyed by trace id.</td>
+                <td>This gave later fixtures and tests a deterministic raw-event source without inventing a second event model.</td>
+              </tr>
+              <tr>
+                <td>02</td>
+                <td>I added manifests, fixture files, event hashes, replay plans, fixture readers/writers, and a Bun CLI for generating repeatable runs.</td>
+                <td>This turned generation into a reusable artifact pipeline that tests, replay, and demos could share.</td>
+              </tr>
+              <tr>
+                <td>03</td>
+                <td>I created scenario catalogs, separate labels, and expected-output sidecars for positive, negative, suppression, forbidden-evidence, and false-positive checks.</td>
+                <td>This made smart-flow validation possible without contaminating market events with hidden truth.</td>
+              </tr>
+              <tr>
+                <td>04</td>
+                <td>I integrated fixture-backed runs into replay selectors and added expected smart-flow output signature comparisons.</td>
+                <td>This let replay evaluate deterministic synthetic runs in manifest order using stable identifiers.</td>
+              </tr>
+              <tr>
+                <td>05</td>
+                <td>I added named demo and load profiles, fixture-backed live synthetic emitters, and profile-aware admin controls.</td>
+                <td>This moved demos away from ambient randomness and onto named, reviewable behavior profiles.</td>
+              </tr>
+              <tr>
+                <td>99</td>
+                <td>I left historical calibration open as future work.</td>
+                <td>Historical tuning is valuable, but it should tune a deterministic generator after the MVP semantics are stable.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Smart-Flow, <code>islandflow-zxh</code></h3>
+        <div class="ledger">
+          <table>
+            <thead>
+              <tr>
+                <th>Phase</th>
+                <th>What I built</th>
+                <th>Why it mattered</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>01</td>
+                <td>I added canonical smart-flow contracts for observations, candidates, evidence clusters, hypotheses, confidence vectors, abstention, alternatives, and insight projections.</td>
+                <td>This separated the domain vocabulary from legacy smart-money naming and made cautious reasoning representable.</td>
+              </tr>
+              <tr>
+                <td>02a</td>
+                <td>I added evidence fact extraction, eligibility decisions, quote/context quality signals, and rejected-candidate reasoning.</td>
+                <td>This made input quality explicit before scoring could turn noisy flow into a claim.</td>
+              </tr>
+              <tr>
+                <td>02b</td>
+                <td>I added deterministic clustering and traceable feature vectors that carry fact ids and raw evidence refs.</td>
+                <td>This gave scoring a stable evidence bundle and preserved explainability back to source events.</td>
+              </tr>
+              <tr>
+                <td>03a</td>
+                <td>I added score vectors for supported hypothesis types, separating strength, confidence, conviction, and penalties.</td>
+                <td>This avoided one opaque score and made tradeoffs inspectable.</td>
+              </tr>
+              <tr>
+                <td>03b</td>
+                <td>I added abstention, alternative explanations, and canonical insight projection from hypothesis events.</td>
+                <td>This made “do not claim” a product output instead of a missing result.</td>
+              </tr>
+              <tr>
+                <td>04</td>
+                <td>I added deterministic replay evaluation and golden signature tests for positive, abstention, false-positive, noisy, and unexpected-extra-alert cases.</td>
+                <td>This made replay the acceptance gate for smart-flow behavior instead of relying on hand inspection.</td>
+              </tr>
+              <tr>
+                <td>05a</td>
+                <td>I exposed smart-flow explainability through recent, history, replay, one-channel websocket, and live subscription surfaces.</td>
+                <td>This made canonical explainability available to product surfaces while legacy streams remained available.</td>
+              </tr>
+              <tr>
+                <td>05b</td>
+                <td>I updated terminal tables, drawers, ticker context, and priority rows to prefer smart-flow projections.</td>
+                <td>This let the product show cautious hypotheses, alternatives, and abstention reasons in the workflow.</td>
+              </tr>
+              <tr>
+                <td>05c</td>
+                <td>I migrated chart markers toward smart-flow projections with legacy fallback only when projections are absent.</td>
+                <td>This connected visual evidence to the canonical reasoning layer.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Terminal Refactor, <code>islandflow-e30y</code></h3>
+        <div class="ledger">
+          <table>
+            <thead>
+              <tr>
+                <th>Phase</th>
+                <th>What I built</th>
+                <th>Why it mattered</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>01</td>
+                <td>I scaffolded <code>apps/web/features/terminal</code> and extracted pure route, config, format, filter, tape, evidence, and chart-marker helpers.</td>
+                <td>Pure helpers were the lowest-risk first move because they did not depend on React, DOM APIs, websockets, or JSX.</td>
+              </tr>
+              <tr>
+                <td>02</td>
+                <td>I extracted scroll, virtual-list, tape, live stream, replay transport, and live-session hooks into focused modules.</td>
+                <td>This removed data movement from the route file while keeping panes and shell behavior unchanged.</td>
+              </tr>
+              <tr>
+                <td>03</td>
+                <td>I moved terminal state, context, app shell, chrome, nav drawer, topbar controls, mode switch, shell metrics, and synthetic dock.</td>
+                <td>This created the state/shell seam that later component extraction could trust.</td>
+              </tr>
+              <tr>
+                <td>04</td>
+                <td>I extracted primitives, flow filter controls, OPRA panes, news panes and rails, dashboard/chart components, drawers, and UI helpers.</td>
+                <td>This moved rendered UI into feature modules while keeping <code>terminal.tsx</code> as the facade.</td>
+              </tr>
+              <tr>
+                <td>05</td>
+                <td>I removed retired <code>SignalsRoute</code>, <code>ChartsRoute</code>, <code>ReplayRoute</code>, unreachable panes, stale route branches, CSS, and table config after import-search proof.</td>
+                <td>This was cleanup after extraction, not cleanup before proof. I retained <code>/tape</code>, replay data mode, smart-money fallback, and mock bypasses.</td>
+              </tr>
+              <tr>
+                <td>06</td>
+                <td>I ran the final gate sweep, updated the implementation board, closed the phase issues, and published the closeout document.</td>
+                <td>This made the refactor complete as an implementation stream, not a pile of merged mechanical PRs.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Reusable Lightweight Charts, <code>islandflow-mloi</code></h3>
+        <div class="ledger">
+          <table>
+            <thead>
+              <tr>
+                <th>Phase</th>
+                <th>What I built</th>
+                <th>Why it mattered</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>01</td>
+                <td>I created the reusable <code>market-chart</code> module, upgraded to <code>lightweight-charts</code> 5.2.0, and defined typed extension points.</td>
+                <td>The dashboard chart stopped owning terminal-specific lifecycle and became reusable infrastructure.</td>
+              </tr>
+              <tr>
+                <td>02</td>
+                <td>I added the timeframe registry, 1m/5m/15m defaults, favorite interval persistence, and subscription/candle coverage.</td>
+                <td>Timeframes became a chart capability rather than a hard-coded dashboard choice.</td>
+              </tr>
+              <tr>
+                <td>03</td>
+                <td>I replaced the dashboard chart with a terminal adapter that maps terminal state into reusable chart inputs.</td>
+                <td>This preserved Market Command behavior while keeping the module free of terminal state imports.</td>
+              </tr>
+              <tr>
+                <td>04</td>
+                <td>I added versioned chart settings, price renderer selection, lower-pane modes, and viewport-safe settings popovers.</td>
+                <td>The chart became configurable without forking per route.</td>
+              </tr>
+              <tr>
+                <td>05</td>
+                <td>I added crosshair readouts, hover aggregation transforms, rounded lower-pane bars, responsive tooltip hardening, and terminal-owned flow context.</td>
+                <td>The chart became an evidence inspection surface, not only a price plot.</td>
+              </tr>
+              <tr>
+                <td>06</td>
+                <td>I ran browser QA against the hosted backend, performed a boundary audit, closed the stream, and filed stale invalid-ticker chart data separately.</td>
+                <td>The stream ended with evidence and follow-up hygiene instead of pretending every edge case was solved.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Durable Tape Modules, <code>islandflow-h9c0</code></h3>
+        <div class="ledger">
+          <table>
+            <thead>
+              <tr>
+                <th>Phase</th>
+                <th>What I built</th>
+                <th>Why it mattered</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>00</td>
+                <td>I wrote the durable tape roadmap, phase documents, and readable plan.</td>
+                <td>This established module boundaries and Beads order before runtime behavior moved.</td>
+              </tr>
+              <tr>
+                <td>01</td>
+                <td>I extracted the shared durable tape foundation: row keys, templates, hot/history composition, cursors, scroll hold, and virtualization.</td>
+                <td>Every domain tape got the same durable mechanics instead of copy-pasted terminal behavior.</td>
+              </tr>
+              <tr>
+                <td>02</td>
+                <td>I built <code>OptionsTape</code> with signal-first defaults, contract focus, packet focus, filters, row tinting, hover detail, and no-horizontal-scroll templates.</td>
+                <td>Options proved the shared foundation against the densest tape.</td>
+              </tr>
+              <tr>
+                <td>03</td>
+                <td>I built <code>FlowPacketsTape</code> with packet summaries, packet focus callbacks, and packet detail behavior.</td>
+                <td>Options and alerts could link to packets without owning packet UI.</td>
+              </tr>
+              <tr>
+                <td>04</td>
+                <td>I built <code>NewsWire</code> with live-first history, source and symbol filters, responsive headline rows, and detail content.</td>
+                <td>News became reusable on dashboards and symbol-focused surfaces, not only on <code>/news</code>.</td>
+              </tr>
+              <tr>
+                <td>05</td>
+                <td>I built <code>EquitiesTape</code> with ticker scope, venue/off-exchange context, live/history source, callbacks, and filters.</td>
+                <td>Equity prints became inspectable through a durable module without chart coupling.</td>
+              </tr>
+              <tr>
+                <td>06</td>
+                <td>I rebuilt alerts as a module with alert rows, detail, evidence hydration, and links to options, flow, and equities.</td>
+                <td>Alerts stopped being only a terminal drawer attachment.</td>
+              </tr>
+              <tr>
+                <td>07</td>
+                <td>I composed the route, verified the module family, and closed the durable-tapes stream.</td>
+                <td>The modules became a coherent product surface rather than isolated package exports.</td>
+              </tr>
+              <tr>
+                <td>Follow-up</td>
+                <td>I added empty-history backfill and web dev port CORS QA around the module stream.</td>
+                <td>Those fixes made the modules practical under empty state and local browser testing conditions.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Durable-Tapes Performance, <code>islandflow-ze79</code></h3>
+        <div class="ledger">
+          <table>
+            <thead>
+              <tr>
+                <th>Phase</th>
+                <th>What I built</th>
+                <th>Why it mattered</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>00</td>
+                <td>I built the CDP/browser performance probe, budget profile, local/deployed baselines, and later split the probe into focused modules after review.</td>
+                <td>I needed repeatable evidence before changing behavior, and the first baselines captured the request storm clearly.</td>
+              </tr>
+              <tr>
+                <td>01</td>
+                <td>I added shared hydration scheduling, dedupe, in-flight reuse, negative caching, and bounded packet hydration batches.</td>
+                <td>This removed the repeated support/evidence lookup storm and endpoint abort churn.</td>
+              </tr>
+              <tr>
+                <td>02</td>
+                <td>I bounded option-print recent, replay, history, and by-trace reads with validation, caps, storage timeouts, and focused tests.</td>
+                <td>Missing or oversized trace lookups could no longer hang the API or amplify frontend churn.</td>
+              </tr>
+              <tr>
+                <td>03</td>
+                <td>I added a stable terminal store, <code>useTerminalSelector</code>, and memoized durable-tapes pane adapters.</td>
+                <td>Each pane subscribed to the slice it rendered instead of recomputing on unrelated live state.</td>
+              </tr>
+              <tr>
+                <td>04</td>
+                <td>I replaced whole-window live merges with keyed incremental buffers and batched websocket event application.</td>
+                <td>Hot live paths stopped repeatedly sorting and slicing entire windows per event.</td>
+              </tr>
+              <tr>
+                <td>05</td>
+                <td>I moved durable-row composition server-side with typed API/web contracts and explicit hosted fallback behavior.</td>
+                <td>The client received ready-to-render rows instead of performing expensive per-client joins.</td>
+              </tr>
+              <tr>
+                <td>06</td>
+                <td>I added production smoke checks, same-origin fallback checks, CDP budgets, fallback flags, and deployed closeout evidence.</td>
+                <td>I could close the performance epic only after live smoke and browser evidence proved the storm was gone.</td>
+              </tr>
+              <tr>
+                <td>Resolver</td>
+                <td>I kept the epic open while deployed production evidence was red, refreshed native web/API, and reran smoke plus the 30s warmup/180s probe.</td>
+                <td>This prevented a source-only victory from masking a deployed failure.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>API Private Edge, <code>islandflow-hnbk</code></h3>
+        <div class="ledger">
+          <table>
+            <thead>
+              <tr>
+                <th>Phase</th>
+                <th>What I built</th>
+                <th>Why it mattered</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>00</td>
+                <td>I recorded the live edge baseline: raw host behavior, same-origin route gaps, bundle exposure, NPM state, env posture, and direct port reachability.</td>
+                <td>I needed a factual before-state so later closure work could prove what changed.</td>
+              </tr>
+              <tr>
+                <td>01</td>
+                <td>I scrubbed active defaults, examples, tests, probes, and dev fallbacks so they used local defaults or placeholders instead of concrete production API domains.</td>
+                <td>Agents and developers stopped being taught to hit the hosted API by default.</td>
+              </tr>
+              <tr>
+                <td>02</td>
+                <td>I switched production browser REST and websocket builders to same-origin paths and added server-only internal API config for Next route handlers.</td>
+                <td>The hosted UI could talk to the API without advertising the raw API host to browsers.</td>
+              </tr>
+              <tr>
+                <td>03</td>
+                <td>I added API rate limiting with REST, lookup, and websocket buckets, forwarded-IP handling, health exemptions, JSON <code>429</code>, and telemetry.</td>
+                <td>The public app-origin routes got abuse bounds before direct raw-host access was closed.</td>
+              </tr>
+              <tr>
+                <td>04</td>
+                <td>I closed the raw public API host through durable NPM/deploy state while preserving same-origin app routes and operational local access.</td>
+                <td>The API host changed from public product endpoint to private infrastructure.</td>
+              </tr>
+              <tr>
+                <td>05</td>
+                <td>I rolled out the final live posture, verified app-origin REST and websocket paths, checked raw host closure, checked direct port 4000, and scanned the production bundle.</td>
+                <td>The closeout proved the actual server matched the implementation plan.</td>
+              </tr>
+              <tr>
+                <td>Follow-up</td>
+                <td>I filed <code>islandflow-od61</code> for automating native private API bind-host selection.</td>
+                <td>I kept future deployment hardening visible without widening phase 05 after live acceptance.</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
 
