@@ -58,7 +58,7 @@ Manual/API probes:
 
 ```bash
 curl -sS -m 5 "http://127.0.0.1:4000/option-prints/by-trace?trace_id=missing-probe"
-curl -sS -m 5 "https://api.flow.deltaisland.io/option-prints/by-trace?trace_id=missing-probe"
+curl -sS -m 5 "<raw-api-origin>/option-prints/by-trace?trace_id=missing-probe"
 ```
 
 Use deployed probes only when the phase explicitly reaches deployment verification.

@@ -76,9 +76,9 @@ Current deployed native evidence is good enough for Phase 06 review:
 
 - Native web/API were redeployed from `lavender/ze79-phase-06-production-hardening-closeout` with the narrow `web,api` native scope.
 - Production smoke passes native web route, browser API-origin routing, API health, durable-row websocket snapshot, `/lookup/options-support` latency, and `/option-prints/by-trace` miss latency.
-- The durable-row websocket check against `wss://api.flow.deltaisland.io/ws/live` returned a 10-row snapshot.
+- The durable-row websocket check against `<raw-api-origin>/ws/live` returned a 10-row snapshot.
 - The 30s warmup plus 180s deployed CDP probe passes request, script/task, heap, DOM, pane, options-row, and alerts-row budgets: 0 total measured network requests, 0 support/evidence requests, 0 aborted requests, 15.25s task duration, 11.24s script duration, 68 visible rows, 20 options rows, and 13 alerts rows.
-- Explicit public support/evidence endpoint checks returned JSON from `X-Served-By: api.flow.deltaisland.io`.
+- Explicit public support/evidence endpoint checks returned JSON from the raw API origin.
 
 Deployment blocker `islandflow-ze79.11` is resolved by the saved smoke/probe evidence. `islandflow-ze79.7` is ready for review. Close `islandflow-ba9q` only with the same production evidence attached, and close `islandflow-ze79` after Phase 06 review/merge confirms the epic closeout state.
 

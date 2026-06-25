@@ -150,6 +150,6 @@ For Islandflow durable-tapes work, the concrete substitutions are:
 - `Canonical git remote`: Forgejo remote `forgejo`
 - `Branch prefix`: `lavender/` when a branch is explicitly assigned
 - `Turn-doc location`: `docs/implementation/durable-tapes/turn-docs/`
-- `Web-only QA`: use `bun run dev:web` against `api.flow.deltaisland.io`; do not start the full stack for web-only checks
+- `Web-only QA`: use `bun run dev:web` against the local API by default; use `<raw-api-origin>` only when the phase explicitly requires nonlocal API QA
 - Reviewer docs: update the existing phase turn doc under `docs/implementation/durable-tapes/turn-docs/`; do not create a separate reviewer turn doc
 - CI ownership: reviewers verify and wait for Forgejo CI, including after reviewer repair commits

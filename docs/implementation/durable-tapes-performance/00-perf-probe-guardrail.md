@@ -17,7 +17,7 @@ The current evidence shows a frontend request storm, high script time, and heap 
 ## Scope
 
 - Add or document one repeatable browser/CDP probe for `/durable-tapes`.
-- Record baseline metrics for local web against hosted API and for deployed native web when appropriate.
+- Record baseline metrics for local web against the local API and for deployed native web when appropriate.
 - Define budgets that fail on the known bad behavior.
 - Keep the probe agent-runnable.
 - Add row/pane sanity checks so the probe cannot pass on a blank or broken page.
@@ -105,8 +105,8 @@ Baselines were captured with a 30-second warmup and a 180-second measurement win
 
 | Target | Budget | Requests | Support | By-trace | Aborts | Endpoint aborts | WS frames / bytes | Task / Script | Heap delta | Pane rows |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| Local web + hosted API (`http://localhost:3100/durable-tapes`) | fail | 9,853 | 3,473 | 1,737 | 8,117 | 3,472 | 2,817 / 1,812,154 | 59.1s / 55.2s | 44.3 MiB | options 20, flow 20, equities 15, alerts 15, news 0 |
-| Deployed web (`https://flow.deltaisland.io/durable-tapes`) | fail | 11,162 | 4,250 | 2,125 | 9,036 | 4,248 | 2,732 / 1,676,670 | 27.6s / 24.5s | 26.2 MiB | options 20, flow 20, equities 15, alerts 15, news 0 |
+| Local web + explicit nonlocal API (`http://localhost:3100/durable-tapes`) | fail | 9,853 | 3,473 | 1,737 | 8,117 | 3,472 | 2,817 / 1,812,154 | 59.1s / 55.2s | 44.3 MiB | options 20, flow 20, equities 15, alerts 15, news 0 |
+| Deployed web (`<production-app-origin>/durable-tapes`) | fail | 11,162 | 4,250 | 2,125 | 9,036 | 4,248 | 2,732 / 1,676,670 | 27.6s / 24.5s | 26.2 MiB | options 20, flow 20, equities 15, alerts 15, news 0 |
 
 The support/evidence endpoint status distribution did not show endpoint 4xx/5xx responses in these captures. `/lookup/options-support` returned `204` for completed support responses, while the `/option-prints/by-trace` calls were mostly aborted before responses were observed. This points the next phases at client-side request fanout and abort churn, not a blank route or simple status-code failure.
 
@@ -122,10 +122,10 @@ bun --cwd=apps/web run build
 Probe gate:
 
 ```bash
-WEB_DEV_PORT=3100 NEXT_PUBLIC_API_URL=https://api.flow.deltaisland.io bun run dev:web
+bun run dev:web
 ```
 
-Then run the probe against `http://localhost:3100/durable-tapes`. For baseline collection without a nonzero exit code, add `--no-fail-on-budget`; for a real gate, omit that flag so the known storm fails.
+Then run the probe against `http://localhost:3000/durable-tapes`. For baseline collection without a nonzero exit code, add `--no-fail-on-budget`; for a real gate, omit that flag so the known storm fails.
 
 ## Acceptance Criteria
 
