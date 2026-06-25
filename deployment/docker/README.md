@@ -65,7 +65,7 @@ Important defaults:
 - `WEB_BIND_IP=127.0.0.1` and `API_BIND_IP=127.0.0.1` keep the published ports local to the host by default.
 - `WEB_HOST_PORT=3000` and `API_HOST_PORT=4000` control the host-side published ports.
 - `NEXT_PUBLIC_API_URL=` (empty, the default in `.env.example`) fits same-origin mode where your edge layer proxies API paths from the app origin to the API host port.
-- `NEXT_PUBLIC_API_URL=https://api.example.com` fits a two-origin setup where the browser reaches the API on a separate public origin.
+- `NEXT_PUBLIC_API_URL=<raw-api-origin>` is a legacy two-origin setup where the browser reaches the API on a separate public origin. Do not use it for private-edge production.
 
 3. Build and start the stack:
 
@@ -117,8 +117,8 @@ Supported routing modes:
 
 1. Legacy two-origin mode
    - `app.<domain>` -> host `WEB_HOST_PORT`
-   - `api.<domain>` -> host `API_HOST_PORT`
-   - Build web with `NEXT_PUBLIC_API_URL=https://api.<domain>`.
+   - `<raw-api-origin-host>` -> host `API_HOST_PORT`
+   - Build web with `NEXT_PUBLIC_API_URL=<raw-api-origin>`.
    - This is not the normal production posture after raw API host closure.
 
 2. Same-origin mode
@@ -476,6 +476,6 @@ After the stack is up:
 - `docker compose ps` should show healthy `api`, `web`, `clickhouse`, and `redis` services.
 - `curl http://127.0.0.1:4000/health` should return a healthy response on the server.
 - `curl -I http://127.0.0.1:3000/` should return a successful HTTP status on the server.
-- In two-origin mode, browser requests should target `https://api.<domain>/...` and live feeds should use `wss://api.<domain>/ws/...`.
+- In legacy two-origin mode, browser requests target `<raw-api-origin>/...` and live feeds use the matching websocket origin. This is not the private-edge production posture.
 - In same-origin mode, browser requests should target `https://app.<domain>/...` for API paths and live feeds should use `wss://app.<domain>/ws/...`.
 - In same-origin mode, `bun run check:public-api-routes` should pass for `/prints/options`, `/history/options`, `/replay/options`, `/nbbo/options`, and `/ws/live`.
