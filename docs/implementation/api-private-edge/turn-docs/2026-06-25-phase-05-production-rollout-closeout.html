@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>API Private Edge Phase 05 Production Rollout Closeout</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #07090c;
+        --panel: #101820;
+        --panel-2: #0b1117;
+        --text: #e8eef5;
+        --dim: #9aa9b8;
+        --green: #31c27c;
+        --amber: #f0a83a;
+        --red: #ff6b5f;
+        --blue: #62a8ff;
+        --border: #ffffff18;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.55 ui-sans-serif, system-ui, sans-serif;
+      }
+
+      main {
+        width: min(1180px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 40px 0 72px;
+      }
+
+      header,
+      section {
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+        background: var(--panel);
+        padding: 20px 0;
+      }
+
+      section {
+        margin-top: 18px;
+      }
+
+      h1,
+      h2,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        margin-bottom: 8px;
+        font: 700 1.65rem/1.15 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      h2 {
+        margin-bottom: 12px;
+        color: var(--amber);
+        font: 700 0.78rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      p,
+      li,
+      td {
+        color: var(--dim);
+      }
+
+      code {
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 1px 5px;
+        background: #ffffff0a;
+        color: var(--text);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--panel-2);
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--border);
+        padding: 9px 10px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--text);
+        font: 700 0.72rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .kicker {
+        margin-bottom: 10px;
+        color: var(--amber);
+        font: 700 0.72rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 12px;
+      }
+
+      .tile {
+        border: 1px solid var(--border);
+        background: var(--panel-2);
+        padding: 12px;
+      }
+
+      .ok {
+        color: var(--green);
+      }
+
+      .warn {
+        color: var(--red);
+      }
+
+      .note {
+        color: var(--blue);
+      }
+
+      pre {
+        overflow-x: auto;
+        margin: 0;
+        border: 1px solid var(--border);
+        background: #05080c;
+        padding: 12px;
+        color: var(--text);
+        font: 0.78rem/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .diff-card {
+        border: 1px solid var(--border);
+        background: #070b10;
+      }
+
+      .diff-mount {
+        display: none;
+      }
+
+      .diff-card.rendered .diff-mount {
+        display: block;
+      }
+
+      .diff-card.rendered .diff-fallback {
+        display: none;
+      }
+
+      .diff-fallback {
+        border: 0;
+      }
+
+      .diff-fallback code {
+        border: 0;
+        padding: 0;
+        background: transparent;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="kicker">Turn documentation | June 25, 2026</div>
+        <h1>API Private Edge Phase 05 Production Rollout Closeout</h1>
+        <p>
+          Phase 05 for <code>islandflow-hnbk.6</code> deployed and verified the final private-edge posture:
+          browsers use <code>&lt;production-app-origin&gt;</code>, the raw API host is closed, and direct public
+          <code>:4000</code> no longer reaches the API.
+        </p>
+      </header>
+
+      <section>
+        <h2>Outcome</h2>
+        <div class="grid">
+          <div class="tile">
+            <strong class="ok">Production web rebuilt</strong>
+            <p>
+              The live web build was rebuilt with <code>NEXT_PUBLIC_API_URL=</code>, then web and API user units were
+              restarted. The hosted UI returns a successful response from <code>&lt;production-app-origin&gt;</code>.
+            </p>
+          </div>
+          <div class="tile">
+            <strong class="ok">Internal API selected</strong>
+            <p>
+              Production now uses an internal NPM bridge origin for server-only API access. The API binds to that
+              internal host instead of wildcard public interfaces.
+            </p>
+          </div>
+          <div class="tile">
+            <strong class="ok">Rate limits enabled</strong>
+            <p>
+              Phase 03 fixed-window limits are enabled in the live env with the conservative production values from the
+              implementation plan.
+            </p>
+          </div>
+          <div class="tile">
+            <strong class="ok">Closeout documented</strong>
+            <p>
+              Native unit defaults and deployment docs now steer future installs away from wildcard API binds and raw
+              public API examples.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Live Verification</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Check</th>
+              <th>Result</th>
+              <th>Evidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Hosted UI</td>
+              <td class="ok">Pass</td>
+              <td><code>curl -I &lt;production-app-origin&gt;/</code> returned a successful response.</td>
+            </tr>
+            <tr>
+              <td>App-origin REST and websocket</td>
+              <td class="ok">Pass</td>
+              <td><code>DEPLOY_PUBLIC_APP_URL=&lt;production-app-origin&gt; bun run scripts/check-public-api-routes.ts</code> returned 15 <code>ok</code> lines, including <code>/ws/live</code>.</td>
+            </tr>
+            <tr>
+              <td>Bundle raw-origin scan</td>
+              <td class="ok">Pass</td>
+              <td><code>rg --fixed-strings &lt;raw-api-origin&gt; apps/web/.next/static apps/web/.next/server</code> found no matches in the live production build.</td>
+            </tr>
+            <tr>
+              <td>Raw API host</td>
+              <td class="ok">Pass</td>
+              <td><code>curl -k &lt;raw-api-origin&gt;/health</code> and raw websocket upgrade probes failed with TLS/SNI behavior and HTTP <code>000</code>, not API JSON or <code>101</code>.</td>
+            </tr>
+            <tr>
+              <td>Direct public port 4000</td>
+              <td class="ok">Pass</td>
+              <td><code>curl http://&lt;public-ip&gt;:4000/health</code> and <code>nc -z &lt;public-ip&gt; 4000</code> failed after the API bind was moved off wildcard interfaces.</td>
+            </tr>
+            <tr>
+              <td>Internal API health</td>
+              <td class="ok">Pass</td>
+              <td><code>curl &lt;internal-api-origin&gt;/health</code> succeeds on the server.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Quality Gates</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Command</th>
+              <th>Status</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><code>bun install --frozen-lockfile</code></td><td class="ok">Pass</td><td>Required in this worktree before tests, because dependencies were not linked initially.</td></tr>
+            <tr><td><code>bun test services/api/tests</code></td><td class="ok">Pass</td><td>58 tests passed.</td></tr>
+            <tr><td><code>bun test apps/web/features/terminal apps/web/features/news-wire apps/web/app/api/admin/synthetic</code></td><td class="ok">Pass</td><td>26 tests passed.</td></tr>
+            <tr><td><code>bun --cwd=apps/web run build</code></td><td class="ok">Pass</td><td>Production web build completed.</td></tr>
+            <tr><td><code>git diff --check</code></td><td class="ok">Pass</td><td>No whitespace errors.</td></tr>
+            <tr><td><code>bun run fmt:check</code></td><td class="ok">Pass</td><td>Biome reported no fixes needed.</td></tr>
+            <tr><td><code>bun run lint</code></td><td class="ok">Pass</td><td>Biome reported no fixes needed.</td></tr>
+            <tr><td><code>bun run typecheck</code></td><td class="ok">Pass</td><td>Workspace typecheck passed.</td></tr>
+            <tr><td><code>bun run check:docker-workspace</code></td><td class="ok">Pass</td><td>Docker workspace snapshot is in sync.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Helper Fan-In</h2>
+        <ul>
+          <li>App-origin helper confirmed the route probe coverage and noted live origins must stay local shell variables.</li>
+          <li>Raw-host helper found the important blocker: the raw host was closed, but direct public <code>:4000</code> still reached the API while the service listened on <code>0.0.0.0</code>.</li>
+          <li>Bundle/docs helper found no active raw-host constants in source, and recommended replacing legacy Docker two-origin examples with placeholders.</li>
+          <li>Beads/Forgejo helper confirmed Phase 01 through Phase 04 are closed, Phase 05 needed this turn doc and PR, and the epic should close only after Phase 05 proof.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p>
+          This section keeps the standard HTML unified diff visible by default. If browser module loading succeeds, the
+          same patch is rendered with <code>PatchDiff</code> from browser-side <code>@pierre/diffs/react</code>.
+        </p>
+        <div class="diff-card" data-patch-diff>
+          <div class="diff-mount" aria-label="Rendered diff"></div>
+          <pre class="diff-fallback"><code>diff --git a/.env.example b/.env.example
++API_HOST=127.0.0.1
+ # API-side rate limiting is disabled by default for local development.
+
+diff --git a/deployment/native/systemd/user/islandflow-api.service b/deployment/native/systemd/user/islandflow-api.service
+-Environment=API_HOST=0.0.0.0
++Environment=API_HOST=127.0.0.1
+
+diff --git a/deployment/native/README.md b/deployment/native/README.md
++NEXT_PUBLIC_API_URL=
++API_HOST=&lt;internal-api-bind-host&gt;
++ISLANDFLOW_INTERNAL_API_URL=&lt;internal-api-origin&gt;
+ API_RATE_LIMIT_ENABLED=1
+ API_RATE_LIMIT_WINDOW_MS=60000
+ API_RATE_LIMIT_REST_MAX=1200
+ API_RATE_LIMIT_LOOKUP_MAX=120
+ API_RATE_LIMIT_WS_MAX=120
++
++Do not bind the API to 0.0.0.0 for private-edge production.
+
+diff --git a/deployment/docker/README.md b/deployment/docker/README.md
+-NEXT_PUBLIC_API_URL=&lt;legacy-raw-api-example&gt;
++NEXT_PUBLIC_API_URL=&lt;raw-api-origin&gt;
++
++This legacy two-origin mode is not the private-edge production posture.</code></pre>
+        </div>
+      </section>
+
+      <section>
+        <h2>Risks</h2>
+        <ul>
+          <li>The live native API service relies on a server-local env value for <code>API_HOST</code> that points at the NPM bridge host. Keep that value aligned with the active NPM network if Docker networks are rebuilt.</li>
+          <li>Raw host behavior is TLS/SNI failure rather than a friendly 404 page. That is acceptable for the closed posture because it returns no API JSON and no websocket upgrade.</li>
+          <li>Shutdown logs still show a Redis client closed error during API restarts. It did not prevent startup or live verification, but it remains unrelated operational noise.</li>
+        </ul>
+      </section>
+    </main>
+    <script type="module">
+      import React from "https://esm.sh/react@19";
+      import { createRoot } from "https://esm.sh/react-dom@19/client";
+      import { PatchDiff } from "https://esm.sh/@pierre/diffs@1.2.2/react?deps=react@19,react-dom@19";
+
+      for (const card of document.querySelectorAll("[data-patch-diff]")) {
+        const source = card.querySelector(".diff-fallback code");
+        const target = card.querySelector(".diff-mount");
+        if (!source || !target) continue;
+        try {
+          createRoot(target).render(React.createElement(PatchDiff, { patch: source.textContent || "" }));
+          card.classList.add("rendered");
+        } catch (error) {
+          console.warn("Rich diff renderer failed; keeping HTML fallback.", error);
+        }
+      }
+    </script>
+  </body>
+</html>

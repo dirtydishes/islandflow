@@ -273,12 +273,17 @@ This keeps native app ownership explicit until infra, app health, and proxy rout
 Phase 03 adds API-side fixed-window throttling for public same-origin API traffic. Local development keeps it disabled by default; production rollout should enable it explicitly in `/home/delta/islandflow/.env` after the edge is confirmed to forward `X-Forwarded-For` or `X-Real-IP` to the API:
 
 ```bash
+NEXT_PUBLIC_API_URL=
+API_HOST=<internal-api-bind-host>
+ISLANDFLOW_INTERNAL_API_URL=<internal-api-origin>
 API_RATE_LIMIT_ENABLED=1
 API_RATE_LIMIT_WINDOW_MS=60000
 API_RATE_LIMIT_REST_MAX=1200
 API_RATE_LIMIT_LOOKUP_MAX=120
 API_RATE_LIMIT_WS_MAX=120
 ```
+
+For the native Nginx Proxy Manager path, `<internal-api-bind-host>` is the host-side Docker bridge address that NPM forwards to, and `<internal-api-origin>` is that same host plus `:4000`. Do not bind the API to `0.0.0.0` for private-edge production; that reopens direct public `:4000` when the host firewall allows it.
 
 The limits are per API process and keyed by the forwarded client address when present and valid, otherwise by the socket peer when available. `/health` and CORS preflight are exempt. Rejections return JSON `429` responses and log only the coarse bucket/category, not request query strings, trace IDs, bearer tokens, or raw client addresses.
 
