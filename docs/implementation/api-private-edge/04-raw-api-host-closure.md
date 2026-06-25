@@ -32,6 +32,10 @@ curl -sS -o /dev/null -w "%{http_code}\\n" --max-time 5 <raw-api-origin>/health
 
 Use shell variables for origins during live checks. Do not commit concrete production domains into docs or scripts.
 
+The raw API health probe is a negative check in this phase: closed, timeout, 404-style, 403, 410, 421, or 502 behavior is acceptable; healthy API JSON is not. For app-origin verification, prefer `/` plus `bun run scripts/check-public-api-routes.ts <production-app-origin>` unless the app-origin edge deliberately proxies `/health`.
+
+Rollback for a same-origin outage must be an explicit operator action, for example `ISLANDFLOW_RAW_API_MODE=temporary-open ./deployment/native/switch-npm-edge.sh docker`, followed by `./deployment/native/switch-npm-edge.sh docker --raw-api=closed` after the emergency path is no longer needed.
+
 ## Implementation Subagents
 
 Run this phase through the full topology in `IMPLEMENT.md` when useful: selector agent, 6-10 read-only scout agents, one implementation worker, 3-6 review agents, and one lead reviewer. Use scouts for NPM/live-edge state and reviewers for rollback, same-origin preservation, and deployment durability.
