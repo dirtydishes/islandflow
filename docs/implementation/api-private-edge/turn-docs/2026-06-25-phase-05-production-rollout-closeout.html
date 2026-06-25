@@ -299,6 +299,71 @@
       </section>
 
       <section>
+        <h2>Reviewer Addendum</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Area</th>
+              <th>Reviewer result</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Strict review</td>
+              <td>
+                Applied the thermo-nuclear review bar to the Phase 05 diff. No structural regression, wrong-layer logic,
+                avoidable wrapper, cast churn, or file-size growth was found. The branch is an operational defaults and
+                evidence patch, and the direct-port closure repair stays in Phase 05 scope.
+              </td>
+            </tr>
+            <tr>
+              <td>Live evidence</td>
+              <td>
+                Accepted the redacted matrix as sufficient for the phase contract: app-origin REST and websocket route
+                checks passed, the production bundle scan found no raw origin, raw-host probes failed closed without API
+                JSON or websocket <code>101</code>, direct public <code>:4000</code> failed, and internal API health passed.
+              </td>
+            </tr>
+            <tr>
+              <td>Repository hygiene</td>
+              <td>
+                Confirmed the touched active docs and examples use placeholders or local/container origins, not concrete
+                production domains. The native API unit now defaults to loopback, while production can still override
+                <code>API_HOST</code> from the environment file for the selected internal NPM bridge host.
+              </td>
+            </tr>
+            <tr>
+              <td>Reviewer repairs</td>
+              <td>
+                No product or deployment code repair was needed. Reviewer updated only this existing Phase 05 turn
+                document to record the review pass and verification ownership.
+              </td>
+            </tr>
+            <tr>
+              <td>Reviewer local gates</td>
+              <td>
+                Reran <code>bun test services/api/tests</code>,
+                <code>bun test apps/web/features/terminal apps/web/features/news-wire apps/web/app/api/admin/synthetic</code>,
+                <code>bun --cwd=apps/web run build</code>, <code>bun run fmt:check</code>,
+                <code>bun run lint</code>, <code>bun run typecheck</code>,
+                <code>bun run check:docker-workspace</code>, and <code>git diff --check</code>; all passed.
+              </td>
+            </tr>
+            <tr>
+              <td>CI and tracker state</td>
+              <td>
+                <code>fj pr status 84</code> hit a Forgejo CLI response-shape bug, so reviewer verified Actions through
+                <code>fj actions tasks</code>. The worker head had a successful Validate run, and the reviewer-owned final
+                pushed head is checked there before callback. <code>islandflow-hnbk.6</code> and epic
+                <code>islandflow-hnbk</code> remain closed; follow-up <code>islandflow-od61</code> remains open for
+                automating native private API bind-host selection.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
         <h2>Relevant Diff Snippets</h2>
         <p>
           This section keeps the standard HTML unified diff visible by default. If browser module loading succeeds, the
