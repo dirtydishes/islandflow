@@ -333,6 +333,79 @@
               <td><code>git diff --check</code></td>
               <td>No whitespace errors in the patch.</td>
             </tr>
+            <tr>
+              <td class="ok">pass</td>
+              <td><code>bun run fmt:check</code></td>
+              <td>Checked 350 files after <code>bun install</code> restored the local workspace binary links.</td>
+            </tr>
+            <tr>
+              <td class="ok">pass</td>
+              <td><code>bun run lint</code></td>
+              <td>Checked 350 files after dependency links were restored.</td>
+            </tr>
+            <tr>
+              <td class="ok">pass</td>
+              <td><code>bun run typecheck</code></td>
+              <td>All workspace TypeScript projects passed.</td>
+            </tr>
+            <tr>
+              <td class="ok">green</td>
+              <td>Forgejo CI / Validate</td>
+              <td>
+                Head <code>bf7fbba0490e4dc98468fb0e7d40dca117789c24</code> completed
+                <code>Validate</code> successfully in <code>1m28s</code> for pull request task <code>#323</code>.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Reviewer Addendum</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Area</th>
+              <th>Disposition</th>
+              <th>Evidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Thermo-nuclear review</td>
+              <td class="ok">no findings</td>
+              <td>
+                The durable NPM DB update is the canonical control point, generated raw config is removed as stale runtime
+                state, and temporary raw-host reopen is a single explicit mode. No file crosses the 1k-line threshold, no
+                wrong-layer browser transport logic was added, and the extra branch surface remains bounded to deployment
+                helper behavior.
+              </td>
+            </tr>
+            <tr>
+              <td>Generated config sync</td>
+              <td class="ok">accepted</td>
+              <td>
+                The regex rewrite is limited to NPM's generated proxy-host files and is backed by durable DB state plus
+                fixture tests. It is still documented as a residual operational risk because NPM's generated file shape is
+                not a public API.
+              </td>
+            </tr>
+            <tr>
+              <td>Reviewer repairs</td>
+              <td class="note">docs only</td>
+              <td>
+                No Phase 04 code repair was needed. Reviewer updated this turn document to record the strict review,
+                expanded local gates, Forgejo CI state, and readiness.
+              </td>
+            </tr>
+            <tr>
+              <td>Readiness</td>
+              <td class="ok">merge-ready</td>
+              <td>
+                <code>islandflow-hnbk.5</code> remains closed, no follow-up Beads issue was required, local gates pass,
+                and PR #83 is ready for orchestrator closeout after this reviewer documentation commit is pushed.
+              </td>
+            </tr>
           </tbody>
         </table>
       </section>
