@@ -250,6 +250,20 @@ Without that variable, these commands are refused:
 
 This keeps native app ownership explicit until infra, app health, and proxy routing are switched deliberately.
 
+## API rate limiting
+
+Phase 03 adds API-side fixed-window throttling for public same-origin API traffic. Local development keeps it disabled by default; production rollout should enable it explicitly in `/home/delta/islandflow/.env` after the edge is confirmed to forward `X-Forwarded-For` or `X-Real-IP` to the API:
+
+```bash
+API_RATE_LIMIT_ENABLED=1
+API_RATE_LIMIT_WINDOW_MS=60000
+API_RATE_LIMIT_REST_MAX=1200
+API_RATE_LIMIT_LOOKUP_MAX=120
+API_RATE_LIMIT_WS_MAX=120
+```
+
+The limits are per API process and keyed by the forwarded client address when present and valid, otherwise by the socket peer when available. `/health` and CORS preflight are exempt. Rejections return JSON `429` responses and log only the coarse bucket/category, not request query strings, trace IDs, bearer tokens, or raw client addresses.
+
 ## Running deploy from the VPS itself
 
 If you run `./deploy` from `/home/delta/islandflow` on the live server, the deploy helper now executes the remote steps locally instead of SSHing back into the same machine.
