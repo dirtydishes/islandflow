@@ -45,6 +45,14 @@ describe("browser API transport builders", () => {
     expect(buildBrowserWsUrl("/ws/live")).toBe("ws://localhost:4000/ws/live");
   });
 
+  it("keeps IPv6 loopback pages on the local API port", () => {
+    delete process.env.NEXT_PUBLIC_API_URL;
+    setWindowLocation("http://[::1]:3000/durable-tapes");
+
+    expect(buildBrowserApiUrl("/history/options")).toBe("http://[::1]:4000/history/options");
+    expect(buildBrowserWsUrl("/ws/live")).toBe("ws://[::1]:4000/ws/live");
+  });
+
   it("uses same-origin app paths for blank-env production pages", () => {
     delete process.env.NEXT_PUBLIC_API_URL;
     setWindowLocation("https://app.example.test/durable-tapes");

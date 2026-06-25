@@ -326,6 +326,46 @@
       </section>
 
       <section>
+        <h2>Reviewer Addendum</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Review Area</th>
+              <th>Finding</th>
+              <th>Resolution</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Browser transport</td>
+              <td>
+                Thermo-nuclear review found one centralized local-host edge case:
+                browser URL parsing reports IPv6 loopback as <code>[::1]</code>, so the new shared helper would treat
+                <code>http://[::1]:3000</code> as same-origin web traffic instead of local API traffic.
+              </td>
+              <td>
+                Added <code>[::1]</code> to the local host set and covered it in
+                <code>apps/web/features/api-transport.test.ts</code>. No structural regression or file-size threshold issue
+                was found in the shared helper, synthetic proxy boundary, route matcher, or smoke probe.
+              </td>
+            </tr>
+            <tr>
+              <td>Reviewer gates</td>
+              <td>
+                The reviewer reran formatting, lint, typecheck, focused transport/module tests, production build, probe CLI,
+                route-check fail-fast behavior, shell syntax, whitespace checks, and production artifact raw-origin scans.
+              </td>
+              <td>
+                Local gates passed. Live public route verification still requires an explicit
+                <code>DEPLOY_PUBLIC_APP_URL</code> or app-origin argument and was not executed against production from this
+                worktree.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
         <h2>Relevant Diff Snippets</h2>
         <p>
           This section keeps the standard HTML unified diff visible by default.
@@ -337,7 +377,7 @@
           <pre class="diff-fallback"><code>diff --git a/apps/web/features/api-transport.ts b/apps/web/features/api-transport.ts
 new file mode 100644
 +const DEFAULT_LOCAL_API_ORIGIN = "http://127.0.0.1:4000";
-+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
++const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 +...
 +export const buildBrowserApiUrl = (path: string, apiBaseUrl?: string): string =&gt;
 +  normalizeUrl(path, "http", apiBaseUrl);

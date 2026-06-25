@@ -1,5 +1,5 @@
 const DEFAULT_LOCAL_API_ORIGIN = "http://127.0.0.1:4000";
-const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 
 const getPublicApiOverride = (): string | undefined => {
   const value = process.env.NEXT_PUBLIC_API_URL?.trim();
