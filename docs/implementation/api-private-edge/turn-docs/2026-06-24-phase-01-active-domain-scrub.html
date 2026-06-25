@@ -382,6 +382,70 @@
               <td><span class="status-ok">passed</span></td>
               <td>No whitespace errors.</td>
             </tr>
+            <tr>
+              <td><code>Forgejo CI / Validate (pull_request)</code></td>
+              <td><span class="status-warn">failed</span></td>
+              <td>
+                Reviewer verified commit status for
+                <code>a08ed046cc1fd1fc267b6aba563d735a874b228b</code>: run
+                <code>308</code> failed after 23 seconds. The Forgejo API exposed the
+                commit status but not Actions log endpoints, and the web job page
+                returned an unauthenticated shell with the available credentials.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Reviewer Pass</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Review Area</th>
+              <th>Disposition</th>
+              <th>Evidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Thermo-nuclear code-quality review</td>
+              <td><span class="status-ok">no findings</span></td>
+              <td>
+                The branch keeps Phase 01 as a direct defaults/docs/probe scrub.
+                No new wrong-layer transport behavior, rate limiting, raw-host
+                closure, wrapper layer, cast-heavy boundary, or file-size threshold
+                regression was found.
+              </td>
+            </tr>
+            <tr>
+              <td>Active domain scan</td>
+              <td><span class="status-ok">passed</span></td>
+              <td>
+                Reviewer reran the raw-host and default-name scans. Remaining
+                concrete production-domain hits are historical baselines/turn docs
+                or the documented desktop app trust-policy constant and tests.
+              </td>
+            </tr>
+            <tr>
+              <td>Local gates rerun</td>
+              <td><span class="status-ok">passed</span></td>
+              <td>
+                Reviewer reran the focused Bun tests, web production build,
+                durable-tapes smoke help and fail-fast checks, public route
+                fail-fast check, native shell syntax check, and
+                <code>git diff --check</code>.
+              </td>
+            </tr>
+            <tr>
+              <td>Merge readiness</td>
+              <td><span class="status-warn">blocked by CI</span></td>
+              <td>
+                PR #80 is open, non-draft, and Forgejo reports it mergeable, but
+                the required validate status is red. No reviewer repair was made
+                because the CI log was not accessible from this environment.
+              </td>
+            </tr>
           </tbody>
         </table>
       </section>
