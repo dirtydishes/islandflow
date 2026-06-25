@@ -574,22 +574,42 @@
 
         <div class="phase">
           <div>
-            <p class="phase-kicker">Second pivot</p>
+            <p class="phase-kicker">Synthetic foundation</p>
             <div class="phase-window">June 17 to June 18</div>
           </div>
           <div class="phase-copy">
-            <h3>Synthetic data and smart-flow matured in parallel.</h3>
-            <p>Then the story moved below the UI. The Beads epics <code>islandflow-259</code> and <code>islandflow-zxh</code> split the synthetic and smart-flow plans into a dependency chain: synthetic phase 01 and smart-flow contracts could run in parallel, then fixtures unblocked evidence clustering, labels unblocked scoring, replay unblocked golden tests, and demo profiles unblocked API/UI explainability.</p>
-            <p>Synthetic market data began with a deterministic spine: seeded profiles, canonical event wrappers, provenance outside payloads, stable ordering, and infra-free tests. It became manifests and fixtures, then scenarios and labels, then replay integration, demo profiles, and hosted controls. In parallel, smart-flow moved from contracts to evidence facts, clustering, score vectors, abstention, API projections, UI explainability, and chart markers.</p>
-            <p>The recurring choice was to keep truth outside the wrong place. Labels stayed outside emitted market events. Provenance lived by trace ID. Smart-flow projections became canonical, while legacy smart-money streams stayed as fallback. The two epics remain open only because their future calibration phases are intentionally out of the MVP path.</p>
+            <h3>Synthetic data became a deterministic raw-event source.</h3>
+            <p>Then the story moved below the UI, but the first major stream was about the data source itself. The synthetic epic <code>islandflow-259</code> made generated market data repeatable before I trusted it for demos, replay, or smart-flow evaluation. Phase 01 created a deterministic generator with seeded profiles, canonical event wrappers, stable ordering, and provenance keyed by trace id instead of hidden metadata inside emitted events.</p>
+            <p>That spine became manifests, fixture files, event hashes, replay plans, fixture loaders, a Bun CLI, named scenarios, separate labels, expected-output sidecars, replay selectors, demo profiles, load profiles, and hosted controls. The rule was simple: synthetic market events should look like real market events, while labels and provenance stay in sidecars where tests and replay can use them without teaching the runtime impossible truth.</p>
+            <p>This stream happened at the same time as smart-flow, but it was not the same project. Synthetic work gave me repeatable option and equity prints, quotes, labels, and replay runs. Smart-flow changed how those prints were interpreted. The dependency chain mattered because synthetic fixtures and labels made smart-flow validation reproducible, but the semantic rebuild lived in its own epic.</p>
             <div class="doc-strip">
               <a class="doc-link" href="../implementation/synthetic-market-data/00-roadmap.md">synthetic roadmap</a>
-              <a class="doc-link" href="../implementation/smart-money/00-roadmap.md">smart-flow roadmap</a>
               <a class="doc-link" href="2026-06-17-1334-synthetic-deterministic-spine.html">synthetic spine</a>
               <a class="doc-link" href="2026-06-17-1621-synthetic-prints-phase-02-manifests-fixtures-cli.html">fixtures cli</a>
               <a class="doc-link" href="2026-06-17-1800-synthetic-phase-03-scenarios-labels-expected-outputs.html">phase 03</a>
-              <a class="doc-link" href="2026-06-17-1332-smart-money-1b-smart-flow-contracts.html">smart-flow contracts</a>
-              <a class="doc-link" href="2026-06-17-1702-smart-flow-clustering-features.html">clustering</a>
+              <a class="doc-link" href="../implementation/synthetic-market-data/04-replay-integration.md">replay integration</a>
+              <a class="doc-link" href="../implementation/synthetic-market-data/05-demo-load-profiles.md">demo profiles</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div>
+            <p class="phase-kicker">Smart-flow rebuild</p>
+            <div class="phase-window">June 17 to June 18</div>
+          </div>
+          <div class="phase-copy">
+            <h3>Print processing changed from signal labels to evidence facts.</h3>
+            <p>The separate smart-flow epic <code>islandflow-zxh</code> rebuilt the meaning of an option or equity print inside the system. Before this turn sequence, a print could flow toward a smart-money style classification too quickly: the pipeline could sound like it knew intent when it mainly had a print, surrounding quote context, and a few derived features. The new direction kept raw observations as observations, then made each later interpretation step explicit.</p>
+            <p>The new flow started with contracts for observation refs, candidates, evidence quality, eligibility, clusters, hypotheses, score vectors, alternatives, abstention, and user-facing projections. Then phase 02 changed print handling directly: quote joins, sale conditions, stale quotes, wide markets, odd lots, complex-spread context, noisy context, and execution context became accept, reject, or down-weight reasons before scoring. Eligible candidates were clustered into deterministic windows, rejected candidates stayed visible as rejected input, and feature values carried fact ids plus raw evidence refs.</p>
+            <p>After that, scoring stopped being a single confident label. Premium concentration, sweep-like activity, IV movement, equity confirmation, deep-ITM stock-replacement risk, stale quote penalties, hedge/spread alternatives, and event-driven caveats fed score vectors, confidence, conviction, penalties, and abstention. A good abstention became an output with reasons. Then replay golden tests checked positive, abstain, false-positive, noisy, and unexpected-extra-alert cases before API, websocket, terminal, and chart surfaces presented smart-flow projections as the canonical explanation layer.</p>
+            <div class="doc-strip">
+              <a class="doc-link" href="../implementation/smart-money/00-roadmap.md">smart-flow roadmap</a>
+              <a class="doc-link" href="2026-06-17-1332-smart-money-1b-smart-flow-contracts.html">contracts</a>
+              <a class="doc-link" href="../implementation/smart-money/02-evidence-clustering-features.md">evidence phase</a>
+              <a class="doc-link" href="2026-06-17-1702-smart-flow-clustering-features.html">clustering turn</a>
+              <a class="doc-link" href="../implementation/smart-money/03-hypothesis-scoring-abstention.md">scoring phase</a>
+              <a class="doc-link" href="../implementation/smart-money/04-replay-evaluation-golden-tests.md">golden tests</a>
               <a class="doc-link" href="2026-06-18-2005-smart-flow-ui-explainability.html">ui explainability</a>
             </div>
           </div>
@@ -736,14 +756,19 @@
             <p class="milestone-side">Future calibration remains open after the MVP explanation pipeline.</p>
           </div>
           <div>
-            <h3>I rebuilt smart-money into an evidence and abstention system.</h3>
-            <p>The smart-flow roadmap in <a href="../implementation/smart-money/00-roadmap.md">smart-money/00-roadmap.md</a> chose a careful path: keep the useful working stack, but rebuild the domain model around observations, facts, evidence clusters, cautious hypotheses, confidence, alternatives, abstention, replay evaluation, and user-facing projections. That choice mattered because the old smart-money surface could sound more certain than the data justified.</p>
-            <p>Phase 01 introduced the canonical contract family in <code>packages/types/src/smart-flow.ts</code>. Phase 02 split evidence work into eligibility facts and deterministic clustering, preserving fact ids and raw evidence refs so later projections could explain themselves. Phase 03 converted clusters into score vectors, alternatives, penalties, confidence, conviction, and explicit abstention reasons. Phase 04 made replay golden tests the acceptance gate, rebuilding smart-flow outputs from raw synthetic fixtures instead of relying on precomputed answers. Phase 05 then exposed the projection through API, websocket, terminal UI, and chart markers.</p>
-            <p>The important story here is that I stopped treating classification as the only valuable output. A good abstention, with reasons, became a first-class product result. The UI work followed that posture: tables, drawers, command context, priority rows, and chart markers prefer smart-flow projections, while legacy smart-money remains compatibility fallback when no projection is available.</p>
+            <h3>I rebuilt smart-money into a print evidence system.</h3>
+            <p>The smart-flow roadmap in <a href="../implementation/smart-money/00-roadmap.md">smart-money/00-roadmap.md</a> chose a careful path: keep the useful working stack, but rebuild the domain model around observations, facts, evidence clusters, cautious hypotheses, confidence, alternatives, abstention, replay evaluation, and user-facing projections. This was a separate milestone from the synthetic rebuild. Synthetic gave me deterministic raw streams and expected outputs. Smart-flow changed what the system does with option prints, equity prints, quote context, and derived evidence once those events enter compute.</p>
+            <p>The old smart-money shape made the product vulnerable to overclaiming. A large or aggressive-looking print could travel toward a confident label before the system had made quote quality, sale conditions, stale context, wide markets, odd-lot noise, spread or hedge structure, deep-ITM stock-replacement risk, or event-driven alternatives visible. The rebuild changed that posture. A print is first an observation. It can become a <code>FlowCandidate</code> only with explicit observation refs, packet ids, member print ids, baseline context, evidence quality, and eligibility. It can be accepted, rejected, or down-weighted before it is allowed into a scored hypothesis.</p>
+            <p>Phase 01 introduced the canonical contract family in <code>packages/types/src/smart-flow.ts</code>: <code>FlowObservationRef</code>, <code>FlowCandidate</code>, <code>FlowEvidenceCluster</code>, <code>FlowHypothesisEvent</code>, evidence quality, baseline snapshots, alternatives, abstention, and <code>SmartFlowInsight</code>. The compatibility aliases let old smart-money feeds keep working, but the canonical vocabulary moved to smart-flow. That was the first major semantic correction: legacy smart-money became projection language, not the source of truth.</p>
+            <p>Phase 02 was the direct print-processing rewrite. Eligibility and evidence facts made quote joins, execution context, sale conditions, stale quotes, wide markets, odd lots, noisy context, and complex-spread context first-class. Then deterministic clustering grouped only eligible evidence into stable windows while keeping rejected candidates visible by id. Traceable feature vectors preserved whether a value was measured, derived, or inferred, and each feature carried fact ids plus raw evidence refs. This changed print processing from a generic feature bag into an auditable evidence ledger.</p>
+            <p>Phase 03 changed the meaning of the final output. Clusters produce score vectors, not a single opaque classifier verdict. Evidence strength, confidence, conviction, penalties, alternatives, and abstention are separate. Premium concentration, sweep-like activity, IV movement, and equity confirmation can support a hypothesis only when evidence quality and context agree. Deep-ITM stock replacement, spreads, hedges, stale quotes, and event-driven flow can push the system toward penalties or abstention. A good abstention, with reasons, became a product result rather than a missing alert.</p>
+            <p>Phase 04 made deterministic replay and golden signatures the acceptance gate. Smart-flow behavior is recomputed from raw synthetic streams and compared across positive, abstain, false-positive, noisy, and unexpected-extra-alert scenarios. Phase 05 then exposed the cautious explanation layer through recent/history/replay APIs, websocket feeds, terminal tables, drawers, command ticker context, priority rows, and chart markers. The product surface now prefers smart-flow projections while legacy smart-money remains fallback only when no projection exists.</p>
             <ul class="milestone-points">
-              <li>I made evidence quality, confidence, conviction, alternatives, and why-not signals explicit instead of burying them under one label.</li>
-              <li>I used synthetic scenarios to validate both positive and negative cases, including unexpected extra alerts and false positives.</li>
-              <li>I split phase 05 into API/websocket surfaces, UI explainability, and chart-marker migration so the presentation layer could be reviewed in manageable slices.</li>
+              <li>I separated raw observations from candidates, candidates from evidence clusters, clusters from hypotheses, and hypotheses from user-facing projections.</li>
+              <li>I made accept, reject, and down-weight decisions part of print processing, with quality and context attached before scoring.</li>
+              <li>I made evidence quality, confidence, conviction, alternatives, penalties, and why-not signals explicit instead of burying them under one label.</li>
+              <li>I used synthetic scenarios to validate both positive and negative smart-flow behavior, including abstentions, unexpected extra alerts, and false positives.</li>
+              <li>I split phase 05 into API/websocket surfaces, UI explainability, and chart-marker migration so presentation changes could be reviewed without weakening the domain model.</li>
               <li>I left <code>islandflow-zxh.6</code> open because calibration should tune a proven pipeline, not compensate for a vague one.</li>
             </ul>
             <div class="doc-strip">
@@ -752,6 +777,37 @@
               <a class="doc-link" href="../implementation/smart-money/03-hypothesis-scoring-abstention.md">scoring</a>
               <a class="doc-link" href="../implementation/smart-money/04-replay-evaluation-golden-tests.md">golden tests</a>
               <a class="doc-link" href="../implementation/smart-money/05-api-ui-explainability.md">explainability</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="milestone">
+          <div>
+            <p class="phase-kicker">Print processing</p>
+            <div class="phase-window">Smart-flow phases 02 to 05</div>
+            <p class="milestone-side">The print path became evidence-first before any user-facing claim.</p>
+          </div>
+          <div>
+            <h3>I changed how prints become product claims.</h3>
+            <p>The most important smart-flow change was not the name. It was the sequence. Option and equity prints no longer jump straight from raw feed material into a smart-money assertion. The system now asks a chain of smaller questions first: what observation is this, what quote context was available, is the quote stale or wide, is the print odd-lot or noisy, does the structure look like a spread or hedge, does the equity tape confirm or contradict it, and should the print be accepted, rejected, or down-weighted before it influences anything visible.</p>
+            <p>Phase 02a is where that chain became explicit. Evidence facts record direct observations, quote joins, execution context, and eligibility decisions. The acceptance criteria required accept, reject, or down-weight reasons, so a bad input is no longer silently washed into an aggregate. Rejected candidates are useful because they explain why an expected signal did not appear. Down-weighted candidates are useful because they keep weak evidence visible without granting it the same authority as clean evidence.</p>
+            <p>Phase 02b then changed aggregation. Instead of rebuilding the old <code>FlowPacket</code> as a renamed feature bag, the cluster builder creates deterministic cluster ids and windows, sorts by observed timestamp and candidate id, excludes rejected candidates from normal clusters, reports rejected ids separately, and derives feature details with lineage. Premium, size, quote coverage, stale ratio, aggression, spread values, packet counts, member counts, eligibility status, and structure context become features with fact ids and evidence refs attached.</p>
+            <p>Phase 03 made the print-processing output cautious. A cluster can support an accumulation, sweep-like, unusual activity, hedge, or replacement-style hypothesis only through score vectors that preserve evidence strength, confidence, conviction, penalties, and alternatives. If the print context is stale, ambiguous, spread-like, event-driven, or otherwise weak, the system can abstain with machine-readable and user-readable reasons. That makes the absence of a claim explainable, which matters as much as the alert itself.</p>
+            <p>Phase 05 carried the new semantics to the operator. Recent/history/replay APIs and the websocket feed expose smart-flow projections, and the terminal now presents hypothesis, direction, confidence, conviction, evidence quality, why-not context, abstention, alternatives, and inspectable refs. Chart markers moved toward the same projection source. That means the UI no longer has to pretend a print is a hidden-participant fact. It can show the print as evidence, the hypothesis as a hypothesis, and the caveats as part of the product.</p>
+            <ul class="milestone-points">
+              <li>Before: a print could mainly become a signal row, a smart-money-style event, or a chart marker.</li>
+              <li>After: a print passes through observation refs, evidence facts, eligibility, evidence quality, deterministic clusters, traceable features, cautious scoring, and projection.</li>
+              <li>Before: weak context was easy to lose inside a final label.</li>
+              <li>After: stale quotes, wide markets, odd lots, noisy conditions, spread or hedge alternatives, and false-positive suppressions remain visible.</li>
+              <li>Before: the user-facing product leaned on confidence language too early.</li>
+              <li>After: confidence means policy confidence in evidence quality, while conviction, penalties, alternatives, and abstention stay separate.</li>
+            </ul>
+            <div class="doc-strip">
+              <a class="doc-link" href="../implementation/smart-money/02-evidence-clustering-features.md">evidence facts</a>
+              <a class="doc-link" href="2026-06-17-1702-smart-flow-clustering-features.html">cluster turn</a>
+              <a class="doc-link" href="../implementation/smart-money/03-hypothesis-scoring-abstention.md">scoring</a>
+              <a class="doc-link" href="../implementation/smart-money/04-replay-evaluation-golden-tests.md">replay gate</a>
+              <a class="doc-link" href="../implementation/smart-money/05-api-ui-explainability.md">presentation</a>
             </div>
           </div>
         </div>
@@ -957,49 +1013,79 @@
             </thead>
             <tbody>
               <tr>
-                <td>01</td>
-                <td>I added canonical smart-flow contracts for observations, candidates, evidence clusters, hypotheses, confidence vectors, abstention, alternatives, and insight projections.</td>
-                <td>This separated the domain vocabulary from legacy smart-money naming and made cautious reasoning representable.</td>
+                <td>01 contracts</td>
+                <td>I added canonical smart-flow contracts for observation refs, evidence quality, baseline snapshots, candidates, evidence clusters, hypotheses, confidence vectors, abstention, alternatives, and insight projections.</td>
+                <td>This created the vocabulary needed to describe print interpretation without calling every output a smart-money fact.</td>
               </tr>
               <tr>
-                <td>02a</td>
-                <td>I added evidence fact extraction, eligibility decisions, quote/context quality signals, and rejected-candidate reasoning.</td>
-                <td>This made input quality explicit before scoring could turn noisy flow into a claim.</td>
+                <td>01 compatibility</td>
+                <td>I kept legacy smart-money projection helpers and aliases, but marked them as compatibility language around the canonical smart-flow contracts.</td>
+                <td>Existing feeds could keep working while new work moved toward cautious evidence and hypothesis semantics.</td>
               </tr>
               <tr>
-                <td>02b</td>
-                <td>I added deterministic clustering and traceable feature vectors that carry fact ids and raw evidence refs.</td>
-                <td>This gave scoring a stable evidence bundle and preserved explainability back to source events.</td>
+                <td>02a observation path</td>
+                <td>I moved print handling toward direct observations, quote joins, execution context, and explicit eligibility facts before any scoring policy runs.</td>
+                <td>A raw option or equity print became evidence input with context, not a claim about participant intent.</td>
               </tr>
               <tr>
-                <td>03a</td>
-                <td>I added score vectors for supported hypothesis types, separating strength, confidence, conviction, and penalties.</td>
-                <td>This avoided one opaque score and made tradeoffs inspectable.</td>
+                <td>02a eligibility</td>
+                <td>I made accept, reject, and down-weight reasons part of the evidence layer, covering stale quotes, wide markets, odd lots, noisy context, complex-spread context, and ambiguous execution context.</td>
+                <td>Weak inputs became explainable. They could be rejected or weakened without disappearing from the audit trail.</td>
               </tr>
               <tr>
-                <td>03b</td>
+                <td>02a quality</td>
+                <td>I carried evidence quality, coverage, stale ratio, completeness, caveats, and rejected-candidate reasoning alongside candidate facts.</td>
+                <td>Later phases could separate evidence strength from evidence cleanliness instead of collapsing them into one confidence label.</td>
+              </tr>
+              <tr>
+                <td>02b clustering</td>
+                <td>I added deterministic cluster ids and windows, sorted inputs by observed timestamp and candidate id, grouped eligible candidates, and reported rejected candidate ids separately.</td>
+                <td>Aggregation became stable and reviewable, and rejected prints stayed visible as negative context.</td>
+              </tr>
+              <tr>
+                <td>02b feature lineage</td>
+                <td>I added traceable feature details for premium, size, quote coverage, stale ratio, aggression, spread values, candidate counts, packet counts, member counts, eligibility status, and structure context.</td>
+                <td>Features became auditable because each value can point back to fact ids and raw evidence refs.</td>
+              </tr>
+              <tr>
+                <td>03a score vectors</td>
+                <td>I added score vectors for supported hypothesis types, separating evidence strength, confidence, conviction, and penalties.</td>
+                <td>This replaced one opaque score with inspectable tradeoffs that can evolve by policy version.</td>
+              </tr>
+              <tr>
+                <td>03a false-positive pressure</td>
+                <td>I made premium concentration, sweep-like activity, IV movement, and equity confirmation supportive only when evidence quality agrees, while deep-ITM replacement, stale quotes, hedges, spreads, and event-driven flow can penalize the hypothesis.</td>
+                <td>The system became capable of saying that a large print is interesting but not clean enough to claim.</td>
+              </tr>
+              <tr>
+                <td>03b abstention</td>
                 <td>I added abstention, alternative explanations, and canonical insight projection from hypothesis events.</td>
-                <td>This made “do not claim” a product output instead of a missing result.</td>
+                <td>A "do not claim" result became a product output with reasons, rather than an empty table or hidden log line.</td>
               </tr>
               <tr>
-                <td>04</td>
+                <td>04 replay</td>
                 <td>I added deterministic replay evaluation and golden signature tests for positive, abstention, false-positive, noisy, and unexpected-extra-alert cases.</td>
-                <td>This made replay the acceptance gate for smart-flow behavior instead of relying on hand inspection.</td>
+                <td>Smart-flow behavior had to recompute from raw fixture streams and survive stable output comparisons before presentation work expanded.</td>
               </tr>
               <tr>
-                <td>05a</td>
+                <td>05a API and WS</td>
                 <td>I exposed smart-flow explainability through recent, history, replay, one-channel websocket, and live subscription surfaces.</td>
-                <td>This made canonical explainability available to product surfaces while legacy streams remained available.</td>
+                <td>Product surfaces could consume canonical smart-flow projections instead of stitching meaning from legacy events.</td>
               </tr>
               <tr>
-                <td>05b</td>
-                <td>I updated terminal tables, drawers, ticker context, and priority rows to prefer smart-flow projections.</td>
-                <td>This let the product show cautious hypotheses, alternatives, and abstention reasons in the workflow.</td>
+                <td>05b terminal UI</td>
+                <td>I updated terminal tables, drawers, ticker context, flow filters, and priority rows to prefer smart-flow projections with evidence quality, confidence, conviction, why-not context, abstention, alternatives, and inspectable refs.</td>
+                <td>The terminal became an evidence explanation surface, not a classifier scoreboard.</td>
               </tr>
               <tr>
-                <td>05c</td>
+                <td>05c chart markers</td>
                 <td>I migrated chart markers toward smart-flow projections with legacy fallback only when projections are absent.</td>
-                <td>This connected visual evidence to the canonical reasoning layer.</td>
+                <td>Visual markers now align with the canonical reasoning layer instead of turning prints into overconfident chart annotations.</td>
+              </tr>
+              <tr>
+                <td>99 calibration</td>
+                <td>I left historical confidence, threshold, penalty, and abstention calibration open after the MVP evidence pipeline.</td>
+                <td>Calibration should tune a replay-validated evidence system, not hide ambiguous print semantics behind thresholds.</td>
               </tr>
             </tbody>
           </table>
