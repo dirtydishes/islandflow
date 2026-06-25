@@ -18,7 +18,9 @@ const routeChecks: RouteCheck[] = [
 
 const appUrl = process.env.DEPLOY_PUBLIC_APP_URL?.trim() || process.argv[2]?.trim();
 if (!appUrl) {
-  throw new Error("Set DEPLOY_PUBLIC_APP_URL=<production-app-origin> or pass the app origin as an argument.");
+  throw new Error(
+    "Set DEPLOY_PUBLIC_APP_URL=<production-app-origin> or pass the app origin as an argument."
+  );
 }
 const baseUrl = appUrl;
 

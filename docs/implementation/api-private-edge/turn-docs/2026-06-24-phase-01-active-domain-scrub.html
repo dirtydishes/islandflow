@@ -384,7 +384,7 @@
             </tr>
             <tr>
               <td><code>Forgejo CI / Validate (pull_request)</code></td>
-              <td><span class="status-warn">failed</span></td>
+              <td><span class="status-warn">repaired locally</span></td>
               <td>
                 Reviewer verified commit status for
                 <code>a08ed046cc1fd1fc267b6aba563d735a874b228b</code> and reviewer
@@ -393,6 +393,10 @@
                 <code>309</code> failed after 21 seconds. The Forgejo API exposed
                 commit status but not Actions log endpoints, and the web job page
                 returned an unauthenticated shell with the available credentials.
+                The orchestrator supplied the local Forgejo action log, which showed
+                <code>bun run fmt:check</code> failed on a long
+                <code>scripts/check-public-api-routes.ts</code> error string. Reviewer
+                applied the Biome formatting repair and reran local gates.
               </td>
             </tr>
           </tbody>
@@ -433,20 +437,18 @@
               <td>Local gates rerun</td>
               <td><span class="status-ok">passed</span></td>
               <td>
-                Reviewer reran the focused Bun tests, web production build,
-                durable-tapes smoke help and fail-fast checks, public route
-                fail-fast check, native shell syntax check, and
-                <code>git diff --check</code>.
+                Reviewer reran <code>bun run fmt:check</code>, the focused Bun
+                tests, web production build, durable-tapes smoke help and fail-fast
+                checks, public route fail-fast check, native shell syntax check,
+                and <code>git diff --check</code>.
               </td>
             </tr>
             <tr>
               <td>Merge readiness</td>
-              <td><span class="status-warn">blocked by CI</span></td>
+              <td><span class="status-warn">awaiting repaired CI</span></td>
               <td>
-                PR #80 is open, non-draft, and Forgejo reports it mergeable, but
-                the required validate status is red on reviewer-checked commits.
-                No reviewer repair was made because the CI log was not accessible
-                from this environment.
+                PR #80 is open, non-draft, and Forgejo reports it mergeable.
+                Reviewer repair is ready for Forgejo validation after push.
               </td>
             </tr>
           </tbody>
