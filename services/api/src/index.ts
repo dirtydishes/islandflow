@@ -148,6 +148,7 @@ import {
   parseOptionPrintTraceLookupParams
 } from "./option-print-lookup";
 import { getOptionPrintQueryErrorStatus, parseOptionPrintQuery } from "./option-queries";
+import { ApiRateLimiter, buildRateLimitResponse, recordRateLimitRejection } from "./rate-limit";
 import {
   fetchRecentSmartFlowExplainability,
   fetchSmartFlowExplainabilityAfter,
@@ -182,6 +183,24 @@ const envSchema = z.object({
   API_DELIVER_POLICY: DeliverPolicySchema.default("new"),
   API_CONSUMER_RESET: z.coerce.boolean().default(false),
   LIVE_LAG_WARN_MS: z.coerce.number().int().positive().default(120_000),
+  API_RATE_LIMIT_ENABLED: z
+    .preprocess((value) => {
+      if (typeof value === "string") {
+        const normalized = value.trim().toLowerCase();
+        if (["1", "true", "yes", "on"].includes(normalized)) {
+          return true;
+        }
+        if (["0", "false", "no", "off"].includes(normalized)) {
+          return false;
+        }
+      }
+      return value;
+    }, z.boolean())
+    .default(false),
+  API_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
+  API_RATE_LIMIT_REST_MAX: z.coerce.number().int().positive().default(1200),
+  API_RATE_LIMIT_LOOKUP_MAX: z.coerce.number().int().positive().default(120),
+  API_RATE_LIMIT_WS_MAX: z.coerce.number().int().positive().default(120),
   SYNTHETIC_CONTROL_ENABLED: z
     .preprocess((value) => {
       if (typeof value === "string") {
@@ -202,6 +221,14 @@ const envSchema = z.object({
 
 const env = readEnv(envSchema);
 const corsAllowedOrigins = parseCorsAllowedOrigins(env.API_CORS_ORIGINS);
+const rateLimiter = new ApiRateLimiter();
+const rateLimitConfig = {
+  enabled: env.API_RATE_LIMIT_ENABLED,
+  windowMs: env.API_RATE_LIMIT_WINDOW_MS,
+  restMax: env.API_RATE_LIMIT_REST_MAX,
+  lookupMax: env.API_RATE_LIMIT_LOOKUP_MAX,
+  wsMax: env.API_RATE_LIMIT_WS_MAX
+};
 
 const state = {
   shuttingDown: false,
@@ -1456,6 +1483,14 @@ const run = async () => {
 
         if (req.method === "GET" && url.pathname === "/health") {
           return jsonResponse({ status: "ok" });
+        }
+
+        const socketAddress =
+          typeof serverRef.requestIP === "function" ? serverRef.requestIP(req)?.address : null;
+        const rateLimitDecision = rateLimiter.check(req, rateLimitConfig, socketAddress);
+        if (!rateLimitDecision.allowed) {
+          recordRateLimitRejection(rateLimitDecision, { logger, metrics });
+          return buildRateLimitResponse(rateLimitDecision);
         }
 
         if (req.method === "GET" && url.pathname === "/admin/synthetic/status") {

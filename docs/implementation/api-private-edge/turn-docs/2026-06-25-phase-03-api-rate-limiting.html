@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>API Private Edge Phase 03 API Rate Limiting</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #07090c;
+        --panel: #101820;
+        --panel-2: #0b1117;
+        --text: #e8eef5;
+        --dim: #9aa9b8;
+        --green: #31c27c;
+        --amber: #f0a83a;
+        --red: #ff6b5f;
+        --blue: #62a8ff;
+        --border: #ffffff18;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.55 ui-sans-serif, system-ui, sans-serif;
+      }
+
+      main {
+        width: min(1180px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 40px 0 72px;
+      }
+
+      header,
+      section {
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+        background: var(--panel);
+        padding: 20px 0;
+      }
+
+      section {
+        margin-top: 18px;
+      }
+
+      h1,
+      h2,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        margin-bottom: 8px;
+        font: 700 1.65rem/1.15 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      h2 {
+        margin-bottom: 12px;
+        color: var(--amber);
+        font: 700 0.78rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      p,
+      li,
+      td {
+        color: var(--dim);
+      }
+
+      code {
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 1px 5px;
+        background: #ffffff0a;
+        color: var(--text);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--panel-2);
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--border);
+        padding: 9px 10px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--text);
+        font: 700 0.72rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .kicker {
+        margin-bottom: 10px;
+        color: var(--amber);
+        font: 700 0.72rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 12px;
+      }
+
+      .tile {
+        border: 1px solid var(--border);
+        background: var(--panel-2);
+        padding: 12px;
+      }
+
+      .ok {
+        color: var(--green);
+      }
+
+      .warn {
+        color: var(--red);
+      }
+
+      .note {
+        color: var(--blue);
+      }
+
+      pre {
+        overflow-x: auto;
+        margin: 0;
+        border: 1px solid var(--border);
+        background: #05080c;
+        padding: 12px;
+        color: var(--text);
+        font: 0.78rem/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .diff-card {
+        border: 1px solid var(--border);
+        background: #070b10;
+      }
+
+      .diff-mount {
+        display: none;
+      }
+
+      .diff-card.rendered .diff-mount {
+        display: block;
+      }
+
+      .diff-card.rendered .diff-fallback {
+        display: none;
+      }
+
+      .diff-fallback {
+        border: 0;
+      }
+
+      .diff-fallback code {
+        border: 0;
+        padding: 0;
+        background: transparent;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="kicker">Turn documentation | June 25, 2026</div>
+        <h1>API Private Edge Phase 03 API Rate Limiting</h1>
+        <p>
+          Phase 03 for <code>islandflow-hnbk.4</code> adds env-gated API throttling
+          before route handling, with separate REST, evidence lookup, and websocket
+          upgrade buckets for the hosted app API surface.
+        </p>
+      </header>
+
+      <section>
+        <h2>Outcome</h2>
+        <div class="grid">
+          <div class="tile">
+            <strong class="ok">Rate limit gate</strong>
+            <p>
+              Added a fixed-window in-memory limiter that is disabled by default,
+              enabled through env, and applied before REST dispatch, body parsing,
+              and websocket upgrades.
+            </p>
+          </div>
+          <div class="tile">
+            <strong class="ok">Route buckets</strong>
+            <p>
+              <code>/health</code> and preflight are exempt. Ordinary reads,
+              evidence lookup routes, synthetic admin routes, and <code>/ws/*</code>
+              upgrades are categorized with low-cardinality labels.
+            </p>
+          </div>
+          <div class="tile">
+            <strong class="ok">Client keying</strong>
+            <p>
+              Valid <code>X-Forwarded-For</code> values are preferred, then
+              <code>X-Real-IP</code>, then Bun socket peer, with malformed headers
+              falling back safely instead of breaking requests.
+            </p>
+          </div>
+          <div class="tile">
+            <strong class="ok">Observable rejection</strong>
+            <p>
+              Rejections return bounded JSON <code>429</code> responses with
+              <code>Retry-After</code> and emit coarse bucket/category metrics and
+              logs without query strings, tokens, trace IDs, or raw client IPs.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Changed Files</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Area</th>
+              <th>Files</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>API limiter</td>
+              <td>
+                <code>services/api/src/rate-limit.ts</code>,
+                <code>services/api/src/index.ts</code>
+              </td>
+            </tr>
+            <tr>
+              <td>API tests</td>
+              <td><code>services/api/tests/rate-limit.test.ts</code></td>
+            </tr>
+            <tr>
+              <td>Operator docs</td>
+              <td>
+                <code>.env.example</code>,
+                <code>deployment/native/README.md</code>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Command</th>
+              <th>Result</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="ok">pass</td>
+              <td><code>bun test services/api/tests</code></td>
+              <td>58 tests passed across the API suite.</td>
+            </tr>
+            <tr>
+              <td class="ok">pass</td>
+              <td><code>bun run typecheck</code></td>
+              <td>All workspace TypeScript projects passed.</td>
+            </tr>
+            <tr>
+              <td class="ok">pass</td>
+              <td>
+                <code>bunx biome check services/api/src/rate-limit.ts services/api/tests/rate-limit.test.ts services/api/src/index.ts</code>
+              </td>
+              <td>Touched TypeScript files passed formatting and lint checks after formatter application.</td>
+            </tr>
+            <tr>
+              <td class="ok">pass</td>
+              <td><code>git diff --check</code></td>
+              <td>No whitespace errors in the patch.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Helper Fan-In</h2>
+        <ul>
+          <li>Route categorization helper mapped ordinary reads, lookup/detail routes, admin routes, health, preflight, and websocket upgrades.</li>
+          <li>Forwarded-IP helper recommended valid forwarded-header parsing with Bun socket fallback and no raw IP telemetry.</li>
+          <li>Telemetry helper confirmed existing logger/metrics style and low-cardinality rejection labels.</li>
+          <li>Design helper recommended a small exported limiter module to avoid adding more branching inside the large route table.</li>
+          <li>Test helper confirmed helper-level API tests are the local pattern because full API startup requires infra services.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p>
+          This section keeps the standard HTML unified diff visible by default.
+          If browser module loading succeeds, the same patch is rendered with
+          <code>PatchDiff</code> from browser-side <code>@pierre/diffs/react</code>.
+        </p>
+        <div class="diff-card" data-patch-diff>
+          <div class="diff-mount" aria-label="Rendered diff"></div>
+          <pre class="diff-fallback"><code>diff --git a/services/api/src/rate-limit.ts b/services/api/src/rate-limit.ts
+new file mode 100644
++export type ApiRateLimitBucket = "rest" | "lookup" | "ws";
++export type ApiRateLimitRouteCategory = "rest_read" | "lookup" | "websocket" | "admin" | "unknown";
++...
++export const resolveApiClientAddress = (
++  headers: Headers,
++  socketAddress?: string | null
++): ApiClientAddress =&gt; {
++  const forwardedFor = headers.get("x-forwarded-for");
++  if (forwardedFor) {
++    for (const candidate of forwardedFor.split(",")) {
++      const normalized = normalizeIpCandidate(candidate);
++      if (normalized) {
++        return { key: `ip:${normalized}`, source: "x_forwarded_for" };
++      }
++    }
++  }
++  ...
++};
++...
++export class ApiRateLimiter {
++  check(req: Request, config: ApiRateLimitConfig, socketAddress?: string | null): ApiRateLimitDecision {
++    const route = classifyApiRouteForRateLimit(req.method, new URL(req.url).pathname);
++    if (!config.enabled || route.exempt) return { allowed: true, route };
++    ...
++  }
++}
+
+diff --git a/services/api/src/index.ts b/services/api/src/index.ts
++import { ApiRateLimiter, buildRateLimitResponse, recordRateLimitRejection } from "./rate-limit";
++...
++  API_RATE_LIMIT_ENABLED: z.preprocess(...).default(false),
++  API_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
++  API_RATE_LIMIT_REST_MAX: z.coerce.number().int().positive().default(1200),
++  API_RATE_LIMIT_LOOKUP_MAX: z.coerce.number().int().positive().default(120),
++  API_RATE_LIMIT_WS_MAX: z.coerce.number().int().positive().default(120),
++...
++        const rateLimitDecision = rateLimiter.check(req, rateLimitConfig, socketAddress);
++        if (!rateLimitDecision.allowed) {
++          recordRateLimitRejection(rateLimitDecision, { logger, metrics });
++          return buildRateLimitResponse(rateLimitDecision);
++        }
+
+diff --git a/services/api/tests/rate-limit.test.ts b/services/api/tests/rate-limit.test.ts
+new file mode 100644
++it("uses the first valid x-forwarded-for value", () =&gt; { ... });
++it("keeps separate buckets and client addresses", () =&gt; { ... });
++it("exempts health from quota and limits websocket upgrades separately", () =&gt; { ... });
++it("leaves synthetic admin bearer and header auth semantics to the admin route", () =&gt; { ... });
++it("builds bounded json 429 responses and coarse rejection telemetry", async () =&gt; { ... });
+
+diff --git a/.env.example b/.env.example
++API_RATE_LIMIT_ENABLED=false
++API_RATE_LIMIT_WINDOW_MS=60000
++API_RATE_LIMIT_REST_MAX=1200
++API_RATE_LIMIT_LOOKUP_MAX=120
++API_RATE_LIMIT_WS_MAX=120</code></pre>
+        </div>
+      </section>
+
+      <section>
+        <h2>Risks</h2>
+        <ul>
+          <li>The limiter is in-memory and per API process. That matches the current single-process phase scope, but it is not a distributed quota.</li>
+          <li>Forwarded client headers remain spoofable while the raw API host is still reachable. Phase 04 owns raw host closure.</li>
+          <li>The metrics facade remains a no-op unless the runtime wires a metrics emitter. The code uses the existing API metrics surface.</li>
+        </ul>
+      </section>
+    </main>
+    <script type="module">
+      import React from "https://esm.sh/react@19";
+      import { createRoot } from "https://esm.sh/react-dom@19/client";
+      import { PatchDiff } from "https://esm.sh/@pierre/diffs@1.2.2/react?deps=react@19,react-dom@19";
+
+      for (const card of document.querySelectorAll("[data-patch-diff]")) {
+        const source = card.querySelector(".diff-fallback code");
+        const target = card.querySelector(".diff-mount");
+        if (!source || !target) continue;
+        try {
+          createRoot(target).render(React.createElement(PatchDiff, { patch: source.textContent || "" }));
+          card.classList.add("rendered");
+        } catch (error) {
+          console.warn("Rich diff renderer failed; keeping HTML fallback.", error);
+        }
+      }
+    </script>
+  </body>
+</html>
