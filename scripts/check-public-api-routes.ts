@@ -22,7 +22,7 @@ const routeChecks: RouteCheck[] = [
   { path: "/quotes/equities?limit=1", expectJson: true },
   { path: "/dark/inferred?limit=1", expectJson: true },
   { path: "/flow/packets?limit=1", expectJson: true },
-  { path: "/candles/equities?limit=1", expectJson: true },
+  { path: "/candles/equities?underlying_id=SPY&interval_ms=60000&limit=1", expectJson: true },
   { path: "/news?limit=1", expectJson: true },
   {
     path: "/lookup/options-support",

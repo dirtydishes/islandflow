@@ -115,10 +115,11 @@ If you use Caddy, Nginx, Traefik, a cloud load balancer, or another edge layer, 
 
 Supported routing modes:
 
-1. Two-origin mode
+1. Legacy two-origin mode
    - `app.<domain>` -> host `WEB_HOST_PORT`
    - `api.<domain>` -> host `API_HOST_PORT`
    - Build web with `NEXT_PUBLIC_API_URL=https://api.<domain>`.
+   - This is not the normal production posture after raw API host closure.
 
 2. Same-origin mode
    - Build web with `NEXT_PUBLIC_API_URL=` (empty).
@@ -336,13 +337,13 @@ The helper always does the final public verification against:
 
 It also verifies API health from inside the `api` container during the remote verification step.
 
-If you intentionally run a separate public API origin, add an extra public API check by exporting `DEPLOY_PUBLIC_API_HEALTH_URL` before running the deploy:
+If you intentionally run a separate public API origin during a temporary reopen, add an extra public API check by exporting `DEPLOY_PUBLIC_API_HEALTH_URL` before running the deploy:
 
 ```bash
-DEPLOY_PUBLIC_API_HEALTH_URL=https://api.example.com/health ./deploy main
+DEPLOY_PUBLIC_API_HEALTH_URL=<raw-api-origin>/health ./deploy main
 ```
 
-Same-origin deployments should leave that unset unless the edge layer exposes a public API health route on purpose.
+Same-origin deployments should leave that unset. Keeping it unset prevents normal deploy verification from blessing a reopened raw API host.
 
 ## Manual server fallback
 

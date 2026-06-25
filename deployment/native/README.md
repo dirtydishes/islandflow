@@ -151,7 +151,23 @@ The edge switch helper updates the Nginx Proxy Manager database entries for `<pr
 
 For native cutover, the helper targets the NPM bridge gateway IP by default, not `host.docker.internal`. NPM generates `proxy_pass` with a runtime-resolved `$server` variable, so Docker's `/etc/hosts` alias is not sufficient for these proxy hosts. On the current VPS that native target resolves to `172.18.0.1`, which reaches the host-native `3000` and `4000` listeners from the NPM container.
 
-Switching back to Docker restores upstreams to the Compose service names `web:3000` and `api:4000`.
+Switching back to Docker restores app-origin upstreams to the Compose service names `web:3000` and `api:4000`. The raw public API host stays closed by default for both `native` and `docker` switches: the helper disables the raw API proxy host in NPM database state, disables websocket upgrades there, and removes any generated raw API proxy config that would otherwise keep serving stale traffic.
+
+To temporarily reopen the raw API host while investigating a same-origin outage, the operator must make that intent explicit:
+
+```bash
+ISLANDFLOW_RAW_API_MODE=temporary-open ./deployment/native/switch-npm-edge.sh docker
+# or
+./deployment/native/switch-npm-edge.sh native --raw-api=temporary-open
+```
+
+Reclose it with the default mode:
+
+```bash
+./deployment/native/switch-npm-edge.sh docker --raw-api=closed
+```
+
+Do not treat `DEPLOY_NATIVE_EDGE_READY=1` as a raw API reopen acknowledgement. Reopening `<raw-api-origin>` is a separate emergency action and should be followed by a reclose command after app-origin routing is healthy.
 
 ### Rollback helper
 
@@ -169,6 +185,8 @@ Rollback helper behavior:
 - rebuilds the web app only when web scope is included
 - restarts the selected user units
 - runs the native smoke checks
+
+Full runtime rollback back to Docker does not reopen the raw public API host by default. It validates `<production-app-origin>` plus `DEPLOY_INTERNAL_API_HEALTH_URL` or `http://127.0.0.1:4000/health`. If a same-origin outage requires temporary public raw API access, set `ISLANDFLOW_RAW_API_MODE=temporary-open` and `DEPLOY_PUBLIC_API_HEALTH_URL=<raw-api-origin>/health` for that rollback run, then run `./deployment/native/switch-npm-edge.sh docker --raw-api=closed` when the emergency path is no longer needed.
 
 ## Expected unit names
 
@@ -285,7 +303,8 @@ That means:
 | Host access to NATS/ClickHouse/Redis | required | required |
 | Proxy routes updated for `/prints`, `/history`, `/replay`, `/nbbo`, `/ws`, `/flow`, `/candles` | not required | required |
 | Public app check | not required | required |
-| Public API route suite | not required | required |
+| App-origin API route suite | not required | required |
+| Raw API public host closed | not required | required |
 
 ## Staged cutover plan
 
@@ -302,6 +321,7 @@ That means:
    - export `DEPLOY_NATIVE_EDGE_READY=1`
    - run full native deploy
    - validate `bun run scripts/check-public-api-routes.ts <production-app-origin>`
+   - validate `<raw-api-origin>` no longer returns API health JSON or websocket upgrades
 4. **Stage 4: decide final default runtime**
    - keep Docker as fallback until native edge has proven stable
 
