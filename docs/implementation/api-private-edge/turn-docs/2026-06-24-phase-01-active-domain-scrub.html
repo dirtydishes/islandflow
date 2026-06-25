@@ -387,8 +387,10 @@
               <td><span class="status-warn">failed</span></td>
               <td>
                 Reviewer verified commit status for
-                <code>a08ed046cc1fd1fc267b6aba563d735a874b228b</code>: run
-                <code>308</code> failed after 23 seconds. The Forgejo API exposed the
+                <code>a08ed046cc1fd1fc267b6aba563d735a874b228b</code> and reviewer
+                doc commit <code>92c8af2b987997c23c0253cd86ec2d0785ed517b</code>:
+                run <code>308</code> failed after 23 seconds and run
+                <code>309</code> failed after 21 seconds. The Forgejo API exposed
                 commit status but not Actions log endpoints, and the web job page
                 returned an unauthenticated shell with the available credentials.
               </td>
@@ -442,8 +444,9 @@
               <td><span class="status-warn">blocked by CI</span></td>
               <td>
                 PR #80 is open, non-draft, and Forgejo reports it mergeable, but
-                the required validate status is red. No reviewer repair was made
-                because the CI log was not accessible from this environment.
+                the required validate status is red on reviewer-checked commits.
+                No reviewer repair was made because the CI log was not accessible
+                from this environment.
               </td>
             </tr>
           </tbody>
