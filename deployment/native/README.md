@@ -45,7 +45,7 @@ The plan assumptions were audited on the VPS:
 - `bun` is installed and available at `/home/delta/.bun/bin/bun`
 - `systemctl --user` is available and the `delta` user has lingering enabled
 - `/home/delta/islandflow/.env` exists
-- public `https://flow.deltaisland.io/replay/options` routing is healthy again
+- public `<production-app-origin>/replay/options` routing is healthy again
 - the previously reported duplicate `islandflow` compose project is not currently present in `docker compose ls`
 - native Islandflow user units were not installed at the start of the audit; this change now provides and installs the checked-in user unit files, but they remain disabled until an operator enables a scope intentionally
 
@@ -143,7 +143,7 @@ This validates:
 ./deployment/native/full-rollback.sh
 ```
 
-The edge switch helper updates the Nginx Proxy Manager database entries for `flow.deltaisland.io` and `api.flow.deltaisland.io`, preserving the same-origin Islandflow API location matcher:
+The edge switch helper updates the Nginx Proxy Manager database entries for `<production-app-origin-host>` and `<raw-api-origin-host>`, preserving the same-origin Islandflow API location matcher:
 
 ```nginx
 ^/(ws|replay|prints|joins|nbbo|dark|flow|candles|history)/
@@ -287,7 +287,7 @@ That means:
    - update proxy routing to native `web`/`api`
    - export `DEPLOY_NATIVE_EDGE_READY=1`
    - run full native deploy
-   - validate `bun run scripts/check-public-api-routes.ts https://flow.deltaisland.io`
+   - validate `bun run scripts/check-public-api-routes.ts <production-app-origin>`
 4. **Stage 4: decide final default runtime**
    - keep Docker as fallback until native edge has proven stable
 

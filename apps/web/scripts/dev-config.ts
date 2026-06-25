@@ -1,4 +1,4 @@
-export const DEFAULT_REMOTE_API_URL = "https://api.flow.deltaisland.io";
+export const DEFAULT_LOCAL_API_URL = "http://127.0.0.1:4000";
 export const DEFAULT_WEB_DEV_PORT = 3000;
 export const HOSTED_API_QA_WEB_DEV_PORT = 3100;
 
@@ -29,7 +29,7 @@ const resolveApiUrl = (
   if (configuredApiUrl) {
     return { apiUrl: configuredApiUrl, apiUrlSource: "NEXT_PUBLIC_API_URL" };
   }
-  return { apiUrl: DEFAULT_REMOTE_API_URL, apiUrlSource: "default" };
+  return { apiUrl: DEFAULT_LOCAL_API_URL, apiUrlSource: "default" };
 };
 
 export const parseWebDevPort = (value: string, source: WebDevConfig["portSource"]): number => {
@@ -42,7 +42,7 @@ export const parseWebDevPort = (value: string, source: WebDevConfig["portSource"
 
 const isHostedApiUrl = (apiUrl: string): boolean => {
   try {
-    return new URL(apiUrl).origin === DEFAULT_REMOTE_API_URL;
+    return new URL(apiUrl).hostname !== "127.0.0.1" && new URL(apiUrl).hostname !== "localhost";
   } catch {
     return false;
   }
@@ -57,9 +57,9 @@ const resolveHostedApiCorsWarning = (apiUrl: string, port: number): string | nul
   }
 
   return [
-    `hosted API CORS currently supports localhost ports ${DEFAULT_WEB_DEV_PORT}`,
-    `and ${HOSTED_API_QA_WEB_DEV_PORT}; use WEB_DEV_PORT=${HOSTED_API_QA_WEB_DEV_PORT}`,
-    "when port 3000 is occupied, or point NEXT_PUBLIC_API_URL at an API with matching CORS"
+    `nonlocal API CORS must explicitly allow localhost port ${port};`,
+    `use WEB_DEV_PORT=${HOSTED_API_QA_WEB_DEV_PORT} only when that API allowlist includes it,`,
+    "or point NEXT_PUBLIC_API_URL at a local API with matching CORS"
   ].join(" ");
 };
 

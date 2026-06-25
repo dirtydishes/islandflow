@@ -1,10 +1,10 @@
 # Islandflow Desktop Shell
 
-This workspace packages a thin Electron shell around the hosted Islandflow app.
+This workspace packages a thin Electron shell around the Islandflow app.
 
 ## What It Does
 
-- Loads `https://flow.deltaisland.io` by default.
+- Loads a trusted app origin when `ISLANDFLOW_DESKTOP_START_URL` is set.
 - Supports local UI development against `http://127.0.0.1:3000`.
 - Preserves the existing remote API and WebSocket behavior from the web app.
 - Keeps Electron privileges locked down for remote content.
@@ -25,5 +25,5 @@ This workspace packages a thin Electron shell around the hosted Islandflow app.
 ## Development Notes
 
 - `ISLANDFLOW_DESKTOP_START_URL` controls which trusted app URL Electron loads. Prefer `/options` for deep links; `/tape` remains supported and redirects in the web app for compatibility.
-- `NEXT_PUBLIC_API_URL` remains a web-app setting and should typically be `https://api.flow.deltaisland.io` when developing the local UI inside Electron.
+- `NEXT_PUBLIC_API_URL` remains a web-app setting. Local Electron development defaults to `http://127.0.0.1:4000`; use `<raw-api-origin>` only for explicit nonlocal API QA.
 - `assets/` currently contains placeholders only; a real `.icns` icon is deferred.

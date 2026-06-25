@@ -1,15 +1,15 @@
 import { describe, expect, it } from "bun:test";
 import {
-  DEFAULT_REMOTE_API_URL,
+  DEFAULT_LOCAL_API_URL,
   DEFAULT_WEB_DEV_PORT,
   HOSTED_API_QA_WEB_DEV_PORT,
   resolveWebDevConfig
 } from "./dev-config";
 
 describe("web dev config", () => {
-  it("defaults to the hosted API on localhost port 3000", () => {
+  it("defaults to the local API on localhost port 3000", () => {
     expect(resolveWebDevConfig({})).toEqual({
-      apiUrl: DEFAULT_REMOTE_API_URL,
+      apiUrl: DEFAULT_LOCAL_API_URL,
       apiUrlSource: "default",
       hostedApiCorsWarning: null,
       port: DEFAULT_WEB_DEV_PORT,
@@ -17,9 +17,9 @@ describe("web dev config", () => {
     });
   });
 
-  it("allows the supported hosted-backend QA fallback port", () => {
+  it("allows the alternate local web dev port with the local API default", () => {
     expect(resolveWebDevConfig({ WEB_DEV_PORT: String(HOSTED_API_QA_WEB_DEV_PORT) })).toEqual({
-      apiUrl: DEFAULT_REMOTE_API_URL,
+      apiUrl: DEFAULT_LOCAL_API_URL,
       apiUrlSource: "default",
       hostedApiCorsWarning: null,
       port: HOSTED_API_QA_WEB_DEV_PORT,
@@ -41,10 +41,13 @@ describe("web dev config", () => {
     });
   });
 
-  it("warns when the hosted API is paired with an unsupported local port", () => {
-    const config = resolveWebDevConfig({ WEB_DEV_PORT: "3001" });
+  it("warns when a nonlocal API is paired with an unsupported local port", () => {
+    const config = resolveWebDevConfig({
+      NEXT_PUBLIC_API_URL: "https://api.example.test",
+      WEB_DEV_PORT: "3001"
+    });
 
-    expect(config.hostedApiCorsWarning).toContain("WEB_DEV_PORT=3100");
+    expect(config.hostedApiCorsWarning).toContain("localhost port 3001");
   });
 
   it("does not warn about custom API origins", () => {

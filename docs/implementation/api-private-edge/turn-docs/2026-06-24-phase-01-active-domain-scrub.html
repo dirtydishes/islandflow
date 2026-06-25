@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>API Private Edge Phase 01 Active Domain Scrub</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #111820;
+        --panel-2: #0b1016;
+        --panel-3: #0d141b;
+        --text: #e6edf4;
+        --dim: #90a0b2;
+        --amber: #f5a623;
+        --green: #25c17a;
+        --red: #ff6b5f;
+        --blue: #4da3ff;
+        --border: #ffffff14;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.55 IBM Plex Sans, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      main {
+        width: min(1220px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 42px 0 72px;
+      }
+
+      header,
+      section {
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+        background: var(--panel);
+      }
+
+      header {
+        padding: 22px 0;
+      }
+
+      section {
+        margin-top: 18px;
+        padding: 18px 0;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        margin-bottom: 8px;
+        font: 700 1.65rem/1.15 IBM Plex Mono, ui-monospace, monospace;
+        letter-spacing: 0.02em;
+      }
+
+      h2 {
+        margin-bottom: 12px;
+        color: var(--amber);
+        font: 700 0.76rem/1.2 IBM Plex Mono, ui-monospace, monospace;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h3 {
+        margin: 16px 0 8px;
+        font: 700 0.86rem/1.2 IBM Plex Mono, ui-monospace, monospace;
+      }
+
+      p,
+      li,
+      td {
+        color: var(--dim);
+      }
+
+      p {
+        max-width: 88ch;
+      }
+
+      code {
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 1px 5px;
+        background: #ffffff0a;
+        color: var(--text);
+        font-family: IBM Plex Mono, ui-monospace, monospace;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--panel-2);
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--border);
+        padding: 9px 10px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--text);
+        font: 700 0.72rem/1.2 IBM Plex Mono, ui-monospace, monospace;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .kicker {
+        margin-bottom: 10px;
+        color: var(--amber);
+        font: 700 0.72rem/1.2 IBM Plex Mono, ui-monospace, monospace;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .summary {
+        max-width: 86ch;
+      }
+
+      .evidence-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 12px;
+      }
+
+      .evidence {
+        border: 1px solid var(--border);
+        background: var(--panel-2);
+        padding: 12px;
+      }
+
+      .evidence strong {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--green);
+        font-family: IBM Plex Mono, ui-monospace, monospace;
+      }
+
+      .status-ok {
+        color: var(--green);
+        font-family: IBM Plex Mono, ui-monospace, monospace;
+      }
+
+      .status-warn {
+        color: var(--red);
+        font-family: IBM Plex Mono, ui-monospace, monospace;
+      }
+
+      .status-note {
+        color: var(--blue);
+        font-family: IBM Plex Mono, ui-monospace, monospace;
+      }
+
+      .diff-card {
+        border: 1px solid var(--border);
+        background: #070b10;
+      }
+
+      .diff-mount {
+        display: none;
+      }
+
+      .diff-card.rendered .diff-mount {
+        display: block;
+      }
+
+      .diff-card.rendered .diff-fallback {
+        display: none;
+      }
+
+      .diff-fallback {
+        margin: 0;
+        padding: 12px;
+        overflow-x: auto;
+        background: #05080c;
+        color: var(--text);
+        font: 0.78rem/1.45 IBM Plex Mono, ui-monospace, monospace;
+      }
+
+      .diff-fallback code {
+        border: 0;
+        padding: 0;
+        background: transparent;
+      }
+
+      @media (max-width: 700px) {
+        main {
+          width: min(100% - 24px, 1220px);
+          padding-top: 28px;
+        }
+
+        th,
+        td {
+          padding: 8px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="kicker">Turn documentation | June 24, 2026</div>
+        <h1>API Private Edge Phase 01 Active Domain Scrub</h1>
+        <p class="summary">
+          Phase 01 for <code>islandflow-hnbk.2</code> removes active defaults and
+          examples that taught local developers, agents, probes, or deployment
+          helpers to reach concrete production API domains. Local development now
+          defaults to <code>http://127.0.0.1:4000</code>, production app/API origins
+          are explicit operator inputs or placeholders, and the desktop app-origin
+          allowlist remains documented as a product trust-policy constant.
+        </p>
+      </header>
+
+      <section>
+        <h2>Scope And Inputs</h2>
+        <div class="evidence-grid">
+          <div class="evidence">
+            <strong>phase</strong>
+            <p>
+              Read <code>IMPLEMENT.md</code> and
+              <code>01-active-domain-scrub.md</code>. Phase posture is
+              documentation/config hygiene, with no Phase 02 transport behavior,
+              rate limiting, raw API closure, or deployment rollout.
+            </p>
+          </div>
+          <div class="evidence">
+            <strong>issue</strong>
+            <p>
+              <code>bd show islandflow-hnbk.2</code> confirmed the ready Phase 01
+              task. <code>bd update islandflow-hnbk.2 --claim</code> claimed it
+              before edits.
+            </p>
+          </div>
+          <div class="evidence">
+            <strong>helpers</strong>
+            <p>
+              Five read-only helpers inventoried docs/prompts, env/deploy surfaces,
+              web/dev probes, tests/constants, and repo-wide hostname defaults. The
+              worker resolved the scope and made all edits.
+            </p>
+          </div>
+          <div class="evidence">
+            <strong>style</strong>
+            <p>
+              This document follows the Islandflow product register: compact,
+              evidence-first, restrained, and operational. Diff rendering uses a
+              standard HTML fallback plus browser-side <code>PatchDiff</code>.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Change Summary</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Area</th>
+              <th>Resolved Change</th>
+              <th>Files</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Local web defaults</td>
+              <td>
+                Replaced the raw hosted API dev fallback with a local API default
+                and changed warnings to describe explicit nonlocal API opt-in.
+              </td>
+              <td>
+                <code>apps/web/scripts/dev-config.ts</code>,
+                <code>apps/web/scripts/dev-config.test.ts</code>,
+                <code>scripts/dev-desktop.ts</code>
+              </td>
+            </tr>
+            <tr>
+              <td>API CORS defaults</td>
+              <td>
+                Removed the concrete hosted app origin from the checked-in API CORS
+                default. Production deployments must provide the real app origin via
+                <code>API_CORS_ORIGINS</code>.
+              </td>
+              <td><code>services/api/src/cors.ts</code>, <code>services/api/tests/cors.test.ts</code>, <code>.env.example</code></td>
+            </tr>
+            <tr>
+              <td>Docs and prompts</td>
+              <td>
+                Reworded active README, agent prompt, durable-tapes performance
+                guidance, Docker/native deployment docs, and desktop docs to use
+                local defaults or <code>&lt;production-app-origin&gt;</code>,
+                <code>&lt;raw-api-origin&gt;</code>, and host-only placeholders.
+              </td>
+              <td><code>README.md</code>, <code>docs/agents/prompts/LOOP.md</code>, <code>docs/implementation/durable-tapes-performance/*</code>, <code>deployment/*</code>, <code>apps/desktop/README.md</code></td>
+            </tr>
+            <tr>
+              <td>Probes and helpers</td>
+              <td>
+                Removed no-arg production URL defaults from public route checks,
+                deploy verification, rollback validation, NPM edge switching, and
+                durable-tapes production smoke checks.
+              </td>
+              <td><code>scripts/check-public-api-routes.ts</code>, <code>scripts/deploy.ts</code>, <code>deployment/native/*.sh</code>, <code>scripts/probes/durable-tapes-production-smoke.ts</code></td>
+            </tr>
+            <tr>
+              <td>Tests</td>
+              <td>
+                Replaced incidental concrete production API fixtures with neutral
+                example origins and added coverage for local-default web dev config.
+              </td>
+              <td><code>apps/web/features/news-wire/news-wire.test.ts</code>, <code>apps/web/scripts/dev-config.test.ts</code>, <code>services/api/tests/cors.test.ts</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Validation Status</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Check</th>
+              <th>Status</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>bun test apps/web/scripts/dev-config.test.ts services/api/tests/cors.test.ts</code></td>
+              <td><span class="status-ok">passed</span></td>
+              <td>13 tests passed, covering local web-dev defaults and local-only default CORS origins.</td>
+            </tr>
+            <tr>
+              <td><code>bun test apps/web/features/news-wire/news-wire.test.ts</code></td>
+              <td><span class="status-ok">passed</span></td>
+              <td>8 tests passed after replacing production URL-builder fixtures with neutral example origins.</td>
+            </tr>
+            <tr>
+              <td><code>bun --cwd=apps/web run build</code></td>
+              <td><span class="status-ok">passed</span></td>
+              <td>
+                Passed after <code>bun install</code> populated this fresh worktree's
+                missing dependencies. The generated <code>next-env.d.ts</code> churn
+                from the build was restored.
+              </td>
+            </tr>
+            <tr>
+              <td><code>bun run scripts/probes/durable-tapes-production-smoke.ts --help</code></td>
+              <td><span class="status-ok">passed</span></td>
+              <td>Help now documents explicit placeholder inputs and no concrete defaults.</td>
+            </tr>
+            <tr>
+              <td><code>bun run scripts/check-public-api-routes.ts</code></td>
+              <td><span class="status-ok">passed</span></td>
+              <td>Expected fail-fast behavior: requires <code>DEPLOY_PUBLIC_APP_URL</code> or an app-origin argument.</td>
+            </tr>
+            <tr>
+              <td><code>rg</code> active concrete raw API scan</td>
+              <td><span class="status-ok">passed</span></td>
+              <td>
+                No active non-historical hits for the concrete raw API host or
+                <code>DEFAULT_REMOTE_API_URL</code>. Remaining target-term hits are
+                phase docs, placeholders, public env variable names, or historical
+                turn docs explicitly out of scope.
+              </td>
+            </tr>
+            <tr>
+              <td><code>git diff --check</code></td>
+              <td><span class="status-ok">passed</span></td>
+              <td>No whitespace errors.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Risks And Follow-Up</h2>
+        <ul>
+          <li>
+            Production operators must now set real public app/API verification inputs
+            explicitly for deploy, rollback, and production smoke probes. This is the
+            intended Phase 01 posture, but reviewer should confirm the resulting
+            messages are clear enough for emergency operations.
+          </li>
+          <li>
+            The desktop production URL remains concrete as a trust-policy product
+            constant. It is documented in source as not being an API default.
+          </li>
+          <li>
+            Historical turn docs and baseline JSON/HTML artifacts still contain old
+            concrete domains. They were not rewritten because Phase 01 explicitly
+            excludes historical artifacts unless linked as current instructions.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p>
+          This section keeps the standard HTML unified diff visible by default. If
+          browser module loading succeeds, the same patch is rendered with
+          <code>PatchDiff</code> from browser-side <code>@pierre/diffs/react</code>.
+        </p>
+        <div class="diff-card" data-patch-diff>
+          <div class="diff-mount" aria-label="Rendered diff"></div>
+          <pre class="diff-fallback"><code>diff --git a/apps/web/scripts/dev-config.ts b/apps/web/scripts/dev-config.ts
+@@
+-export const DEFAULT_REMOTE_API_URL = "&lt;raw-api-origin&gt;";
++export const DEFAULT_LOCAL_API_URL = "http://127.0.0.1:4000";
+@@
+-  return { apiUrl: DEFAULT_REMOTE_API_URL, apiUrlSource: "default" };
++  return { apiUrl: DEFAULT_LOCAL_API_URL, apiUrlSource: "default" };
+diff --git a/services/api/src/cors.ts b/services/api/src/cors.ts
+@@
+ export const DEFAULT_API_CORS_ORIGINS = [
+-  "&lt;production-app-origin&gt;",
+   "http://127.0.0.1:3000",
+   "http://localhost:3000",
+diff --git a/scripts/probes/durable-tapes-production-smoke.ts b/scripts/probes/durable-tapes-production-smoke.ts
+@@
+-const DEFAULT_WEB_TARGET = "&lt;production-app-origin&gt;/durable-tapes";
+-const DEFAULT_API_ORIGIN = "&lt;raw-api-origin&gt;";
+@@
+-  --web-target &lt;url&gt;             Deployed durable-tapes URL. Default: ${DEFAULT_WEB_TARGET}
+-  --api-origin &lt;origin&gt;          Expected public API origin. Default: ${DEFAULT_API_ORIGIN}
++  --web-target &lt;url&gt;             Deployed durable-tapes URL, e.g. &lt;production-app-origin&gt;/durable-tapes.
++  --api-origin &lt;origin&gt;          Expected explicit API origin, e.g. &lt;raw-api-origin&gt;.
+diff --git a/.env.example b/.env.example
+@@
+-# Hosted API web-only QA fallback when 3000 is occupied:
+-# NEXT_PUBLIC_API_URL=&lt;raw-api-origin&gt; WEB_DEV_PORT=3100 bun run dev:web
++# Optional explicit external API QA, only when that API allows the selected local web port:
++# NEXT_PUBLIC_API_URL=&lt;raw-api-origin&gt; WEB_DEV_PORT=3100 bun run dev:web
+ WEB_DEV_PORT=3000
+-API_CORS_ORIGINS=&lt;production-app-origin&gt;,http://127.0.0.1:3000,http://localhost:3000,http://127.0.0.1:3100,http://localhost:3100
++# Production deployments must set the real hosted app origin explicitly.
++API_CORS_ORIGINS=http://127.0.0.1:3000,http://localhost:3000,http://127.0.0.1:3100,http://localhost:3100</code></pre>
+        </div>
+      </section>
+    </main>
+    <script type="module">
+      import React from "https://esm.sh/react@19";
+      import { createRoot } from "https://esm.sh/react-dom@19/client";
+      import { PatchDiff } from "https://esm.sh/@pierre/diffs@1.2.2/react?deps=react@19,react-dom@19";
+
+      for (const card of document.querySelectorAll("[data-patch-diff]")) {
+        const source = card.querySelector(".diff-fallback code");
+        const target = card.querySelector(".diff-mount");
+        if (!source || !target) continue;
+        try {
+          createRoot(target).render(React.createElement(PatchDiff, { patch: source.textContent || "" }));
+          card.classList.add("rendered");
+        } catch (error) {
+          console.warn("Rich diff renderer failed; keeping HTML fallback.", error);
+        }
+      }
+    </script>
+  </body>
+</html>

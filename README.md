@@ -204,10 +204,16 @@ Stop local infra:
 bun run dev:infra:down
 ```
 
-Fast web-only iteration against the hosted API is often useful:
+Fast web-only iteration defaults to the local API:
 
 ```bash
-WEB_DEV_PORT=3100 NEXT_PUBLIC_API_URL=https://api.flow.deltaisland.io bun run dev:web
+bun run dev:web
+```
+
+To test against a nonlocal API, opt in explicitly and make sure that API allows the selected local web port:
+
+```bash
+WEB_DEV_PORT=3100 NEXT_PUBLIC_API_URL=<raw-api-origin> bun run dev:web
 ```
 
 The default local posture is synthetic market data. Real provider modes require credentials and are not the safest first path.
@@ -278,12 +284,12 @@ bun test apps/web/features/durable-tape apps/web/features/terminal
 Durable-tapes performance work has a dedicated probe:
 
 ```bash
-WEB_DEV_PORT=3100 NEXT_PUBLIC_API_URL=https://api.flow.deltaisland.io bun run dev:web
+bun run dev:web
 bun run scripts/probes/durable-tapes-perf.ts \
-  --target=http://localhost:3100/durable-tapes \
+  --target=http://localhost:3000/durable-tapes \
   --warmup=30s \
   --duration=180s \
-  --output=docs/implementation/durable-tapes-performance/baselines/local-hosted-api.json
+  --output=docs/implementation/durable-tapes-performance/baselines/local-api.json
 ```
 
 ## Deployment
@@ -322,7 +328,7 @@ Read:
 The Electron app in `apps/desktop` is a thin shell. It can load:
 
 - local web UI during development;
-- hosted `https://flow.deltaisland.io`;
+- hosted `<production-app-origin>`;
 - trusted Islandflow app origins configured through `ISLANDFLOW_DESKTOP_START_URL`.
 
 It does not bundle backend services, local infra, auto-updates, signing, notarization, native notifications, or desktop-specific product features yet.

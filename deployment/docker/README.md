@@ -128,7 +128,7 @@ Supported routing modes:
 
 Enable websocket support on whichever host serves `/ws/*`.
 
-For the current live Nginx Proxy Manager setup behind `flow.deltaisland.io`, keep the API location regex durable in the proxy host advanced config or API, not by hand-editing generated files under `/data/nginx/proxy_host/`. The route matcher should include history:
+For the current live Nginx Proxy Manager setup behind `<production-app-origin>`, keep the API location regex durable in the proxy host advanced config or API, not by hand-editing generated files under `/data/nginx/proxy_host/`. The route matcher should include history:
 
 ```nginx
 ^/(ws|replay|prints|joins|nbbo|dark|flow|candles|history)/
@@ -332,7 +332,7 @@ If the live checkout is on a branch deploy and you want normal production tracki
 
 The helper always does the final public verification against:
 
-- `https://flow.deltaisland.io`
+- `<production-app-origin>`
 
 It also verifies API health from inside the `api` container during the remote verification step.
 

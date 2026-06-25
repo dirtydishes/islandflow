@@ -17,7 +17,10 @@ const routeChecks: RouteCheck[] = [
 ];
 
 const appUrl = process.env.DEPLOY_PUBLIC_APP_URL?.trim() || process.argv[2]?.trim();
-const baseUrl = appUrl || "https://flow.deltaisland.io";
+if (!appUrl) {
+  throw new Error("Set DEPLOY_PUBLIC_APP_URL=<production-app-origin> or pass the app origin as an argument.");
+}
+const baseUrl = appUrl;
 
 const isJsonResponse = (response: Response): boolean => {
   return (response.headers.get("content-type") ?? "").toLowerCase().includes("application/json");
