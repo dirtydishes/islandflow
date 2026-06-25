@@ -1,0 +1,847 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Islandflow Turn Storyboard</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          linear-gradient(180deg, oklch(0.135 0.014 250) 0%, oklch(0.095 0.01 250) 42%, oklch(0.075 0.009 250) 100%);
+        color: oklch(0.93 0.014 250);
+        font-family: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.52;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      a:hover {
+        color: oklch(0.78 0.12 74);
+      }
+
+      .shell {
+        width: min(1240px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 28px 0 52px;
+      }
+
+      .topline,
+      .label,
+      .chip,
+      .timeline-date,
+      .doc-count,
+      .doc-link,
+      .metric-label,
+      .phase-kicker,
+      th {
+        font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      header {
+        border-block: 1px solid oklch(0.78 0.09 74 / 0.32);
+        padding: 18px 0 20px;
+      }
+
+      .topline {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 14px;
+        color: oklch(0.78 0.12 74);
+        font-size: 0.72rem;
+        font-weight: 700;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        max-width: 980px;
+        margin-bottom: 12px;
+        font-family: Quantico, "IBM Plex Sans", Inter, sans-serif;
+        font-size: clamp(2rem, 4vw, 3.5rem);
+        line-height: 1.04;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        text-wrap: balance;
+      }
+
+      .lede {
+        max-width: 78ch;
+        margin: 0;
+        color: oklch(0.77 0.019 250);
+        font-size: 1.02rem;
+        text-wrap: pretty;
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        border-block: 1px solid oklch(0.72 0.012 250 / 0.18);
+        margin: 18px 0 24px;
+      }
+
+      .metric {
+        min-width: 0;
+        padding: 12px 14px;
+        border-right: 1px solid oklch(0.72 0.012 250 / 0.18);
+      }
+
+      .metric:last-child {
+        border-right: 0;
+      }
+
+      .metric-label {
+        display: block;
+        margin-bottom: 5px;
+        color: oklch(0.6 0.017 250);
+        font-size: 0.66rem;
+      }
+
+      .metric strong {
+        display: block;
+        color: oklch(0.93 0.014 250);
+        font-size: 1rem;
+        overflow-wrap: anywhere;
+      }
+
+      nav {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        margin: 0 0 18px;
+        padding: 10px 0;
+        background: oklch(0.105 0.011 250 / 0.96);
+        border-bottom: 1px solid oklch(0.72 0.012 250 / 0.16);
+      }
+
+      .nav-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 32px;
+        padding: 7px 10px;
+        border: 1px solid oklch(0.72 0.012 250 / 0.18);
+        border-radius: 999px;
+        background: oklch(0.97 0.008 250 / 0.035);
+        color: oklch(0.77 0.019 250);
+        font-size: 0.68rem;
+        font-weight: 700;
+      }
+
+      .chip:hover {
+        border-color: oklch(0.78 0.09 74 / 0.34);
+        background: oklch(0.78 0.12 74 / 0.1);
+        color: oklch(0.93 0.014 250);
+      }
+
+      section {
+        border-top: 1px solid oklch(0.72 0.012 250 / 0.16);
+        padding: 28px 0 6px;
+      }
+
+      h2 {
+        margin-bottom: 12px;
+        font-family: Quantico, "IBM Plex Sans", Inter, sans-serif;
+        font-size: clamp(1.35rem, 2.2vw, 2rem);
+        line-height: 1.08;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+
+      h3 {
+        margin-bottom: 8px;
+        font-size: 1rem;
+        line-height: 1.25;
+        color: oklch(0.93 0.014 250);
+      }
+
+      .section-intro {
+        max-width: 76ch;
+        margin-bottom: 16px;
+        color: oklch(0.77 0.019 250);
+        text-wrap: pretty;
+      }
+
+      .story-grid {
+        display: grid;
+        grid-template-columns: minmax(230px, 0.85fr) minmax(0, 2.15fr);
+        gap: 18px;
+      }
+
+      .phase {
+        display: grid;
+        grid-template-columns: minmax(170px, 0.52fr) minmax(0, 1fr);
+        gap: 18px;
+        padding: 18px 0;
+        border-top: 1px solid oklch(0.72 0.012 250 / 0.12);
+      }
+
+      .phase:first-child {
+        border-top: 0;
+      }
+
+      .phase-kicker {
+        margin: 0 0 7px;
+        color: oklch(0.78 0.12 74);
+        font-size: 0.7rem;
+        font-weight: 700;
+      }
+
+      .phase-window {
+        color: oklch(0.6 0.017 250);
+        font-size: 0.9rem;
+      }
+
+      .phase-copy p {
+        max-width: 78ch;
+        color: oklch(0.78 0.018 250);
+        text-wrap: pretty;
+      }
+
+      .phase-copy p strong {
+        color: oklch(0.93 0.014 250);
+      }
+
+      .doc-strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        margin-top: 12px;
+      }
+
+      .doc-link {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        padding: 5px 8px;
+        border: 1px solid oklch(0.72 0.012 250 / 0.15);
+        border-radius: 8px;
+        background: oklch(0.97 0.008 250 / 0.03);
+        color: oklch(0.77 0.019 250);
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: none;
+      }
+
+      .doc-link:hover {
+        border-color: oklch(0.72 0.13 247 / 0.34);
+        color: oklch(0.82 0.1 247);
+      }
+
+      .twist-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 1px;
+        border: 1px solid oklch(0.72 0.012 250 / 0.15);
+        background: oklch(0.72 0.012 250 / 0.15);
+      }
+
+      .twist {
+        min-width: 0;
+        padding: 14px;
+        background: oklch(0.16 0.012 250);
+      }
+
+      .twist p {
+        margin-bottom: 0;
+        color: oklch(0.77 0.019 250);
+      }
+
+      .twist strong {
+        color: oklch(0.93 0.014 250);
+      }
+
+      .timeline {
+        display: grid;
+        gap: 1px;
+        border: 1px solid oklch(0.72 0.012 250 / 0.16);
+        background: oklch(0.72 0.012 250 / 0.16);
+      }
+
+      .timeline-row {
+        display: grid;
+        grid-template-columns: 150px minmax(0, 1fr) minmax(160px, 0.42fr);
+        gap: 0;
+        background: oklch(0.13 0.012 250);
+      }
+
+      .timeline-row > div {
+        padding: 12px 14px;
+        border-right: 1px solid oklch(0.72 0.012 250 / 0.14);
+      }
+
+      .timeline-row > div:last-child {
+        border-right: 0;
+      }
+
+      .timeline-date {
+        color: oklch(0.78 0.12 74);
+        font-size: 0.7rem;
+        font-weight: 700;
+      }
+
+      .timeline-title {
+        margin-bottom: 4px;
+        color: oklch(0.93 0.014 250);
+        font-weight: 700;
+      }
+
+      .timeline-note,
+      .doc-count {
+        color: oklch(0.7 0.018 250);
+        font-size: 0.9rem;
+      }
+
+      .doc-count {
+        font-size: 0.68rem;
+        font-weight: 700;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        border: 1px solid oklch(0.72 0.012 250 / 0.16);
+        background: oklch(0.13 0.012 250);
+      }
+
+      th,
+      td {
+        padding: 10px 12px;
+        border-bottom: 1px solid oklch(0.72 0.012 250 / 0.14);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: oklch(0.6 0.017 250);
+        font-size: 0.66rem;
+      }
+
+      td {
+        color: oklch(0.78 0.018 250);
+      }
+
+      td:first-child {
+        width: 138px;
+        color: oklch(0.78 0.12 74);
+        font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 0.82rem;
+      }
+
+      .small {
+        color: oklch(0.6 0.017 250);
+        font-size: 0.9rem;
+      }
+
+      .ledger {
+        max-height: 620px;
+        overflow: auto;
+      }
+
+      @media (max-width: 880px) {
+        .shell {
+          width: min(100vw - 22px, 1240px);
+          padding-top: 20px;
+        }
+
+        .metrics,
+        .story-grid,
+        .phase,
+        .timeline-row {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        .metric,
+        .timeline-row > div {
+          border-right: 0;
+          border-bottom: 1px solid oklch(0.72 0.012 250 / 0.14);
+        }
+
+        .metric:last-child,
+        .timeline-row > div:last-child {
+          border-bottom: 0;
+        }
+
+        nav {
+          position: static;
+        }
+
+        .ledger {
+          overflow-x: auto;
+        }
+
+        table {
+          min-width: 760px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header>
+        <div class="topline">
+          <span>Turn Storyboard</span>
+          <span>May 14 to June 23, 2026</span>
+          <span>87 source documents</span>
+        </div>
+        <h1>How Islandflow turned from a terminal into an evidence pipeline.</h1>
+        <p class="lede">This page reads the turn documents as one story: the UI got quieter, the deploy path got stricter, the team changed remotes and documentation habits, mock routes forced a stronger product shape, and then the synthetic and smart-flow work gave the terminal something more durable to explain.</p>
+      </header>
+
+      <div class="metrics" aria-label="Storyboard summary">
+        <div class="metric"><span class="metric-label">Window</span><strong>41 calendar days</strong></div>
+        <div class="metric"><span class="metric-label">First move</span><strong>Terminal hardening</strong></div>
+        <div class="metric"><span class="metric-label">Big pivot</span><strong>Mock9 to production routes</strong></div>
+        <div class="metric"><span class="metric-label">End state</span><strong>Smart-flow plus charts</strong></div>
+      </div>
+
+      <nav aria-label="Storyboard sections">
+        <div class="nav-row">
+          <a class="chip" href="#story">Read the story</a>
+          <a class="chip" href="#twists">Twists</a>
+          <a class="chip" href="#timeline">Timeline</a>
+          <a class="chip" href="#ledger">Source ledger</a>
+        </div>
+      </nav>
+
+      <section id="story">
+        <h2>The Story Arc</h2>
+        <p class="section-intro">The turn docs describe a project that kept discovering where its source of truth needed to move. At first the work was mostly about making the terminal usable. Then the deployment path became the thing to stabilize. Then documentation and CI had to become explicit enough for agents and reviewers. Only after that did the product surface absorb the newer synthetic, smart-flow, and charting systems.</p>
+
+        <div class="phase">
+          <div>
+            <p class="phase-kicker">Opening move</p>
+            <div class="phase-window">May 14 to May 15</div>
+          </div>
+          <div class="phase-copy">
+            <h3>The terminal got hardened before it got ambitious.</h3>
+            <p>First, we decided the terminal had to behave like an operator surface instead of a fragile demo. The early turns tightened responsiveness, keyboard behavior, constrained-width layout, and visual intensity. Then, after that hardening branch met main, conflict work preserved both the new terminal coverage and the ticker parsing already present on main.</p>
+            <p>The important decision was restraint: quiet the chrome, keep the dark evidence-console identity, and let live data carry the weight. That choice becomes the visual baseline for the rest of the folder.</p>
+            <div class="doc-strip">
+              <a class="doc-link" href="2026-05-14-harden-terminal-view.html">harden terminal</a>
+              <a class="doc-link" href="2026-05-14-1824-adapt-terminal-view.html">adapt terminal</a>
+              <a class="doc-link" href="2026-05-15-quiet-terminal-view.html">quiet terminal</a>
+              <a class="doc-link" href="2026-05-14-1833-reconcile-pr-conflicts.html">conflict pass</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div>
+            <p class="phase-kicker">First twist</p>
+            <div class="phase-window">May 15 to May 19</div>
+          </div>
+          <div class="phase-copy">
+            <h3>The product could not move faster than the deploy path.</h3>
+            <p>Then, the deployment story took over. Docker was declared the default VPS path, but the repo still needed native units, fast deploy modes, workspace snapshot checks, remote resolution that did not assume <code>origin</code>, and warnings for stale compose stacks. Each fix exposed another edge: frozen lockfile drift, missing history routes, NPM routing, systemd readiness, and remote precheck assumptions.</p>
+            <p>Then came the bigger infrastructure fork: native public edge cutover. The docs show it as a practical detour, not a rewrite for its own sake. The team added units, fallback scripts, firewall and proxy adjustments, and a safer path for worker-only iteration. Then the news ingest service forced another repair, because native templates, Alpaca auth, backfill limits, and websocket fanout all had to agree.</p>
+            <div class="doc-strip">
+              <a class="doc-link" href="2026-05-15-dual-runtime-deploy-workflow.html">dual runtime</a>
+              <a class="doc-link" href="2026-05-15-deploy-preflight-docker-workspace-check.html">docker preflight</a>
+              <a class="doc-link" href="2026-05-16-1752-speed-up-docker-deploys.html">docker speed</a>
+              <a class="doc-link" href="2026-05-17-add-fast-deploy-mode.html">fast mode</a>
+              <a class="doc-link" href="2026-05-18-native-public-edge-cutover.html">native edge</a>
+              <a class="doc-link" href="2026-05-19-fix-native-alpaca-news.html">native news repair</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div>
+            <p class="phase-kicker">Data persistence</p>
+            <div class="phase-window">May 16 to May 20</div>
+          </div>
+          <div class="phase-copy">
+            <h3>The terminal stopped depending on the live cache.</h3>
+            <p>While deploy work was being tightened, the tape work found a product truth: operators scroll away from the live head, and the interface cannot punish them for investigating history. The tape began to hold when scrolled, resume at the top, and lazy-load ClickHouse history. After that, the same principle reached alert drawers, where selecting an alert had to hydrate durable context from ClickHouse instead of hoping linked evidence still lived in memory.</p>
+            <p>Then a subtle bug made the lesson sharper. A historical alert looked broken because the UI assumed the first evidence reference was always a flow packet. Compute alerts often pointed first to a smart-money event. Fixing that made the drawer trust all evidence refs, rather than only the first one.</p>
+            <div class="doc-strip">
+              <a class="doc-link" href="2026-05-16-live-tape-scroll-hold-history.html">scroll hold</a>
+              <a class="doc-link" href="2026-05-16-1725-durable-options-tape-history.html">durable history</a>
+              <a class="doc-link" href="2026-05-17-0331-fix-live-tape-scroll-stability.html">scroll stability</a>
+              <a class="doc-link" href="2026-05-17-clickhouse-alert-context.html">alert context</a>
+              <a class="doc-link" href="2026-05-20-fix-alert-flow-packet-history.html">packet history</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div>
+            <p class="phase-kicker">Workflow correction</p>
+            <div class="phase-window">May 17 to May 30</div>
+          </div>
+          <div class="phase-copy">
+            <h3>The repo changed how work is remembered, reviewed, and published.</h3>
+            <p>Then, project memory moved out of informal notes and into durable systems. Beads got a Dolt remote, Forgejo became canonical, docs publishing produced an index, and turn-document rules were clarified so future implementation work would leave a reviewable trail. The repo also backfilled remotes between GitHub and Forgejo, then made Forgejo CI the baseline instead of a side channel.</p>
+            <p>After that, the quality gates expanded. Typecheck became a first-class command, CI started running formatting, lint, type safety, tests, route checks, Docker snapshot drift checks, and the production web build. Then the remaining CI failures became concrete repairs: dependency resolution, terminal test mocks, and vulnerable package overrides.</p>
+            <div class="doc-strip">
+              <a class="doc-link" href="2026-05-17-configure-beads-dolt-remote.html">beads dolt</a>
+              <a class="doc-link" href="2026-05-22-forgejo-primary-agent-workflow.html">forgejo first</a>
+              <a class="doc-link" href="2026-05-23-forgejo-ci-baseline.html">forgejo ci</a>
+              <a class="doc-link" href="2026-05-29-add-typecheck-command.html">typecheck</a>
+              <a class="doc-link" href="2026-05-30-expand-ci-quality-gates.html">quality gates</a>
+              <a class="doc-link" href="2026-05-30-fix-forgejo-ci-test-mocks.html">ci repair</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div>
+            <p class="phase-kicker">Product pivot</p>
+            <div class="phase-window">May 23 to June 13</div>
+          </div>
+          <div class="phase-copy">
+            <h3>The UI stopped being a home page and became route-specific instrumentation.</h3>
+            <p>Then, the surface changed shape. Tape became Options, the web rail moved into a top-left drawer, and the home page became a command deck. The mock route sequence started as exploration, but it became the decisive design process: first four different dashboard directions, then four no-card routes, then four dense operational studies.</p>
+            <p>The turn docs show the selection pressure clearly. The team refined the command deck header, rejected generic card composition, and eventually rebuilt production Dashboard, Options, and News around mock9 through mock12. Then local development had to catch up: hosted API defaults, CORS preflight, desktop workflows, and terminal evidence text all had to support the new hosted shape.</p>
+            <div class="doc-strip">
+              <a class="doc-link" href="2026-05-23-rename-tape-options-drawer.html">tape to options</a>
+              <a class="doc-link" href="2026-05-28-redesign-home-command-deck.html">command deck</a>
+              <a class="doc-link" href="2026-06-11-0416-ground-up-redesign-mocks.html">mocks 1 to 4</a>
+              <a class="doc-link" href="2026-06-11-1822-add-no-card-mock-routes.html">mocks 5 to 8</a>
+              <a class="doc-link" href="2026-06-11-1946-add-four-dashboard-mocks.html">mocks 9 to 12</a>
+              <a class="doc-link" href="2026-06-13-1022-rebuild-terminal-routes-mock9.html">production rebuild</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div>
+            <p class="phase-kicker">Second pivot</p>
+            <div class="phase-window">June 17 to June 18</div>
+          </div>
+          <div class="phase-copy">
+            <h3>Synthetic data and smart-flow matured in parallel.</h3>
+            <p>Then the story moved below the UI. Synthetic market data began with a deterministic spine: seeded profiles, canonical event wrappers, provenance outside payloads, stable ordering, and infra-free tests. It became manifests and fixtures, then scenarios and labels, then replay integration, demo profiles, and hosted controls. In parallel, smart-flow moved from contracts to evidence facts, clustering, score vectors, abstention, API projections, UI explainability, and chart markers.</p>
+            <p>The recurring choice was to keep truth outside the wrong place. Labels stayed outside emitted market events. Provenance lived by trace ID. Smart-flow projections became canonical, while legacy smart-money streams stayed as fallback. The UI went beyond displaying a new feed and learned to show cautious hypotheses with evidence handles and abstention details.</p>
+            <div class="doc-strip">
+              <a class="doc-link" href="2026-06-17-1334-synthetic-deterministic-spine.html">synthetic spine</a>
+              <a class="doc-link" href="2026-06-17-1621-synthetic-prints-phase-02-manifests-fixtures-cli.html">fixtures cli</a>
+              <a class="doc-link" href="2026-06-17-1800-synthetic-phase-03-scenarios-labels-expected-outputs.html">phase 03</a>
+              <a class="doc-link" href="2026-06-17-1332-smart-money-1b-smart-flow-contracts.html">smart-flow contracts</a>
+              <a class="doc-link" href="2026-06-17-1702-smart-flow-clustering-features.html">clustering</a>
+              <a class="doc-link" href="2026-06-18-2005-smart-flow-ui-explainability.html">ui explainability</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div>
+            <p class="phase-kicker">Closeout</p>
+            <div class="phase-window">June 21 to June 23</div>
+          </div>
+          <div class="phase-copy">
+            <h3>The chart became a reusable instrument, then the tapes got their example route.</h3>
+            <p>Finally, charting became its own implementation stream. The lightweight-charts work started with reusable foundations, then added timeframes, replaced the dashboard chart, added settings and lower-pane modes, hardened hover readouts, and closed with browser QA against the hosted backend. One residual issue remained, stale chart data under nonmatching ticker filters, and it was filed instead of being buried.</p>
+            <p>The most recent turn then exposed a hidden durable-tapes example route. It tied Options, Flow Packets, Equities, News, and Alerts into one existing terminal state model, a fitting end point for the folder: the story began with a terminal that needed to survive real use, and ends with reusable tape modules arranged for inspection.</p>
+            <div class="doc-strip">
+              <a class="doc-link" href="2026-06-21-lightweight-charts-phase-01-foundation.html">chart foundation</a>
+              <a class="doc-link" href="2026-06-21-lightweight-charts-phase-03-dashboard-replacement.html">dashboard chart</a>
+              <a class="doc-link" href="2026-06-21-lightweight-charts-phase-05-hover-readout-visual-hardening.html">hover hardening</a>
+              <a class="doc-link" href="2026-06-21-lightweight-charts-phase-06-final-verification.html">final verification</a>
+              <a class="doc-link" href="2026-06-23-durable-tapes-example-route.html">durable tapes</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="twists">
+        <h2>Important Twists</h2>
+        <p class="section-intro">These are the turns where the project changed direction or found a hidden constraint.</p>
+        <div class="twist-list">
+          <div class="twist">
+            <h3>Docker was default, but native still had to exist.</h3>
+            <p>The deploy docs first clarified Docker-first rollout, then added native units and public edge cutover once operator iteration needed host-level control.</p>
+          </div>
+          <div class="twist">
+            <h3>Live data was not enough evidence.</h3>
+            <p>Scroll hold, durable history, and ClickHouse alert context all came from the same realization: the user investigates old rows while new rows keep arriving.</p>
+          </div>
+          <div class="twist">
+            <h3>Forgejo became the center of gravity.</h3>
+            <p>GitHub Pages stayed useful for published docs, but implementation workflow, PRs, pushes, CI, and Beads sync all moved toward Forgejo as canonical.</p>
+          </div>
+          <div class="twist">
+            <h3>Mock routes were not throwaway screens.</h3>
+            <p>The mock route sequence became the design decision engine, and mock9 through mock12 eventually defined the production terminal routes.</p>
+          </div>
+          <div class="twist">
+            <h3>Labels and provenance were kept out of event payloads.</h3>
+            <p>Synthetic data became credible because generation metadata and ground truth remained traceable without polluting canonical market events.</p>
+          </div>
+          <div class="twist">
+            <h3>Smart-money became smart-flow projection.</h3>
+            <p>The old stream stayed compatible, but the product started preferring canonical explainability projections for tables, drawers, priorities, and chart markers.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="timeline">
+        <h2>Compressed Timeline</h2>
+        <p class="section-intro">The high-level sequence by date, grouped by the event that changed the repo most.</p>
+        <div class="timeline">
+          <div class="timeline-row">
+            <div class="timeline-date">May 14</div>
+            <div>
+              <div class="timeline-title">Terminal hardening starts.</div>
+              <div class="timeline-note">The shell becomes more responsive, accessible, and quiet enough for live data to dominate.</div>
+            </div>
+            <div class="doc-count">4 docs</div>
+          </div>
+          <div class="timeline-row">
+            <div class="timeline-date">May 15 to 18</div>
+            <div>
+              <div class="timeline-title">Deployment becomes a product constraint.</div>
+              <div class="timeline-note">Docker defaults, native runtime support, fast deploys, workspace drift checks, remote resolution, and public edge cutover appear in sequence.</div>
+            </div>
+            <div class="doc-count">16 docs</div>
+          </div>
+          <div class="timeline-row">
+            <div class="timeline-date">May 16 to 20</div>
+            <div>
+              <div class="timeline-title">History and context become durable.</div>
+              <div class="timeline-note">Tape scroll hold, lazy history, ClickHouse alert hydration, news storage, and packet evidence fixes reduce live-cache dependency.</div>
+            </div>
+            <div class="doc-count">9 docs</div>
+          </div>
+          <div class="timeline-row">
+            <div class="timeline-date">May 19 to 30</div>
+            <div>
+              <div class="timeline-title">The repo learns to publish and defend itself.</div>
+              <div class="timeline-note">README current-state docs, turn-doc rules, docs Pages, Forgejo-first workflow, CVE repairs, typecheck, and expanded CI all land.</div>
+            </div>
+            <div class="doc-count">22 docs</div>
+          </div>
+          <div class="timeline-row">
+            <div class="timeline-date">May 28 to Jun 13</div>
+            <div>
+              <div class="timeline-title">The visual system is stress-tested through mocks.</div>
+              <div class="timeline-note">Command Deck and twelve mock routes culminate in Dashboard, Options, and News being rebuilt around the dense flat terminal system.</div>
+            </div>
+            <div class="doc-count">9 docs</div>
+          </div>
+          <div class="timeline-row">
+            <div class="timeline-date">Jun 17 to 18</div>
+            <div>
+              <div class="timeline-title">Synthetic market data and smart-flow run in parallel.</div>
+              <div class="timeline-note">Deterministic events, fixtures, labels, replay checks, smart-flow facts, clusters, scores, projections, UI, and chart markers arrive in a rapid phase stack.</div>
+            </div>
+            <div class="doc-count">18 docs</div>
+          </div>
+          <div class="timeline-row">
+            <div class="timeline-date">Jun 21 to 23</div>
+            <div>
+              <div class="timeline-title">Charts become reusable, and tapes become demonstrable.</div>
+              <div class="timeline-note">The lightweight chart stream closes with verification, then the durable-tapes example route exposes the terminal modules as a composed inspection surface.</div>
+            </div>
+            <div class="doc-count">8 docs</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="ledger">
+        <h2>Source Ledger</h2>
+        <p class="section-intro">All source turn documents in the folder are represented here. The groups match the story above, so a reader can move from narrative to primary documents without losing the thread.</p>
+        <div class="ledger">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Documents</th>
+                <th>Story role</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>May 14</td>
+                <td>
+                  <a href="2026-05-14-harden-terminal-view.html">Harden Terminal View</a>,
+                  <a href="2026-05-14-1824-adapt-terminal-view.html">Adapt Terminal View</a>,
+                  <a href="2026-05-14-1833-reconcile-pr-conflicts.html">Reconcile PR Conflicts</a>
+                </td>
+                <td>Initial terminal hardening and conflict reconciliation.</td>
+              </tr>
+              <tr>
+                <td>May 15</td>
+                <td>
+                  <a href="2026-05-15-quiet-terminal-view.html">Quiet Terminal View</a>,
+                  <a href="2026-05-15-dual-runtime-deploy-workflow.html">Dual-runtime deploy workflow</a>,
+                  <a href="2026-05-15-clarify-docker-first-deploy-workflow.html">Clarify Docker-first deploy workflow</a>,
+                  <a href="2026-05-15-deploy-preflight-docker-workspace-check.html">Deploy preflight docker workspace check</a>,
+                  <a href="2026-05-15-fix-docker-workspace-lockfile-sync.html">Docker workspace lockfile sync</a>,
+                  <a href="2026-05-15-add-duplicate-vps-compose-warning.html">Warn about duplicate VPS compose stacks</a>
+                </td>
+                <td>Deploy path discipline and calmer terminal surface.</td>
+              </tr>
+              <tr>
+                <td>May 16</td>
+                <td>
+                  <a href="2026-05-16-live-tape-scroll-hold-history.html">Live tape scroll hold and lazy history</a>,
+                  <a href="2026-05-16-1725-durable-options-tape-history.html">Durable Options Tape History</a>,
+                  <a href="2026-05-16-1752-speed-up-docker-deploys.html">Speed Up Docker Deploys</a>,
+                  <a href="2026-05-16-2159-fix-durable-options-history-routing.html">Fix Durable Options History Routing</a>
+                </td>
+                <td>History behavior and Docker rollout speed.</td>
+              </tr>
+              <tr>
+                <td>May 17</td>
+                <td>
+                  <a href="2026-05-17-0331-fix-live-tape-scroll-stability.html">Fix Live Tape Scroll Stability</a>,
+                  <a href="2026-05-17-1101-clickhouse-alert-context.html">ClickHouse Alert Context Hydration</a>,
+                  <a href="2026-05-17-clickhouse-alert-context.html">ClickHouse Alert Context Hydration</a>,
+                  <a href="2026-05-17-add-fast-deploy-mode.html">Add Fast Deploy Mode</a>,
+                  <a href="2026-05-17-configure-beads-dolt-remote.html">Configure Beads Dolt Remote</a>,
+                  <a href="2026-05-17-deploy-allowlist-pr-packaging.html">Deploy Allowlist PR Packaging</a>,
+                  <a href="2026-05-17-forgejo-deploy-remote-resolution.html">Forgejo Deploy Remote Resolution</a>
+                </td>
+                <td>Live scroll stability, durable alert context, and workflow foundations.</td>
+              </tr>
+              <tr>
+                <td>May 18</td>
+                <td>
+                  <a href="2026-05-18-native-fast-iterative-deploy.html">Native Fast Iterative Deploy</a>,
+                  <a href="2026-05-18-native-public-edge-cutover.html">Native Public Edge Cutover</a>,
+                  <a href="2026-05-18-news-wire-view.html">News Wire View</a>
+                </td>
+                <td>Native deployment path and the first full news feed surface.</td>
+              </tr>
+              <tr>
+                <td>May 19</td>
+                <td>
+                  <a href="2026-05-19-0739-update-readme-current-state.html">README Current-State Update</a>,
+                  <a href="2026-05-19-0805-clarify-repo-turn-doc-rules.html">Clarify Repo Turn Documentation Rules</a>,
+                  <a href="2026-05-19-fix-native-alpaca-news.html">Fix Native Alpaca News</a>,
+                  <a href="2026-05-19-harden-native-ssh-deploy-checks.html">Harden Native SSH Deploy Checks</a>,
+                  <a href="2026-05-19-native-options-recovery-guardrails.html">Native Options Recovery Guardrails</a>,
+                  <a href="2026-05-19-publish-docs-pages-index.html">Publish Docs Pages Index</a>,
+                  <a href="2026-05-19-reconcile-pr-conflicts.html">Reconcile PR Conflicts</a>,
+                  <a href="2026-05-19-upgrade-nextjs-16.html">Upgrade Next.js 16</a>
+                </td>
+                <td>Documentation, native repairs, and web platform upgrade.</td>
+              </tr>
+              <tr>
+                <td>May 20 to 23</td>
+                <td>
+                  <a href="2026-05-20-fix-alert-flow-packet-history.html">Historical Alert Flow Packets Persist Again</a>,
+                  <a href="2026-05-20-refresh-readme-github-description.html">README GitHub Description Refresh</a>,
+                  <a href="2026-05-20-remote-backfill-sync.html">Remote Backfill Sync</a>,
+                  <a href="2026-05-21-publish-standup-summary-2026-05-20.html">Standup Summary 2026-05-20</a>,
+                  <a href="2026-05-22-forgejo-primary-agent-workflow.html">Forgejo Primary Agent Workflow</a>,
+                  <a href="2026-05-22-publish-standup-summary-2026-05-21.html">Standup Summary 2026-05-21</a>,
+                  <a href="2026-05-23-address-forgejo-issue-10-security-cves.html">Forgejo Issue 10 CVE Remediation</a>,
+                  <a href="2026-05-23-default-turn-doc-diffs.html">Default Turn-Doc Diffs</a>,
+                  <a href="2026-05-23-forgejo-ci-baseline.html">Forgejo CI Baseline</a>,
+                  <a href="2026-05-23-rename-tape-options-drawer.html">Rename Tape to Options</a>,
+                  <a href="2026-05-23-update-github-pages-docs-target.html">Update GitHub Pages Docs Target</a>
+                </td>
+                <td>Forgejo-centered workflow, docs publication, CVE cleanup, and route naming.</td>
+              </tr>
+              <tr>
+                <td>May 28 to 30</td>
+                <td>
+                  <a href="2026-05-28-dashboard-mock-routes.html">Dashboard Mock Routes</a>,
+                  <a href="2026-05-28-redesign-home-command-deck.html">Redesign Home Command Deck</a>,
+                  <a href="2026-05-29-add-typecheck-command.html">Add Typecheck Command</a>,
+                  <a href="2026-05-29-add-typecheck-to-ci.html">Add Typecheck to CI</a>,
+                  <a href="2026-05-29-configure-impeccable-live-mode.html">Configure Impeccable Live Mode</a>,
+                  <a href="2026-05-29-fix-electron-node-gyp-install-resolution.html">CI Dependency Resolution Fix</a>,
+                  <a href="2026-05-29-remove-frontend-cooker.html">Remove Frontend Cooker</a>,
+                  <a href="2026-05-30-expand-ci-quality-gates.html">Expand CI Quality Gates</a>,
+                  <a href="2026-05-30-fix-forgejo-ci-test-mocks.html">Fix Forgejo CI Test Mocks</a>
+                </td>
+                <td>Design exploration begins while CI becomes stricter.</td>
+              </tr>
+              <tr>
+                <td>Jun 6 to 13</td>
+                <td>
+                  <a href="2026-06-06-0730-refine-command-deck-header.html">Refine Command Deck Header</a>,
+                  <a href="2026-06-11-0416-ground-up-redesign-mocks.html">Ground-Up Redesign Mocks</a>,
+                  <a href="2026-06-11-1822-add-no-card-mock-routes.html">No-Card Mock Routes</a>,
+                  <a href="2026-06-11-1946-add-four-dashboard-mocks.html">Four Dense Dashboard Mocks</a>,
+                  <a href="2026-06-12-1855-resolve-tmp-cve-audit.html">Resolve tmp CVE Audit</a>,
+                  <a href="2026-06-13-0338-configure-hosted-api-endpoint.html">Configure Hosted API Endpoint</a>,
+                  <a href="2026-06-13-1022-rebuild-terminal-routes-mock9.html">Rebuild Terminal Routes Around Mock9</a>,
+                  <a href="2026-06-13-1122-consolidated-deploy-script.html">Consolidated Deploy Script</a>,
+                  <a href="2026-06-13-1130-fix-local-backend-connectivity.html">Fix Local Backend Connectivity</a>
+                </td>
+                <td>Mock-led production redesign and local hosted-backend connectivity.</td>
+              </tr>
+              <tr>
+                <td>Jun 17</td>
+                <td>
+                  <a href="2026-06-17-1332-smart-money-1b-smart-flow-contracts.html">Smart-Flow Contracts</a>,
+                  <a href="2026-06-17-1334-synthetic-deterministic-spine.html">Synthetic Deterministic Spine</a>,
+                  <a href="2026-06-17-1621-synthetic-prints-phase-02-manifests-fixtures-cli.html">Synthetic Phase 02</a>,
+                  <a href="2026-06-17-1646-smart-flow-evidence-facts.html">Smart-Flow Evidence Facts</a>,
+                  <a href="2026-06-17-1702-smart-flow-clustering-features.html">Smart-Flow Clustering</a>,
+                  <a href="2026-06-17-1800-synthetic-phase-03-scenarios-labels-expected-outputs.html">Synthetic Phase 03</a>,
+                  <a href="2026-06-17-1801-fix-github-pages-docs-workflow.html">Fix GitHub Pages Docs Workflow</a>,
+                  <a href="2026-06-17-1902-synthetic-scenario-catalog-labels.html">Synthetic Scenario Catalog</a>,
+                  <a href="2026-06-17-2305-smart-flow-score-vectors.html">Smart-Flow Score Vectors</a>
+                </td>
+                <td>Rapid phase work for synthetic generation and smart-flow reasoning.</td>
+              </tr>
+              <tr>
+                <td>Jun 18</td>
+                <td>
+                  <a href="2026-06-18-0101-smart-flow-abstention-projection.html">Smart-Flow Abstention And Projection</a>,
+                  <a href="2026-06-18-1355-synthetic-replay-integration.html">Synthetic Replay Integration</a>,
+                  <a href="2026-06-18-1427-smart-flow-replay-golden-tests.html">Smart-Flow Replay Golden Tests</a>,
+                  <a href="2026-06-18-1849-synthetic-demo-load-profiles.html">Synthetic Demo Load Profiles</a>,
+                  <a href="2026-06-18-1932-smart-flow-evidence-api-websocket.html">Smart-Flow Evidence API And Websocket</a>,
+                  <a href="2026-06-18-2002-fix-github-publish-docs-workflow.html">Fix GitHub Publish Docs Workflow</a>,
+                  <a href="2026-06-18-2005-smart-flow-ui-explainability.html">Smart-Flow UI Explainability</a>,
+                  <a href="2026-06-18-2035-smart-flow-chart-markers.html">Smart-Flow Chart Markers</a>
+                </td>
+                <td>Replay, golden tests, projections, terminal explainability, and chart integration.</td>
+              </tr>
+              <tr>
+                <td>Jun 21 to 23</td>
+                <td>
+                  <a href="2026-06-21-1923-fix-synthetic-1m-candles.html">Fix Synthetic 1m Candles</a>,
+                  <a href="2026-06-21-fix-tar-cve-2026-53655.html">Fix tar CVE-2026-53655</a>,
+                  <a href="2026-06-21-lightweight-charts-phase-01-foundation.html">Lightweight Charts Phase 01</a>,
+                  <a href="2026-06-21-lightweight-charts-phase-02-timeframes.html">Lightweight Charts Phase 02</a>,
+                  <a href="2026-06-21-lightweight-charts-phase-03-dashboard-replacement.html">Lightweight Charts Phase 03</a>,
+                  <a href="2026-06-21-lightweight-charts-phase-04-settings-lower-pane.html">Lightweight Charts Phase 04</a>,
+                  <a href="2026-06-21-lightweight-charts-phase-05-hover-readout-visual-hardening.html">Lightweight Charts Phase 05</a>,
+                  <a href="2026-06-21-lightweight-charts-phase-06-final-verification.html">Lightweight Charts Phase 06</a>,
+                  <a href="2026-06-23-durable-tapes-example-route.html">Durable Tapes Example Route</a>,
+                  <a href="terminal-refactor.html">Terminal Refactor Closeout</a>
+                </td>
+                <td>Chart module completion, security cleanup, terminal refactor closeout, and durable tapes example.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="small">The file list was synthesized from the current contents of <code>docs/turns</code>. Duplicate ClickHouse context docs are kept in the ledger because both exist in the folder.</p>
+      </section>
+    </main>
+  </body>
+</html>
