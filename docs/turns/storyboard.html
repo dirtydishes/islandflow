@@ -407,18 +407,18 @@
       <header>
         <div class="topline">
           <span>Turn Storyboard</span>
-          <span>May 14 to June 23, 2026</span>
-          <span>87 source documents</span>
+          <span>May 14 to June 25, 2026</span>
+          <span>109 turn docs plus 7 epics</span>
         </div>
         <h1>How Islandflow turned from a terminal into an evidence pipeline.</h1>
-        <p class="lede">This page reads the turn documents as one story: the UI got quieter, the deploy path got stricter, the team changed remotes and documentation habits, mock routes forced a stronger product shape, and then the synthetic and smart-flow work gave the terminal something more durable to explain.</p>
+        <p class="lede">This page reads the turn documents, implementation phase folders, and Beads epics as one story: the UI got quieter, the deploy path got stricter, terminal.tsx was broken into focused modules, synthetic and smart-flow gave the product explainable evidence, durable tapes became reusable, and the public edge was narrowed around the hosted UI.</p>
       </header>
 
       <div class="metrics" aria-label="Storyboard summary">
-        <div class="metric"><span class="metric-label">Window</span><strong>41 calendar days</strong></div>
+        <div class="metric"><span class="metric-label">Window</span><strong>43 calendar days</strong></div>
         <div class="metric"><span class="metric-label">First move</span><strong>Terminal hardening</strong></div>
-        <div class="metric"><span class="metric-label">Big pivot</span><strong>Mock9 to production routes</strong></div>
-        <div class="metric"><span class="metric-label">End state</span><strong>Smart-flow plus charts</strong></div>
+        <div class="metric"><span class="metric-label">Big refactor</span><strong>terminal.tsx to facade</strong></div>
+        <div class="metric"><span class="metric-label">End state</span><strong>Private edge plus durable tapes</strong></div>
       </div>
 
       <nav aria-label="Storyboard sections">
@@ -426,13 +426,14 @@
           <a class="chip" href="#story">Read the story</a>
           <a class="chip" href="#twists">Twists</a>
           <a class="chip" href="#timeline">Timeline</a>
+          <a class="chip" href="#epics">Epics</a>
           <a class="chip" href="#ledger">Source ledger</a>
         </div>
       </nav>
 
       <section id="story">
         <h2>The Story Arc</h2>
-        <p class="section-intro">The turn docs describe a project that kept discovering where its source of truth needed to move. At first the work was mostly about making the terminal usable. Then the deployment path became the thing to stabilize. Then documentation and CI had to become explicit enough for agents and reviewers. Only after that did the product surface absorb the newer synthetic, smart-flow, and charting systems.</p>
+        <p class="section-intro">The turn docs describe a project that kept discovering where its source of truth needed to move. At first the work was mostly about making the terminal usable. Then the deployment path became the thing to stabilize. Then Beads epics and implementation phase docs became the operating board for multi-PR streams. Only after that did the product surface absorb synthetic data, smart-flow, terminal extraction, charting, durable tape modules, performance budgets, and private-edge hardening.</p>
 
         <div class="phase">
           <div>
@@ -538,9 +539,12 @@
           </div>
           <div class="phase-copy">
             <h3>Synthetic data and smart-flow matured in parallel.</h3>
-            <p>Then the story moved below the UI. Synthetic market data began with a deterministic spine: seeded profiles, canonical event wrappers, provenance outside payloads, stable ordering, and infra-free tests. It became manifests and fixtures, then scenarios and labels, then replay integration, demo profiles, and hosted controls. In parallel, smart-flow moved from contracts to evidence facts, clustering, score vectors, abstention, API projections, UI explainability, and chart markers.</p>
-            <p>The recurring choice was to keep truth outside the wrong place. Labels stayed outside emitted market events. Provenance lived by trace ID. Smart-flow projections became canonical, while legacy smart-money streams stayed as fallback. The UI went beyond displaying a new feed and learned to show cautious hypotheses with evidence handles and abstention details.</p>
+            <p>Then the story moved below the UI. The Beads epics <code>islandflow-259</code> and <code>islandflow-zxh</code> split the synthetic and smart-flow plans into a dependency chain: synthetic phase 01 and smart-flow contracts could run in parallel, then fixtures unblocked evidence clustering, labels unblocked scoring, replay unblocked golden tests, and demo profiles unblocked API/UI explainability.</p>
+            <p>Synthetic market data began with a deterministic spine: seeded profiles, canonical event wrappers, provenance outside payloads, stable ordering, and infra-free tests. It became manifests and fixtures, then scenarios and labels, then replay integration, demo profiles, and hosted controls. In parallel, smart-flow moved from contracts to evidence facts, clustering, score vectors, abstention, API projections, UI explainability, and chart markers.</p>
+            <p>The recurring choice was to keep truth outside the wrong place. Labels stayed outside emitted market events. Provenance lived by trace ID. Smart-flow projections became canonical, while legacy smart-money streams stayed as fallback. The two epics remain open only because their future calibration phases are intentionally out of the MVP path.</p>
             <div class="doc-strip">
+              <a class="doc-link" href="../implementation/synthetic-market-data/00-roadmap.md">synthetic roadmap</a>
+              <a class="doc-link" href="../implementation/smart-money/00-roadmap.md">smart-flow roadmap</a>
               <a class="doc-link" href="2026-06-17-1334-synthetic-deterministic-spine.html">synthetic spine</a>
               <a class="doc-link" href="2026-06-17-1621-synthetic-prints-phase-02-manifests-fixtures-cli.html">fixtures cli</a>
               <a class="doc-link" href="2026-06-17-1800-synthetic-phase-03-scenarios-labels-expected-outputs.html">phase 03</a>
@@ -553,19 +557,102 @@
 
         <div class="phase">
           <div>
-            <p class="phase-kicker">Closeout</p>
-            <div class="phase-window">June 21 to June 23</div>
+            <p class="phase-kicker">Structural refactor</p>
+            <div class="phase-window">June 20</div>
           </div>
           <div class="phase-copy">
-            <h3>The chart became a reusable instrument, then the tapes got their example route.</h3>
-            <p>Finally, charting became its own implementation stream. The lightweight-charts work started with reusable foundations, then added timeframes, replaced the dashboard chart, added settings and lower-pane modes, hardened hover readouts, and closed with browser QA against the hosted backend. One residual issue remained, stale chart data under nonmatching ticker filters, and it was filed instead of being buried.</p>
-            <p>The most recent turn then exposed a hidden durable-tapes example route. It tied Options, Flow Packets, Equities, News, and Alerts into one existing terminal state model, a fitting end point for the folder: the story began with a terminal that needed to survive real use, and ends with reusable tape modules arranged for inspection.</p>
+            <h3>terminal.tsx stopped being the terminal.</h3>
+            <p>Then we faced the file that had been absorbing too much of the product. The terminal-refactor epic <code>islandflow-e30y</code> turned <code>apps/web/app/terminal.tsx</code> from an 11,107-line route-and-terminal implementation into a 159-line compatibility facade. The point was not aesthetic cleanup. It was to make future terminal, chart, and tape work survivable.</p>
+            <p>The six phases were deliberately mechanical: extract pure helpers first, then data hooks, then state and shell, then rendered UI groups, then retired route code, then final verification. The compatibility facade stayed intact until cleanup proved what could be removed. The refactor created 21 focused terminal feature modules while preserving supported routes, <code>/tape</code> compatibility, replay data mode, mock bypasses, and smart-money fallback behavior.</p>
             <div class="doc-strip">
+              <a class="doc-link" href="../implementation/terminal-refactor/00-roadmap.md">terminal roadmap</a>
+              <a class="doc-link" href="../implementation/terminal-refactor/IMPLEMENT.md">terminal implement</a>
+              <a class="doc-link" href="terminal-refactor.html">closeout doc</a>
+              <a class="doc-link" href="../implementation/terminal-refactor/01-scaffold-pure-utilities.md">pure helpers</a>
+              <a class="doc-link" href="../implementation/terminal-refactor/02-data-hooks.md">data hooks</a>
+              <a class="doc-link" href="../implementation/terminal-refactor/04-ui-components.md">ui extraction</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div>
+            <p class="phase-kicker">Chart stream</p>
+            <div class="phase-window">June 21</div>
+          </div>
+          <div class="phase-copy">
+            <h3>The chart became a reusable instrument.</h3>
+            <p>After terminal extraction, charting became a closed implementation epic of its own. The lightweight-charts stream <code>islandflow-mloi</code> moved the dashboard away from a terminal-specific chart pane into <code>apps/web/features/market-chart</code>, upgraded the chart dependency, added typed extension points, made timeframes and 15m candles first-class, replaced the dashboard adapter, added settings and lower-pane modes, and hardened hover readouts.</p>
+            <p>This mattered because smart-flow evidence needed a chart surface that could carry overlays, markers, flow context, lower-pane modes, and hover evidence without importing terminal state. The final phase closed with tests, browser QA against the hosted backend, a boundary audit, and a follow-up for stale invalid-ticker chart state.</p>
+            <div class="doc-strip">
+              <a class="doc-link" href="../implementation/lightweight-charts/IMPLEMENT.md">chart implement</a>
               <a class="doc-link" href="2026-06-21-lightweight-charts-phase-01-foundation.html">chart foundation</a>
+              <a class="doc-link" href="2026-06-21-lightweight-charts-phase-02-timeframes.html">timeframes</a>
               <a class="doc-link" href="2026-06-21-lightweight-charts-phase-03-dashboard-replacement.html">dashboard chart</a>
+              <a class="doc-link" href="2026-06-21-lightweight-charts-phase-04-settings-lower-pane.html">settings</a>
               <a class="doc-link" href="2026-06-21-lightweight-charts-phase-05-hover-readout-visual-hardening.html">hover hardening</a>
               <a class="doc-link" href="2026-06-21-lightweight-charts-phase-06-final-verification.html">final verification</a>
-              <a class="doc-link" href="2026-06-23-durable-tapes-example-route.html">durable tapes</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div>
+            <p class="phase-kicker">Module family</p>
+            <div class="phase-window">June 22 to June 23</div>
+          </div>
+          <div class="phase-copy">
+            <h3>The tapes stopped being terminal attachments.</h3>
+            <p>Then the durable-tapes epic <code>islandflow-h9c0</code> turned tape behavior into a reusable module family. The shared foundation extracted hot-cache plus ClickHouse history composition, cursor selection, scroll-hold behavior, responsive templates, row keys, and virtual list primitives. Domain modules followed: Options, Flow Packets, News Wire, Equities, and Alerts.</p>
+            <p>The key architectural move was callback ownership. Options could focus packets, alerts could link to packet/options/equity evidence, news could live on more than one route, and equities could expose ticker/print inspection without every module importing terminal state. The route-composition phase then assembled the modules and the later example route showed all five tapes working together through existing terminal state.</p>
+            <div class="doc-strip">
+              <a class="doc-link" href="../implementation/durable-tapes/IMPLEMENT.md">durable implement</a>
+              <a class="doc-link" href="../implementation/durable-tapes/01-shared-foundation.md">shared foundation</a>
+              <a class="doc-link" href="../implementation/durable-tapes/02-options-tape.md">options tape</a>
+              <a class="doc-link" href="../implementation/durable-tapes/03-flow-packets.md">flow packets</a>
+              <a class="doc-link" href="../implementation/durable-tapes/04-news-wire.md">news wire</a>
+              <a class="doc-link" href="../implementation/durable-tapes/06-alerts-module.md">alerts</a>
+              <a class="doc-link" href="2026-06-23-durable-tapes-example-route.html">example route</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div>
+            <p class="phase-kicker">Performance fire drill</p>
+            <div class="phase-window">June 24</div>
+          </div>
+          <div class="phase-copy">
+            <h3>/durable-tapes was made viable on low-power clients.</h3>
+            <p>After the module family landed, the performance epic <code>islandflow-ze79</code> found the next problem: the route could render the right panes while still melting the browser with support/evidence request storms and hot-path recomputation. Phase 00 first built a CDP probe and recorded red budgets, including thousands of repeated support and by-trace requests.</p>
+            <p>The repairs came in layers: shared hydration scheduling and caches, bounded option-print lookup paths, pane-scoped live-state selectors, incremental live buffers, server-composed durable row view models, and production smoke guardrails. The closeout proved the measured storm was gone during the deployed probe window, with production smoke covering API-origin routing, durable-row websocket support, lookup latency, and browser budgets. A native ClickHouse health mismatch stayed open as a separate follow-up instead of blocking the performance epic.</p>
+            <div class="doc-strip">
+              <a class="doc-link" href="../implementation/durable-tapes-performance/IMPLEMENT.md">perf implement</a>
+              <a class="doc-link" href="../implementation/durable-tapes-performance/00-perf-probe-guardrail.md">probe</a>
+              <a class="doc-link" href="../implementation/durable-tapes-performance/01-hydration-scheduler-cache.md">hydration cache</a>
+              <a class="doc-link" href="../implementation/durable-tapes-performance/03-pane-scoped-live-state.md">pane scope</a>
+              <a class="doc-link" href="../implementation/durable-tapes-performance/04-incremental-live-buffers.md">buffers</a>
+              <a class="doc-link" href="../implementation/durable-tapes-performance/05-server-composed-view-models.md">server rows</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="phase">
+          <div>
+            <p class="phase-kicker">Edge hardening</p>
+            <div class="phase-window">June 24 to June 25</div>
+          </div>
+          <div class="phase-copy">
+            <h3>The hosted UI became the public product surface.</h3>
+            <p>The final implementation stream in this slice was API private edge hardening. The epic <code>islandflow-hnbk</code> started with a read-only baseline of the raw API host, same-origin gaps, bundle exposure, NPM state, and direct port reachability. Then it scrubbed active defaults so docs, scripts, tests, and probes stopped teaching developers and agents to hit concrete production API domains by default.</p>
+            <p>After that, production browser transport moved to same-origin REST and websocket paths, server-only Next route handlers got an internal API origin, API rate limiting added REST/lookup/websocket buckets and JSON 429 telemetry, the raw API host was closed through durable proxy/deploy state, and the rollout phase proved the final posture live: app-origin REST and websocket checks passed, the raw API host was closed, direct public port 4000 was unreachable, and the production bundle no longer required the raw API origin.</p>
+            <div class="doc-strip">
+              <a class="doc-link" href="../implementation/api-private-edge/IMPLEMENT.md">private-edge implement</a>
+              <a class="doc-link" href="../implementation/api-private-edge/00-baseline-edge-inventory.md">baseline</a>
+              <a class="doc-link" href="../implementation/api-private-edge/02-same-origin-production-transport.md">same-origin</a>
+              <a class="doc-link" href="../implementation/api-private-edge/03-api-rate-limiting.md">rate limits</a>
+              <a class="doc-link" href="../implementation/api-private-edge/04-raw-api-host-closure.md">raw host closure</a>
+              <a class="doc-link" href="../implementation/api-private-edge/05-production-rollout-closeout.md">rollout</a>
             </div>
           </div>
         </div>
@@ -598,6 +685,18 @@
           <div class="twist">
             <h3>Smart-money became smart-flow projection.</h3>
             <p>The old stream stayed compatible, but the product started preferring canonical explainability projections for tables, drawers, priorities, and chart markers.</p>
+          </div>
+          <div class="twist">
+            <h3>terminal.tsx became a facade.</h3>
+            <p>The refactor did not remove behavior first. It preserved imports and routes while extracting helpers, hooks, state, shell, UI, and only then retired unreachable code.</p>
+          </div>
+          <div class="twist">
+            <h3>Reusable tapes created a performance problem worth measuring.</h3>
+            <p>The durable tape modules were the right product boundary, then the performance epic proved the browser needed request budgets, pane-scoped subscriptions, and server-composed rows.</p>
+          </div>
+          <div class="twist">
+            <h3>The API became infrastructure, not a public product surface.</h3>
+            <p>The private-edge stream moved production browser traffic to same-origin paths, rate-limited public access, and closed direct raw-host usage after live verification.</p>
           </div>
         </div>
       </section>
@@ -655,13 +754,98 @@
             <div class="doc-count">18 docs</div>
           </div>
           <div class="timeline-row">
-            <div class="timeline-date">Jun 21 to 23</div>
+            <div class="timeline-date">Jun 20</div>
             <div>
-              <div class="timeline-title">Charts become reusable, and tapes become demonstrable.</div>
-              <div class="timeline-note">The lightweight chart stream closes with verification, then the durable-tapes example route exposes the terminal modules as a composed inspection surface.</div>
+              <div class="timeline-title">terminal.tsx is split into focused modules.</div>
+              <div class="timeline-note">The terminal-refactor epic closes six phases, turning an 11k-line implementation file into a small compatibility facade backed by terminal feature modules.</div>
             </div>
-            <div class="doc-count">8 docs</div>
+            <div class="doc-count">1 closeout plus 8 phase docs</div>
           </div>
+          <div class="timeline-row">
+            <div class="timeline-date">Jun 21</div>
+            <div>
+              <div class="timeline-title">Charts become reusable.</div>
+              <div class="timeline-note">The lightweight-charts epic closes after chart foundations, timeframes, dashboard replacement, settings, hover readout, and final verification.</div>
+            </div>
+            <div class="doc-count">6 docs plus epic</div>
+          </div>
+          <div class="timeline-row">
+            <div class="timeline-date">Jun 22 to 23</div>
+            <div>
+              <div class="timeline-title">Durable tapes become a module family.</div>
+              <div class="timeline-note">The durable-tapes epic extracts shared mechanics and domain modules for options, flow packets, news, equities, and alerts, then composes the route.</div>
+            </div>
+            <div class="doc-count">9 turn docs plus plan</div>
+          </div>
+          <div class="timeline-row">
+            <div class="timeline-date">Jun 24</div>
+            <div>
+              <div class="timeline-title">The durable-tapes performance storm gets measured and fixed.</div>
+              <div class="timeline-note">The performance epic starts with red CDP budgets and closes with hydration caches, bounded lookups, pane-scoped subscriptions, live buffers, server rows, and deployed smoke evidence.</div>
+            </div>
+            <div class="doc-count">7 turn docs plus baselines</div>
+          </div>
+          <div class="timeline-row">
+            <div class="timeline-date">Jun 24 to 25</div>
+            <div>
+              <div class="timeline-title">The public edge narrows around the hosted UI.</div>
+              <div class="timeline-note">The API private-edge epic moves production browser transport to same-origin paths, adds rate limits, closes the raw API host, and verifies the final live posture.</div>
+            </div>
+            <div class="doc-count">6 turn docs plus epic</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="epics">
+        <h2>Beads Epic Map</h2>
+        <p class="section-intro">The implementation docs are organized around Beads epics. This map shows which arcs are fully closed and which remain open only because their future calibration phases are intentionally outside the MVP path.</p>
+        <div class="ledger">
+          <table>
+            <thead>
+              <tr>
+                <th>Epic</th>
+                <th>Status</th>
+                <th>Story meaning</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>islandflow-259</code></td>
+                <td>In progress, 5 of 6 complete</td>
+                <td>Synthetic market-data phases 01 through 05 are complete. Future historical calibration remains open as <code>islandflow-259.6</code> and does not block the MVP chain.</td>
+              </tr>
+              <tr>
+                <td><code>islandflow-zxh</code></td>
+                <td>In progress, 5 of 6 complete</td>
+                <td>Smart-flow contracts, evidence clustering, scoring/abstention, replay golden tests, and API/UI explainability are complete. Future calibration remains open as <code>islandflow-zxh.6</code>.</td>
+              </tr>
+              <tr>
+                <td><code>islandflow-e30y</code></td>
+                <td>Closed, 6 of 6 complete</td>
+                <td>The staged terminal.tsx refactor is complete: pure helpers, data hooks, state/shell, UI components, cleanup, and final verification all merged.</td>
+              </tr>
+              <tr>
+                <td><code>islandflow-mloi</code></td>
+                <td>Closed, 6 of 6 complete</td>
+                <td>The reusable lightweight-charts market chart module is complete, with one follow-up for stale invalid-ticker chart data tracked separately.</td>
+              </tr>
+              <tr>
+                <td><code>islandflow-h9c0</code></td>
+                <td>Closed, 10 of 10 complete</td>
+                <td>The durable reusable tape module stream is complete, including shared mechanics, domain modules, route composition, and reviewer guidance.</td>
+              </tr>
+              <tr>
+                <td><code>islandflow-ze79</code></td>
+                <td>Closed, 11 of 11 complete</td>
+                <td>The durable-tapes performance hardening stream is complete. Deployed smoke and CDP evidence show the support/evidence request storm is gone during the measured window.</td>
+              </tr>
+              <tr>
+                <td><code>islandflow-hnbk</code></td>
+                <td>Closed</td>
+                <td>The API private-edge stream is complete: active defaults are scrubbed, production uses same-origin transport, rate limits are enabled, and the raw API host is closed.</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
 
@@ -822,25 +1006,82 @@
                 <td>Replay, golden tests, projections, terminal explainability, and chart integration.</td>
               </tr>
               <tr>
-                <td>Jun 21 to 23</td>
+                <td>Jun 20</td>
+                <td>
+                  <a href="terminal-refactor.html">Terminal Refactor Closeout</a>,
+                  <a href="../implementation/terminal-refactor/00-roadmap.md">Terminal Refactor Roadmap</a>,
+                  <a href="../implementation/terminal-refactor/01-scaffold-pure-utilities.md">Phase 01: Pure Utilities</a>,
+                  <a href="../implementation/terminal-refactor/02-data-hooks.md">Phase 02: Data Hooks</a>,
+                  <a href="../implementation/terminal-refactor/03-state-shell.md">Phase 03: State and Shell</a>,
+                  <a href="../implementation/terminal-refactor/04-ui-components.md">Phase 04: UI Components</a>,
+                  <a href="../implementation/terminal-refactor/05-cleanup-retired-code.md">Phase 05: Cleanup</a>,
+                  <a href="../implementation/terminal-refactor/06-final-verification.md">Phase 06: Final Verification</a>
+                </td>
+                <td>Beads epic <code>islandflow-e30y</code>: terminal.tsx staged refactor from implementation file to facade.</td>
+              </tr>
+              <tr>
+                <td>Jun 21</td>
                 <td>
                   <a href="2026-06-21-1923-fix-synthetic-1m-candles.html">Fix Synthetic 1m Candles</a>,
                   <a href="2026-06-21-fix-tar-cve-2026-53655.html">Fix tar CVE-2026-53655</a>,
+                  <a href="../implementation/lightweight-charts/IMPLEMENT.md">Lightweight Charts Implementation Guide</a>,
                   <a href="2026-06-21-lightweight-charts-phase-01-foundation.html">Lightweight Charts Phase 01</a>,
                   <a href="2026-06-21-lightweight-charts-phase-02-timeframes.html">Lightweight Charts Phase 02</a>,
                   <a href="2026-06-21-lightweight-charts-phase-03-dashboard-replacement.html">Lightweight Charts Phase 03</a>,
                   <a href="2026-06-21-lightweight-charts-phase-04-settings-lower-pane.html">Lightweight Charts Phase 04</a>,
                   <a href="2026-06-21-lightweight-charts-phase-05-hover-readout-visual-hardening.html">Lightweight Charts Phase 05</a>,
-                  <a href="2026-06-21-lightweight-charts-phase-06-final-verification.html">Lightweight Charts Phase 06</a>,
-                  <a href="2026-06-23-durable-tapes-example-route.html">Durable Tapes Example Route</a>,
-                  <a href="terminal-refactor.html">Terminal Refactor Closeout</a>
+                  <a href="2026-06-21-lightweight-charts-phase-06-final-verification.html">Lightweight Charts Phase 06</a>
                 </td>
-                <td>Chart module completion, security cleanup, terminal refactor closeout, and durable tapes example.</td>
+                <td>Beads epic <code>islandflow-mloi</code>: reusable market-chart module and dashboard replacement.</td>
+              </tr>
+              <tr>
+                <td>Jun 22 to 23</td>
+                <td>
+                  <a href="../implementation/durable-tapes/IMPLEMENT.md">Durable Tapes Implementation Guide</a>,
+                  <a href="../implementation/durable-tapes/turn-docs/2026-06-22-phase-01-shared-foundation.html">Phase 01 Shared Foundation</a>,
+                  <a href="../implementation/durable-tapes/turn-docs/2026-06-22-phase-02-options-tape.html">Phase 02 Options Tape</a>,
+                  <a href="../implementation/durable-tapes/turn-docs/2026-06-22-phase-03-flow-packets.html">Phase 03 Flow Packets</a>,
+                  <a href="../implementation/durable-tapes/turn-docs/2026-06-22-phase-04-news-wire.html">Phase 04 News Wire</a>,
+                  <a href="../implementation/durable-tapes/turn-docs/2026-06-22-phase-05-equities-tape.html">Phase 05 Equities Tape</a>,
+                  <a href="../implementation/durable-tapes/turn-docs/2026-06-22-web-dev-port-cors-qa.html">Web Dev Port CORS QA</a>,
+                  <a href="../implementation/durable-tapes/turn-docs/2026-06-23-empty-history-backfill.html">Empty History Backfill</a>,
+                  <a href="../implementation/durable-tapes/turn-docs/2026-06-23-phase-06-alerts-module.html">Phase 06 Alerts Module</a>,
+                  <a href="../implementation/durable-tapes/turn-docs/2026-06-23-phase-07-route-composition-closeout.html">Phase 07 Route Composition</a>,
+                  <a href="2026-06-23-durable-tapes-example-route.html">Durable Tapes Example Route</a>
+                </td>
+                <td>Beads epic <code>islandflow-h9c0</code>: reusable durable tape modules and route composition.</td>
+              </tr>
+              <tr>
+                <td>Jun 24</td>
+                <td>
+                  <a href="../implementation/durable-tapes-performance/IMPLEMENT.md">Durable-Tapes Performance Guide</a>,
+                  <a href="../implementation/durable-tapes-performance/turn-docs/2026-06-24-phase-00-perf-probe.html">Phase 00 Perf Probe</a>,
+                  <a href="../implementation/durable-tapes-performance/turn-docs/2026-06-24-phase-01-hydration-scheduler-cache.html">Phase 01 Hydration Scheduler</a>,
+                  <a href="../implementation/durable-tapes-performance/turn-docs/2026-06-24-phase-02-option-prints-bounds.html">Phase 02 Option Prints Bounds</a>,
+                  <a href="../implementation/durable-tapes-performance/turn-docs/2026-06-24-phase-03-pane-scoped-live-state.html">Phase 03 Pane-Scoped State</a>,
+                  <a href="../implementation/durable-tapes-performance/turn-docs/2026-06-24-phase-04-incremental-live-buffers.html">Phase 04 Incremental Buffers</a>,
+                  <a href="../implementation/durable-tapes-performance/turn-docs/2026-06-24-phase-05-server-composed-view-models.html">Phase 05 Server Rows</a>,
+                  <a href="../implementation/durable-tapes-performance/turn-docs/2026-06-24-phase-06-production-hardening-closeout.html">Phase 06 Production Closeout</a>
+                </td>
+                <td>Beads epic <code>islandflow-ze79</code>: performance budgets, request storm repair, and production guardrails.</td>
+              </tr>
+              <tr>
+                <td>Jun 24 to 25</td>
+                <td>
+                  <a href="../implementation/api-private-edge/IMPLEMENT.md">API Private Edge Implementation Guide</a>,
+                  <a href="../implementation/api-private-edge/turn-docs/2026-06-24-phase-00-baseline-edge-inventory.html">Phase 00 Baseline</a>,
+                  <a href="../implementation/api-private-edge/turn-docs/2026-06-24-phase-01-active-domain-scrub.html">Phase 01 Domain Scrub</a>,
+                  <a href="../implementation/api-private-edge/turn-docs/2026-06-25-phase-02-same-origin-production-transport.html">Phase 02 Same-Origin Transport</a>,
+                  <a href="../implementation/api-private-edge/turn-docs/2026-06-25-phase-03-api-rate-limiting.html">Phase 03 Rate Limiting</a>,
+                  <a href="../implementation/api-private-edge/turn-docs/2026-06-25-phase-04-raw-api-host-closure.html">Phase 04 Raw Host Closure</a>,
+                  <a href="../implementation/api-private-edge/turn-docs/2026-06-25-phase-05-production-rollout-closeout.html">Phase 05 Rollout Closeout</a>
+                </td>
+                <td>Beads epic <code>islandflow-hnbk</code>: same-origin production transport, rate limits, raw API closure, and live verification.</td>
               </tr>
             </tbody>
           </table>
         </div>
-        <p class="small">The file list was synthesized from the current contents of <code>docs/turns</code>. Duplicate ClickHouse context docs are kept in the ledger because both exist in the folder.</p>
+        <p class="small">The ledger was synthesized from <code>docs/turns</code>, implementation stream folders under <code>docs/implementation</code>, and the Beads epics named in <code>docs/implementation/README.md</code>. Duplicate ClickHouse context docs are kept because both exist in the folder.</p>
       </section>
     </main>
   </body>
