@@ -23,5 +23,9 @@ echo "Restarting Docker Islandflow runtime."
 )
 
 curl -I -fksS "${DEPLOY_PUBLIC_APP_URL:?Set DEPLOY_PUBLIC_APP_URL to <production-app-origin>}" >/dev/null
-curl -fksS "${DEPLOY_PUBLIC_API_HEALTH_URL:?Set DEPLOY_PUBLIC_API_HEALTH_URL to <raw-api-origin>/health}" >/dev/null
+curl -fksS "${DEPLOY_INTERNAL_API_HEALTH_URL:-http://127.0.0.1:4000/health}" >/dev/null
+
+if [[ "${ISLANDFLOW_RAW_API_MODE:-closed}" == "temporary-open" ]]; then
+  curl -fksS "${DEPLOY_PUBLIC_API_HEALTH_URL:?Set DEPLOY_PUBLIC_API_HEALTH_URL to <raw-api-origin>/health for temporary raw API reopen validation}" >/dev/null
+fi
 echo "Rollback validation passed."

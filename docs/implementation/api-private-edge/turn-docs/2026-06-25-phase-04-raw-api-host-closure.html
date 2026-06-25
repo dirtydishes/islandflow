@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>API Private Edge Phase 04 Raw API Host Closure</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #07090c;
+        --panel: #101820;
+        --panel-2: #0b1117;
+        --text: #e8eef5;
+        --dim: #9aa9b8;
+        --green: #31c27c;
+        --amber: #f0a83a;
+        --red: #ff6b5f;
+        --blue: #62a8ff;
+        --border: #ffffff18;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.55 ui-sans-serif, system-ui, sans-serif;
+      }
+
+      main {
+        width: min(1180px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 40px 0 72px;
+      }
+
+      header,
+      section {
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+        background: var(--panel);
+        padding: 20px 0;
+      }
+
+      section {
+        margin-top: 18px;
+      }
+
+      h1,
+      h2,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        margin-bottom: 8px;
+        font: 700 1.65rem/1.15 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      h2 {
+        margin-bottom: 12px;
+        color: var(--amber);
+        font: 700 0.78rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      p,
+      li,
+      td {
+        color: var(--dim);
+      }
+
+      code {
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 1px 5px;
+        background: #ffffff0a;
+        color: var(--text);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--panel-2);
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--border);
+        padding: 9px 10px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--text);
+        font: 700 0.72rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .kicker {
+        margin-bottom: 10px;
+        color: var(--amber);
+        font: 700 0.72rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 12px;
+      }
+
+      .tile {
+        border: 1px solid var(--border);
+        background: var(--panel-2);
+        padding: 12px;
+      }
+
+      .ok {
+        color: var(--green);
+      }
+
+      .warn {
+        color: var(--red);
+      }
+
+      .note {
+        color: var(--blue);
+      }
+
+      pre {
+        overflow-x: auto;
+        margin: 0;
+        border: 1px solid var(--border);
+        background: #05080c;
+        padding: 12px;
+        color: var(--text);
+        font: 0.78rem/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .diff-card {
+        border: 1px solid var(--border);
+        background: #070b10;
+      }
+
+      .diff-mount {
+        display: none;
+      }
+
+      .diff-card.rendered .diff-mount {
+        display: block;
+      }
+
+      .diff-card.rendered .diff-fallback {
+        display: none;
+      }
+
+      .diff-fallback {
+        border: 0;
+      }
+
+      .diff-fallback code {
+        border: 0;
+        padding: 0;
+        background: transparent;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="kicker">Turn documentation | June 25, 2026</div>
+        <h1>API Private Edge Phase 04 Raw API Host Closure</h1>
+        <p>
+          Phase 04 for <code>islandflow-hnbk.5</code> closes the direct raw API proxy host by default while preserving
+          app-origin REST and websocket routing through <code>&lt;production-app-origin&gt;</code>.
+        </p>
+      </header>
+
+      <section>
+        <h2>Outcome</h2>
+        <div class="grid">
+          <div class="tile">
+            <strong class="ok">Raw host closed</strong>
+            <p>
+              The NPM raw API proxy host is disabled in database state, websocket upgrades are disabled there, and the
+              generated raw proxy config is removed so stale config cannot keep serving direct API traffic.
+            </p>
+          </div>
+          <div class="tile">
+            <strong class="ok">Same-origin preserved</strong>
+            <p>
+              The app proxy host keeps the full API prefix matcher for REST and <code>/ws/live</code>, and generated app
+              config is synchronized with the durable DB matcher when the helper runs.
+            </p>
+          </div>
+          <div class="tile">
+            <strong class="ok">Rollback explicit</strong>
+            <p>
+              Raw public API reopen now requires <code>ISLANDFLOW_RAW_API_MODE=temporary-open</code> or
+              <code>--raw-api=temporary-open</code>. Runtime rollback back to Docker does not reopen it by default.
+            </p>
+          </div>
+          <div class="tile">
+            <strong class="ok">Live verified</strong>
+            <p>
+              Redacted live probes showed internal API health still works, app-origin API routes and websocket pass, and
+              raw-host health, market REST, and websocket upgrade probes do not reach the API.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Changed Files</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Area</th>
+              <th>Files</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>NPM helper</td>
+              <td>
+                <code>deployment/native/switch-npm-edge.sh</code>,
+                <code>deployment/native/switch-npm-edge.test.ts</code>
+              </td>
+            </tr>
+            <tr>
+              <td>Rollback and operator docs</td>
+              <td>
+                <code>deployment/native/full-rollback.sh</code>,
+                <code>deployment/native/README.md</code>,
+                <code>deployment/docker/README.md</code>,
+                <code>docs/implementation/api-private-edge/04-raw-api-host-closure.md</code>
+              </td>
+            </tr>
+            <tr>
+              <td>Verification probe</td>
+              <td><code>scripts/check-public-api-routes.ts</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Live Evidence</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Check</th>
+              <th>Result</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>NPM DB state</td>
+              <td class="ok">pass</td>
+              <td>
+                App proxy host enabled with websocket support and full API matcher. Raw API proxy host disabled,
+                websocket support disabled, forward target parked at loopback discard port, and generated raw config
+                absent.
+              </td>
+            </tr>
+            <tr>
+              <td>Internal API access</td>
+              <td class="ok">pass</td>
+              <td><code>&lt;internal-api-origin&gt;/health</code> returned healthy API JSON from the server-local path.</td>
+            </tr>
+            <tr>
+              <td>App-origin route suite</td>
+              <td class="ok">pass</td>
+              <td>
+                <code>bun run scripts/check-public-api-routes.ts &lt;production-app-origin&gt;</code> passed all REST
+                prefix checks and <code>/ws/live</code>.
+              </td>
+            </tr>
+            <tr>
+              <td>Raw host negative probes</td>
+              <td class="ok">pass</td>
+              <td>
+                <code>&lt;raw-api-origin&gt;/health</code>, market-data REST, and websocket upgrade probes returned
+                TLS/SNI failure with HTTP <code>000</code>; no API JSON or <code>101 Switching Protocols</code> was
+                observed.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Command</th>
+              <th>Result</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="ok">pass</td>
+              <td>
+                <code>bun test deployment/native/switch-npm-edge.test.ts apps/web/features/api-transport.test.ts apps/web/app/api/admin/synthetic</code>
+              </td>
+              <td>12 tests passed.</td>
+            </tr>
+            <tr>
+              <td class="ok">pass</td>
+              <td>
+                <code>bash -n deployment/native/switch-npm-edge.sh deployment/native/full-rollback.sh deployment/native/cutover.sh deployment/native/rollback.sh</code>
+              </td>
+              <td>Shell syntax checks passed.</td>
+            </tr>
+            <tr>
+              <td class="ok">pass</td>
+              <td><code>bunx biome check deployment/native/switch-npm-edge.test.ts scripts/check-public-api-routes.ts</code></td>
+              <td>Biome reported no issues.</td>
+            </tr>
+            <tr>
+              <td class="ok">pass</td>
+              <td><code>git diff --check</code></td>
+              <td>No whitespace errors in the patch.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Helper Fan-In</h2>
+        <ul>
+          <li>NPM helper and regeneration scouts both identified <code>switch-npm-edge.sh</code> as the durable control point and warned that native and Docker switches could otherwise reopen the raw host.</li>
+          <li>Same-origin scout confirmed the app-origin matcher and browser transport must remain untouched, and noted the public route checker should use valid route parameters.</li>
+          <li>Rollback scout identified <code>full-rollback.sh</code> as coupled to public raw API health and recommended separate temporary-open semantics.</li>
+          <li>Verification scout supplied the negative raw-host and positive app-origin/internal access matrix used for live evidence.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p>
+          This section keeps the standard HTML unified diff visible by default. If browser module loading succeeds, the
+          same patch is rendered with <code>PatchDiff</code> from browser-side <code>@pierre/diffs/react</code>.
+        </p>
+        <div class="diff-card" data-patch-diff>
+          <div class="diff-mount" aria-label="Rendered diff"></div>
+          <pre class="diff-fallback"><code>diff --git a/deployment/native/switch-npm-edge.sh b/deployment/native/switch-npm-edge.sh
++raw_api_mode="${ISLANDFLOW_RAW_API_MODE:-closed}"
++# accepted values: closed, temporary-open
++
++if raw_api_mode == "temporary-open":
++    update raw proxy host to API upstream with websocket upgrades enabled
++else:
++    disable raw proxy host, disable websocket upgrades, park forward target at 127.0.0.1:9
++
++replace_api_location(text, app_advanced_config)
++# generated app config now receives the full same-origin matcher from DB state
+
+diff --git a/deployment/native/full-rollback.sh b/deployment/native/full-rollback.sh
+-curl -fksS "${DEPLOY_PUBLIC_API_HEALTH_URL:?Set DEPLOY_PUBLIC_API_HEALTH_URL to &lt;raw-api-origin&gt;/health}" &gt;/dev/null
++curl -fksS "${DEPLOY_INTERNAL_API_HEALTH_URL:-http://127.0.0.1:4000/health}" &gt;/dev/null
++if [[ "${ISLANDFLOW_RAW_API_MODE:-closed}" == "temporary-open" ]]; then
++  curl -fksS "${DEPLOY_PUBLIC_API_HEALTH_URL:?Set DEPLOY_PUBLIC_API_HEALTH_URL to &lt;raw-api-origin&gt;/health for temporary raw API reopen validation}" &gt;/dev/null
++fi
+
+diff --git a/scripts/check-public-api-routes.ts b/scripts/check-public-api-routes.ts
+-  { path: "/candles/equities?limit=1", expectJson: true },
++  { path: "/candles/equities?underlying_id=SPY&amp;interval_ms=60000&amp;limit=1", expectJson: true },</code></pre>
+        </div>
+      </section>
+
+      <section>
+        <h2>Risks</h2>
+        <ul>
+          <li>Raw-host closure now depends on NPM DB state plus generated config sync. The helper covers both, and live NPM was updated through the container because the host-mounted DB is root-owned.</li>
+          <li>Raw host behavior is currently TLS/SNI failure, not a pretty 404 page. This satisfies the closed/no-JSON/no-upgrade posture.</li>
+          <li>Do not set <code>DEPLOY_PUBLIC_API_HEALTH_URL</code> in normal same-origin deploys. It is now only appropriate for a deliberate temporary raw-host reopen.</li>
+        </ul>
+      </section>
+    </main>
+    <script type="module">
+      import React from "https://esm.sh/react@19";
+      import { createRoot } from "https://esm.sh/react-dom@19/client";
+      import { PatchDiff } from "https://esm.sh/@pierre/diffs@1.2.2/react?deps=react@19,react-dom@19";
+
+      for (const card of document.querySelectorAll("[data-patch-diff]")) {
+        const source = card.querySelector(".diff-fallback code");
+        const target = card.querySelector(".diff-mount");
+        if (!source || !target) continue;
+        try {
+          createRoot(target).render(React.createElement(PatchDiff, { patch: source.textContent || "" }));
+          card.classList.add("rendered");
+        } catch (error) {
+          console.warn("Rich diff renderer failed; keeping HTML fallback.", error);
+        }
+      }
+    </script>
+  </body>
+</html>
