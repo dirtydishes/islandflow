@@ -281,6 +281,10 @@
             <strong>Follow-up: chart candles needed dedupe</strong>
             <p>After the fixture removal deployed, browser verification showed fresh <code>/candles/equities</code> responses but a lightweight-charts <code>Value is null</code> exception. The current 300-row SPY window contained a duplicate minute timestamp, which chart data must collapse before rendering.</p>
           </div>
+          <div class="finding">
+            <strong>Follow-up: synthetic SPY regimes were mixed</strong>
+            <p>Live SPY candles also contained background prints near <code>182</code> and phase03 demo prints near <code>500</code> under the same <code>underlying_id</code>. The chart now rejects extreme intrabar range outliers; <code>islandflow-vqut</code> tracks the source-side feed cleanup.</p>
+          </div>
         </div>
       </section>
 
@@ -294,6 +298,7 @@
           <li>Changed <code>/qa</code> route features so the route subscribes to the live feeds it renders: options, NBBO, equities, flow, news, alerts, smart-flow, durable rows, and equity candles.</li>
           <li>Rewired <code>DurableTapesQaRoute</code> to feed its template matrix from live terminal selectors and REST-bootstrapped/live chart candles instead of the static 10:30 fixture arrays.</li>
           <li>Hardened shared market-chart candle normalization so chart inputs are finite, sorted, and unique by chart time, keeping the latest aggregate when duplicate timestamps arrive.</li>
+          <li>Added an intrabar range guard so mixed-regime synthetic candles cannot flatten chart autoscale while the source-side feed cleanup is pending.</li>
         </ul>
       </section>
 
@@ -305,6 +310,7 @@
           <div class="check"><strong>Passed</strong><p><code>bun --cwd=apps/web run build</code>, Next.js production build.</p></div>
           <div class="check"><strong>Passed</strong><p><code>bun test apps/web/app/terminal.test.ts</code>, including the updated <code>/qa</code> live manifest and route feature assertions.</p></div>
           <div class="check"><strong>Passed</strong><p><code>bun test apps/web/features/market-chart/transforms/candles.test.ts apps/web/app/terminal.test.ts</code>, including duplicate candle-time regression coverage.</p></div>
+          <div class="check"><strong>Passed</strong><p><code>bun test apps/web/features/market-chart/transforms/candles.test.ts apps/web/app/terminal.test.ts</code>, including intrabar range outlier regression coverage.</p></div>
           <div class="check"><strong>Passed</strong><p><code>bunx biome check</code> on the touched web files after formatting.</p></div>
           <div class="check"><strong>Passed</strong><p>Deployed CDP verification confirmed <code>/qa</code> fetches fresh candle data and live tape rows in Eastern time; no <code>10:30</code> fixture text remains in the hydrated page.</p></div>
           <div class="check warn"><strong>Existing repo issue</strong><p><code>bun run check</code> still fails on unrelated pre-existing Biome import-order diagnostics outside this change set.</p></div>
