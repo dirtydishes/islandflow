@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Smart-Flow Alerts Phase 01 Tint Foundation</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #0d141b;
+        --panel-2: #111820;
+        --line: rgba(230, 237, 244, 0.14);
+        --line-strong: rgba(245, 166, 35, 0.36);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --green: #25c17a;
+        --blue: #4da3ff;
+        --red: #ff6b5f;
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.55 var(--sans);
+      }
+
+      main {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+
+      header {
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      .label,
+      h2,
+      code,
+      pre {
+        font-family: var(--mono);
+      }
+
+      .label {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--faint);
+        font-size: 0.66rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 920px;
+        font-size: 2rem;
+        line-height: 1.1;
+        letter-spacing: 0;
+        text-wrap: balance;
+      }
+
+      .subtitle {
+        max-width: 78ch;
+        margin-top: 12px;
+        color: var(--muted);
+      }
+
+      .meta-grid,
+      .qa-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1px;
+        margin-top: 18px;
+        border: 1px solid var(--line);
+        background: var(--line);
+      }
+
+      .meta-cell,
+      .qa-cell {
+        min-width: 0;
+        padding: 10px 12px;
+        background: var(--panel-2);
+      }
+
+      section {
+        padding: 20px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      h2 {
+        margin-bottom: 10px;
+        color: var(--accent);
+        font-size: 0.9rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      p {
+        max-width: 82ch;
+      }
+
+      p + p {
+        margin-top: 10px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 7px;
+      }
+
+      code {
+        padding: 0.08rem 0.28rem;
+        border: 1px solid rgba(245, 166, 35, 0.18);
+        border-radius: 5px;
+        background: rgba(245, 166, 35, 0.1);
+        color: #ffe0a3;
+        font-size: 0.9em;
+      }
+
+      .ok {
+        color: var(--green);
+      }
+
+      .note {
+        color: var(--blue);
+      }
+
+      .risk {
+        color: var(--red);
+      }
+
+      .diff-panel {
+        display: grid;
+        gap: 12px;
+      }
+
+      .diff-rich {
+        min-height: 32px;
+      }
+
+      .diff-panel[data-rich-ready="true"] .diff-fallback {
+        display: none;
+      }
+
+      .diff-fallback {
+        max-height: 560px;
+        overflow: auto;
+        margin: 0;
+        padding: 12px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--text);
+        font-size: 0.76rem;
+        line-height: 1.45;
+      }
+
+      .diff-note,
+      .qa-cell span {
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <span class="label">Repository turn document</span>
+        <h1>Smart-Flow Alerts Phase 01 Tint Foundation</h1>
+        <p class="subtitle">
+          Extracted reusable smart-flow tint semantics from Options Tape into a shared frontend
+          module while preserving Options Tape row behavior, durable option row tinting, and the
+          existing runtime contract surface.
+        </p>
+        <div class="meta-grid" aria-label="Turn metadata">
+          <div class="meta-cell"><span class="label">Branch</span>lavender/smart-flow-alerts-01-tint-foundation</div>
+          <div class="meta-cell"><span class="label">Beads</span>islandflow-ghce.1</div>
+          <div class="meta-cell"><span class="label">Scope</span>frontend tint policy refactor</div>
+          <div class="meta-cell"><span class="label">Runtime impact</span>none intended</div>
+        </div>
+      </header>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          Added <code>apps/web/features/smart-flow</code> as the shared home for smart-flow tint
+          types, hypothesis tone mapping, direction normalization, confidence and evidence bands,
+          abstention intensity, classifier intensity style generation, and summary labels.
+        </p>
+        <p>
+          Reworked <code>apps/web/features/options-tape/tinting.ts</code> so Options Tape keeps its
+          evidence ref expansion, direct-print precedence, and <code>options-tape-*</code> class
+          assembly while delegating generic smart-flow presentation policy to the shared module.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changed Files</h2>
+        <ul>
+          <li><code>apps/web/features/smart-flow/tinting.ts</code>: shared tint policy and exported stable types.</li>
+          <li><code>apps/web/features/smart-flow/index.ts</code>: feature-level exports for future consumers.</li>
+          <li><code>apps/web/features/smart-flow/tinting.test.ts</code>: generic tint matrix tests.</li>
+          <li><code>apps/web/features/options-tape/tinting.ts</code>: Options Tape wrapper over the shared policy.</li>
+          <li><code>apps/web/features/options-tape/options-tape.test.ts</code>: narrowed Options Tape tests to row classes and option-specific mapping.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <div class="qa-grid" aria-label="Quality gates">
+          <div class="qa-cell"><span class="label">Beads</span><span class="ok">passed</span><br /> <code>bd show islandflow-ghce.1</code></div>
+          <div class="qa-cell"><span class="label">Shared tint</span><span class="ok">passed</span><br /> <code>bun test apps/web/features/smart-flow</code></div>
+          <div class="qa-cell"><span class="label">Options Tape</span><span class="ok">passed</span><br /> <code>bun test apps/web/features/options-tape</code></div>
+          <div class="qa-cell"><span class="label">Durable Tape</span><span class="ok">passed</span><br /> <code>bun test apps/web/features/durable-tape</code></div>
+          <div class="qa-cell"><span class="label">Web Build</span><span class="ok">passed</span><br /> <code>bun --cwd=apps/web run build</code></div>
+        </div>
+        <p class="subtitle">
+          The Next build rewrote <code>apps/web/next-env.d.ts</code> to point at
+          <code>.next/types</code> during the gate. That generated churn was restored after the
+          passing build so the commit remains scoped to the tint foundation.
+        </p>
+      </section>
+
+      <section>
+        <h2>Risks</h2>
+        <ul>
+          <li><span class="ok">Low:</span> This is presentation-policy extraction only. No alert, API, scoring, live subscription, storage, or runtime payload path was changed.</li>
+          <li><span class="note">Note:</span> The shared module intentionally uses structural string inputs instead of importing <code>@islandflow/types</code>, keeping it frontend-local and row-model independent.</li>
+          <li><span class="note">Note:</span> No helper subagents were used.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p class="diff-note">
+          The standard HTML unified diff fallback is visible by default. The richer view is rendered
+          in the browser with <code>PatchDiff</code> from <code>@pierre/diffs/react</code>; the
+          fallback is hidden only after that renderer mounts successfully.
+        </p>
+        <div class="diff-panel" id="diff-panel">
+          <div class="diff-rich" id="diff-rich"></div>
+          <pre class="diff-fallback" id="diff-fallback">diff --git a/apps/web/features/smart-flow/tinting.ts b/apps/web/features/smart-flow/tinting.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/smart-flow/tinting.ts
+@@
++export type SmartFlowTintDirection =
++  | "bullish"
++  | "bearish"
++  | "neutral"
++  | "mixed"
++  | "unknown"
++  | "abstained";
++
++export type SmartFlowTintTone =
++  | "green"
++  | "red"
++  | "amber"
++  | "copper"
++  | "blue"
++  | "teal"
++  | "yellowgreen"
++  | "violet"
++  | "cyan"
++  | "magenta"
++  | "neutral";
++
++export type SmartFlowTint = {
++  style: CSSProperties;
++  metadata: SmartFlowTintMetadata;
++};
++
++export const getSmartFlowTint = (projection: SmartFlowTintInput): SmartFlowTint => {
++  const hypothesisType = projection.hypothesis.hypothesis_type;
++  const abstained = projection.abstention.abstained;
++  const direction = abstained
++    ? "abstained"
++    : normalizeSmartFlowDirection(projection.hypothesis.direction);
++  const policyConfidence = roundSmartFlowUnit(
++    projection.hypothesis.scores.confidence.policy_confidence
++  );
++  const evidenceQuality = roundSmartFlowUnit(projection.evidence.evidence_quality);
++  const confidenceBand = getSmartFlowPolicyConfidenceBand(policyConfidence);
++  const evidenceQualityBand = getSmartFlowEvidenceQualityBand(evidenceQuality);
++  const tone = abstained ? "neutral" : getSmartFlowHypothesisTone(hypothesisType);
++  const intensity = getSmartFlowTintIntensity({
++    abstained,
++    evidenceQuality,
++    policyConfidence
++  });
++
++  return {
++    style: getSmartFlowTintStyle(intensity),
++    metadata: {
++      family: hypothesisType,
++      hypothesisType,
++      tone,
++      intensity,
++      direction,
++      policyConfidence,
++      confidenceBand,
++      evidenceQuality,
++      evidenceQualityBand,
++      abstained,
++      abstentionReasons: getAbstentionReasons(projection.abstention),
++      sourceReasons: [...projection.abstention.source_reasons]
++    }
++  };
++};
+diff --git a/apps/web/features/options-tape/tinting.ts b/apps/web/features/options-tape/tinting.ts
+--- a/apps/web/features/options-tape/tinting.ts
++++ b/apps/web/features/options-tape/tinting.ts
+@@
++import {
++  getSmartFlowEvidenceQualityBand,
++  getSmartFlowPolicyConfidenceBand,
++  getSmartFlowSummary,
++  getSmartFlowTint,
++  getSmartFlowTintStyle as tintStyle,
++  normalizeSmartFlowClassToken as normalizeClassToken,
++  normalizeSmartFlowDirection as normalizeTintDirection,
++  normalizeSmartFlowTintTone as normalizeTintTone,
++  roundSmartFlowUnit as roundUnit,
++  type SmartFlowEvidenceQualityBand,
++  type SmartFlowPolicyConfidenceBand,
++  type SmartFlowSummary,
++  type SmartFlowTintDirection,
++  type SmartFlowTintInput,
++  type SmartFlowTintTone
++} from "../smart-flow";
+@@
++export const getOptionsTapePolicyConfidenceBand = getSmartFlowPolicyConfidenceBand;
++export const getOptionsTapeEvidenceQualityBand = getSmartFlowEvidenceQualityBand;
+@@
++  const smartFlowTint = getSmartFlowTint(projection);
++  const { metadata } = smartFlowTint;
++  const hypothesisClass = normalizeClassToken(metadata.hypothesisType);
+@@
++      `options-tape-row-direction-${metadata.direction}`,
++      `options-tape-row-confidence-${metadata.confidenceBand}`,
++      `options-tape-row-evidence-${metadata.evidenceQualityBand}`,
++      metadata.abstained ? "options-tape-row-abstained" : "",
++      `classifier-${metadata.tone}`
+@@
++    style: smartFlowTint.style,
++    metadata: {
++      source: "smart-flow",
++      ...metadata
++    }
+diff --git a/apps/web/features/smart-flow/tinting.test.ts b/apps/web/features/smart-flow/tinting.test.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/smart-flow/tinting.test.ts
+@@
++describe("smart-flow tinting", () => {
++  it("maps smart-flow hypothesis types into semantic row hues", () => {
++    const cases: [CurrentSmartFlowHypothesisType, SmartFlowTintTone][] = [
++      ["directional_accumulation", "green"],
++      ["retail_attention_flow", "teal"],
++      ["event_positioning", "blue"],
++      ["volatility_supply", "copper"],
++      ["structure_arbitrage", "violet"],
++      ["hedge_rebalance", "cyan"],
++      ["unclear", "neutral"]
++    ];
++
++    for (const [hypothesisType, expectedTone] of cases) {
++      const tint = getSmartFlowTint(makeSmartFlowTintInput({ hypothesisType }));
++
++      expect(tint.metadata.hypothesisType).toBe(hypothesisType);
++      expect(tint.metadata.tone).toBe(expectedTone);
++    }
++  });
++});</pre>
+        </div>
+      </section>
+    </main>
+
+    <script type="module">
+      const patch = document.getElementById("diff-fallback")?.textContent ?? "";
+      const panel = document.getElementById("diff-panel");
+      const rich = document.getElementById("diff-rich");
+
+      try {
+        const [{ createElement }, { createRoot }, { PatchDiff }] = await Promise.all([
+          import("https://esm.sh/react@19.2.3"),
+          import("https://esm.sh/react-dom@19.2.3/client"),
+          import("https://esm.sh/@pierre/diffs@1.2.2/react")
+        ]);
+
+        createRoot(rich).render(
+          createElement(PatchDiff, {
+            patch,
+            disableWorkerPool: true,
+            options: {
+              layout: "split",
+              background: true,
+              indicators: "bars",
+              overflow: "scroll"
+            }
+          })
+        );
+
+        requestAnimationFrame(() => {
+          rich.dataset.ready = "true";
+          panel.dataset.richReady = "true";
+        });
+      } catch (error) {
+        console.warn("Diffs rich renderer failed; keeping HTML fallback.", error);
+      }
+    </script>
+  </body>
+</html>
