@@ -1,8 +1,9 @@
 "use client";
 
-import { type CSSProperties, type ReactNode, useMemo } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { AlertsModule } from "../alerts";
+import { buildBrowserApiUrl } from "../api-transport";
 import { createStaticEquitiesTapeSource, EquitiesTape } from "../equities-tape";
 import { createStaticFlowPacketsTapeSource, FlowPacketsTape } from "../flow-packets";
 import {
@@ -10,6 +11,7 @@ import {
   DEFAULT_MARKET_CHART_SETTINGS,
   MarketChart,
   type MarketChartCandle,
+  type MarketChartCandleInput,
   type MarketChartLayoutPresetId,
   type MarketChartLowerSeries,
   MarketChartSection,
@@ -125,6 +127,44 @@ const buildByIdMap = <T extends { id?: string; trace_id?: string }>(
   return map;
 };
 
+const useQaChartCandleBootstrap = (): MarketChartCandleInput[] => {
+  const [candles, setCandles] = useState<MarketChartCandleInput[]>([]);
+
+  useEffect(() => {
+    const abort = new AbortController();
+    const url = new URL(buildBrowserApiUrl("/candles/equities"));
+    url.searchParams.set("underlying_id", "SPY");
+    url.searchParams.set("interval_ms", QA_INTERVAL_MS.toString());
+    url.searchParams.set("limit", "300");
+    url.searchParams.set("cache", "1");
+
+    void fetch(url.toString(), { signal: abort.signal })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`QA candle bootstrap failed with ${response.status}`);
+        }
+        return (await response.json()) as { data?: MarketChartCandleInput[] };
+      })
+      .then((payload) => {
+        if (!abort.signal.aborted) {
+          setCandles(payload.data ?? []);
+        }
+      })
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+        console.warn("Failed to load QA chart candles", error);
+      });
+
+    return () => {
+      abort.abort();
+    };
+  }, []);
+
+  return candles;
+};
+
 const QaSection = ({ id, title, summary, options, children, style }: QaSectionProps) => (
   <section className="durable-tapes-qa-section" id={id} style={style}>
     <div className="durable-tapes-qa-section-head">
@@ -196,9 +236,14 @@ export const DurableTapesQaRoute = () => {
   const smartFlowProjections = optionsPane.smartFlowProjections;
   const alerts = alertsPane.alerts;
   const newsStories = newsPane.stories;
+  const fetchedChartCandles = useQaChartCandleBootstrap();
+  const chartCandleInput =
+    state.liveSession.chartCandles.length > 0
+      ? state.liveSession.chartCandles
+      : fetchedChartCandles;
   const chartCandles = useMemo(
-    () => normalizeMarketChartCandles(state.liveSession.chartCandles),
-    [state.liveSession.chartCandles]
+    () => normalizeMarketChartCandles(chartCandleInput),
+    [chartCandleInput]
   );
   const chartLowerSeries = useMemo(
     () =>
