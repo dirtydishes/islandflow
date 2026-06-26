@@ -1,6 +1,4 @@
 import {
-  type AlertEvent,
-  type ClassifierHitEvent,
   type Cursor,
   DurableTapeAlertRowViewModelSchema,
   type DurableTapeAlertRowViewModel,
@@ -15,8 +13,8 @@ import {
   matchesOptionPrintFilters,
   type OptionNBBO,
   type OptionPrint,
-  type SmartFlowExplainabilityProjection,
-  type SmartMoneyEvent
+  type SmartFlowAlertEvent,
+  type SmartFlowExplainabilityProjection
 } from "@islandflow/types";
 
 const DURABLE_ROW_DEFAULT_LANES: DurableTapeComposedLane[] = ["options", "alerts"];
@@ -27,12 +25,10 @@ const DURABLE_ROW_MAX_ALERT_PREVIEW_PRINTS = 3;
 export type DurableRowsSubscription = Extract<LiveSubscription, { channel: "durable-rows" }>;
 
 export type DurableRowCompositionContext = {
-  alerts: AlertEvent[];
+  alerts: SmartFlowAlertEvent[];
   flowPackets: FlowPacket[];
   optionPrints: OptionPrint[];
   nbbo: OptionNBBO[];
-  classifierHits: ClassifierHitEvent[];
-  smartMoney: SmartMoneyEvent[];
   smartFlowProjections: SmartFlowExplainabilityProjection[];
 };
 
@@ -41,8 +37,6 @@ type DurableRowLookups = {
   flowPacketById: Map<string, FlowPacket>;
   optionPrintByTraceId: Map<string, OptionPrint>;
   nbboByContractId: Map<string, OptionNBBO>;
-  classifierHitsByPacketId: Map<string, ClassifierHitEvent[]>;
-  smartMoneyByPacketId: Map<string, SmartMoneyEvent>;
   smartFlowByPacketId: Map<string, SmartFlowExplainabilityProjection>;
 };
 
@@ -117,11 +111,6 @@ const getPacketContractId = (packet: FlowPacket | null | undefined): string | un
   return match?.[1];
 };
 
-const extractPacketIdFromClassifierHitTrace = (traceId: string): string | null => {
-  const index = traceId.indexOf("flowpacket:");
-  return index >= 0 ? traceId.slice(index) : null;
-};
-
 const buildFlowPacketByMemberTraceId = (packets: FlowPacket[]): Map<string, FlowPacket> => {
   const map = new Map<string, FlowPacket>();
   for (const packet of packets) {
@@ -166,37 +155,6 @@ const buildNbboByContractId = (items: OptionNBBO[]): Map<string, OptionNBBO> => 
   return map;
 };
 
-const buildClassifierHitsByPacketId = (
-  hits: ClassifierHitEvent[]
-): Map<string, ClassifierHitEvent[]> => {
-  const map = new Map<string, ClassifierHitEvent[]>();
-  for (const hit of hits) {
-    const packetId = extractPacketIdFromClassifierHitTrace(hit.trace_id);
-    if (!packetId) {
-      continue;
-    }
-    map.set(packetId, [...(map.get(packetId) ?? []), hit]);
-  }
-  return map;
-};
-
-const buildSmartMoneyByPacketId = (events: SmartMoneyEvent[]): Map<string, SmartMoneyEvent> => {
-  const map = new Map<string, SmartMoneyEvent>();
-  for (const event of events) {
-    for (const packetId of event.packet_ids) {
-      const existing = map.get(packetId);
-      if (
-        !existing ||
-        event.source_ts > existing.source_ts ||
-        (event.source_ts === existing.source_ts && event.seq > existing.seq)
-      ) {
-        map.set(packetId, event);
-      }
-    }
-  }
-  return map;
-};
-
 const buildSmartFlowByPacketId = (
   projections: SmartFlowExplainabilityProjection[]
 ): Map<string, SmartFlowExplainabilityProjection> => {
@@ -223,42 +181,14 @@ const buildDurableRowLookups = (context: DurableRowCompositionContext): DurableR
   flowPacketById: buildFlowPacketById(context.flowPackets),
   optionPrintByTraceId: buildOptionPrintByTraceId(context.optionPrints),
   nbboByContractId: buildNbboByContractId(context.nbbo),
-  classifierHitsByPacketId: buildClassifierHitsByPacketId(context.classifierHits),
-  smartMoneyByPacketId: buildSmartMoneyByPacketId(context.smartMoney),
   smartFlowByPacketId: buildSmartFlowByPacketId(context.smartFlowProjections)
 });
 
-const selectPrimaryClassifierHit = (
-  hits: readonly ClassifierHitEvent[]
-): ClassifierHitEvent | null =>
-  [...hits].sort((left, right) => {
-    const confidenceDelta = right.confidence - left.confidence;
-    if (confidenceDelta !== 0) {
-      return confidenceDelta;
-    }
-    return right.source_ts - left.source_ts || right.seq - left.seq;
-  })[0] ?? null;
-
-const selectPrimaryAlertHit = (
-  hits: readonly AlertEvent["hits"][number][]
-): AlertEvent["hits"][number] | null =>
-  [...hits].sort((left, right) => right.confidence - left.confidence)[0] ?? null;
-
-const normalizeAlertSeverity = (alert: AlertEvent): "high" | "medium" | "low" => {
-  const severity = alert.severity.trim().toLowerCase();
-  if (["high", "critical", "severe", "sev1", "p0", "p1"].includes(severity)) {
+const normalizeAlertSeverity = (alert: SmartFlowAlertEvent): "high" | "medium" | "low" => {
+  if (alert.policy_confidence >= 0.72 && alert.evidence_quality >= 0.55) {
     return "high";
   }
-  if (["medium", "med", "moderate", "sev2", "p2"].includes(severity)) {
-    return "medium";
-  }
-  if (["low", "minor", "info", "informational", "sev3", "p3", "p4"].includes(severity)) {
-    return "low";
-  }
-  if (alert.score >= 80) {
-    return "high";
-  }
-  if (alert.score >= 45) {
+  if (alert.policy_confidence >= 0.52 || alert.evidence_quality >= 0.45) {
     return "medium";
   }
   return "low";
@@ -271,26 +201,6 @@ const normalizeDirection = (
   return normalized === "bullish" || normalized === "bearish" || normalized === "neutral"
     ? normalized
     : "neutral";
-};
-
-const deriveAlertDirection = (alert: AlertEvent): "bullish" | "bearish" | "neutral" => {
-  const totals = {
-    bullish: { count: 0, confidence: 0 },
-    bearish: { count: 0, confidence: 0 },
-    neutral: { count: 0, confidence: 0 }
-  };
-  for (const hit of alert.hits) {
-    const direction = normalizeDirection(hit.direction);
-    totals[direction].count += 1;
-    totals[direction].confidence += Number.isFinite(hit.confidence) ? hit.confidence : 0;
-  }
-  const [direction, value] = Object.entries(totals).sort((left, right) => {
-    if (right[1].count !== left[1].count) {
-      return right[1].count - left[1].count;
-    }
-    return right[1].confidence - left[1].confidence;
-  })[0] as ["bullish" | "bearish" | "neutral", { count: number; confidence: number }];
-  return value.count > 0 ? direction : "neutral";
 };
 
 const matchesDurableOptionSubscription = (
@@ -388,22 +298,17 @@ const buildDurableOptionRow = (
   lookups: DurableRowLookups
 ): DurableTapeOptionRowViewModel => {
   const packet = lookups.flowPacketByMemberTraceId.get(print.trace_id) ?? null;
-  const classifier = packet
-    ? selectPrimaryClassifierHit(lookups.classifierHitsByPacketId.get(packet.id) ?? [])
-    : null;
-  const smartMoney = packet ? (lookups.smartMoneyByPacketId.get(packet.id) ?? null) : null;
   const smartFlow = packet ? (lookups.smartFlowByPacketId.get(packet.id) ?? null) : null;
   const premium = getOptionPremium(print);
   const side = print.execution_nbbo_side ?? print.nbbo_side ?? null;
   const nbbo = resolveOptionNbbo(print, lookups.nbboByContractId);
   const underlying =
     print.underlying_id ?? extractUnderlyingFromContract(print.option_contract_id) ?? undefined;
-  const primarySmartMoneyScore =
-    smartMoney?.profile_scores.find(
-      (score) => score.profile_id === smartMoney.primary_profile_id
-    ) ??
-    smartMoney?.profile_scores[0] ??
-    null;
+  const supportLabel = smartFlow
+    ? humanizeToken(smartFlow.hypothesis.hypothesis_type)
+    : packet
+      ? "smart-flow unavailable"
+      : "packet unavailable";
   const badges = [
     side
       ? {
@@ -424,18 +329,11 @@ const buildDurableOptionRow = (
             ? "neutral"
             : normalizeDirection(smartFlow.hypothesis.direction)
         }
-      : null,
-    smartMoney
-      ? {
-          kind: "smart-money",
-          label: humanizeToken(smartMoney.primary_profile_id),
-          tone: smartMoney.abstained ? "neutral" : smartMoney.primary_direction
-        }
-      : classifier
+      : packet
         ? {
-            kind: "classifier",
-            label: humanizeToken(classifier.classifier_id),
-            tone: normalizeDirection(classifier.direction)
+            kind: "diagnostic",
+            label: "smart-flow unavailable",
+            tone: "warning"
           }
         : null
   ].filter((badge): badge is NonNullable<typeof badge> => badge !== null);
@@ -458,15 +356,7 @@ const buildDurableOptionRow = (
       side: side ?? "--",
       nbbo: nbbo ? `${formatPrice(nbbo.bid)} x ${formatPrice(nbbo.ask)}` : "--",
       exchange: print.exchange,
-      support: smartFlow
-        ? humanizeToken(smartFlow.hypothesis.hypothesis_type)
-        : smartMoney
-          ? humanizeToken(smartMoney.primary_profile_id)
-          : classifier
-            ? humanizeToken(classifier.classifier_id)
-            : packet
-              ? "packet"
-              : "--"
+      support: supportLabel
     },
     option: {
       trace_id: print.trace_id,
@@ -497,29 +387,8 @@ const buildDurableOptionRow = (
     },
     support: {
       packet: packetSummary(packet),
-      classifier: classifier
-        ? {
-            trace_id: classifier.trace_id,
-            classifier_id: classifier.classifier_id,
-            label: humanizeToken(classifier.classifier_id),
-            direction: classifier.direction ?? null,
-            confidence: Number.isFinite(classifier.confidence) ? classifier.confidence : null,
-            explanation: classifier.explanations?.[0] ?? null
-          }
-        : null,
-      smart_money: smartMoney
-        ? {
-            trace_id: smartMoney.trace_id,
-            event_id: smartMoney.event_id,
-            profile_id: smartMoney.primary_profile_id ?? null,
-            label: humanizeToken(smartMoney.primary_profile_id),
-            direction: smartMoney.primary_direction ?? null,
-            confidence_band: primarySmartMoneyScore?.confidence_band ?? null,
-            probability: primarySmartMoneyScore?.probability ?? null,
-            abstained: smartMoney.abstained,
-            reasons: primarySmartMoneyScore?.reasons ?? smartMoney.suppressed_reasons ?? []
-          }
-        : null,
+      classifier: null,
+      smart_money: null,
       smart_flow: smartFlow
     },
     badges,
@@ -540,7 +409,7 @@ const buildDurableOptionRow = (
 };
 
 const buildDurableAlertRow = (
-  alert: AlertEvent,
+  alert: SmartFlowAlertEvent,
   lookups: DurableRowLookups
 ): DurableTapeAlertRowViewModel => {
   const flowPacketRefs = alert.evidence_refs.filter((ref) => ref.startsWith("flowpacket:"));
@@ -559,15 +428,15 @@ const buildDurableAlertRow = (
   const packetContract = getPacketContractId(primaryPacket);
   const firstPreviewPrint = previewPrints[0];
   const underlying =
-    (packetContract ? extractUnderlyingFromContract(packetContract) : null) ??
-    firstPreviewPrint?.underlying_id ??
+    alert.underlying_id ||
+    (packetContract ? extractUnderlyingFromContract(packetContract) : null) ||
+    firstPreviewPrint?.underlying_id ||
     (firstPreviewPrint
       ? extractUnderlyingFromContract(firstPreviewPrint.option_contract_id)
       : null);
   const severity = normalizeAlertSeverity(alert);
-  const direction = deriveAlertDirection(alert);
-  const topHit = selectPrimaryAlertHit(alert.hits);
-  const primaryLabel = humanizeToken(topHit?.classifier_id ?? alert.primary_profile_id);
+  const direction = normalizeDirection(alert.direction);
+  const primaryLabel = humanizeToken(alert.hypothesis_type);
   const badges = [
     { kind: "severity", label: severity, tone: severity },
     { kind: "direction", label: direction, tone: direction },
@@ -579,7 +448,7 @@ const buildDurableAlertRow = (
   ];
 
   return DurableTapeAlertRowViewModelSchema.parse({
-    id: `alerts:${alert.trace_id}:${alert.seq}`,
+    id: `smart-flow-alerts:${alert.alert_id}:${alert.seq}`,
     lane: "alerts",
     source: "server",
     ts: alert.source_ts,
@@ -591,27 +460,19 @@ const buildDurableAlertRow = (
       time: formatTimeCell(alert.source_ts),
       symbol: underlying ?? "ALERT",
       kind: primaryLabel,
-      score: Math.round(alert.score),
+      score: Math.round(alert.policy_confidence * 100),
       state: `${severity} / ${direction}`,
       evidence: `${availableRefs.length}/${alert.evidence_refs.length} refs`
     },
     alert: {
       trace_id: alert.trace_id,
       primary_label: primaryLabel,
-      primary_profile_id: alert.primary_profile_id ?? null,
-      score: alert.score,
+      primary_profile_id: null,
+      score: alert.policy_confidence * 100,
       severity,
       direction,
-      hit_count: alert.hits.length,
-      top_hit: topHit
-        ? {
-            classifier_id: topHit.classifier_id,
-            label: humanizeToken(topHit.classifier_id),
-            direction: topHit.direction ?? null,
-            confidence: Number.isFinite(topHit.confidence) ? topHit.confidence : null,
-            explanation: topHit.explanations?.[0] ?? null
-          }
-        : null
+      hit_count: 1,
+      top_hit: null
     },
     evidence: {
       total_refs: alert.evidence_refs.length,
@@ -726,7 +587,7 @@ export const composeDurableRowsForEvent = (
     }
     push(buildDurableOptionRow(print, lookups));
   };
-  const pushAlert = (alert: AlertEvent | null | undefined) => {
+  const pushAlert = (alert: SmartFlowAlertEvent | null | undefined) => {
     if (!alert) {
       return;
     }
@@ -743,21 +604,6 @@ export const composeDurableRowsForEvent = (
       const packet = item as FlowPacket;
       for (const traceId of packet.members.slice(0, DURABLE_ROW_MAX_PACKET_MEMBERS)) {
         pushOptionPrint(lookups.optionPrintByTraceId.get(traceId));
-      }
-    } else if (channel === "classifier-hits") {
-      const hit = item as ClassifierHitEvent;
-      const packetId = extractPacketIdFromClassifierHitTrace(hit.trace_id);
-      const packet = packetId ? lookups.flowPacketById.get(packetId) : null;
-      for (const traceId of packet?.members.slice(0, DURABLE_ROW_MAX_PACKET_MEMBERS) ?? []) {
-        pushOptionPrint(lookups.optionPrintByTraceId.get(traceId));
-      }
-    } else if (channel === "smart-money") {
-      const event = item as SmartMoneyEvent;
-      for (const packetId of event.packet_ids.slice(0, DURABLE_ROW_MAX_REFS)) {
-        const packet = lookups.flowPacketById.get(packetId);
-        for (const traceId of packet?.members.slice(0, DURABLE_ROW_MAX_PACKET_MEMBERS) ?? []) {
-          pushOptionPrint(lookups.optionPrintByTraceId.get(traceId));
-        }
       }
     } else if (channel === "smart-flow") {
       const projection = item as SmartFlowExplainabilityProjection;
@@ -780,8 +626,8 @@ export const composeDurableRowsForEvent = (
   }
 
   if (lanes.has("alerts")) {
-    if (channel === "alerts") {
-      pushAlert(item as AlertEvent);
+    if (channel === "smart-flow-alerts") {
+      pushAlert(item as SmartFlowAlertEvent);
     } else if (channel === "flow") {
       const packet = item as FlowPacket;
       for (const alert of context.alerts) {

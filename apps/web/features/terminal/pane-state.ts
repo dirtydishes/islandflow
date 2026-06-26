@@ -2,7 +2,6 @@ import type { TerminalState } from "./state";
 import { EMPTY_FLOW_PACKET_MAP, EMPTY_OPTION_PRINT_MAP } from "./state";
 
 export const selectDurableTapesOptionsPane = (state: TerminalState) => ({
-  decorByTraceId: state.classifierDecorByOptionTraceId,
   filters: state.flowFilters,
   flowPacketById: state.flowPacketMap,
   focusedContractId:
@@ -10,7 +9,6 @@ export const selectDurableTapesOptionsPane = (state: TerminalState) => ({
       ? state.selectedInstrument.contractId
       : null,
   nbboByContractId: state.nbboMap,
-  nbboByTraceId: state.historicalNbboByTraceId,
   onClearFocus: state.clearSelectedInstrument,
   onContractFocus: state.focusOptionContract,
   onFiltersChange: state.setFlowFilters,

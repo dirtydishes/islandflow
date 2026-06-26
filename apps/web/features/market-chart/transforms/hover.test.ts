@@ -6,8 +6,12 @@ import {
   buildDirectionalOptionNotionalRows,
   buildFlowContextHoverRows,
   buildHoverSnapshot,
-  marketChartHoverSnapshotsEqual
+  marketChartHoverSnapshotsEqual,
+  type MarketChartFlowContextInput
 } from "./hover";
+
+const untrustedFlowContext = (input: Record<string, unknown>): MarketChartFlowContextInput =>
+  input as unknown as MarketChartFlowContextInput;
 
 const context = (ts = 60_000): MarketChartHoverContext => {
   const candle = normalizeMarketChartCandle({
@@ -138,17 +142,16 @@ describe("market chart hover transforms", () => {
     });
   });
 
-  it("prefers smart-flow hover context over legacy fallback in the same bucket", () => {
+  it("uses smart-flow hover context and ignores non-canonical entries in the same bucket", () => {
     const rows = buildFlowContextHoverRows(context(), [
-      {
+      untrustedFlowContext({
         timestampMs: 62_000,
         sequence: 1,
-        source: "legacy-smart-money",
+        source: "legacy",
         direction: "bearish",
-        compatibility: true,
         label: "Institutional directional",
         confidence: 0.4
-      },
+      }),
       {
         timestampMs: 63_000,
         sequence: 2,
@@ -170,26 +173,20 @@ describe("market chart hover transforms", () => {
     ]);
   });
 
-  it("falls back to compatibility smart-money context and abstention copy", () => {
+  it("returns no flow context rows when canonical smart-flow is unavailable", () => {
     const rows = buildFlowContextHoverRows(context(), [
-      {
+      untrustedFlowContext({
         timestampMs: 62_000,
         sequence: 1,
-        source: "legacy-smart-money",
+        source: "legacy",
         direction: "abstained",
-        compatibility: true,
         evidenceScore: 0.12,
         confidence: 0,
         whyNot: "Abstained: Stale Or Missing Quote Context",
         abstained: true
-      }
+      })
     ]);
 
-    expect(rows.map((row) => [row.label, row.value, row.tone])).toEqual([
-      ["Flow direction", "Abstained compatibility fallback", "neutral"],
-      ["Evidence quality", "thin · 12%", "warning"],
-      ["Confidence", "0%", "warning"],
-      ["Why-not", "Abstained: Stale Or Missing Quote Context", "warning"]
-    ]);
+    expect(rows).toEqual([]);
   });
 });

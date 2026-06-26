@@ -1,8 +1,9 @@
-import type { SmartFlowExplainabilityProjection, SmartMoneyEvent } from "@islandflow/types";
+import type { SmartFlowExplainabilityProjection } from "@islandflow/types";
 
-export type ChartFlowMarkerItem =
-  | { kind: "smart-flow"; projection: SmartFlowExplainabilityProjection }
-  | { kind: "smart-money-fallback"; event: SmartMoneyEvent };
+export type ChartFlowMarkerItem = {
+  kind: "smart-flow";
+  projection: SmartFlowExplainabilityProjection;
+};
 
 export const sortBySourceTime = <T extends { source_ts: number; seq: number }>(
   items: readonly T[]
@@ -17,10 +18,8 @@ export const sortBySourceTime = <T extends { source_ts: number; seq: number }>(
 
 export const getChartFlowMarkerItems = (
   smartFlowProjections: readonly SmartFlowExplainabilityProjection[],
-  legacySmartMoneyEvents: readonly SmartMoneyEvent[],
   visibleRangeMs: { from: number; to: number } | null,
-  maxSmartFlowMarkers = 220,
-  maxLegacySmartMoneyMarkers = 220
+  maxSmartFlowMarkers = 220
 ): ChartFlowMarkerItem[] => {
   if (!visibleRangeMs) {
     return [];
@@ -33,26 +32,11 @@ export const getChartFlowMarkerItems = (
     )
   );
 
-  if (inRangeSmartFlow.length > 0) {
-    const cappedSmartFlow =
-      inRangeSmartFlow.length > maxSmartFlowMarkers
-        ? inRangeSmartFlow.slice(inRangeSmartFlow.length - maxSmartFlowMarkers)
-        : inRangeSmartFlow;
-    return cappedSmartFlow.map(
-      (projection): ChartFlowMarkerItem => ({ kind: "smart-flow", projection })
-    );
-  }
-
-  const inRangeLegacy = sortBySourceTime(
-    legacySmartMoneyEvents.filter(
-      (event) => event.source_ts >= visibleRangeMs.from && event.source_ts <= visibleRangeMs.to
-    )
-  );
-  const cappedLegacy =
-    inRangeLegacy.length > maxLegacySmartMoneyMarkers
-      ? inRangeLegacy.slice(inRangeLegacy.length - maxLegacySmartMoneyMarkers)
-      : inRangeLegacy;
-  return cappedLegacy.map(
-    (event): ChartFlowMarkerItem => ({ kind: "smart-money-fallback", event })
+  const cappedSmartFlow =
+    inRangeSmartFlow.length > maxSmartFlowMarkers
+      ? inRangeSmartFlow.slice(inRangeSmartFlow.length - maxSmartFlowMarkers)
+      : inRangeSmartFlow;
+  return cappedSmartFlow.map(
+    (projection): ChartFlowMarkerItem => ({ kind: "smart-flow", projection })
   );
 };

@@ -199,18 +199,19 @@ const getDurableOptionRowSmartFlowContext = (
   const evidenceRefs = getOptionsTapeSmartFlowEvidenceRefs(projection);
   const directPrintRefs = getOptionsTapeSmartFlowOptionPrintRefs(projection);
   const packetRefs = getOptionsTapeSmartFlowPacketRefs(projection);
-  const expandedPacketRefs =
+  const hasDirectPrintRef = directPrintRefs.includes(row.option.trace_id);
+  const hasAttachedPacketRef = Boolean(
     row.support.packet && packetRefs.includes(row.support.packet.id)
-      ? row.support.packet.member_trace_ids
-      : [];
-  const traceId = row.option.trace_id;
-  if (!directPrintRefs.includes(traceId) && !expandedPacketRefs.includes(traceId)) {
+  );
+  const expandedPacketRefs =
+    row.support.packet && hasAttachedPacketRef ? row.support.packet.member_trace_ids : [];
+  if (!hasDirectPrintRef && !hasAttachedPacketRef) {
     return undefined;
   }
 
   return {
     projection,
-    source: directPrintRefs.includes(traceId) ? "direct-print" : "packet-member",
+    source: hasDirectPrintRef ? "direct-print" : "packet-member",
     evidenceRefs,
     directPrintRefs,
     packetRefs,
@@ -282,8 +283,8 @@ const renderOptionHover = (row: DurableTapeOptionRowViewModel) => {
           <dd>{row.support.packet?.id ?? "--"}</dd>
         </div>
         <div>
-          <dt>Classifier</dt>
-          <dd>{row.support.classifier?.label ?? row.support.smart_money?.label ?? "--"}</dd>
+          <dt>Smart-flow</dt>
+          <dd>{smartFlowSummary?.hypothesis ?? row.cells.support ?? "smart-flow unavailable"}</dd>
         </div>
         {smartFlowSummary ? (
           <>

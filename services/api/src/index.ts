@@ -55,11 +55,6 @@ import {
   ensureSmartFlowAlertsTable,
   ensureSmartFlowProjectionsTable,
   ensureSmartMoneyEventsTable,
-  fetchAlertContextByTraceId,
-  fetchAlertsAfter,
-  fetchAlertsBefore,
-  fetchClassifierHitsAfter,
-  fetchClassifierHitsBefore,
   fetchEquityCandlesAfter,
   fetchEquityCandlesRange,
   fetchEquityPrintJoinsAfter,
@@ -82,8 +77,6 @@ import {
   fetchOptionPrintsAfter,
   fetchOptionPrintsBefore,
   fetchOptionPrintsByTraceIds,
-  fetchRecentAlerts,
-  fetchRecentClassifierHits,
   fetchRecentEquityPrintJoins,
   fetchRecentEquityPrints,
   fetchRecentEquityQuotes,
@@ -92,9 +85,6 @@ import {
   fetchRecentNews,
   fetchRecentOptionNBBO,
   fetchRecentOptionPrints,
-  fetchRecentSmartMoneyEvents,
-  fetchSmartMoneyEventsAfter,
-  fetchSmartMoneyEventsBefore,
   insertNewsStory
 } from "@islandflow/storage";
 import {
@@ -134,7 +124,10 @@ import {
 } from "@islandflow/types";
 import { createClient } from "redis";
 import { z } from "zod";
-import { isAlertContextPath, parseAlertContextTraceIdPath } from "./alert-context";
+import {
+  createLegacyDerivedRouteResponse,
+  getLegacyLiveSubscriptionReplacement
+} from "./legacy-derived-routes";
 import {
   createCorsPreflightResponse,
   DEFAULT_API_CORS_ORIGINS,
@@ -341,10 +334,7 @@ type Channel =
   | "inferred-dark"
   | "flow"
   | "smart-flow"
-  | "smart-flow-alerts"
-  | "smart-money"
-  | "classifier-hits"
-  | "alerts";
+  | "smart-flow-alerts";
 
 type WsData = {
   channel: Channel;
@@ -367,9 +357,6 @@ const inferredDarkSockets = new Set<LegacySocket>();
 const flowSockets = new Set<LegacySocket>();
 const smartFlowSockets = new Set<LegacySocket>();
 const smartFlowAlertSockets = new Set<LegacySocket>();
-const smartMoneySockets = new Set<LegacySocket>();
-const classifierHitSockets = new Set<LegacySocket>();
-const alertSockets = new Set<LegacySocket>();
 const liveSocketSubscriptions = new Map<LiveSocket, Set<string>>();
 const subscriptionSockets = new Map<string, Set<LiveSocket>>();
 const subscriptionDefinitions = new Map<string, LiveSubscription>();
@@ -1324,7 +1311,6 @@ const run = async () => {
       try {
         const payload = SmartMoneyEventSchema.parse(smartMoneySubscription.decode(msg));
         recordSyntheticProfileHit(syntheticProfileHits, payload);
-        broadcast(smartMoneySockets, { type: "smart-money", payload });
         await fanoutLive({ channel: "smart-money" }, payload, "smart-money");
         msg.ack();
       } catch (error) {
@@ -1374,7 +1360,6 @@ const run = async () => {
     for await (const msg of classifierHitSubscription.messages) {
       try {
         const payload = ClassifierHitEventSchema.parse(classifierHitSubscription.decode(msg));
-        broadcast(classifierHitSockets, { type: "classifier-hit", payload });
         await fanoutLive({ channel: "classifier-hits" }, payload, "classifier-hits");
         msg.ack();
       } catch (error) {
@@ -1390,7 +1375,6 @@ const run = async () => {
     for await (const msg of alertSubscription.messages) {
       try {
         const payload = AlertEventSchema.parse(alertSubscription.decode(msg));
-        broadcast(alertSockets, { type: "alert", payload });
         await fanoutLive({ channel: "alerts" }, payload, "alerts");
         msg.ack();
       } catch (error) {
@@ -1489,6 +1473,13 @@ const run = async () => {
 
         if (req.method === "OPTIONS") {
           return createCorsPreflightResponse(req, corsAllowedOrigins);
+        }
+
+        if (req.method === "GET") {
+          const legacyResponse = createLegacyDerivedRouteResponse(url.pathname);
+          if (legacyResponse) {
+            return legacyResponse;
+          }
         }
 
         if (req.method === "GET" && url.pathname === "/health") {
@@ -1667,12 +1658,6 @@ const run = async () => {
           return jsonResponse({ data });
         }
 
-        if (req.method === "GET" && url.pathname === "/flow/smart-money") {
-          const limit = parseLimit(url.searchParams.get("limit"));
-          const data = await fetchRecentSmartMoneyEvents(clickhouse, limit);
-          return jsonResponse({ data });
-        }
-
         if (req.method === "GET" && url.pathname === "/flow/smart-flow") {
           const limit = parseLimit(url.searchParams.get("limit"));
           const data = await fetchRecentSmartFlowExplainability(clickhouse, limit);
@@ -1685,41 +1670,10 @@ const run = async () => {
           return jsonResponse({ data });
         }
 
-        if (req.method === "GET" && url.pathname === "/flow/classifier-hits") {
-          const limit = parseLimit(url.searchParams.get("limit"));
-          const data = await fetchRecentClassifierHits(clickhouse, limit);
-          return jsonResponse({ data });
-        }
-
-        if (req.method === "GET" && url.pathname === "/flow/alerts") {
-          const limit = parseLimit(url.searchParams.get("limit"));
-          const data = await fetchRecentAlerts(clickhouse, limit);
-          return jsonResponse({ data });
-        }
-
         if (req.method === "GET" && url.pathname === "/news") {
           const limit = parseLimit(url.searchParams.get("limit") ?? "100");
           const data = await fetchRecentNews(clickhouse, limit);
           return jsonResponse({ data });
-        }
-
-        if (req.method === "GET" && isAlertContextPath(url.pathname)) {
-          try {
-            const traceId = parseAlertContextTraceIdPath(url.pathname);
-            if (traceId === null) {
-              return jsonResponse({ error: "not found" }, 404);
-            }
-            const data = await fetchAlertContextByTraceId(clickhouse, traceId);
-            return jsonResponse(data);
-          } catch (error) {
-            return jsonResponse(
-              {
-                error: "invalid alert context query",
-                detail: error instanceof Error ? error.message : String(error)
-              },
-              400
-            );
-          }
         }
 
         if (req.method === "GET" && url.pathname === "/history/options") {
@@ -1798,14 +1752,6 @@ const run = async () => {
           );
         }
 
-        if (req.method === "GET" && url.pathname === "/history/smart-money") {
-          const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
-          const data = await fetchSmartMoneyEventsBefore(clickhouse, beforeTs, beforeSeq, limit);
-          return jsonResponse(
-            buildHistoryResponse(data, (item) => ({ ts: item.source_ts, seq: item.seq }))
-          );
-        }
-
         if (req.method === "GET" && url.pathname === "/history/smart-flow") {
           const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
           const data = await fetchSmartFlowExplainabilityBefore(
@@ -1828,22 +1774,6 @@ const run = async () => {
           return jsonResponse(buildHistoryResponse(data, smartFlowAlertCursor));
         }
 
-        if (req.method === "GET" && url.pathname === "/history/classifier-hits") {
-          const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
-          const data = await fetchClassifierHitsBefore(clickhouse, beforeTs, beforeSeq, limit);
-          return jsonResponse(
-            buildHistoryResponse(data, (item) => ({ ts: item.source_ts, seq: item.seq }))
-          );
-        }
-
-        if (req.method === "GET" && url.pathname === "/history/alerts") {
-          const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
-          const data = await fetchAlertsBefore(clickhouse, beforeTs, beforeSeq, limit);
-          return jsonResponse(
-            buildHistoryResponse(data, (item) => ({ ts: item.source_ts, seq: item.seq }))
-          );
-        }
-
         if (req.method === "GET" && url.pathname === "/history/inferred-dark") {
           const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
           const data = await fetchInferredDarkBefore(clickhouse, beforeTs, beforeSeq, limit);
@@ -1864,17 +1794,6 @@ const run = async () => {
           const id = decodeURIComponent(url.pathname.slice("/flow/packets/".length));
           const data = await fetchFlowPacketById(clickhouse, id);
           return jsonResponse({ data });
-        }
-
-        if (req.method === "GET" && /^\/flow\/alerts\/[^/]+\/context$/.test(url.pathname)) {
-          const traceId = decodeURIComponent(
-            url.pathname.slice("/flow/alerts/".length, -"/context".length)
-          ).trim();
-          if (!traceId || traceId.length > 512) {
-            return jsonResponse({ error: "invalid alert trace id" }, 400);
-          }
-          const data = await fetchAlertContextByTraceId(clickhouse, traceId);
-          return jsonResponse(data);
         }
 
         if (req.method === "GET" && url.pathname === "/option-prints/by-trace") {
@@ -2040,14 +1959,6 @@ const run = async () => {
           return jsonResponse({ data, next });
         }
 
-        if (req.method === "GET" && url.pathname === "/replay/smart-money") {
-          const { afterTs, afterSeq, limit } = parseReplayParams(url);
-          const data = await fetchSmartMoneyEventsAfter(clickhouse, afterTs, afterSeq, limit);
-          const last = data.at(-1);
-          const next = last ? { ts: last.source_ts, seq: last.seq } : null;
-          return jsonResponse({ data, next });
-        }
-
         if (req.method === "GET" && url.pathname === "/replay/smart-flow") {
           const { afterTs, afterSeq, limit } = parseReplayParams(url);
           const data = await fetchSmartFlowExplainabilityAfter(
@@ -2066,22 +1977,6 @@ const run = async () => {
           const data = await fetchSmartFlowAlertEventsAfter(clickhouse, afterTs, afterSeq, limit);
           const last = data.at(-1);
           const next = last ? smartFlowAlertCursor(last) : null;
-          return jsonResponse({ data, next });
-        }
-
-        if (req.method === "GET" && url.pathname === "/replay/classifier-hits") {
-          const { afterTs, afterSeq, limit } = parseReplayParams(url);
-          const data = await fetchClassifierHitsAfter(clickhouse, afterTs, afterSeq, limit);
-          const last = data.at(-1);
-          const next = last ? { ts: last.source_ts, seq: last.seq } : null;
-          return jsonResponse({ data, next });
-        }
-
-        if (req.method === "GET" && url.pathname === "/replay/alerts") {
-          const { afterTs, afterSeq, limit } = parseReplayParams(url);
-          const data = await fetchAlertsAfter(clickhouse, afterTs, afterSeq, limit);
-          const last = data.at(-1);
-          const next = last ? { ts: last.source_ts, seq: last.seq } : null;
           return jsonResponse({ data, next });
         }
 
@@ -2149,22 +2044,6 @@ const run = async () => {
           return jsonResponse({ error: "websocket upgrade failed" }, 400);
         }
 
-        if (req.method === "GET" && url.pathname === "/ws/classifier-hits") {
-          if (serverRef.upgrade(req, { data: { channel: "classifier-hits" } })) {
-            return new Response(null, { status: 101 });
-          }
-
-          return jsonResponse({ error: "websocket upgrade failed" }, 400);
-        }
-
-        if (req.method === "GET" && url.pathname === "/ws/smart-money") {
-          if (serverRef.upgrade(req, { data: { channel: "smart-money" } })) {
-            return new Response(null, { status: 101 });
-          }
-
-          return jsonResponse({ error: "websocket upgrade failed" }, 400);
-        }
-
         if (req.method === "GET" && url.pathname === "/ws/smart-flow") {
           if (serverRef.upgrade(req, { data: { channel: "smart-flow" } })) {
             return new Response(null, { status: 101 });
@@ -2175,14 +2054,6 @@ const run = async () => {
 
         if (req.method === "GET" && url.pathname === "/ws/smart-flow-alerts") {
           if (serverRef.upgrade(req, { data: { channel: "smart-flow-alerts" } })) {
-            return new Response(null, { status: 101 });
-          }
-
-          return jsonResponse({ error: "websocket upgrade failed" }, 400);
-        }
-
-        if (req.method === "GET" && url.pathname === "/ws/alerts") {
-          if (serverRef.upgrade(req, { data: { channel: "alerts" } })) {
             return new Response(null, { status: 101 });
           }
 
@@ -2235,12 +2106,6 @@ const run = async () => {
           smartFlowSockets.add(socket);
         } else if (socket.data.channel === "smart-flow-alerts") {
           smartFlowAlertSockets.add(socket);
-        } else if (socket.data.channel === "smart-money") {
-          smartMoneySockets.add(socket);
-        } else if (socket.data.channel === "classifier-hits") {
-          classifierHitSockets.add(socket);
-        } else {
-          alertSockets.add(socket);
         }
 
         logger.info("websocket connected", { channel: socket.data.channel });
@@ -2269,6 +2134,14 @@ const run = async () => {
 
           for (const subscription of parsed.subscriptions) {
             LiveSubscriptionSchema.parse(subscription);
+            const replacement = getLegacyLiveSubscriptionReplacement(subscription.channel);
+            if (replacement) {
+              sendLiveMessage(socket, {
+                op: "error",
+                message: `legacy derived live channel deprecated; use ${replacement}`
+              });
+              continue;
+            }
             if (parsed.op === "unsubscribe") {
               unsubscribeSocket(socket, subscription);
               continue;
@@ -2308,12 +2181,6 @@ const run = async () => {
           smartFlowSockets.delete(socket);
         } else if (socket.data.channel === "smart-flow-alerts") {
           smartFlowAlertSockets.delete(socket);
-        } else if (socket.data.channel === "smart-money") {
-          smartMoneySockets.delete(socket);
-        } else if (socket.data.channel === "classifier-hits") {
-          classifierHitSockets.delete(socket);
-        } else {
-          alertSockets.delete(socket);
         }
 
         logger.info("websocket disconnected", { channel: socket.data.channel });

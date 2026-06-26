@@ -93,7 +93,7 @@ export const PINNED_EVIDENCE_MAX_ITEMS = parseBoundedInt(
 const NBBO_MAX_AGE_MS = Number(process.env.NEXT_PUBLIC_NBBO_MAX_AGE_MS);
 export const NBBO_MAX_AGE_MS_SAFE =
   Number.isFinite(NBBO_MAX_AGE_MS) && NBBO_MAX_AGE_MS > 0 ? NBBO_MAX_AGE_MS : 1000;
-export const FLOW_FILTER_PRESET = process.env.NEXT_PUBLIC_FLOW_FILTER_PRESET ?? "smart-money";
+export const FLOW_FILTER_PRESET = process.env.NEXT_PUBLIC_FLOW_FILTER_PRESET ?? "balanced";
 export const SUPPORTED_CANDLE_INTERVAL_MS = parseSupportedTimeframeMs(
   process.env.NEXT_PUBLIC_CANDLE_INTERVALS_MS
 );

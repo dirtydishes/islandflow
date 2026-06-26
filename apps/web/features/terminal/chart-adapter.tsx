@@ -7,8 +7,7 @@ import {
   type InferredDarkEvent,
   type OptionPrint,
   parseOptionContractId,
-  type SmartFlowExplainabilityProjection,
-  type SmartMoneyEvent
+  type SmartFlowExplainabilityProjection
 } from "@islandflow/types";
 import { type ChangeEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -25,7 +24,6 @@ import {
   MarketChartSection,
   resolveLowerPaneMode,
   type MarketChartCandle,
-  type MarketChartDirection,
   type MarketChartFlowContextInput,
   type MarketChartHoverRowProvider,
   type MarketChartMarker,
@@ -46,7 +44,6 @@ import {
   smartFlowEvidenceQualityLabel,
   smartFlowHypothesisLabel,
   smartFlowWhyNotLabel,
-  smartMoneyProfileLabel,
   statusLabel
 } from "./format";
 import { extractUnderlying, normalizeContractId } from "./state-helpers";
@@ -57,7 +54,6 @@ import { formatTime } from "./components/ui-helpers";
 
 export type TerminalMarketChartMarkerPayload =
   | { kind: "smart-flow"; projection: SmartFlowExplainabilityProjection }
-  | { kind: "smart-money"; event: SmartMoneyEvent }
   | { kind: "inferred-dark"; event: InferredDarkEvent };
 
 type TerminalChartFetchState = {
@@ -151,13 +147,6 @@ const getOptionPrintUnderlying = (print: OptionPrint): string | null => {
     return print.underlying_id.toUpperCase();
   }
   return extractUnderlying(normalizeContractId(print.option_contract_id));
-};
-
-const normalizeTerminalDirection = (value: string | null | undefined): MarketChartDirection => {
-  if (value === "bullish" || value === "bearish") {
-    return value;
-  }
-  return "neutral";
 };
 
 type TerminalOptionRight = "call" | "put";
@@ -274,27 +263,10 @@ const toOptionFlowHoverInputs = (
   }))
 ];
 
-const legacyEvidenceScore = (event: SmartMoneyEvent): number | null => {
-  const coverage = event.features?.nbbo_coverage_ratio;
-  const stale = event.features?.nbbo_stale_ratio;
-  if (typeof coverage !== "number" || typeof stale !== "number") {
-    return null;
-  }
-  return Math.max(0, Math.min(1, coverage - stale));
-};
-
-const legacyConfidence = (event: SmartMoneyEvent): number | null => {
-  const primaryScore =
-    event.profile_scores.find((score) => score.profile_id === event.primary_profile_id) ??
-    event.profile_scores[0];
-  return typeof primaryScore?.probability === "number" ? primaryScore.probability : null;
-};
-
 const toFlowContextHoverInputs = (
-  smartFlowProjections: readonly SmartFlowExplainabilityProjection[],
-  smartMoneyEvents: readonly SmartMoneyEvent[]
-): MarketChartFlowContextInput[] => [
-  ...smartFlowProjections.map((projection) => ({
+  smartFlowProjections: readonly SmartFlowExplainabilityProjection[]
+): MarketChartFlowContextInput[] =>
+  smartFlowProjections.map((projection) => ({
     timestampMs: projection.source_ts,
     sequence: projection.seq,
     source: "smart-flow",
@@ -304,46 +276,20 @@ const toFlowContextHoverInputs = (
     evidenceScore: projection.evidence.evidence_quality,
     confidence: projection.hypothesis.scores.confidence.policy_confidence,
     whyNot: smartFlowWhyNotLabel(projection),
-    compatibility:
-      projection.source_channel === "smart-money" ||
-      projection.compatibility?.compatibility_only === true,
     abstained: projection.abstention.abstained
-  })),
-  ...smartMoneyEvents.map((event) => {
-    const evidenceScore = legacyEvidenceScore(event);
-    const confidence = legacyConfidence(event);
-    return {
-      timestampMs: event.source_ts,
-      sequence: event.seq,
-      source: "legacy-smart-money",
-      direction: event.abstained
-        ? "abstained"
-        : normalizeTerminalDirection(event.primary_direction),
-      label: smartMoneyProfileLabel(event.primary_profile_id),
-      evidenceScore,
-      confidence,
-      whyNot: event.abstained
-        ? `Abstained: ${event.suppressed_reasons[0] ?? "compatibility policy"}`
-        : (event.suppressed_reasons[0] ?? null),
-      compatibility: true,
-      abstained: event.abstained
-    } satisfies MarketChartFlowContextInput;
-  })
-];
+  }));
 
 export const buildTerminalMarketChartHoverRowProvider = ({
   smartFlowProjections,
-  smartMoneyEvents,
   flowPackets,
   optionPrints
 }: {
   smartFlowProjections: readonly SmartFlowExplainabilityProjection[];
-  smartMoneyEvents: readonly SmartMoneyEvent[];
   flowPackets: readonly FlowPacket[];
   optionPrints: readonly OptionPrint[];
 }): MarketChartHoverRowProvider => {
   const optionFlowInputs = toOptionFlowHoverInputs(flowPackets, optionPrints);
-  const flowContextInputs = toFlowContextHoverInputs(smartFlowProjections, smartMoneyEvents);
+  const flowContextInputs = toFlowContextHoverInputs(smartFlowProjections);
 
   return (context) => [
     ...buildDirectionalOptionNotionalRows(context, optionFlowInputs),
@@ -403,20 +349,17 @@ export const buildTerminalLowerPaneInput = ({
   chartTicker,
   candles,
   smartFlowProjections,
-  smartMoneyEvents,
   flowPackets,
   optionPrints
 }: {
   chartTicker: string;
   candles: readonly MarketChartCandle[];
   smartFlowProjections: readonly SmartFlowExplainabilityProjection[];
-  smartMoneyEvents: readonly SmartMoneyEvent[];
   flowPackets: readonly FlowPacket[];
   optionPrints: readonly OptionPrint[];
 }) => ({
   candles,
   smartFlowProjections,
-  smartMoneyEvents,
   flowPackets: flowPackets.filter((packet) =>
     matchesChartTicker(getFlowPacketUnderlying(packet), chartTicker)
   ),
@@ -462,12 +405,10 @@ export const getTerminalChartReplayEndTs = (
 
 export const buildTerminalMarketChartMarkers = ({
   smartFlowProjections,
-  smartMoneyEvents,
   inferredDark,
   visibleRangeMs
 }: {
   smartFlowProjections: readonly SmartFlowExplainabilityProjection[];
-  smartMoneyEvents: readonly SmartMoneyEvent[];
   inferredDark: readonly InferredDarkEvent[];
   visibleRangeMs: MarketChartRange | null;
 }): MarketChartMarker<TerminalMarketChartMarkerPayload>[] => {
@@ -476,57 +417,26 @@ export const buildTerminalMarketChartMarkers = ({
   }
 
   const markers: MarketChartMarker<TerminalMarketChartMarkerPayload>[] = [];
-  const flowMarkerItems = getChartFlowMarkerItems(
-    smartFlowProjections,
-    smartMoneyEvents,
-    visibleRangeMs
-  );
+  const flowMarkerItems = getChartFlowMarkerItems(smartFlowProjections, visibleRangeMs);
 
   for (const item of flowMarkerItems) {
-    if (item.kind === "smart-flow") {
-      const { projection } = item;
-      const direction = smartFlowDirectionTone(projection);
-      markers.push({
-        id: `smart-flow:${projection.refs.hypothesis_id}:${projection.seq}`,
-        time: toChartTime(projection.source_ts),
-        label: projection.abstention.abstained ? "ABS" : "HYP",
-        title: "Smart-flow hypothesis",
-        direction,
-        position: direction === "bullish" ? "belowBar" : "aboveBar",
-        color:
-          direction === "bullish"
-            ? "#25c17a"
-            : direction === "bearish"
-              ? "#ff6b5f"
-              : "rgba(144, 160, 178, 0.9)",
-        shape:
-          direction === "bullish" ? "arrowUp" : direction === "bearish" ? "arrowDown" : "circle",
-        payload: { kind: "smart-flow", projection }
-      });
-      continue;
-    }
-
-    const { event } = item;
-    const direction = normalizeTerminalDirection(event.primary_direction);
+    const { projection } = item;
+    const direction = smartFlowDirectionTone(projection);
     markers.push({
-      id: `smart-money:${event.trace_id}:${event.seq}`,
-      time: toChartTime(event.source_ts),
-      label: event.abstained
-        ? "ABS"
-        : event.primary_profile_id
-          ? event.primary_profile_id.slice(0, 3).toUpperCase()
-          : "SM",
-      title: "Legacy smart-money fallback",
+      id: `smart-flow:${projection.refs.hypothesis_id}:${projection.seq}`,
+      time: toChartTime(projection.source_ts),
+      label: projection.abstention.abstained ? "ABS" : "HYP",
+      title: "Smart-flow hypothesis",
       direction,
       position: direction === "bullish" ? "belowBar" : "aboveBar",
       color:
         direction === "bullish"
-          ? "#2f6d4f"
+          ? "#25c17a"
           : direction === "bearish"
-            ? "#c46f2a"
-            : "rgba(111, 91, 57, 0.9)",
+            ? "#ff6b5f"
+            : "rgba(144, 160, 178, 0.9)",
       shape: direction === "bullish" ? "arrowUp" : direction === "bearish" ? "arrowDown" : "circle",
-      payload: { kind: "smart-money", event }
+      payload: { kind: "smart-flow", projection }
     });
   }
 
@@ -818,13 +728,12 @@ export const TerminalMarketChartSection = memo(
     const markers = useMemo(() => {
       const allMarkers = buildTerminalMarketChartMarkers({
         smartFlowProjections: state.chartSmartFlowProjections,
-        smartMoneyEvents: state.chartSmartMoneyEvents,
         inferredDark: state.chartInferredDark,
         visibleRangeMs
       });
       return allMarkers.filter((marker) => {
         const payload = marker.payload as TerminalMarketChartMarkerPayload | undefined;
-        if (payload?.kind === "smart-flow" || payload?.kind === "smart-money") {
+        if (payload?.kind === "smart-flow") {
           return settings.display.showSmartFlowMarkers;
         }
         if (payload?.kind === "inferred-dark") {
@@ -836,7 +745,6 @@ export const TerminalMarketChartSection = memo(
       settings.display.showInferredDarkMarkers,
       settings.display.showSmartFlowMarkers,
       state.chartSmartFlowProjections,
-      state.chartSmartMoneyEvents,
       state.chartInferredDark,
       visibleRangeMs
     ]);
@@ -846,7 +754,6 @@ export const TerminalMarketChartSection = memo(
           chartTicker: state.chartTicker,
           candles: normalizedCandles,
           smartFlowProjections: state.chartSmartFlowProjections,
-          smartMoneyEvents: state.chartSmartMoneyEvents,
           flowPackets: state.flow.items as readonly FlowPacket[],
           optionPrints: state.options.items as readonly OptionPrint[]
         }),
@@ -854,7 +761,6 @@ export const TerminalMarketChartSection = memo(
         normalizedCandles,
         state.chartTicker,
         state.chartSmartFlowProjections,
-        state.chartSmartMoneyEvents,
         state.flow.items,
         state.options.items
       ]
@@ -924,8 +830,6 @@ export const TerminalMarketChartSection = memo(
         }
         if (payload.kind === "smart-flow") {
           state.handleSmartFlowMarkerClick(payload.projection);
-        } else if (payload.kind === "smart-money") {
-          state.handleSmartMoneyMarkerClick(payload.event);
         } else {
           state.handleDarkMarkerClick(payload.event);
         }

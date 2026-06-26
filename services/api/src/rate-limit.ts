@@ -129,8 +129,7 @@ export const classifyApiRouteForRateLimit = (
 
   if (
     LOOKUP_EXACT_PATHS.has(pathname) ||
-    (method === "GET" && /^\/flow\/packets\/[^/]+$/.test(pathname)) ||
-    (method === "GET" && /^\/flow\/alerts\/[^/]+\/context$/.test(pathname))
+    (method === "GET" && /^\/flow\/packets\/[^/]+$/.test(pathname))
   ) {
     return { exempt: false, bucket: "lookup", routeCategory: "lookup" };
   }

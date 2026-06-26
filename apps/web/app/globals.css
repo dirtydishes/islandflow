@@ -2418,8 +2418,8 @@ h3 {
     linear-gradient(
       90deg,
       rgba(
-        var(--classifier-rgb, 192, 200, 210),
-        calc(0.012 + var(--classifier-intensity, 0) * 0.06)
+        var(--smart-flow-rgb, 192, 200, 210),
+        calc(0.012 + var(--smart-flow-intensity, 0) * 0.06)
       ),
       transparent 62%
     ),
@@ -2431,7 +2431,7 @@ h3 {
   background:
     linear-gradient(
       90deg,
-      rgba(var(--classifier-rgb, 192, 200, 210), calc(0.02 + var(--classifier-intensity, 0) * 0.1)),
+      rgba(var(--smart-flow-rgb, 192, 200, 210), calc(0.02 + var(--smart-flow-intensity, 0) * 0.1)),
       transparent 68%
     ),
     oklch(0.78 0.12 74 / 0.035);
@@ -2439,7 +2439,7 @@ h3 {
 
 .data-table-row-classified.is-classified {
   box-shadow: inset 0 0 0 1px
-    rgba(var(--classifier-rgb), calc(0.16 + var(--classifier-intensity) * 0.12));
+    rgba(var(--smart-flow-rgb), calc(0.16 + var(--smart-flow-intensity) * 0.12));
 }
 
 .data-table-row-warn {
@@ -2995,15 +2995,15 @@ h3 {
 
 .alerts-tape .durable-tape-row.alerts-row-tinted {
   border-color: rgba(
-    var(--classifier-rgb, 192, 200, 210),
-    calc(0.12 + var(--classifier-intensity, 0) * 0.1)
+    var(--smart-flow-rgb, 192, 200, 210),
+    calc(0.12 + var(--smart-flow-intensity, 0) * 0.1)
   );
   background:
     linear-gradient(
       90deg,
       rgba(
-          var(--classifier-rgb, 192, 200, 210),
-          calc(0.012 + var(--classifier-intensity, 0) * 0.065)
+          var(--smart-flow-rgb, 192, 200, 210),
+          calc(0.012 + var(--smart-flow-intensity, 0) * 0.065)
         )
         0%,
       transparent 54%
@@ -3017,13 +3017,13 @@ h3 {
     linear-gradient(
       90deg,
       rgba(
-          var(--classifier-rgb, 192, 200, 210),
-          calc(0.024 + var(--classifier-intensity, 0) * 0.11)
+          var(--smart-flow-rgb, 192, 200, 210),
+          calc(0.024 + var(--smart-flow-intensity, 0) * 0.11)
         )
         0%,
       transparent 58%
     ),
-    rgba(var(--classifier-rgb, 192, 200, 210), 0.03);
+    rgba(var(--smart-flow-rgb, 192, 200, 210), 0.03);
 }
 
 .alerts-tape .durable-tape-cell[data-align="end"] {
@@ -3064,8 +3064,8 @@ h3 {
 }
 
 .alerts-state-direction {
-  border-color: rgba(var(--classifier-rgb, 192, 200, 210), 0.34);
-  background: rgba(var(--classifier-rgb, 192, 200, 210), 0.1);
+  border-color: rgba(var(--smart-flow-rgb, 192, 200, 210), 0.34);
+  background: rgba(var(--smart-flow-rgb, 192, 200, 210), 0.1);
   color: var(--text);
 }
 
@@ -3451,8 +3451,8 @@ h3 {
     linear-gradient(
       90deg,
       rgba(
-        var(--classifier-rgb, 192, 200, 210),
-        calc(0.012 + var(--classifier-intensity, 0) * 0.06)
+        var(--smart-flow-rgb, 192, 200, 210),
+        calc(0.012 + var(--smart-flow-intensity, 0) * 0.06)
       ),
       transparent 64%
     ),
@@ -3464,7 +3464,7 @@ h3 {
   background:
     linear-gradient(
       90deg,
-      rgba(var(--classifier-rgb, 192, 200, 210), calc(0.02 + var(--classifier-intensity, 0) * 0.1)),
+      rgba(var(--smart-flow-rgb, 192, 200, 210), calc(0.02 + var(--smart-flow-intensity, 0) * 0.1)),
       transparent 68%
     ),
     oklch(0.78 0.12 74 / 0.04);
@@ -3475,14 +3475,14 @@ h3 {
     linear-gradient(
       90deg,
       rgba(
-        var(--classifier-rgb, 192, 200, 210),
-        calc(0.012 + var(--classifier-intensity, 0) * 0.065)
+        var(--smart-flow-rgb, 192, 200, 210),
+        calc(0.012 + var(--smart-flow-intensity, 0) * 0.065)
       ),
       transparent 64%
     ),
     transparent;
   box-shadow: inset 0 0 0 1px
-    rgba(var(--classifier-rgb, 192, 200, 210), calc(0.12 + var(--classifier-intensity, 0) * 0.1));
+    rgba(var(--smart-flow-rgb, 192, 200, 210), calc(0.12 + var(--smart-flow-intensity, 0) * 0.1));
 }
 
 .options-tape .durable-tape-row.options-tape-row-tinted:hover,
@@ -3491,8 +3491,8 @@ h3 {
     linear-gradient(
       90deg,
       rgba(
-        var(--classifier-rgb, 192, 200, 210),
-        calc(0.024 + var(--classifier-intensity, 0) * 0.11)
+        var(--smart-flow-rgb, 192, 200, 210),
+        calc(0.024 + var(--smart-flow-intensity, 0) * 0.11)
       ),
       transparent 70%
     ),
@@ -3502,14 +3502,14 @@ h3 {
 .options-tape .durable-tape-row.options-tape-row-tinted:focus-visible {
   box-shadow:
     inset 0 0 0 1px
-    rgba(var(--classifier-rgb, 192, 200, 210), calc(0.18 + var(--classifier-intensity, 0) * 0.14)),
+    rgba(var(--smart-flow-rgb, 192, 200, 210), calc(0.18 + var(--smart-flow-intensity, 0) * 0.14)),
     0 0 0 1px oklch(0.83 0.08 74 / 0.22);
 }
 
 .options-tape .durable-tape-row.options-tape-row-abstained {
   color: oklch(0.79 0.012 250);
   box-shadow: inset 0 0 0 1px
-    rgba(var(--classifier-rgb, 192, 200, 210), calc(0.08 + var(--classifier-intensity, 0) * 0.06));
+    rgba(var(--smart-flow-rgb, 192, 200, 210), calc(0.08 + var(--smart-flow-intensity, 0) * 0.06));
 }
 
 .options-tape .durable-tape-row.options-tape-row-abstained:hover,
@@ -3658,8 +3658,8 @@ h3 {
     linear-gradient(
       90deg,
       rgba(
-        var(--classifier-rgb, 192, 200, 210),
-        calc(0.012 + var(--classifier-intensity, 0) * 0.06)
+        var(--smart-flow-rgb, 192, 200, 210),
+        calc(0.012 + var(--smart-flow-intensity, 0) * 0.06)
       ),
       transparent 62%
     ),
@@ -3675,7 +3675,7 @@ h3 {
   background:
     linear-gradient(
       90deg,
-      rgba(var(--classifier-rgb, 192, 200, 210), calc(0.02 + var(--classifier-intensity, 0) * 0.1)),
+      rgba(var(--smart-flow-rgb, 192, 200, 210), calc(0.02 + var(--smart-flow-intensity, 0) * 0.1)),
       transparent 68%
     ),
     oklch(0.78 0.12 74 / 0.03);
@@ -3684,7 +3684,7 @@ h3 {
 .options-table-row.is-classified {
   cursor: pointer;
   box-shadow: inset 0 0 0 1px
-    rgba(var(--classifier-rgb), calc(0.16 + var(--classifier-intensity) * 0.12));
+    rgba(var(--smart-flow-rgb), calc(0.16 + var(--smart-flow-intensity) * 0.12));
 }
 
 .options-table-row > span {
@@ -3699,38 +3699,38 @@ h3 {
   font-variant-numeric: tabular-nums;
 }
 
-.classifier-green {
-  --classifier-rgb: 37, 193, 122;
+.smart-flow-tone-green {
+  --smart-flow-rgb: 37, 193, 122;
 }
-.classifier-red {
-  --classifier-rgb: 255, 107, 95;
+.smart-flow-tone-red {
+  --smart-flow-rgb: 255, 107, 95;
 }
-.classifier-amber {
-  --classifier-rgb: 245, 166, 35;
+.smart-flow-tone-amber {
+  --smart-flow-rgb: 245, 166, 35;
 }
-.classifier-copper {
-  --classifier-rgb: 198, 122, 75;
+.smart-flow-tone-copper {
+  --smart-flow-rgb: 198, 122, 75;
 }
-.classifier-blue {
-  --classifier-rgb: 77, 163, 255;
+.smart-flow-tone-blue {
+  --smart-flow-rgb: 77, 163, 255;
 }
-.classifier-teal {
-  --classifier-rgb: 64, 210, 190;
+.smart-flow-tone-teal {
+  --smart-flow-rgb: 64, 210, 190;
 }
-.classifier-yellowgreen {
-  --classifier-rgb: 174, 210, 78;
+.smart-flow-tone-yellowgreen {
+  --smart-flow-rgb: 174, 210, 78;
 }
-.classifier-violet {
-  --classifier-rgb: 170, 130, 255;
+.smart-flow-tone-violet {
+  --smart-flow-rgb: 170, 130, 255;
 }
-.classifier-cyan {
-  --classifier-rgb: 94, 214, 255;
+.smart-flow-tone-cyan {
+  --smart-flow-rgb: 94, 214, 255;
 }
-.classifier-magenta {
-  --classifier-rgb: 255, 92, 205;
+.smart-flow-tone-magenta {
+  --smart-flow-rgb: 255, 92, 205;
 }
-.classifier-neutral {
-  --classifier-rgb: 192, 200, 210;
+.smart-flow-tone-neutral {
+  --smart-flow-rgb: 192, 200, 210;
 }
 
 .contract,

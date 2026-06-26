@@ -773,23 +773,20 @@ export class LiveStateManager {
 
   private getDurableRowCompositionContext(): DurableRowCompositionContext {
     return {
-      alerts: (this.genericItems.get("alerts") ?? []) as DurableRowCompositionContext["alerts"],
+      alerts: (this.genericItems.get("smart-flow-alerts") ??
+        []) as DurableRowCompositionContext["alerts"],
       flowPackets: (this.genericItems.get("flow") ??
         []) as DurableRowCompositionContext["flowPackets"],
       optionPrints: (this.genericItems.get("options") ??
         []) as DurableRowCompositionContext["optionPrints"],
       nbbo: (this.genericItems.get("nbbo") ?? []) as DurableRowCompositionContext["nbbo"],
-      classifierHits: (this.genericItems.get("classifier-hits") ??
-        []) as DurableRowCompositionContext["classifierHits"],
-      smartMoney: (this.genericItems.get("smart-money") ??
-        []) as DurableRowCompositionContext["smartMoney"],
       smartFlowProjections: (this.genericItems.get("smart-flow") ??
         []) as DurableRowCompositionContext["smartFlowProjections"]
     };
   }
 
   private durableRowsConfiguredLimit(): number {
-    return Math.max(this.config.limits.options, this.config.limits.alerts);
+    return Math.max(this.config.limits.options, this.config.limits["smart-flow-alerts"]);
   }
 
   private getDurableRowSnapshot(subscription: DurableRowsSubscription): FeedSnapshot<unknown> {

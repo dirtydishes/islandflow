@@ -42,7 +42,6 @@ const {
   buildTerminalMarketChartMarkers,
   buildDurableTapesRouteFeatures,
   buildOptionTapeQueryParams,
-  classifierToneForFamily,
   collectAlertContextEvidence,
   composeTapeItems,
   countActiveFlowFilterGroups,
@@ -86,10 +85,7 @@ const {
   shouldRetainLiveSnapshotHistory,
   shouldIncludeEquitiesForDarkUnderlyingFallback,
   shouldShowEquitiesSilentFeedWarning,
-  selectPrimaryClassifierHit,
   shouldClearOptionFocusSeed,
-  smartMoneyProfileLabel,
-  smartMoneyToneForProfile,
   smartFlowDirectionLabel,
   smartFlowDirectionTone,
   smartFlowEvidenceQualityLabel,
@@ -165,7 +161,6 @@ describe("durable tapes pane selectors", () => {
     const nextPrint = makeOptionPrint({ trace_id: "opt-next", seq: 2, ts: 2_000 });
     const baseState = {
       activeTickers,
-      classifierDecorByOptionTraceId: new Map(),
       clearSelectedAlert: noop,
       clearSelectedInstrument: noop,
       durableRows: { status: "connected" },
@@ -184,7 +179,6 @@ describe("durable tapes pane selectors", () => {
       focusEquityTicker: noop,
       focusFlowPacketRequest: noop,
       focusOptionContract: noop,
-      historicalNbboByTraceId: new Map(),
       mode: "live",
       nbboMap: new Map(),
       news: newsFeed,
@@ -239,7 +233,6 @@ describe("durable tapes pane selectors", () => {
   it("maps live smart-flow projections into the durable-tapes OptionsTape fallback pane", () => {
     const projection = { trace_id: "smart-flow:1", seq: 1 } as any;
     const baseState = {
-      classifierDecorByOptionTraceId: new Map(),
       clearSelectedInstrument: () => {},
       durableRows: { status: "connected" },
       filteredDurableOptionRows: [],
@@ -249,7 +242,6 @@ describe("durable tapes pane selectors", () => {
       flowPacketMap: new Map(),
       focusFlowPacketRequest: () => {},
       focusOptionContract: () => {},
-      historicalNbboByTraceId: new Map(),
       mode: "live",
       nbboMap: new Map(),
       packetIdByOptionTraceId: new Map(),
@@ -642,6 +634,7 @@ describe("contract-focused option helpers", () => {
         { underlying_ids: ["AAPL"] }
       )
     ).toEqual({
+      min_notional: "5000",
       view: "raw",
       underlying_ids: "AAPL"
     });
@@ -701,9 +694,8 @@ describe("route feature map", () => {
     expect(features.showOptionsPane).toBe(true);
     expect(features.showEquitiesPane).toBe(false);
     expect(features.showFlowPane).toBe(true);
-    expect(features.needsClassifierDecor).toBe(true);
+    expect(features.needsSmartFlowDecor).toBe(true);
     expect(features.smartFlow).toBe(true);
-    expect(features.smartMoney).toBe(false);
     expect(features.alerts).toBe(false);
   });
 
@@ -741,7 +733,7 @@ describe("route feature map", () => {
     expect(features.options).toBe(false);
     expect(features.alerts).toBe(true);
     expect(features.durableRows).toBe(true);
-    expect(features.needsClassifierDecor).toBe(false);
+    expect(features.needsSmartFlowDecor).toBe(false);
     expect(features.needsAlertEvidencePrefetch).toBe(false);
     expect(features.showChartPane).toBe(false);
     expect(features.equityCandles).toBe(false);
@@ -756,7 +748,7 @@ describe("route feature map", () => {
     expect(features.smartFlow).toBe(true);
     expect(features.showOptionsPane).toBe(true);
     expect(features.showAlertsPane).toBe(true);
-    expect(features.needsClassifierDecor).toBe(false);
+    expect(features.needsSmartFlowDecor).toBe(false);
     expect(features.needsAlertEvidencePrefetch).toBe(false);
   });
 });
@@ -1212,46 +1204,6 @@ describe("options display formatters", () => {
   });
 });
 
-describe("classifier row decoration helpers", () => {
-  it("maps classifier families to row tones", () => {
-    expect(classifierToneForFamily("large_bullish_call_sweep")).toBe("green");
-    expect(classifierToneForFamily("large_bearish_put_sweep")).toBe("red");
-    expect(classifierToneForFamily("straddle")).toBe("blue");
-    expect(classifierToneForFamily("unknown_family")).toBe("neutral");
-  });
-
-  it("selects primary hits by confidence, source timestamp, then seq", () => {
-    const hit = selectPrimaryClassifierHit([
-      {
-        ...makeAlert({ classifier_id: "old", confidence: 0.9, source_ts: 1_000, seq: 1 }),
-        direction: "bullish",
-        explanations: []
-      },
-      {
-        ...makeAlert({ classifier_id: "new", confidence: 0.9, source_ts: 2_000, seq: 1 }),
-        direction: "bullish",
-        explanations: []
-      },
-      {
-        ...makeAlert({ classifier_id: "low", confidence: 0.5, source_ts: 3_000, seq: 9 }),
-        direction: "bullish",
-        explanations: []
-      }
-    ]);
-
-    expect(hit?.classifier_id).toBe("new");
-  });
-});
-
-describe("smart-money profile helpers", () => {
-  it("labels and colors primary profiles", () => {
-    expect(smartMoneyProfileLabel("institutional_directional")).toBe("Institutional Directional");
-    expect(smartMoneyProfileLabel(null)).toBe("Abstained");
-    expect(smartMoneyToneForProfile("event_driven")).toBe("blue");
-    expect(smartMoneyToneForProfile(null)).toBe("neutral");
-  });
-});
-
 describe("smart-flow explainability helpers", () => {
   const makeProjection = (overrides: Record<string, unknown> = {}) =>
     ({
@@ -1285,20 +1237,6 @@ describe("smart-flow explainability helpers", () => {
         ...((overrides.abstention as Record<string, unknown> | undefined) ?? {})
       },
       alternatives: [],
-      ...overrides
-    }) as any;
-
-  const makeLegacySmartMoneyEvent = (overrides: Record<string, unknown> = {}) =>
-    ({
-      source_ts: 1_000,
-      ingest_ts: 1_001,
-      seq: 1,
-      trace_id: "smart-money:1",
-      underlying_id: "SPY",
-      primary_direction: "bullish",
-      primary_profile_id: "institutional_directional",
-      abstained: false,
-      profile_scores: [],
       ...overrides
     }) as any;
 
@@ -1400,32 +1338,30 @@ describe("smart-flow explainability helpers", () => {
     ).toBe("Alternative considered: Hedge rebalance");
   });
 
-  it("prefers smart-flow projections for chart marker source rows", () => {
+  it("uses smart-flow projections for chart marker source rows", () => {
     const projection = makeProjection({
       source_ts: 2_000,
       seq: 2,
       refs: { hypothesis_id: "hypothesis:2" }
     });
-    const legacy = makeLegacySmartMoneyEvent({ source_ts: 2_000, seq: 1 });
 
-    const items = getChartFlowMarkerItems([projection], [legacy], { from: 1_000, to: 3_000 });
+    const items = getChartFlowMarkerItems([projection], { from: 1_000, to: 3_000 });
 
     expect(items).toEqual([{ kind: "smart-flow", projection }]);
   });
 
-  it("uses legacy smart-money events only when no smart-flow projection is available", () => {
+  it("does not create fallback chart marker rows when smart-flow is unavailable", () => {
     const outOfRangeProjection = makeProjection({
       source_ts: 8_000,
       refs: { hypothesis_id: "hypothesis:outside" }
     });
-    const legacy = makeLegacySmartMoneyEvent({ source_ts: 2_000, seq: 4 });
 
-    const items = getChartFlowMarkerItems([outOfRangeProjection], [legacy], {
+    const items = getChartFlowMarkerItems([outOfRangeProjection], {
       from: 1_000,
       to: 3_000
     });
 
-    expect(items).toEqual([{ kind: "smart-money-fallback", event: legacy }]);
+    expect(items).toEqual([]);
   });
 
   it("sorts smart-flow chart marker rows by source time and sequence", () => {
@@ -1440,7 +1376,7 @@ describe("smart-flow explainability helpers", () => {
       refs: { hypothesis_id: "hypothesis:earlier" }
     });
 
-    const items = getChartFlowMarkerItems([later, earlier], [], { from: 1_000, to: 3_000 });
+    const items = getChartFlowMarkerItems([later, earlier], { from: 1_000, to: 3_000 });
 
     expect(
       items.map((item) => item.kind === "smart-flow" && item.projection.refs.hypothesis_id)
@@ -1521,7 +1457,6 @@ describe("smart-flow explainability helpers", () => {
       chartTicker: "SPY",
       candles: [],
       smartFlowProjections: [makeProjection()],
-      smartMoneyEvents: [makeLegacySmartMoneyEvent()],
       flowPackets: [
         {
           id: "flowpacket:SPY-2025-01-17-450-C:1",
@@ -1574,7 +1509,6 @@ describe("smart-flow explainability helpers", () => {
     });
 
     expect(input.smartFlowProjections).toHaveLength(1);
-    expect(input.smartMoneyEvents).toHaveLength(1);
     expect(input.flowPackets.map((packet) => packet.seq)).toEqual([1, 3]);
     expect(input.optionPrints.map((print) => print.trace_id)).toEqual([
       "print:spy:1",
@@ -1585,7 +1519,6 @@ describe("smart-flow explainability helpers", () => {
   it("maps option hover notional with call/put-aware side direction", () => {
     const provider = buildTerminalMarketChartHoverRowProvider({
       smartFlowProjections: [],
-      smartMoneyEvents: [],
       flowPackets: [
         {
           id: "flowpacket:SPY-2025-01-17-460-P:1",
@@ -1660,18 +1593,16 @@ describe("smart-flow explainability helpers", () => {
     ]);
   });
 
-  it("maps smart-flow, legacy fallback, and inferred dark events into clickable chart markers", () => {
+  it("maps smart-flow and inferred dark events into clickable chart markers", () => {
     const projection = makeProjection({
       source_ts: 2_000,
       seq: 2,
       refs: { hypothesis_id: "hypothesis:2" }
     });
-    const legacy = makeLegacySmartMoneyEvent({ source_ts: 2_000, seq: 1 });
     const dark = makeDarkEvent({ source_ts: 2_500, seq: 3 });
 
     const smartFlowMarkers = buildTerminalMarketChartMarkers({
       smartFlowProjections: [projection],
-      smartMoneyEvents: [legacy],
       inferredDark: [dark],
       visibleRangeMs: { from: 1_000, to: 3_000 }
     });
@@ -1688,17 +1619,11 @@ describe("smart-flow explainability helpers", () => {
 
     const fallbackMarkers = buildTerminalMarketChartMarkers({
       smartFlowProjections: [],
-      smartMoneyEvents: [legacy],
       inferredDark: [],
       visibleRangeMs: { from: 1_000, to: 3_000 }
     });
 
-    expect(fallbackMarkers).toHaveLength(1);
-    expect(fallbackMarkers[0]).toMatchObject({
-      id: "smart-money:smart-money:1:1",
-      label: "INS"
-    });
-    expect(fallbackMarkers[0].payload?.kind).toBe("smart-money");
+    expect(fallbackMarkers).toEqual([]);
   });
 
   it("maps terminal feed status into reusable chart status metadata", () => {

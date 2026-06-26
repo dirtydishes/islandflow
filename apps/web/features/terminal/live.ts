@@ -1,6 +1,4 @@
 import type {
-  AlertEvent,
-  ClassifierHitEvent,
   Cursor,
   DurableTapeRowViewModel,
   EquityCandle,
@@ -16,8 +14,7 @@ import type {
   OptionNBBO,
   OptionPrint,
   SmartFlowAlertEvent,
-  SmartFlowExplainabilityProjection,
-  SmartMoneyEvent
+  SmartFlowExplainabilityProjection
 } from "@islandflow/types";
 import { getSubscriptionKey as getLiveSubscriptionKey } from "@islandflow/types";
 import type { Dispatch, SetStateAction } from "react";
@@ -910,9 +907,6 @@ export type LiveSessionState = {
   flowHistory: FlowPacket[];
   smartFlowHistory: SmartFlowExplainabilityProjection[];
   smartFlowAlertsHistory: SmartFlowAlertEvent[];
-  smartMoneyHistory: SmartMoneyEvent[];
-  classifierHitsHistory: ClassifierHitEvent[];
-  alertsHistory: AlertEvent[];
   durableRowsHistory: DurableTapeRowViewModel[];
   newsHistory: NewsStory[];
   inferredDarkHistory: InferredDarkEvent[];
@@ -924,9 +918,6 @@ export type LiveSessionState = {
   flow: FlowPacket[];
   smartFlow: SmartFlowExplainabilityProjection[];
   smartFlowAlerts: SmartFlowAlertEvent[];
-  smartMoney: SmartMoneyEvent[];
-  classifierHits: ClassifierHitEvent[];
-  alerts: AlertEvent[];
   durableRows: DurableTapeRowViewModel[];
   news: NewsStory[];
   inferredDark: InferredDarkEvent[];
@@ -948,9 +939,6 @@ export const LIVE_HISTORY_ENDPOINTS: Partial<Record<LiveSubscription["channel"],
   flow: "/history/flow",
   "smart-flow": "/history/smart-flow",
   "smart-flow-alerts": "/history/smart-flow-alerts",
-  "smart-money": "/history/smart-money",
-  "classifier-hits": "/history/classifier-hits",
-  alerts: "/history/alerts",
   news: "/history/news",
   "inferred-dark": "/history/inferred-dark"
 };
@@ -983,9 +971,6 @@ export const useLiveSession = (
   const [flow, setFlow] = useState<FlowPacket[]>([]);
   const [smartFlow, setSmartFlow] = useState<SmartFlowExplainabilityProjection[]>([]);
   const [smartFlowAlerts, setSmartFlowAlerts] = useState<SmartFlowAlertEvent[]>([]);
-  const [smartMoney, setSmartMoney] = useState<SmartMoneyEvent[]>([]);
-  const [classifierHits, setClassifierHits] = useState<ClassifierHitEvent[]>([]);
-  const [alerts, setAlerts] = useState<AlertEvent[]>([]);
   const [durableRows, setDurableRows] = useState<DurableTapeRowViewModel[]>([]);
   const [news, setNews] = useState<NewsStory[]>([]);
   const [inferredDark, setInferredDark] = useState<InferredDarkEvent[]>([]);
@@ -996,9 +981,6 @@ export const useLiveSession = (
   const [flowHistory, setFlowHistory] = useState<FlowPacket[]>([]);
   const [smartFlowHistory, setSmartFlowHistory] = useState<SmartFlowExplainabilityProjection[]>([]);
   const [smartFlowAlertsHistory, setSmartFlowAlertsHistory] = useState<SmartFlowAlertEvent[]>([]);
-  const [smartMoneyHistory, setSmartMoneyHistory] = useState<SmartMoneyEvent[]>([]);
-  const [classifierHitsHistory, setClassifierHitsHistory] = useState<ClassifierHitEvent[]>([]);
-  const [alertsHistory, setAlertsHistory] = useState<AlertEvent[]>([]);
   const [durableRowsHistory, setDurableRowsHistory] = useState<DurableTapeRowViewModel[]>([]);
   const [newsHistory, setNewsHistory] = useState<NewsStory[]>([]);
   const [inferredDarkHistory, setInferredDarkHistory] = useState<InferredDarkEvent[]>([]);
@@ -1012,15 +994,13 @@ export const useLiveSession = (
   const flowRef = useRef<FlowPacket[]>([]);
   const smartFlowRef = useRef<SmartFlowExplainabilityProjection[]>([]);
   const smartFlowAlertsRef = useRef<SmartFlowAlertEvent[]>([]);
-  const smartMoneyRef = useRef<SmartMoneyEvent[]>([]);
-  const classifierHitsRef = useRef<ClassifierHitEvent[]>([]);
-  const alertsRef = useRef<AlertEvent[]>([]);
   const durableRowsRef = useRef<DurableTapeRowViewModel[]>([]);
   const newsRef = useRef<NewsStory[]>([]);
   const inferredDarkRef = useRef<InferredDarkEvent[]>([]);
   const chartCandlesRef = useRef<EquityCandle[]>([]);
   const chartOverlayRef = useRef<EquityPrint[]>([]);
   const liveBuffersRef = useRef<LiveSessionChannelBufferRegistry | null>(null);
+  const manifestRef = useRef(manifest);
   const optionsHistoryRef = useRef<OptionPrint[]>([]);
   const nbboHistoryRef = useRef<OptionNBBO[]>([]);
   const equitiesHistoryRef = useRef<EquityPrint[]>([]);
@@ -1028,9 +1008,6 @@ export const useLiveSession = (
   const flowHistoryRef = useRef<FlowPacket[]>([]);
   const smartFlowHistoryRef = useRef<SmartFlowExplainabilityProjection[]>([]);
   const smartFlowAlertsHistoryRef = useRef<SmartFlowAlertEvent[]>([]);
-  const smartMoneyHistoryRef = useRef<SmartMoneyEvent[]>([]);
-  const classifierHitsHistoryRef = useRef<ClassifierHitEvent[]>([]);
-  const alertsHistoryRef = useRef<AlertEvent[]>([]);
   const durableRowsHistoryRef = useRef<DurableTapeRowViewModel[]>([]);
   const newsHistoryRef = useRef<NewsStory[]>([]);
   const inferredDarkHistoryRef = useRef<InferredDarkEvent[]>([]);
@@ -1074,6 +1051,10 @@ export const useLiveSession = (
   };
 
   useEffect(() => {
+    manifestRef.current = manifest;
+  }, [manifest]);
+
+  useEffect(() => {
     if (!enabled) {
       setStatus("disconnected");
       setConnectedAt(null);
@@ -1096,9 +1077,6 @@ export const useLiveSession = (
       setFlow([]);
       setSmartFlow([]);
       setSmartFlowAlerts([]);
-      setSmartMoney([]);
-      setClassifierHits([]);
-      setAlerts([]);
       setDurableRows([]);
       setNews([]);
       setInferredDark([]);
@@ -1109,9 +1087,6 @@ export const useLiveSession = (
       setFlowHistory([]);
       setSmartFlowHistory([]);
       setSmartFlowAlertsHistory([]);
-      setSmartMoneyHistory([]);
-      setClassifierHitsHistory([]);
-      setAlertsHistory([]);
       setDurableRowsHistory([]);
       setNewsHistory([]);
       setInferredDarkHistory([]);
@@ -1125,9 +1100,6 @@ export const useLiveSession = (
       flowRef.current = [];
       smartFlowRef.current = [];
       smartFlowAlertsRef.current = [];
-      smartMoneyRef.current = [];
-      classifierHitsRef.current = [];
-      alertsRef.current = [];
       durableRowsRef.current = [];
       newsRef.current = [];
       inferredDarkRef.current = [];
@@ -1142,9 +1114,6 @@ export const useLiveSession = (
       flowHistoryRef.current = [];
       smartFlowHistoryRef.current = [];
       smartFlowAlertsHistoryRef.current = [];
-      smartMoneyHistoryRef.current = [];
-      classifierHitsHistoryRef.current = [];
-      alertsHistoryRef.current = [];
       durableRowsHistoryRef.current = [];
       newsHistoryRef.current = [];
       inferredDarkHistoryRef.current = [];
@@ -1170,10 +1139,13 @@ export const useLiveSession = (
     let active = true;
 
     const syncSubscriptions = (socket: WebSocket) => {
-      const nextKeys = new Set(manifest.map(getLiveSubscriptionKey));
-      const nextMap = new Map(manifest.map((sub) => [getLiveSubscriptionKey(sub), sub]));
+      const nextManifest = manifestRef.current;
+      const nextKeys = new Set(nextManifest.map(getLiveSubscriptionKey));
+      const nextMap = new Map(nextManifest.map((sub) => [getLiveSubscriptionKey(sub), sub]));
       const currentKeys = subscribedKeysRef.current;
-      const toSubscribe = manifest.filter((sub) => !currentKeys.has(getLiveSubscriptionKey(sub)));
+      const toSubscribe = nextManifest.filter(
+        (sub) => !currentKeys.has(getLiveSubscriptionKey(sub))
+      );
       const toUnsubscribe = Array.from(currentKeys)
         .filter((key) => !nextKeys.has(key))
         .map((key) => subscribedMapRef.current.get(key) ?? null)
@@ -1315,30 +1287,6 @@ export const useLiveSession = (
               ref: smartFlowAlertsHistoryRef
             }
           );
-          break;
-        case "smart-money":
-          mergeItems("smart-money", setSmartMoney, smartMoneyRef, items as SmartMoneyEvent[], {
-            setter: setSmartMoneyHistory,
-            ref: smartMoneyHistoryRef
-          });
-          break;
-        case "classifier-hits":
-          mergeItems(
-            "classifier-hits",
-            setClassifierHits,
-            classifierHitsRef,
-            items as ClassifierHitEvent[],
-            {
-              setter: setClassifierHitsHistory,
-              ref: classifierHitsHistoryRef
-            }
-          );
-          break;
-        case "alerts":
-          mergeItems("alerts", setAlerts, alertsRef, items as AlertEvent[], {
-            setter: setAlertsHistory,
-            ref: alertsHistoryRef
-          });
           break;
         case "durable-rows":
           mergeItems(
@@ -1699,19 +1647,6 @@ export const useLiveSession = (
               smartFlowAlertsRef.current
             );
             break;
-          case "smart-money":
-            mergeOlder(setSmartMoneyHistory, smartMoneyHistoryRef, smartMoneyRef.current);
-            break;
-          case "classifier-hits":
-            mergeOlder(
-              setClassifierHitsHistory,
-              classifierHitsHistoryRef,
-              classifierHitsRef.current
-            );
-            break;
-          case "alerts":
-            mergeOlder(setAlertsHistory, alertsHistoryRef, alertsRef.current);
-            break;
           case "news":
             mergeOlder(setNewsHistory, newsHistoryRef, newsRef.current);
             break;
@@ -1755,9 +1690,6 @@ export const useLiveSession = (
     flowHistory,
     smartFlowHistory,
     smartFlowAlertsHistory,
-    smartMoneyHistory,
-    classifierHitsHistory,
-    alertsHistory,
     durableRowsHistory,
     newsHistory,
     inferredDarkHistory,
@@ -1769,9 +1701,6 @@ export const useLiveSession = (
     flow,
     smartFlow,
     smartFlowAlerts,
-    smartMoney,
-    classifierHits,
-    alerts,
     durableRows,
     news,
     inferredDark,

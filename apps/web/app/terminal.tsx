@@ -83,21 +83,17 @@ export {
   toggleFilterValue
 } from "../features/terminal/filters";
 export {
-  classifierToneForFamily,
   decodeNewsText,
   formatCompactUsd,
   formatNewsTimestamp,
   formatOptionContractLabel,
   getAlertWindowAnchorTs,
   getOptionTableSnapshot,
-  selectPrimaryClassifierHit,
   smartFlowDirectionLabel,
   smartFlowDirectionTone,
   smartFlowEvidenceQualityLabel,
   smartFlowHypothesisLabel,
   smartFlowWhyNotLabel,
-  smartMoneyProfileLabel,
-  smartMoneyToneForProfile,
   statusLabel
 } from "../features/terminal/format";
 export { getLiveSubscriptionResetChannels } from "../features/terminal/live";
@@ -182,7 +178,6 @@ export function OverviewRoute() {
           <CommandDecisionLevels state={state} />
           <OptionsTape
             className="command-contracts-tape"
-            decorByTraceId={state.classifierDecorByOptionTraceId}
             features={compactTapeFeatures}
             filters={state.flowFilters}
             flowPacketById={state.flowPacketMap}
@@ -192,7 +187,6 @@ export function OverviewRoute() {
                 : null
             }
             nbboByContractId={state.nbboMap}
-            nbboByTraceId={state.historicalNbboByTraceId}
             onClearFocus={() => state.setSelectedInstrument(null)}
             onContractFocus={state.focusOptionContract}
             onFiltersChange={state.setFlowFilters}
@@ -252,13 +246,11 @@ const DurableTapesOptionsPane = memo(function DurableTapesOptionsPane() {
   return (
     <OptionsTape
       className="durable-tapes-options"
-      decorByTraceId={pane.decorByTraceId}
       features={DURABLE_TAPES_ROUTE_FEATURES}
       filters={pane.filters}
       flowPacketById={pane.flowPacketById}
       focusedContractId={pane.focusedContractId}
       nbboByContractId={pane.nbboByContractId}
-      nbboByTraceId={pane.nbboByTraceId}
       onClearFocus={pane.onClearFocus}
       onContractFocus={pane.onContractFocus}
       onFiltersChange={pane.onFiltersChange}
@@ -401,7 +393,6 @@ export function OptionsRoute() {
         <div className="opra-intake-grid opra-intake-grid-tape-first">
           <OptionsTape
             className="opra-options-tape"
-            decorByTraceId={state.classifierDecorByOptionTraceId}
             filters={state.flowFilters}
             flowPacketById={state.flowPacketMap}
             focusedContractId={
@@ -410,7 +401,6 @@ export function OptionsRoute() {
                 : null
             }
             nbboByContractId={state.nbboMap}
-            nbboByTraceId={state.historicalNbboByTraceId}
             onClearFocus={() => state.setSelectedInstrument(null)}
             onContractFocus={state.focusOptionContract}
             onFiltersChange={state.setFlowFilters}

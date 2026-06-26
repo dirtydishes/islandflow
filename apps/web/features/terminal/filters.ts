@@ -118,9 +118,7 @@ const LIVE_SNAPSHOT_HISTORY_CHANNELS = new Set<LiveSubscription["channel"]>([
   "nbbo",
   "equities",
   "flow",
-  "smart-flow",
-  "smart-money",
-  "classifier-hits"
+  "smart-flow"
 ]);
 
 export const shouldRetainLiveSnapshotHistory = (

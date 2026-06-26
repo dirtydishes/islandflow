@@ -26,7 +26,7 @@ export const getSmartFlowAlertRowTint = (alert: SmartFlowAlertEvent): AlertRowTi
       `alerts-row-direction-${metadata.direction}`,
       `alerts-row-confidence-${metadata.confidenceBand}`,
       `alerts-row-evidence-${metadata.evidenceQualityBand}`,
-      `classifier-${metadata.tone}`
+      `smart-flow-tone-${metadata.tone}`
     ].join(" "),
     style: tint.style,
     metadata

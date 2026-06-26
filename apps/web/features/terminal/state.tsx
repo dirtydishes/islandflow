@@ -1,7 +1,6 @@
 "use client";
 
 import type {
-  ClassifierHitEvent,
   DurableTapeAlertRowViewModel,
   DurableTapeOptionRowViewModel,
   DurableTapeRowViewModel,
@@ -15,8 +14,7 @@ import type {
   OptionNBBO,
   OptionPrint,
   SmartFlowAlertEvent,
-  SmartFlowExplainabilityProjection,
-  SmartMoneyEvent
+  SmartFlowExplainabilityProjection
 } from "@islandflow/types";
 import {
   getSubscriptionKey as getLiveSubscriptionKey,
@@ -38,12 +36,7 @@ import {
 import type { AlertContractFocusRequest, AlertEquityFocusRequest } from "../alerts";
 import type { FlowPacketFocusRequest } from "../flow-packets";
 import { sortBySourceTime } from "./charts/markers";
-import {
-  CANDLE_INTERVALS,
-  LIVE_HOT_WINDOW_OPTIONS,
-  LIVE_OPTIONS_HEAD_LIMIT,
-  PINNED_EVIDENCE_MAX_ITEMS
-} from "./config";
+import { CANDLE_INTERVALS, LIVE_HOT_WINDOW_OPTIONS, LIVE_OPTIONS_HEAD_LIMIT } from "./config";
 import { bumpTapeDebugMetric, logTapeDebug } from "./debug";
 import {
   getAlertFlowPacketRefs,
@@ -66,23 +59,13 @@ import {
   shouldClearOptionFocusSeed,
   shouldShowEquitiesSilentFeedWarning
 } from "./filters";
-import { formatOptionContractLabel, selectPrimaryClassifierHit } from "./format";
-import {
-  type OptionSupportNbboContext,
-  stableHydrationKey,
-  stableOptionSupportNbboKey,
-  terminalHydrationScheduler
-} from "./hydration-scheduler";
+import { formatOptionContractLabel } from "./format";
+import { stableHydrationKey, terminalHydrationScheduler } from "./hydration-scheduler";
 import { toStaticTapeState, useLiveSession, usePausableTapeView, useTape } from "./live";
 import { getLiveManifest, getRouteFeatures } from "./routes";
 import { useListScroll, useScrollAnchor } from "./scroll";
 import {
-  buildClassifierDecor,
-  buildSmartMoneyDecor,
-  type ClassifierDecor,
   type DarkEvidenceItem,
-  EMPTY_CLASSIFIER_DECOR_BY_OPTION_TRACE_ID,
-  EMPTY_CLASSIFIER_HITS_BY_PACKET_ID,
   EMPTY_PACKET_ID_BY_OPTION_TRACE_ID,
   type EvidenceItem,
   extractUnderlying,
@@ -98,7 +81,6 @@ import {
   getHotChannelFeedStatus,
   getTapeItemKey,
   incrementRetentionMetric,
-  mergeNewest,
   setRetentionMetric
 } from "./tape";
 import { buildApiUrl, extractReplaySource, readErrorDetail } from "./transport";
@@ -112,9 +94,7 @@ import type {
 } from "./types";
 
 const EMPTY_ALERT_EVENTS: SmartFlowAlertEvent[] = [];
-const EMPTY_CLASSIFIER_HIT_EVENTS: ClassifierHitEvent[] = [];
 const EMPTY_SMART_FLOW_EXPLAINABILITY: SmartFlowExplainabilityProjection[] = [];
-const EMPTY_SMART_MONEY_EVENTS: SmartMoneyEvent[] = [];
 const EMPTY_INFERRED_DARK_EVENTS: InferredDarkEvent[] = [];
 const EMPTY_NEWS_STORIES: NewsStory[] = [];
 const EMPTY_DURABLE_OPTION_ROWS: DurableTapeOptionRowViewModel[] = [];
@@ -137,12 +117,6 @@ export const useTerminalState = () => {
   const [selectedAlert, setSelectedAlert] = useState<SmartFlowAlertEvent | null>(null);
   const [selectedNewsStory, setSelectedNewsStory] = useState<NewsStory | null>(null);
   const [selectedDarkEvent, setSelectedDarkEvent] = useState<InferredDarkEvent | null>(null);
-  const [selectedClassifierHit, setSelectedClassifierHit] = useState<ClassifierHitEvent | null>(
-    null
-  );
-  const [selectedSmartMoneyEvent, setSelectedSmartMoneyEvent] = useState<SmartMoneyEvent | null>(
-    null
-  );
   const [selectedSmartFlowProjection, setSelectedSmartFlowProjection] =
     useState<SmartFlowExplainabilityProjection | null>(null);
   const [selectedInstrument, setSelectedInstrument] = useState<SelectedInstrument>(null);
@@ -230,9 +204,7 @@ export const useTerminalState = () => {
   const flowLastUpdate = liveSession.lastEventByChannel.flow ?? null;
   const alertsLastUpdate = liveSession.lastEventByChannel["smart-flow-alerts"] ?? null;
   const durableRowsLastUpdate = liveSession.lastEventByChannel["durable-rows"] ?? null;
-  const classifierHitsLastUpdate = liveSession.lastEventByChannel["classifier-hits"] ?? null;
   const smartFlowLastUpdate = liveSession.lastEventByChannel["smart-flow"] ?? null;
-  const smartMoneyLastUpdate = liveSession.lastEventByChannel["smart-money"] ?? null;
   const inferredDarkLastUpdate = liveSession.lastEventByChannel["inferred-dark"] ?? null;
   const newsLastUpdate = liveSession.lastEventByChannel.news ?? null;
   const currentOptionSubscription = useMemo(
@@ -261,10 +233,8 @@ export const useTerminalState = () => {
     if (
       !selectedAlert &&
       !selectedNewsStory &&
-      !selectedClassifierHit &&
       !selectedDarkEvent &&
-      !selectedSmartFlowProjection &&
-      !selectedSmartMoneyEvent
+      !selectedSmartFlowProjection
     ) {
       return;
     }
@@ -272,9 +242,7 @@ export const useTerminalState = () => {
     const dismissDrawers = () => {
       setSelectedAlert(null);
       setSelectedNewsStory(null);
-      setSelectedClassifierHit(null);
       setSelectedSmartFlowProjection(null);
-      setSelectedSmartMoneyEvent(null);
       setSelectedDarkEvent(null);
     };
 
@@ -298,21 +266,14 @@ export const useTerminalState = () => {
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [
-    selectedAlert,
-    selectedNewsStory,
-    selectedClassifierHit,
-    selectedDarkEvent,
-    selectedSmartFlowProjection,
-    selectedSmartMoneyEvent
-  ]);
+  }, [selectedAlert, selectedNewsStory, selectedDarkEvent, selectedSmartFlowProjection]);
 
   const optionsScroll = useListScroll();
   const equitiesScroll = useListScroll();
   const flowScroll = useListScroll();
   const darkScroll = useListScroll();
   const alertsScroll = useListScroll();
-  const classifierScroll = useListScroll();
+  const smartFlowScroll = useListScroll();
   const newsScroll = useListScroll();
 
   const optionsAnchor = useScrollAnchor(optionsScroll.listRef, optionsScroll.isAtTopRef);
@@ -320,7 +281,7 @@ export const useTerminalState = () => {
   const flowAnchor = useScrollAnchor(flowScroll.listRef, flowScroll.isAtTopRef);
   const darkAnchor = useScrollAnchor(darkScroll.listRef, darkScroll.isAtTopRef);
   const alertsAnchor = useScrollAnchor(alertsScroll.listRef, alertsScroll.isAtTopRef);
-  const classifierAnchor = useScrollAnchor(classifierScroll.listRef, classifierScroll.isAtTopRef);
+  const smartFlowAnchor = useScrollAnchor(smartFlowScroll.listRef, smartFlowScroll.isAtTopRef);
   const newsAnchor = useScrollAnchor(newsScroll.listRef, newsScroll.isAtTopRef);
   const disableReplayGrouping = useCallback(() => null, []);
   const optionQueryParams = useMemo<Record<string, string | undefined>>(
@@ -430,19 +391,6 @@ export const useTerminalState = () => {
     onNewItems: alertsScroll.onNewItems,
     getReplayKey: disableReplayGrouping
   });
-  const classifierHits = useTape<ClassifierHitEvent>({
-    mode,
-    liveEnabled: false,
-    wsPath: "/ws/classifier-hits",
-    replayPath: "/replay/classifier-hits",
-    latestPath: "/flow/classifier-hits",
-    expectedType: "classifier-hit",
-    batchSize: mode === "replay" ? 120 : undefined,
-    pollMs: mode === "replay" ? 200 : undefined,
-    captureScroll: classifierAnchor.capture,
-    onNewItems: classifierScroll.onNewItems,
-    getReplayKey: disableReplayGrouping
-  });
   const smartFlow = useTape<SmartFlowExplainabilityProjection>({
     mode,
     liveEnabled: false,
@@ -452,21 +400,8 @@ export const useTerminalState = () => {
     expectedType: "smart-flow",
     batchSize: mode === "replay" ? 120 : undefined,
     pollMs: mode === "replay" ? 200 : undefined,
-    captureScroll: classifierAnchor.capture,
-    onNewItems: classifierScroll.onNewItems,
-    getReplayKey: disableReplayGrouping
-  });
-  const smartMoney = useTape<SmartMoneyEvent>({
-    mode,
-    liveEnabled: false,
-    wsPath: "/ws/smart-money",
-    replayPath: "/replay/smart-money",
-    latestPath: "/flow/smart-money",
-    expectedType: "smart-money",
-    batchSize: mode === "replay" ? 120 : undefined,
-    pollMs: mode === "replay" ? 200 : undefined,
-    captureScroll: classifierAnchor.capture,
-    onNewItems: classifierScroll.onNewItems,
+    captureScroll: smartFlowAnchor.capture,
+    onNewItems: smartFlowScroll.onNewItems,
     getReplayKey: disableReplayGrouping
   });
 
@@ -565,17 +500,9 @@ export const useTerminalState = () => {
     () => composeTapeItems([], liveSession.durableRows, liveSession.durableRowsHistory),
     [liveSession.durableRows, liveSession.durableRowsHistory]
   );
-  const liveClassifierHitItems = useMemo(
-    () => composeTapeItems([], liveSession.classifierHits, liveSession.classifierHitsHistory),
-    [liveSession.classifierHits, liveSession.classifierHitsHistory]
-  );
   const liveSmartFlowItems = useMemo(
     () => composeTapeItems([], liveSession.smartFlow, liveSession.smartFlowHistory),
     [liveSession.smartFlow, liveSession.smartFlowHistory]
-  );
-  const liveSmartMoneyItems = useMemo(
-    () => composeTapeItems([], liveSession.smartMoney, liveSession.smartMoneyHistory),
-    [liveSession.smartMoney, liveSession.smartMoneyHistory]
   );
   const liveInferredDarkItems = useMemo(
     () => composeTapeItems([], liveSession.inferredDark, liveSession.inferredDarkHistory),
@@ -607,18 +534,10 @@ export const useTerminalState = () => {
     mode === "live"
       ? toStaticTapeState(liveSession.status, liveDurableRowItems, durableRowsLastUpdate)
       : toStaticTapeState<DurableTapeRowViewModel>("disconnected", [], null);
-  const classifierHitsFeed =
-    mode === "live"
-      ? toStaticTapeState(liveSession.status, liveClassifierHitItems, classifierHitsLastUpdate)
-      : classifierHits;
   const smartFlowFeed =
     mode === "live"
       ? toStaticTapeState(liveSession.status, liveSmartFlowItems, smartFlowLastUpdate)
       : smartFlow;
-  const smartMoneyFeed =
-    mode === "live"
-      ? toStaticTapeState(liveSession.status, liveSmartMoneyItems, smartMoneyLastUpdate)
-      : smartMoney;
   const inferredDarkFeed =
     mode === "live"
       ? toStaticTapeState(liveSession.status, liveInferredDarkItems, inferredDarkLastUpdate)
@@ -645,8 +564,8 @@ export const useTerminalState = () => {
   }, [alertsFeed.items, alertsAnchor.apply]);
 
   useLayoutEffect(() => {
-    classifierAnchor.apply();
-  }, [smartFlowFeed.items, smartMoneyFeed.items, classifierHitsFeed.items, classifierAnchor.apply]);
+    smartFlowAnchor.apply();
+  }, [smartFlowFeed.items, smartFlowAnchor.apply]);
 
   useLayoutEffect(() => {
     newsAnchor.apply();
@@ -701,16 +620,6 @@ export const useTerminalState = () => {
   >(() => new Map());
   const [pinnedEquityJoinMap, setPinnedEquityJoinMap] = useState<
     Map<string, PinnedEntry<EquityPrintJoin>>
-  >(() => new Map());
-  const [optionSupportSmartMoney, setOptionSupportSmartMoney] = useState<SmartMoneyEvent[]>([]);
-  const [optionSupportSmartFlowProjections, setOptionSupportSmartFlowProjections] = useState<
-    SmartFlowExplainabilityProjection[]
-  >([]);
-  const [optionSupportClassifierHits, setOptionSupportClassifierHits] = useState<
-    ClassifierHitEvent[]
-  >([]);
-  const [historicalNbboByTraceId, setHistoricalNbboByTraceId] = useState<
-    Map<string, OptionNBBO | null>
   >(() => new Map());
 
   const resolvedOptionPrintMap = useMemo(() => {
@@ -830,9 +739,7 @@ export const useTerminalState = () => {
       setSelectedAlert(null);
     }
     setSelectedDarkEvent(null);
-    setSelectedClassifierHit(null);
     setSelectedSmartFlowProjection(null);
-    setSelectedSmartMoneyEvent(null);
   }, [mode]);
 
   const extractPacketContract = useCallback((packet: FlowPacket): string => {
@@ -844,60 +751,8 @@ export const useTerminalState = () => {
     return match?.[1] ?? packet.id;
   }, []);
 
-  const extractUnderlyingFromTrace = useCallback((traceId: string): string | null => {
-    const match = traceId.match(/flowpacket:([^:]+):/);
-    if (!match?.[1]) {
-      return null;
-    }
-    return extractUnderlying(match[1]);
-  }, []);
-
-  const extractPacketIdFromClassifierHitTrace = useCallback((traceId: string): string | null => {
-    const idx = traceId.indexOf("flowpacket:");
-    if (idx < 0) {
-      return null;
-    }
-    return traceId.slice(idx);
-  }, []);
-
-  const classifierHitsByPacketId = useMemo(() => {
-    if (!routeFeatures.needsClassifierDecor) {
-      return EMPTY_CLASSIFIER_HITS_BY_PACKET_ID;
-    }
-    const map = new Map<string, ClassifierHitEvent[]>();
-    for (const hit of [...classifierHitsFeed.items, ...optionSupportClassifierHits]) {
-      const packetId = extractPacketIdFromClassifierHitTrace(hit.trace_id);
-      if (!packetId) {
-        continue;
-      }
-      map.set(packetId, [...(map.get(packetId) ?? []), hit]);
-    }
-    return map;
-  }, [
-    classifierHitsFeed.items,
-    optionSupportClassifierHits,
-    extractPacketIdFromClassifierHitTrace,
-    routeFeatures.needsClassifierDecor
-  ]);
-
-  const smartMoneyByPacketId = useMemo(() => {
-    if (!routeFeatures.needsClassifierDecor) {
-      return new Map<string, SmartMoneyEvent>();
-    }
-    const map = new Map<string, SmartMoneyEvent>();
-    for (const event of [...smartMoneyFeed.items, ...optionSupportSmartMoney]) {
-      for (const packetId of event.packet_ids) {
-        const existing = map.get(packetId);
-        if (!existing || event.source_ts > existing.source_ts || event.seq > existing.seq) {
-          map.set(packetId, event);
-        }
-      }
-    }
-    return map;
-  }, [smartMoneyFeed.items, optionSupportSmartMoney, routeFeatures.needsClassifierDecor]);
-
   const packetIdByOptionTraceId = useMemo(() => {
-    if (!routeFeatures.needsClassifierDecor) {
+    if (!routeFeatures.needsSmartFlowDecor) {
       return EMPTY_PACKET_ID_BY_OPTION_TRACE_ID;
     }
     const map = new Map<string, string>();
@@ -907,239 +762,7 @@ export const useTerminalState = () => {
       }
     }
     return map;
-  }, [resolvedFlowPacketMap, routeFeatures.needsClassifierDecor]);
-
-  const classifierDecorByOptionTraceId = useMemo(() => {
-    if (!routeFeatures.needsClassifierDecor) {
-      return EMPTY_CLASSIFIER_DECOR_BY_OPTION_TRACE_ID;
-    }
-    const map = new Map<string, ClassifierDecor>();
-    for (const [traceId, packetId] of packetIdByOptionTraceId) {
-      const smartMoneyEvent = smartMoneyByPacketId.get(packetId);
-      if (smartMoneyEvent) {
-        map.set(traceId, buildSmartMoneyDecor(smartMoneyEvent));
-        continue;
-      }
-      const primary = selectPrimaryClassifierHit(classifierHitsByPacketId.get(packetId) ?? []);
-      if (primary) {
-        map.set(traceId, buildClassifierDecor(primary));
-      }
-    }
-    return map;
-  }, [
-    classifierHitsByPacketId,
-    packetIdByOptionTraceId,
-    smartMoneyByPacketId,
-    routeFeatures.needsClassifierDecor
-  ]);
-
-  const optionSupportHydrationInput = useMemo(() => {
-    const traceIds: string[] = [];
-    const nbboContext: OptionSupportNbboContext[] = [];
-    if (!routeFeatures.needsClassifierDecor || mode !== "live" || optionsFeed.items.length === 0) {
-      return { traceIds, nbboContext };
-    }
-
-    for (const print of optionsFeed.items.slice(0, 1000)) {
-      if (!print.trace_id || classifierDecorByOptionTraceId.has(print.trace_id)) {
-        continue;
-      }
-      if (!packetIdByOptionTraceId.has(print.trace_id)) {
-        traceIds.push(print.trace_id);
-      }
-      const missingPreservedNbbo =
-        typeof print.execution_nbbo_side !== "string" &&
-        typeof print.nbbo_side !== "string" &&
-        !historicalNbboByTraceId.has(print.trace_id);
-      if (missingPreservedNbbo) {
-        nbboContext.push({
-          trace_id: print.trace_id,
-          option_contract_id: print.option_contract_id,
-          ts: print.ts
-        });
-      }
-      if (traceIds.length >= 250 && nbboContext.length >= 250) {
-        break;
-      }
-    }
-
-    const uniqueTraceIds = Array.from(new Set(traceIds)).slice(0, 250);
-    const uniqueNbboContext = Array.from(
-      new Map(nbboContext.map((item) => [item.trace_id, item])).values()
-    ).slice(0, 250);
-    return { traceIds: uniqueTraceIds, nbboContext: uniqueNbboContext };
-  }, [
-    mode,
-    optionsFeed.items,
-    classifierDecorByOptionTraceId,
-    packetIdByOptionTraceId,
-    historicalNbboByTraceId,
-    routeFeatures.needsClassifierDecor
-  ]);
-
-  const optionSupportTraceKey = stableHydrationKey(optionSupportHydrationInput.traceIds);
-  const optionSupportNbboKey = stableOptionSupportNbboKey(optionSupportHydrationInput.nbboContext);
-
-  useEffect(() => {
-    if (!routeFeatures.needsClassifierDecor || mode !== "live") {
-      return;
-    }
-
-    const uniqueTraceIds = optionSupportHydrationInput.traceIds;
-    const uniqueNbboContext = optionSupportHydrationInput.nbboContext;
-    if (uniqueTraceIds.length === 0 && uniqueNbboContext.length === 0) {
-      return;
-    }
-
-    let active = true;
-    void terminalHydrationScheduler
-      .requestOptionSupport({
-        traceIds: uniqueTraceIds,
-        nbboContext: uniqueNbboContext
-      })
-      .then((payload) => {
-        if (!active) {
-          return;
-        }
-        const now = Date.now();
-        const packetMap = new Map<string, FlowPacket>();
-        for (const packet of payload.packets ?? []) {
-          if (!packet || !packet.id) {
-            continue;
-          }
-          packetMap.set(packet.id, packet);
-        }
-        if (packetMap.size > 0) {
-          setPinnedFlowPacketMap((prev) => upsertPinnedEntries(prev, packetMap, now));
-        }
-        if (payload.smartMoney.length) {
-          const filtered = payload.smartMoney.filter((item): item is SmartMoneyEvent =>
-            Boolean(item && item.trace_id)
-          );
-          setOptionSupportSmartMoney((prev) =>
-            mergeNewest(filtered, prev, PINNED_EVIDENCE_MAX_ITEMS)
-          );
-        }
-        if (payload.smartFlowProjections.length) {
-          const filtered = payload.smartFlowProjections.filter(
-            (item): item is SmartFlowExplainabilityProjection => Boolean(item && item.trace_id)
-          );
-          setOptionSupportSmartFlowProjections((prev) =>
-            mergeNewest(filtered, prev, PINNED_EVIDENCE_MAX_ITEMS)
-          );
-        }
-        if (payload.classifierHits.length) {
-          const filtered = payload.classifierHits.filter((item): item is ClassifierHitEvent =>
-            Boolean(item && item.trace_id)
-          );
-          setOptionSupportClassifierHits((prev) =>
-            mergeNewest(filtered, prev, PINNED_EVIDENCE_MAX_ITEMS)
-          );
-        }
-        if (Object.keys(payload.nbboByTraceId).length > 0) {
-          setHistoricalNbboByTraceId((prev) => {
-            const next = new Map(prev);
-            for (const [traceId, quote] of Object.entries(payload.nbboByTraceId)) {
-              next.set(traceId, quote);
-            }
-            return next;
-          });
-        }
-      })
-      .catch((error) => {
-        if (!active) {
-          return;
-        }
-        console.warn("Failed to hydrate option row support", error);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [mode, optionSupportNbboKey, optionSupportTraceKey, routeFeatures.needsClassifierDecor]);
-
-  const selectedClassifierPacketId = useMemo(() => {
-    if (!selectedClassifierHit) {
-      return null;
-    }
-    return extractPacketIdFromClassifierHitTrace(selectedClassifierHit.trace_id);
-  }, [extractPacketIdFromClassifierHitTrace, selectedClassifierHit]);
-
-  const selectedClassifierMissingPacketIds = useMemo(
-    () =>
-      selectedClassifierPacketId && !resolvedFlowPacketMap.has(selectedClassifierPacketId)
-        ? [selectedClassifierPacketId]
-        : [],
-    [resolvedFlowPacketMap, selectedClassifierPacketId]
-  );
-  const selectedClassifierMissingPacketKey = stableHydrationKey(selectedClassifierMissingPacketIds);
-
-  useEffect(() => {
-    if (mode !== "live" || selectedClassifierMissingPacketIds.length === 0) {
-      return;
-    }
-
-    let active = true;
-    incrementRetentionMetric("pinnedFetchMisses", selectedClassifierMissingPacketIds.length);
-    void terminalHydrationScheduler
-      .requestFlowPackets(selectedClassifierMissingPacketIds)
-      .then(({ packets }) => {
-        if (!active || packets.length === 0) {
-          return;
-        }
-        const next = new Map<string, FlowPacket>();
-        for (const packet of packets) {
-          next.set(packet.id, packet);
-        }
-        setPinnedFlowPacketMap((prev) => upsertPinnedEntries(prev, next, Date.now()));
-      })
-      .catch((error) => {
-        if (!active) {
-          return;
-        }
-        incrementRetentionMetric("pinnedFetchFailures", 1);
-        console.warn("Failed to fetch classifier flow packet", error);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [mode, selectedClassifierMissingPacketKey]);
-
-  const selectedClassifierFlowPacket = useMemo(() => {
-    if (!selectedClassifierPacketId) {
-      return null;
-    }
-    return resolvedFlowPacketMap.get(selectedClassifierPacketId) ?? null;
-  }, [resolvedFlowPacketMap, selectedClassifierPacketId]);
-
-  const selectedClassifierEvidence = useMemo((): EvidenceItem[] => {
-    if (!selectedClassifierHit) {
-      return [];
-    }
-
-    if (!selectedClassifierPacketId) {
-      return [];
-    }
-
-    const packet = resolvedFlowPacketMap.get(selectedClassifierPacketId);
-    if (!packet) {
-      return [];
-    }
-
-    return packet.members.map((id) => {
-      const print = resolvedOptionPrintMap.get(id);
-      if (print) {
-        return { kind: "print", id, print };
-      }
-      return { kind: "unknown", id };
-    });
-  }, [
-    resolvedFlowPacketMap,
-    resolvedOptionPrintMap,
-    selectedClassifierHit,
-    selectedClassifierPacketId
-  ]);
+  }, [resolvedFlowPacketMap, routeFeatures.needsSmartFlowDecor]);
 
   const selectedSmartFlowRefs = useMemo(
     () =>
@@ -1244,105 +867,6 @@ export const useTerminalState = () => {
     selectedSmartFlowMissingPacketKey,
     selectedSmartFlowMissingPrintKey,
     selectedSmartFlowProjection
-  ]);
-
-  const selectedSmartMoneyFlowPacket = useMemo(() => {
-    const packetId = selectedSmartMoneyEvent?.packet_ids[0];
-    return packetId ? (resolvedFlowPacketMap.get(packetId) ?? null) : null;
-  }, [resolvedFlowPacketMap, selectedSmartMoneyEvent]);
-
-  const selectedSmartMoneyEvidence = useMemo((): EvidenceItem[] => {
-    if (!selectedSmartMoneyEvent) {
-      return [];
-    }
-    return selectedSmartMoneyEvent.member_print_ids.map((id) => {
-      const print = resolvedOptionPrintMap.get(id);
-      if (print) {
-        return { kind: "print", id, print };
-      }
-      return { kind: "unknown", id };
-    });
-  }, [resolvedOptionPrintMap, selectedSmartMoneyEvent]);
-
-  const selectedSmartMoneyMissingPacketIds = useMemo(
-    () =>
-      (selectedSmartMoneyEvent?.packet_ids ?? []).filter((id) => !resolvedFlowPacketMap.has(id)),
-    [resolvedFlowPacketMap, selectedSmartMoneyEvent]
-  );
-  const selectedSmartMoneyMissingPacketKey = stableHydrationKey(selectedSmartMoneyMissingPacketIds);
-  const selectedSmartMoneyMissingPrintIds = useMemo(
-    () =>
-      (selectedSmartMoneyEvent?.member_print_ids ?? []).filter(
-        (id) => !resolvedOptionPrintMap.has(id)
-      ),
-    [resolvedOptionPrintMap, selectedSmartMoneyEvent]
-  );
-  const selectedSmartMoneyMissingPrintKey = stableHydrationKey(selectedSmartMoneyMissingPrintIds);
-
-  useEffect(() => {
-    if (!selectedSmartMoneyEvent || mode !== "live") {
-      return;
-    }
-
-    let active = true;
-    if (selectedSmartMoneyMissingPacketIds.length > 0) {
-      incrementRetentionMetric("pinnedFetchMisses", selectedSmartMoneyMissingPacketIds.length);
-      void terminalHydrationScheduler
-        .requestFlowPackets(selectedSmartMoneyMissingPacketIds)
-        .then(({ packets }) => {
-          if (!active) {
-            return;
-          }
-          const next = new Map<string, FlowPacket>();
-          for (const packet of packets) {
-            next.set(packet.id, packet);
-          }
-          if (next.size > 0) {
-            setPinnedFlowPacketMap((prev) => upsertPinnedEntries(prev, next, Date.now()));
-          }
-        })
-        .catch((error) => {
-          if (!active) {
-            return;
-          }
-          incrementRetentionMetric("pinnedFetchFailures", 1);
-          console.warn("Failed to fetch smart-money flow packets", error);
-        });
-    }
-
-    if (selectedSmartMoneyMissingPrintIds.length > 0) {
-      incrementRetentionMetric("pinnedFetchMisses", selectedSmartMoneyMissingPrintIds.length);
-      void terminalHydrationScheduler
-        .requestOptionPrints(selectedSmartMoneyMissingPrintIds)
-        .then(({ prints }) => {
-          if (!active) {
-            return;
-          }
-          const next = new Map<string, OptionPrint>();
-          for (const item of prints) {
-            next.set(item.trace_id, item);
-          }
-          if (next.size > 0) {
-            setPinnedOptionPrintMap((prev) => upsertPinnedEntries(prev, next, Date.now()));
-          }
-        })
-        .catch((error) => {
-          if (!active) {
-            return;
-          }
-          incrementRetentionMetric("pinnedFetchFailures", 1);
-          console.warn("Failed to fetch smart-money option prints", error);
-        });
-    }
-
-    return () => {
-      active = false;
-    };
-  }, [
-    mode,
-    selectedSmartMoneyEvent,
-    selectedSmartMoneyMissingPacketKey,
-    selectedSmartMoneyMissingPrintKey
   ]);
 
   const inferAlertUnderlying = useCallback(
@@ -1848,12 +1372,6 @@ export const useTerminalState = () => {
         keys.add(packetId);
       }
     }
-    if (selectedClassifierPacketId) {
-      keys.add(selectedClassifierPacketId);
-    }
-    for (const packetId of selectedSmartMoneyEvent?.packet_ids ?? []) {
-      keys.add(packetId);
-    }
     for (const packetId of getSmartFlowPinnedFlowKeys(selectedSmartFlowProjection)) {
       keys.add(packetId);
     }
@@ -1863,13 +1381,7 @@ export const useTerminalState = () => {
       }
     }
     return keys;
-  }, [
-    selectedAlert,
-    selectedClassifierPacketId,
-    selectedSmartFlowProjection,
-    selectedSmartMoneyEvent,
-    visibleAlerts
-  ]);
+  }, [selectedAlert, selectedSmartFlowProjection, visibleAlerts]);
 
   const activePinnedOptionKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -1878,14 +1390,6 @@ export const useTerminalState = () => {
         keys.add(id);
       }
     }
-    if (selectedClassifierFlowPacket) {
-      for (const id of selectedClassifierFlowPacket.members) {
-        keys.add(id);
-      }
-    }
-    for (const id of selectedSmartMoneyEvent?.member_print_ids ?? []) {
-      keys.add(id);
-    }
     for (const id of getSmartFlowPinnedOptionKeys(selectedSmartFlowProjection)) {
       keys.add(id);
     }
@@ -1893,13 +1397,7 @@ export const useTerminalState = () => {
       keys.add(id);
     }
     return keys;
-  }, [
-    selectedAlert,
-    selectedClassifierFlowPacket,
-    selectedSmartFlowProjection,
-    selectedSmartMoneyEvent,
-    visibleAlertOptionPrintRefs
-  ]);
+  }, [selectedAlert, selectedSmartFlowProjection, visibleAlertOptionPrintRefs]);
 
   const activePinnedJoinKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -1941,71 +1439,17 @@ export const useTerminalState = () => {
     };
   }, []);
 
-  const filteredClassifierHits = useMemo(() => {
-    if (!routeFeatures.classifierHits) {
-      return EMPTY_CLASSIFIER_HIT_EVENTS;
-    }
-    if (tickerSet.size === 0) {
-      return classifierHitsFeed.items;
-    }
-    return classifierHitsFeed.items.filter((hit) => {
-      const underlying = extractUnderlyingFromTrace(hit.trace_id);
-      return matchesTicker(underlying);
-    });
-  }, [
-    classifierHitsFeed.items,
-    extractUnderlyingFromTrace,
-    matchesTicker,
-    tickerSet,
-    routeFeatures.classifierHits
-  ]);
-
   const filteredSmartFlowProjections = useMemo(() => {
     if (!routeFeatures.smartFlow) {
       return EMPTY_SMART_FLOW_EXPLAINABILITY;
     }
-    const items = mergeNewest(
-      smartFlowFeed.items,
-      optionSupportSmartFlowProjections,
-      PINNED_EVIDENCE_MAX_ITEMS
+    if (tickerSet.size === 0) {
+      return smartFlowFeed.items;
+    }
+    return smartFlowFeed.items.filter((projection) =>
+      matchesTicker(projection.hypothesis.underlying_id)
     );
-    if (tickerSet.size === 0) {
-      return items;
-    }
-    return items.filter((projection) => matchesTicker(projection.hypothesis.underlying_id));
-  }, [
-    matchesTicker,
-    optionSupportSmartFlowProjections,
-    smartFlowFeed.items,
-    tickerSet,
-    routeFeatures.smartFlow
-  ]);
-
-  const filteredSmartMoneyEvents = useMemo(() => {
-    if (!routeFeatures.smartMoney) {
-      return EMPTY_SMART_MONEY_EVENTS;
-    }
-    if (tickerSet.size === 0) {
-      return smartMoneyFeed.items;
-    }
-    return smartMoneyFeed.items.filter((event) => matchesTicker(event.underlying_id));
-  }, [matchesTicker, smartMoneyFeed.items, tickerSet, routeFeatures.smartMoney]);
-
-  const chartSmartMoneyEvents = useMemo(() => {
-    if (!routeFeatures.showChartPane) {
-      return EMPTY_SMART_MONEY_EVENTS;
-    }
-    const desired = chartTicker.toUpperCase();
-    return smartMoneyFeed.items
-      .filter((event) => event.underlying_id.toUpperCase() === desired)
-      .sort((a, b) => {
-        const delta = a.source_ts - b.source_ts;
-        if (delta !== 0) {
-          return delta;
-        }
-        return a.seq - b.seq;
-      });
-  }, [chartTicker, smartMoneyFeed.items, routeFeatures.showChartPane]);
+  }, [matchesTicker, smartFlowFeed.items, tickerSet, routeFeatures.smartFlow]);
 
   const chartSmartFlowProjections = useMemo(() => {
     if (!routeFeatures.showChartPane) {
@@ -2035,73 +1479,14 @@ export const useTerminalState = () => {
       });
   }, [chartTicker, inferredDarkFeed.items, resolvedEquityJoinMap, routeFeatures.showChartPane]);
 
-  const findAlertForClassifierHit = useCallback(
-    (hit: ClassifierHitEvent): SmartFlowAlertEvent | null => {
-      const packetId = extractPacketIdFromClassifierHitTrace(hit.trace_id);
-      if (!packetId) {
-        return null;
-      }
-
-      return (
-        alertsFeed.items.find(
-          (item) =>
-            item.trigger.projection_trace_id === hit.trace_id ||
-            getAlertFlowPacketRefs(item).includes(packetId)
-        ) ?? null
-      );
-    },
-    [alertsFeed.items, extractPacketIdFromClassifierHitTrace]
-  );
-
-  const openFromClassifierHit = useCallback(
-    (hit: ClassifierHitEvent) => {
-      const alert = findAlertForClassifierHit(hit);
-      if (alert) {
-        setSelectedNewsStory(null);
-        setSelectedClassifierHit(null);
-        setSelectedDarkEvent(null);
-        setSelectedSmartFlowProjection(null);
-        setSelectedSmartMoneyEvent(null);
-        setSelectedAlert(alert);
-        return;
-      }
-
-      setSelectedNewsStory(null);
-      setSelectedAlert(null);
-      setSelectedDarkEvent(null);
-      setSelectedSmartFlowProjection(null);
-      setSelectedSmartMoneyEvent(null);
-      setSelectedClassifierHit(hit);
-    },
-    [findAlertForClassifierHit]
-  );
-
   const openFromSmartFlowProjection = useCallback(
     (projection: SmartFlowExplainabilityProjection) => {
       setSelectedNewsStory(null);
       setSelectedAlert(null);
-      setSelectedClassifierHit(null);
       setSelectedDarkEvent(null);
-      setSelectedSmartMoneyEvent(null);
       setSelectedSmartFlowProjection(projection);
     },
     []
-  );
-
-  const openFromSmartMoneyEvent = useCallback((event: SmartMoneyEvent) => {
-    setSelectedNewsStory(null);
-    setSelectedAlert(null);
-    setSelectedClassifierHit(null);
-    setSelectedDarkEvent(null);
-    setSelectedSmartFlowProjection(null);
-    setSelectedSmartMoneyEvent(event);
-  }, []);
-
-  const handleSmartMoneyMarkerClick = useCallback(
-    (event: SmartMoneyEvent) => {
-      openFromSmartMoneyEvent(event);
-    },
-    [openFromSmartMoneyEvent]
   );
 
   const handleSmartFlowMarkerClick = useCallback(
@@ -2114,9 +1499,7 @@ export const useTerminalState = () => {
   const handleDarkMarkerClick = useCallback((event: InferredDarkEvent) => {
     setSelectedNewsStory(null);
     setSelectedAlert(null);
-    setSelectedClassifierHit(null);
     setSelectedSmartFlowProjection(null);
-    setSelectedSmartMoneyEvent(null);
     setSelectedDarkEvent(event);
   }, []);
 
@@ -2146,12 +1529,6 @@ export const useTerminalState = () => {
     if (routeFeatures.smartFlow || routeFeatures.showChartPane) {
       updates.push(smartFlowFeed.lastUpdate);
     }
-    if (routeFeatures.smartMoney || routeFeatures.showChartPane) {
-      updates.push(smartMoneyFeed.lastUpdate);
-    }
-    if (routeFeatures.classifierHits) {
-      updates.push(classifierHitsFeed.lastUpdate);
-    }
     return (
       updates.filter((value): value is number => value !== null).sort((a, b) => b - a)[0] ?? null
     );
@@ -2170,9 +1547,7 @@ export const useTerminalState = () => {
     routeFeatures.showAlertsPane,
     routeFeatures.durableRows,
     routeFeatures.smartFlow,
-    routeFeatures.smartMoney,
     routeFeatures.showChartPane,
-    routeFeatures.classifierHits,
     optionsFeed.lastUpdate,
     equitiesFeed.lastUpdate,
     inferredDarkFeed.lastUpdate,
@@ -2180,9 +1555,7 @@ export const useTerminalState = () => {
     newsFeed.lastUpdate,
     alertsFeed.lastUpdate,
     durableRowsFeed.lastUpdate,
-    smartMoneyFeed.lastUpdate,
-    smartFlowFeed.lastUpdate,
-    classifierHitsFeed.lastUpdate
+    smartFlowFeed.lastUpdate
   ]);
 
   return {
@@ -2196,12 +1569,8 @@ export const useTerminalState = () => {
     setSelectedNewsStory,
     selectedDarkEvent,
     setSelectedDarkEvent,
-    selectedClassifierHit,
-    setSelectedClassifierHit,
     selectedSmartFlowProjection,
     setSelectedSmartFlowProjection,
-    selectedSmartMoneyEvent,
-    setSelectedSmartMoneyEvent,
     selectedInstrument,
     setSelectedInstrument,
     clearSelectedInstrument,
@@ -2217,7 +1586,7 @@ export const useTerminalState = () => {
     flowScroll,
     darkScroll,
     alertsScroll,
-    classifierScroll,
+    smartFlowScroll,
     newsScroll,
     options: optionsFeed,
     equities: equitiesFeed,
@@ -2229,29 +1598,19 @@ export const useTerminalState = () => {
     alerts: alertsFeed,
     durableRows: durableRowsFeed,
     smartFlow: smartFlowFeed,
-    smartMoney: smartMoneyFeed,
-    classifierHits: classifierHitsFeed,
     liveSession,
     routeFeatures,
     activeTickers,
     tickerSet,
     chartTicker,
     nbboMap,
-    historicalNbboByTraceId,
     optionPrintMap: resolvedOptionPrintMap,
     equityJoinMap: resolvedEquityJoinMap,
     flowPacketMap: resolvedFlowPacketMap,
-    classifierHitsByPacketId,
     packetIdByOptionTraceId,
-    classifierDecorByOptionTraceId,
     selectedDarkEvidence,
     selectedDarkUnderlying,
-    selectedClassifierPacketId,
-    selectedClassifierFlowPacket,
-    selectedClassifierEvidence,
     selectedSmartFlowEvidence,
-    selectedSmartMoneyFlowPacket,
-    selectedSmartMoneyEvidence,
     filteredOptions,
     filteredEquities,
     optionsScopedQuiet,
@@ -2264,10 +1623,7 @@ export const useTerminalState = () => {
     filteredDurableOptionRows,
     filteredDurableAlertRows,
     filteredSmartFlowProjections,
-    filteredSmartMoneyEvents,
-    filteredClassifierHits,
     chartSmartFlowProjections,
-    chartSmartMoneyEvents,
     chartInferredDark,
     focusOptionContract,
     focusEquityTicker,
@@ -2276,10 +1632,7 @@ export const useTerminalState = () => {
     focusAlertEquity,
     clearSelectedAlert,
     openFromSmartFlowProjection,
-    openFromSmartMoneyEvent,
-    openFromClassifierHit,
     handleSmartFlowMarkerClick,
-    handleSmartMoneyMarkerClick,
     handleDarkMarkerClick,
     lastSeen,
     toggleMode: () => {

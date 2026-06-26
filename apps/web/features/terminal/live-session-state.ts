@@ -1,6 +1,4 @@
 import type {
-  AlertEvent,
-  ClassifierHitEvent,
   DurableTapeRowViewModel,
   EquityCandle,
   EquityPrint,
@@ -13,8 +11,7 @@ import type {
   OptionNBBO,
   OptionPrint,
   SmartFlowAlertEvent,
-  SmartFlowExplainabilityProjection,
-  SmartMoneyEvent
+  SmartFlowExplainabilityProjection
 } from "@islandflow/types";
 import { getSubscriptionKey as getLiveSubscriptionKey } from "@islandflow/types";
 import type { LiveWindowBuffer, LiveWindowSnapshot } from "../durable-tape";
@@ -38,9 +35,6 @@ type LiveSessionChannelItems = {
   flow: FlowPacket;
   smartFlow: SmartFlowExplainabilityProjection;
   smartFlowAlerts: SmartFlowAlertEvent;
-  smartMoney: SmartMoneyEvent;
-  classifierHits: ClassifierHitEvent;
-  alerts: AlertEvent;
   durableRows: DurableTapeRowViewModel;
   news: NewsStory;
   inferredDark: InferredDarkEvent;
@@ -63,9 +57,6 @@ const LIVE_SESSION_BUFFER_CHANNELS = [
   "flow",
   "smartFlow",
   "smartFlowAlerts",
-  "smartMoney",
-  "classifierHits",
-  "alerts",
   "durableRows",
   "news",
   "inferredDark",
@@ -73,7 +64,9 @@ const LIVE_SESSION_BUFFER_CHANNELS = [
   "chartOverlay"
 ] as const satisfies readonly LiveSessionBufferedChannel[];
 
-const LIVE_SUBSCRIPTION_BUFFER_CHANNELS = {
+const LIVE_SUBSCRIPTION_BUFFER_CHANNELS: Partial<
+  Record<LiveSubscription["channel"], LiveSessionBufferedChannel>
+> = {
   options: "options",
   nbbo: "nbbo",
   equities: "equities",
@@ -82,15 +75,12 @@ const LIVE_SUBSCRIPTION_BUFFER_CHANNELS = {
   flow: "flow",
   "smart-flow": "smartFlow",
   "smart-flow-alerts": "smartFlowAlerts",
-  "smart-money": "smartMoney",
-  "classifier-hits": "classifierHits",
-  alerts: "alerts",
   "durable-rows": "durableRows",
   news: "news",
   "inferred-dark": "inferredDark",
   "equity-candles": "chartCandles",
   "equity-overlay": "chartOverlay"
-} as const satisfies Record<LiveSubscription["channel"], LiveSessionBufferedChannel>;
+};
 
 export type LiveSessionChannelBufferRegistry = {
   resetAll: () => void;
@@ -111,7 +101,13 @@ export type LiveSessionChannelBufferRegistryOptions = {
 
 const getLiveSessionBufferedChannel = (
   channel: LiveSubscription["channel"]
-): LiveSessionBufferedChannel => LIVE_SUBSCRIPTION_BUFFER_CHANNELS[channel];
+): LiveSessionBufferedChannel => {
+  const bufferedChannel = LIVE_SUBSCRIPTION_BUFFER_CHANNELS[channel];
+  if (!bufferedChannel) {
+    throw new Error(`Unsupported live session channel: ${channel}`);
+  }
+  return bufferedChannel;
+};
 
 const createLiveSessionBuffers = (
   options: LiveSessionChannelBufferRegistryOptions = {}
@@ -135,12 +131,6 @@ const createLiveSessionBuffers = (
       limit: LIVE_HOT_WINDOW,
       onTrim
     }),
-    smartMoney: createLiveWindowBuffer<SmartMoneyEvent>({ limit: LIVE_HOT_WINDOW, onTrim }),
-    classifierHits: createLiveWindowBuffer<ClassifierHitEvent>({
-      limit: LIVE_HOT_WINDOW,
-      onTrim
-    }),
-    alerts: createLiveWindowBuffer<AlertEvent>({ limit: LIVE_HOT_WINDOW, onTrim }),
     durableRows: createLiveWindowBuffer<DurableTapeRowViewModel>({
       limit: LIVE_OPTIONS_HEAD_LIMIT,
       onTrim

@@ -225,10 +225,10 @@ describe("alerts module helpers", () => {
     expect(tint.metadata.confidenceBand).toBe("high");
     expect(tint.metadata.evidenceQualityBand).toBe("strong");
     expect(getSmartFlowAlertRowTintClassName(alert)).toContain("alerts-smart-flow-row");
-    expect(getSmartFlowAlertRowTintClassName(alert)).toContain("classifier-green");
+    expect(getSmartFlowAlertRowTintClassName(alert)).toContain("smart-flow-tone-green");
     expect(getSmartFlowAlertRowTintClassName(alert)).toContain("alerts-row-direction-bullish");
     expect(
-      (getSmartFlowAlertRowTintStyle(alert) as Record<string, string>)["--classifier-intensity"]
+      (getSmartFlowAlertRowTintStyle(alert) as Record<string, string>)["--smart-flow-intensity"]
     ).toBe("0.784");
   });
 
