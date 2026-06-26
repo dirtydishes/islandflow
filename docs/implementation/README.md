@@ -45,6 +45,7 @@ Research reports provide rationale and useful constraints. They do not add activ
 | Durable tape modules | `islandflow-h9c0` - Plan durable reusable tape modules | `docs/implementation/durable-tapes/IMPLEMENT.md` |
 | Durable-tapes performance hardening | `islandflow-ze79` - Durable-tapes performance hardening | `docs/implementation/durable-tapes-performance/IMPLEMENT.md` |
 | API private edge hardening | `islandflow-hnbk` - Make public Islandflow API private behind the hosted UI | `docs/implementation/api-private-edge/IMPLEMENT.md` |
+| Options tape smart-flow row tinting | `islandflow-xcdn` - Options tape smart-flow row tinting | `docs/implementation/options-tape-smart-flow-row-tinting/IMPLEMENT.md` |
 
 ## Dependency Order
 
