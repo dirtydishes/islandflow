@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import type { ClickHouseClient } from "@islandflow/storage";
 import {
+  type SmartFlowExplainabilityProjection,
   type SmartMoneyEvent,
   smartFlowExplainabilityFromLegacySmartMoneyEvent
 } from "@islandflow/types";
@@ -126,6 +127,11 @@ const makeSmartMoneyEvent = (now = Date.now()): SmartMoneyEvent => ({
   primary_direction: "bullish",
   abstained: false,
   suppressed_reasons: []
+});
+
+const makeSmartFlowProjection = (event: SmartMoneyEvent): SmartFlowExplainabilityProjection => ({
+  ...smartFlowExplainabilityFromLegacySmartMoneyEvent(event),
+  source_channel: "smart-flow"
 });
 
 describe("LiveStateManager", () => {
@@ -288,7 +294,7 @@ describe("LiveStateManager", () => {
 
   it("stores smart-flow explainability projections as a canonical live channel", async () => {
     const now = Date.now();
-    const projection = smartFlowExplainabilityFromLegacySmartMoneyEvent(makeSmartMoneyEvent(now));
+    const projection = makeSmartFlowProjection(makeSmartMoneyEvent(now));
     const manager = new LiveStateManager(makeClickHouse(), null);
 
     await manager.ingest("smart-flow", projection);
@@ -359,6 +365,7 @@ describe("LiveStateManager", () => {
       explanations: ["large premium"]
     };
     const smartMoney = makeSmartMoneyEvent(now + 12);
+    const smartFlow = makeSmartFlowProjection(smartMoney);
     const alert = {
       source_ts: now + 20,
       ingest_ts: now + 21,
@@ -382,6 +389,7 @@ describe("LiveStateManager", () => {
     await manager.ingest("options", optionPrint);
     await manager.ingest("classifier-hits", classifierHit);
     await manager.ingest("smart-money", smartMoney);
+    await manager.ingest("smart-flow", smartFlow);
     await manager.ingest("alerts", alert);
 
     const snapshot = await manager.getSnapshot({
@@ -395,7 +403,7 @@ describe("LiveStateManager", () => {
 
     expect(optionRow?.support.packet.id).toBe("flowpacket:7");
     expect(optionRow?.support.smart_money.profile_id).toBe("institutional_directional");
-    expect(optionRow?.support.smart_flow.source_channel).toBe("smart-money");
+    expect(optionRow?.support.smart_flow.source_channel).toBe("smart-flow");
     expect(optionRow?.support.smart_flow.refs.evidence_refs).toEqual(["flowpacket:7", "print:7"]);
     expect(optionRow?.option.nbbo.source).toBe("print");
     expect(alertRow?.evidence.primary_packet.id).toBe("flowpacket:7");

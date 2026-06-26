@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Smart-Flow Alerts Phase 02 Native Runtime</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #101720;
+        --panel-2: #0b1118;
+        --line: #223041;
+        --line-strong: #614719;
+        --text: #e6edf4;
+        --muted: #9aaaBC;
+        --faint: #728094;
+        --accent: #f5a623;
+        --green: #25c17a;
+        --red: #ff6b5f;
+        --code: #080d13;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.55;
+      }
+
+      main {
+        width: min(1120px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 40px 0 64px;
+      }
+
+      header,
+      section {
+        border: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      header {
+        padding: 24px;
+      }
+
+      section {
+        margin-top: 14px;
+        padding: 20px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 860px;
+        font-size: 2.25rem;
+        line-height: 1.08;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        margin-bottom: 10px;
+        font-size: 1.08rem;
+        letter-spacing: 0;
+      }
+
+      h3 {
+        margin: 14px 0 6px;
+        color: var(--accent);
+        font-size: 0.92rem;
+      }
+
+      p,
+      li {
+        color: var(--muted);
+      }
+
+      code,
+      pre {
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      }
+
+      code {
+        color: #fff0cf;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 1.1rem;
+      }
+
+      li + li {
+        margin-top: 6px;
+      }
+
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 18px;
+      }
+
+      .chip {
+        border: 1px solid var(--line-strong);
+        background: rgba(245, 166, 35, 0.1);
+        color: #ffe0a6;
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 650;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 10px;
+      }
+
+      .tile {
+        border: 1px solid var(--line);
+        background: var(--panel-2);
+        padding: 14px;
+      }
+
+      .tile strong {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--text);
+      }
+
+      .diff-panel[data-rich-ready="true"] .diff-fallback {
+        display: none;
+      }
+
+      .diff-rich {
+        display: none;
+        overflow: auto;
+        border: 1px solid var(--line);
+        background: var(--code);
+      }
+
+      .diff-panel[data-rich-ready="true"] .diff-rich {
+        display: block;
+      }
+
+      .diff-fallback {
+        overflow-x: auto;
+        margin: 0;
+        padding: 14px;
+        border: 1px solid var(--line);
+        background: var(--code);
+        color: #cbd8e6;
+        font-size: 0.82rem;
+        line-height: 1.45;
+      }
+
+      .note {
+        color: var(--faint);
+        font-size: 0.9rem;
+      }
+
+      .ok {
+        color: var(--green);
+      }
+
+      .risk {
+        color: var(--red);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="note">Islandflow implementation turn</p>
+        <h1>Smart-flow alerts phase 02 moved runtime smart-flow to native projections.</h1>
+        <div class="meta">
+          <span class="chip">Beads islandflow-ghce.2</span>
+          <span class="chip">Branch lavender/smart-flow-alerts-02-native-runtime</span>
+          <span class="chip">2026-06-26</span>
+        </div>
+      </header>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          Runtime smart-flow now has its own bus stream, persisted ClickHouse read model,
+          compute emitter, API fetchers, and live-cache ingestion path. The old smart-money,
+          classifier-hit, and alert emitters remain in place for comparison and rollback, but the
+          API smart-flow routes no longer project from <code>SmartMoneyEvent</code> storage.
+        </p>
+      </section>
+
+      <section>
+        <h2>Implementation</h2>
+        <div class="grid">
+          <div class="tile">
+            <strong>Native stream</strong>
+            <p>Added <code>flow.smart_flow</code> on <code>SMART_FLOW</code> as a derived JetStream stream.</p>
+          </div>
+          <div class="tile">
+            <strong>Canonical storage</strong>
+            <p>Added <code>smart_flow_projections</code> with full projection JSON plus ordering, refs, hypothesis, cluster, and abstention metadata.</p>
+          </div>
+          <div class="tile">
+            <strong>Compute runtime</strong>
+            <p>Added a deep runtime builder that turns a <code>FlowPacket</code> into native explainability projections through evidence, clusters, scoring, and projection in one call.</p>
+          </div>
+          <div class="tile">
+            <strong>API and live</strong>
+            <p>Smart-flow recent, history, replay, websocket, live-cache, durable rows, and option support now read native projections directly.</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Verification</h2>
+        <ul>
+          <li><span class="ok">Passed</span>: <code>bun test services/compute/tests/smart-flow-evidence.test.ts services/compute/tests/smart-flow-clusters.test.ts services/compute/tests/smart-flow-scoring.test.ts services/compute/tests/smart-flow-runtime.test.ts</code></li>
+          <li><span class="ok">Passed</span>: <code>bun test services/compute/tests/smart-flow-replay-evaluation.test.ts</code></li>
+          <li><span class="ok">Passed</span>: <code>bun test services/api/tests/smart-flow.test.ts services/api/tests/live.test.ts</code></li>
+          <li><span class="ok">Passed</span>: <code>bun test services/api/tests/options-support.test.ts</code></li>
+          <li><span class="ok">Passed</span>: <code>bun test packages/storage/tests</code></li>
+          <li><span class="ok">Passed</span>: <code>bun test packages/bus/tests/jetstream.test.ts</code></li>
+          <li><span class="ok">Passed</span>: <code>bun run typecheck</code></li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p class="note">
+          The fallback unified diff is visible by default. The richer view mounts in the browser
+          with <code>PatchDiff</code> from <code>@pierre/diffs/react</code>; the fallback is hidden only
+          after that render succeeds.
+        </p>
+        <div class="diff-panel" data-rich-ready="false">
+          <div class="diff-rich" id="diff-rich"></div>
+          <pre class="diff-fallback" id="diff-fallback">diff --git a/packages/bus/src/subjects.ts b/packages/bus/src/subjects.ts
+@@
+ export const STREAM_SMART_MONEY_EVENTS = "SMART_MONEY_EVENTS";
+ export const SUBJECT_SMART_MONEY_EVENTS = "flow.smart_money";
++export const STREAM_SMART_FLOW = "SMART_FLOW";
++export const SUBJECT_SMART_FLOW = "flow.smart_flow";
+
+diff --git a/services/api/src/smart-flow.ts b/services/api/src/smart-flow.ts
+@@
+-  fetchRecentSmartMoneyEvents,
+-  fetchSmartMoneyEventsAfter,
+-  fetchSmartMoneyEventsBefore,
+-  fetchSmartMoneyEventsByPacketIds
++  fetchRecentSmartFlowProjections,
++  fetchSmartFlowProjectionsAfter,
++  fetchSmartFlowProjectionsBefore,
++  fetchSmartFlowProjectionsByPacketIds
+ } from "@islandflow/storage";
+@@
+-export const projectSmartFlowExplainability = (
+-  events: readonly SmartMoneyEvent[]
+-): SmartFlowExplainabilityProjection[] =&gt;
+-  events.map((event) =&gt; smartFlowExplainabilityFromLegacySmartMoneyEvent(event));
+-
+ export const fetchRecentSmartFlowExplainability = async (
+   client: ClickHouseClient,
+   limit: number
+-): Promise&lt;SmartFlowExplainabilityProjection[]&gt; =&gt;
+-  projectSmartFlowExplainability(await fetchRecentSmartMoneyEvents(client, limit));
++): Promise&lt;SmartFlowExplainabilityProjection[]&gt; =&gt; fetchRecentSmartFlowProjections(client, limit);
+
+diff --git a/services/compute/src/smart-flow-runtime.ts b/services/compute/src/smart-flow-runtime.ts
+new file mode 100644
+@@
++export const buildNativeSmartFlowProjectionsFromPacket = (
++  packet: FlowPacket,
++  config: NativeSmartFlowRuntimeConfig = {}
++): SmartFlowExplainabilityProjection[] =&gt; {
++  const extraction = buildFlowEvidenceCandidateFromPacket(packet);
++  const { clusters } = buildFlowEvidenceClusters([extraction], {
++    windowMs: 60_000,
++    includeRejectedCandidates: true,
++    ...config.cluster
++  });
++
++  return clusters.map((cluster) =&gt;
++    smartFlowExplainabilityFromHypothesisEvent(
++      buildFlowHypothesisEventFromCluster(cluster, config.projection),
++      { source_channel: "smart-flow" }
++    )
++  );
++};
+
+diff --git a/services/api/src/index.ts b/services/api/src/index.ts
+@@
+     {
+       subject: SUBJECT_SMART_MONEY_EVENTS,
+       stream: STREAM_SMART_MONEY_EVENTS,
+       durableName: "api-smart-money-events"
+     },
++    {
++      subject: SUBJECT_SMART_FLOW,
++      stream: STREAM_SMART_FLOW,
++      durableName: "api-smart-flow"
++    },
+@@
+   const pumpSmartMoney = async () =&gt; {
+@@
+-        const smartFlow = projectSmartFlowExplainability([payload])[0];
+         recordSyntheticProfileHit(syntheticProfileHits, payload);
+         broadcast(smartMoneySockets, { type: "smart-money", payload });
+-        if (smartFlow) {
+-          broadcast(smartFlowSockets, { type: "smart-flow", payload: smartFlow });
+-          await fanoutLive({ channel: "smart-flow" }, smartFlow, "smart-flow");
+-        }
+         await fanoutLive({ channel: "smart-money" }, payload, "smart-money");
+@@
++  const pumpSmartFlow = async () =&gt; {
++    for await (const msg of smartFlowSubscription.messages) {
++      const payload = SmartFlowExplainabilityProjectionSchema.parse(
++        smartFlowSubscription.decode(msg)
++      );
++      broadcast(smartFlowSockets, { type: "smart-flow", payload });
++      await fanoutLive({ channel: "smart-flow" }, payload, "smart-flow");
++      msg.ack();
++    }
++  };
+          </pre>
+        </div>
+      </section>
+
+      <section>
+        <h2>Risks</h2>
+        <ul>
+          <li>Existing deployments need the new stream and table reconciled before native smart-flow data appears in live APIs.</li>
+          <li>Legacy smart-money emitters intentionally remain, so consumers can still compare old and new rows during the next phases.</li>
+          <li>No alert-surface migration was included; that remains phase 03 and later work.</li>
+        </ul>
+      </section>
+    </main>
+
+    <script type="module">
+      const patch = document.getElementById("diff-fallback")?.textContent ?? "";
+      const richRoot = document.getElementById("diff-rich");
+      const panel = richRoot?.closest(".diff-panel");
+
+      if (patch && richRoot && panel) {
+        try {
+          const [{ createElement }, { createRoot }, { PatchDiff }] = await Promise.all([
+            import("https://esm.sh/react@18"),
+            import("https://esm.sh/react-dom@18/client"),
+            import("https://esm.sh/@pierre/diffs@1.2.2/react")
+          ]);
+          createRoot(richRoot).render(
+            createElement(PatchDiff, {
+              patch,
+              viewType: "unified",
+              overflow: "wrap"
+            })
+          );
+          panel.setAttribute("data-rich-ready", "true");
+        } catch (error) {
+          console.warn("Diffs rich renderer failed; keeping HTML fallback.", error);
+        }
+      }
+    </script>
+  </body>
+</html>

@@ -12,7 +12,7 @@ import type {
   SmartFlowExplainabilityProjection,
   SmartMoneyEvent
 } from "@islandflow/types";
-import { projectSmartFlowExplainability } from "./smart-flow";
+import { fetchSmartFlowExplainabilityByPacketIds } from "./smart-flow";
 
 export type OptionsSupportNbboLookupInput = {
   trace_id: string;
@@ -46,6 +46,10 @@ export type OptionsSupportLookupDeps = {
     client: ClickHouseClient,
     packetIds: string[]
   ) => Promise<ClassifierHitEvent[]>;
+  fetchSmartFlowExplainabilityByPacketIds: (
+    client: ClickHouseClient,
+    packetIds: string[]
+  ) => Promise<SmartFlowExplainabilityProjection[]>;
   fetchNearestOptionNBBOForPrints: (
     client: ClickHouseClient,
     inputs: OptionsSupportNbboLookupInput[]
@@ -56,6 +60,7 @@ const defaultOptionsSupportLookupDeps: OptionsSupportLookupDeps = {
   fetchFlowPacketsByMemberTraceIds,
   fetchSmartMoneyEventsByPacketIds,
   fetchClassifierHitsByPacketIds,
+  fetchSmartFlowExplainabilityByPacketIds,
   fetchNearestOptionNBBOForPrints
 };
 
@@ -73,8 +78,9 @@ export const lookupOptionsSupport = async (
     );
   const packets = await packetsPromise;
   const packetIds = packets.map((packet) => packet.id);
-  const [smartMoney, classifierHits, nbboByTraceIdResult] = await Promise.all([
+  const [smartMoney, smartFlow, classifierHits, nbboByTraceIdResult] = await Promise.all([
     deps.fetchSmartMoneyEventsByPacketIds(client, packetIds),
+    deps.fetchSmartFlowExplainabilityByPacketIds(client, packetIds),
     deps.fetchClassifierHitsByPacketIds(client, packetIds),
     nbboByTraceIdPromise
   ]);
@@ -85,7 +91,7 @@ export const lookupOptionsSupport = async (
   return {
     packets,
     smart_money: smartMoney,
-    smart_flow: projectSmartFlowExplainability(smartMoney),
+    smart_flow: smartFlow,
     classifier_hits: classifierHits,
     nbbo_by_trace_id: nbboByTraceIdResult.value
   };

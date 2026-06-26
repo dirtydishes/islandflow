@@ -12,6 +12,7 @@ import {
   STREAM_INFERRED_DARK,
   STREAM_OPTION_NBBO,
   STREAM_OPTION_SIGNAL_PRINTS,
+  STREAM_SMART_FLOW,
   STREAM_SMART_MONEY_EVENTS,
   SUBJECT_ALERTS,
   SUBJECT_CLASSIFIER_HITS,
@@ -22,6 +23,7 @@ import {
   SUBJECT_INFERRED_DARK,
   SUBJECT_OPTION_NBBO,
   SUBJECT_OPTION_SIGNAL_PRINTS,
+  SUBJECT_SMART_FLOW,
   SUBJECT_SMART_MONEY_EVENTS,
   subscribeJson
 } from "@islandflow/bus";
@@ -40,12 +42,14 @@ import {
   enqueueEquityPrintJoinInsert,
   enqueueFlowPacketInsert,
   enqueueInferredDarkInsert,
+  enqueueSmartFlowProjectionInsert,
   enqueueSmartMoneyEventInsert,
   ensureAlertsTable,
   ensureClassifierHitsTable,
   ensureEquityPrintJoinsTable,
   ensureFlowPacketsTable,
   ensureInferredDarkTable,
+  ensureSmartFlowProjectionsTable,
   ensureSmartMoneyEventsTable
 } from "@islandflow/storage";
 import {
@@ -90,6 +94,7 @@ import {
   RollingWindowStore,
   type RollingWindowStoreConfig
 } from "./rolling-stats";
+import { buildNativeSmartFlowProjectionsFromPacket } from "./smart-flow-runtime";
 import {
   buildStructureFlowPacket,
   type LegEvidence,
@@ -307,6 +312,8 @@ const CACHE_PRUNE_INTERVAL_MS = 60_000;
 const emitCounters = {
   flowPackets: 0,
   structurePackets: 0,
+  smartFlowProjections: 0,
+  smartFlowAbstentions: 0,
   smartMoneyEvents: 0,
   classifierHits: 0,
   alerts: 0,
@@ -575,6 +582,7 @@ const emitStructurePacketIfNeeded = async (
   await publishJson(js, SUBJECT_FLOW_PACKETS, validated);
   emitCounters.flowPackets += 1;
   emitCounters.structurePackets += 1;
+  await emitNativeSmartFlow(js, batchWriter, validated);
   await emitClassifiers(js, batchWriter, validated);
 };
 
@@ -1070,6 +1078,7 @@ const flushCluster = async (
     enqueueFlowPacketInsert(batchWriter, validated);
     await publishJson(js, SUBJECT_FLOW_PACKETS, validated);
     emitCounters.flowPackets += 1;
+    await emitNativeSmartFlow(js, batchWriter, validated);
     await emitClassifiers(js, batchWriter, validated);
   } catch (error) {
     if (isExpectedShutdownNatsError(error)) {
@@ -1083,6 +1092,32 @@ const flushCluster = async (
 
     cluster.flushed = false;
     throw error;
+  }
+};
+
+const emitNativeSmartFlow = async (
+  js: Awaited<ReturnType<typeof connectJetStreamWithRetry>>["js"],
+  batchWriter: ClickHouseBatchWriter,
+  packet: FlowPacket
+): Promise<void> => {
+  try {
+    const projections = buildNativeSmartFlowProjectionsFromPacket(packet);
+    for (const projection of projections) {
+      enqueueSmartFlowProjectionInsert(batchWriter, projection);
+      await publishJson(js, SUBJECT_SMART_FLOW, projection);
+      emitCounters.smartFlowProjections += 1;
+      if (projection.abstention.abstained) {
+        emitCounters.smartFlowAbstentions += 1;
+      }
+    }
+  } catch (error) {
+    if (isExpectedShutdownNatsError(error)) {
+      return;
+    }
+    logger.error("failed to emit native smart-flow projection", {
+      error: error instanceof Error ? error.message : String(error),
+      packet_id: packet.id
+    });
   }
 };
 
@@ -1299,6 +1334,7 @@ const run = async () => {
       STREAM_EQUITY_QUOTES,
       STREAM_FLOW_PACKETS,
       STREAM_SMART_MONEY_EVENTS,
+      STREAM_SMART_FLOW,
       STREAM_EQUITY_JOINS,
       STREAM_INFERRED_DARK,
       STREAM_CLASSIFIER_HITS,
@@ -1374,6 +1410,8 @@ const run = async () => {
     logger.info("compute minute summary", {
       flow_packets_emitted: emitCounters.flowPackets,
       structure_packets_emitted: emitCounters.structurePackets,
+      smart_flow_projections_emitted: emitCounters.smartFlowProjections,
+      smart_flow_projections_abstained: emitCounters.smartFlowAbstentions,
       smart_money_events_emitted: emitCounters.smartMoneyEvents,
       classifier_hits_emitted: emitCounters.classifierHits,
       alerts_emitted: emitCounters.alerts,
@@ -1383,6 +1421,8 @@ const run = async () => {
     });
     emitCounters.flowPackets = 0;
     emitCounters.structurePackets = 0;
+    emitCounters.smartFlowProjections = 0;
+    emitCounters.smartFlowAbstentions = 0;
     emitCounters.smartMoneyEvents = 0;
     emitCounters.classifierHits = 0;
     emitCounters.alerts = 0;
@@ -1396,6 +1436,7 @@ const run = async () => {
   await retry("clickhouse table init", 120, 500, async () => {
     await ensureFlowPacketsTable(clickhouse);
     await ensureSmartMoneyEventsTable(clickhouse);
+    await ensureSmartFlowProjectionsTable(clickhouse);
     await ensureEquityPrintJoinsTable(clickhouse);
     await ensureInferredDarkTable(clickhouse);
     await ensureClassifierHitsTable(clickhouse);

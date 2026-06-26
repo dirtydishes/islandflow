@@ -731,7 +731,9 @@ export class LiveStateManager {
       classifierHits: (this.genericItems.get("classifier-hits") ??
         []) as DurableRowCompositionContext["classifierHits"],
       smartMoney: (this.genericItems.get("smart-money") ??
-        []) as DurableRowCompositionContext["smartMoney"]
+        []) as DurableRowCompositionContext["smartMoney"],
+      smartFlowProjections: (this.genericItems.get("smart-flow") ??
+        []) as DurableRowCompositionContext["smartFlowProjections"]
     };
   }
 

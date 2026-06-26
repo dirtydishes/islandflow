@@ -15,9 +15,9 @@ import {
   matchesOptionPrintFilters,
   type OptionNBBO,
   type OptionPrint,
+  type SmartFlowExplainabilityProjection,
   type SmartMoneyEvent
 } from "@islandflow/types";
-import { projectSmartFlowExplainability } from "./smart-flow";
 
 const DURABLE_ROW_DEFAULT_LANES: DurableTapeComposedLane[] = ["options", "alerts"];
 const DURABLE_ROW_MAX_REFS = 32;
@@ -33,6 +33,7 @@ export type DurableRowCompositionContext = {
   nbbo: OptionNBBO[];
   classifierHits: ClassifierHitEvent[];
   smartMoney: SmartMoneyEvent[];
+  smartFlowProjections: SmartFlowExplainabilityProjection[];
 };
 
 type DurableRowLookups = {
@@ -42,6 +43,7 @@ type DurableRowLookups = {
   nbboByContractId: Map<string, OptionNBBO>;
   classifierHitsByPacketId: Map<string, ClassifierHitEvent[]>;
   smartMoneyByPacketId: Map<string, SmartMoneyEvent>;
+  smartFlowByPacketId: Map<string, SmartFlowExplainabilityProjection>;
 };
 
 const compareCursors = (a: Cursor, b: Cursor): number => b.ts - a.ts || b.seq - a.seq;
@@ -195,13 +197,35 @@ const buildSmartMoneyByPacketId = (events: SmartMoneyEvent[]): Map<string, Smart
   return map;
 };
 
+const buildSmartFlowByPacketId = (
+  projections: SmartFlowExplainabilityProjection[]
+): Map<string, SmartFlowExplainabilityProjection> => {
+  const map = new Map<string, SmartFlowExplainabilityProjection>();
+  for (const projection of projections) {
+    for (const packetId of projection.refs.evidence_refs.filter((ref) =>
+      ref.startsWith("flowpacket:")
+    )) {
+      const existing = map.get(packetId);
+      if (
+        !existing ||
+        projection.source_ts > existing.source_ts ||
+        (projection.source_ts === existing.source_ts && projection.seq > existing.seq)
+      ) {
+        map.set(packetId, projection);
+      }
+    }
+  }
+  return map;
+};
+
 const buildDurableRowLookups = (context: DurableRowCompositionContext): DurableRowLookups => ({
   flowPacketByMemberTraceId: buildFlowPacketByMemberTraceId(context.flowPackets),
   flowPacketById: buildFlowPacketById(context.flowPackets),
   optionPrintByTraceId: buildOptionPrintByTraceId(context.optionPrints),
   nbboByContractId: buildNbboByContractId(context.nbbo),
   classifierHitsByPacketId: buildClassifierHitsByPacketId(context.classifierHits),
-  smartMoneyByPacketId: buildSmartMoneyByPacketId(context.smartMoney)
+  smartMoneyByPacketId: buildSmartMoneyByPacketId(context.smartMoney),
+  smartFlowByPacketId: buildSmartFlowByPacketId(context.smartFlowProjections)
 });
 
 const selectPrimaryClassifierHit = (
@@ -368,7 +392,7 @@ const buildDurableOptionRow = (
     ? selectPrimaryClassifierHit(lookups.classifierHitsByPacketId.get(packet.id) ?? [])
     : null;
   const smartMoney = packet ? (lookups.smartMoneyByPacketId.get(packet.id) ?? null) : null;
-  const smartFlow = smartMoney ? (projectSmartFlowExplainability([smartMoney])[0] ?? null) : null;
+  const smartFlow = packet ? (lookups.smartFlowByPacketId.get(packet.id) ?? null) : null;
   const premium = getOptionPremium(print);
   const side = print.execution_nbbo_side ?? print.nbbo_side ?? null;
   const nbbo = resolveOptionNbbo(print, lookups.nbboByContractId);
@@ -392,6 +416,15 @@ const buildDurableOptionRow = (
       ? { kind: "signal", label: print.signal_profile ?? "signal", tone: "info" }
       : null,
     packet ? { kind: "packet", label: `${packet.members.length} prints`, tone: "neutral" } : null,
+    smartFlow
+      ? {
+          kind: "smart-flow",
+          label: humanizeToken(smartFlow.hypothesis.hypothesis_type),
+          tone: smartFlow.abstention.abstained
+            ? "neutral"
+            : normalizeDirection(smartFlow.hypothesis.direction)
+        }
+      : null,
     smartMoney
       ? {
           kind: "smart-money",
@@ -425,8 +458,10 @@ const buildDurableOptionRow = (
       side: side ?? "--",
       nbbo: nbbo ? `${formatPrice(nbbo.bid)} x ${formatPrice(nbbo.ask)}` : "--",
       exchange: print.exchange,
-      support: smartMoney
-        ? humanizeToken(smartMoney.primary_profile_id)
+      support: smartFlow
+        ? humanizeToken(smartFlow.hypothesis.hypothesis_type)
+        : smartMoney
+          ? humanizeToken(smartMoney.primary_profile_id)
         : classifier
           ? humanizeToken(classifier.classifier_id)
           : packet
@@ -719,6 +754,16 @@ export const composeDurableRowsForEvent = (
     } else if (channel === "smart-money") {
       const event = item as SmartMoneyEvent;
       for (const packetId of event.packet_ids.slice(0, DURABLE_ROW_MAX_REFS)) {
+        const packet = lookups.flowPacketById.get(packetId);
+        for (const traceId of packet?.members.slice(0, DURABLE_ROW_MAX_PACKET_MEMBERS) ?? []) {
+          pushOptionPrint(lookups.optionPrintByTraceId.get(traceId));
+        }
+      }
+    } else if (channel === "smart-flow") {
+      const projection = item as SmartFlowExplainabilityProjection;
+      for (const packetId of projection.refs.evidence_refs
+        .filter((ref) => ref.startsWith("flowpacket:"))
+        .slice(0, DURABLE_ROW_MAX_REFS)) {
         const packet = lookups.flowPacketById.get(packetId);
         for (const traceId of packet?.members.slice(0, DURABLE_ROW_MAX_PACKET_MEMBERS) ?? []) {
           pushOptionPrint(lookups.optionPrintByTraceId.get(traceId));

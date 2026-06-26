@@ -1,6 +1,11 @@
 import { describe, expect, it } from "bun:test";
 import type { ClickHouseClient } from "@islandflow/storage";
-import type { FlowPacket, SmartMoneyEvent } from "@islandflow/types";
+import {
+  type FlowPacket,
+  type SmartFlowExplainabilityProjection,
+  type SmartMoneyEvent,
+  smartFlowExplainabilityFromLegacySmartMoneyEvent
+} from "@islandflow/types";
 import { lookupOptionsSupport } from "../src/options-support";
 
 const clickhouse = {} as ClickHouseClient;
@@ -79,10 +84,18 @@ const makeSmartMoneyEvent = (): SmartMoneyEvent => ({
   suppressed_reasons: []
 });
 
+const makeSmartFlowProjection = (
+  smartMoney: SmartMoneyEvent
+): SmartFlowExplainabilityProjection => ({
+  ...smartFlowExplainabilityFromLegacySmartMoneyEvent(smartMoney),
+  source_channel: "smart-flow"
+});
+
 describe("options support lookup", () => {
   it("projects smart_flow beside packet, smart-money, classifier, and nbbo support", async () => {
     const packet = makePacket();
     const smartMoney = makeSmartMoneyEvent();
+    const smartFlow = makeSmartFlowProjection(smartMoney);
     const payload = await lookupOptionsSupport(
       clickhouse,
       {
@@ -98,6 +111,10 @@ describe("options support lookup", () => {
           expect(packetIds).toEqual(["flowpacket:1"]);
           return [smartMoney];
         },
+        fetchSmartFlowExplainabilityByPacketIds: async (_client, packetIds) => {
+          expect(packetIds).toEqual(["flowpacket:1"]);
+          return [smartFlow];
+        },
         fetchClassifierHitsByPacketIds: async (_client, packetIds) => {
           expect(packetIds).toEqual(["flowpacket:1"]);
           return [];
@@ -112,7 +129,7 @@ describe("options support lookup", () => {
     expect(payload.packets.map((item) => item.id)).toEqual(["flowpacket:1"]);
     expect(payload.smart_money.map((item) => item.trace_id)).toEqual(["smartmoney:flowpacket:1"]);
     expect(payload.smart_flow).toHaveLength(1);
-    expect(payload.smart_flow[0]?.source_channel).toBe("smart-money");
+    expect(payload.smart_flow[0]?.source_channel).toBe("smart-flow");
     expect(payload.smart_flow[0]?.refs.evidence_refs).toEqual(["flowpacket:1", "print:1"]);
     expect(payload.nbbo_by_trace_id).toEqual({ "print:1": null });
   });
@@ -120,6 +137,7 @@ describe("options support lookup", () => {
   it("starts independent nbbo lookup without waiting for packet support", async () => {
     const packet = makePacket();
     const smartMoney = makeSmartMoneyEvent();
+    const smartFlow = makeSmartFlowProjection(smartMoney);
     let releasePacketLookup!: () => void;
     const packetLookupGate = new Promise<void>((resolve) => {
       releasePacketLookup = resolve;
@@ -138,6 +156,7 @@ describe("options support lookup", () => {
           return [packet];
         },
         fetchSmartMoneyEventsByPacketIds: async () => [smartMoney],
+        fetchSmartFlowExplainabilityByPacketIds: async () => [smartFlow],
         fetchClassifierHitsByPacketIds: async () => [],
         fetchNearestOptionNBBOForPrints: async () => {
           nbboStarted = true;
@@ -155,6 +174,7 @@ describe("options support lookup", () => {
     await expect(lookup).resolves.toMatchObject({
       packets: [packet],
       smart_money: [smartMoney],
+      smart_flow: [smartFlow],
       nbbo_by_trace_id: { "print:1": null }
     });
   });
