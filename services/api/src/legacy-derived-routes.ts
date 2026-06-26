@@ -15,14 +15,32 @@ const LEGACY_DERIVED_ROUTE_REPLACEMENTS: Record<string, string> = {
   "/ws/alerts": "/ws/smart-flow-alerts"
 };
 
+const LEGACY_DERIVED_ROUTE_PATTERN_REPLACEMENTS: Array<{
+  pattern: RegExp;
+  replacement: string;
+}> = [
+  {
+    pattern: /^\/flow\/alerts\/[^/]+\/context$/,
+    replacement: "/flow/smart-flow-alerts"
+  }
+];
+
 const LEGACY_DERIVED_LIVE_CHANNEL_REPLACEMENTS: Partial<Record<LiveChannel, LiveChannel>> = {
   "smart-money": "smart-flow",
   "classifier-hits": "smart-flow",
   alerts: "smart-flow-alerts"
 };
 
-export const getLegacyDerivedRouteReplacement = (pathname: string): string | null =>
-  LEGACY_DERIVED_ROUTE_REPLACEMENTS[pathname] ?? null;
+export const getLegacyDerivedRouteReplacement = (pathname: string): string | null => {
+  const exactReplacement = LEGACY_DERIVED_ROUTE_REPLACEMENTS[pathname];
+  if (exactReplacement) {
+    return exactReplacement;
+  }
+  return (
+    LEGACY_DERIVED_ROUTE_PATTERN_REPLACEMENTS.find(({ pattern }) => pattern.test(pathname))
+      ?.replacement ?? null
+  );
+};
 
 export const createLegacyDerivedRouteResponse = (pathname: string): Response | null => {
   const replacement = getLegacyDerivedRouteReplacement(pathname);

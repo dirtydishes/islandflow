@@ -25,7 +25,7 @@ export type MarketChartOptionNotionalSummary = {
   count: number;
 };
 
-export type MarketChartFlowContextSource = "smart-flow" | string;
+export type MarketChartFlowContextSource = "smart-flow";
 
 export type MarketChartFlowContextInput = {
   timestampMs: number;

@@ -6,8 +6,12 @@ import {
   buildDirectionalOptionNotionalRows,
   buildFlowContextHoverRows,
   buildHoverSnapshot,
-  marketChartHoverSnapshotsEqual
+  marketChartHoverSnapshotsEqual,
+  type MarketChartFlowContextInput
 } from "./hover";
+
+const untrustedFlowContext = (input: Record<string, unknown>): MarketChartFlowContextInput =>
+  input as unknown as MarketChartFlowContextInput;
 
 const context = (ts = 60_000): MarketChartHoverContext => {
   const candle = normalizeMarketChartCandle({
@@ -140,14 +144,14 @@ describe("market chart hover transforms", () => {
 
   it("uses smart-flow hover context and ignores non-canonical entries in the same bucket", () => {
     const rows = buildFlowContextHoverRows(context(), [
-      {
+      untrustedFlowContext({
         timestampMs: 62_000,
         sequence: 1,
         source: "legacy",
         direction: "bearish",
         label: "Institutional directional",
         confidence: 0.4
-      },
+      }),
       {
         timestampMs: 63_000,
         sequence: 2,
@@ -171,7 +175,7 @@ describe("market chart hover transforms", () => {
 
   it("returns no flow context rows when canonical smart-flow is unavailable", () => {
     const rows = buildFlowContextHoverRows(context(), [
-      {
+      untrustedFlowContext({
         timestampMs: 62_000,
         sequence: 1,
         source: "legacy",
@@ -180,7 +184,7 @@ describe("market chart hover transforms", () => {
         confidence: 0,
         whyNot: "Abstained: Stale Or Missing Quote Context",
         abstained: true
-      }
+      })
     ]);
 
     expect(rows).toEqual([]);

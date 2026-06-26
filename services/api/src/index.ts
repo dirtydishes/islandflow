@@ -55,7 +55,6 @@ import {
   ensureSmartFlowAlertsTable,
   ensureSmartFlowProjectionsTable,
   ensureSmartMoneyEventsTable,
-  fetchAlertContextByTraceId,
   fetchEquityCandlesAfter,
   fetchEquityCandlesRange,
   fetchEquityPrintJoinsAfter,
@@ -125,7 +124,6 @@ import {
 } from "@islandflow/types";
 import { createClient } from "redis";
 import { z } from "zod";
-import { isAlertContextPath, parseAlertContextTraceIdPath } from "./alert-context";
 import {
   createLegacyDerivedRouteResponse,
   getLegacyLiveSubscriptionReplacement
@@ -1678,25 +1676,6 @@ const run = async () => {
           return jsonResponse({ data });
         }
 
-        if (req.method === "GET" && isAlertContextPath(url.pathname)) {
-          try {
-            const traceId = parseAlertContextTraceIdPath(url.pathname);
-            if (traceId === null) {
-              return jsonResponse({ error: "not found" }, 404);
-            }
-            const data = await fetchAlertContextByTraceId(clickhouse, traceId);
-            return jsonResponse(data);
-          } catch (error) {
-            return jsonResponse(
-              {
-                error: "invalid alert context query",
-                detail: error instanceof Error ? error.message : String(error)
-              },
-              400
-            );
-          }
-        }
-
         if (req.method === "GET" && url.pathname === "/history/options") {
           try {
             const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
@@ -1815,17 +1794,6 @@ const run = async () => {
           const id = decodeURIComponent(url.pathname.slice("/flow/packets/".length));
           const data = await fetchFlowPacketById(clickhouse, id);
           return jsonResponse({ data });
-        }
-
-        if (req.method === "GET" && /^\/flow\/alerts\/[^/]+\/context$/.test(url.pathname)) {
-          const traceId = decodeURIComponent(
-            url.pathname.slice("/flow/alerts/".length, -"/context".length)
-          ).trim();
-          if (!traceId || traceId.length > 512) {
-            return jsonResponse({ error: "invalid alert trace id" }, 400);
-          }
-          const data = await fetchAlertContextByTraceId(clickhouse, traceId);
-          return jsonResponse(data);
         }
 
         if (req.method === "GET" && url.pathname === "/option-prints/by-trace") {

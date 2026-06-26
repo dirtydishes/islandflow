@@ -3,11 +3,7 @@ import {
   fetchFlowPacketsByMemberTraceIds,
   fetchNearestOptionNBBOForPrints
 } from "@islandflow/storage";
-import type {
-  FlowPacket,
-  OptionNBBO,
-  SmartFlowExplainabilityProjection
-} from "@islandflow/types";
+import type { FlowPacket, OptionNBBO, SmartFlowExplainabilityProjection } from "@islandflow/types";
 import { fetchSmartFlowExplainabilityByPacketIds } from "./smart-flow";
 
 export type OptionsSupportNbboLookupInput = {

@@ -277,7 +277,7 @@ export const FlowFilterPopover = ({ filters, onChange }: FlowFilterPopoverProps)
                 ))}
               </div>
               <p className="flow-filter-section-copy">
-                Signal keeps classifier-ready prints. All prints includes raw option tape rows.
+                Signal keeps smart-flow-qualified prints. All prints includes raw option tape rows.
               </p>
             </FlowFilterSection>
 

@@ -1000,6 +1000,7 @@ export const useLiveSession = (
   const chartCandlesRef = useRef<EquityCandle[]>([]);
   const chartOverlayRef = useRef<EquityPrint[]>([]);
   const liveBuffersRef = useRef<LiveSessionChannelBufferRegistry | null>(null);
+  const manifestRef = useRef(manifest);
   const optionsHistoryRef = useRef<OptionPrint[]>([]);
   const nbboHistoryRef = useRef<OptionNBBO[]>([]);
   const equitiesHistoryRef = useRef<EquityPrint[]>([]);
@@ -1048,6 +1049,10 @@ export const useLiveSession = (
     ref.current = next;
     setter(next);
   };
+
+  useEffect(() => {
+    manifestRef.current = manifest;
+  }, [manifest]);
 
   useEffect(() => {
     if (!enabled) {
@@ -1134,10 +1139,13 @@ export const useLiveSession = (
     let active = true;
 
     const syncSubscriptions = (socket: WebSocket) => {
-      const nextKeys = new Set(manifest.map(getLiveSubscriptionKey));
-      const nextMap = new Map(manifest.map((sub) => [getLiveSubscriptionKey(sub), sub]));
+      const nextManifest = manifestRef.current;
+      const nextKeys = new Set(nextManifest.map(getLiveSubscriptionKey));
+      const nextMap = new Map(nextManifest.map((sub) => [getLiveSubscriptionKey(sub), sub]));
       const currentKeys = subscribedKeysRef.current;
-      const toSubscribe = manifest.filter((sub) => !currentKeys.has(getLiveSubscriptionKey(sub)));
+      const toSubscribe = nextManifest.filter(
+        (sub) => !currentKeys.has(getLiveSubscriptionKey(sub))
+      );
       const toUnsubscribe = Array.from(currentKeys)
         .filter((key) => !nextKeys.has(key))
         .map((key) => subscribedMapRef.current.get(key) ?? null)

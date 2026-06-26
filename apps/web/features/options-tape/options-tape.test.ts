@@ -434,7 +434,7 @@ describe("options tape row tint helpers", () => {
     expect(tint.className).toContain("options-tape-row-abstained");
     expect(tint.className).toContain("options-tape-row-confidence-high");
     expect(tint.className).toContain("options-tape-row-evidence-strong");
-    expect(tint.className).toContain("classifier-neutral");
+    expect(tint.className).toContain("smart-flow-tone-neutral");
   });
 
   it("maps smart-flow direct option-print refs and packet members to row contexts", () => {
@@ -568,9 +568,7 @@ describe("options tape row tint helpers", () => {
   });
 
   it("uses the same smart-flow tint helper for durable option rows", () => {
-    const projection = makeSmartFlowProjection({
-      refs: ["flowpacket:durable", "durable-print"]
-    });
+    const projection = makeSmartFlowProjection({ refs: ["flowpacket:durable"] });
     const row = {
       id: "options:durable-print:1",
       lane: "options",
@@ -594,8 +592,8 @@ describe("options tape row tint helpers", () => {
       support: {
         packet: {
           id: "flowpacket:durable",
-          member_trace_ids: ["durable-print"],
-          member_count: 1
+          member_trace_ids: [],
+          member_count: 250
         },
         classifier: null,
         smart_money: null,

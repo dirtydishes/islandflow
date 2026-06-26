@@ -74,7 +74,7 @@ const concepts: Record<MockVariant, Concept> = {
     title: "Alert Blotter",
     shortName: "Alerts",
     routeName: "Alerts",
-    premise: "Smart-money alerts with trigger, read type, severity, and invalidation level.",
+    premise: "Smart-flow alerts with trigger, read type, priority, and invalidation level.",
     bodyClass: "mock-alerts"
   },
   mock8: {
@@ -199,7 +199,7 @@ const anomalies = [
   {
     time: "09:39:47",
     symbol: "TSLA",
-    title: "Momentum classifier fired",
+    title: "Momentum hypothesis fired",
     value: "91%",
     confidence: "High",
     direction: "Bullish",

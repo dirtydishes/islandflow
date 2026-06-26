@@ -199,18 +199,19 @@ const getDurableOptionRowSmartFlowContext = (
   const evidenceRefs = getOptionsTapeSmartFlowEvidenceRefs(projection);
   const directPrintRefs = getOptionsTapeSmartFlowOptionPrintRefs(projection);
   const packetRefs = getOptionsTapeSmartFlowPacketRefs(projection);
-  const expandedPacketRefs =
+  const hasDirectPrintRef = directPrintRefs.includes(row.option.trace_id);
+  const hasAttachedPacketRef = Boolean(
     row.support.packet && packetRefs.includes(row.support.packet.id)
-      ? row.support.packet.member_trace_ids
-      : [];
-  const traceId = row.option.trace_id;
-  if (!directPrintRefs.includes(traceId) && !expandedPacketRefs.includes(traceId)) {
+  );
+  const expandedPacketRefs =
+    row.support.packet && hasAttachedPacketRef ? row.support.packet.member_trace_ids : [];
+  if (!hasDirectPrintRef && !hasAttachedPacketRef) {
     return undefined;
   }
 
   return {
     projection,
-    source: directPrintRefs.includes(traceId) ? "direct-print" : "packet-member",
+    source: hasDirectPrintRef ? "direct-print" : "packet-member",
     evidenceRefs,
     directPrintRefs,
     packetRefs,

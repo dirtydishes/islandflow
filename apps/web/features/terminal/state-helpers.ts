@@ -2,7 +2,7 @@ import type {
   EquityPrintJoin,
   FlowPacket,
   InferredDarkEvent,
-  OptionPrint,
+  OptionPrint
 } from "@islandflow/types";
 
 import type { PinnedEntry } from "./types";

@@ -336,7 +336,10 @@ export const MARKET_CHART_LOWER_PANE_MODE_REGISTRY = [
     formatter: (value) => value.toLocaleString(),
     defaultRenderer: { series: "rounded-bars", signed: true, priceFormat: "price" },
     transform: (input) =>
-      buildSmartDirectionBars(input.smartFlowProjections ?? [], toBuckets(input.buckets, input.candles))
+      buildSmartDirectionBars(
+        input.smartFlowProjections ?? [],
+        toBuckets(input.buckets, input.candles)
+      )
   },
   {
     id: "all-flow",

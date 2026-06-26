@@ -119,7 +119,7 @@ export const roundSmartFlowUnit = (value: number): number =>
 
 export const getSmartFlowTintStyle = (intensity: number): CSSProperties =>
   ({
-    "--classifier-intensity": roundSmartFlowUnit(intensity).toFixed(3)
+    "--smart-flow-intensity": roundSmartFlowUnit(intensity).toFixed(3)
   }) as CSSProperties;
 
 export const normalizeSmartFlowTintTone = (value: string | undefined): SmartFlowTintTone => {

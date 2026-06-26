@@ -14,7 +14,7 @@ import {
   type OptionNBBO,
   type OptionPrint,
   type SmartFlowAlertEvent,
-  type SmartFlowExplainabilityProjection,
+  type SmartFlowExplainabilityProjection
 } from "@islandflow/types";
 
 const DURABLE_ROW_DEFAULT_LANES: DurableTapeComposedLane[] = ["options", "alerts"];
@@ -431,7 +431,9 @@ const buildDurableAlertRow = (
     alert.underlying_id ||
     (packetContract ? extractUnderlyingFromContract(packetContract) : null) ||
     firstPreviewPrint?.underlying_id ||
-    (firstPreviewPrint ? extractUnderlyingFromContract(firstPreviewPrint.option_contract_id) : null);
+    (firstPreviewPrint
+      ? extractUnderlyingFromContract(firstPreviewPrint.option_contract_id)
+      : null);
   const severity = normalizeAlertSeverity(alert);
   const direction = normalizeDirection(alert.direction);
   const primaryLabel = humanizeToken(alert.hypothesis_type);

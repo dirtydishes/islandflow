@@ -211,7 +211,7 @@
           </div>
           <div class="tile">
             <strong>Terminal and durable consumers</strong>
-            <p>Legacy classifier and smart-money drawers, row decoration, hydration, chart marker callbacks, and option support merges were removed. Durable option and alert rows now compose from canonical smart-flow projections and smart-flow alert events.</p>
+            <p>Legacy classifier and smart-money drawers, row decoration, hydration, chart marker callbacks, and option support merges were removed. Durable option and alert rows now compose from canonical smart-flow projections and smart-flow alert events, including server-attached packet support when member previews are truncated.</p>
           </div>
           <div class="tile">
             <strong>Canonical chart and tape behavior</strong>
@@ -219,7 +219,7 @@
           </div>
           <div class="tile">
             <strong>Transition API responses</strong>
-            <p>Old derived HTTP and websocket routes return explicit <code>410</code> deprecation payloads with canonical replacements. Live session subscriptions to legacy derived channels receive an error naming the replacement channel.</p>
+            <p>Old derived HTTP and websocket routes, including the retired alert context subroute, return explicit <code>410</code> deprecation payloads with canonical replacements. Live session subscriptions to legacy derived channels receive an error naming the replacement channel.</p>
           </div>
         </div>
       </section>
@@ -228,8 +228,8 @@
         <h2>Changed Files</h2>
         <ul>
           <li>Terminal cutover: <code>apps/web/features/terminal/*</code> route features, state, live buffers, transport, chart adapter, chart components, drawers, hydration scheduler, filters, and tests.</li>
-          <li>Consumer modules: durable tape row view models, market-chart lower-pane and hover transforms, options tape types/tinting, and related tests.</li>
-          <li>API cutover: <code>services/api/src/index.ts</code>, <code>durable-rows.ts</code>, <code>live.ts</code>, <code>options-support.ts</code>, plus new <code>legacy-derived-routes.ts</code> helper and tests.</li>
+          <li>Consumer modules: durable tape row view models, market-chart lower-pane and hover transforms, options tape types/tinting, smart-flow tint tokens, visible mock/filter copy, and related tests.</li>
+          <li>API cutover: <code>services/api/src/index.ts</code>, <code>durable-rows.ts</code>, <code>live.ts</code>, <code>options-support.ts</code>, <code>rate-limit.ts</code>, plus <code>legacy-derived-routes.ts</code> helper and tests.</li>
           <li>Turn documentation: this closeout file in <code>docs/turns</code>.</li>
         </ul>
       </section>
@@ -240,11 +240,14 @@
           <li><span class="ok">Passed</span>: <code>bd show islandflow-ghce.5</code></li>
           <li><span class="ok">Passed</span>: <code>bun test apps/web/app/terminal.test.ts apps/web/features/terminal</code> - 106 tests.</li>
           <li><span class="ok">Passed</span>: <code>bun test apps/web/features/alerts apps/web/features/options-tape apps/web/features/market-chart</code> - 56 tests.</li>
-          <li><span class="ok">Passed</span>: <code>bun test services/api/tests</code> - 68 tests.</li>
+          <li><span class="ok">Passed</span>: <code>bun test services/api/tests</code> - 65 tests.</li>
           <li><span class="ok">Passed</span>: <code>bun --cwd=apps/web run build</code>.</li>
+          <li><span class="ok">Passed</span>: <code>bun run typecheck</code>.</li>
+          <li><span class="ok">Passed</span>: <code>bun run fmt:check</code>.</li>
           <li><span class="ok">Passed</span>: exact runtime UI inventory found no legacy channel subscriptions, old route paths, or legacy event-type imports in <code>apps/web/app</code> or <code>apps/web/features</code>.</li>
-          <li><span class="ok">Passed</span>: broader API inventory shows only transition/internal legacy plumbing remains: live compatibility storage, NATS ingest fanout, alert context transition route, and explicit deprecation mappings.</li>
+          <li><span class="ok">Passed</span>: broader API inventory shows only transition/internal legacy plumbing remains: live compatibility storage, NATS ingest fanout, and explicit deprecation mappings.</li>
           <li><span class="ok">Passed</span>: browser QA at 1440x900 and 390x844 for <code>/durable-tapes</code> and the dashboard alert-priority surface using a temporary mock API on <code>127.0.0.1:4105</code>. Outbound <code>/ws/live</code> subscriptions included <code>smart-flow-alerts</code> and, on dashboard, <code>smart-flow</code>; no <code>smart-money</code>, <code>classifier-hits</code>, or legacy <code>alerts</code> channels were sent. Screenshots: <code>/tmp/islandflow-phase05-browser-qa/durable-desktop.png</code>, <code>/tmp/islandflow-phase05-browser-qa/durable-mobile.png</code>, <code>/tmp/islandflow-phase05-browser-qa/dashboard-alerts-desktop.png</code>, <code>/tmp/islandflow-phase05-browser-qa/dashboard-alerts-mobile.png</code>.</li>
+          <li><span class="ok">Passed</span>: reviewer focused tests for legacy route deprecation, durable option-row tinting, alert tint tokens, smart-flow tint style, and terminal hydration scheduler.</li>
           <li><span class="ok">Passed</span>: <code>git diff --check</code>.</li>
         </ul>
       </section>
@@ -336,6 +339,9 @@ new file mode 100644
 +  "/replay/alerts": "/replay/smart-flow-alerts",
 +  "/ws/alerts": "/ws/smart-flow-alerts"
 +};
++const LEGACY_DERIVED_ROUTE_PATTERN_REPLACEMENTS = [
++  { pattern: /^\/flow\/alerts\/[^/]+\/context$/, replacement: "/flow/smart-flow-alerts" }
++];
 @@
 +export const createLegacyDerivedRouteResponse = (pathname: string): Response | null =&gt; {
 +  const replacement = getLegacyDerivedRouteReplacement(pathname);
@@ -365,6 +371,33 @@ index 47aac13..7d5fe33 100644
 +      : packet
 +        ? "smart-flow unavailable"
 +        : "packet unavailable";
+
+diff --git a/apps/web/features/durable-tape/row-view-models.tsx b/apps/web/features/durable-tape/row-view-models.tsx
+index 3f79d2b..7d00951 100644
+--- a/apps/web/features/durable-tape/row-view-models.tsx
++++ b/apps/web/features/durable-tape/row-view-models.tsx
+@@
++  const hasDirectPrintRef = directPrintRefs.includes(row.option.trace_id);
++  const hasAttachedPacketRef = Boolean(
++    row.support.packet && packetRefs.includes(row.support.packet.id)
++  );
++  if (!hasDirectPrintRef && !hasAttachedPacketRef) {
++    return undefined;
++  }
+
+diff --git a/apps/web/features/terminal/live.ts b/apps/web/features/terminal/live.ts
+index a004350..3f41cdb 100644
+--- a/apps/web/features/terminal/live.ts
++++ b/apps/web/features/terminal/live.ts
+@@
++  const manifestRef = useRef(manifest);
++  useEffect(() =&gt; {
++    manifestRef.current = manifest;
++  }, [manifest]);
+@@
+-      const toSubscribe = manifest.filter((sub) =&gt; !currentKeys.has(getLiveSubscriptionKey(sub)));
++      const nextManifest = manifestRef.current;
++      const toSubscribe = nextManifest.filter((sub) =&gt; !currentKeys.has(getLiveSubscriptionKey(sub)));
           </pre>
         </div>
       </section>
@@ -385,19 +418,22 @@ index 47aac13..7d5fe33 100644
 
       if (patch && richRoot && panel) {
         try {
-          const [{ createElement }, { createRoot }, { PatchDiff }] = await Promise.all([
+          const [{ createElement, useEffect }, { createRoot }, { PatchDiff }] = await Promise.all([
             import("https://esm.sh/react@18"),
             import("https://esm.sh/react-dom@18/client"),
             import("https://esm.sh/@pierre/diffs@1.2.2/react")
           ]);
-          createRoot(richRoot).render(
-            createElement(PatchDiff, {
+          const DiffView = () => {
+            useEffect(() => {
+              panel.setAttribute("data-rich-ready", "true");
+            }, []);
+            return createElement(PatchDiff, {
               patch,
               viewType: "unified",
               overflow: "wrap"
-            })
-          );
-          panel.setAttribute("data-rich-ready", "true");
+            });
+          };
+          createRoot(richRoot).render(createElement(DiffView));
         } catch (error) {
           console.warn("Diffs rich renderer failed; keeping HTML fallback.", error);
         }

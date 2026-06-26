@@ -36,11 +36,7 @@ import {
 import type { AlertContractFocusRequest, AlertEquityFocusRequest } from "../alerts";
 import type { FlowPacketFocusRequest } from "../flow-packets";
 import { sortBySourceTime } from "./charts/markers";
-import {
-  CANDLE_INTERVALS,
-  LIVE_HOT_WINDOW_OPTIONS,
-  LIVE_OPTIONS_HEAD_LIMIT
-} from "./config";
+import { CANDLE_INTERVALS, LIVE_HOT_WINDOW_OPTIONS, LIVE_OPTIONS_HEAD_LIMIT } from "./config";
 import { bumpTapeDebugMetric, logTapeDebug } from "./debug";
 import {
   getAlertFlowPacketRefs,
@@ -64,10 +60,7 @@ import {
   shouldShowEquitiesSilentFeedWarning
 } from "./filters";
 import { formatOptionContractLabel } from "./format";
-import {
-  stableHydrationKey,
-  terminalHydrationScheduler
-} from "./hydration-scheduler";
+import { stableHydrationKey, terminalHydrationScheduler } from "./hydration-scheduler";
 import { toStaticTapeState, useLiveSession, usePausableTapeView, useTape } from "./live";
 import { getLiveManifest, getRouteFeatures } from "./routes";
 import { useListScroll, useScrollAnchor } from "./scroll";
@@ -273,12 +266,7 @@ export const useTerminalState = () => {
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [
-    selectedAlert,
-    selectedNewsStory,
-    selectedDarkEvent,
-    selectedSmartFlowProjection
-  ]);
+  }, [selectedAlert, selectedNewsStory, selectedDarkEvent, selectedSmartFlowProjection]);
 
   const optionsScroll = useListScroll();
   const equitiesScroll = useListScroll();
@@ -881,7 +869,6 @@ export const useTerminalState = () => {
     selectedSmartFlowProjection
   ]);
 
-
   const inferAlertUnderlying = useCallback(
     (alert: SmartFlowAlertEvent): string | null => {
       if (alert.underlying_id.trim()) {
@@ -1394,11 +1381,7 @@ export const useTerminalState = () => {
       }
     }
     return keys;
-  }, [
-    selectedAlert,
-    selectedSmartFlowProjection,
-    visibleAlerts
-  ]);
+  }, [selectedAlert, selectedSmartFlowProjection, visibleAlerts]);
 
   const activePinnedOptionKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -1414,11 +1397,7 @@ export const useTerminalState = () => {
       keys.add(id);
     }
     return keys;
-  }, [
-    selectedAlert,
-    selectedSmartFlowProjection,
-    visibleAlertOptionPrintRefs
-  ]);
+  }, [selectedAlert, selectedSmartFlowProjection, visibleAlertOptionPrintRefs]);
 
   const activePinnedJoinKeys = useMemo(() => {
     const keys = new Set<string>();

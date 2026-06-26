@@ -27,21 +27,7 @@ export type OptionsTapePolicyConfidenceBand = SmartFlowPolicyConfidenceBand;
 export type OptionsTapeEvidenceQualityBand = SmartFlowEvidenceQualityBand;
 export type OptionsTapeSmartFlowTintInput = SmartFlowTintInput;
 
-export type OptionsTapeRowTintMetadata = {
-  source: "smart-flow";
-  family: string;
-  tone: OptionsTapeTintTone;
-  intensity: number;
-  direction: OptionsTapeTintDirection;
-  abstained: boolean;
-  abstentionReasons: string[];
-  sourceReasons: string[];
-  hypothesisType?: SmartFlowTintMetadata["hypothesisType"];
-  policyConfidence?: number;
-  confidenceBand?: OptionsTapePolicyConfidenceBand;
-  evidenceQuality?: number;
-  evidenceQualityBand?: OptionsTapeEvidenceQualityBand;
-};
+export type OptionsTapeRowTintMetadata = { source: "smart-flow" } & SmartFlowTintMetadata;
 
 export type OptionsTapeRowTint = {
   className: string;
@@ -182,7 +168,7 @@ export const getOptionsTapeSmartFlowRowTint = (
       `options-tape-row-confidence-${metadata.confidenceBand}`,
       `options-tape-row-evidence-${metadata.evidenceQualityBand}`,
       metadata.abstained ? "options-tape-row-abstained" : "",
-      `classifier-${metadata.tone}`
+      `smart-flow-tone-${metadata.tone}`
     ]
       .filter(Boolean)
       .join(" "),

@@ -180,7 +180,7 @@ describe("smart-flow tinting", () => {
     expect(tint.metadata.abstentionReasons).toEqual(["below_policy_threshold"]);
     expect(tint.metadata.sourceReasons).toEqual(["policy confidence below threshold"]);
     expect(tint.metadata.intensity).toBeLessThanOrEqual(0.36);
-    expect((tint.style as Record<string, string>)["--classifier-intensity"]).toBe("0.360");
+    expect((tint.style as Record<string, string>)["--smart-flow-intensity"]).toBe("0.360");
   });
 
   it("summarizes smart-flow context for hover and scope labels", () => {

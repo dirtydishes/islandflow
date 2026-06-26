@@ -26,6 +26,9 @@ describe("legacy derived route cutover helpers", () => {
   it("maps legacy derived routes and live channels to canonical replacements only", () => {
     expect(getLegacyDerivedRouteReplacement("/flow/smart-money")).toBe("/flow/smart-flow");
     expect(getLegacyDerivedRouteReplacement("/ws/alerts")).toBe("/ws/smart-flow-alerts");
+    expect(getLegacyDerivedRouteReplacement("/flow/alerts/alert%3Actx/context")).toBe(
+      "/flow/smart-flow-alerts"
+    );
     expect(getLegacyDerivedRouteReplacement("/flow/smart-flow")).toBeNull();
 
     expect(getLegacyLiveSubscriptionReplacement("smart-money")).toBe("smart-flow");
