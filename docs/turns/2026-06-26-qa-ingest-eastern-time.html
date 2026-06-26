@@ -277,6 +277,10 @@
             <strong>Follow-up: the visible QA page was static</strong>
             <p>Screenshots showed <code>/qa</code> still topping out at <code>10:30 AM EDT</code>. The route was subscribing to live shell feeds but rendered hardcoded <code>QA_*</code> fixture arrays anchored at <code>2026-06-26T14:30:00Z</code>.</p>
           </div>
+          <div class="finding">
+            <strong>Follow-up: chart candles needed dedupe</strong>
+            <p>After the fixture removal deployed, browser verification showed fresh <code>/candles/equities</code> responses but a lightweight-charts <code>Value is null</code> exception. The current 300-row SPY window contained a duplicate minute timestamp, which chart data must collapse before rendering.</p>
+          </div>
         </div>
       </section>
 
@@ -289,6 +293,7 @@
           <li>Added tests that pin the reported <code>2026-06-26T14:30Z</code> timestamp to <code>10:30 AM EDT</code> and guard Eastern-day comparisons around UTC midnight.</li>
           <li>Changed <code>/qa</code> route features so the route subscribes to the live feeds it renders: options, NBBO, equities, flow, news, alerts, smart-flow, durable rows, and equity candles.</li>
           <li>Rewired <code>DurableTapesQaRoute</code> to feed its template matrix from live terminal selectors and REST-bootstrapped/live chart candles instead of the static 10:30 fixture arrays.</li>
+          <li>Hardened shared market-chart candle normalization so chart inputs are finite, sorted, and unique by chart time, keeping the latest aggregate when duplicate timestamps arrive.</li>
         </ul>
       </section>
 
@@ -299,7 +304,9 @@
           <div class="check"><strong>Passed</strong><p><code>bun test apps/web/features/time-format.test.ts apps/web/features/market-chart/transforms/candles.test.ts apps/web/features/market-chart/transforms/hover.test.ts</code>, 16 focused tests.</p></div>
           <div class="check"><strong>Passed</strong><p><code>bun --cwd=apps/web run build</code>, Next.js production build.</p></div>
           <div class="check"><strong>Passed</strong><p><code>bun test apps/web/app/terminal.test.ts</code>, including the updated <code>/qa</code> live manifest and route feature assertions.</p></div>
+          <div class="check"><strong>Passed</strong><p><code>bun test apps/web/features/market-chart/transforms/candles.test.ts apps/web/app/terminal.test.ts</code>, including duplicate candle-time regression coverage.</p></div>
           <div class="check"><strong>Passed</strong><p><code>bunx biome check</code> on the touched web files after formatting.</p></div>
+          <div class="check"><strong>Passed</strong><p>Deployed CDP verification confirmed <code>/qa</code> fetches fresh candle data and live tape rows in Eastern time; no <code>10:30</code> fixture text remains in the hydrated page.</p></div>
           <div class="check warn"><strong>Existing repo issue</strong><p><code>bun run check</code> still fails on unrelated pre-existing Biome import-order diagnostics outside this change set.</p></div>
         </div>
       </section>

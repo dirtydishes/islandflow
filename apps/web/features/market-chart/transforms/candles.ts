@@ -42,10 +42,38 @@ export const normalizeMarketChartCandle = (candle: MarketChartCandleInput): Mark
   };
 };
 
+const isRenderableCandle = (candle: MarketChartCandle): boolean =>
+  [candle.timestampMs, candle.open, candle.high, candle.low, candle.close].every(Number.isFinite) &&
+  candle.high >= candle.low;
+
+const compareCandlesForChart = (a: MarketChartCandle, b: MarketChartCandle): number => {
+  const timeDelta = a.time - b.time;
+  if (timeDelta !== 0) {
+    return timeDelta;
+  }
+
+  const timestampDelta = a.timestampMs - b.timestampMs;
+  if (timestampDelta !== 0) {
+    return timestampDelta;
+  }
+
+  return (a.sequence ?? 0) - (b.sequence ?? 0);
+};
+
 export const normalizeMarketChartCandles = (
   candles: MarketChartCandleInput[]
 ): MarketChartCandle[] => {
-  return candles.map(normalizeMarketChartCandle);
+  const candlesByTime = new Map<MarketChartCandle["time"], MarketChartCandle>();
+  const normalized = candles
+    .map(normalizeMarketChartCandle)
+    .filter(isRenderableCandle)
+    .sort(compareCandlesForChart);
+
+  for (const candle of normalized) {
+    candlesByTime.set(candle.time, candle);
+  }
+
+  return [...candlesByTime.values()];
 };
 
 export const toCandlestickData = (

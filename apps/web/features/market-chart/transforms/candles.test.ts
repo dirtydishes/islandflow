@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   deriveCandleDirection,
   normalizeMarketChartCandle,
+  normalizeMarketChartCandles,
   toChartCandle,
   toHeikinAshiCandles
 } from "./candles";
@@ -53,6 +54,45 @@ describe("market chart candle transforms", () => {
       high: 12,
       low: 9,
       close: 9.5
+    });
+  });
+
+  it("sorts candles and keeps the latest aggregate for duplicate chart times", () => {
+    const candles = normalizeMarketChartCandles([
+      {
+        ts: 120_000,
+        open: 11,
+        high: 12,
+        low: 10,
+        close: 11.5,
+        volume: 10,
+        seq: 2
+      },
+      {
+        ts: 60_000,
+        open: 10,
+        high: 11,
+        low: 9,
+        close: 10.5,
+        volume: 3,
+        seq: 1
+      },
+      {
+        ts: 60_000,
+        open: 10,
+        high: 11,
+        low: 9,
+        close: 10.75,
+        volume: 30,
+        seq: 3
+      }
+    ]);
+
+    expect(candles.map((candle) => candle.timestampMs)).toEqual([60_000, 120_000]);
+    expect(candles[0]).toMatchObject({
+      close: 10.75,
+      volume: 30,
+      sequence: 3
     });
   });
 
