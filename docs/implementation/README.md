@@ -46,6 +46,7 @@ Research reports provide rationale and useful constraints. They do not add activ
 | Durable-tapes performance hardening | `islandflow-ze79` - Durable-tapes performance hardening | `docs/implementation/durable-tapes-performance/IMPLEMENT.md` |
 | API private edge hardening | `islandflow-hnbk` - Make public Islandflow API private behind the hosted UI | `docs/implementation/api-private-edge/IMPLEMENT.md` |
 | Options tape smart-flow row tinting | `islandflow-xcdn` - Options tape smart-flow row tinting | `docs/implementation/options-tape-smart-flow-row-tinting/IMPLEMENT.md` |
+| Smart-flow alerts and legacy removal | `islandflow-ghce` - Smart-flow hypothesis alerts and legacy path removal | `docs/implementation/smart-flow-alerts/IMPLEMENT.md` |
 
 ## Dependency Order
 
@@ -74,3 +75,5 @@ This is the intended MVP ordering. Future calibration phases sit after the MVP c
 ## Existing Related Issue
 
 `islandflow-9dz` already tracks tuning synthetic smart-money scenario coverage. It is narrower than these phase plans and was already in progress before this split. Treat it as related context for `docs/implementation/synthetic-market-data/03-scenarios-labels-expected-outputs.md`, not as the phase-level tracker.
+
+`islandflow-ghce` tracks the migration from legacy smart-money/classifier/alert derived paths to canonical smart-flow hypothesis alerts. It starts after the core smart-flow MVP contracts, scoring, replay, API/UI explainability, and current options-tape smart-flow tinting foundation are available. It intentionally drops old derived history at final cutover instead of backfilling legacy smart-money, classifier-hit, or legacy-alert rows.
