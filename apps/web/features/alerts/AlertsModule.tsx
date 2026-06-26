@@ -1,9 +1,15 @@
 "use client";
 
-import type { FlowPacket, OptionPrint, SmartFlowAlertEvent } from "@islandflow/types";
+import type {
+  DurableTapeAlertRowViewModel,
+  FlowPacket,
+  OptionPrint,
+  SmartFlowAlertEvent
+} from "@islandflow/types";
 import { useMemo } from "react";
 
 import { DurableTape } from "../durable-tape";
+import { DurableTapeAlertRowsTape } from "../durable-tape/row-view-models";
 import { toFlowPacketFocusRequest } from "../flow-packets";
 import { humanizeSmartFlowToken } from "../smart-flow";
 import { ALERTS_COLUMNS, ALERTS_TEMPLATES, renderAlertsRow } from "./columns";
@@ -40,7 +46,9 @@ import type {
   AlertEvidenceHydration,
   AlertEvidenceItem,
   AlertsModuleProps,
-  AlertsModuleSourceOptions
+  AlertsModuleSourceOptions,
+  NormalizedAlertsModuleFilters,
+  NormalizedAlertsModuleScope
 } from "./types";
 
 const DEFAULT_TITLE = "Alerts";
@@ -112,6 +120,39 @@ const renderAlertHover = (alert: SmartFlowAlertEvent) => {
     </div>
   );
 };
+
+const filterDurableAlertRows = (
+  rows: readonly DurableTapeAlertRowViewModel[],
+  scope?: NormalizedAlertsModuleScope,
+  filters?: NormalizedAlertsModuleFilters
+): DurableTapeAlertRowViewModel[] =>
+  rows.filter((row) => {
+    if (scope?.underlyingIds?.length) {
+      const underlying = row.evidence.underlying_id ?? row.symbol;
+      if (!underlying || !scope.underlyingIds.includes(underlying.toUpperCase())) {
+        return false;
+      }
+    }
+    if (
+      typeof filters?.minConfidence === "number" &&
+      row.alert.policy_confidence < filters.minConfidence
+    ) {
+      return false;
+    }
+    if (
+      typeof filters?.minEvidenceQuality === "number" &&
+      row.alert.evidence_quality < filters.minEvidenceQuality
+    ) {
+      return false;
+    }
+    if (
+      filters?.directions?.length &&
+      !filters.directions.includes(normalizeAlertDirection(row.alert.direction))
+    ) {
+      return false;
+    }
+    return true;
+  });
 
 export const AlertDetail = ({
   alert,
@@ -415,6 +456,8 @@ export const AlertsModule = ({
   ariaLabel = "Alerts",
   className,
   alerts = [],
+  rowViewModels = [],
+  useRowViewModels = false,
   source,
   sourceOptions,
   scope,
@@ -433,8 +476,21 @@ export const AlertsModule = ({
 }: AlertsModuleProps) => {
   const normalizedScope = useMemo(() => normalizeAlertsScope(scope), [scope]);
   const normalizedFilters = useMemo(() => normalizeAlertsFilters(filters), [filters]);
+  const filteredRowViewModels = useMemo(
+    () => filterDurableAlertRows(rowViewModels, normalizedScope, normalizedFilters),
+    [normalizedFilters, normalizedScope, rowViewModels]
+  );
   const arraySource = useAlertsArraySource({ alerts, options: sourceOptions });
   const tapeSource = source ?? arraySource;
+  const alertLookup = useMemo(() => {
+    const byAlertId = new Map<string, SmartFlowAlertEvent>();
+    const byTraceId = new Map<string, SmartFlowAlertEvent>();
+    for (const alert of alerts) {
+      byAlertId.set(alert.alert_id, alert);
+      byTraceId.set(alert.trace_id, alert);
+    }
+    return { byAlertId, byTraceId };
+  }, [alerts]);
   const hydration = useAlertEvidenceHydration({
     alert: selectedAlert,
     flowPacketById,
@@ -444,27 +500,47 @@ export const AlertsModule = ({
 
   return (
     <section className={`alerts-module ${className ?? ""}`.trim()}>
-      <DurableTape
-        ariaLabel={ariaLabel}
-        className="alerts-tape"
-        columns={ALERTS_COLUMNS}
-        features={features}
-        filters={normalizedFilters}
-        getCursor={getAlertCursor}
-        getRowClassName={({ item }) => getSmartFlowAlertRowTintClassName(item)}
-        getRowKey={getAlertKey}
-        getRowStyle={({ item }) => getSmartFlowAlertRowTintStyle(item)}
-        onActivate={(event) => onSelectAlert?.(event.item)}
-        renderHover={({ item }) => renderAlertHover(item)}
-        renderRow={({ item, columns }) => renderAlertsRow({ alert: item, columns })}
-        rowHeight={rowHeight}
-        overscan={overscan}
-        scope={normalizedScope}
-        source={tapeSource}
-        template={template}
-        templates={ALERTS_TEMPLATES}
-        title={title}
-      />
+      {useRowViewModels ? (
+        <DurableTapeAlertRowsTape
+          ariaLabel={ariaLabel}
+          features={features}
+          onSelectRow={(row) => {
+            const alert =
+              alertLookup.byAlertId.get(row.alert.alert_id) ??
+              alertLookup.byTraceId.get(row.alert.trace_id);
+            if (alert) {
+              onSelectAlert?.(alert);
+            }
+          }}
+          overscan={overscan}
+          rowHeight={rowHeight}
+          rows={filteredRowViewModels}
+          template={template}
+          title={title}
+        />
+      ) : (
+        <DurableTape
+          ariaLabel={ariaLabel}
+          className="alerts-tape"
+          columns={ALERTS_COLUMNS}
+          features={features}
+          filters={normalizedFilters}
+          getCursor={getAlertCursor}
+          getRowClassName={({ item }) => getSmartFlowAlertRowTintClassName(item)}
+          getRowKey={getAlertKey}
+          getRowStyle={({ item }) => getSmartFlowAlertRowTintStyle(item)}
+          onActivate={(event) => onSelectAlert?.(event.item)}
+          renderHover={({ item }) => renderAlertHover(item)}
+          renderRow={({ item, columns }) => renderAlertsRow({ alert: item, columns })}
+          rowHeight={rowHeight}
+          overscan={overscan}
+          scope={normalizedScope}
+          source={tapeSource}
+          template={template}
+          templates={ALERTS_TEMPLATES}
+          title={title}
+        />
+      )}
       {showDetail && selectedAlert ? (
         <div className="alerts-module-detail">
           <button className="alerts-module-detail-close" type="button" onClick={onCloseDetail}>

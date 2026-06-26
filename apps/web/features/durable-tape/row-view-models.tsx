@@ -4,13 +4,13 @@ import type {
   DurableTapeAlertRowViewModel,
   DurableTapeOptionRowViewModel,
   DurableTapeRowViewModel,
+  OptionFlowFilters,
   OptionPrint
 } from "@islandflow/types";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { matchesOptionPrintFilters } from "@islandflow/types";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import type { FlowPacketFocusRequest } from "../flow-packets";
-import { DurableTape } from "./components/DurableTape";
-import { createDurableTapeInitialHistoryCursor } from "./history";
 import {
   getOptionsTapeRowTintClassName,
   getOptionsTapeRowTintFromContext,
@@ -21,12 +21,14 @@ import {
   getOptionsTapeSmartFlowSummary,
   type OptionsTapeRowTint
 } from "../options-tape/tinting";
-import type { OptionsTapeSmartFlowContext } from "../options-tape/types";
+import type { OptionsTapeSmartFlowContext, OptionsTapeSourceScope } from "../options-tape/types";
+import { DurableTape } from "./components/DurableTape";
 import {
   type DurableTapeColumnDefinition,
   type DurableTapeFeatureInput,
   type DurableTapeSource,
-  type DurableTapeTemplate
+  type DurableTapeTemplate,
+  type DurableTapeTemplateId
 } from "./types";
 
 type StaticRowListener<T extends DurableTapeRowViewModel> = {
@@ -62,7 +64,7 @@ const useStaticRowSource = <T extends DurableTapeRowViewModel>(
           listenersRef.current.clear();
         }
       }),
-      getInitialHistoryCursor: () => createDurableTapeInitialHistoryCursor(),
+      getInitialHistoryCursor: () => null,
       loadOlder: async () => ({ items: [], nextCursor: null, exhausted: true })
     }),
     []
@@ -189,6 +191,26 @@ const optionPrintFromRow = (row: DurableTapeOptionRowViewModel): OptionPrint => 
   signal_profile: row.option.signal?.profile as OptionPrint["signal_profile"]
 });
 
+export const filterDurableOptionRows = (
+  rows: readonly DurableTapeOptionRowViewModel[],
+  scope?: OptionsTapeSourceScope,
+  filters?: OptionFlowFilters
+): DurableTapeOptionRowViewModel[] => {
+  const memberTraceIds = new Set(scope?.packetMemberTraceIds ?? []);
+  return rows.filter((row) => {
+    if (memberTraceIds.size > 0 && !memberTraceIds.has(row.option.trace_id)) {
+      return false;
+    }
+    if (
+      scope?.optionContractId &&
+      row.option.option_contract_id.trim() !== scope.optionContractId
+    ) {
+      return false;
+    }
+    return matchesOptionPrintFilters(optionPrintFromRow(row), filters);
+  });
+};
+
 const getDurableOptionRowSmartFlowContext = (
   row: DurableTapeOptionRowViewModel
 ): OptionsTapeSmartFlowContext | undefined => {
@@ -308,58 +330,73 @@ const renderOptionHover = (row: DurableTapeOptionRowViewModel) => {
   );
 };
 
-export const DurableTapeOptionRowsPane = ({
+export const DurableTapeOptionRowsTape = ({
   rows,
   title = "Options Tape",
+  ariaLabel,
   className,
   features,
+  template = "auto",
   rowHeight = 34,
+  overscan = 10,
   onContractFocus,
   onPacketFocus
 }: {
   rows: readonly DurableTapeOptionRowViewModel[];
   title?: string;
+  ariaLabel?: string;
   className?: string;
   features?: readonly DurableTapeFeatureInput[];
+  template?: DurableTapeTemplateId | "auto";
   rowHeight?: number;
+  overscan?: number;
   onContractFocus?: (print: OptionPrint) => void;
   onPacketFocus?: (request: FlowPacketFocusRequest) => void;
 }) => {
   const source = useStaticRowSource(rows);
 
   return (
-    <section className={`options-tape-module ${className ?? ""}`.trim()} data-row-source="server">
-      <DurableTape
-        ariaLabel={title}
-        className="options-tape options-tape-mode-global"
-        columns={OPTION_ROW_COLUMNS}
-        features={features}
-        getCursor={getRowCursor}
-        getRowClassName={({ item }) =>
-          getOptionsTapeRowTintClassName(getDurableOptionRowTint(item))
+    <DurableTape
+      ariaLabel={ariaLabel ?? title}
+      className={`options-tape ${className ?? "options-tape-mode-global"}`.trim()}
+      columns={OPTION_ROW_COLUMNS}
+      features={features}
+      getCursor={getRowCursor}
+      getRowClassName={({ item }) => getOptionsTapeRowTintClassName(getDurableOptionRowTint(item))}
+      getRowKey={getRowKey}
+      getRowStyle={({ item }) => getOptionsTapeRowTintStyle(getDurableOptionRowTint(item))}
+      onActivate={({ item }) => {
+        const print = optionPrintFromRow(item);
+        onContractFocus?.(print);
+        const packet = item.support.packet;
+        if (packet) {
+          onPacketFocus?.({
+            packetId: packet.id,
+            memberTraceIds: packet.member_trace_ids,
+            optionContractId: packet.option_contract_id ?? item.option.option_contract_id,
+            source: "options-tape"
+          });
         }
-        getRowKey={getRowKey}
-        getRowStyle={({ item }) => getOptionsTapeRowTintStyle(getDurableOptionRowTint(item))}
-        onActivate={({ item }) => {
-          const print = optionPrintFromRow(item);
-          onContractFocus?.(print);
-          const packet = item.support.packet;
-          if (packet) {
-            onPacketFocus?.({
-              packetId: packet.id,
-              memberTraceIds: packet.member_trace_ids,
-              optionContractId: packet.option_contract_id ?? item.option.option_contract_id,
-              source: "options-tape"
-            });
-          }
-        }}
-        renderHover={({ item }) => renderOptionHover(item)}
-        renderRow={({ item, columns }) => renderOptionRow({ row: item, columns })}
-        rowHeight={rowHeight}
-        source={source}
-        templates={OPTION_ROW_TEMPLATES}
-        title={title}
-      />
+      }}
+      overscan={overscan}
+      renderHover={({ item }) => renderOptionHover(item)}
+      renderRow={({ item, columns }) => renderOptionRow({ row: item, columns })}
+      rowHeight={rowHeight}
+      source={source}
+      template={template}
+      templates={OPTION_ROW_TEMPLATES}
+      title={title}
+    />
+  );
+};
+
+export const DurableTapeOptionRowsPane = ({
+  className,
+  ...props
+}: Parameters<typeof DurableTapeOptionRowsTape>[0]) => {
+  return (
+    <section className={`options-tape-module ${className ?? ""}`.trim()} data-row-source="server">
+      <DurableTapeOptionRowsTape {...props} />
     </section>
   );
 };
@@ -529,17 +566,22 @@ const renderAlertDetail = (row: DurableTapeAlertRowViewModel) => (
 export const DurableTapeAlertRowsPane = ({
   rows,
   title = "Alerts",
+  ariaLabel,
   className,
   features,
-  rowHeight = 36
+  template = "auto",
+  rowHeight = 36,
+  overscan = 10
 }: {
   rows: readonly DurableTapeAlertRowViewModel[];
   title?: string;
+  ariaLabel?: string;
   className?: string;
   features?: readonly DurableTapeFeatureInput[];
+  template?: DurableTapeTemplateId | "auto";
   rowHeight?: number;
+  overscan?: number;
 }) => {
-  const source = useStaticRowSource(rows);
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
   const selectedRow = rows.find((row) => row.id === selectedRowId) ?? null;
 
@@ -551,19 +593,14 @@ export const DurableTapeAlertRowsPane = ({
 
   return (
     <section className={`alerts-module ${className ?? ""}`.trim()} data-row-source="server">
-      <DurableTape
-        ariaLabel={title}
-        className="alerts-tape"
-        columns={ALERT_ROW_COLUMNS}
+      <DurableTapeAlertRowsTape
+        ariaLabel={ariaLabel}
         features={features}
-        getCursor={getRowCursor}
-        getRowKey={getRowKey}
-        onActivate={({ item }) => setSelectedRowId(item.id)}
-        renderHover={({ item }) => renderAlertDetail(item)}
-        renderRow={({ item, columns }) => renderAlertRow({ row: item, columns })}
+        onSelectRow={(row) => setSelectedRowId(row.id)}
+        overscan={overscan}
         rowHeight={rowHeight}
-        source={source}
-        templates={ALERT_ROW_TEMPLATES}
+        rows={rows}
+        template={template}
         title={title}
       />
       {selectedRow ? (
@@ -579,5 +616,49 @@ export const DurableTapeAlertRowsPane = ({
         </div>
       ) : null}
     </section>
+  );
+};
+
+export const DurableTapeAlertRowsTape = ({
+  rows,
+  title = "Alerts",
+  ariaLabel,
+  className,
+  features,
+  template = "auto",
+  rowHeight = 36,
+  overscan = 10,
+  onSelectRow
+}: {
+  rows: readonly DurableTapeAlertRowViewModel[];
+  title?: string;
+  ariaLabel?: string;
+  className?: string;
+  features?: readonly DurableTapeFeatureInput[];
+  template?: DurableTapeTemplateId | "auto";
+  rowHeight?: number;
+  overscan?: number;
+  onSelectRow?: (row: DurableTapeAlertRowViewModel) => void;
+}) => {
+  const source = useStaticRowSource(rows);
+
+  return (
+    <DurableTape
+      ariaLabel={ariaLabel ?? title}
+      className={`alerts-tape ${className ?? ""}`.trim()}
+      columns={ALERT_ROW_COLUMNS}
+      features={features}
+      getCursor={getRowCursor}
+      getRowKey={getRowKey}
+      onActivate={({ item }) => onSelectRow?.(item)}
+      overscan={overscan}
+      renderHover={({ item }) => renderAlertDetail(item)}
+      renderRow={({ item, columns }) => renderAlertRow({ row: item, columns })}
+      rowHeight={rowHeight}
+      source={source}
+      template={template}
+      templates={ALERT_ROW_TEMPLATES}
+      title={title}
+    />
   );
 };

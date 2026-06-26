@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Contained Durable Tape Modules</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #08090b;
+        --panel: #12161a;
+        --panel-2: #181e23;
+        --panel-3: #0d1114;
+        --text: #edf2f7;
+        --muted: #a7b1bd;
+        --faint: #7d8894;
+        --line: #ffffff1c;
+        --line-strong: #ffffff2e;
+        --green: #35c978;
+        --amber: #f2b84b;
+        --red: #ff6f61;
+        --cyan: #77c7e8;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+        --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--sans);
+      }
+
+      main {
+        width: min(1120px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 34px 0 54px;
+      }
+
+      header,
+      section {
+        border: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      header {
+        padding: 22px;
+      }
+
+      section {
+        margin-top: 14px;
+        padding: 18px 20px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 880px;
+        font-family: var(--mono);
+        font-size: 1.42rem;
+        line-height: 1.18;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+
+      h2,
+      .eyebrow,
+      .meta-label {
+        font-family: var(--mono);
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+      }
+
+      h2,
+      .eyebrow {
+        color: var(--amber);
+        font-size: 0.72rem;
+        font-weight: 700;
+      }
+
+      h2 {
+        margin-bottom: 12px;
+      }
+
+      h3 {
+        font-size: 0.92rem;
+      }
+
+      p,
+      li {
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.56;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+
+      li + li {
+        margin-top: 6px;
+      }
+
+      code {
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 0.86em;
+      }
+
+      .subtitle {
+        margin-top: 10px;
+        max-width: 90ch;
+      }
+
+      .meta-grid,
+      .check-grid,
+      .finding-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+        gap: 10px;
+      }
+
+      .meta-grid {
+        margin-top: 18px;
+      }
+
+      .meta-card,
+      .check,
+      .finding {
+        border: 1px solid var(--line);
+        background: var(--panel-3);
+        padding: 12px;
+      }
+
+      .meta-label {
+        display: block;
+        margin-bottom: 7px;
+        color: var(--faint);
+        font-size: 0.68rem;
+      }
+
+      .finding strong,
+      .check strong {
+        display: block;
+        margin-bottom: 7px;
+        color: var(--text);
+        font-size: 0.9rem;
+      }
+
+      .check strong {
+        color: var(--green);
+        font-family: var(--mono);
+        font-size: 0.76rem;
+      }
+
+      .check.warn strong {
+        color: var(--amber);
+      }
+
+      .finding p,
+      .check p {
+        font-size: 0.84rem;
+      }
+
+      .pill {
+        display: inline-block;
+        margin-right: 8px;
+        color: var(--cyan);
+        font-family: var(--mono);
+        font-size: 0.76rem;
+      }
+
+      .diff-card {
+        margin-top: 14px;
+        border: 1px solid var(--line-strong);
+        background: #090d10;
+        overflow: hidden;
+      }
+
+      .diff-card h3 {
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--line);
+        background: var(--panel-2);
+        font-family: var(--mono);
+        font-size: 0.82rem;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+      }
+
+      .rich-diff {
+        display: none;
+        overflow: auto;
+        background: #0b1016;
+      }
+
+      .diff-card.rendered .rich-diff {
+        display: block;
+      }
+
+      .diff-card.rendered .diff-fallback {
+        display: none;
+      }
+
+      .diff-fallback {
+        margin: 0;
+        overflow: auto;
+        padding: 12px 14px;
+        color: #d7e1ec;
+        background: #0b1016;
+        font-family: var(--mono);
+        font-size: 0.78rem;
+        line-height: 1.5;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <span class="eyebrow">2026-06-26</span>
+        <h1>Contained Durable Tape Modules</h1>
+        <p class="subtitle">
+          Durable tape modules now own a bounded scroll viewport by default, so a page can mount many
+          modules without the TanStack virtual spacer expanding the module, page, and DOM work.
+        </p>
+        <div class="meta-grid">
+          <div class="meta-card">
+            <span class="meta-label">Issue</span>
+            <p><code>islandflow-to8b</code></p>
+          </div>
+          <div class="meta-card">
+            <span class="meta-label">Surface</span>
+            <p><code>apps/web</code> durable tapes, options, alerts, QA route</p>
+          </div>
+          <div class="meta-card">
+            <span class="meta-label">Production Recovery</span>
+            <p>Rebuilt and restarted only <code>islandflow-web.service</code> after a partial build state.</p>
+          </div>
+        </div>
+      </header>
+
+      <section>
+        <h2>Findings</h2>
+        <div class="finding-grid">
+          <div class="finding">
+            <strong>Root cause</strong>
+            <p>
+              <code>DurableTape</code> used <code>@tanstack/react-virtual</code>, but embedded tapes did
+              not always have a bounded scroll container. The virtual body height then became page
+              height, so the virtualizer rendered far too many rows.
+            </p>
+          </div>
+          <div class="finding">
+            <strong>Fix</strong>
+            <p>
+              Shared tape CSS now gives every tape a default contained height, while known full-height
+              shells opt into their parent height. QA preview frames also have explicit heights.
+            </p>
+          </div>
+          <div class="finding">
+            <strong>Efficiency path</strong>
+            <p>
+              Options and alerts modules can consume server-composed durable row models and still honor
+              local scope/filter behavior before rows reach the virtual list.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Verification</h2>
+        <div class="check-grid">
+          <div class="check">
+            <strong>PASS</strong>
+            <p><code>bun x biome check</code> on the touched web files.</p>
+          </div>
+          <div class="check">
+            <strong>PASS</strong>
+            <p>
+              <code>bun test apps/web/features/durable-tape apps/web/features/options-tape apps/web/features/alerts apps/web/app/terminal.test.ts</code>
+            </p>
+          </div>
+          <div class="check">
+            <strong>PASS</strong>
+            <p><code>bun run typecheck</code></p>
+          </div>
+          <div class="check">
+            <strong>PASS</strong>
+            <p><code>bun --cwd=apps/web run build</code></p>
+          </div>
+          <div class="check">
+            <strong>PASS</strong>
+            <p>
+              External hydrated probe for <code>https://flow.deltaisland.io/qa</code>: 15 durable tapes,
+              263 rendered rows, max tape height 416px, page height 6080px, chart previews live.
+            </p>
+          </div>
+          <div class="check warn">
+            <strong>NOTE</strong>
+            <p>
+              Repo-wide <code>bun run check</code> still reports pre-existing import-order issues in
+              unrelated files; the touched-file Biome check passes.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <article class="diff-card">
+          <h3>Contain tape viewports</h3>
+          <div class="rich-diff" aria-label="Rendered diff"></div>
+          <pre class="diff-fallback"><code>diff --git a/apps/web/app/globals.css b/apps/web/app/globals.css
+@@
+   --drawer-width: min(320px, calc(100vw - 28px));
+   --topbar-height: 64px;
++  --durable-tape-default-height: clamp(280px, 42vh, 420px);
+ }
+@@
+ .durable-tape {
+   position: relative;
+   display: flex;
+   min-width: 0;
+   min-height: 0;
++  height: var(--durable-tape-height, var(--durable-tape-default-height));
++  max-height: var(
++    --durable-tape-max-height,
++    var(--durable-tape-height, var(--durable-tape-default-height))
++  );
++  flex: 1 1 var(--durable-tape-height, var(--durable-tape-default-height));
+   flex-direction: column;
+   overflow: hidden;
+@@
+ .durable-tape-scroll {
+   flex: 1 1 auto;
+   min-height: 0;
+   overflow-x: hidden;
+   overflow-y: auto;
++  overscroll-behavior: contain;
++  scrollbar-gutter: stable;
+ }
+@@
+ .durable-tapes-template-frame {
+   min-width: 0;
++  height: var(--qa-compact-height);
+   min-height: var(--qa-compact-height);
+   display: grid;
+   grid-template-rows: auto minmax(0, 1fr);
+@@
+ .durable-tapes-template-frame-full {
+   grid-column: 1 / -1;
++  height: var(--qa-full-height);
+   min-height: var(--qa-full-height);
+ }</code></pre>
+          <script type="text/plain" class="patch-source">diff --git a/apps/web/app/globals.css b/apps/web/app/globals.css
+@@
+   --drawer-width: min(320px, calc(100vw - 28px));
+   --topbar-height: 64px;
++  --durable-tape-default-height: clamp(280px, 42vh, 420px);
+ }
+@@
+ .durable-tape {
+   position: relative;
+   display: flex;
+   min-width: 0;
+   min-height: 0;
++  height: var(--durable-tape-height, var(--durable-tape-default-height));
++  max-height: var(
++    --durable-tape-max-height,
++    var(--durable-tape-height, var(--durable-tape-default-height))
++  );
++  flex: 1 1 var(--durable-tape-height, var(--durable-tape-default-height));
+   flex-direction: column;
+   overflow: hidden;
+@@
+ .durable-tape-scroll {
+   flex: 1 1 auto;
+   min-height: 0;
+   overflow-x: hidden;
+   overflow-y: auto;
++  overscroll-behavior: contain;
++  scrollbar-gutter: stable;
+ }
+@@
+ .durable-tapes-template-frame {
+   min-width: 0;
++  height: var(--qa-compact-height);
+   min-height: var(--qa-compact-height);
+   display: grid;
+   grid-template-rows: auto minmax(0, 1fr);
+@@
+ .durable-tapes-template-frame-full {
+   grid-column: 1 / -1;
++  height: var(--qa-full-height);
+   min-height: var(--qa-full-height);
+ }</script>
+        </article>
+
+        <article class="diff-card">
+          <h3>Use server-composed rows where available</h3>
+          <div class="rich-diff" aria-label="Rendered diff"></div>
+          <pre class="diff-fallback"><code>diff --git a/apps/web/features/options-tape/OptionsTape.tsx b/apps/web/features/options-tape/OptionsTape.tsx
+@@
++import {
++  DurableTapeOptionRowsTape,
++  filterDurableOptionRows
++} from "../durable-tape/row-view-models";
+@@
++  rowViewModels = [],
++  useRowViewModels = false,
+@@
++  const filteredRowViewModels = useMemo(
++    () =&gt; filterDurableOptionRows(rowViewModels, sourceScope, sourceFilters),
++    [rowViewModels, sourceFilters, sourceScope]
++  );
+@@
+-      &lt;DurableTape ... /&gt;
++      {useServerRows ? (
++        &lt;DurableTapeOptionRowsTape
++          rows={filteredRowViewModels}
++          template={template}
++          rowHeight={rowHeight}
++          overscan={overscan}
++        /&gt;
++      ) : (
++        &lt;DurableTape ... /&gt;
++      )}
+
+diff --git a/apps/web/features/alerts/AlertsModule.tsx b/apps/web/features/alerts/AlertsModule.tsx
+@@
++import { DurableTapeAlertRowsTape } from "../durable-tape/row-view-models";
+@@
++  rowViewModels = [],
++  useRowViewModels = false,
+@@
++  const filteredRowViewModels = useMemo(
++    () =&gt; filterDurableAlertRows(rowViewModels, normalizedScope, normalizedFilters),
++    [normalizedFilters, normalizedScope, rowViewModels]
++  );
+@@
+-      &lt;DurableTape ... /&gt;
++      {useRowViewModels ? (
++        &lt;DurableTapeAlertRowsTape
++          rows={filteredRowViewModels}
++          template={template}
++          rowHeight={rowHeight}
++          overscan={overscan}
++        /&gt;
++      ) : (
++        &lt;DurableTape ... /&gt;
++      )}</code></pre>
+          <script type="text/plain" class="patch-source">diff --git a/apps/web/features/options-tape/OptionsTape.tsx b/apps/web/features/options-tape/OptionsTape.tsx
+@@
++import {
++  DurableTapeOptionRowsTape,
++  filterDurableOptionRows
++} from "../durable-tape/row-view-models";
+@@
++  rowViewModels = [],
++  useRowViewModels = false,
+@@
++  const filteredRowViewModels = useMemo(
++    () => filterDurableOptionRows(rowViewModels, sourceScope, sourceFilters),
++    [rowViewModels, sourceFilters, sourceScope]
++  );
+@@
+-      <DurableTape ... />
++      {useServerRows ? (
++        <DurableTapeOptionRowsTape
++          rows={filteredRowViewModels}
++          template={template}
++          rowHeight={rowHeight}
++          overscan={overscan}
++        />
++      ) : (
++        <DurableTape ... />
++      )}
+
+diff --git a/apps/web/features/alerts/AlertsModule.tsx b/apps/web/features/alerts/AlertsModule.tsx
+@@
++import { DurableTapeAlertRowsTape } from "../durable-tape/row-view-models";
+@@
++  rowViewModels = [],
++  useRowViewModels = false,
+@@
++  const filteredRowViewModels = useMemo(
++    () => filterDurableAlertRows(rowViewModels, normalizedScope, normalizedFilters),
++    [normalizedFilters, normalizedScope, rowViewModels]
++  );
+@@
+-      <DurableTape ... />
++      {useRowViewModels ? (
++        <DurableTapeAlertRowsTape
++          rows={filteredRowViewModels}
++          template={template}
++          rowHeight={rowHeight}
++          overscan={overscan}
++        />
++      ) : (
++        <DurableTape ... />
++      )}</script>
+        </article>
+      </section>
+    </main>
+
+    <script type="module">
+      import React from "https://esm.sh/react@19";
+      import { createRoot } from "https://esm.sh/react-dom@19/client";
+      import { PatchDiff } from "https://esm.sh/@pierre/diffs@1.2.2/react?deps=react@19,react-dom@19";
+
+      for (const card of document.querySelectorAll(".diff-card")) {
+        const target = card.querySelector(".rich-diff");
+        const source = card.querySelector(".patch-source");
+        if (!target || !source) continue;
+        try {
+          createRoot(target).render(React.createElement(PatchDiff, { patch: source.textContent || "" }));
+          card.classList.add("rendered");
+        } catch (error) {
+          console.warn("Rich diff renderer failed; keeping HTML fallback.", error);
+        }
+      }
+    </script>
+  </body>
+</html>

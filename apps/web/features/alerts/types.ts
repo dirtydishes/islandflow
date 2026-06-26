@@ -1,4 +1,9 @@
-import type { FlowPacket, OptionPrint, SmartFlowAlertEvent } from "@islandflow/types";
+import type {
+  DurableTapeAlertRowViewModel,
+  FlowPacket,
+  OptionPrint,
+  SmartFlowAlertEvent
+} from "@islandflow/types";
 
 import type {
   DurableTapeFeatureInput,
@@ -88,6 +93,8 @@ export type AlertsModuleProps = AlertActionCallbacks & {
   ariaLabel?: string;
   className?: string;
   alerts?: readonly SmartFlowAlertEvent[];
+  rowViewModels?: readonly DurableTapeAlertRowViewModel[];
+  useRowViewModels?: boolean;
   source?: DurableTapeSource<
     SmartFlowAlertEvent,
     NormalizedAlertsModuleScope,

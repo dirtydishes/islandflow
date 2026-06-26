@@ -1,4 +1,5 @@
 import type {
+  DurableTapeOptionRowViewModel,
   FlowPacket,
   OptionFlowFilters,
   OptionNBBO,
@@ -101,6 +102,8 @@ export type OptionsTapeProps = {
   ariaLabel?: string;
   className?: string;
   prints?: readonly OptionPrint[];
+  rowViewModels?: readonly DurableTapeOptionRowViewModel[];
+  useRowViewModels?: boolean;
   source?: DurableTapeSource<OptionPrint, OptionsTapeSourceScope, OptionFlowFilters>;
   sourceOptions?: OptionsTapeSourceOptions;
   filters?: OptionFlowFilters;

@@ -19,6 +19,10 @@ import {
 } from "react";
 
 import { DurableTape } from "../durable-tape/components/DurableTape";
+import {
+  DurableTapeOptionRowsTape,
+  filterDurableOptionRows
+} from "../durable-tape/row-view-models";
 import type { DurableTapeFocusEvent } from "../durable-tape/types";
 import {
   stableHydrationKey,
@@ -56,8 +60,8 @@ import {
 } from "./support-hydration";
 import {
   buildOptionsTapeSmartFlowContextByTraceId,
-  getOptionsTapeRowTintFromContext,
   getOptionsTapeRowTintClassName,
+  getOptionsTapeRowTintFromContext,
   getOptionsTapeRowTintStyle,
   getOptionsTapeSmartFlowSummary
 } from "./tinting";
@@ -444,6 +448,8 @@ export const OptionsTape = ({
   ariaLabel = "Options tape",
   className,
   prints = [],
+  rowViewModels = [],
+  useRowViewModels = false,
   source,
   sourceOptions,
   filters,
@@ -471,6 +477,7 @@ export const OptionsTape = ({
   const activeFilters = filters ?? localFilters;
   const setFilters = onFiltersChange ?? setLocalFilters;
   const [scope, setScope] = useState<OptionsTapeScope>(GLOBAL_SCOPE);
+  const useServerRows = useRowViewModels;
   const tapeSource = useOptionsTapeArraySource({ prints, options: sourceOptions });
   const activeSource = source ?? tapeSource;
   const mountedRef = useRef(true);
@@ -491,6 +498,10 @@ export const OptionsTape = ({
   const sourceFilters = useMemo(
     () => getOptionsTapeScopeFilters(sourceScope, activeFilters),
     [activeFilters, sourceScope]
+  );
+  const filteredRowViewModels = useMemo(
+    () => filterDurableOptionRows(rowViewModels, sourceScope, sourceFilters),
+    [rowViewModels, sourceFilters, sourceScope]
   );
   const templates = OPTIONS_TAPE_TEMPLATES_BY_MODE[mode];
   const hydratedPacketMaps = useMemo(
@@ -740,32 +751,47 @@ export const OptionsTape = ({
         <OptionsTapeSettings filters={activeFilters} onChange={updateFilters} />
       </div>
       {renderScopeBand({ scope, onShowAll: showAllForContract, onClear: clearScope })}
-      <DurableTape
-        ariaLabel={ariaLabel}
-        className={`options-tape options-tape-mode-${mode}`}
-        columns={OPTIONS_TAPE_COLUMNS}
-        features={features}
-        filters={sourceFilters}
-        getCursor={getOptionsTapePrintCursor}
-        getRowClassName={({ item }) => getOptionsTapeRowTintClassName(rowTintForPrint(item))}
-        getRowKey={getOptionsTapePrintKey}
-        getRowStyle={({ item }) => getOptionsTapeRowTintStyle(rowTintForPrint(item))}
-        onActivate={activatePrint}
-        renderHover={renderHover}
-        renderRow={({ item, columns }) =>
-          renderOptionsTapeRow({
-            context: contextForPrint(item),
-            columns
-          })
-        }
-        rowHeight={rowHeight}
-        overscan={overscan}
-        scope={sourceScope}
-        source={supportHydratedSource}
-        template={template}
-        templates={templates}
-        title={title}
-      />
+      {useServerRows ? (
+        <DurableTapeOptionRowsTape
+          ariaLabel={ariaLabel}
+          className={`options-tape-mode-${mode}`}
+          features={features}
+          onContractFocus={onContractFocus}
+          onPacketFocus={onPacketFocus}
+          overscan={overscan}
+          rowHeight={rowHeight}
+          rows={filteredRowViewModels}
+          template={template}
+          title={title}
+        />
+      ) : (
+        <DurableTape
+          ariaLabel={ariaLabel}
+          className={`options-tape options-tape-mode-${mode}`}
+          columns={OPTIONS_TAPE_COLUMNS}
+          features={features}
+          filters={sourceFilters}
+          getCursor={getOptionsTapePrintCursor}
+          getRowClassName={({ item }) => getOptionsTapeRowTintClassName(rowTintForPrint(item))}
+          getRowKey={getOptionsTapePrintKey}
+          getRowStyle={({ item }) => getOptionsTapeRowTintStyle(rowTintForPrint(item))}
+          onActivate={activatePrint}
+          renderHover={renderHover}
+          renderRow={({ item, columns }) =>
+            renderOptionsTapeRow({
+              context: contextForPrint(item),
+              columns
+            })
+          }
+          rowHeight={rowHeight}
+          overscan={overscan}
+          scope={sourceScope}
+          source={supportHydratedSource}
+          template={template}
+          templates={templates}
+          title={title}
+        />
+      )}
     </section>
   );
 };

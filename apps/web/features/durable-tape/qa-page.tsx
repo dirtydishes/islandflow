@@ -321,10 +321,12 @@ export const DurableTapesQaRoute = () => {
                 onPacketFocus={optionsPane.onPacketFocus}
                 packetIdByOptionTraceId={optionsPane.packetIdByOptionTraceId}
                 prints={optionPrints}
+                rowViewModels={optionsPane.rowViewModels}
                 rowHeight={34}
                 smartFlowProjections={smartFlowProjections}
                 template={template}
                 title="Options Tape"
+                useRowViewModels={optionsPane.useRowViewModels}
               />
             )}
           />
@@ -410,10 +412,12 @@ export const DurableTapesQaRoute = () => {
                 onPacketFocus={alertsPane.onPacketFocus}
                 onSelectAlert={alertsPane.onSelectAlert}
                 optionPrintByTraceId={alertsPane.optionPrintByTraceId}
+                rowViewModels={alertsPane.rowViewModels}
                 rowHeight={36}
                 selectedAlert={alertsPane.selectedAlert}
                 template={template}
                 title="Alerts"
+                useRowViewModels={alertsPane.useRowViewModels}
               />
             )}
           />

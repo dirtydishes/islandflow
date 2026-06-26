@@ -23,6 +23,7 @@
   --route-line: var(--border);
   --drawer-width: min(320px, calc(100vw - 28px));
   --topbar-height: 64px;
+  --durable-tape-default-height: clamp(280px, 42vh, 420px);
 }
 
 * {
@@ -893,6 +894,8 @@ h3 {
 .opra-options-tape {
   height: clamp(620px, calc(100vh - var(--topbar-height) - 178px), 820px);
   min-height: 620px;
+  --durable-tape-height: auto;
+  --durable-tape-max-height: none;
 }
 
 .page-grid-home > :nth-child(3),
@@ -1284,17 +1287,24 @@ h3 {
 
 .command-contracts-tape {
   grid-area: contracts;
+  height: 314px;
   min-height: 314px;
+  --durable-tape-height: auto;
+  --durable-tape-max-height: none;
 }
 
 .command-flow-tape {
   grid-area: flow;
   min-height: 252px;
+  --durable-tape-height: 252px;
+  --durable-tape-max-height: 252px;
 }
 
 .command-equities-tape {
   grid-area: equities;
   min-height: 230px;
+  --durable-tape-height: 230px;
+  --durable-tape-max-height: 230px;
 }
 
 .command-feed-pane {
@@ -2469,6 +2479,12 @@ h3 {
   display: flex;
   min-width: 0;
   min-height: 0;
+  height: var(--durable-tape-height, var(--durable-tape-default-height));
+  max-height: var(
+    --durable-tape-max-height,
+    var(--durable-tape-height, var(--durable-tape-default-height))
+  );
+  flex: 1 1 var(--durable-tape-height, var(--durable-tape-default-height));
   flex-direction: column;
   overflow: hidden;
   border-top: 1px solid var(--border);
@@ -2596,6 +2612,8 @@ h3 {
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .durable-tape-body {
@@ -4206,6 +4224,8 @@ h3 {
 .news-pane-full {
   height: max(520px, calc(100vh - var(--topbar-height) - 190px));
   min-height: 0;
+  --durable-tape-height: auto;
+  --durable-tape-max-height: none;
 }
 
 .news-wire-module {
@@ -4692,6 +4712,7 @@ h3 {
 
 .durable-tapes-template-frame {
   min-width: 0;
+  height: var(--qa-compact-height);
   min-height: var(--qa-compact-height);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -4703,6 +4724,7 @@ h3 {
 
 .durable-tapes-template-frame-full {
   grid-column: 1 / -1;
+  height: var(--qa-full-height);
   min-height: var(--qa-full-height);
 }
 
@@ -4761,6 +4783,8 @@ h3 {
 .durable-tapes-demo-module.alerts-module,
 .durable-tapes-demo-module.news-wire-module {
   overflow: hidden;
+  --durable-tape-height: auto;
+  --durable-tape-max-height: none;
 }
 
 .durable-tapes-demo-module.options-tape-module {
@@ -5048,10 +5072,12 @@ h3 {
   .durable-tapes-template-frame-two-thirds,
   .durable-tapes-template-frame-one-third {
     grid-column: 1 / -1;
+    height: min(var(--qa-compact-height), 70vh);
     min-height: min(var(--qa-compact-height), 70vh);
   }
 
   .durable-tapes-template-frame-full {
+    height: min(var(--qa-full-height), 78vh);
     min-height: min(var(--qa-full-height), 78vh);
   }
 
