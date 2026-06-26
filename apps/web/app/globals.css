@@ -3248,9 +3248,13 @@ h3 {
 
 .options-tape-scope-main {
   flex: 1 1 auto;
-  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.84fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   gap: 10px;
+}
+
+.options-tape-scope-main.has-smart-flow {
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.84fr);
 }
 
 .options-tape-scope-smart-flow {

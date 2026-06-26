@@ -333,7 +333,11 @@ const renderScopeBand = ({
     : null;
   return (
     <div className={`options-tape-scope-band options-tape-scope-${scope.mode}`}>
-      <div className="options-tape-scope-main">
+      <div
+        className={`options-tape-scope-main ${
+          smartFlowSummary ? "has-smart-flow" : ""
+        }`.trim()}
+      >
         <div className="options-tape-scope-focus">
           <span>{scope.mode === "packet" ? "Packet prints" : "Contract flow"}</span>
           <strong>{label}</strong>
