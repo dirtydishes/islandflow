@@ -1,20 +1,20 @@
 "use client";
 
-import type { AlertEvent } from "@islandflow/types";
+import type { SmartFlowAlertEvent } from "@islandflow/types";
 import type { ReactNode } from "react";
 
 import type { DurableTapeColumnDefinition, DurableTapeTemplate } from "../durable-tape";
 import {
-  deriveAlertDirection,
-  formatAlertScore,
   formatAlertTime,
-  getAlertKind,
-  inferAlertUnderlying,
-  normalizeAlertSeverity
+  getAlertConfidenceEvidenceLabel,
+  getAlertDirectionLabel,
+  getAlertName,
+  getAlertSymbol,
+  normalizeAlertDirection
 } from "./format";
 import type { AlertColumnId } from "./types";
 
-export const ALERTS_COLUMNS: DurableTapeColumnDefinition<AlertEvent, AlertColumnId>[] = [
+export const ALERTS_COLUMNS: DurableTapeColumnDefinition<SmartFlowAlertEvent, AlertColumnId>[] = [
   {
     id: "time",
     label: "TIME",
@@ -27,45 +27,43 @@ export const ALERTS_COLUMNS: DurableTapeColumnDefinition<AlertEvent, AlertColumn
     label: "SYMBOL",
     minWidth: 76,
     className: "alerts-cell-symbol",
-    render: (alert) => inferAlertUnderlying(alert) ?? "ALERT"
+    render: getAlertSymbol
   },
   {
-    id: "kind",
-    label: "KIND",
-    minWidth: 136,
-    className: "alerts-cell-kind",
-    render: getAlertKind
+    id: "hypothesis",
+    label: "HYPOTHESIS",
+    minWidth: 168,
+    className: "alerts-cell-hypothesis",
+    render: getAlertName
   },
   {
-    id: "score",
-    label: "SCORE",
-    minWidth: 66,
-    align: "end",
-    className: "alerts-cell-score durable-tape-cell-number",
-    render: (alert) => formatAlertScore(alert.score)
+    id: "direction",
+    label: "DIR",
+    minWidth: 92,
+    className: "alerts-cell-direction",
+    render: getAlertDirectionLabel
   },
   {
-    id: "state",
-    label: "STATE",
-    minWidth: 86,
-    className: "alerts-cell-state",
-    render: (alert) => normalizeAlertSeverity(alert)
+    id: "confidenceEvidence",
+    label: "CONF/EVID",
+    minWidth: 132,
+    className: "alerts-cell-confidence",
+    render: getAlertConfidenceEvidenceLabel
   }
 ];
 
 export const ALERTS_TEMPLATES: DurableTapeTemplate<AlertColumnId>[] = [
-  { id: "full", columns: ["time", "symbol", "kind", "score", "state"] },
-  { id: "twoThirds", columns: ["time", "symbol", "kind", "score"] },
-  { id: "oneThird", columns: ["time", "symbol", "state"] },
-  { id: "micro", columns: ["symbol", "state"] }
+  { id: "full", columns: ["time", "symbol", "hypothesis", "direction", "confidenceEvidence"] },
+  { id: "twoThirds", columns: ["time", "symbol", "hypothesis", "confidenceEvidence"] },
+  { id: "oneThird", columns: ["time", "symbol", "direction"] },
+  { id: "micro", columns: ["symbol", "direction"] }
 ];
 
-const renderStateCell = (alert: AlertEvent): ReactNode => {
-  const severity = normalizeAlertSeverity(alert);
-  const direction = deriveAlertDirection(alert);
+const renderDirectionCell = (alert: SmartFlowAlertEvent): ReactNode => {
+  const direction = normalizeAlertDirection(alert.direction);
   return (
-    <span className={`alerts-state alerts-state-${severity} direction-${direction}`}>
-      {severity} / {direction}
+    <span className={`alerts-state alerts-state-direction direction-${direction}`}>
+      {direction}
     </span>
   );
 };
@@ -74,12 +72,16 @@ export const renderAlertsRow = ({
   alert,
   columns
 }: {
-  alert: AlertEvent;
-  columns: DurableTapeColumnDefinition<AlertEvent>[];
+  alert: SmartFlowAlertEvent;
+  columns: DurableTapeColumnDefinition<SmartFlowAlertEvent>[];
 }): ReactNode =>
   columns.map((column) => {
     const content =
-      column.id === "state" ? renderStateCell(alert) : column.render ? column.render(alert) : "--";
+      column.id === "direction"
+        ? renderDirectionCell(alert)
+        : column.render
+          ? column.render(alert)
+          : "--";
     return (
       <span
         className={`durable-tape-cell ${column.className ?? ""}`.trim()}

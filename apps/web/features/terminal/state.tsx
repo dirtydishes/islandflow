@@ -1,7 +1,6 @@
 "use client";
 
 import type {
-  AlertEvent,
   ClassifierHitEvent,
   DurableTapeAlertRowViewModel,
   DurableTapeOptionRowViewModel,
@@ -15,6 +14,7 @@ import type {
   OptionFlowFilters,
   OptionNBBO,
   OptionPrint,
+  SmartFlowAlertEvent,
   SmartFlowExplainabilityProjection,
   SmartMoneyEvent
 } from "@islandflow/types";
@@ -110,7 +110,7 @@ import type {
   TapeMode
 } from "./types";
 
-const EMPTY_ALERT_EVENTS: AlertEvent[] = [];
+const EMPTY_ALERT_EVENTS: SmartFlowAlertEvent[] = [];
 const EMPTY_CLASSIFIER_HIT_EVENTS: ClassifierHitEvent[] = [];
 const EMPTY_SMART_FLOW_EXPLAINABILITY: SmartFlowExplainabilityProjection[] = [];
 const EMPTY_SMART_MONEY_EVENTS: SmartMoneyEvent[] = [];
@@ -133,7 +133,7 @@ export const useTerminalState = () => {
   const routeFeatures = useMemo(() => getRouteFeatures(pathname), [pathname]);
   const [mode, setMode] = useState<TapeMode>("live");
   const [replaySource, setReplaySource] = useState<string | null>(null);
-  const [selectedAlert, setSelectedAlert] = useState<AlertEvent | null>(null);
+  const [selectedAlert, setSelectedAlert] = useState<SmartFlowAlertEvent | null>(null);
   const [selectedNewsStory, setSelectedNewsStory] = useState<NewsStory | null>(null);
   const [selectedDarkEvent, setSelectedDarkEvent] = useState<InferredDarkEvent | null>(null);
   const [selectedClassifierHit, setSelectedClassifierHit] = useState<ClassifierHitEvent | null>(
@@ -227,7 +227,7 @@ export const useTerminalState = () => {
   const equitiesLastUpdate = liveSession.lastEventByChannel.equities ?? null;
   const equityJoinsLastUpdate = liveSession.lastEventByChannel["equity-joins"] ?? null;
   const flowLastUpdate = liveSession.lastEventByChannel.flow ?? null;
-  const alertsLastUpdate = liveSession.lastEventByChannel.alerts ?? null;
+  const alertsLastUpdate = liveSession.lastEventByChannel["smart-flow-alerts"] ?? null;
   const durableRowsLastUpdate = liveSession.lastEventByChannel["durable-rows"] ?? null;
   const classifierHitsLastUpdate = liveSession.lastEventByChannel["classifier-hits"] ?? null;
   const smartFlowLastUpdate = liveSession.lastEventByChannel["smart-flow"] ?? null;
@@ -416,13 +416,13 @@ export const useTerminalState = () => {
     onNewItems: flowScroll.onNewItems,
     getReplayKey: disableReplayGrouping
   });
-  const alerts = useTape<AlertEvent>({
+  const alerts = useTape<SmartFlowAlertEvent>({
     mode,
     liveEnabled: false,
-    wsPath: "/ws/alerts",
-    replayPath: "/replay/alerts",
-    latestPath: "/flow/alerts",
-    expectedType: "alert",
+    wsPath: "/ws/smart-flow-alerts",
+    replayPath: "/replay/smart-flow-alerts",
+    latestPath: "/flow/smart-flow-alerts",
+    expectedType: "smart-flow-alert",
     batchSize: mode === "replay" ? 120 : undefined,
     pollMs: mode === "replay" ? 200 : undefined,
     captureScroll: alertsAnchor.capture,
@@ -557,8 +557,8 @@ export const useTerminalState = () => {
     [liveSession.equityJoins, liveSession.equityJoinsHistory]
   );
   const liveAlertItems = useMemo(
-    () => composeTapeItems([], liveSession.alerts, liveSession.alertsHistory),
-    [liveSession.alerts, liveSession.alertsHistory]
+    () => composeTapeItems([], liveSession.smartFlowAlerts, liveSession.smartFlowAlertsHistory),
+    [liveSession.smartFlowAlerts, liveSession.smartFlowAlertsHistory]
   );
   const liveDurableRowItems = useMemo(
     () => composeTapeItems([], liveSession.durableRows, liveSession.durableRowsHistory),
@@ -1345,10 +1345,9 @@ export const useTerminalState = () => {
   ]);
 
   const inferAlertUnderlying = useCallback(
-    (alert: AlertEvent): string | null => {
-      const fromTrace = extractUnderlyingFromTrace(alert.trace_id);
-      if (fromTrace) {
-        return fromTrace;
+    (alert: SmartFlowAlertEvent): string | null => {
+      if (alert.underlying_id.trim()) {
+        return alert.underlying_id.toUpperCase();
       }
 
       const packet = resolveAlertFlowPacket(alert, resolvedFlowPacketMap);
@@ -1365,12 +1364,7 @@ export const useTerminalState = () => {
 
       return null;
     },
-    [
-      extractPacketContract,
-      extractUnderlyingFromTrace,
-      resolvedFlowPacketMap,
-      resolvedOptionPrintMap
-    ]
+    [extractPacketContract, resolvedFlowPacketMap, resolvedOptionPrintMap]
   );
 
   const matchesTicker = useCallback(
@@ -2044,17 +2038,17 @@ export const useTerminalState = () => {
   }, [chartTicker, inferredDarkFeed.items, resolvedEquityJoinMap, routeFeatures.showChartPane]);
 
   const findAlertForClassifierHit = useCallback(
-    (hit: ClassifierHitEvent): AlertEvent | null => {
+    (hit: ClassifierHitEvent): SmartFlowAlertEvent | null => {
       const packetId = extractPacketIdFromClassifierHitTrace(hit.trace_id);
       if (!packetId) {
         return null;
       }
 
-      const desiredTrace = `alert:${packetId}`;
       return (
         alertsFeed.items.find(
           (item) =>
-            item.trace_id === desiredTrace || getAlertFlowPacketRefs(item).includes(packetId)
+            item.trigger.projection_trace_id === hit.trace_id ||
+            getAlertFlowPacketRefs(item).includes(packetId)
         ) ?? null
       );
     },

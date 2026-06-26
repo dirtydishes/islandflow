@@ -1,72 +1,24 @@
-import type { AlertEvent, FlowPacket, OptionPrint } from "@islandflow/types";
+import type { FlowPacket, OptionPrint, SmartFlowAlertEvent } from "@islandflow/types";
 import { parseOptionContractId } from "@islandflow/types";
+
+import {
+  getSmartFlowEvidenceQualityBand,
+  getSmartFlowHypothesisLabel,
+  humanizeSmartFlowToken,
+  normalizeSmartFlowDirection
+} from "../smart-flow";
 
 export const normalizeAlertDirection = (
   value: string | null | undefined
-): "bullish" | "bearish" | "neutral" => {
-  const normalized = value?.toLowerCase();
-  if (normalized === "bullish" || normalized === "bearish" || normalized === "neutral") {
-    return normalized;
-  }
-  return "neutral";
+): "bullish" | "bearish" | "neutral" | "mixed" | "unknown" => {
+  const normalized = normalizeSmartFlowDirection(value);
+  return normalized === "abstained" ? "unknown" : normalized;
 };
 
-const normalizeAlertSeverityValue = (value: string): "high" | "medium" | "low" | null => {
-  const normalized = value.trim().toLowerCase();
-  if (["high", "critical", "severe", "sev1", "p0", "p1"].includes(normalized)) {
-    return "high";
-  }
-  if (["medium", "med", "moderate", "sev2", "p2"].includes(normalized)) {
-    return "medium";
-  }
-  if (["low", "minor", "info", "informational", "sev3", "p3", "p4"].includes(normalized)) {
-    return "low";
-  }
-  return null;
-};
-
-export const normalizeAlertSeverity = (alert: AlertEvent): "high" | "medium" | "low" => {
-  const normalized = normalizeAlertSeverityValue(alert.severity);
-  if (normalized) {
-    return normalized;
-  }
-  if (alert.score >= 80) {
-    return "high";
-  }
-  if (alert.score >= 45) {
-    return "medium";
-  }
-  return "low";
-};
-
-export const deriveAlertDirection = (alert: AlertEvent): "bullish" | "bearish" | "neutral" => {
-  const totals = {
-    bullish: { count: 0, confidence: 0 },
-    bearish: { count: 0, confidence: 0 },
-    neutral: { count: 0, confidence: 0 }
-  };
-
-  for (const hit of alert.hits) {
-    const direction = normalizeAlertDirection(hit.direction);
-    totals[direction].count += 1;
-    totals[direction].confidence += Number.isFinite(hit.confidence) ? hit.confidence : 0;
-  }
-
-  const ranked = (
-    Object.entries(totals) as Array<
-      ["bullish" | "bearish" | "neutral", { count: number; confidence: number }]
-    >
-  ).sort((a, b) => {
-    if (b[1].count !== a[1].count) {
-      return b[1].count - a[1].count;
-    }
-    return b[1].confidence - a[1].confidence;
-  });
-
-  return ranked[0] && ranked[0][1].count > 0 ? ranked[0][0] : "neutral";
-};
-
-export const getAlertWindowAnchorTs = (alerts: AlertEvent[], fallbackNow = Date.now()): number => {
+export const getAlertWindowAnchorTs = (
+  alerts: SmartFlowAlertEvent[],
+  fallbackNow = Date.now()
+): number => {
   if (alerts.length === 0) {
     return fallbackNow;
   }
@@ -74,17 +26,6 @@ export const getAlertWindowAnchorTs = (alerts: AlertEvent[], fallbackNow = Date.
     (max, alert) => Math.max(max, alert.source_ts),
     alerts[0]?.source_ts ?? fallbackNow
   );
-};
-
-export const humanizeAlertClassifierId = (value: string | null | undefined): string => {
-  if (!value) {
-    return "Classifier alert";
-  }
-
-  return value
-    .split("_")
-    .map((part) => (part ? part[0].toUpperCase() + part.slice(1) : part))
-    .join(" ");
 };
 
 export const formatAlertTime = (ts: number): string =>
@@ -99,9 +40,6 @@ export const formatAlertDateTime = (ts: number): string => {
   const ms = String(date.getMilliseconds()).padStart(3, "0");
   return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}.${ms}`;
 };
-
-export const formatAlertScore = (value: number): string =>
-  Number.isFinite(value) ? String(Math.round(value)) : "--";
 
 export const formatAlertConfidence = (value: number): string =>
   Number.isFinite(value) ? `${Math.round(value * 100)}%` : "--";
@@ -128,19 +66,37 @@ export const formatAlertMoney = (value: number): string => {
   return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
 };
 
-export const getAlertKey = (alert: AlertEvent): string =>
-  alert.trace_id ? `${alert.trace_id}:${alert.seq}` : `${alert.source_ts}:${alert.seq}`;
+export const getAlertKey = (alert: SmartFlowAlertEvent): string =>
+  alert.alert_id ? `${alert.alert_id}:${alert.seq}` : `${alert.trace_id}:${alert.seq}`;
 
-export const getAlertCursor = (alert: AlertEvent) => ({
+export const getAlertCursor = (alert: SmartFlowAlertEvent) => ({
   ts: alert.source_ts,
   seq: alert.seq
 });
 
-export const getAlertName = (alert: AlertEvent): string =>
-  humanizeAlertClassifierId(alert.hits[0]?.classifier_id ?? alert.primary_profile_id);
+export const getAlertName = (alert: SmartFlowAlertEvent): string =>
+  getSmartFlowHypothesisLabel(alert.hypothesis_type);
 
-export const getAlertKind = (alert: AlertEvent): string =>
-  humanizeAlertClassifierId(alert.hits[0]?.classifier_id ?? alert.primary_profile_id);
+export const getAlertSymbol = (alert: SmartFlowAlertEvent): string =>
+  alert.underlying_id.trim().toUpperCase() || "FLOW";
+
+export const getAlertDirectionLabel = (alert: SmartFlowAlertEvent): string =>
+  humanizeSmartFlowToken(normalizeAlertDirection(alert.direction));
+
+export const getAlertEvidenceQualityLabel = (alert: SmartFlowAlertEvent): string => {
+  const band = getSmartFlowEvidenceQualityBand(alert.evidence_quality);
+  return `${formatAlertConfidence(alert.evidence_quality)} ${band}`;
+};
+
+export const getAlertConfidenceEvidenceLabel = (alert: SmartFlowAlertEvent): string =>
+  `${formatAlertConfidence(alert.policy_confidence)} / ${getAlertEvidenceQualityLabel(alert)}`;
+
+export const getAlertTriggerReason = (alert: SmartFlowAlertEvent): string => {
+  if (alert.trigger.kind === "non_abstained_hypothesis") {
+    return "Non-abstained flow hypothesis met alert policy.";
+  }
+  return humanizeSmartFlowToken(alert.trigger.kind);
+};
 
 export const extractAlertUnderlyingFromContract = (contractId: string): string | null => {
   const parsed = parseOptionContractId(contractId);
@@ -161,10 +117,14 @@ export const getFlowPacketContractId = (packet: FlowPacket): string | null => {
 };
 
 export const inferAlertUnderlying = (
-  alert: AlertEvent,
+  alert: Pick<SmartFlowAlertEvent, "underlying_id" | "evidence_refs">,
   packet?: FlowPacket | null,
   prints: readonly OptionPrint[] = []
 ): string | null => {
+  if (alert.underlying_id.trim()) {
+    return alert.underlying_id.toUpperCase();
+  }
+
   const contract = packet ? getFlowPacketContractId(packet) : null;
   if (contract) {
     return extractAlertUnderlyingFromContract(contract);
@@ -180,10 +140,20 @@ export const inferAlertUnderlying = (
     }
   }
 
-  const traceMatch = alert.trace_id.match(/flowpacket:([^:]+):/);
-  if (traceMatch?.[1]) {
-    return extractAlertUnderlyingFromContract(traceMatch[1]);
+  for (const ref of alert.evidence_refs) {
+    const match = ref.match(/flowpacket:([^:]+):/);
+    if (match?.[1]) {
+      return extractAlertUnderlyingFromContract(match[1]);
+    }
   }
 
   return null;
 };
+
+export const getAlertPrimaryPacketRef = (
+  alert: Pick<SmartFlowAlertEvent, "evidence_refs">
+): string | null => alert.evidence_refs.find((ref) => ref.startsWith("flowpacket:")) ?? null;
+
+export const getAlertPrimaryOptionRef = (
+  alert: Pick<SmartFlowAlertEvent, "evidence_refs">
+): string | null => alert.evidence_refs.find((ref) => !ref.startsWith("flowpacket:")) ?? null;

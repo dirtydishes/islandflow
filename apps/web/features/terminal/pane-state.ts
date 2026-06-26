@@ -48,7 +48,7 @@ export const selectDurableTapesAlertsPane = (state: TerminalState) => {
     rowViewModels: state.filteredDurableAlertRows,
     rowViewModelStatus: state.durableRows.status,
     selectedAlert,
-    useRowViewModels: state.mode === "live" && state.filteredDurableAlertRows.length > 0
+    useRowViewModels: false
   };
 };
 

@@ -1,6 +1,6 @@
 "use client";
 
-import type { AlertEvent, FlowPacket, OptionPrint } from "@islandflow/types";
+import type { FlowPacket, OptionPrint, SmartFlowAlertEvent } from "@islandflow/types";
 import { useEffect, useMemo, useState } from "react";
 
 import { buildAlertsApiUrl } from "./source";
@@ -19,8 +19,17 @@ const EMPTY_STATUS: AlertContextStatus = {
   error: null
 };
 
-export const buildAlertContextPath = (traceId: string): string =>
-  `/flow/alerts/${encodeURIComponent(traceId)}/context`;
+export const buildAlertFlowPacketPath = (packetId: string): string =>
+  `/flow/packets/${encodeURIComponent(packetId)}`;
+
+export const buildAlertOptionPrintsPath = (traceIds: readonly string[]): string => {
+  const params = new URLSearchParams();
+  for (const traceId of traceIds) {
+    params.append("trace_id", traceId);
+  }
+  const query = params.toString();
+  return query ? `/option-prints/by-trace?${query}` : "/option-prints/by-trace";
+};
 
 export const collectAlertContextEvidence = (
   bundle: AlertContextBundle
@@ -48,11 +57,21 @@ export const collectAlertContextEvidence = (
   return { packets, prints };
 };
 
-export const getAlertFlowPacketRefs = (alert: Pick<AlertEvent, "evidence_refs">): string[] =>
-  alert.evidence_refs.filter((ref) => ref.startsWith("flowpacket:"));
+const uniqueNonEmpty = (items: readonly string[]): string[] =>
+  Array.from(new Set(items.map((item) => item.trim()).filter(Boolean)));
+
+export const isAlertFlowPacketRef = (ref: string): boolean => ref.startsWith("flowpacket:");
+
+export const getAlertFlowPacketRefs = (
+  alert: Pick<SmartFlowAlertEvent, "evidence_refs">
+): string[] => uniqueNonEmpty(alert.evidence_refs).filter(isAlertFlowPacketRef);
+
+export const getAlertOptionPrintRefs = (
+  alert: Pick<SmartFlowAlertEvent, "evidence_refs">
+): string[] => uniqueNonEmpty(alert.evidence_refs).filter((ref) => !isAlertFlowPacketRef(ref));
 
 export const resolveAlertFlowPacket = (
-  alert: Pick<AlertEvent, "evidence_refs">,
+  alert: Pick<SmartFlowAlertEvent, "evidence_refs">,
   packets: ReadonlyMap<string, FlowPacket>
 ): FlowPacket | null => {
   for (const ref of getAlertFlowPacketRefs(alert)) {
@@ -70,7 +89,7 @@ export const resolveAlertEvidence = ({
   packets,
   prints
 }: {
-  alert: Pick<AlertEvent, "evidence_refs">;
+  alert: Pick<SmartFlowAlertEvent, "evidence_refs">;
   packets: ReadonlyMap<string, FlowPacket>;
   prints: ReadonlyMap<string, OptionPrint>;
 }): AlertEvidenceItem[] =>
@@ -86,13 +105,97 @@ export const resolveAlertEvidence = ({
     return { kind: "unknown", id };
   });
 
+const readErrorDetail = async (response: Response): Promise<string> => {
+  const text = await response.text();
+  return text || `HTTP ${response.status}`;
+};
+
+const fetchFlowPacketsById = async ({
+  packetIds,
+  fetcher,
+  apiBaseUrl,
+  signal
+}: {
+  packetIds: readonly string[];
+  fetcher: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+  apiBaseUrl?: string;
+  signal: AbortSignal;
+}): Promise<{ packets: Map<string, FlowPacket>; missing: string[] }> => {
+  const packets = new Map<string, FlowPacket>();
+  const missing: string[] = [];
+
+  await Promise.all(
+    packetIds.map(async (packetId) => {
+      const response = await fetcher(
+        buildAlertsApiUrl(buildAlertFlowPacketPath(packetId), apiBaseUrl),
+        { signal }
+      );
+      if (response.status === 404) {
+        missing.push(packetId);
+        return;
+      }
+      if (!response.ok) {
+        throw new Error(await readErrorDetail(response));
+      }
+      const payload = (await response.json()) as { data?: FlowPacket | null };
+      if (payload.data) {
+        packets.set(payload.data.id, payload.data);
+        if (payload.data.trace_id) {
+          packets.set(payload.data.trace_id, payload.data);
+        }
+      } else {
+        missing.push(packetId);
+      }
+    })
+  );
+
+  return { packets, missing };
+};
+
+const fetchOptionPrintsByTraceId = async ({
+  traceIds,
+  fetcher,
+  apiBaseUrl,
+  signal
+}: {
+  traceIds: readonly string[];
+  fetcher: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+  apiBaseUrl?: string;
+  signal: AbortSignal;
+}): Promise<{ prints: Map<string, OptionPrint>; missing: string[] }> => {
+  const prints = new Map<string, OptionPrint>();
+  if (traceIds.length === 0) {
+    return { prints, missing: [] };
+  }
+
+  const response = await fetcher(
+    buildAlertsApiUrl(buildAlertOptionPrintsPath(traceIds), apiBaseUrl),
+    { signal }
+  );
+  if (!response.ok) {
+    throw new Error(await readErrorDetail(response));
+  }
+
+  const payload = (await response.json()) as { data?: OptionPrint[] };
+  for (const print of payload.data ?? []) {
+    if (print.trace_id) {
+      prints.set(print.trace_id, print);
+    }
+  }
+
+  return {
+    prints,
+    missing: traceIds.filter((traceId) => !prints.has(traceId))
+  };
+};
+
 export const useAlertEvidenceHydration = ({
   alert,
   flowPacketById,
   optionPrintByTraceId,
   sourceOptions
 }: {
-  alert: AlertEvent | null | undefined;
+  alert: SmartFlowAlertEvent | null | undefined;
   flowPacketById?: ReadonlyMap<string, FlowPacket>;
   optionPrintByTraceId?: ReadonlyMap<string, OptionPrint>;
   sourceOptions?: AlertsModuleSourceOptions;
@@ -109,6 +212,21 @@ export const useAlertEvidenceHydration = ({
       return;
     }
 
+    const packetRefs = getAlertFlowPacketRefs(alert).filter((id) => !flowPacketById?.has(id));
+    const printRefs = getAlertOptionPrintRefs(alert).filter((id) => !optionPrintByTraceId?.has(id));
+
+    if (packetRefs.length === 0 && printRefs.length === 0) {
+      setHydratedPackets(new Map());
+      setHydratedPrints(new Map());
+      setStatus({
+        traceId: alert.trace_id,
+        loading: false,
+        missingRefs: [],
+        error: null
+      });
+      return;
+    }
+
     const abort = new AbortController();
     const fetcher = sourceOptions?.fetcher ?? fetch;
     setStatus({
@@ -118,30 +236,30 @@ export const useAlertEvidenceHydration = ({
       error: null
     });
 
-    void fetcher(
-      buildAlertsApiUrl(buildAlertContextPath(alert.trace_id), sourceOptions?.apiBaseUrl),
-      {
+    void Promise.all([
+      fetchFlowPacketsById({
+        packetIds: packetRefs,
+        fetcher,
+        apiBaseUrl: sourceOptions?.apiBaseUrl,
         signal: abort.signal
-      }
-    )
-      .then(async (response) => {
-        if (!response.ok) {
-          const detail = await response.text();
-          throw new Error(detail || `Alert context failed with HTTP ${response.status}`);
-        }
-        return response.json() as Promise<AlertContextBundle>;
+      }),
+      fetchOptionPrintsByTraceId({
+        traceIds: printRefs,
+        fetcher,
+        apiBaseUrl: sourceOptions?.apiBaseUrl,
+        signal: abort.signal
       })
-      .then((payload) => {
+    ])
+      .then(([packetResult, printResult]) => {
         if (abort.signal.aborted) {
           return;
         }
-        const { packets, prints } = collectAlertContextEvidence(payload);
-        setHydratedPackets(packets);
-        setHydratedPrints(prints);
+        setHydratedPackets(packetResult.packets);
+        setHydratedPrints(printResult.prints);
         setStatus({
           traceId: alert.trace_id,
           loading: false,
-          missingRefs: payload.missing_refs ?? [],
+          missingRefs: [...packetResult.missing, ...printResult.missing],
           error: null
         });
       })
@@ -160,7 +278,7 @@ export const useAlertEvidenceHydration = ({
       });
 
     return () => abort.abort();
-  }, [alert, sourceOptions]);
+  }, [alert, flowPacketById, optionPrintByTraceId, sourceOptions]);
 
   const packets = useMemo(() => {
     const next = new Map<string, FlowPacket>();

@@ -1,7 +1,7 @@
 "use client";
 
-import type { AlertEvent } from "@islandflow/types";
-import { AlertEventSchema } from "@islandflow/types";
+import type { SmartFlowAlertEvent } from "@islandflow/types";
+import { SmartFlowAlertEventSchema } from "@islandflow/types";
 import { useEffect, useMemo, useRef } from "react";
 
 import { buildBrowserApiUrl } from "../api-transport";
@@ -11,7 +11,7 @@ import {
   type DurableTapeHistoryPage,
   type DurableTapeSource
 } from "../durable-tape";
-import { getAlertCursor } from "./format";
+import { normalizeAlertDirection } from "./format";
 import type {
   AlertsModuleFilters,
   AlertsModuleHistoryResponse,
@@ -27,7 +27,8 @@ export const buildAlertsApiUrl = (path: string, apiBaseUrl?: string): string => 
   return buildBrowserApiUrl(path, apiBaseUrl);
 };
 
-const parseAlerts = (items: unknown[]): AlertEvent[] => AlertEventSchema.array().parse(items);
+const parseAlerts = (items: unknown[]): SmartFlowAlertEvent[] =>
+  SmartFlowAlertEventSchema.array().parse(items);
 
 export const normalizeAlertsScope = (
   scope?: {
@@ -41,59 +42,60 @@ export const normalizeAlertsScope = (
   return values.length > 0 ? { underlyingIds: Array.from(new Set(values)) } : {};
 };
 
+const normalizeUnitFilter = (value: number | null | undefined): number | undefined =>
+  typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : undefined;
+
 export const normalizeAlertsFilters = (
   filters?: AlertsModuleFilters | null
 ): NormalizedAlertsModuleFilters => {
-  const severities = filters?.severities
-    ?.map((value) => value.trim().toLowerCase())
+  const directions = filters?.directions
+    ?.map((value) => normalizeAlertDirection(value))
     .filter(Boolean);
   return {
-    ...(typeof filters?.minScore === "number" && Number.isFinite(filters.minScore)
-      ? { minScore: filters.minScore }
+    ...(normalizeUnitFilter(filters?.minConfidence) !== undefined
+      ? { minConfidence: normalizeUnitFilter(filters?.minConfidence) }
       : {}),
-    ...(severities?.length ? { severities: Array.from(new Set(severities)) } : {})
+    ...(normalizeUnitFilter(filters?.minEvidenceQuality) !== undefined
+      ? { minEvidenceQuality: normalizeUnitFilter(filters?.minEvidenceQuality) }
+      : {}),
+    ...(directions?.length ? { directions: Array.from(new Set(directions)) } : {})
   };
 };
 
-const appendAlertParams = (
-  params: URLSearchParams,
-  scope?: NormalizedAlertsModuleScope,
-  filters?: NormalizedAlertsModuleFilters
-) => {
-  if (scope?.underlyingIds?.length) {
-    params.set("underlying_ids", scope.underlyingIds.join(","));
-  }
-  if (typeof filters?.minScore === "number") {
-    params.set("min_score", String(filters.minScore));
-  }
-  if (filters?.severities?.length) {
-    params.set("severity", filters.severities.join(","));
-  }
-};
-
-const alertMatchesScope = (alert: AlertEvent, scope?: NormalizedAlertsModuleScope): boolean => {
+const alertMatchesScope = (
+  alert: SmartFlowAlertEvent,
+  scope?: NormalizedAlertsModuleScope
+): boolean => {
   if (!scope?.underlyingIds?.length) {
     return true;
   }
-  const haystack = `${alert.trace_id} ${alert.evidence_refs.join(" ")}`.toUpperCase();
-  return scope.underlyingIds.some((underlying) => haystack.includes(underlying));
+  return scope.underlyingIds.includes(alert.underlying_id.toUpperCase());
 };
 
 export const filterAlerts = (
-  alerts: readonly AlertEvent[],
+  alerts: readonly SmartFlowAlertEvent[],
   scope?: NormalizedAlertsModuleScope,
   filters?: NormalizedAlertsModuleFilters
-): AlertEvent[] =>
+): SmartFlowAlertEvent[] =>
   alerts.filter((alert) => {
     if (!alertMatchesScope(alert, scope)) {
       return false;
     }
-    if (typeof filters?.minScore === "number" && alert.score < filters.minScore) {
+    if (
+      typeof filters?.minConfidence === "number" &&
+      alert.policy_confidence < filters.minConfidence
+    ) {
       return false;
     }
     if (
-      filters?.severities?.length &&
-      !filters.severities.includes(alert.severity.trim().toLowerCase())
+      typeof filters?.minEvidenceQuality === "number" &&
+      alert.evidence_quality < filters.minEvidenceQuality
+    ) {
+      return false;
+    }
+    if (
+      filters?.directions?.length &&
+      !filters.directions.includes(normalizeAlertDirection(alert.direction))
     ) {
       return false;
     }
@@ -118,22 +120,21 @@ export const loadAlertsHistoryPage = async ({
   scope?: NormalizedAlertsModuleScope;
   filters?: NormalizedAlertsModuleFilters;
   options?: AlertsModuleSourceOptions;
-}): Promise<DurableTapeHistoryPage<AlertEvent>> => {
+}): Promise<DurableTapeHistoryPage<SmartFlowAlertEvent>> => {
   const fetcher = options?.fetcher ?? fetch;
   const limit = options?.historyPageSize ?? DEFAULT_HISTORY_PAGE_SIZE;
   const maxPages = options?.maxFilteredHistoryPages ?? DEFAULT_MAX_FILTERED_HISTORY_PAGES;
   let nextCursor: DurableTapeCursor | null = cursor;
 
   for (let page = 0; page < maxPages && nextCursor; page += 1) {
-    const url = new URL(buildAlertsApiUrl("/history/alerts", options?.apiBaseUrl));
+    const url = new URL(buildAlertsApiUrl("/history/smart-flow-alerts", options?.apiBaseUrl));
     url.searchParams.set("before_ts", String(nextCursor.ts));
     url.searchParams.set("before_seq", String(nextCursor.seq));
     url.searchParams.set("limit", String(limit));
-    appendAlertParams(url.searchParams, scope, filters);
 
     const response = await fetcher(url.toString());
     if (!response.ok) {
-      throw new Error(`Alerts history failed with HTTP ${response.status}`);
+      throw new Error(`Smart-flow alert history failed with HTTP ${response.status}`);
     }
 
     const payload = await parseHistoryResponse(response);
@@ -158,17 +159,21 @@ export const loadAlertsHistoryPage = async ({
 type AlertsArrayListener = {
   scope: NormalizedAlertsModuleScope | undefined;
   filters: NormalizedAlertsModuleFilters | undefined;
-  listener: (items: readonly AlertEvent[]) => void;
+  listener: (items: readonly SmartFlowAlertEvent[]) => void;
 };
 
 export const useAlertsArraySource = ({
   alerts,
   options
 }: {
-  alerts: readonly AlertEvent[];
+  alerts: readonly SmartFlowAlertEvent[];
   options?: AlertsModuleSourceOptions;
-}): DurableTapeSource<AlertEvent, NormalizedAlertsModuleScope, NormalizedAlertsModuleFilters> => {
-  const alertsRef = useRef<readonly AlertEvent[]>(alerts);
+}): DurableTapeSource<
+  SmartFlowAlertEvent,
+  NormalizedAlertsModuleScope,
+  NormalizedAlertsModuleFilters
+> => {
+  const alertsRef = useRef<readonly SmartFlowAlertEvent[]>(alerts);
   const listenersRef = useRef(new Set<AlertsArrayListener>());
   const optionsRef = useRef(options);
 

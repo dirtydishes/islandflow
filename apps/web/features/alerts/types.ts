@@ -1,4 +1,4 @@
-import type { AlertEvent, FlowPacket, OptionPrint } from "@islandflow/types";
+import type { FlowPacket, OptionPrint, SmartFlowAlertEvent } from "@islandflow/types";
 
 import type {
   DurableTapeFeatureInput,
@@ -7,7 +7,7 @@ import type {
 } from "../durable-tape";
 import type { FlowPacketFocusRequest } from "../flow-packets";
 
-export type AlertColumnId = "time" | "symbol" | "kind" | "score" | "state";
+export type AlertColumnId = "time" | "symbol" | "hypothesis" | "direction" | "confidenceEvidence";
 
 export type AlertsModuleScope = {
   tickers?: readonly string[] | null;
@@ -19,13 +19,15 @@ export type NormalizedAlertsModuleScope = {
 };
 
 export type AlertsModuleFilters = {
-  minScore?: number | null;
-  severities?: readonly string[] | null;
+  minConfidence?: number | null;
+  minEvidenceQuality?: number | null;
+  directions?: readonly string[] | null;
 };
 
 export type NormalizedAlertsModuleFilters = {
-  minScore?: number;
-  severities?: string[];
+  minConfidence?: number;
+  minEvidenceQuality?: number;
+  directions?: string[];
 };
 
 export type AlertEvidenceItem =
@@ -34,7 +36,7 @@ export type AlertEvidenceItem =
   | { kind: "unknown"; id: string };
 
 export type AlertContextBundle = {
-  alert: AlertEvent | null;
+  alert?: unknown;
   flow_packets: FlowPacket[];
   option_prints: OptionPrint[];
   missing_refs: string[];
@@ -77,7 +79,7 @@ export type AlertsModuleSourceOptions = {
 };
 
 export type AlertsModuleHistoryResponse = {
-  data?: AlertEvent[];
+  data?: SmartFlowAlertEvent[];
   next_before?: { ts: number; seq: number } | null;
 };
 
@@ -85,9 +87,9 @@ export type AlertsModuleProps = AlertActionCallbacks & {
   title?: string;
   ariaLabel?: string;
   className?: string;
-  alerts?: readonly AlertEvent[];
+  alerts?: readonly SmartFlowAlertEvent[];
   source?: DurableTapeSource<
-    AlertEvent,
+    SmartFlowAlertEvent,
     NormalizedAlertsModuleScope,
     NormalizedAlertsModuleFilters
   >;
@@ -98,8 +100,8 @@ export type AlertsModuleProps = AlertActionCallbacks & {
   template?: DurableTapeTemplateId | "auto";
   flowPacketById?: ReadonlyMap<string, FlowPacket>;
   optionPrintByTraceId?: ReadonlyMap<string, OptionPrint>;
-  selectedAlert?: AlertEvent | null;
-  onSelectAlert?: (alert: AlertEvent) => void;
+  selectedAlert?: SmartFlowAlertEvent | null;
+  onSelectAlert?: (alert: SmartFlowAlertEvent) => void;
   onCloseDetail?: () => void;
   showDetail?: boolean;
   rowHeight?: number;

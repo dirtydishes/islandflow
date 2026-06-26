@@ -2993,13 +2993,46 @@ h3 {
   background: oklch(0.78 0.12 74 / 0.05);
 }
 
+.alerts-tape .durable-tape-row.alerts-row-tinted {
+  border-color: rgba(
+    var(--classifier-rgb, 192, 200, 210),
+    calc(0.12 + var(--classifier-intensity, 0) * 0.1)
+  );
+  background:
+    linear-gradient(
+      90deg,
+      rgba(
+          var(--classifier-rgb, 192, 200, 210),
+          calc(0.012 + var(--classifier-intensity, 0) * 0.065)
+        )
+        0%,
+      transparent 54%
+    ),
+    var(--bg-soft);
+}
+
+.alerts-tape .durable-tape-row.alerts-row-tinted:hover,
+.alerts-tape .durable-tape-row.alerts-row-tinted:focus-visible {
+  background:
+    linear-gradient(
+      90deg,
+      rgba(
+          var(--classifier-rgb, 192, 200, 210),
+          calc(0.024 + var(--classifier-intensity, 0) * 0.11)
+        )
+        0%,
+      transparent 58%
+    ),
+    rgba(var(--classifier-rgb, 192, 200, 210), 0.03);
+}
+
 .alerts-tape .durable-tape-cell[data-align="end"] {
   justify-content: flex-end;
   text-align: right;
 }
 
 .alerts-cell-symbol,
-.alerts-cell-kind {
+.alerts-cell-hypothesis {
   min-width: 0;
   overflow: hidden;
   color: var(--text);
@@ -3009,7 +3042,7 @@ h3 {
 }
 
 .alerts-cell-time,
-.alerts-cell-score {
+.alerts-cell-confidence {
   color: var(--text-dim);
 }
 
@@ -3030,22 +3063,10 @@ h3 {
   white-space: nowrap;
 }
 
-.alerts-state-high {
-  border-color: rgba(255, 107, 95, 0.36);
-  background: var(--red-soft);
-  color: #ffc3bd;
-}
-
-.alerts-state-medium {
-  border-color: rgba(245, 166, 35, 0.36);
-  background: var(--accent-soft);
-  color: #ffd994;
-}
-
-.alerts-state-low {
-  border-color: rgba(77, 163, 255, 0.28);
-  background: var(--blue-soft);
-  color: #bddcff;
+.alerts-state-direction {
+  border-color: rgba(var(--classifier-rgb, 192, 200, 210), 0.34);
+  background: rgba(var(--classifier-rgb, 192, 200, 210), 0.1);
+  color: var(--text);
 }
 
 .alerts-hover {
@@ -3117,13 +3138,13 @@ h3 {
   overflow-wrap: anywhere;
 }
 
-.alerts-detail-score {
+.alerts-detail-signal {
   display: grid;
   justify-items: end;
   gap: 2px;
 }
 
-.alerts-detail-score strong {
+.alerts-detail-signal strong {
   color: var(--accent);
   font-family: var(--font-mono), monospace;
   font-size: 1.25rem;

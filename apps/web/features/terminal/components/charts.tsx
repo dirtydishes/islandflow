@@ -10,7 +10,6 @@ import type {
   SmartMoneyEvent
 } from "@islandflow/types";
 import { parseOptionContractId } from "@islandflow/types";
-import { AlertsModule } from "../../alerts";
 import {
   createChart,
   createSeriesMarkers,
@@ -33,25 +32,31 @@ import {
   useRef,
   useState
 } from "react";
-
-import { getChartFlowMarkerItems } from "../charts/markers";
-import { SUPPORTED_CANDLE_INTERVAL_MS } from "../config";
-import { getAlertFlowPacketRefs, getSmartFlowEvidenceRefs } from "../evidence";
+import {
+  AlertsModule,
+  formatAlertConfidence,
+  getAlertEvidenceQualityLabel,
+  getAlertName,
+  getAlertPrimaryPacketRef,
+  getAlertSymbol,
+  normalizeAlertDirection
+} from "../../alerts";
 import {
   buildTimeframeToolbarModel,
   createDefaultTimeframeFavorites,
+  type MarketChartTimeframeId,
   readTimeframeFavorites,
   reduceTimeframeFavorites,
-  writeTimeframeFavorites,
-  type MarketChartTimeframeId,
-  type TimeframeFavoritesState
+  type TimeframeFavoritesState,
+  writeTimeframeFavorites
 } from "../../market-chart";
+import { getChartFlowMarkerItems } from "../charts/markers";
+import { SUPPORTED_CANDLE_INTERVAL_MS } from "../config";
+import { getSmartFlowEvidenceRefs } from "../evidence";
 import {
   decodeNewsText,
-  deriveAlertDirection,
   formatCompactUsd,
   formatOptionContractLabel,
-  normalizeAlertSeverity,
   smartFlowDirectionLabel,
   smartFlowDirectionTone,
   smartFlowEvidenceQualityLabel,
@@ -1016,7 +1021,7 @@ const buildCommandDeckTickers = (state: TerminalState): CommandDeckTicker[] => {
       }).length;
       const alerts = state.filteredAlerts
         .slice(0, 80)
-        .filter((alert) => alert.trace_id.toUpperCase().includes(symbol)).length;
+        .filter((alert) => alert.underlying_id.toUpperCase() === symbol).length;
       return { symbol, price, move, options, alerts };
     });
 };
@@ -1051,14 +1056,6 @@ const commandStateFromDirection = (direction: string): CommandPriorityState => {
     return "reject";
   }
   return "watch";
-};
-
-const inferCommandSymbolFromTrace = (traceId: string): string | null => {
-  const token = traceId
-    .toUpperCase()
-    .split(/[^A-Z0-9]+/)
-    .find((part) => /^[A-Z]{1,6}$/.test(part) && !["ALERT", "FLOW", "SMART"].includes(part));
-  return token ?? null;
 };
 
 const buildCommandPriorityRows = (state: TerminalState): CommandPriorityRow[] => {
@@ -1113,23 +1110,16 @@ const buildCommandPriorityRows = (state: TerminalState): CommandPriorityRow[] =>
   }
 
   for (const alert of state.filteredAlerts.slice(0, 8)) {
-    const primary = alert.hits[0];
-    const direction = deriveAlertDirection(alert);
-    const severity = normalizeAlertSeverity(alert);
+    const direction = normalizeAlertDirection(alert.direction);
     rows.push({
-      key: `alert-${alert.trace_id}-${alert.seq}`,
+      key: `alert-${alert.alert_id}-${alert.seq}`,
       ts: alert.source_ts,
-      symbol: inferCommandSymbolFromTrace(alert.trace_id) ?? "ALERT",
-      packet: getAlertFlowPacketRefs(alert)[0] ?? alert.trace_id,
-      read: primary?.explanations?.[0] ?? primary?.classifier_id ?? "Classifier alert",
-      score: clampCommandScore(alert.score),
-      invalidation: `${alert.evidence_refs.length} refs`,
-      state:
-        severity === "high"
-          ? commandStateFromDirection(direction)
-          : severity === "medium"
-            ? "watch"
-            : "hold",
+      symbol: getAlertSymbol(alert),
+      packet: getAlertPrimaryPacketRef(alert) ?? alert.hypothesis_id,
+      read: getAlertName(alert),
+      score: clampCommandScore(alert.policy_confidence * 100),
+      invalidation: `${getAlertEvidenceQualityLabel(alert)} evidence`,
+      state: commandStateFromDirection(direction),
       onOpen: () => {
         state.setSelectedNewsStory(null);
         state.setSelectedDarkEvent(null);
@@ -1188,9 +1178,11 @@ export const CommandMetricsStrip = ({ state }: { state: TerminalState }) => {
     state.selectedInstrument?.kind === "option-contract"
       ? (state.selectedInstrumentLabel ?? "Contract focus")
       : `${state.chartTicker.toUpperCase()} / ${formatIntervalLabel(state.chartIntervalMs)}`;
-  const risk =
-    state.filteredAlerts[0]?.severity ??
-    (state.filteredInferredDark.length > 0 ? "dark context" : "no active alert");
+  const risk = state.filteredAlerts[0]
+    ? `${normalizeAlertDirection(state.filteredAlerts[0].direction)} alert`
+    : state.filteredInferredDark.length > 0
+      ? "dark context"
+      : "no active alert";
   const metrics = [
     {
       label: "Regime",
@@ -1242,7 +1234,7 @@ export const CommandPriorityBoard = ({ state }: { state: TerminalState }) => {
       ) : (
         <div className="command-priority-table" role="table" aria-label="Priority board">
           <div className="command-priority-row is-head" role="row">
-            {["Time", "Sym", "Packet", "Read", "Score", "Decision", "State"].map((label) => (
+            {["Time", "Sym", "Packet", "Read", "Signal", "Decision", "State"].map((label) => (
               <span role="columnheader" key={label}>
                 {label}
               </span>
@@ -1291,7 +1283,9 @@ export const CommandDecisionLevels = ({ state }: { state: TerminalState }) => {
     [
       "Evidence",
       topAlert
-        ? `${normalizeAlertSeverity(topAlert)} alert at ${formatTime(topAlert.source_ts)}`
+        ? `${getAlertName(topAlert)} ${formatAlertConfidence(topAlert.policy_confidence)} at ${formatTime(
+            topAlert.source_ts
+          )}`
         : topDark
           ? `${humanizeClassifierId(topDark.type)} ${formatConfidence(topDark.confidence)}`
           : "waiting"

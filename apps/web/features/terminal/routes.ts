@@ -34,7 +34,7 @@ export const buildDurableTapesRouteFeatures = (
   equities: true,
   flow: true,
   news: true,
-  alerts: rawFallbackEnabled,
+  alerts: true,
   durableRows: true,
   smartFlow: rawFallbackEnabled,
   smartMoney: false,
@@ -233,7 +233,7 @@ export const getLiveManifest = (
     subscriptions.push({ channel: "news", snapshot_limit: LIVE_OPTIONS_HEAD_LIMIT });
   }
   if (features.alerts) {
-    subscriptions.push({ channel: "alerts", snapshot_limit: LIVE_HOT_WINDOW });
+    subscriptions.push({ channel: "smart-flow-alerts", snapshot_limit: LIVE_HOT_WINDOW });
   }
   if (features.smartFlow) {
     subscriptions.push({ channel: "smart-flow", snapshot_limit: LIVE_HOT_WINDOW });

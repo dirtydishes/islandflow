@@ -33,7 +33,8 @@ mock.module(nextNavigationJsResolved, () => ({
 const {
   NAV_ITEMS,
   appendHistoryTail,
-  buildAlertContextPath,
+  buildAlertFlowPacketPath,
+  buildAlertOptionPrintsPath,
   buildDefaultFlowFilters,
   buildTerminalEquityOverlays,
   buildTerminalLowerPaneInput,
@@ -44,7 +45,6 @@ const {
   classifierToneForFamily,
   collectAlertContextEvidence,
   composeTapeItems,
-  deriveAlertDirection,
   countActiveFlowFilterGroups,
   decodeNewsText,
   filterOptionTapeItems,
@@ -74,7 +74,6 @@ const {
   mergeHeldTapeHistory,
   mergeNewestWithOverflow,
   mapTerminalChartStatus,
-  normalizeAlertSeverity,
   normalizeTickerFilterInput,
   normalizeTerminalChartCandles,
   nextFlowFilterPopoverState,
@@ -135,12 +134,16 @@ const makeOptionPrint = (overrides: Record<string, unknown> = {}) =>
 
 const makeAlert = (overrides: Record<string, unknown> = {}) =>
   ({
+    alert_id: "smartflow:alert:1",
+    hypothesis_id: "hypothesis:1",
     trace_id: "alert-1",
     seq: 1,
     source_ts: 1_000,
-    severity: "low",
-    score: 20,
-    hits: [],
+    underlying_id: "SPY",
+    direction: "bullish",
+    policy_confidence: 0.76,
+    evidence_quality: 0.84,
+    evidence_refs: ["flowpacket:1", "print:1"],
     ...overrides
   }) as any;
 
@@ -282,9 +285,12 @@ describe("pinned evidence pruning", () => {
 });
 
 describe("alert context hydration helpers", () => {
-  it("builds the persisted ClickHouse context endpoint path", () => {
-    expect(buildAlertContextPath("alert:large_call/one")).toBe(
-      "/flow/alerts/alert%3Alarge_call%2Fone/context"
+  it("builds canonical packet and option-print evidence lookup paths", () => {
+    expect(buildAlertFlowPacketPath("flowpacket:large_call/one")).toBe(
+      "/flow/packets/flowpacket%3Alarge_call%2Fone"
+    );
+    expect(buildAlertOptionPrintsPath(["print:1", "print:2"])).toBe(
+      "/option-prints/by-trace?trace_id=print%3A1&trace_id=print%3A2"
     );
   });
 
@@ -460,12 +466,12 @@ describe("live manifest", () => {
     ).toEqual(["news"]);
   });
 
-  it("subscribes /durable-tapes to server rows and non-decorated tape feeds by default", () => {
+  it("subscribes /durable-tapes to server rows and canonical alert feed by default", () => {
     const filters = buildDefaultFlowFilters();
     const manifest = getLiveManifest("/durable-tapes", "SPY", 60000, filters);
     const channels = manifest.map((subscription) => subscription.channel);
 
-    expect(channels).toEqual(["durable-rows", "equities", "flow", "news"]);
+    expect(channels).toEqual(["durable-rows", "equities", "flow", "news", "smart-flow-alerts"]);
     expect(manifest.find((subscription) => subscription.channel === "durable-rows")).toMatchObject({
       lanes: ["options", "alerts"],
       filters
@@ -724,7 +730,7 @@ describe("route feature map", () => {
     expect(features.showNewsPane).toBe(true);
     expect(features.showAlertsPane).toBe(true);
     expect(features.options).toBe(false);
-    expect(features.alerts).toBe(false);
+    expect(features.alerts).toBe(true);
     expect(features.durableRows).toBe(true);
     expect(features.needsClassifierDecor).toBe(false);
     expect(features.needsAlertEvidencePrefetch).toBe(false);
@@ -1725,49 +1731,10 @@ describe("flow filter popup helpers", () => {
 });
 
 describe("signals helpers", () => {
-  it("normalizes severity aliases/casing and falls back to score", () => {
-    expect(normalizeAlertSeverity(makeAlert({ severity: "HIGH", score: 1 }))).toBe("high");
-    expect(normalizeAlertSeverity(makeAlert({ severity: "med", score: 1 }))).toBe("medium");
-    expect(normalizeAlertSeverity(makeAlert({ severity: "informational", score: 99 }))).toBe("low");
-    expect(normalizeAlertSeverity(makeAlert({ severity: "unknown", score: 80 }))).toBe("high");
-    expect(normalizeAlertSeverity(makeAlert({ severity: "unknown", score: 45 }))).toBe("medium");
-    expect(normalizeAlertSeverity(makeAlert({ severity: "unknown", score: 44 }))).toBe("low");
-  });
-
-  it("derives dominant direction with confidence tie-break and neutral fallback", () => {
-    expect(
-      deriveAlertDirection(
-        makeAlert({
-          hits: [
-            { direction: "bullish", confidence: 0.4 },
-            { direction: "bullish", confidence: 0.2 },
-            { direction: "bearish", confidence: 0.9 }
-          ]
-        })
-      )
-    ).toBe("bullish");
-
-    expect(
-      deriveAlertDirection(
-        makeAlert({
-          hits: [
-            { direction: "bullish", confidence: 0.4 },
-            { direction: "bearish", confidence: 0.9 }
-          ]
-        })
-      )
-    ).toBe("bearish");
-
-    expect(
-      deriveAlertDirection(makeAlert({ hits: [{ direction: "weird", confidence: 0.4 }] }))
-    ).toBe("neutral");
-    expect(deriveAlertDirection(makeAlert({ hits: [] }))).toBe("neutral");
-  });
-
-  it("anchors strip window to latest visible alert timestamp", () => {
+  it("anchors strip window to latest visible canonical alert timestamp", () => {
     const alerts = [
-      makeAlert({ source_ts: 1_700_000_000_000, severity: "high" }),
-      makeAlert({ source_ts: 1_700_000_000_000 - 10 * 60 * 1000, severity: "low" })
+      makeAlert({ source_ts: 1_700_000_000_000 }),
+      makeAlert({ source_ts: 1_700_000_000_000 - 10 * 60 * 1000 })
     ];
     expect(getAlertWindowAnchorTs(alerts, 42)).toBe(1_700_000_000_000);
     expect(getAlertWindowAnchorTs([], 42)).toBe(42);
