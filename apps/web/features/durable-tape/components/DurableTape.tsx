@@ -18,6 +18,7 @@ import {
   selectDurableTapeHistoryCursor,
   shouldApplyDurableTapeHistoryLoad
 } from "../history";
+import { resolveDurableTapeRowDecoration } from "../row-hooks";
 import {
   createEmptyDurableTapeScrollHold,
   flushDurableTapeJumpToLive,
@@ -83,6 +84,8 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
   source,
   renderRow,
   renderHover,
+  getRowClassName,
+  getRowStyle,
   onFocus,
   onActivate,
   rowHeight = DEFAULT_ROW_HEIGHT,
@@ -422,40 +425,49 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
             style={{ height: `${virtual.totalSize}px` }}
             aria-busy={historyLoading}
           >
-            {virtual.virtualItems.map(({ item, key, index, start, size }) => (
-              <div
-                className="durable-tape-row"
-                data-tape-key={key}
-                data-row-start={start}
-                data-row-size={size}
-                key={key}
-                role="row"
-                tabIndex={canInspectRows ? 0 : -1}
-                style={{
-                  ...rowStyle,
-                  height: `${size}px`,
-                  transform: `translateY(${start}px)`
-                }}
-                onFocus={() => {
-                  onFocus?.({ item, rowKey: key, index });
-                  showHoverDetail(item, key, index);
-                }}
-                onBlur={() => clearHoverDetail(key)}
-                onClick={() => activateRow(item, key, index)}
-                onKeyDown={(event) => {
-                  if (event.key !== "Enter" && event.key !== " ") {
-                    return;
-                  }
-                  event.preventDefault();
-                  activateRow(item, key, index);
-                }}
-                onMouseEnter={() => showHoverDetail(item, key, index)}
-                onMouseLeave={() => clearHoverDetail(key)}
-                onPointerDown={() => showHoverDetail(item, key, index)}
-              >
-                {renderRow({ item, rowKey: key, index, columns: selectedTemplate.columns })}
-              </div>
-            ))}
+            {virtual.virtualItems.map(({ item, key, index, start, size }) => {
+              const rowDecoration = resolveDurableTapeRowDecoration({
+                enabled: resolvedFeatures.rowTinting,
+                input: { item, rowKey: key, index },
+                getRowClassName,
+                getRowStyle
+              });
+              return (
+                <div
+                  className={`durable-tape-row ${rowDecoration.className ?? ""}`.trim()}
+                  data-tape-key={key}
+                  data-row-start={start}
+                  data-row-size={size}
+                  key={key}
+                  role="row"
+                  tabIndex={canInspectRows ? 0 : -1}
+                  style={{
+                    ...rowDecoration.style,
+                    ...rowStyle,
+                    height: `${size}px`,
+                    transform: `translateY(${start}px)`
+                  }}
+                  onFocus={() => {
+                    onFocus?.({ item, rowKey: key, index });
+                    showHoverDetail(item, key, index);
+                  }}
+                  onBlur={() => clearHoverDetail(key)}
+                  onClick={() => activateRow(item, key, index)}
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter" && event.key !== " ") {
+                      return;
+                    }
+                    event.preventDefault();
+                    activateRow(item, key, index);
+                  }}
+                  onMouseEnter={() => showHoverDetail(item, key, index)}
+                  onMouseLeave={() => clearHoverDetail(key)}
+                  onPointerDown={() => showHoverDetail(item, key, index)}
+                >
+                  {renderRow({ item, rowKey: key, index, columns: selectedTemplate.columns })}
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
