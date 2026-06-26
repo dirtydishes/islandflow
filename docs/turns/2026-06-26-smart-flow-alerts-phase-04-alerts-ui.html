@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Smart-Flow Alerts Phase 04 Alerts UI Migration</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #07090c;
+        --panel: #10151b;
+        --panel-2: #0b1015;
+        --line: #24313d;
+        --line-strong: #6b4e1a;
+        --text: #e8eef5;
+        --muted: #9aa8b6;
+        --faint: #748293;
+        --accent: #f5a623;
+        --green: #28c879;
+        --red: #ff6b5f;
+        --code: #06090d;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.55;
+      }
+
+      main {
+        width: min(1120px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 40px 0 64px;
+      }
+
+      header,
+      section {
+        border: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      header {
+        padding: 24px;
+      }
+
+      section {
+        margin-top: 14px;
+        padding: 20px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 900px;
+        font-size: 2.15rem;
+        line-height: 1.1;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        margin-bottom: 10px;
+        font-size: 1.08rem;
+        letter-spacing: 0;
+      }
+
+      h3 {
+        margin: 14px 0 6px;
+        color: var(--accent);
+        font-size: 0.92rem;
+      }
+
+      p,
+      li {
+        color: var(--muted);
+      }
+
+      code,
+      pre {
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      }
+
+      code {
+        color: #fff0cf;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 1.1rem;
+      }
+
+      li + li {
+        margin-top: 6px;
+      }
+
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 18px;
+      }
+
+      .chip {
+        border: 1px solid var(--line-strong);
+        background: rgba(245, 166, 35, 0.1);
+        color: #ffe0a6;
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 650;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 10px;
+      }
+
+      .tile {
+        border: 1px solid var(--line);
+        background: var(--panel-2);
+        padding: 14px;
+      }
+
+      .tile strong {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--text);
+      }
+
+      .diff-panel[data-rich-ready="true"] .diff-fallback {
+        display: none;
+      }
+
+      .diff-rich {
+        display: none;
+        overflow: auto;
+        border: 1px solid var(--line);
+        background: var(--code);
+      }
+
+      .diff-panel[data-rich-ready="true"] .diff-rich {
+        display: block;
+      }
+
+      .diff-fallback {
+        overflow-x: auto;
+        margin: 0;
+        padding: 14px;
+        border: 1px solid var(--line);
+        background: var(--code);
+        color: #cbd8e6;
+        font-size: 0.82rem;
+        line-height: 1.45;
+      }
+
+      .note {
+        color: var(--faint);
+        font-size: 0.9rem;
+      }
+
+      .ok {
+        color: var(--green);
+      }
+
+      .risk {
+        color: var(--red);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="note">Islandflow implementation turn</p>
+        <h1>Smart-flow alerts phase 04 migrated the alerts UI to canonical hypothesis alerts.</h1>
+        <div class="meta">
+          <span class="chip">Beads islandflow-ghce.4</span>
+          <span class="chip">Branch lavender/smart-flow-alerts-04-alerts-ui</span>
+          <span class="chip">2026-06-26</span>
+        </div>
+      </header>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          Moved the web alerts module off legacy <code>AlertEvent</code> rows and onto
+          canonical <code>SmartFlowAlertEvent</code> hypothesis alerts. The rows now expose
+          time, symbol, hypothesis, direction, and confidence/evidence; legacy score,
+          severity, and classifier-hit presentation is gone from the canonical alert UI.
+          The detail drawer now starts with fast triage and keeps packet, contract, and
+          equity focus handoffs owned by the alerts module.
+        </p>
+      </section>
+
+      <section>
+        <h2>Implementation</h2>
+        <div class="grid">
+          <div class="tile">
+            <strong>Canonical alert source</strong>
+            <p><code>AlertsModule</code>, its source adapter, filters, row keys, and history loading now consume <code>SmartFlowAlertEvent</code> and <code>/history/smart-flow-alerts</code>.</p>
+          </div>
+          <div class="tile">
+            <strong>Triage-first detail</strong>
+            <p>The drawer leads with symbol, hypothesis, direction, trigger, confidence/evidence quality, and primary packet or option refs before alternatives, why-not context, penalties, and versions.</p>
+          </div>
+          <div class="tile">
+            <strong>Shared tinting</strong>
+            <p>Alert rows call the shared smart-flow tint module and map its metadata into row classes and CSS variables instead of recomputing tint locally.</p>
+          </div>
+          <div class="tile">
+            <strong>Terminal cutover</strong>
+            <p>Terminal alert transport, live manifest, replay paths, and command surfaces now use <code>smart-flow-alerts</code> while keeping transport/state thin.</p>
+          </div>
+          <div class="tile">
+            <strong>Evidence ownership</strong>
+            <p>The alerts feature owns packet and option-print evidence hydration through direct canonical refs, without reading legacy alert context for normal rendering.</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Changed Files</h2>
+        <ul>
+          <li>Canonical alerts UI: <code>apps/web/features/alerts/AlertsModule.tsx</code>, <code>columns.tsx</code>, <code>format.ts</code>, <code>source.ts</code>, <code>evidence.ts</code>, <code>types.ts</code>, <code>tinting.ts</code>, and exports.</li>
+          <li>Terminal integration: <code>apps/web/features/terminal/state.tsx</code>, <code>routes.ts</code>, <code>transport.ts</code>, <code>pane-state.ts</code>, <code>components/charts.tsx</code>, <code>evidence.ts</code>, <code>format.ts</code>, and app exports.</li>
+          <li>Styles and tests: <code>apps/web/app/globals.css</code>, <code>apps/web/features/alerts/alerts-module.test.ts</code>, and <code>apps/web/app/terminal.test.ts</code>.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Verification</h2>
+        <ul>
+          <li><span class="ok">Passed</span>: <code>bd show islandflow-ghce.4</code></li>
+          <li><span class="ok">Passed</span>: <code>bunx biome check</code> on the touched alert and terminal web files.</li>
+          <li><span class="ok">Passed</span>: <code>bun test apps/web/features/alerts</code></li>
+          <li><span class="ok">Passed</span>: <code>bun test apps/web/app/terminal.test.ts apps/web/features/terminal</code></li>
+          <li><span class="ok">Passed</span>: <code>bun --cwd=apps/web run build</code></li>
+          <li><span class="ok">Passed</span>: browser QA at desktop and mobile widths using <code>WEB_DEV_PORT=3100 NEXT_PUBLIC_API_URL=https://api.flow.deltaisland.io bun run dev:web</code>. Probed <code>/</code> and <code>/durable-tapes</code> for alert-bearing surfaces, text clipping, overlap, and horizontal overflow.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p class="note">
+          The fallback unified diff is visible by default. The richer view mounts in the browser
+          with <code>PatchDiff</code> from <code>@pierre/diffs/react</code>; the fallback is hidden only
+          after that render succeeds.
+        </p>
+        <div class="diff-panel" data-rich-ready="false">
+          <div class="diff-rich" id="diff-rich"></div>
+          <pre class="diff-fallback" id="diff-fallback">diff --git a/apps/web/features/alerts/columns.tsx b/apps/web/features/alerts/columns.tsx
+index 973c418..5063627 100644
+--- a/apps/web/features/alerts/columns.tsx
++++ b/apps/web/features/alerts/columns.tsx
+@@
+-import type { AlertEvent } from "@islandflow/types";
++import type { SmartFlowAlertEvent } from "@islandflow/types";
+@@
+-export const ALERTS_COLUMNS: DurableTapeColumnDefinition&lt;AlertEvent, AlertColumnId&gt;[] = [
++export const ALERTS_COLUMNS: DurableTapeColumnDefinition&lt;SmartFlowAlertEvent, AlertColumnId&gt;[] = [
+@@
+-    id: "kind",
+-    label: "KIND",
+-    render: getAlertKind
++    id: "hypothesis",
++    label: "HYPOTHESIS",
++    render: getAlertName
+@@
+-    id: "score",
+-    label: "SCORE",
+-    render: (alert) =&gt; formatAlertScore(alert.score)
++    id: "direction",
++    label: "DIR",
++    render: getAlertDirectionLabel
+@@
+-    id: "state",
+-    label: "STATE",
+-    render: (alert) =&gt; normalizeAlertSeverity(alert)
++    id: "confidenceEvidence",
++    label: "CONF/EVID",
++    render: getAlertConfidenceEvidenceLabel
+@@
+-  { id: "full", columns: ["time", "symbol", "kind", "score", "state"] },
++  { id: "full", columns: ["time", "symbol", "hypothesis", "direction", "confidenceEvidence"] },
+
+diff --git a/apps/web/features/alerts/tinting.ts b/apps/web/features/alerts/tinting.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/alerts/tinting.ts
+@@
++import type { SmartFlowAlertEvent } from "@islandflow/types";
++import type { CSSProperties } from "react";
++
++import { getSmartFlowTint } from "../smart-flow";
++import { normalizeAlertDirection } from "./format";
++
++export const getSmartFlowAlertRowTint = (alert: SmartFlowAlertEvent) =&gt;
++  getSmartFlowTint(alert.projection);
++
++export const getSmartFlowAlertRowTintClassName = (alert: SmartFlowAlertEvent): string =&gt; {
++  const tint = getSmartFlowAlertRowTint(alert);
++  const direction = normalizeAlertDirection(alert.direction);
++  return [
++    "alerts-row-tinted",
++    "alerts-smart-flow-row",
++    `classifier-${tint.tone}`,
++    `alerts-row-direction-${direction}`,
++    `alerts-row-confidence-${tint.metadata.confidenceBand}`,
++    `alerts-row-evidence-${tint.metadata.evidenceQualityBand}`
++  ].join(" ");
++};
++
++export const getSmartFlowAlertRowTintStyle = (alert: SmartFlowAlertEvent): CSSProperties =&gt; {
++  const tint = getSmartFlowAlertRowTint(alert);
++  return { "--classifier-intensity": tint.alpha.toFixed(3) } as CSSProperties;
++};
+
+diff --git a/apps/web/features/alerts/AlertsModule.tsx b/apps/web/features/alerts/AlertsModule.tsx
+index 1a7df2b..efb8459 100644
+--- a/apps/web/features/alerts/AlertsModule.tsx
++++ b/apps/web/features/alerts/AlertsModule.tsx
+@@
+-import type { AlertEvent, FlowPacket, OptionPrint } from "@islandflow/types";
++import type { FlowPacket, OptionPrint, SmartFlowAlertEvent } from "@islandflow/types";
+@@
+-const renderAlertHover = (alert: AlertEvent) =&gt; {
+-  const severity = normalizeAlertSeverity(alert);
+-  const direction = deriveAlertDirection(alert);
+-  const primary = alert.hits[0];
++const renderAlertHover = (alert: SmartFlowAlertEvent) =&gt; {
++  const primaryPacketRef = getAlertPrimaryPacketRef(alert);
+@@
+-        {renderDetailMetric("Score", formatAlertScore(alert.score))}
+-        {renderDetailMetric("Source", formatAlertTime(alert.source_ts))}
+-        {renderDetailMetric("Evidence", alert.evidence_refs.length)}
++        {renderDetailMetric("Confidence", formatAlertConfidence(alert.policy_confidence))}
++        {renderDetailMetric("Evidence", getAlertEvidenceQualityLabel(alert))}
++        {renderDetailMetric("Refs", alert.evidence_refs.length)}
+@@
+-  alert: AlertEvent;
++  alert: SmartFlowAlertEvent;
+@@
+-        &lt;div className="alerts-detail-score"&gt;
+-          &lt;span&gt;Score&lt;/span&gt;
+-          &lt;strong&gt;{formatAlertScore(alert.score)}&lt;/strong&gt;
++        &lt;div className="alerts-detail-signal"&gt;
++          &lt;span&gt;Confidence&lt;/span&gt;
++          &lt;strong&gt;{formatAlertConfidence(alert.policy_confidence)}&lt;/strong&gt;
+@@
++      &lt;section className="alerts-detail-section alerts-detail-triage"&gt;
++        &lt;h4&gt;Fast triage&lt;/h4&gt;
++        &lt;div className="alerts-detail-list"&gt;
++          {renderTriageRow("Symbol", getAlertSymbol(alert))}
++          {renderTriageRow("Hypothesis", getAlertName(alert), projection.insight.summary)}
++          {renderTriageRow("Direction", getAlertDirectionLabel(alert))}
++          {renderTriageRow("Trigger", getAlertTriggerReason(alert), projection.insight.label)}
++          {renderTriageRow("Confidence / evidence", getAlertConfidenceEvidenceLabel(alert))}
++          {renderTriageRow("Primary refs", [primaryPacketRef, primaryOptionRef].filter(Boolean).join(" / ") || "No primary ref")}
++        &lt;/div&gt;
++      &lt;/section&gt;
+@@
++        getRowClassName={({ item }) =&gt; getSmartFlowAlertRowTintClassName(item)}
+         getRowKey={getAlertKey}
++        getRowStyle={({ item }) =&gt; getSmartFlowAlertRowTintStyle(item)}
+
+diff --git a/apps/web/features/alerts/source.ts b/apps/web/features/alerts/source.ts
+index 44edd86..bf57cea 100644
+--- a/apps/web/features/alerts/source.ts
++++ b/apps/web/features/alerts/source.ts
+@@
+-import type { AlertEvent } from "@islandflow/types";
+-import { AlertEventSchema } from "@islandflow/types";
++import type { SmartFlowAlertEvent } from "@islandflow/types";
++import { SmartFlowAlertEventSchema } from "@islandflow/types";
+@@
+-const parseAlerts = (items: unknown[]): AlertEvent[] =&gt; AlertEventSchema.array().parse(items);
++const parseAlerts = (items: unknown[]): SmartFlowAlertEvent[] =&gt;
++  SmartFlowAlertEventSchema.array().parse(items);
+@@
+-    const url = new URL(buildAlertsApiUrl("/history/alerts", options?.apiBaseUrl));
++    const url = new URL(buildAlertsApiUrl("/history/smart-flow-alerts", options?.apiBaseUrl));
+@@
+-      throw new Error(`Alerts history failed with HTTP ${response.status}`);
++      throw new Error(`Smart-flow alert history failed with HTTP ${response.status}`);
+
+diff --git a/apps/web/features/terminal/routes.ts b/apps/web/features/terminal/routes.ts
+index 881ff86..bcdb97e 100644
+--- a/apps/web/features/terminal/routes.ts
++++ b/apps/web/features/terminal/routes.ts
+@@
+-  alerts: rawFallbackEnabled,
++  alerts: true,
+@@
+-    subscriptions.push({ channel: "alerts", snapshot_limit: LIVE_HOT_WINDOW });
++    subscriptions.push({ channel: "smart-flow-alerts", snapshot_limit: LIVE_HOT_WINDOW });
+
+diff --git a/apps/web/features/terminal/state.tsx b/apps/web/features/terminal/state.tsx
+index 44d9f76..e10f1a7 100644
+--- a/apps/web/features/terminal/state.tsx
++++ b/apps/web/features/terminal/state.tsx
+@@
+-const EMPTY_ALERT_EVENTS: AlertEvent[] = [];
++const EMPTY_ALERT_EVENTS: SmartFlowAlertEvent[] = [];
+@@
+-  const [selectedAlert, setSelectedAlert] = useState&lt;AlertEvent | null&gt;(null);
++  const [selectedAlert, setSelectedAlert] = useState&lt;SmartFlowAlertEvent | null&gt;(null);
+@@
+-  const alertsLastUpdate = liveSession.lastEventByChannel.alerts ?? null;
++  const alertsLastUpdate = liveSession.lastEventByChannel["smart-flow-alerts"] ?? null;
+@@
+-    wsPath: "/ws/alerts",
+-    replayPath: "/replay/alerts",
+-    latestPath: "/flow/alerts",
+-    expectedType: "alert",
++    wsPath: "/ws/smart-flow-alerts",
++    replayPath: "/replay/smart-flow-alerts",
++    latestPath: "/flow/smart-flow-alerts",
++    expectedType: "smart-flow-alert",
+@@
+-    () =&gt; composeTapeItems([], liveSession.alerts, liveSession.alertsHistory),
+-    [liveSession.alerts, liveSession.alertsHistory]
++    () =&gt; composeTapeItems([], liveSession.smartFlowAlerts, liveSession.smartFlowAlertsHistory),
++    [liveSession.smartFlowAlerts, liveSession.smartFlowAlertsHistory]
+          </pre>
+        </div>
+      </section>
+
+      <section>
+        <h2>Reviewer Update</h2>
+        <p>
+          Review found no phase-blocking structural issue in the canonical alert migration. Two
+          narrow repairs were made on the branch: visible smart-flow alert prefetch now reuses the
+          canonical packet/option ref split so <code>flowpacket:*</code> refs are not sent to the
+          option-print lookup path, and the alert test helper now has an explicit React element prop
+          boundary so full repo typecheck passes.
+        </p>
+        <div class="grid">
+          <div class="tile">
+            <strong>Reviewer repairs</strong>
+            <p><code>apps/web/features/terminal/state.tsx</code> now keeps alert packet refs in flow-packet hydration and alert option refs in option-print hydration. <code>apps/web/features/terminal/evidence.ts</code> and <code>apps/web/app/terminal.tsx</code> export the shared helper for that split.</p>
+          </div>
+          <div class="tile">
+            <strong>Additional coverage</strong>
+            <p><code>apps/web/app/terminal.test.ts</code> covers packet refs staying out of alert option-print refs. <code>apps/web/features/alerts/alerts-module.test.ts</code> typechecks its React element traversal helper without unsafe prop access.</p>
+          </div>
+          <div class="tile">
+            <strong>Reviewer gates</strong>
+            <p><span class="ok">Passed</span>: alert tests, terminal tests, <code>bun --cwd=apps/web run build</code>, <code>bun run typecheck</code>, <code>bun run fmt:check</code>, and <code>git diff --check</code>.</p>
+          </div>
+          <div class="tile">
+            <strong>Reviewer browser QA</strong>
+            <p><span class="ok">Passed</span>: Chromium probes at 1440x1000 and 390x900 for <code>/</code> and <code>/durable-tapes</code>. No horizontal overflow, alert-surface clipping, or alert text overlap was detected. Screenshots: <code>/tmp/islandflow-alerts-review-qa/home-desktop.png</code>, <code>/tmp/islandflow-alerts-review-qa/home-mobile.png</code>, <code>/tmp/islandflow-alerts-review-qa/durable-desktop.png</code>, <code>/tmp/islandflow-alerts-review-qa/durable-mobile.png</code>, and <code>/tmp/islandflow-alerts-review-qa/durable-mobile-alert-pane.png</code>.</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Risks</h2>
+        <ul>
+          <li>The live production API endpoint did not return smart-flow alert rows during browser QA from this host; UI layout and shell behavior were verified with the local web app and live route shell, but no live alert row data appeared.</li>
+          <li>Legacy alert routes and legacy derived history remain in place by design for later cleanup phases.</li>
+        </ul>
+      </section>
+    </main>
+
+    <script type="module">
+      const patch = document.getElementById("diff-fallback")?.textContent ?? "";
+      const richRoot = document.getElementById("diff-rich");
+      const panel = richRoot?.closest(".diff-panel");
+
+      if (patch && richRoot && panel) {
+        try {
+          const [{ createElement }, { createRoot }, { PatchDiff }] = await Promise.all([
+            import("https://esm.sh/react@18"),
+            import("https://esm.sh/react-dom@18/client"),
+            import("https://esm.sh/@pierre/diffs@1.2.2/react")
+          ]);
+          createRoot(richRoot).render(
+            createElement(PatchDiff, {
+              patch,
+              viewType: "unified",
+              overflow: "wrap"
+            })
+          );
+          panel.setAttribute("data-rich-ready", "true");
+        } catch (error) {
+          console.warn("Diffs rich renderer failed; keeping HTML fallback.", error);
+        }
+      }
+    </script>
+  </body>
+</html>
