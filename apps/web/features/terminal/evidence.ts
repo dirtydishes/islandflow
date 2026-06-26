@@ -1,10 +1,13 @@
 import type { SmartFlowExplainabilityProjection } from "@islandflow/types";
 import { PINNED_EVIDENCE_MAX_ITEMS, PINNED_EVIDENCE_TTL_MS } from "./config";
 import type { PinnedEntry } from "./types";
+
 export {
-  buildAlertContextPath,
+  buildAlertFlowPacketPath,
+  buildAlertOptionPrintsPath,
   collectAlertContextEvidence,
   getAlertFlowPacketRefs,
+  getAlertOptionPrintRefs,
   resolveAlertFlowPacket
 } from "../alerts";
 

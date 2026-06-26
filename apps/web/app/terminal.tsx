@@ -3,11 +3,11 @@
 import { memo, type ReactNode, useMemo } from "react";
 
 import { AlertsModule } from "../features/alerts";
+import { DurableTapeAlertRowsPane, DurableTapeOptionRowsPane } from "../features/durable-tape";
 import { createStaticEquitiesTapeSource, EquitiesTape } from "../features/equities-tape";
 import { createStaticFlowPacketsTapeSource, FlowPacketsTape } from "../features/flow-packets";
 import { NewsWire } from "../features/news-wire";
 import { OptionsTape } from "../features/options-tape";
-import { DurableTapeAlertRowsPane, DurableTapeOptionRowsPane } from "../features/durable-tape";
 import { TerminalMarketChartSection } from "../features/terminal/chart-adapter";
 import {
   CommandDecisionLevels,
@@ -54,9 +54,11 @@ export {
   shouldIncludeEquitiesForDarkUnderlyingFallback
 } from "../features/terminal/config";
 export {
-  buildAlertContextPath,
+  buildAlertFlowPacketPath,
+  buildAlertOptionPrintsPath,
   collectAlertContextEvidence,
   getAlertFlowPacketRefs,
+  getAlertOptionPrintRefs,
   getSmartFlowEvidenceRefs,
   getSmartFlowOptionPrintRefs,
   getSmartFlowPacketRefs,
@@ -83,13 +85,11 @@ export {
 export {
   classifierToneForFamily,
   decodeNewsText,
-  deriveAlertDirection,
   formatCompactUsd,
   formatNewsTimestamp,
   formatOptionContractLabel,
   getAlertWindowAnchorTs,
   getOptionTableSnapshot,
-  normalizeAlertSeverity,
   selectPrimaryClassifierHit,
   smartFlowDirectionLabel,
   smartFlowDirectionTone,
@@ -109,12 +109,12 @@ export {
   selectDurableTapesOptionsPane
 } from "../features/terminal/pane-state";
 export {
+  buildDurableTapesRouteFeatures,
   getLiveManifest,
   getRouteFeatures,
   getTerminalNavCurrentHref,
   NAV_ITEMS,
-  normalizeTerminalPathname,
-  buildDurableTapesRouteFeatures
+  normalizeTerminalPathname
 } from "../features/terminal/routes";
 export { shallowEqualTerminalSelection } from "../features/terminal/state";
 export {

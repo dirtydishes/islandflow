@@ -8,6 +8,7 @@ export type MessageType =
   | "equity-join"
   | "flow-packet"
   | "smart-flow"
+  | "smart-flow-alert"
   | "smart-money"
   | "inferred-dark"
   | "classifier-hit"

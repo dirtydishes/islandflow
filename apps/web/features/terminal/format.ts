@@ -1,10 +1,10 @@
 import type {
-  AlertEvent,
   ClassifierHitEvent,
   FlowHypothesisType,
   OptionFlowFilters,
   OptionNbboSide,
   OptionPrint,
+  SmartFlowAlertEvent,
   SmartFlowExplainabilityProjection,
   SmartMoneyProfileId
 } from "@islandflow/types";
@@ -169,62 +169,10 @@ const normalizeDirection = (value: string): "bullish" | "bearish" | "neutral" =>
   return "neutral";
 };
 
-const normalizeAlertSeverityValue = (value: string): "high" | "medium" | "low" | null => {
-  const normalized = value.trim().toLowerCase();
-  if (["high", "critical", "severe", "sev1", "p0", "p1"].includes(normalized)) {
-    return "high";
-  }
-  if (["medium", "med", "moderate", "sev2", "p2"].includes(normalized)) {
-    return "medium";
-  }
-  if (["low", "minor", "info", "informational", "sev3", "p3", "p4"].includes(normalized)) {
-    return "low";
-  }
-  return null;
-};
-
-export const normalizeAlertSeverity = (alert: AlertEvent): "high" | "medium" | "low" => {
-  const normalized = normalizeAlertSeverityValue(alert.severity);
-  if (normalized) {
-    return normalized;
-  }
-  if (alert.score >= 80) {
-    return "high";
-  }
-  if (alert.score >= 45) {
-    return "medium";
-  }
-  return "low";
-};
-
-export const deriveAlertDirection = (alert: AlertEvent): "bullish" | "bearish" | "neutral" => {
-  const totals = {
-    bullish: { count: 0, confidence: 0 },
-    bearish: { count: 0, confidence: 0 },
-    neutral: { count: 0, confidence: 0 }
-  };
-
-  for (const hit of alert.hits) {
-    const direction = normalizeDirection(hit.direction);
-    totals[direction].count += 1;
-    totals[direction].confidence += Number.isFinite(hit.confidence) ? hit.confidence : 0;
-  }
-
-  const ranked = (
-    Object.entries(totals) as Array<
-      ["bullish" | "bearish" | "neutral", { count: number; confidence: number }]
-    >
-  ).sort((a, b) => {
-    if (b[1].count !== a[1].count) {
-      return b[1].count - a[1].count;
-    }
-    return b[1].confidence - a[1].confidence;
-  });
-
-  return ranked[0] && ranked[0][1].count > 0 ? ranked[0][0] : "neutral";
-};
-
-export const getAlertWindowAnchorTs = (alerts: AlertEvent[], fallbackNow = Date.now()): number => {
+export const getAlertWindowAnchorTs = (
+  alerts: SmartFlowAlertEvent[],
+  fallbackNow = Date.now()
+): number => {
   if (alerts.length === 0) {
     return fallbackNow;
   }
