@@ -436,6 +436,35 @@ index 44d9f76..e10f1a7 100644
       </section>
 
       <section>
+        <h2>Reviewer Update</h2>
+        <p>
+          Review found no phase-blocking structural issue in the canonical alert migration. Two
+          narrow repairs were made on the branch: visible smart-flow alert prefetch now reuses the
+          canonical packet/option ref split so <code>flowpacket:*</code> refs are not sent to the
+          option-print lookup path, and the alert test helper now has an explicit React element prop
+          boundary so full repo typecheck passes.
+        </p>
+        <div class="grid">
+          <div class="tile">
+            <strong>Reviewer repairs</strong>
+            <p><code>apps/web/features/terminal/state.tsx</code> now keeps alert packet refs in flow-packet hydration and alert option refs in option-print hydration. <code>apps/web/features/terminal/evidence.ts</code> and <code>apps/web/app/terminal.tsx</code> export the shared helper for that split.</p>
+          </div>
+          <div class="tile">
+            <strong>Additional coverage</strong>
+            <p><code>apps/web/app/terminal.test.ts</code> covers packet refs staying out of alert option-print refs. <code>apps/web/features/alerts/alerts-module.test.ts</code> typechecks its React element traversal helper without unsafe prop access.</p>
+          </div>
+          <div class="tile">
+            <strong>Reviewer gates</strong>
+            <p><span class="ok">Passed</span>: alert tests, terminal tests, <code>bun --cwd=apps/web run build</code>, <code>bun run typecheck</code>, <code>bun run fmt:check</code>, and <code>git diff --check</code>.</p>
+          </div>
+          <div class="tile">
+            <strong>Reviewer browser QA</strong>
+            <p><span class="ok">Passed</span>: Chromium probes at 1440x1000 and 390x900 for <code>/</code> and <code>/durable-tapes</code>. No horizontal overflow, alert-surface clipping, or alert text overlap was detected. Screenshots: <code>/tmp/islandflow-alerts-review-qa/home-desktop.png</code>, <code>/tmp/islandflow-alerts-review-qa/home-mobile.png</code>, <code>/tmp/islandflow-alerts-review-qa/durable-desktop.png</code>, <code>/tmp/islandflow-alerts-review-qa/durable-mobile.png</code>, and <code>/tmp/islandflow-alerts-review-qa/durable-mobile-alert-pane.png</code>.</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
         <h2>Risks</h2>
         <ul>
           <li>The live production API endpoint did not return smart-flow alert rows during browser QA from this host; UI layout and shell behavior were verified with the local web app and live route shell, but no live alert row data appeared.</li>

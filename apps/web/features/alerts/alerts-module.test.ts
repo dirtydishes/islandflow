@@ -10,7 +10,7 @@ import {
   smartFlowAlertFromProjection,
   smartFlowExplainabilityFromHypothesisEvent
 } from "@islandflow/types";
-import { createElement, Fragment, isValidElement, type ReactNode } from "react";
+import { createElement, Fragment, isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { selectDurableTapeTemplate } from "../durable-tape";
@@ -146,11 +146,13 @@ const makePrint = (overrides: Partial<OptionPrint> = {}): OptionPrint =>
 const renderNode = (node: ReactNode): string =>
   renderToStaticMarkup(createElement(Fragment, null, node));
 
+type TestElement = ReactElement<{ children?: ReactNode } & Record<string, unknown>>;
+
 const collectElements = (
   node: ReactNode,
   type: string,
-  found: Array<{ props: Record<string, unknown> }> = []
-): Array<{ props: Record<string, unknown> }> => {
+  found: TestElement[] = []
+): TestElement[] => {
   if (Array.isArray(node)) {
     for (const child of node) {
       collectElements(child, type, found);
@@ -160,10 +162,11 @@ const collectElements = (
   if (!isValidElement(node)) {
     return found;
   }
+  const element = node as TestElement;
   if (node.type === type) {
-    found.push(node as unknown as { props: Record<string, unknown> });
+    found.push(element);
   }
-  collectElements(node.props.children, type, found);
+  collectElements(element.props.children, type, found);
   return found;
 };
 

@@ -58,6 +58,7 @@ export {
   buildAlertOptionPrintsPath,
   collectAlertContextEvidence,
   getAlertFlowPacketRefs,
+  getAlertOptionPrintRefs,
   getSmartFlowEvidenceRefs,
   getSmartFlowOptionPrintRefs,
   getSmartFlowPacketRefs,

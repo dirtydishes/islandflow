@@ -47,6 +47,7 @@ import {
 import { bumpTapeDebugMetric, logTapeDebug } from "./debug";
 import {
   getAlertFlowPacketRefs,
+  getAlertOptionPrintRefs,
   getSmartFlowEvidenceRefs,
   getSmartFlowOptionPrintRefs,
   getSmartFlowPacketRefs,
@@ -1736,10 +1737,10 @@ export const useTerminalState = () => {
     return EMPTY_ALERT_EVENTS;
   }, [filteredAlerts, routeFeatures.needsAlertEvidencePrefetch, routeFeatures.showAlertsPane]);
 
-  const visibleAlertEvidenceRefs = useMemo(() => {
+  const visibleAlertOptionPrintRefs = useMemo(() => {
     const refs = new Set<string>();
     for (const alert of visibleAlerts) {
-      for (const id of alert.evidence_refs.slice(0, 8)) {
+      for (const id of getAlertOptionPrintRefs(alert).slice(0, 8)) {
         refs.add(id);
       }
     }
@@ -1759,15 +1760,12 @@ export const useTerminalState = () => {
     if (!routeFeatures.needsAlertEvidencePrefetch || mode !== "live") {
       return [];
     }
-    return visibleAlertEvidenceRefs.filter(
-      (id) => !resolvedFlowPacketMap.has(id) && !resolvedOptionPrintMap.has(id)
-    );
+    return visibleAlertOptionPrintRefs.filter((id) => !resolvedOptionPrintMap.has(id));
   }, [
     mode,
-    resolvedFlowPacketMap,
     resolvedOptionPrintMap,
     routeFeatures.needsAlertEvidencePrefetch,
-    visibleAlertEvidenceRefs
+    visibleAlertOptionPrintRefs
   ]);
   const visibleAlertMissingPrintKey = stableHydrationKey(visibleAlertMissingPrintIds);
 
@@ -1876,7 +1874,7 @@ export const useTerminalState = () => {
   const activePinnedOptionKeys = useMemo(() => {
     const keys = new Set<string>();
     if (selectedAlert) {
-      for (const id of selectedAlert.evidence_refs) {
+      for (const id of getAlertOptionPrintRefs(selectedAlert)) {
         keys.add(id);
       }
     }
@@ -1891,7 +1889,7 @@ export const useTerminalState = () => {
     for (const id of getSmartFlowPinnedOptionKeys(selectedSmartFlowProjection)) {
       keys.add(id);
     }
-    for (const id of visibleAlertEvidenceRefs) {
+    for (const id of visibleAlertOptionPrintRefs) {
       keys.add(id);
     }
     return keys;
@@ -1900,7 +1898,7 @@ export const useTerminalState = () => {
     selectedClassifierFlowPacket,
     selectedSmartFlowProjection,
     selectedSmartMoneyEvent,
-    visibleAlertEvidenceRefs
+    visibleAlertOptionPrintRefs
   ]);
 
   const activePinnedJoinKeys = useMemo(() => {

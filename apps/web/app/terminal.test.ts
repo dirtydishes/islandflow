@@ -63,6 +63,7 @@ const {
   getLiveManifest,
   getLiveSubscriptionResetChannels,
   getSmartFlowEvidenceRefs,
+  getAlertOptionPrintRefs,
   getSmartFlowOptionPrintRefs,
   getSmartFlowPacketRefs,
   getSmartFlowPinnedFlowKeys,
@@ -330,6 +331,14 @@ describe("alert context hydration helpers", () => {
     });
 
     expect(getAlertFlowPacketRefs(alert)).toEqual(["flowpacket:1"]);
+  });
+
+  it("keeps packet refs out of alert option-print evidence refs", () => {
+    const alert = makeAlert({
+      evidence_refs: ["flowpacket:1", "print:1", "print:2"]
+    });
+
+    expect(getAlertOptionPrintRefs(alert)).toEqual(["print:1", "print:2"]);
   });
 
   it("resolves the primary alert flow packet from hydrated historical context", () => {

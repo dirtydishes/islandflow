@@ -7,6 +7,7 @@ export {
   buildAlertOptionPrintsPath,
   collectAlertContextEvidence,
   getAlertFlowPacketRefs,
+  getAlertOptionPrintRefs,
   resolveAlertFlowPacket
 } from "../alerts";
 
