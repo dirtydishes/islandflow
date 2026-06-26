@@ -1,0 +1,621 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Smart-Flow Alerts And Legacy Removal Plan</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #101215;
+        --panel: #171b20;
+        --panel-2: #20262d;
+        --ink: #f3f5f7;
+        --muted: #b6c0c8;
+        --faint: #7f8b95;
+        --line: rgba(214, 222, 229, 0.16);
+        --green: #25c17a;
+        --blue: #4da3ff;
+        --cyan: #5ed6ff;
+        --violet: #aa82ff;
+        --amber: #f5a623;
+        --red: #ff6b5f;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        background:
+          linear-gradient(180deg, #182029 0, var(--bg) 420px),
+          var(--bg);
+        color: var(--ink);
+        font: 15px/1.6 var(--sans);
+      }
+
+      main {
+        width: min(1180px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 28px 0 72px;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 16px;
+      }
+
+      .brand,
+      .kicker,
+      .phase-code,
+      th,
+      .chip,
+      .nav a {
+        font-family: var(--mono);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .brand {
+        display: grid;
+        gap: 2px;
+        font-size: 0.8rem;
+      }
+
+      .brand span,
+      .kicker,
+      .phase-code {
+        color: var(--amber);
+      }
+
+      .nav {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .nav a,
+      .chip {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--muted);
+        padding: 6px 10px;
+        text-decoration: none;
+      }
+
+      .nav a:hover,
+      .chip:hover {
+        border-color: var(--amber);
+        color: var(--ink);
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(260px, 380px);
+        gap: 28px;
+        padding: 42px 0 30px;
+        align-items: end;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        line-height: 1.1;
+      }
+
+      h1 {
+        max-width: 820px;
+        font-size: clamp(2.25rem, 5vw, 4.8rem);
+        letter-spacing: -0.02em;
+      }
+
+      h2 {
+        font-size: 1.35rem;
+      }
+
+      h3 {
+        font-size: 1rem;
+      }
+
+      p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      p + p {
+        margin-top: 10px;
+      }
+
+      code {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 0.08rem 0.28rem;
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--ink);
+        font-family: var(--mono);
+      }
+
+      .kicker {
+        font-size: 0.76rem;
+        font-weight: 800;
+        margin-bottom: 12px;
+      }
+
+      .summary,
+      .pipe-step,
+      .phase,
+      .decision,
+      .role {
+        border: 1px solid var(--line);
+        background: var(--panel);
+        border-radius: 8px;
+      }
+
+      .summary {
+        padding: 18px;
+      }
+
+      .summary dl {
+        display: grid;
+        gap: 12px;
+        margin: 0;
+      }
+
+      .summary dt {
+        color: var(--faint);
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .summary dd {
+        margin: 2px 0 0;
+        color: var(--ink);
+      }
+
+      section {
+        border-top: 1px solid var(--line);
+        padding: 30px 0;
+      }
+
+      .section-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: end;
+        margin-bottom: 16px;
+      }
+
+      .section-head p {
+        max-width: 660px;
+      }
+
+      .pipeline {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .pipe-step,
+      .phase,
+      .decision,
+      .role {
+        padding: 14px;
+      }
+
+      .pipe-step strong {
+        display: block;
+        margin-bottom: 6px;
+      }
+
+      .pipe-step:nth-child(1) {
+        border-color: rgba(77, 163, 255, 0.35);
+      }
+
+      .pipe-step:nth-child(2) {
+        border-color: rgba(94, 214, 255, 0.35);
+      }
+
+      .pipe-step:nth-child(3) {
+        border-color: rgba(170, 130, 255, 0.35);
+      }
+
+      .pipe-step:nth-child(4) {
+        border-color: rgba(37, 193, 122, 0.35);
+      }
+
+      .pipe-step:nth-child(5) {
+        border-color: rgba(245, 166, 35, 0.42);
+      }
+
+      .phase-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .phase {
+        display: grid;
+        gap: 10px;
+      }
+
+      .phase-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: start;
+      }
+
+      .phase-code {
+        font-size: 0.74rem;
+        font-weight: 800;
+      }
+
+      .phase ul,
+      .decision ul {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--muted);
+      }
+
+      .phase li + li,
+      .decision li + li {
+        margin-top: 6px;
+      }
+
+      .decisions,
+      .roles {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 10px 12px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--faint);
+        font-size: 0.72rem;
+      }
+
+      td {
+        color: var(--muted);
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .role strong {
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      .footer-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      @media (max-width: 860px) {
+        .hero,
+        .pipeline,
+        .phase-grid,
+        .decisions,
+        .roles {
+          grid-template-columns: 1fr;
+        }
+
+        .topbar,
+        .section-head {
+          align-items: start;
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="topbar">
+        <div class="brand">
+          <span>Islandflow</span>
+          <strong>Smart-flow alerts plan</strong>
+        </div>
+        <nav class="nav" aria-label="Plan navigation">
+          <a href="#pipeline">Pipeline</a>
+          <a href="#phases">Phases</a>
+          <a href="#decisions">Decisions</a>
+          <a href="#agents">Agents</a>
+          <a href="#gates">Gates</a>
+        </nav>
+      </header>
+
+      <section class="hero" aria-labelledby="title">
+        <div>
+          <div class="kicker">islandflow-ghce</div>
+          <h1 id="title">Replace legacy smart-money alerts with canonical smart-flow hypothesis alerts.</h1>
+        </div>
+        <aside class="summary" aria-label="Plan summary">
+          <dl>
+            <div>
+              <dt>End state</dt>
+              <dd>Alerts are derived from non-abstained smart-flow projections.</dd>
+            </div>
+            <div>
+              <dt>Cutover</dt>
+              <dd>New canonical surfaces first, consumer migration second, deletion last.</dd>
+            </div>
+            <div>
+              <dt>History</dt>
+              <dd>Old derived history is dropped after cutover. No backfill.</dd>
+            </div>
+            <div>
+              <dt>Review bar</dt>
+              <dd>Thermo-nuclear code quality review; reviewer threads own CI.</dd>
+            </div>
+          </dl>
+        </aside>
+      </section>
+
+      <section id="pipeline">
+        <div class="section-head">
+          <h2>Canonical Pipeline</h2>
+          <p>The migration removes the parallel alert/classifier interpretation path. Alerts become a delivery projection from smart-flow, not a second opinion.</p>
+        </div>
+        <div class="pipeline">
+          <article class="pipe-step">
+            <strong>Observations</strong>
+            <p>Raw option prints, NBBO, equity context, and supporting market data.</p>
+          </article>
+          <article class="pipe-step">
+            <strong>Evidence Clusters</strong>
+            <p>Eligibility, quote context, feature vectors, penalties, and refs.</p>
+          </article>
+          <article class="pipe-step">
+            <strong>Hypotheses</strong>
+            <p>Typed hypothesis events with confidence, conviction, alternatives, and abstention.</p>
+          </article>
+          <article class="pipe-step">
+            <strong>Insights</strong>
+            <p>User-facing explainability projections from the canonical hypothesis.</p>
+          </article>
+          <article class="pipe-step">
+            <strong>Hypothesis Alerts</strong>
+            <p>Actionable triage rows derived only from non-abstained smart-flow projections.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="phases">
+        <div class="section-head">
+          <h2>Execution Phases</h2>
+          <p>Each phase is intentionally PR-sized. Run them serially because each phase creates the contract consumed by the next one.</p>
+        </div>
+        <div class="phase-grid">
+          <article class="phase">
+            <div class="phase-top">
+              <h3>Shared Smart-Flow Tint Foundation</h3>
+              <span class="phase-code">ghce.1</span>
+            </div>
+            <ul>
+              <li>Extract reusable tint policy into <code>apps/web/features/smart-flow</code>.</li>
+              <li>Keep Options Tape row mapping local and behavior-preserving.</li>
+              <li>Make this the visual policy alerts will later consume.</li>
+            </ul>
+          </article>
+          <article class="phase">
+            <div class="phase-top">
+              <h3>Native Smart-Flow Runtime</h3>
+              <span class="phase-code">ghce.2</span>
+            </div>
+            <ul>
+              <li>Publish and persist native <code>SmartFlowExplainabilityProjection</code> rows.</li>
+              <li>Stop API smart-flow fetchers from projecting stored smart-money events.</li>
+              <li>Keep legacy emitters temporarily for comparison and rollback.</li>
+            </ul>
+          </article>
+          <article class="phase">
+            <div class="phase-top">
+              <h3>Derived Hypothesis Alerts</h3>
+              <span class="phase-code">ghce.3</span>
+            </div>
+            <ul>
+              <li>Add <code>SmartFlowAlertEvent</code> contracts and <code>smart-flow-alerts</code> surfaces.</li>
+              <li>Emit only for non-abstained projections.</li>
+              <li>Do not carry legacy score, severity, or classifier hits forward.</li>
+            </ul>
+          </article>
+          <article class="phase">
+            <div class="phase-top">
+              <h3>Alerts UI Migration</h3>
+              <span class="phase-code">ghce.4</span>
+            </div>
+            <ul>
+              <li>Move <code>AlertsModule</code> to smart-flow alert rows.</li>
+              <li>Use hypothesis, direction, confidence, and evidence columns.</li>
+              <li>Lead detail with fast triage, then alternatives and why-not context.</li>
+            </ul>
+          </article>
+          <article class="phase">
+            <div class="phase-top">
+              <h3>Consumer Cutover</h3>
+              <span class="phase-code">ghce.5</span>
+            </div>
+            <ul>
+              <li>Move terminal, durable-tapes, dashboard, and chart consumers to canonical feeds.</li>
+              <li>Remove normal subscriptions to smart-money, classifier-hits, and legacy alerts.</li>
+              <li>Leave only explicit transition aliases for final deletion.</li>
+            </ul>
+          </article>
+          <article class="phase">
+            <div class="phase-top">
+              <h3>Legacy Deletion And History Drop</h3>
+              <span class="phase-code">ghce.6</span>
+            </div>
+            <ul>
+              <li>Delete legacy emitters, routes, channels, storage helpers, UI state, and fallbacks.</li>
+              <li>Drop old derived history without backfill.</li>
+              <li>Preserve raw data, flow packets, smart-flow, and smart-flow-alert history.</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section id="decisions">
+        <div class="section-head">
+          <h2>Locked Decisions</h2>
+          <p>These decisions remove ambiguity for implementers and reviewers.</p>
+        </div>
+        <div class="decisions">
+          <article class="decision">
+            <h3>Alerts Are Derived</h3>
+            <ul>
+              <li>No independent alert classifier.</li>
+              <li>No old score or severity fields.</li>
+              <li>Only non-abstained smart-flow projections alert.</li>
+            </ul>
+          </article>
+          <article class="decision">
+            <h3>History Is Dropped</h3>
+            <ul>
+              <li>No legacy derived backfill.</li>
+              <li>Old smart-money, classifier-hit, and legacy-alert history disappears at cutover.</li>
+              <li>Raw replay remains the source of recovery.</li>
+            </ul>
+          </article>
+          <article class="decision">
+            <h3>Reviewers Own CI</h3>
+            <ul>
+              <li>Reviewer threads inspect Forgejo CI.</li>
+              <li>They repair in-scope failures on the same branch.</li>
+              <li>No merge-ready callback while CI is pending or red.</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section id="agents">
+        <div class="section-head">
+          <h2>Agent Topology</h2>
+          <p>Use up to 20 subagents per phase. The count is a ceiling for broad phases, not busywork for narrow changes.</p>
+        </div>
+        <div class="roles">
+          <article class="role">
+            <strong>1 selector</strong>
+            <p>Reads Beads, the phase doc, and reports the next unblocked task.</p>
+          </article>
+          <article class="role">
+            <strong>Up to 8 scouts</strong>
+            <p>Read-only contract, compute, API, UI, storage, tests, docs, and deletion inventory.</p>
+          </article>
+          <article class="role">
+            <strong>Up to 4 worker helpers</strong>
+            <p>Assist the implementation worker with bounded inspection and proposed patches.</p>
+          </article>
+          <article class="role">
+            <strong>Up to 6 review agents</strong>
+            <p>Review focused slices with thermo-nuclear quality expectations.</p>
+          </article>
+          <article class="role">
+            <strong>1 lead reviewer</strong>
+            <p>Consolidates findings, repairs safely, owns CI, updates Beads, and callbacks once.</p>
+          </article>
+          <article class="role">
+            <strong>1 orchestrator</strong>
+            <p>Creates threads, receives callbacks, and closes out only after reviewer says CI is green.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="gates">
+        <div class="section-head">
+          <h2>Quality Gates</h2>
+          <p>Phase docs define exact gates. These common gates are expected across the stream.</p>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Area</th>
+              <th>Gate</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Contracts</td>
+              <td><code>bun test packages/types</code></td>
+            </tr>
+            <tr>
+              <td>Compute</td>
+              <td><code>bun test services/compute/tests</code></td>
+            </tr>
+            <tr>
+              <td>API/live</td>
+              <td><code>bun test services/api/tests</code></td>
+            </tr>
+            <tr>
+              <td>Web</td>
+              <td><code>bun test apps/web/features/alerts apps/web/features/options-tape apps/web/features/terminal</code></td>
+            </tr>
+            <tr>
+              <td>Build</td>
+              <td><code>bun --cwd=apps/web run build</code></td>
+            </tr>
+            <tr>
+              <td>Browser QA</td>
+              <td>Verify <code>/durable-tapes</code> and alert-bearing terminal surfaces at desktop and mobile widths.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <h2>Source Docs</h2>
+          <p>The markdown phase docs and implementation index are the source of truth for execution.</p>
+        </div>
+        <div class="footer-links">
+          <a class="chip" href="./IMPLEMENT.md">IMPLEMENT.md</a>
+          <a class="chip" href="./00-roadmap.md">Roadmap</a>
+          <a class="chip" href="./01-shared-smart-flow-tint-foundation.md">Phase 01</a>
+          <a class="chip" href="./02-native-smart-flow-runtime.md">Phase 02</a>
+          <a class="chip" href="./03-derived-hypothesis-alerts.md">Phase 03</a>
+          <a class="chip" href="./04-alerts-ui-migration.md">Phase 04</a>
+          <a class="chip" href="./05-consumer-cutover.md">Phase 05</a>
+          <a class="chip" href="./06-legacy-deletion-history-drop.md">Phase 06</a>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
