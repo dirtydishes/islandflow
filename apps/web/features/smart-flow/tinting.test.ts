@@ -1,4 +1,9 @@
 import { describe, expect, it } from "bun:test";
+import {
+  FlowHypothesisTypeSchema,
+  type FlowHypothesisType,
+  type SmartMoneyDirection
+} from "@islandflow/types";
 
 import {
   getSmartFlowEvidenceQualityBand,
@@ -10,18 +15,7 @@ import {
   type SmartFlowTintTone
 } from "./tinting";
 
-const CURRENT_SMART_FLOW_HYPOTHESIS_TYPES = [
-  "directional_accumulation",
-  "retail_attention_flow",
-  "event_positioning",
-  "volatility_supply",
-  "structure_arbitrage",
-  "hedge_rebalance",
-  "unclear"
-] as const;
-
-type CurrentSmartFlowHypothesisType = (typeof CURRENT_SMART_FLOW_HYPOTHESIS_TYPES)[number];
-type CurrentSmartFlowDirection = "bullish" | "bearish" | "neutral" | "mixed" | "unknown";
+const CURRENT_SMART_FLOW_HYPOTHESIS_TYPES = FlowHypothesisTypeSchema.options;
 
 const makeSmartFlowTintInput = ({
   abstained = false,
@@ -33,9 +27,9 @@ const makeSmartFlowTintInput = ({
   sourceReasons = []
 }: {
   abstained?: boolean;
-  direction?: CurrentSmartFlowDirection;
+  direction?: SmartMoneyDirection;
   evidenceQuality?: number;
-  hypothesisType?: CurrentSmartFlowHypothesisType;
+  hypothesisType?: FlowHypothesisType;
   policyConfidence?: number;
   reasons?: SmartFlowTintInput["abstention"]["reasons"];
   sourceReasons?: SmartFlowTintInput["abstention"]["source_reasons"];
@@ -77,7 +71,7 @@ describe("smart-flow tinting", () => {
   });
 
   it("maps smart-flow hypothesis types into semantic row hues", () => {
-    const cases: [CurrentSmartFlowHypothesisType, SmartFlowTintTone][] = [
+    const cases: [FlowHypothesisType, SmartFlowTintTone][] = [
       ["directional_accumulation", "green"],
       ["retail_attention_flow", "teal"],
       ["event_positioning", "blue"],
@@ -96,7 +90,7 @@ describe("smart-flow tinting", () => {
   });
 
   it("maps direction states into tint metadata", () => {
-    const cases: [CurrentSmartFlowDirection, SmartFlowTintDirection][] = [
+    const cases: [SmartMoneyDirection, SmartFlowTintDirection][] = [
       ["bullish", "bullish"],
       ["bearish", "bearish"],
       ["neutral", "neutral"],

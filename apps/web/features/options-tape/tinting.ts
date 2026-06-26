@@ -16,6 +16,7 @@ import {
   type SmartFlowSummary,
   type SmartFlowTintDirection,
   type SmartFlowTintInput,
+  type SmartFlowTintMetadata,
   type SmartFlowTintTone
 } from "../smart-flow";
 import type {
@@ -40,7 +41,7 @@ export type OptionsTapeRowTintMetadata = {
   abstained: boolean;
   abstentionReasons: string[];
   sourceReasons: string[];
-  hypothesisType?: string;
+  hypothesisType?: SmartFlowTintMetadata["hypothesisType"];
   policyConfidence?: number;
   confidenceBand?: OptionsTapePolicyConfidenceBand;
   evidenceQuality?: number;

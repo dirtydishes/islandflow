@@ -1,12 +1,11 @@
+import type {
+  FlowHypothesisType,
+  SmartFlowExplainabilityProjection,
+  SmartMoneyDirection
+} from "@islandflow/types";
 import type { CSSProperties } from "react";
 
-export type SmartFlowTintDirection =
-  | "bullish"
-  | "bearish"
-  | "neutral"
-  | "mixed"
-  | "unknown"
-  | "abstained";
+export type SmartFlowTintDirection = SmartMoneyDirection | "abstained";
 
 export type SmartFlowTintTone =
   | "green"
@@ -26,28 +25,22 @@ export type SmartFlowEvidenceQualityBand = "poor" | "thin" | "usable" | "strong"
 
 export type SmartFlowTintInput = {
   hypothesis: {
-    hypothesis_type: string;
-    direction: string | null | undefined;
+    hypothesis_type: SmartFlowExplainabilityProjection["hypothesis"]["hypothesis_type"];
+    direction: SmartFlowExplainabilityProjection["hypothesis"]["direction"];
     scores: {
-      confidence: {
-        policy_confidence: number;
-        evidence_quality: number;
-      };
+      confidence: Pick<
+        SmartFlowExplainabilityProjection["hypothesis"]["scores"]["confidence"],
+        "policy_confidence" | "evidence_quality"
+      >;
     };
   };
-  evidence: {
-    evidence_quality: number;
-  };
-  abstention: {
-    abstained: boolean;
-    reasons: readonly string[];
-    source_reasons: readonly string[];
-  };
+  evidence: Pick<SmartFlowExplainabilityProjection["evidence"], "evidence_quality">;
+  abstention: SmartFlowExplainabilityProjection["abstention"];
 };
 
 export type SmartFlowTintMetadata = {
-  family: string;
-  hypothesisType: string;
+  family: FlowHypothesisType;
+  hypothesisType: FlowHypothesisType;
   tone: SmartFlowTintTone;
   intensity: number;
   direction: SmartFlowTintDirection;
@@ -87,7 +80,7 @@ const SMART_FLOW_TINT_TONES = new Set<SmartFlowTintTone>([
   "neutral"
 ]);
 
-const TONE_BY_HYPOTHESIS: Record<string, SmartFlowTintTone> = {
+const TONE_BY_HYPOTHESIS: Record<FlowHypothesisType, SmartFlowTintTone> = {
   directional_accumulation: "green",
   retail_attention_flow: "teal",
   event_positioning: "blue",
@@ -97,7 +90,7 @@ const TONE_BY_HYPOTHESIS: Record<string, SmartFlowTintTone> = {
   unclear: "neutral"
 };
 
-const SMART_FLOW_HYPOTHESIS_LABELS: Record<string, string> = {
+const SMART_FLOW_HYPOTHESIS_LABELS: Record<FlowHypothesisType, string> = {
   directional_accumulation: "Directional accumulation",
   retail_attention_flow: "Retail attention flow",
   event_positioning: "Event positioning",
@@ -159,11 +152,12 @@ export const humanizeSmartFlowToken = (value: string): string => {
   return normalized.replace(/\b\w/g, (match) => match.toUpperCase());
 };
 
-export const getSmartFlowHypothesisTone = (hypothesisType: string): SmartFlowTintTone =>
-  TONE_BY_HYPOTHESIS[hypothesisType] ?? "neutral";
+export const getSmartFlowHypothesisTone = (
+  hypothesisType: FlowHypothesisType
+): SmartFlowTintTone => TONE_BY_HYPOTHESIS[hypothesisType];
 
-export const getSmartFlowHypothesisLabel = (hypothesisType: string): string =>
-  SMART_FLOW_HYPOTHESIS_LABELS[hypothesisType] ?? humanizeSmartFlowToken(hypothesisType);
+export const getSmartFlowHypothesisLabel = (hypothesisType: FlowHypothesisType): string =>
+  SMART_FLOW_HYPOTHESIS_LABELS[hypothesisType];
 
 export const getSmartFlowPolicyConfidenceBand = (
   confidence: number

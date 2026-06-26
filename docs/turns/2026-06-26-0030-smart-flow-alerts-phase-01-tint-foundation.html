@@ -212,14 +212,18 @@
           evidence ref expansion, direct-print precedence, and <code>options-tape-*</code> class
           assembly while delegating generic smart-flow presentation policy to the shared module.
         </p>
+        <p>
+          Reviewer hardening restored canonical <code>@islandflow/types</code> inputs and metadata
+          for the shared tint API, preserving exhaustive hypothesis coverage as the contract evolves.
+        </p>
       </section>
 
       <section>
         <h2>Changed Files</h2>
         <ul>
-          <li><code>apps/web/features/smart-flow/tinting.ts</code>: shared tint policy and exported stable types.</li>
+          <li><code>apps/web/features/smart-flow/tinting.ts</code>: shared tint policy and contract-typed exported stable types.</li>
           <li><code>apps/web/features/smart-flow/index.ts</code>: feature-level exports for future consumers.</li>
-          <li><code>apps/web/features/smart-flow/tinting.test.ts</code>: generic tint matrix tests.</li>
+          <li><code>apps/web/features/smart-flow/tinting.test.ts</code>: generic tint matrix tests backed by the canonical hypothesis schema.</li>
           <li><code>apps/web/features/options-tape/tinting.ts</code>: Options Tape wrapper over the shared policy.</li>
           <li><code>apps/web/features/options-tape/options-tape.test.ts</code>: narrowed Options Tape tests to row classes and option-specific mapping.</li>
         </ul>
@@ -245,7 +249,7 @@
         <h2>Risks</h2>
         <ul>
           <li><span class="ok">Low:</span> This is presentation-policy extraction only. No alert, API, scoring, live subscription, storage, or runtime payload path was changed.</li>
-          <li><span class="note">Note:</span> The shared module intentionally uses structural string inputs instead of importing <code>@islandflow/types</code>, keeping it frontend-local and row-model independent.</li>
+          <li><span class="note">Note:</span> The shared module imports canonical smart-flow contract types while staying frontend-local and row-model independent.</li>
           <li><span class="note">Note:</span> No helper subagents were used.</li>
         </ul>
       </section>
@@ -264,13 +268,13 @@ new file mode 100644
 --- /dev/null
 +++ b/apps/web/features/smart-flow/tinting.ts
 @@
-+export type SmartFlowTintDirection =
-+  | "bullish"
-+  | "bearish"
-+  | "neutral"
-+  | "mixed"
-+  | "unknown"
-+  | "abstained";
++import type {
++  FlowHypothesisType,
++  SmartFlowExplainabilityProjection,
++  SmartMoneyDirection
++} from "@islandflow/types";
++
++export type SmartFlowTintDirection = SmartMoneyDirection | "abstained";
 +
 +export type SmartFlowTintTone =
 +  | "green"
@@ -288,6 +292,16 @@ new file mode 100644
 +export type SmartFlowTint = {
 +  style: CSSProperties;
 +  metadata: SmartFlowTintMetadata;
++};
++
++const TONE_BY_HYPOTHESIS: Record&lt;FlowHypothesisType, SmartFlowTintTone&gt; = {
++  directional_accumulation: "green",
++  retail_attention_flow: "teal",
++  event_positioning: "blue",
++  volatility_supply: "copper",
++  structure_arbitrage: "violet",
++  hedge_rebalance: "cyan",
++  unclear: "neutral"
 +};
 +
 +export const getSmartFlowTint = (projection: SmartFlowTintInput): SmartFlowTint => {
@@ -346,6 +360,7 @@ diff --git a/apps/web/features/options-tape/tinting.ts b/apps/web/features/optio
 +  type SmartFlowSummary,
 +  type SmartFlowTintDirection,
 +  type SmartFlowTintInput,
++  type SmartFlowTintMetadata,
 +  type SmartFlowTintTone
 +} from "../smart-flow";
 @@
@@ -372,9 +387,11 @@ new file mode 100644
 --- /dev/null
 +++ b/apps/web/features/smart-flow/tinting.test.ts
 @@
++const CURRENT_SMART_FLOW_HYPOTHESIS_TYPES = FlowHypothesisTypeSchema.options;
++
 +describe("smart-flow tinting", () => {
 +  it("maps smart-flow hypothesis types into semantic row hues", () => {
-+    const cases: [CurrentSmartFlowHypothesisType, SmartFlowTintTone][] = [
++    const cases: [FlowHypothesisType, SmartFlowTintTone][] = [
 +      ["directional_accumulation", "green"],
 +      ["retail_attention_flow", "teal"],
 +      ["event_positioning", "blue"],
