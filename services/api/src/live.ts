@@ -299,6 +299,14 @@ const parseCursor = (value: string | null): Cursor | null => {
   }
 };
 
+const parseNativeSmartFlowProjection = (value: unknown) => {
+  const projection = SmartFlowExplainabilityProjectionSchema.parse(value);
+  if (projection.source_channel !== "smart-flow" || projection.compatibility?.compatibility_only) {
+    throw new Error("cached smart-flow projection is not native");
+  }
+  return projection;
+};
+
 const getGenericConfig = (
   limits: GenericLiveLimits
 ): {
@@ -365,7 +373,7 @@ const getGenericConfig = (
     redisKey: "live:smart-flow",
     cursorField: "smart-flow",
     limit: limits["smart-flow"],
-    parse: (value) => SmartFlowExplainabilityProjectionSchema.parse(value),
+    parse: parseNativeSmartFlowProjection,
     cursor: smartFlowCursor,
     fetchRecent: fetchRecentSmartFlowExplainability
   },
@@ -731,7 +739,9 @@ export class LiveStateManager {
       classifierHits: (this.genericItems.get("classifier-hits") ??
         []) as DurableRowCompositionContext["classifierHits"],
       smartMoney: (this.genericItems.get("smart-money") ??
-        []) as DurableRowCompositionContext["smartMoney"]
+        []) as DurableRowCompositionContext["smartMoney"],
+      smartFlowProjections: (this.genericItems.get("smart-flow") ??
+        []) as DurableRowCompositionContext["smartFlowProjections"]
     };
   }
 

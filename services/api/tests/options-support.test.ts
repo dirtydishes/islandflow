@@ -1,6 +1,14 @@
 import { describe, expect, it } from "bun:test";
 import type { ClickHouseClient } from "@islandflow/storage";
-import type { FlowPacket, SmartMoneyEvent } from "@islandflow/types";
+import {
+  SMART_FLOW_CONTRACT_VERSION,
+  SMART_FLOW_HYPOTHESIS_SCORE_MODEL_VERSION,
+  SMART_FLOW_HYPOTHESIS_SCORE_POLICY_VERSION,
+  type FlowPacket,
+  type SmartFlowExplainabilityProjection,
+  type SmartMoneyEvent,
+  smartFlowExplainabilityFromHypothesisEvent
+} from "@islandflow/types";
 import { lookupOptionsSupport } from "../src/options-support";
 
 const clickhouse = {} as ClickHouseClient;
@@ -79,10 +87,55 @@ const makeSmartMoneyEvent = (): SmartMoneyEvent => ({
   suppressed_reasons: []
 });
 
+const makeSmartFlowProjection = (
+  smartMoney: SmartMoneyEvent
+): SmartFlowExplainabilityProjection => {
+  const clusterId = `cluster:${smartMoney.underlying_id}:${smartMoney.source_ts}:${smartMoney.source_ts + 60_000}`;
+  return smartFlowExplainabilityFromHypothesisEvent({
+    source_ts: smartMoney.source_ts,
+    ingest_ts: smartMoney.ingest_ts,
+    seq: smartMoney.seq,
+    trace_id: `smartflow:hypothesis:${clusterId}`,
+    schema_version: SMART_FLOW_CONTRACT_VERSION,
+    policy_version: SMART_FLOW_HYPOTHESIS_SCORE_POLICY_VERSION,
+    model_version: SMART_FLOW_HYPOTHESIS_SCORE_MODEL_VERSION,
+    event_id: `smartflow:hypothesis:${clusterId}`,
+    hypothesis_id: `hypothesis:${clusterId}`,
+    cluster_id: clusterId,
+    candidate_ids: smartMoney.packet_ids.map((packetId) => `candidate:${packetId}`),
+    underlying_id: smartMoney.underlying_id,
+    hypothesis_type: "directional_accumulation",
+    direction: smartMoney.primary_direction,
+    scores: {
+      schema_version: SMART_FLOW_CONTRACT_VERSION,
+      policy_version: SMART_FLOW_HYPOTHESIS_SCORE_POLICY_VERSION,
+      model_version: SMART_FLOW_HYPOTHESIS_SCORE_MODEL_VERSION,
+      hypothesis_type: "directional_accumulation",
+      direction: smartMoney.primary_direction,
+      evidence_strength: 0.8,
+      fit_score: 0.72,
+      penalty_score: 0,
+      penalties: [],
+      confidence: {
+        policy_confidence: 0.76,
+        evidence_quality: 0.84,
+        hypothesis_margin: 0.28,
+        conviction: 0.72,
+        calibration_version: null
+      }
+    },
+    alternatives: [],
+    abstention: { abstained: false, reasons: ["not_abstained"], source_reasons: [] },
+    evidence_refs: [...smartMoney.packet_ids, ...smartMoney.member_print_ids],
+    generated_from: "flow_evidence_cluster"
+  });
+};
+
 describe("options support lookup", () => {
   it("projects smart_flow beside packet, smart-money, classifier, and nbbo support", async () => {
     const packet = makePacket();
     const smartMoney = makeSmartMoneyEvent();
+    const smartFlow = makeSmartFlowProjection(smartMoney);
     const payload = await lookupOptionsSupport(
       clickhouse,
       {
@@ -98,6 +151,10 @@ describe("options support lookup", () => {
           expect(packetIds).toEqual(["flowpacket:1"]);
           return [smartMoney];
         },
+        fetchSmartFlowExplainabilityByPacketIds: async (_client, packetIds) => {
+          expect(packetIds).toEqual(["flowpacket:1"]);
+          return [smartFlow];
+        },
         fetchClassifierHitsByPacketIds: async (_client, packetIds) => {
           expect(packetIds).toEqual(["flowpacket:1"]);
           return [];
@@ -112,7 +169,7 @@ describe("options support lookup", () => {
     expect(payload.packets.map((item) => item.id)).toEqual(["flowpacket:1"]);
     expect(payload.smart_money.map((item) => item.trace_id)).toEqual(["smartmoney:flowpacket:1"]);
     expect(payload.smart_flow).toHaveLength(1);
-    expect(payload.smart_flow[0]?.source_channel).toBe("smart-money");
+    expect(payload.smart_flow[0]?.source_channel).toBe("smart-flow");
     expect(payload.smart_flow[0]?.refs.evidence_refs).toEqual(["flowpacket:1", "print:1"]);
     expect(payload.nbbo_by_trace_id).toEqual({ "print:1": null });
   });
@@ -120,6 +177,7 @@ describe("options support lookup", () => {
   it("starts independent nbbo lookup without waiting for packet support", async () => {
     const packet = makePacket();
     const smartMoney = makeSmartMoneyEvent();
+    const smartFlow = makeSmartFlowProjection(smartMoney);
     let releasePacketLookup!: () => void;
     const packetLookupGate = new Promise<void>((resolve) => {
       releasePacketLookup = resolve;
@@ -138,6 +196,7 @@ describe("options support lookup", () => {
           return [packet];
         },
         fetchSmartMoneyEventsByPacketIds: async () => [smartMoney],
+        fetchSmartFlowExplainabilityByPacketIds: async () => [smartFlow],
         fetchClassifierHitsByPacketIds: async () => [],
         fetchNearestOptionNBBOForPrints: async () => {
           nbboStarted = true;
@@ -155,6 +214,7 @@ describe("options support lookup", () => {
     await expect(lookup).resolves.toMatchObject({
       packets: [packet],
       smart_money: [smartMoney],
+      smart_flow: [smartFlow],
       nbbo_by_trace_id: { "print:1": null }
     });
   });

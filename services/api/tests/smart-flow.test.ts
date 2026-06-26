@@ -1,117 +1,124 @@
 import { describe, expect, it } from "bun:test";
-import { type ClickHouseClient, toSmartMoneyEventRecord } from "@islandflow/storage";
-import type { SmartMoneyEvent } from "@islandflow/types";
+import { type ClickHouseClient, toSmartFlowProjectionRecord } from "@islandflow/storage";
+import {
+  SMART_FLOW_CONTRACT_VERSION,
+  SMART_FLOW_HYPOTHESIS_SCORE_MODEL_VERSION,
+  SMART_FLOW_HYPOTHESIS_SCORE_POLICY_VERSION,
+  SMART_FLOW_MODEL_VERSION,
+  SMART_FLOW_POLICY_VERSION,
+  smartFlowExplainabilityFromHypothesisEvent
+} from "@islandflow/types";
 import {
   fetchRecentSmartFlowExplainability,
-  projectSmartFlowExplainability,
+  fetchSmartFlowExplainabilityByPacketIds,
   smartFlowCursor
 } from "../src/smart-flow";
 
-const makeClickHouse = (rows: unknown[]): ClickHouseClient =>
+const makeClickHouse = (rows: unknown[], queries: string[] = []): ClickHouseClient =>
   ({
     exec: async () => {},
     insert: async () => {},
     ping: async () => ({ success: true }),
     close: async () => {},
-    query: async () => ({
-      async json<T>() {
-        return rows as T;
-      }
-    })
+    query: async ({ query }) => {
+      queries.push(query);
+      return {
+        async json<T>() {
+          return rows as T;
+        }
+      };
+    }
   }) as ClickHouseClient;
 
-const makeSmartMoneyEvent = (): SmartMoneyEvent => ({
-  source_ts: 1_000,
-  ingest_ts: 1_005,
-  seq: 12,
-  trace_id: "smartmoney:flowpacket:12",
-  event_id: "smartmoney:event:12",
-  packet_ids: ["flowpacket:12"],
-  member_print_ids: ["print:12"],
-  underlying_id: "SPY",
-  event_kind: "single_leg_event",
-  event_window_ms: 500,
-  features: {
-    contract_count: 1,
-    print_count: 3,
-    total_size: 900,
-    total_premium: 90_000,
-    total_notional: 9_000_000,
-    start_ts: 1_000,
-    end_ts: 1_120,
-    window_ms: 500,
-    option_contract_id: "SPY-2025-01-17-450-C",
-    option_type: "C",
-    dte_days: 1,
-    moneyness: 1.01,
-    atm_proximity: 0.01,
-    aggressor_buy_ratio: 0.8,
-    aggressor_sell_ratio: 0.1,
-    aggressor_ratio: 0.9,
-    nbbo_coverage_ratio: 0.95,
-    nbbo_inside_ratio: 0.02,
-    nbbo_stale_ratio: 0,
-    quote_age_ms: 20,
-    venue_count: 2,
-    inter_fill_ms_mean: 60,
-    strike_count: 1,
-    strike_concentration: 1,
-    structure_legs: 0,
-    same_size_leg_symmetry: 0,
-    net_directional_bias: 0.7,
-    synthetic_iv_shock: null,
-    spread_widening: null,
-    underlying_move_bps: null,
-    days_to_event: null,
-    expiry_after_event: null,
-    pre_event_concentration: null,
-    special_print_ratio: 0
-  },
-  profile_scores: [
-    {
-      profile_id: "institutional_directional",
-      probability: 0.78,
-      confidence_band: "high",
+const makeSmartFlowProjection = () =>
+  smartFlowExplainabilityFromHypothesisEvent({
+    source_ts: 1_000,
+    ingest_ts: 1_005,
+    seq: 12,
+    trace_id: "smartflow:hypothesis:cluster:SPY:1000:1120",
+    schema_version: SMART_FLOW_CONTRACT_VERSION,
+    policy_version: SMART_FLOW_POLICY_VERSION,
+    model_version: SMART_FLOW_MODEL_VERSION,
+    event_id: "smartflow:hypothesis:cluster:SPY:1000:1120",
+    hypothesis_id: "hypothesis:cluster:SPY:1000:1120",
+    cluster_id: "cluster:SPY:1000:1120",
+    candidate_ids: ["candidate:flowpacket:12"],
+    underlying_id: "SPY",
+    hypothesis_type: "directional_accumulation",
+    direction: "bullish",
+    scores: {
+      schema_version: SMART_FLOW_CONTRACT_VERSION,
+      policy_version: SMART_FLOW_HYPOTHESIS_SCORE_POLICY_VERSION,
+      model_version: SMART_FLOW_HYPOTHESIS_SCORE_MODEL_VERSION,
+      hypothesis_type: "directional_accumulation",
       direction: "bullish",
-      reasons: ["large_parent_event"]
+      evidence_strength: 0.8,
+      fit_score: 0.7,
+      penalty_score: 0.1,
+      penalties: [
+        {
+          penalty_id: "penalty:cluster:SPY:1000:1120:directional_accumulation:wide_quote",
+          kind: "wide_quote_context",
+          score: 0.1,
+          reason: "The option quote was wide enough to discount confidence.",
+          evidence_refs: ["flowpacket:12"],
+          feature_key: "option_spread_bps_max"
+        }
+      ],
+      confidence: {
+        policy_confidence: 0.64,
+        evidence_quality: 0.8,
+        hypothesis_margin: 0.12,
+        conviction: 0.58,
+        calibration_version: null
+      }
     },
-    {
-      profile_id: "retail_whale",
-      probability: 0.34,
-      confidence_band: "low",
-      direction: "bullish",
-      reasons: ["burst_print_pattern"]
-    }
-  ],
-  primary_profile_id: "institutional_directional",
-  primary_direction: "bullish",
-  abstained: false,
-  suppressed_reasons: []
-});
+    alternatives: [
+      {
+        hypothesis_type: "hedge_rebalance",
+        direction: "neutral",
+        score: 0.32,
+        reasons: ["near_atm_short_dated_context"]
+      }
+    ],
+    abstention: {
+      abstained: false,
+      reasons: ["not_abstained"],
+      source_reasons: []
+    },
+    evidence_refs: ["flowpacket:12", "print:12"],
+    generated_from: "flow_evidence_cluster"
+  });
 
 describe("smart-flow API projections", () => {
-  it("projects recent smart-money storage rows into smart-flow explainability payloads", async () => {
-    const event = makeSmartMoneyEvent();
+  it("reads recent canonical smart-flow projection rows without smart-money storage", async () => {
+    const projection = makeSmartFlowProjection();
+    const queries: string[] = [];
     const [payload] = await fetchRecentSmartFlowExplainability(
-      makeClickHouse([toSmartMoneyEventRecord(event)]),
+      makeClickHouse([toSmartFlowProjectionRecord(projection)], queries),
       1
     );
 
-    expect(payload?.source_channel).toBe("smart-money");
+    expect(queries[0]).toContain("smart_flow_projections");
+    expect(queries[0]).not.toContain("smart_money_events");
+    expect(payload?.source_channel).toBe("smart-flow");
     expect(payload?.projection_version).toBe("smart-flow.explainability-projection.v1");
     expect(payload?.hypothesis.hypothesis_type).toBe("directional_accumulation");
-    expect(payload?.insight.summary).toContain("Alternative explanations considered");
     expect(payload?.refs.evidence_refs).toEqual(["flowpacket:12", "print:12"]);
     expect(payload?.abstention.reasons).toEqual(["not_abstained"]);
-    expect(payload?.alternatives[0]?.reasons).toEqual(["burst_print_pattern"]);
+    expect(payload?.alternatives[0]?.hypothesis_type).toBe("hedge_rebalance");
     expect(smartFlowCursor(payload!)).toEqual({ ts: 1_000, seq: 12 });
   });
 
-  it("keeps projection logic reusable for websocket fanout", () => {
-    const [payload] = projectSmartFlowExplainability([makeSmartMoneyEvent()]);
+  it("looks up canonical smart-flow projections by packet evidence refs", async () => {
+    const projection = makeSmartFlowProjection();
+    const queries: string[] = [];
+    const [payload] = await fetchSmartFlowExplainabilityByPacketIds(
+      makeClickHouse([toSmartFlowProjectionRecord(projection)], queries),
+      ["flowpacket:12"]
+    );
 
-    expect(payload?.versions.contract).toBe("smart-flow.contracts.v1");
-    expect(payload?.compatibility?.compatibility_only).toBe(true);
-    expect(payload?.compatibility?.legacy_channel).toBe("smart-money");
+    expect(queries[0]).toContain("has(evidence_refs, 'flowpacket:12')");
+    expect(payload?.refs.cluster_id).toBe("cluster:SPY:1000:1120");
   });
 });

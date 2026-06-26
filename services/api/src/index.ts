@@ -15,6 +15,7 @@ import {
   STREAM_NEWS,
   STREAM_OPTION_NBBO,
   STREAM_OPTION_SIGNAL_PRINTS,
+  STREAM_SMART_FLOW,
   STREAM_SMART_MONEY_EVENTS,
   SUBJECT_ALERTS,
   SUBJECT_CLASSIFIER_HITS,
@@ -27,6 +28,7 @@ import {
   SUBJECT_NEWS,
   SUBJECT_OPTION_NBBO,
   SUBJECT_OPTION_SIGNAL_PRINTS,
+  SUBJECT_SMART_FLOW,
   SUBJECT_SMART_MONEY_EVENTS,
   subscribeJson,
   watchSyntheticControlState,
@@ -48,6 +50,7 @@ import {
   ensureNewsTable,
   ensureOptionNBBOTable,
   ensureOptionPrintsTable,
+  ensureSmartFlowProjectionsTable,
   ensureSmartMoneyEventsTable,
   fetchAlertContextByTraceId,
   fetchAlertsAfter,
@@ -120,6 +123,7 @@ import {
   OptionNBBOSchema,
   type OptionPrint,
   OptionPrintSchema,
+  SmartFlowExplainabilityProjectionSchema,
   SmartMoneyEventSchema,
   type SyntheticControlState,
   SyntheticControlStateSchema
@@ -150,7 +154,6 @@ import {
   fetchRecentSmartFlowExplainability,
   fetchSmartFlowExplainabilityAfter,
   fetchSmartFlowExplainabilityBefore,
-  projectSmartFlowExplainability,
   smartFlowCursor
 } from "./smart-flow";
 import {
@@ -742,6 +745,7 @@ const run = async () => {
       STREAM_INFERRED_DARK,
       STREAM_FLOW_PACKETS,
       STREAM_SMART_MONEY_EVENTS,
+      STREAM_SMART_FLOW,
       STREAM_CLASSIFIER_HITS,
       STREAM_ALERTS,
       STREAM_NEWS
@@ -795,6 +799,7 @@ const run = async () => {
     await ensureInferredDarkTable(clickhouse);
     await ensureFlowPacketsTable(clickhouse);
     await ensureSmartMoneyEventsTable(clickhouse);
+    await ensureSmartFlowProjectionsTable(clickhouse);
     await ensureClassifierHitsTable(clickhouse);
     await ensureAlertsTable(clickhouse);
     await ensureNewsTable(clickhouse);
@@ -912,6 +917,11 @@ const run = async () => {
       subject: SUBJECT_SMART_MONEY_EVENTS,
       stream: STREAM_SMART_MONEY_EVENTS,
       durableName: "api-smart-money-events"
+    },
+    {
+      subject: SUBJECT_SMART_FLOW,
+      stream: STREAM_SMART_FLOW,
+      durableName: "api-smart-flow"
     },
     {
       subject: SUBJECT_CLASSIFIER_HITS,
@@ -1060,22 +1070,28 @@ const run = async () => {
     consumerBindings[8].durableName
   );
 
-  const classifierHitSubscription = await subscribeWithReset(
+  const smartFlowSubscription = await subscribeWithReset(
     consumerBindings[9].subject,
     consumerBindings[9].stream,
     consumerBindings[9].durableName
   );
 
-  const alertSubscription = await subscribeWithReset(
+  const classifierHitSubscription = await subscribeWithReset(
     consumerBindings[10].subject,
     consumerBindings[10].stream,
     consumerBindings[10].durableName
   );
 
-  const newsSubscription = await subscribeWithReset(
+  const alertSubscription = await subscribeWithReset(
     consumerBindings[11].subject,
     consumerBindings[11].stream,
     consumerBindings[11].durableName
+  );
+
+  const newsSubscription = await subscribeWithReset(
+    consumerBindings[12].subject,
+    consumerBindings[12].stream,
+    consumerBindings[12].durableName
   );
 
   const fanoutLive = async (
@@ -1341,17 +1357,30 @@ const run = async () => {
     for await (const msg of smartMoneySubscription.messages) {
       try {
         const payload = SmartMoneyEventSchema.parse(smartMoneySubscription.decode(msg));
-        const smartFlow = projectSmartFlowExplainability([payload])[0];
         recordSyntheticProfileHit(syntheticProfileHits, payload);
         broadcast(smartMoneySockets, { type: "smart-money", payload });
-        if (smartFlow) {
-          broadcast(smartFlowSockets, { type: "smart-flow", payload: smartFlow });
-          await fanoutLive({ channel: "smart-flow" }, smartFlow, "smart-flow");
-        }
         await fanoutLive({ channel: "smart-money" }, payload, "smart-money");
         msg.ack();
       } catch (error) {
         logger.error("failed to process smart money event", {
+          error: error instanceof Error ? error.message : String(error)
+        });
+        msg.term();
+      }
+    }
+  };
+
+  const pumpSmartFlow = async () => {
+    for await (const msg of smartFlowSubscription.messages) {
+      try {
+        const payload = SmartFlowExplainabilityProjectionSchema.parse(
+          smartFlowSubscription.decode(msg)
+        );
+        broadcast(smartFlowSockets, { type: "smart-flow", payload });
+        await fanoutLive({ channel: "smart-flow" }, payload, "smart-flow");
+        msg.ack();
+      } catch (error) {
+        logger.error("failed to process smart-flow projection", {
           error: error instanceof Error ? error.message : String(error)
         });
         msg.term();
@@ -1416,6 +1445,7 @@ const run = async () => {
   void pumpInferredDark();
   void pumpFlow();
   void pumpSmartMoney();
+  void pumpSmartFlow();
   void pumpClassifierHits();
   void pumpAlerts();
   void pumpNews();

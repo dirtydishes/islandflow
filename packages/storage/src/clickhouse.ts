@@ -10,6 +10,7 @@ import {
   NewsStorySchema,
   OptionNBBOSchema,
   OptionPrintSchema,
+  SmartFlowExplainabilityProjectionSchema,
   SmartMoneyEventSchema
 } from "@islandflow/types";
 import type {
@@ -22,6 +23,7 @@ import type {
   InferredDarkEvent,
   FlowPacket,
   NewsStory,
+  SmartFlowExplainabilityProjection,
   SmartMoneyEvent,
   OptionNBBO,
   OptionPrint,
@@ -89,6 +91,13 @@ import {
   toSmartMoneyEventRecord,
   type SmartMoneyEventRecord
 } from "./smart-money-events";
+import {
+  SMART_FLOW_PROJECTIONS_TABLE,
+  smartFlowProjectionsTableDDL,
+  fromSmartFlowProjectionRecord,
+  toSmartFlowProjectionRecord,
+  type SmartFlowProjectionRecord
+} from "./smart-flow-projections";
 import { NEWS_TABLE, newsTableDDL, fromNewsRecord, toNewsRecord, type NewsRecord } from "./news";
 
 export type ClickHouseOptions = {
@@ -358,6 +367,12 @@ export const ensureSmartMoneyEventsTable = async (client: ClickHouseClient): Pro
   });
 };
 
+export const ensureSmartFlowProjectionsTable = async (client: ClickHouseClient): Promise<void> => {
+  await client.exec({
+    query: smartFlowProjectionsTableDDL()
+  });
+};
+
 export const ensureClassifierHitsTable = async (client: ClickHouseClient): Promise<void> => {
   await client.exec({
     query: classifierHitsTableDDL()
@@ -482,6 +497,18 @@ export const insertSmartMoneyEvent = async (
   const record = toSmartMoneyEventRecord(event);
   await client.insert({
     table: SMART_MONEY_EVENTS_TABLE,
+    values: [record],
+    format: "JSONEachRow"
+  });
+};
+
+export const insertSmartFlowProjection = async (
+  client: ClickHouseClient,
+  projection: SmartFlowExplainabilityProjection
+): Promise<void> => {
+  const record = toSmartFlowProjectionRecord(projection);
+  await client.insert({
+    table: SMART_FLOW_PROJECTIONS_TABLE,
     values: [record],
     format: "JSONEachRow"
   });
@@ -655,6 +682,13 @@ export const enqueueSmartMoneyEventInsert = (
   event: SmartMoneyEvent
 ): void => {
   writer.enqueue(SMART_MONEY_EVENTS_TABLE, toSmartMoneyEventRecord(event));
+};
+
+export const enqueueSmartFlowProjectionInsert = (
+  writer: ClickHouseBatchWriter,
+  projection: SmartFlowExplainabilityProjection
+): void => {
+  writer.enqueue(SMART_FLOW_PROJECTIONS_TABLE, toSmartFlowProjectionRecord(projection));
 };
 
 export const enqueueClassifierHitInsert = (
@@ -1097,6 +1131,35 @@ const normalizeSmartMoneyEventRow = (row: unknown): SmartMoneyEventRecord | null
   };
 };
 
+const normalizeStringArray = (value: unknown): string[] =>
+  Array.isArray(value) ? value.map((entry) => String(entry)) : [];
+
+const normalizeBoolean = (value: unknown): boolean =>
+  value === true || value === 1 || value === "1" || value === "true";
+
+const normalizeSmartFlowProjectionRow = (row: unknown): SmartFlowProjectionRecord | null => {
+  if (!row || typeof row !== "object") {
+    return null;
+  }
+
+  const record = row as Record<string, unknown>;
+  return {
+    source_ts: coerceNumber(record.source_ts) as number,
+    ingest_ts: coerceNumber(record.ingest_ts) as number,
+    seq: coerceNumber(record.seq) as number,
+    trace_id: String(record.trace_id ?? ""),
+    projection_version: String(record.projection_version ?? ""),
+    source_channel: String(record.source_channel ?? ""),
+    hypothesis_id: String(record.hypothesis_id ?? ""),
+    cluster_id: String(record.cluster_id ?? ""),
+    underlying_id: String(record.underlying_id ?? ""),
+    candidate_ids: normalizeStringArray(record.candidate_ids),
+    evidence_refs: normalizeStringArray(record.evidence_refs),
+    abstained: normalizeBoolean(record.abstained),
+    projection_json: String(record.projection_json ?? "{}")
+  };
+};
+
 const normalizeAlertRow = (row: unknown): AlertRecord | null => {
   if (!row || typeof row !== "object") {
     return null;
@@ -1315,6 +1378,25 @@ export const fetchRecentSmartMoneyEvents = async (
     .map(normalizeSmartMoneyEventRow)
     .filter((record): record is SmartMoneyEventRecord => record !== null);
   return SmartMoneyEventSchema.array().parse(records.map(fromSmartMoneyEventRecord));
+};
+
+export const fetchRecentSmartFlowProjections = async (
+  client: ClickHouseClient,
+  limit: number
+): Promise<SmartFlowExplainabilityProjection[]> => {
+  const safeLimit = clampLimit(limit);
+  const result = await client.query({
+    query: `SELECT * FROM ${SMART_FLOW_PROJECTIONS_TABLE} ORDER BY source_ts DESC, seq DESC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  const records = rows
+    .map(normalizeSmartFlowProjectionRow)
+    .filter((record): record is SmartFlowProjectionRecord => record !== null);
+  return SmartFlowExplainabilityProjectionSchema.array().parse(
+    records.map(fromSmartFlowProjectionRecord)
+  );
 };
 
 export const fetchRecentAlerts = async (
@@ -1754,6 +1836,30 @@ export const fetchSmartMoneyEventsAfter = async (
   return SmartMoneyEventSchema.array().parse(records.map(fromSmartMoneyEventRecord));
 };
 
+export const fetchSmartFlowProjectionsAfter = async (
+  client: ClickHouseClient,
+  afterTs: number,
+  afterSeq: number,
+  limit: number
+): Promise<SmartFlowExplainabilityProjection[]> => {
+  const safeLimit = clampLimit(limit);
+  const safeAfterTs = clampCursor(afterTs);
+  const safeAfterSeq = clampCursor(afterSeq);
+
+  const result = await client.query({
+    query: `SELECT * FROM ${SMART_FLOW_PROJECTIONS_TABLE} WHERE (source_ts, seq) > (${safeAfterTs}, ${safeAfterSeq}) ORDER BY source_ts ASC, seq ASC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  const records = rows
+    .map(normalizeSmartFlowProjectionRow)
+    .filter((record): record is SmartFlowProjectionRecord => record !== null);
+  return SmartFlowExplainabilityProjectionSchema.array().parse(
+    records.map(fromSmartFlowProjectionRecord)
+  );
+};
+
 export const fetchAlertsAfter = async (
   client: ClickHouseClient,
   afterTs: number,
@@ -1958,6 +2064,27 @@ export const fetchSmartMoneyEventsBefore = async (
   return SmartMoneyEventSchema.array().parse(records.map(fromSmartMoneyEventRecord));
 };
 
+export const fetchSmartFlowProjectionsBefore = async (
+  client: ClickHouseClient,
+  beforeTs: number,
+  beforeSeq: number,
+  limit: number
+): Promise<SmartFlowExplainabilityProjection[]> => {
+  const safeLimit = clampLimit(limit);
+  const result = await client.query({
+    query: `SELECT * FROM ${SMART_FLOW_PROJECTIONS_TABLE} WHERE ${buildBeforeTupleCondition("source_ts", "seq", beforeTs, beforeSeq)} ORDER BY source_ts DESC, seq DESC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  const records = rows
+    .map(normalizeSmartFlowProjectionRow)
+    .filter((record): record is SmartFlowProjectionRecord => record !== null);
+  return SmartFlowExplainabilityProjectionSchema.array().parse(
+    records.map(fromSmartFlowProjectionRecord)
+  );
+};
+
 export const fetchAlertsBefore = async (
   client: ClickHouseClient,
   beforeTs: number,
@@ -2092,6 +2219,30 @@ export const fetchSmartMoneyEventsByPacketIds = async (
     .map(normalizeSmartMoneyEventRow)
     .filter((record): record is SmartMoneyEventRecord => record !== null);
   return SmartMoneyEventSchema.array().parse(records.map(fromSmartMoneyEventRecord));
+};
+
+export const fetchSmartFlowProjectionsByPacketIds = async (
+  client: ClickHouseClient,
+  packetIds: string[]
+): Promise<SmartFlowExplainabilityProjection[]> => {
+  const ids = Array.from(new Set(packetIds.map((id) => id.trim()).filter(Boolean)));
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const packetPredicates = ids.map((id) => `has(evidence_refs, ${quoteString(id)})`);
+  const result = await client.query({
+    query: `SELECT * FROM ${SMART_FLOW_PROJECTIONS_TABLE} WHERE ${packetPredicates.join(" OR ")} ORDER BY source_ts DESC, seq DESC LIMIT ${clampLookupLimit(ids.length * 4)}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  const records = rows
+    .map(normalizeSmartFlowProjectionRow)
+    .filter((record): record is SmartFlowProjectionRecord => record !== null);
+  return SmartFlowExplainabilityProjectionSchema.array().parse(
+    records.map(fromSmartFlowProjectionRecord)
+  );
 };
 
 export const fetchClassifierHitsByPacketIds = async (

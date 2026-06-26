@@ -1,8 +1,13 @@
 import { describe, expect, it } from "bun:test";
-import type { ClickHouseClient } from "@islandflow/storage";
+import { type ClickHouseClient, toSmartFlowProjectionRecord } from "@islandflow/storage";
 import {
+  SMART_FLOW_CONTRACT_VERSION,
+  SMART_FLOW_HYPOTHESIS_SCORE_MODEL_VERSION,
+  SMART_FLOW_HYPOTHESIS_SCORE_POLICY_VERSION,
+  type SmartFlowExplainabilityProjection,
   type SmartMoneyEvent,
-  smartFlowExplainabilityFromLegacySmartMoneyEvent
+  smartFlowExplainabilityFromLegacySmartMoneyEvent,
+  smartFlowExplainabilityFromHypothesisEvent
 } from "@islandflow/types";
 import {
   buildOptionSnapshotFilters,
@@ -127,6 +132,55 @@ const makeSmartMoneyEvent = (now = Date.now()): SmartMoneyEvent => ({
   abstained: false,
   suppressed_reasons: []
 });
+
+const makeSmartFlowProjection = (event: SmartMoneyEvent): SmartFlowExplainabilityProjection => {
+  const clusterId = `cluster:${event.underlying_id}:${event.source_ts}:${event.source_ts + 60_000}`;
+  return smartFlowExplainabilityFromHypothesisEvent({
+    source_ts: event.source_ts,
+    ingest_ts: event.ingest_ts,
+    seq: event.seq,
+    trace_id: `smartflow:hypothesis:${clusterId}`,
+    schema_version: SMART_FLOW_CONTRACT_VERSION,
+    policy_version: SMART_FLOW_HYPOTHESIS_SCORE_POLICY_VERSION,
+    model_version: SMART_FLOW_HYPOTHESIS_SCORE_MODEL_VERSION,
+    event_id: `smartflow:hypothesis:${clusterId}`,
+    hypothesis_id: `hypothesis:${clusterId}`,
+    cluster_id: clusterId,
+    candidate_ids: event.packet_ids.map((packetId) => `candidate:${packetId}`),
+    underlying_id: event.underlying_id,
+    hypothesis_type: "directional_accumulation",
+    direction: event.primary_direction,
+    scores: {
+      schema_version: SMART_FLOW_CONTRACT_VERSION,
+      policy_version: SMART_FLOW_HYPOTHESIS_SCORE_POLICY_VERSION,
+      model_version: SMART_FLOW_HYPOTHESIS_SCORE_MODEL_VERSION,
+      hypothesis_type: "directional_accumulation",
+      direction: event.primary_direction,
+      evidence_strength: 0.8,
+      fit_score: 0.72,
+      penalty_score: 0,
+      penalties: [],
+      confidence: {
+        policy_confidence: 0.76,
+        evidence_quality: 0.84,
+        hypothesis_margin: 0.28,
+        conviction: 0.72,
+        calibration_version: null
+      }
+    },
+    alternatives: [
+      {
+        hypothesis_type: "hedge_rebalance",
+        direction: "neutral",
+        score: 0.31,
+        reasons: ["could_be_hedge_rebalance"]
+      }
+    ],
+    abstention: { abstained: false, reasons: ["not_abstained"], source_reasons: [] },
+    evidence_refs: [...event.packet_ids, ...event.member_print_ids],
+    generated_from: "flow_evidence_cluster"
+  });
+};
 
 describe("LiveStateManager", () => {
   it("resolves live limits from env with clamping", () => {
@@ -288,7 +342,7 @@ describe("LiveStateManager", () => {
 
   it("stores smart-flow explainability projections as a canonical live channel", async () => {
     const now = Date.now();
-    const projection = smartFlowExplainabilityFromLegacySmartMoneyEvent(makeSmartMoneyEvent(now));
+    const projection = makeSmartFlowProjection(makeSmartMoneyEvent(now));
     const manager = new LiveStateManager(makeClickHouse(), null);
 
     await manager.ingest("smart-flow", projection);
@@ -308,6 +362,39 @@ describe("LiveStateManager", () => {
     expect((snapshot.items as Array<typeof projection>)[0]?.alternatives[0]?.reasons).toEqual([
       "could_be_hedge_rebalance"
     ]);
+  });
+
+  it("hydrates smart-flow snapshots from ClickHouse when Redis only has legacy compatibility rows", async () => {
+    const redis = makeRedis();
+    const now = Date.now();
+    const legacyProjection = smartFlowExplainabilityFromLegacySmartMoneyEvent(
+      makeSmartMoneyEvent(now - 1_000)
+    );
+    const nativeProjection = makeSmartFlowProjection(makeSmartMoneyEvent(now));
+    let smartFlowQueried = false;
+
+    await redis.lPush("live:smart-flow", JSON.stringify(legacyProjection));
+
+    const manager = new LiveStateManager(
+      makeClickHouse((query) => {
+        if (!query.includes("smart_flow_projections")) {
+          return [];
+        }
+        smartFlowQueried = true;
+        return [toSmartFlowProjectionRecord(nativeProjection)];
+      }),
+      redis as never
+    );
+
+    await manager.hydrate();
+    const snapshot = await manager.getSnapshot({ channel: "smart-flow" });
+    const [item] = snapshot.items as SmartFlowExplainabilityProjection[];
+    const [persisted] = await redis.lRange("live:smart-flow", 0, 0);
+
+    expect(smartFlowQueried).toBe(true);
+    expect(item?.source_channel).toBe("smart-flow");
+    expect(item?.compatibility).toBeUndefined();
+    expect(JSON.parse(persisted ?? "{}").source_channel).toBe("smart-flow");
   });
 
   it("composes durable option and alert row models from cached live windows", async () => {
@@ -359,6 +446,7 @@ describe("LiveStateManager", () => {
       explanations: ["large premium"]
     };
     const smartMoney = makeSmartMoneyEvent(now + 12);
+    const smartFlow = makeSmartFlowProjection(smartMoney);
     const alert = {
       source_ts: now + 20,
       ingest_ts: now + 21,
@@ -382,6 +470,7 @@ describe("LiveStateManager", () => {
     await manager.ingest("options", optionPrint);
     await manager.ingest("classifier-hits", classifierHit);
     await manager.ingest("smart-money", smartMoney);
+    await manager.ingest("smart-flow", smartFlow);
     await manager.ingest("alerts", alert);
 
     const snapshot = await manager.getSnapshot({
@@ -395,7 +484,7 @@ describe("LiveStateManager", () => {
 
     expect(optionRow?.support.packet.id).toBe("flowpacket:7");
     expect(optionRow?.support.smart_money.profile_id).toBe("institutional_directional");
-    expect(optionRow?.support.smart_flow.source_channel).toBe("smart-money");
+    expect(optionRow?.support.smart_flow.source_channel).toBe("smart-flow");
     expect(optionRow?.support.smart_flow.refs.evidence_refs).toEqual(["flowpacket:7", "print:7"]);
     expect(optionRow?.option.nbbo.source).toBe("print");
     expect(alertRow?.evidence.primary_packet.id).toBe("flowpacket:7");

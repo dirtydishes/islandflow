@@ -12,6 +12,7 @@ import {
   STREAM_INFERRED_DARK,
   STREAM_OPTION_NBBO,
   STREAM_OPTION_SIGNAL_PRINTS,
+  STREAM_SMART_FLOW,
   STREAM_SMART_MONEY_EVENTS,
   SUBJECT_ALERTS,
   SUBJECT_CLASSIFIER_HITS,
@@ -22,6 +23,7 @@ import {
   SUBJECT_INFERRED_DARK,
   SUBJECT_OPTION_NBBO,
   SUBJECT_OPTION_SIGNAL_PRINTS,
+  SUBJECT_SMART_FLOW,
   SUBJECT_SMART_MONEY_EVENTS,
   subscribeJson
 } from "@islandflow/bus";
@@ -40,12 +42,14 @@ import {
   enqueueEquityPrintJoinInsert,
   enqueueFlowPacketInsert,
   enqueueInferredDarkInsert,
+  enqueueSmartFlowProjectionInsert,
   enqueueSmartMoneyEventInsert,
   ensureAlertsTable,
   ensureClassifierHitsTable,
   ensureEquityPrintJoinsTable,
   ensureFlowPacketsTable,
   ensureInferredDarkTable,
+  ensureSmartFlowProjectionsTable,
   ensureSmartMoneyEventsTable
 } from "@islandflow/storage";
 import {
@@ -90,6 +94,7 @@ import {
   RollingWindowStore,
   type RollingWindowStoreConfig
 } from "./rolling-stats";
+import { NativeSmartFlowRuntime, type NativeSmartFlowProjectionFlush } from "./smart-flow-runtime";
 import {
   buildStructureFlowPacket,
   type LegEvidence,
@@ -307,12 +312,15 @@ const CACHE_PRUNE_INTERVAL_MS = 60_000;
 const emitCounters = {
   flowPackets: 0,
   structurePackets: 0,
+  smartFlowProjections: 0,
+  smartFlowAbstentions: 0,
   smartMoneyEvents: 0,
   classifierHits: 0,
   alerts: 0,
   equityJoins: 0,
   darkEvents: 0
 };
+const nativeSmartFlowRuntime = new NativeSmartFlowRuntime();
 
 const rollingKey = (metric: string, contractId: string): string => {
   return `rolling:${metric}:${contractId}`;
@@ -575,6 +583,7 @@ const emitStructurePacketIfNeeded = async (
   await publishJson(js, SUBJECT_FLOW_PACKETS, validated);
   emitCounters.flowPackets += 1;
   emitCounters.structurePackets += 1;
+  await emitNativeSmartFlow(js, batchWriter, validated);
   await emitClassifiers(js, batchWriter, validated);
 };
 
@@ -1012,7 +1021,19 @@ const flushCluster = async (
       features.structure_rights = summary.rights;
     }
 
-    await emitStructurePacketIfNeeded(js, batchWriter, legs, summary, currentLeg.contractId);
+    try {
+      await emitStructurePacketIfNeeded(js, batchWriter, legs, summary, currentLeg.contractId);
+    } catch (error) {
+      if (isExpectedShutdownNatsError(error)) {
+        logger.info("skipped structure packet publish during shutdown", {
+          contract: currentLeg.contractId,
+          error: getErrorCode(error) ?? (error instanceof Error ? error.message : String(error))
+        });
+        return;
+      }
+      cluster.flushed = false;
+      throw error;
+    }
 
     const rootKey = buildRootKey(currentLeg);
     const rootCandidates = [
@@ -1022,13 +1043,25 @@ const flushCluster = async (
     const rollLegs = [currentLeg, ...rootCandidates];
     const rollSummary = summarizeStructure(rollLegs);
     if (rollSummary?.type === "roll") {
-      await emitStructurePacketIfNeeded(
-        js,
-        batchWriter,
-        rollLegs,
-        rollSummary,
-        currentLeg.contractId
-      );
+      try {
+        await emitStructurePacketIfNeeded(
+          js,
+          batchWriter,
+          rollLegs,
+          rollSummary,
+          currentLeg.contractId
+        );
+      } catch (error) {
+        if (isExpectedShutdownNatsError(error)) {
+          logger.info("skipped structure roll packet publish during shutdown", {
+            contract: currentLeg.contractId,
+            error: getErrorCode(error) ?? (error instanceof Error ? error.message : String(error))
+          });
+          return;
+        }
+        cluster.flushed = false;
+        throw error;
+      }
     }
 
     storeRecentLeg(currentLeg, anchorTs);
@@ -1070,6 +1103,7 @@ const flushCluster = async (
     enqueueFlowPacketInsert(batchWriter, validated);
     await publishJson(js, SUBJECT_FLOW_PACKETS, validated);
     emitCounters.flowPackets += 1;
+    await emitNativeSmartFlow(js, batchWriter, validated);
     await emitClassifiers(js, batchWriter, validated);
   } catch (error) {
     if (isExpectedShutdownNatsError(error)) {
@@ -1084,6 +1118,50 @@ const flushCluster = async (
     cluster.flushed = false;
     throw error;
   }
+};
+
+const emitNativeSmartFlow = async (
+  js: Awaited<ReturnType<typeof connectJetStreamWithRetry>>["js"],
+  batchWriter: ClickHouseBatchWriter,
+  packet: FlowPacket
+): Promise<void> => {
+  const flush = nativeSmartFlowRuntime.ingest(packet);
+  try {
+    await publishNativeSmartFlowFlush(js, batchWriter, flush);
+  } catch (error) {
+    if (isExpectedShutdownNatsError(error)) {
+      throw error;
+    }
+    logger.error("failed to emit native smart-flow projection", {
+      error: error instanceof Error ? error.message : String(error),
+      packet_id: packet.id,
+      projection_count: flush.projections.length
+    });
+    throw error;
+  }
+};
+
+const flushNativeSmartFlow = async (
+  js: Awaited<ReturnType<typeof connectJetStreamWithRetry>>["js"],
+  batchWriter: ClickHouseBatchWriter
+): Promise<void> => {
+  await publishNativeSmartFlowFlush(js, batchWriter, nativeSmartFlowRuntime.collectAll());
+};
+
+const publishNativeSmartFlowFlush = async (
+  js: Awaited<ReturnType<typeof connectJetStreamWithRetry>>["js"],
+  batchWriter: ClickHouseBatchWriter,
+  flush: NativeSmartFlowProjectionFlush
+): Promise<void> => {
+  for (const projection of flush.projections) {
+    enqueueSmartFlowProjectionInsert(batchWriter, projection);
+    await publishJson(js, SUBJECT_SMART_FLOW, projection);
+    emitCounters.smartFlowProjections += 1;
+    if (projection.abstention.abstained) {
+      emitCounters.smartFlowAbstentions += 1;
+    }
+  }
+  flush.commit();
 };
 
 const emitClassifiers = async (
@@ -1273,8 +1351,8 @@ const flushEligibleClusters = async (
     }
 
     if (currentTs - cluster.endTs > env.CLUSTER_WINDOW_MS) {
-      clusters.delete(contractId);
       await flushCluster(js, batchWriter, rollingStore, cluster);
+      clusters.delete(contractId);
     }
   }
 };
@@ -1299,6 +1377,7 @@ const run = async () => {
       STREAM_EQUITY_QUOTES,
       STREAM_FLOW_PACKETS,
       STREAM_SMART_MONEY_EVENTS,
+      STREAM_SMART_FLOW,
       STREAM_EQUITY_JOINS,
       STREAM_INFERRED_DARK,
       STREAM_CLASSIFIER_HITS,
@@ -1374,6 +1453,8 @@ const run = async () => {
     logger.info("compute minute summary", {
       flow_packets_emitted: emitCounters.flowPackets,
       structure_packets_emitted: emitCounters.structurePackets,
+      smart_flow_projections_emitted: emitCounters.smartFlowProjections,
+      smart_flow_projections_abstained: emitCounters.smartFlowAbstentions,
       smart_money_events_emitted: emitCounters.smartMoneyEvents,
       classifier_hits_emitted: emitCounters.classifierHits,
       alerts_emitted: emitCounters.alerts,
@@ -1383,6 +1464,8 @@ const run = async () => {
     });
     emitCounters.flowPackets = 0;
     emitCounters.structurePackets = 0;
+    emitCounters.smartFlowProjections = 0;
+    emitCounters.smartFlowAbstentions = 0;
     emitCounters.smartMoneyEvents = 0;
     emitCounters.classifierHits = 0;
     emitCounters.alerts = 0;
@@ -1396,6 +1479,7 @@ const run = async () => {
   await retry("clickhouse table init", 120, 500, async () => {
     await ensureFlowPacketsTable(clickhouse);
     await ensureSmartMoneyEventsTable(clickhouse);
+    await ensureSmartFlowProjectionsTable(clickhouse);
     await ensureEquityPrintJoinsTable(clickhouse);
     await ensureInferredDarkTable(clickhouse);
     await ensureClassifierHitsTable(clickhouse);
@@ -1788,6 +1872,7 @@ const run = async () => {
         await flushCluster(js, batchWriter, rollingStore, cluster);
       }
       clusters.clear();
+      await flushNativeSmartFlow(js, batchWriter);
       await batchWriter.close();
       await rollingStore.flushToRedis(redis);
 
@@ -1855,7 +1940,6 @@ const run = async () => {
       } else if (print.ts - existing.startTs <= env.CLUSTER_WINDOW_MS) {
         updateCluster(existing, print);
       } else {
-        clusters.delete(print.option_contract_id);
         await flushCluster(js, batchWriter, rollingStore, existing);
         clusters.set(print.option_contract_id, buildCluster(print));
       }
