@@ -214,7 +214,7 @@
           </div>
           <div class="meta-cell"><span class="meta-label">Beads</span>islandflow-xcdn.1</div>
           <div class="meta-cell"><span class="meta-label">Phase</span>01 durable tape tint foundation</div>
-          <div class="meta-cell"><span class="meta-label">Status</span><span class="ok">PR-ready locally</span></div>
+          <div class="meta-cell"><span class="meta-label">Status</span><span class="ok">Reviewer repaired</span></div>
         </div>
       </header>
 
@@ -237,6 +237,23 @@
       </section>
 
       <section>
+        <h2>Reviewer Pass</h2>
+        <p>
+          The thermo-nuclear review found one safe in-scope quality issue: the smart-flow tint tests
+          and helper contract duplicated canonical projection shape and hypothesis coverage in
+          options-tape code. The repair anchors tint input fields to
+          <code>SmartFlowExplainabilityProjection</code>, derives hypothesis coverage in tests from
+          <code>FlowHypothesisTypeSchema.options</code>, removes the optional evidence fallback, and
+          fixes the TypeScript-only test assertions that caused the pre-review Forgejo task to fail.
+        </p>
+        <p>
+          No structural blocker remains in the Phase 01 implementation. The PR still does not widen
+          into live smart-flow subscription wiring, API payloads, route composition, historical
+          hydration, durable option row view models, scoring, calibration, or model logic.
+        </p>
+      </section>
+
+      <section>
         <h2>Changed Files</h2>
         <ul>
           <li><code>apps/web/features/durable-tape/types.ts</code></li>
@@ -254,7 +271,13 @@
       <section>
         <h2>Verification</h2>
         <ul>
+          <li><span class="ok">Passed</span> <code>bun run fmt:check</code>: full Biome format check.</li>
+          <li><span class="ok">Passed</span> <code>bun run lint</code>: full Biome lint check.</li>
+          <li><span class="ok">Passed</span> <code>bun run typecheck</code>: all project TypeScript configs.</li>
+          <li><span class="ok">Passed</span> <code>bun --no-env-file test</code>: 492 tests, 6570 assertions.</li>
           <li><span class="ok">Passed</span> <code>bun test apps/web/features/durable-tape apps/web/features/options-tape</code>: 56 tests, 180 assertions.</li>
+          <li><span class="ok">Passed</span> <code>bun run check:docker-workspace</code>: Docker workspace snapshot is in sync.</li>
+          <li><span class="ok">Passed</span> CI public-route guard: <code>check:public-api-routes</code> fails with the expected <code>DEPLOY_PUBLIC_APP_URL=&lt;production-app-origin&gt;</code> message when no production origin is set.</li>
           <li><span class="ok">Passed</span> <code>bun --cwd=apps/web run build</code>: Next production build and TypeScript completed.</li>
           <li>
             <span class="ok">Passed</span> browser probes against local production <code>next start</code> on
@@ -263,6 +286,9 @@
           </li>
           <li>
             <span class="note">Note</span> local browser state was disconnected/no-history, so the probes verified responsive route/module rendering and table headers, not live smart-flow row color because live smart-flow wiring is Phase 02.
+          </li>
+          <li>
+            <span class="note">Note</span> a plain host-local <code>bun test</code> loads the deployment server's untracked <code>.env</code>, including <code>LIVE_LIMIT_OPTIONS=1000</code>, and therefore disagrees with the API test that asserts the no-env 100-row default. <code>bun --no-env-file test</code> matches a clean CI checkout and passes.
           </li>
         </ul>
       </section>
@@ -330,15 +356,25 @@ new file mode 100644
 --- /dev/null
 +++ b/apps/web/features/options-tape/tinting.ts
 @@
-+export const OPTIONS_TAPE_SMART_FLOW_HYPOTHESIS_TYPES = [
-+  "directional_accumulation",
-+  "retail_attention_flow",
-+  "event_positioning",
-+  "volatility_supply",
-+  "structure_arbitrage",
-+  "hedge_rebalance",
-+  "unclear"
-+] as const satisfies readonly FlowHypothesisType[];
++import type {
++  FlowHypothesisType,
++  SmartFlowExplainabilityProjection,
++  SmartMoneyDirection
++} from "@islandflow/types";
++export type OptionsTapeSmartFlowTintInput = {
++  hypothesis: {
++    hypothesis_type: SmartFlowExplainabilityProjection["hypothesis"]["hypothesis_type"];
++    direction: SmartFlowExplainabilityProjection["hypothesis"]["direction"];
++    scores: {
++      confidence: Pick&lt;
++        SmartFlowExplainabilityProjection["hypothesis"]["scores"]["confidence"],
++        "policy_confidence" | "evidence_quality"
++      &gt;;
++    };
++  };
++  evidence: Pick&lt;SmartFlowExplainabilityProjection["evidence"], "evidence_quality"&gt;;
++  abstention: SmartFlowExplainabilityProjection["abstention"];
++};
 @@
 +export const getOptionsTapeSmartFlowRowTint = (
 +  projection: OptionsTapeSmartFlowTintInput
@@ -351,10 +387,7 @@ new file mode 100644
 +  const policyConfidence = roundUnit(
 +    projection.hypothesis.scores.confidence.policy_confidence
 +  );
-+  const evidenceQuality = roundUnit(
-+    projection.evidence?.evidence_quality ??
-+      projection.hypothesis.scores.confidence.evidence_quality
-+  );
++  const evidenceQuality = roundUnit(projection.evidence.evidence_quality);
 +  return {
 +    className: [
 +      "options-tape-row-tinted",

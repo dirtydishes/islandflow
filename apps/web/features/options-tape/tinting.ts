@@ -1,17 +1,11 @@
-import type { FlowHypothesisType, SmartMoneyDirection } from "@islandflow/types";
+import type {
+  FlowHypothesisType,
+  SmartFlowExplainabilityProjection,
+  SmartMoneyDirection
+} from "@islandflow/types";
 import type { CSSProperties } from "react";
 
 import type { OptionsTapeDecor } from "./types";
-
-export const OPTIONS_TAPE_SMART_FLOW_HYPOTHESIS_TYPES = [
-  "directional_accumulation",
-  "retail_attention_flow",
-  "event_positioning",
-  "volatility_supply",
-  "structure_arbitrage",
-  "hedge_rebalance",
-  "unclear"
-] as const satisfies readonly FlowHypothesisType[];
 
 export type OptionsTapeTintDirection = SmartMoneyDirection | "abstained";
 export type OptionsTapeTintTone =
@@ -31,23 +25,17 @@ export type OptionsTapeEvidenceQualityBand = "poor" | "thin" | "usable" | "stron
 
 export type OptionsTapeSmartFlowTintInput = {
   hypothesis: {
-    hypothesis_type: FlowHypothesisType;
-    direction: SmartMoneyDirection;
+    hypothesis_type: SmartFlowExplainabilityProjection["hypothesis"]["hypothesis_type"];
+    direction: SmartFlowExplainabilityProjection["hypothesis"]["direction"];
     scores: {
-      confidence: {
-        policy_confidence: number;
-        evidence_quality: number;
-      };
+      confidence: Pick<
+        SmartFlowExplainabilityProjection["hypothesis"]["scores"]["confidence"],
+        "policy_confidence" | "evidence_quality"
+      >;
     };
   };
-  evidence?: {
-    evidence_quality?: number | null;
-  };
-  abstention: {
-    abstained: boolean;
-    reasons: readonly string[];
-    source_reasons: readonly string[];
-  };
+  evidence: Pick<SmartFlowExplainabilityProjection["evidence"], "evidence_quality">;
+  abstention: SmartFlowExplainabilityProjection["abstention"];
 };
 
 export type OptionsTapeRowTintMetadata = {
@@ -191,10 +179,7 @@ export const getOptionsTapeSmartFlowRowTint = (
     ? "abstained"
     : normalizeTintDirection(projection.hypothesis.direction);
   const policyConfidence = roundUnit(projection.hypothesis.scores.confidence.policy_confidence);
-  const evidenceQuality = roundUnit(
-    projection.evidence?.evidence_quality ??
-      projection.hypothesis.scores.confidence.evidence_quality
-  );
+  const evidenceQuality = roundUnit(projection.evidence.evidence_quality);
   const confidenceBand = getOptionsTapePolicyConfidenceBand(policyConfidence);
   const evidenceQualityBand = getOptionsTapeEvidenceQualityBand(evidenceQuality);
   const tone = TONE_BY_DIRECTION[direction];

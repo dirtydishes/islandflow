@@ -1,5 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import type { FlowHypothesisType, OptionPrint, SmartMoneyDirection } from "@islandflow/types";
+import {
+  type FlowHypothesisType,
+  FlowHypothesisTypeSchema,
+  type OptionPrint,
+  type SmartMoneyDirection
+} from "@islandflow/types";
 
 import { createDurableTapeInitialHistoryCursor, selectDurableTapeTemplate } from "../durable-tape";
 import {
@@ -27,8 +32,9 @@ import {
   getOptionsTapeRowTintClassName,
   getOptionsTapeRowTintStyle,
   getOptionsTapeSmartFlowRowTint,
-  OPTIONS_TAPE_SMART_FLOW_HYPOTHESIS_TYPES,
-  type OptionsTapeSmartFlowTintInput
+  type OptionsTapeSmartFlowTintInput,
+  type OptionsTapeTintDirection,
+  type OptionsTapeTintTone
 } from "./tinting";
 
 const makePrint = (overrides: Partial<OptionPrint> = {}): OptionPrint => ({
@@ -241,31 +247,37 @@ describe("options tape row tint helpers", () => {
     evidenceQuality?: number;
     hypothesisType?: FlowHypothesisType;
     policyConfidence?: number;
-    reasons?: string[];
-    sourceReasons?: string[];
-  } = {}): OptionsTapeSmartFlowTintInput => ({
-    hypothesis: {
-      hypothesis_type: hypothesisType,
-      direction,
-      scores: {
-        confidence: {
-          policy_confidence: policyConfidence,
-          evidence_quality: evidenceQuality
+    reasons?: OptionsTapeSmartFlowTintInput["abstention"]["reasons"];
+    sourceReasons?: OptionsTapeSmartFlowTintInput["abstention"]["source_reasons"];
+  } = {}): OptionsTapeSmartFlowTintInput => {
+    const defaultReasons: OptionsTapeSmartFlowTintInput["abstention"]["reasons"] = abstained
+      ? ["below_policy_threshold"]
+      : ["not_abstained"];
+
+    return {
+      hypothesis: {
+        hypothesis_type: hypothesisType,
+        direction,
+        scores: {
+          confidence: {
+            policy_confidence: policyConfidence,
+            evidence_quality: evidenceQuality
+          }
         }
+      },
+      evidence: {
+        evidence_quality: evidenceQuality
+      },
+      abstention: {
+        abstained,
+        reasons: reasons ?? defaultReasons,
+        source_reasons: sourceReasons
       }
-    },
-    evidence: {
-      evidence_quality: evidenceQuality
-    },
-    abstention: {
-      abstained,
-      reasons: reasons ?? (abstained ? ["below_policy_threshold"] : ["not_abstained"]),
-      source_reasons: sourceReasons
-    }
-  });
+    };
+  };
 
   it("maps every current smart-flow hypothesis type into row metadata and classes", () => {
-    for (const hypothesisType of OPTIONS_TAPE_SMART_FLOW_HYPOTHESIS_TYPES) {
+    for (const hypothesisType of FlowHypothesisTypeSchema.options) {
       const tint = getOptionsTapeSmartFlowRowTint(makeSmartFlowTintInput({ hypothesisType }));
       const classToken = hypothesisType.replaceAll("_", "-");
 
@@ -277,7 +289,7 @@ describe("options tape row tint helpers", () => {
   });
 
   it("maps direction states into semantic row tones", () => {
-    const cases: [SmartMoneyDirection, string, string][] = [
+    const cases: [SmartMoneyDirection, OptionsTapeTintDirection, OptionsTapeTintTone][] = [
       ["bullish", "bullish", "green"],
       ["bearish", "bearish", "red"],
       ["neutral", "neutral", "blue"],
@@ -364,6 +376,10 @@ describe("options tape row tint helpers", () => {
 
     expect(getOptionsTapeRowTintClassName(tint)).toContain("options-tape-decor-row");
     expect(getOptionsTapeRowTintClassName(tint)).toContain("classifier-green");
-    expect(getOptionsTapeRowTintStyle(tint)).toEqual({ "--classifier-intensity": "0.700" });
+    expect(
+      (getOptionsTapeRowTintStyle(tint) as Record<string, string> | undefined)?.[
+        "--classifier-intensity"
+      ]
+    ).toBe("0.700");
   });
 });
