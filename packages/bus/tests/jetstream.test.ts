@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { nanos, type JetStreamManager, type StreamConfig } from "nats";
+import { type JetStreamManager, nanos, type StreamConfig } from "nats";
 import {
   auditStreamConfig,
   buildKnownStreamConfig,
@@ -72,6 +72,20 @@ describe("jetstream retention defaults", () => {
     ).toEqual({
       max_age: nanos(1234),
       max_bytes: 5678
+    });
+  });
+});
+
+describe("known smart-flow alert stream", () => {
+  it("registers the canonical smart-flow alerts subject as a derived stream", () => {
+    const definition = getKnownStreamDefinitions().find(
+      (entry) => entry.name === "SMART_FLOW_ALERTS"
+    );
+
+    expect(definition).toEqual({
+      name: "SMART_FLOW_ALERTS",
+      subject: "flow.smart_flow_alerts",
+      retentionClass: "derived"
     });
   });
 });

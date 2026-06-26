@@ -12,6 +12,7 @@ import type {
   NewsStory,
   OptionNBBO,
   OptionPrint,
+  SmartFlowAlertEvent,
   SmartFlowExplainabilityProjection,
   SmartMoneyEvent
 } from "@islandflow/types";
@@ -36,6 +37,7 @@ type LiveSessionChannelItems = {
   equityJoins: EquityPrintJoin;
   flow: FlowPacket;
   smartFlow: SmartFlowExplainabilityProjection;
+  smartFlowAlerts: SmartFlowAlertEvent;
   smartMoney: SmartMoneyEvent;
   classifierHits: ClassifierHitEvent;
   alerts: AlertEvent;
@@ -60,6 +62,7 @@ const LIVE_SESSION_BUFFER_CHANNELS = [
   "equityJoins",
   "flow",
   "smartFlow",
+  "smartFlowAlerts",
   "smartMoney",
   "classifierHits",
   "alerts",
@@ -78,6 +81,7 @@ const LIVE_SUBSCRIPTION_BUFFER_CHANNELS = {
   "equity-joins": "equityJoins",
   flow: "flow",
   "smart-flow": "smartFlow",
+  "smart-flow-alerts": "smartFlowAlerts",
   "smart-money": "smartMoney",
   "classifier-hits": "classifierHits",
   alerts: "alerts",
@@ -124,6 +128,10 @@ const createLiveSessionBuffers = (
     equityJoins: createLiveWindowBuffer<EquityPrintJoin>({ limit: LIVE_HOT_WINDOW, onTrim }),
     flow: createLiveWindowBuffer<FlowPacket>({ limit: LIVE_HOT_WINDOW, onTrim }),
     smartFlow: createLiveWindowBuffer<SmartFlowExplainabilityProjection>({
+      limit: LIVE_HOT_WINDOW,
+      onTrim
+    }),
+    smartFlowAlerts: createLiveWindowBuffer<SmartFlowAlertEvent>({
       limit: LIVE_HOT_WINDOW,
       onTrim
     }),

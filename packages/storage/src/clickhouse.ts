@@ -1,104 +1,113 @@
-import {
-  AlertEventSchema,
-  ClassifierHitEventSchema,
-  EquityCandleSchema,
-  EquityPrintSchema,
-  EquityQuoteSchema,
-  EquityPrintJoinSchema,
-  InferredDarkEventSchema,
-  FlowPacketSchema,
-  NewsStorySchema,
-  OptionNBBOSchema,
-  OptionPrintSchema,
-  SmartFlowExplainabilityProjectionSchema,
-  SmartMoneyEventSchema
-} from "@islandflow/types";
 import type {
   AlertEvent,
   ClassifierHitEvent,
   EquityCandle,
   EquityPrint,
-  EquityQuote,
   EquityPrintJoin,
-  InferredDarkEvent,
+  EquityQuote,
   FlowPacket,
+  InferredDarkEvent,
   NewsStory,
-  SmartFlowExplainabilityProjection,
-  SmartMoneyEvent,
+  OptionFlowFilters,
+  OptionFlowView,
   OptionNBBO,
   OptionPrint,
-  OptionFlowFilters,
-  OptionFlowView
+  SmartFlowAlertEvent,
+  SmartFlowExplainabilityProjection,
+  SmartMoneyEvent
 } from "@islandflow/types";
+import {
+  AlertEventSchema,
+  ClassifierHitEventSchema,
+  EquityCandleSchema,
+  EquityPrintJoinSchema,
+  EquityPrintSchema,
+  EquityQuoteSchema,
+  FlowPacketSchema,
+  InferredDarkEventSchema,
+  NewsStorySchema,
+  OptionNBBOSchema,
+  OptionPrintSchema,
+  SmartFlowAlertEventSchema,
+  SmartFlowExplainabilityProjectionSchema,
+  SmartMoneyEventSchema
+} from "@islandflow/types";
+import {
+  ALERTS_TABLE,
+  type AlertRecord,
+  alertsTableDDL,
+  alertsTableMigrations,
+  fromAlertRecord,
+  toAlertRecord
+} from "./alerts";
+import {
+  CLASSIFIER_HITS_TABLE,
+  type ClassifierHitRecord,
+  classifierHitsTableDDL,
+  fromClassifierHitRecord,
+  toClassifierHitRecord
+} from "./classifier-hits";
+import {
+  EQUITY_CANDLES_TABLE,
+  equityCandlesTableDDL,
+  normalizeEquityCandle
+} from "./equity-candles";
+import {
+  EQUITY_PRINT_JOINS_TABLE,
+  type EquityPrintJoinRecord,
+  equityPrintJoinsTableDDL,
+  fromEquityPrintJoinRecord,
+  toEquityPrintJoinRecord
+} from "./equity-print-joins";
+import { EQUITY_PRINTS_TABLE, equityPrintsTableDDL, normalizeEquityPrint } from "./equity-prints";
+import { EQUITY_QUOTES_TABLE, equityQuotesTableDDL, normalizeEquityQuote } from "./equity-quotes";
+import {
+  FLOW_PACKETS_TABLE,
+  type FlowPacketRecord,
+  flowPacketsTableDDL,
+  fromFlowPacketRecord,
+  toFlowPacketRecord
+} from "./flow-packets";
+import {
+  fromInferredDarkRecord,
+  INFERRED_DARK_TABLE,
+  type InferredDarkRecord,
+  inferredDarkTableDDL,
+  toInferredDarkRecord
+} from "./inferred-dark";
+import { fromNewsRecord, NEWS_TABLE, type NewsRecord, newsTableDDL, toNewsRecord } from "./news";
+import { normalizeOptionNBBO, OPTION_NBBO_TABLE, optionNBBOTableDDL } from "./option-nbbo";
 import {
   normalizeOptionPrint,
   OPTION_PRINT_QUERY_MAX_EXECUTION_SECONDS,
   OPTION_PRINT_QUERY_TIMEOUT_MS,
-  optionPrintsTableDDL,
-  optionPrintsTableMigrations,
-  OPTION_PRINTS_TABLE,
   OPTION_PRINT_TRACE_ID_MAX_LENGTH,
-  OPTION_PRINT_TRACE_LOOKUP_MAX_IDS
+  OPTION_PRINT_TRACE_LOOKUP_MAX_IDS,
+  OPTION_PRINTS_TABLE,
+  optionPrintsTableDDL,
+  optionPrintsTableMigrations
 } from "./option-prints";
-import { normalizeOptionNBBO, optionNBBOTableDDL, OPTION_NBBO_TABLE } from "./option-nbbo";
-import { equityPrintsTableDDL, EQUITY_PRINTS_TABLE, normalizeEquityPrint } from "./equity-prints";
-import { equityQuotesTableDDL, EQUITY_QUOTES_TABLE, normalizeEquityQuote } from "./equity-quotes";
 import {
-  equityCandlesTableDDL,
-  EQUITY_CANDLES_TABLE,
-  normalizeEquityCandle
-} from "./equity-candles";
+  fromSmartFlowAlertRecord,
+  SMART_FLOW_ALERTS_TABLE,
+  type SmartFlowAlertRecord,
+  smartFlowAlertsTableDDL,
+  toSmartFlowAlertRecord
+} from "./smart-flow-alerts";
 import {
-  equityPrintJoinsTableDDL,
-  EQUITY_PRINT_JOINS_TABLE,
-  fromEquityPrintJoinRecord,
-  toEquityPrintJoinRecord,
-  type EquityPrintJoinRecord
-} from "./equity-print-joins";
-import {
-  inferredDarkTableDDL,
-  INFERRED_DARK_TABLE,
-  fromInferredDarkRecord,
-  toInferredDarkRecord,
-  type InferredDarkRecord
-} from "./inferred-dark";
-import {
-  FLOW_PACKETS_TABLE,
-  flowPacketsTableDDL,
-  fromFlowPacketRecord,
-  toFlowPacketRecord,
-  type FlowPacketRecord
-} from "./flow-packets";
-import {
-  CLASSIFIER_HITS_TABLE,
-  classifierHitsTableDDL,
-  fromClassifierHitRecord,
-  toClassifierHitRecord,
-  type ClassifierHitRecord
-} from "./classifier-hits";
-import {
-  ALERTS_TABLE,
-  alertsTableMigrations,
-  alertsTableDDL,
-  fromAlertRecord,
-  toAlertRecord,
-  type AlertRecord
-} from "./alerts";
-import {
-  SMART_MONEY_EVENTS_TABLE,
-  smartMoneyEventsTableDDL,
-  fromSmartMoneyEventRecord,
-  toSmartMoneyEventRecord,
-  type SmartMoneyEventRecord
-} from "./smart-money-events";
-import {
-  SMART_FLOW_PROJECTIONS_TABLE,
-  smartFlowProjectionsTableDDL,
   fromSmartFlowProjectionRecord,
-  toSmartFlowProjectionRecord,
-  type SmartFlowProjectionRecord
+  SMART_FLOW_PROJECTIONS_TABLE,
+  type SmartFlowProjectionRecord,
+  smartFlowProjectionsTableDDL,
+  toSmartFlowProjectionRecord
 } from "./smart-flow-projections";
-import { NEWS_TABLE, newsTableDDL, fromNewsRecord, toNewsRecord, type NewsRecord } from "./news";
+import {
+  fromSmartMoneyEventRecord,
+  SMART_MONEY_EVENTS_TABLE,
+  type SmartMoneyEventRecord,
+  smartMoneyEventsTableDDL,
+  toSmartMoneyEventRecord
+} from "./smart-money-events";
 
 export type ClickHouseOptions = {
   url: string;
@@ -373,6 +382,12 @@ export const ensureSmartFlowProjectionsTable = async (client: ClickHouseClient):
   });
 };
 
+export const ensureSmartFlowAlertsTable = async (client: ClickHouseClient): Promise<void> => {
+  await client.exec({
+    query: smartFlowAlertsTableDDL()
+  });
+};
+
 export const ensureClassifierHitsTable = async (client: ClickHouseClient): Promise<void> => {
   await client.exec({
     query: classifierHitsTableDDL()
@@ -509,6 +524,18 @@ export const insertSmartFlowProjection = async (
   const record = toSmartFlowProjectionRecord(projection);
   await client.insert({
     table: SMART_FLOW_PROJECTIONS_TABLE,
+    values: [record],
+    format: "JSONEachRow"
+  });
+};
+
+export const insertSmartFlowAlert = async (
+  client: ClickHouseClient,
+  alert: SmartFlowAlertEvent
+): Promise<void> => {
+  const record = toSmartFlowAlertRecord(alert);
+  await client.insert({
+    table: SMART_FLOW_ALERTS_TABLE,
     values: [record],
     format: "JSONEachRow"
   });
@@ -689,6 +716,13 @@ export const enqueueSmartFlowProjectionInsert = (
   projection: SmartFlowExplainabilityProjection
 ): void => {
   writer.enqueue(SMART_FLOW_PROJECTIONS_TABLE, toSmartFlowProjectionRecord(projection));
+};
+
+export const enqueueSmartFlowAlertInsert = (
+  writer: ClickHouseBatchWriter,
+  alert: SmartFlowAlertEvent
+): void => {
+  writer.enqueue(SMART_FLOW_ALERTS_TABLE, toSmartFlowAlertRecord(alert));
 };
 
 export const enqueueClassifierHitInsert = (
@@ -1160,6 +1194,75 @@ const normalizeSmartFlowProjectionRow = (row: unknown): SmartFlowProjectionRecor
   };
 };
 
+const normalizeSmartFlowAlertRow = (row: unknown): SmartFlowAlertRecord | null => {
+  if (!row || typeof row !== "object") {
+    return null;
+  }
+
+  const record = row as Record<string, unknown>;
+  return {
+    source_ts: coerceNumber(record.source_ts) as number,
+    ingest_ts: coerceNumber(record.ingest_ts) as number,
+    seq: coerceNumber(record.seq) as number,
+    trace_id: String(record.trace_id ?? ""),
+    schema_version: String(record.schema_version ?? ""),
+    alert_id: String(record.alert_id ?? ""),
+    hypothesis_id: String(record.hypothesis_id ?? ""),
+    insight_id: String(record.insight_id ?? ""),
+    underlying_id: String(record.underlying_id ?? ""),
+    hypothesis_type: String(record.hypothesis_type ?? ""),
+    direction: String(record.direction ?? ""),
+    policy_confidence: Number(coerceNumber(record.policy_confidence) ?? 0),
+    evidence_quality: Number(coerceNumber(record.evidence_quality) ?? 0),
+    trigger_kind: String(record.trigger_kind ?? ""),
+    projection_trace_id: String(record.projection_trace_id ?? ""),
+    evidence_refs: normalizeStringArray(record.evidence_refs),
+    alert_json: String(record.alert_json ?? "{}")
+  };
+};
+
+const smartFlowAlertEventsFromRows = (rows: unknown[]): SmartFlowAlertEvent[] => {
+  const records = rows
+    .map(normalizeSmartFlowAlertRow)
+    .filter((record): record is SmartFlowAlertRecord => record !== null);
+  return SmartFlowAlertEventSchema.array().parse(records.map(fromSmartFlowAlertRecord));
+};
+
+const appendSmartFlowAlertBoundaryTies = async (
+  client: ClickHouseClient,
+  alerts: SmartFlowAlertEvent[],
+  limit: number,
+  direction: "asc" | "desc"
+): Promise<SmartFlowAlertEvent[]> => {
+  if (alerts.length < limit) {
+    return alerts;
+  }
+
+  const boundary = alerts.at(-1);
+  if (!boundary) {
+    return alerts;
+  }
+
+  const order = direction === "asc" ? "ASC" : "DESC";
+  const result = await client.query({
+    query: `SELECT * FROM ${SMART_FLOW_ALERTS_TABLE} WHERE source_ts = ${boundary.source_ts} AND seq = ${boundary.seq} ORDER BY source_ts ${order}, seq ${order}, alert_id ${order}`,
+    format: "JSONEachRow"
+  });
+  const boundaryTies = smartFlowAlertEventsFromRows(await result.json<unknown[]>());
+  const byAlertId = new Map<string, SmartFlowAlertEvent>();
+
+  for (const alert of [...alerts, ...boundaryTies]) {
+    byAlertId.set(alert.alert_id, alert);
+  }
+
+  return [...byAlertId.values()].sort((left, right) => {
+    const timeOrder = right.source_ts - left.source_ts || right.seq - left.seq;
+    const alertOrder = right.alert_id.localeCompare(left.alert_id);
+    const descending = timeOrder || alertOrder;
+    return direction === "asc" ? -descending : descending;
+  });
+};
+
 const normalizeAlertRow = (row: unknown): AlertRecord | null => {
   if (!row || typeof row !== "object") {
     return null;
@@ -1397,6 +1500,20 @@ export const fetchRecentSmartFlowProjections = async (
   return SmartFlowExplainabilityProjectionSchema.array().parse(
     records.map(fromSmartFlowProjectionRecord)
   );
+};
+
+export const fetchRecentSmartFlowAlerts = async (
+  client: ClickHouseClient,
+  limit: number
+): Promise<SmartFlowAlertEvent[]> => {
+  const safeLimit = clampLimit(limit);
+  const result = await client.query({
+    query: `SELECT * FROM ${SMART_FLOW_ALERTS_TABLE} ORDER BY source_ts DESC, seq DESC, alert_id DESC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  return smartFlowAlertEventsFromRows(rows);
 };
 
 export const fetchRecentAlerts = async (
@@ -1860,6 +1977,30 @@ export const fetchSmartFlowProjectionsAfter = async (
   );
 };
 
+export const fetchSmartFlowAlertsAfter = async (
+  client: ClickHouseClient,
+  afterTs: number,
+  afterSeq: number,
+  limit: number
+): Promise<SmartFlowAlertEvent[]> => {
+  const safeLimit = clampLimit(limit);
+  const safeAfterTs = clampCursor(afterTs);
+  const safeAfterSeq = clampCursor(afterSeq);
+
+  const result = await client.query({
+    query: `SELECT * FROM ${SMART_FLOW_ALERTS_TABLE} WHERE (source_ts, seq) > (${safeAfterTs}, ${safeAfterSeq}) ORDER BY source_ts ASC, seq ASC, alert_id ASC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  return appendSmartFlowAlertBoundaryTies(
+    client,
+    smartFlowAlertEventsFromRows(rows),
+    safeLimit,
+    "asc"
+  );
+};
+
 export const fetchAlertsAfter = async (
   client: ClickHouseClient,
   afterTs: number,
@@ -2082,6 +2223,27 @@ export const fetchSmartFlowProjectionsBefore = async (
     .filter((record): record is SmartFlowProjectionRecord => record !== null);
   return SmartFlowExplainabilityProjectionSchema.array().parse(
     records.map(fromSmartFlowProjectionRecord)
+  );
+};
+
+export const fetchSmartFlowAlertsBefore = async (
+  client: ClickHouseClient,
+  beforeTs: number,
+  beforeSeq: number,
+  limit: number
+): Promise<SmartFlowAlertEvent[]> => {
+  const safeLimit = clampLimit(limit);
+  const result = await client.query({
+    query: `SELECT * FROM ${SMART_FLOW_ALERTS_TABLE} WHERE ${buildBeforeTupleCondition("source_ts", "seq", beforeTs, beforeSeq)} ORDER BY source_ts DESC, seq DESC, alert_id DESC LIMIT ${safeLimit}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  return appendSmartFlowAlertBoundaryTies(
+    client,
+    smartFlowAlertEventsFromRows(rows),
+    safeLimit,
+    "desc"
   );
 };
 

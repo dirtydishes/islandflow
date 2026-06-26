@@ -16,6 +16,7 @@ import {
   STREAM_OPTION_NBBO,
   STREAM_OPTION_SIGNAL_PRINTS,
   STREAM_SMART_FLOW,
+  STREAM_SMART_FLOW_ALERTS,
   STREAM_SMART_MONEY_EVENTS,
   SUBJECT_ALERTS,
   SUBJECT_CLASSIFIER_HITS,
@@ -29,6 +30,7 @@ import {
   SUBJECT_OPTION_NBBO,
   SUBJECT_OPTION_SIGNAL_PRINTS,
   SUBJECT_SMART_FLOW,
+  SUBJECT_SMART_FLOW_ALERTS,
   SUBJECT_SMART_MONEY_EVENTS,
   subscribeJson,
   watchSyntheticControlState,
@@ -50,6 +52,7 @@ import {
   ensureNewsTable,
   ensureOptionNBBOTable,
   ensureOptionPrintsTable,
+  ensureSmartFlowAlertsTable,
   ensureSmartFlowProjectionsTable,
   ensureSmartMoneyEventsTable,
   fetchAlertContextByTraceId,
@@ -123,6 +126,7 @@ import {
   OptionNBBOSchema,
   type OptionPrint,
   OptionPrintSchema,
+  SmartFlowAlertEventSchema,
   SmartFlowExplainabilityProjectionSchema,
   SmartMoneyEventSchema,
   type SyntheticControlState,
@@ -156,6 +160,12 @@ import {
   fetchSmartFlowExplainabilityBefore,
   smartFlowCursor
 } from "./smart-flow";
+import {
+  fetchRecentSmartFlowAlertEvents,
+  fetchSmartFlowAlertEventsAfter,
+  fetchSmartFlowAlertEventsBefore,
+  smartFlowAlertCursor
+} from "./smart-flow-alerts";
 import {
   buildSyntheticDerivedStatus,
   createRollingSyntheticProfileHits,
@@ -331,6 +341,7 @@ type Channel =
   | "inferred-dark"
   | "flow"
   | "smart-flow"
+  | "smart-flow-alerts"
   | "smart-money"
   | "classifier-hits"
   | "alerts";
@@ -355,6 +366,7 @@ const equityJoinSockets = new Set<LegacySocket>();
 const inferredDarkSockets = new Set<LegacySocket>();
 const flowSockets = new Set<LegacySocket>();
 const smartFlowSockets = new Set<LegacySocket>();
+const smartFlowAlertSockets = new Set<LegacySocket>();
 const smartMoneySockets = new Set<LegacySocket>();
 const classifierHitSockets = new Set<LegacySocket>();
 const alertSockets = new Set<LegacySocket>();
@@ -746,6 +758,7 @@ const run = async () => {
       STREAM_FLOW_PACKETS,
       STREAM_SMART_MONEY_EVENTS,
       STREAM_SMART_FLOW,
+      STREAM_SMART_FLOW_ALERTS,
       STREAM_CLASSIFIER_HITS,
       STREAM_ALERTS,
       STREAM_NEWS
@@ -800,6 +813,7 @@ const run = async () => {
     await ensureFlowPacketsTable(clickhouse);
     await ensureSmartMoneyEventsTable(clickhouse);
     await ensureSmartFlowProjectionsTable(clickhouse);
+    await ensureSmartFlowAlertsTable(clickhouse);
     await ensureClassifierHitsTable(clickhouse);
     await ensureAlertsTable(clickhouse);
     await ensureNewsTable(clickhouse);
@@ -924,6 +938,11 @@ const run = async () => {
       durableName: "api-smart-flow"
     },
     {
+      subject: SUBJECT_SMART_FLOW_ALERTS,
+      stream: STREAM_SMART_FLOW_ALERTS,
+      durableName: "api-smart-flow-alerts"
+    },
+    {
       subject: SUBJECT_CLASSIFIER_HITS,
       stream: STREAM_CLASSIFIER_HITS,
       durableName: "api-classifier-hits"
@@ -1016,83 +1035,30 @@ const run = async () => {
     }
   };
 
-  const optionSubscription = await subscribeWithReset(
-    consumerBindings[0].subject,
-    consumerBindings[0].stream,
-    consumerBindings[0].durableName
-  );
+  const subscribeConsumerBinding = (
+    durableName: (typeof consumerBindings)[number]["durableName"]
+  ) => {
+    const binding = consumerBindings.find((entry) => entry.durableName === durableName);
+    if (!binding) {
+      throw new Error(`Missing API consumer binding: ${durableName}`);
+    }
+    return subscribeWithReset(binding.subject, binding.stream, binding.durableName);
+  };
 
-  const optionNbboSubscription = await subscribeWithReset(
-    consumerBindings[1].subject,
-    consumerBindings[1].stream,
-    consumerBindings[1].durableName
-  );
-
-  const equitySubscription = await subscribeWithReset(
-    consumerBindings[2].subject,
-    consumerBindings[2].stream,
-    consumerBindings[2].durableName
-  );
-
-  const equityQuoteSubscription = await subscribeWithReset(
-    consumerBindings[3].subject,
-    consumerBindings[3].stream,
-    consumerBindings[3].durableName
-  );
-
-  const equityCandleSubscription = await subscribeWithReset(
-    consumerBindings[4].subject,
-    consumerBindings[4].stream,
-    consumerBindings[4].durableName
-  );
-
-  const equityJoinSubscription = await subscribeWithReset(
-    consumerBindings[5].subject,
-    consumerBindings[5].stream,
-    consumerBindings[5].durableName
-  );
-
-  const inferredDarkSubscription = await subscribeWithReset(
-    consumerBindings[6].subject,
-    consumerBindings[6].stream,
-    consumerBindings[6].durableName
-  );
-
-  const flowSubscription = await subscribeWithReset(
-    consumerBindings[7].subject,
-    consumerBindings[7].stream,
-    consumerBindings[7].durableName
-  );
-
-  const smartMoneySubscription = await subscribeWithReset(
-    consumerBindings[8].subject,
-    consumerBindings[8].stream,
-    consumerBindings[8].durableName
-  );
-
-  const smartFlowSubscription = await subscribeWithReset(
-    consumerBindings[9].subject,
-    consumerBindings[9].stream,
-    consumerBindings[9].durableName
-  );
-
-  const classifierHitSubscription = await subscribeWithReset(
-    consumerBindings[10].subject,
-    consumerBindings[10].stream,
-    consumerBindings[10].durableName
-  );
-
-  const alertSubscription = await subscribeWithReset(
-    consumerBindings[11].subject,
-    consumerBindings[11].stream,
-    consumerBindings[11].durableName
-  );
-
-  const newsSubscription = await subscribeWithReset(
-    consumerBindings[12].subject,
-    consumerBindings[12].stream,
-    consumerBindings[12].durableName
-  );
+  const optionSubscription = await subscribeConsumerBinding("api-option-prints");
+  const optionNbboSubscription = await subscribeConsumerBinding("api-option-nbbo");
+  const equitySubscription = await subscribeConsumerBinding("api-equity-prints");
+  const equityQuoteSubscription = await subscribeConsumerBinding("api-equity-quotes");
+  const equityCandleSubscription = await subscribeConsumerBinding("api-equity-candles");
+  const equityJoinSubscription = await subscribeConsumerBinding("api-equity-joins");
+  const inferredDarkSubscription = await subscribeConsumerBinding("api-inferred-dark");
+  const flowSubscription = await subscribeConsumerBinding("api-flow-packets");
+  const smartMoneySubscription = await subscribeConsumerBinding("api-smart-money-events");
+  const smartFlowSubscription = await subscribeConsumerBinding("api-smart-flow");
+  const smartFlowAlertSubscription = await subscribeConsumerBinding("api-smart-flow-alerts");
+  const classifierHitSubscription = await subscribeConsumerBinding("api-classifier-hits");
+  const alertSubscription = await subscribeConsumerBinding("api-alerts");
+  const newsSubscription = await subscribeConsumerBinding("api-news");
 
   const fanoutLive = async (
     subscription: LiveSubscription,
@@ -1388,6 +1354,22 @@ const run = async () => {
     }
   };
 
+  const pumpSmartFlowAlerts = async () => {
+    for await (const msg of smartFlowAlertSubscription.messages) {
+      try {
+        const payload = SmartFlowAlertEventSchema.parse(smartFlowAlertSubscription.decode(msg));
+        broadcast(smartFlowAlertSockets, { type: "smart-flow-alert", payload });
+        await fanoutLive({ channel: "smart-flow-alerts" }, payload, "smart-flow-alerts");
+        msg.ack();
+      } catch (error) {
+        logger.error("failed to process smart-flow alert", {
+          error: error instanceof Error ? error.message : String(error)
+        });
+        msg.term();
+      }
+    }
+  };
+
   const pumpClassifierHits = async () => {
     for await (const msg of classifierHitSubscription.messages) {
       try {
@@ -1446,6 +1428,7 @@ const run = async () => {
   void pumpFlow();
   void pumpSmartMoney();
   void pumpSmartFlow();
+  void pumpSmartFlowAlerts();
   void pumpClassifierHits();
   void pumpAlerts();
   void pumpNews();
@@ -1696,6 +1679,12 @@ const run = async () => {
           return jsonResponse({ data });
         }
 
+        if (req.method === "GET" && url.pathname === "/flow/smart-flow-alerts") {
+          const limit = parseLimit(url.searchParams.get("limit"));
+          const data = await fetchRecentSmartFlowAlertEvents(clickhouse, limit);
+          return jsonResponse({ data });
+        }
+
         if (req.method === "GET" && url.pathname === "/flow/classifier-hits") {
           const limit = parseLimit(url.searchParams.get("limit"));
           const data = await fetchRecentClassifierHits(clickhouse, limit);
@@ -1826,6 +1815,17 @@ const run = async () => {
             limit
           );
           return jsonResponse(buildHistoryResponse(data, smartFlowCursor));
+        }
+
+        if (req.method === "GET" && url.pathname === "/history/smart-flow-alerts") {
+          const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
+          const data = await fetchSmartFlowAlertEventsBefore(
+            clickhouse,
+            beforeTs,
+            beforeSeq,
+            limit
+          );
+          return jsonResponse(buildHistoryResponse(data, smartFlowAlertCursor));
         }
 
         if (req.method === "GET" && url.pathname === "/history/classifier-hits") {
@@ -2061,6 +2061,14 @@ const run = async () => {
           return jsonResponse({ data, next });
         }
 
+        if (req.method === "GET" && url.pathname === "/replay/smart-flow-alerts") {
+          const { afterTs, afterSeq, limit } = parseReplayParams(url);
+          const data = await fetchSmartFlowAlertEventsAfter(clickhouse, afterTs, afterSeq, limit);
+          const last = data.at(-1);
+          const next = last ? smartFlowAlertCursor(last) : null;
+          return jsonResponse({ data, next });
+        }
+
         if (req.method === "GET" && url.pathname === "/replay/classifier-hits") {
           const { afterTs, afterSeq, limit } = parseReplayParams(url);
           const data = await fetchClassifierHitsAfter(clickhouse, afterTs, afterSeq, limit);
@@ -2165,6 +2173,14 @@ const run = async () => {
           return jsonResponse({ error: "websocket upgrade failed" }, 400);
         }
 
+        if (req.method === "GET" && url.pathname === "/ws/smart-flow-alerts") {
+          if (serverRef.upgrade(req, { data: { channel: "smart-flow-alerts" } })) {
+            return new Response(null, { status: 101 });
+          }
+
+          return jsonResponse({ error: "websocket upgrade failed" }, 400);
+        }
+
         if (req.method === "GET" && url.pathname === "/ws/alerts") {
           if (serverRef.upgrade(req, { data: { channel: "alerts" } })) {
             return new Response(null, { status: 101 });
@@ -2217,6 +2233,8 @@ const run = async () => {
           flowSockets.add(socket);
         } else if (socket.data.channel === "smart-flow") {
           smartFlowSockets.add(socket);
+        } else if (socket.data.channel === "smart-flow-alerts") {
+          smartFlowAlertSockets.add(socket);
         } else if (socket.data.channel === "smart-money") {
           smartMoneySockets.add(socket);
         } else if (socket.data.channel === "classifier-hits") {
@@ -2288,6 +2306,8 @@ const run = async () => {
           flowSockets.delete(socket);
         } else if (socket.data.channel === "smart-flow") {
           smartFlowSockets.delete(socket);
+        } else if (socket.data.channel === "smart-flow-alerts") {
+          smartFlowAlertSockets.delete(socket);
         } else if (socket.data.channel === "smart-money") {
           smartMoneySockets.delete(socket);
         } else if (socket.data.channel === "classifier-hits") {

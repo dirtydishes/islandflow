@@ -42,6 +42,7 @@ import {
   OptionNBBOSchema,
   type OptionPrint,
   OptionPrintSchema,
+  SmartFlowAlertEventSchema,
   SmartFlowExplainabilityProjectionSchema,
   SmartMoneyEventSchema
 } from "@islandflow/types";
@@ -53,6 +54,7 @@ import {
   type DurableRowsSubscription
 } from "./durable-rows";
 import { fetchRecentSmartFlowExplainability, smartFlowCursor } from "./smart-flow";
+import { fetchRecentSmartFlowAlertEvents, smartFlowAlertCursor } from "./smart-flow-alerts";
 
 const CURSOR_HASH_KEY = "live:cursors";
 export const LIVE_FEED_LOOKBACK_MS = 24 * 60 * 60 * 1000;
@@ -70,6 +72,7 @@ const GENERIC_LIMIT_ENV_KEYS: Record<LiveGenericChannel, string> = {
   "equity-joins": "LIVE_LIMIT_EQUITY_JOINS",
   flow: "LIVE_LIMIT_FLOW",
   "smart-flow": "LIVE_LIMIT_SMART_FLOW",
+  "smart-flow-alerts": "LIVE_LIMIT_SMART_FLOW_ALERTS",
   "smart-money": "LIVE_LIMIT_SMART_MONEY",
   "classifier-hits": "LIVE_LIMIT_CLASSIFIER_HITS",
   alerts: "LIVE_LIMIT_ALERTS",
@@ -90,6 +93,7 @@ const DEFAULT_LIVE_LIMITS: GenericLiveLimits = {
   "equity-joins": 500,
   flow: 500,
   "smart-flow": 300,
+  "smart-flow-alerts": 300,
   "smart-money": 300,
   "classifier-hits": 300,
   alerts: 300,
@@ -107,6 +111,7 @@ type GenericFeedConfig = {
   limit: number;
   parse: (value: unknown) => any;
   cursor: (item: any) => Cursor;
+  identity?: (item: any) => string;
   fetchRecent: (clickhouse: ClickHouseClient, limit: number) => Promise<any[]>;
 };
 
@@ -213,6 +218,11 @@ export const resolveGenericLiveLimits = (
       "smart-flow",
       env.LIVE_LIMIT_DEFAULT ? liveLimitDefault : DEFAULT_LIVE_LIMITS["smart-flow"]
     ),
+    "smart-flow-alerts": parseGenericLimit(
+      env,
+      "smart-flow-alerts",
+      env.LIVE_LIMIT_DEFAULT ? liveLimitDefault : DEFAULT_LIVE_LIMITS["smart-flow-alerts"]
+    ),
     "smart-money": parseGenericLimit(
       env,
       "smart-money",
@@ -250,6 +260,7 @@ const extractFreshnessTs = (channel: LiveGenericChannel, item: any): number | nu
       return typeof item.ts === "number" ? item.ts : null;
     case "flow":
     case "smart-flow":
+    case "smart-flow-alerts":
     case "smart-money":
     case "classifier-hits":
     case "alerts":
@@ -377,6 +388,15 @@ const getGenericConfig = (
     cursor: smartFlowCursor,
     fetchRecent: fetchRecentSmartFlowExplainability
   },
+  "smart-flow-alerts": {
+    redisKey: "live:smart-flow-alerts",
+    cursorField: "smart-flow-alerts",
+    limit: limits["smart-flow-alerts"],
+    parse: (value) => SmartFlowAlertEventSchema.parse(value),
+    cursor: smartFlowAlertCursor,
+    identity: (item) => item.alert_id,
+    fetchRecent: fetchRecentSmartFlowAlertEvents
+  },
   "classifier-hits": {
     redisKey: "live:classifier-hits",
     cursorField: "classifier-hits",
@@ -428,6 +448,11 @@ const compareCursors = (a: Cursor, b: Cursor): number => b.ts - a.ts || b.seq - 
 const sortGenericItems = <T>(items: T[], cursorOf: (item: T) => Cursor): T[] =>
   [...items].sort((a, b) => compareCursors(cursorOf(a), cursorOf(b)));
 
+const cursorIdentity = <T>(item: T, cursorOf: (item: T) => Cursor): string => {
+  const cursor = cursorOf(item);
+  return `${cursor.ts}:${cursor.seq}`;
+};
+
 const keepNewestNbboByContract = <T extends { option_contract_id: string }>(
   items: T[],
   cursorOf: (item: T) => Cursor,
@@ -445,6 +470,20 @@ const keepNewestNbboByContract = <T extends { option_contract_id: string }>(
   return sortGenericItems(Array.from(latestByContract.values()), cursorOf).slice(0, limit);
 };
 
+const dedupeGenericItems = <T>(
+  items: T[],
+  cursorOf: (item: T) => Cursor,
+  identityOf?: (item: T) => string
+): T[] => {
+  const deduped = new Map<string, T>();
+
+  for (const item of items) {
+    deduped.set(identityOf?.(item) ?? cursorIdentity(item, cursorOf), item);
+  }
+
+  return Array.from(deduped.values());
+};
+
 const normalizeGenericItems = <T>(
   channel: LiveGenericChannel,
   items: T[],
@@ -458,7 +497,10 @@ const normalizeGenericItems = <T>(
     );
   }
 
-  return sortGenericItems(items, config.cursor).slice(0, config.limit);
+  return sortGenericItems(
+    dedupeGenericItems(items, config.cursor, config.identity),
+    config.cursor
+  ).slice(0, config.limit);
 };
 
 const isWithinLiveFeedLookback = (
@@ -593,17 +635,18 @@ const candleCursorField = (underlyingId: string, intervalMs: number): string =>
 const overlayRedisKey = (underlyingId: string): string => `live:equity-overlay:${underlyingId}`;
 const overlayCursorField = (underlyingId: string): string => `equities:${underlyingId}`;
 
-const dropMatchingCursor = <T>(items: T[], target: Cursor, cursorOf: (item: T) => Cursor): T[] =>
-  items.filter((item) => compareCursors(cursorOf(item), target) !== 0);
-
 const insertNewestFirst = <T>(
   items: T[],
   item: T,
   cursorOf: (item: T) => Cursor,
-  limit: number
+  limit: number,
+  identityOf?: (item: T) => string
 ): { items: T[]; outOfOrder: boolean } => {
   const cursor = cursorOf(item);
-  const deduped = dropMatchingCursor(items, cursor, cursorOf);
+  const identity = identityOf?.(item) ?? cursorIdentity(item, cursorOf);
+  const deduped = items.filter(
+    (entry) => (identityOf?.(entry) ?? cursorIdentity(entry, cursorOf)) !== identity
+  );
   const head = deduped[0];
   const outOfOrder = head ? compareCursors(cursor, cursorOf(head)) > 0 : false;
 
@@ -1149,7 +1192,8 @@ export class LiveStateManager {
                 this.genericItems.get(channel) ?? [],
                 parsed,
                 config.cursor,
-                config.limit
+                config.limit,
+                config.identity
               );
 
         if (nextState.outOfOrder) {

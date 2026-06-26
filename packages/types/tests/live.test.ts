@@ -10,6 +10,7 @@ describe("live protocol types", () => {
   it("builds stable keys for generic and parameterized subscriptions", () => {
     expect(getSubscriptionKey({ channel: "flow" })).toBe("flow|{}");
     expect(getSubscriptionKey({ channel: "smart-flow" })).toBe("smart-flow");
+    expect(getSubscriptionKey({ channel: "smart-flow-alerts" })).toBe("smart-flow-alerts");
     expect(getSubscriptionKey({ channel: "news" })).toBe("news");
     expect(
       getSubscriptionKey({
@@ -64,6 +65,7 @@ describe("live protocol types", () => {
       subscriptions: [
         { channel: "flow", filters: { nbboSides: ["AA", "A"], minNotional: 50000 } },
         { channel: "smart-flow", snapshot_limit: 25 },
+        { channel: "smart-flow-alerts", snapshot_limit: 25 },
         { channel: "durable-rows", lanes: ["options", "alerts"], snapshot_limit: 100 },
         { channel: "news", snapshot_limit: 100 },
         { channel: "equity-candles", underlying_id: "SPY", interval_ms: 60000 }
@@ -71,7 +73,7 @@ describe("live protocol types", () => {
     });
 
     expect(parsed.op).toBe("subscribe");
-    expect(parsed.subscriptions).toHaveLength(5);
+    expect(parsed.subscriptions).toHaveLength(6);
   });
 
   it("validates snapshot and event server messages", () => {

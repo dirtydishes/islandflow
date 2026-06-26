@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Smart-Flow Alerts Phase 03 Derived Alerts</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #101720;
+        --panel-2: #0b1118;
+        --line: #223041;
+        --line-strong: #614719;
+        --text: #e6edf4;
+        --muted: #9aaabc;
+        --faint: #728094;
+        --accent: #f5a623;
+        --green: #25c17a;
+        --red: #ff6b5f;
+        --code: #080d13;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.55;
+      }
+
+      main {
+        width: min(1120px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 40px 0 64px;
+      }
+
+      header,
+      section {
+        border: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      header {
+        padding: 24px;
+      }
+
+      section {
+        margin-top: 14px;
+        padding: 20px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 860px;
+        font-size: 2.25rem;
+        line-height: 1.08;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        margin-bottom: 10px;
+        font-size: 1.08rem;
+        letter-spacing: 0;
+      }
+
+      h3 {
+        margin: 14px 0 6px;
+        color: var(--accent);
+        font-size: 0.92rem;
+      }
+
+      p,
+      li {
+        color: var(--muted);
+      }
+
+      code,
+      pre {
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      }
+
+      code {
+        color: #fff0cf;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 1.1rem;
+      }
+
+      li + li {
+        margin-top: 6px;
+      }
+
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 18px;
+      }
+
+      .chip {
+        border: 1px solid var(--line-strong);
+        background: rgba(245, 166, 35, 0.1);
+        color: #ffe0a6;
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 650;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 10px;
+      }
+
+      .tile {
+        border: 1px solid var(--line);
+        background: var(--panel-2);
+        padding: 14px;
+      }
+
+      .tile strong {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--text);
+      }
+
+      .diff-panel[data-rich-ready="true"] .diff-fallback {
+        display: none;
+      }
+
+      .diff-rich {
+        display: none;
+        overflow: auto;
+        border: 1px solid var(--line);
+        background: var(--code);
+      }
+
+      .diff-panel[data-rich-ready="true"] .diff-rich {
+        display: block;
+      }
+
+      .diff-fallback {
+        overflow-x: auto;
+        margin: 0;
+        padding: 14px;
+        border: 1px solid var(--line);
+        background: var(--code);
+        color: #cbd8e6;
+        font-size: 0.82rem;
+        line-height: 1.45;
+      }
+
+      .note {
+        color: var(--faint);
+        font-size: 0.9rem;
+      }
+
+      .ok {
+        color: var(--green);
+      }
+
+      .risk {
+        color: var(--red);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="note">Islandflow implementation turn</p>
+        <h1>Smart-flow alerts phase 03 added canonical derived alert contracts and delivery surfaces.</h1>
+        <div class="meta">
+          <span class="chip">Beads islandflow-ghce.3</span>
+          <span class="chip">Branch lavender/smart-flow-alerts-03-derived-alerts</span>
+          <span class="chip">2026-06-26</span>
+        </div>
+      </header>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          Added <code>SmartFlowAlertEvent</code> as the canonical alert contract derived from
+          non-abstained native smart-flow projections. The new alert path has its own JetStream
+          subject and stream, ClickHouse table, live-cache channel, REST history and replay routes,
+          and websocket route. Legacy alert and classifier-hit surfaces remain untouched, and the web
+          terminal only gained passive live-session support for the new channel rather than switching
+          any UI consumer. Reviewer hardening tightened projection-derived invariants, fixed same-cursor
+          alert paging and live-cache identity, and moved compute alert validation ahead of publish
+          side effects.
+        </p>
+      </section>
+
+      <section>
+        <h2>Implementation</h2>
+        <div class="grid">
+          <div class="tile">
+            <strong>Canonical contract</strong>
+            <p><code>SmartFlowAlertEvent</code> carries event metadata, schema version, hypothesis refs, policy confidence, evidence quality, a <code>non_abstained_hypothesis</code> trigger, the source projection, and evidence refs.</p>
+          </div>
+          <div class="tile">
+            <strong>Projection-only derivation</strong>
+            <p>Compute derives alerts only through <code>smartFlowAlertFromProjection</code> after a native smart-flow projection is emitted, and returns <code>null</code> for abstentions or compatibility rows.</p>
+          </div>
+          <div class="tile">
+            <strong>Dedicated delivery</strong>
+            <p>Added <code>flow.smart_flow_alerts</code> on <code>SMART_FLOW_ALERTS</code>, plus <code>smart-flow-alerts</code> live, history, replay, flow, and websocket surfaces.</p>
+          </div>
+          <div class="tile">
+            <strong>Storage and cache</strong>
+            <p>Added <code>smart_flow_alerts</code> ClickHouse storage with JSON round-trip parsing, alert-id tie ordering, boundary-tie paging, and live-cache hydration support.</p>
+          </div>
+          <div class="tile">
+            <strong>Reviewer hardening</strong>
+            <p>Canonical alerts now reject nested abstention or compatibility drift, preserve same-cursor alert siblings, and validate the whole compute alert plan before any publish loop side effects.</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Changed Files</h2>
+        <ul>
+          <li>Contracts and live typing: <code>packages/types/src/smart-flow-alerts.ts</code>, <code>packages/types/src/live.ts</code>, and package exports.</li>
+          <li>Bus and storage: <code>packages/bus/src/subjects.ts</code>, <code>packages/bus/src/streams.ts</code>, <code>packages/storage/src/smart-flow-alerts.ts</code>, and ClickHouse read/write helpers.</li>
+          <li>Runtime and API: <code>services/compute/src/index.ts</code>, <code>services/compute/src/smart-flow-alerts.ts</code>, <code>services/api/src/index.ts</code>, <code>services/api/src/live.ts</code>, and <code>services/api/src/smart-flow-alerts.ts</code>.</li>
+          <li>Passive web support: <code>apps/web/features/terminal/live-session-state.ts</code> and <code>apps/web/features/terminal/live.ts</code>.</li>
+          <li>Focused tests: smart-flow alert contract, storage, bus, compute runtime, API smart-flow, API live collision coverage, and live subscription tests.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Verification</h2>
+        <ul>
+          <li><span class="ok">Passed</span>: <code>bd show islandflow-ghce.3</code></li>
+          <li><span class="ok">Passed</span>: <code>bun test packages/types</code></li>
+          <li><span class="ok">Passed</span>: <code>bun test services/compute/tests</code></li>
+          <li><span class="ok">Passed</span>: <code>bun test services/api/tests/live.test.ts services/api/tests/smart-flow.test.ts</code></li>
+          <li><span class="ok">Passed</span>: <code>bun test packages/storage packages/bus apps/web/features/terminal/live-session-state.test.ts</code></li>
+          <li><span class="ok">Passed</span>: <code>bun --cwd=apps/web run build</code></li>
+          <li><span class="ok">Passed</span>: <code>bun run typecheck</code></li>
+          <li><span class="ok">Passed</span>: <code>bun run fmt:check</code></li>
+          <li><span class="ok">Passed</span>: <code>git diff --check</code></li>
+          <li><span class="ok">Passed</span>: <code>bunx biome check</code> on the touched code/test files after import-order cleanup.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p class="note">
+          The fallback unified diff is visible by default. The richer view mounts in the browser
+          with <code>PatchDiff</code> from <code>@pierre/diffs/react</code>; the fallback is hidden only
+          after that render succeeds.
+        </p>
+        <div class="diff-panel" data-rich-ready="false">
+          <div class="diff-rich" id="diff-rich"></div>
+          <pre class="diff-fallback" id="diff-fallback">diff --git a/packages/types/src/smart-flow-alerts.ts b/packages/types/src/smart-flow-alerts.ts
+new file mode 100644
+index 0000000..32afceb
+--- /dev/null
++++ b/packages/types/src/smart-flow-alerts.ts
+@@ -0,0 +1,86 @@
++export const SMART_FLOW_ALERT_TRIGGER_KIND = "non_abstained_hypothesis";
++
++export const isNativeNonAbstainedSmartFlowProjection = (
++  projection: SmartFlowExplainabilityProjection
++): boolean =&gt;
++  projection.source_channel === "smart-flow" &amp;&amp;
++  projection.hypothesis.generated_from === "flow_evidence_cluster" &amp;&amp;
++  projection.abstention.abstained === false &amp;&amp;
++  projection.hypothesis.abstention.abstained === false &amp;&amp;
++  projection.insight.abstention.abstained === false &amp;&amp;
++  projection.compatibility === undefined &amp;&amp;
++  projection.hypothesis.compatibility === undefined &amp;&amp;
++  projection.insight.compatibility === undefined;
++
++export const SmartFlowAlertEventSchema = EventMetaSchema.extend({
++  schema_version: SmartFlowContractVersionSchema,
++  alert_id: z.string().min(1),
++  hypothesis_id: z.string().min(1),
++  insight_id: z.string().min(1),
++  underlying_id: z.string().min(1),
++  hypothesis_type: FlowHypothesisTypeSchema,
++  direction: SmartMoneyDirectionSchema,
++  policy_confidence: z.number().min(0).max(1),
++  evidence_quality: z.number().min(0).max(1),
++  trigger: SmartFlowAlertTriggerSchema,
++  projection: NonAbstainedNativeSmartFlowProjectionSchema,
++  evidence_refs: z.array(z.string().min(1)).min(1)
++})
++  .strict()
++  .superRefine((alert, ctx) =&gt; {
++    // Alert metadata must stay projection-derived, not independently mutable.
++  });
++
++export const smartFlowAlertFromProjection = (
++  projection: SmartFlowExplainabilityProjection,
++  options: { alert_id?: string; trace_id?: string } = {}
++): SmartFlowAlertEvent | null =&gt; {
++  if (!isNativeNonAbstainedSmartFlowProjection(projection)) {
++    return null;
++  }
++
++  const alertId = options.alert_id ?? `smartflow:alert:${projection.refs.hypothesis_id}`;
++  return SmartFlowAlertEventSchema.parse({
++    source_ts: projection.source_ts,
++    ingest_ts: projection.ingest_ts,
++    seq: projection.seq,
++    trace_id: options.trace_id ?? alertId,
++    schema_version: projection.schema_version,
++    alert_id: alertId,
++    hypothesis_id: projection.refs.hypothesis_id,
++    insight_id: projection.refs.insight_id,
++    underlying_id: projection.hypothesis.underlying_id,
++    hypothesis_type: projection.hypothesis.hypothesis_type,
++    direction: projection.hypothesis.direction,
++    policy_confidence: projection.hypothesis.scores.confidence.policy_confidence,
++    evidence_quality: projection.hypothesis.scores.confidence.evidence_quality,
++    trigger: {
++      kind: SMART_FLOW_ALERT_TRIGGER_KIND,
++      projection_trace_id: projection.trace_id,
++      projection_version: projection.projection_version,
++      source_channel: projection.source_channel
++    },
++    projection,
++    evidence_refs: projection.refs.evidence_refs
++  });
++};
+
+diff --git a/packages/bus/src/subjects.ts b/packages/bus/src/subjects.ts
+index a00aaae..f053f54 100644
+--- a/packages/bus/src/subjects.ts
++++ b/packages/bus/src/subjects.ts
+@@ -20,6 +20,8 @@
+ export const STREAM_SMART_FLOW = "SMART_FLOW";
+ export const SUBJECT_SMART_FLOW = "flow.smart_flow";
++export const STREAM_SMART_FLOW_ALERTS = "SMART_FLOW_ALERTS";
++export const SUBJECT_SMART_FLOW_ALERTS = "flow.smart_flow_alerts";
+
+diff --git a/packages/storage/src/smart-flow-alerts.ts b/packages/storage/src/smart-flow-alerts.ts
+new file mode 100644
+index 0000000..60a5439
+--- /dev/null
++++ b/packages/storage/src/smart-flow-alerts.ts
+@@ -0,0 +1,75 @@
++export const SMART_FLOW_ALERTS_TABLE = "smart_flow_alerts";
++
++export const smartFlowAlertsTableDDL = (): string =&gt; {
++  return `
++CREATE TABLE IF NOT EXISTS ${SMART_FLOW_ALERTS_TABLE} (
++  source_ts UInt64,
++  ingest_ts UInt64,
++  seq UInt64,
++  trace_id String,
++  schema_version String,
++  alert_id String,
++  hypothesis_id String,
++  insight_id String,
++  underlying_id String,
++  hypothesis_type String,
++  direction String,
++  policy_confidence Float64,
++  evidence_quality Float64,
++  trigger_kind String,
++  projection_trace_id String,
++  evidence_refs Array(String),
++  alert_json String
++)
++ENGINE = MergeTree
++ORDER BY (source_ts, seq, alert_id)
++`;
++};
+
+diff --git a/packages/storage/src/clickhouse.ts b/packages/storage/src/clickhouse.ts
+@@
++const appendSmartFlowAlertBoundaryTies = async (
++  client: ClickHouseClient,
++  alerts: SmartFlowAlertEvent[],
++  limit: number,
++  direction: "asc" | "desc"
++): Promise&lt;SmartFlowAlertEvent[]&gt; =&gt; {
++  if (alerts.length &lt; limit) {
++    return alerts;
++  }
++  // Include every alert that shares the boundary cursor so the next two-field cursor cannot skip siblings.
++};
+
+diff --git a/services/compute/src/smart-flow-alerts.ts b/services/compute/src/smart-flow-alerts.ts
+new file mode 100644
+@@
++export const planSmartFlowAlertEmissions = (
++  projections: readonly SmartFlowExplainabilityProjection[]
++): SmartFlowAlertEmissionPlan[] =&gt;
++  projections.map((projection) =&gt; ({
++    projection,
++    alert: smartFlowAlertFromProjection(projection)
++  }));
+
+diff --git a/services/compute/src/index.ts b/services/compute/src/index.ts
+@@
++  const emissions = planSmartFlowAlertEmissions(flush.projections);
++
++  for (const { projection, alert } of emissions) {
++    enqueueSmartFlowProjectionInsert(batchWriter, projection);
++    await publishJson(js, SUBJECT_SMART_FLOW, projection);
++    if (alert) {
++      enqueueSmartFlowAlertInsert(batchWriter, alert);
++      await publishJson(js, SUBJECT_SMART_FLOW_ALERTS, alert);
++    }
++  }
+
+diff --git a/services/api/src/live.ts b/services/api/src/live.ts
+index a79db4a..1bf2ce7 100644
+--- a/services/api/src/live.ts
++++ b/services/api/src/live.ts
+@@ -377,6 +387,14 @@
++  "smart-flow-alerts": {
++    redisKey: "live:smart-flow-alerts",
++    cursorField: "smart-flow-alerts",
++    limit: limits["smart-flow-alerts"],
++    parse: (value) =&gt; SmartFlowAlertEventSchema.parse(value),
++    cursor: smartFlowAlertCursor,
++    identity: (item) =&gt; item.alert_id,
++    fetchRecent: fetchRecentSmartFlowAlertEvents
++  },
+
+diff --git a/services/api/src/index.ts b/services/api/src/index.ts
+index c2afa39..50e1f39 100644
+--- a/services/api/src/index.ts
++++ b/services/api/src/index.ts
+@@ -1413,6 +1413,15 @@
++  const pumpSmartFlowAlerts = async () =&gt; {
++    for await (const msg of smartFlowAlertSubscription.messages) {
++      const payload = SmartFlowAlertEventSchema.parse(smartFlowAlertSubscription.decode(msg));
++      broadcast(smartFlowAlertSockets, { type: "smart-flow-alert", payload });
++      await fanoutLive({ channel: "smart-flow-alerts" }, payload, "smart-flow-alerts");
++      msg.ack();
++    }
++  };
+@@ -1738,6 +1738,35 @@
++        if (req.method === "GET" &amp;&amp; url.pathname === "/flow/smart-flow-alerts") {
++          const limit = parseLimit(url.searchParams.get("limit"));
++          const data = await fetchRecentSmartFlowAlertEvents(clickhouse, limit);
++          return jsonResponse({ data });
++        }
++
++        if (req.method === "GET" &amp;&amp; url.pathname === "/history/smart-flow-alerts") {
++          const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
++          const data = await fetchSmartFlowAlertEventsBefore(clickhouse, beforeTs, beforeSeq, limit);
++          return jsonResponse(buildHistoryResponse(data, smartFlowAlertCursor));
++        }
++
++        if (req.method === "GET" &amp;&amp; url.pathname === "/replay/smart-flow-alerts") {
++          const { afterTs, afterSeq, limit } = parseReplayParams(url);
++          const data = await fetchSmartFlowAlertEventsAfter(clickhouse, afterTs, afterSeq, limit);
++          const last = data.at(-1);
++          const next = last ? smartFlowAlertCursor(last) : null;
++          return jsonResponse({ data, next });
++        }
++
++        if (req.method === "GET" &amp;&amp; url.pathname === "/ws/smart-flow-alerts") {
++          if (serverRef.upgrade(req, { data: { channel: "smart-flow-alerts" } })) {
++            return new Response(null, { status: 101 });
++          }
++          return jsonResponse({ error: "websocket upgrade failed" }, 400);
++        }
+          </pre>
+        </div>
+      </section>
+
+      <section>
+        <h2>Risks</h2>
+        <ul>
+          <li>Deployment needs the new <code>SMART_FLOW_ALERTS</code> stream and <code>smart_flow_alerts</code> table reconciled before canonical alerts appear through live APIs.</li>
+          <li>Alert priority remains a UI concern for phase 04; no stored legacy score, severity, or classifier hits were added to the canonical event.</li>
+          <li>Smart-flow alert history and replay may return extra rows that share a page-boundary cursor; this preserves correctness with the existing two-field cursor shape.</li>
+          <li>Old alert routes intentionally remain available until the later legacy-removal phase, so both alert surfaces can coexist during migration.</li>
+        </ul>
+      </section>
+    </main>
+
+    <script type="module">
+      const patch = document.getElementById("diff-fallback")?.textContent ?? "";
+      const richRoot = document.getElementById("diff-rich");
+      const panel = richRoot?.closest(".diff-panel");
+
+      if (patch && richRoot && panel) {
+        try {
+          const [{ createElement }, { createRoot }, { PatchDiff }] = await Promise.all([
+            import("https://esm.sh/react@18"),
+            import("https://esm.sh/react-dom@18/client"),
+            import("https://esm.sh/@pierre/diffs@1.2.2/react")
+          ]);
+          createRoot(richRoot).render(
+            createElement(PatchDiff, {
+              patch,
+              viewType: "unified",
+              overflow: "wrap"
+            })
+          );
+          panel.setAttribute("data-rich-ready", "true");
+        } catch (error) {
+          console.warn("Diffs rich renderer failed; keeping HTML fallback.", error);
+        }
+      }
+    </script>
+  </body>
+</html>

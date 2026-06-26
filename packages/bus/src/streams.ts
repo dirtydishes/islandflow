@@ -12,6 +12,7 @@ import {
   STREAM_OPTION_PRINTS,
   STREAM_OPTION_SIGNAL_PRINTS,
   STREAM_SMART_FLOW,
+  STREAM_SMART_FLOW_ALERTS,
   STREAM_SMART_MONEY_EVENTS,
   SUBJECT_ALERTS,
   SUBJECT_CLASSIFIER_HITS,
@@ -26,6 +27,7 @@ import {
   SUBJECT_OPTION_PRINTS,
   SUBJECT_OPTION_SIGNAL_PRINTS,
   SUBJECT_SMART_FLOW,
+  SUBJECT_SMART_FLOW_ALERTS,
   SUBJECT_SMART_MONEY_EVENTS
 } from "./subjects";
 
@@ -59,6 +61,11 @@ export const STREAM_CATALOG: readonly KnownStreamDefinition[] = [
   {
     name: STREAM_SMART_FLOW,
     subject: SUBJECT_SMART_FLOW,
+    retentionClass: "derived"
+  },
+  {
+    name: STREAM_SMART_FLOW_ALERTS,
+    subject: SUBJECT_SMART_FLOW_ALERTS,
     retentionClass: "derived"
   },
   { name: STREAM_CLASSIFIER_HITS, subject: SUBJECT_CLASSIFIER_HITS, retentionClass: "derived" },

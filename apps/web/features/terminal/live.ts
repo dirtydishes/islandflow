@@ -15,6 +15,7 @@ import type {
   NewsStory,
   OptionNBBO,
   OptionPrint,
+  SmartFlowAlertEvent,
   SmartFlowExplainabilityProjection,
   SmartMoneyEvent
 } from "@islandflow/types";
@@ -908,6 +909,7 @@ export type LiveSessionState = {
   equityJoinsHistory: EquityPrintJoin[];
   flowHistory: FlowPacket[];
   smartFlowHistory: SmartFlowExplainabilityProjection[];
+  smartFlowAlertsHistory: SmartFlowAlertEvent[];
   smartMoneyHistory: SmartMoneyEvent[];
   classifierHitsHistory: ClassifierHitEvent[];
   alertsHistory: AlertEvent[];
@@ -921,6 +923,7 @@ export type LiveSessionState = {
   equityJoins: EquityPrintJoin[];
   flow: FlowPacket[];
   smartFlow: SmartFlowExplainabilityProjection[];
+  smartFlowAlerts: SmartFlowAlertEvent[];
   smartMoney: SmartMoneyEvent[];
   classifierHits: ClassifierHitEvent[];
   alerts: AlertEvent[];
@@ -944,6 +947,7 @@ export const LIVE_HISTORY_ENDPOINTS: Partial<Record<LiveSubscription["channel"],
   "equity-joins": "/history/equity-joins",
   flow: "/history/flow",
   "smart-flow": "/history/smart-flow",
+  "smart-flow-alerts": "/history/smart-flow-alerts",
   "smart-money": "/history/smart-money",
   "classifier-hits": "/history/classifier-hits",
   alerts: "/history/alerts",
@@ -978,6 +982,7 @@ export const useLiveSession = (
   const [equityJoins, setEquityJoins] = useState<EquityPrintJoin[]>([]);
   const [flow, setFlow] = useState<FlowPacket[]>([]);
   const [smartFlow, setSmartFlow] = useState<SmartFlowExplainabilityProjection[]>([]);
+  const [smartFlowAlerts, setSmartFlowAlerts] = useState<SmartFlowAlertEvent[]>([]);
   const [smartMoney, setSmartMoney] = useState<SmartMoneyEvent[]>([]);
   const [classifierHits, setClassifierHits] = useState<ClassifierHitEvent[]>([]);
   const [alerts, setAlerts] = useState<AlertEvent[]>([]);
@@ -990,6 +995,7 @@ export const useLiveSession = (
   const [equityJoinsHistory, setEquityJoinsHistory] = useState<EquityPrintJoin[]>([]);
   const [flowHistory, setFlowHistory] = useState<FlowPacket[]>([]);
   const [smartFlowHistory, setSmartFlowHistory] = useState<SmartFlowExplainabilityProjection[]>([]);
+  const [smartFlowAlertsHistory, setSmartFlowAlertsHistory] = useState<SmartFlowAlertEvent[]>([]);
   const [smartMoneyHistory, setSmartMoneyHistory] = useState<SmartMoneyEvent[]>([]);
   const [classifierHitsHistory, setClassifierHitsHistory] = useState<ClassifierHitEvent[]>([]);
   const [alertsHistory, setAlertsHistory] = useState<AlertEvent[]>([]);
@@ -1005,6 +1011,7 @@ export const useLiveSession = (
   const equityJoinsRef = useRef<EquityPrintJoin[]>([]);
   const flowRef = useRef<FlowPacket[]>([]);
   const smartFlowRef = useRef<SmartFlowExplainabilityProjection[]>([]);
+  const smartFlowAlertsRef = useRef<SmartFlowAlertEvent[]>([]);
   const smartMoneyRef = useRef<SmartMoneyEvent[]>([]);
   const classifierHitsRef = useRef<ClassifierHitEvent[]>([]);
   const alertsRef = useRef<AlertEvent[]>([]);
@@ -1020,6 +1027,7 @@ export const useLiveSession = (
   const equityJoinsHistoryRef = useRef<EquityPrintJoin[]>([]);
   const flowHistoryRef = useRef<FlowPacket[]>([]);
   const smartFlowHistoryRef = useRef<SmartFlowExplainabilityProjection[]>([]);
+  const smartFlowAlertsHistoryRef = useRef<SmartFlowAlertEvent[]>([]);
   const smartMoneyHistoryRef = useRef<SmartMoneyEvent[]>([]);
   const classifierHitsHistoryRef = useRef<ClassifierHitEvent[]>([]);
   const alertsHistoryRef = useRef<AlertEvent[]>([]);
@@ -1087,6 +1095,7 @@ export const useLiveSession = (
       setEquityJoins([]);
       setFlow([]);
       setSmartFlow([]);
+      setSmartFlowAlerts([]);
       setSmartMoney([]);
       setClassifierHits([]);
       setAlerts([]);
@@ -1099,6 +1108,7 @@ export const useLiveSession = (
       setEquityJoinsHistory([]);
       setFlowHistory([]);
       setSmartFlowHistory([]);
+      setSmartFlowAlertsHistory([]);
       setSmartMoneyHistory([]);
       setClassifierHitsHistory([]);
       setAlertsHistory([]);
@@ -1114,6 +1124,7 @@ export const useLiveSession = (
       equityJoinsRef.current = [];
       flowRef.current = [];
       smartFlowRef.current = [];
+      smartFlowAlertsRef.current = [];
       smartMoneyRef.current = [];
       classifierHitsRef.current = [];
       alertsRef.current = [];
@@ -1130,6 +1141,7 @@ export const useLiveSession = (
       equityJoinsHistoryRef.current = [];
       flowHistoryRef.current = [];
       smartFlowHistoryRef.current = [];
+      smartFlowAlertsHistoryRef.current = [];
       smartMoneyHistoryRef.current = [];
       classifierHitsHistoryRef.current = [];
       alertsHistoryRef.current = [];
@@ -1289,6 +1301,18 @@ export const useLiveSession = (
             {
               setter: setSmartFlowHistory,
               ref: smartFlowHistoryRef
+            }
+          );
+          break;
+        case "smart-flow-alerts":
+          mergeItems(
+            "smart-flow-alerts",
+            setSmartFlowAlerts,
+            smartFlowAlertsRef,
+            items as SmartFlowAlertEvent[],
+            {
+              setter: setSmartFlowAlertsHistory,
+              ref: smartFlowAlertsHistoryRef
             }
           );
           break;
@@ -1668,6 +1692,13 @@ export const useLiveSession = (
           case "smart-flow":
             mergeOlder(setSmartFlowHistory, smartFlowHistoryRef, smartFlowRef.current);
             break;
+          case "smart-flow-alerts":
+            mergeOlder(
+              setSmartFlowAlertsHistory,
+              smartFlowAlertsHistoryRef,
+              smartFlowAlertsRef.current
+            );
+            break;
           case "smart-money":
             mergeOlder(setSmartMoneyHistory, smartMoneyHistoryRef, smartMoneyRef.current);
             break;
@@ -1723,6 +1754,7 @@ export const useLiveSession = (
     equityJoinsHistory,
     flowHistory,
     smartFlowHistory,
+    smartFlowAlertsHistory,
     smartMoneyHistory,
     classifierHitsHistory,
     alertsHistory,
@@ -1736,6 +1768,7 @@ export const useLiveSession = (
     equityJoins,
     flow,
     smartFlow,
+    smartFlowAlerts,
     smartMoney,
     classifierHits,
     alerts,

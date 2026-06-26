@@ -1,11 +1,16 @@
 import { describe, expect, it } from "bun:test";
-import { type ClickHouseClient, toSmartFlowProjectionRecord } from "@islandflow/storage";
+import {
+  type ClickHouseClient,
+  toSmartFlowAlertRecord,
+  toSmartFlowProjectionRecord
+} from "@islandflow/storage";
 import {
   SMART_FLOW_CONTRACT_VERSION,
   SMART_FLOW_HYPOTHESIS_SCORE_MODEL_VERSION,
   SMART_FLOW_HYPOTHESIS_SCORE_POLICY_VERSION,
   SMART_FLOW_MODEL_VERSION,
   SMART_FLOW_POLICY_VERSION,
+  smartFlowAlertFromProjection,
   smartFlowExplainabilityFromHypothesisEvent
 } from "@islandflow/types";
 import {
@@ -13,8 +18,36 @@ import {
   fetchSmartFlowExplainabilityByPacketIds,
   smartFlowCursor
 } from "../src/smart-flow";
+import {
+  fetchRecentSmartFlowAlertEvents,
+  fetchSmartFlowAlertEventsAfter,
+  fetchSmartFlowAlertEventsBefore,
+  smartFlowAlertCursor
+} from "../src/smart-flow-alerts";
 
-const makeClickHouse = (rows: unknown[], queries: string[] = []): ClickHouseClient =>
+const makeClickHouse = (
+  rows: unknown[] | unknown[][],
+  queries: string[] = []
+): ClickHouseClient => {
+  let queryIndex = 0;
+  return {
+    exec: async () => {},
+    insert: async () => {},
+    ping: async () => ({ success: true }),
+    close: async () => {},
+    query: async ({ query }) => {
+      queries.push(query);
+      const currentRows = Array.isArray(rows[0]) ? (rows as unknown[][])[queryIndex++] : rows;
+      return {
+        async json<T>() {
+          return currentRows as T;
+        }
+      };
+    }
+  } as ClickHouseClient;
+};
+
+const makeClickHouseSingle = (rows: unknown[], queries: string[] = []): ClickHouseClient =>
   ({
     exec: async () => {},
     insert: async () => {},
@@ -95,7 +128,7 @@ describe("smart-flow API projections", () => {
     const projection = makeSmartFlowProjection();
     const queries: string[] = [];
     const [payload] = await fetchRecentSmartFlowExplainability(
-      makeClickHouse([toSmartFlowProjectionRecord(projection)], queries),
+      makeClickHouseSingle([toSmartFlowProjectionRecord(projection)], queries),
       1
     );
 
@@ -114,11 +147,121 @@ describe("smart-flow API projections", () => {
     const projection = makeSmartFlowProjection();
     const queries: string[] = [];
     const [payload] = await fetchSmartFlowExplainabilityByPacketIds(
-      makeClickHouse([toSmartFlowProjectionRecord(projection)], queries),
+      makeClickHouseSingle([toSmartFlowProjectionRecord(projection)], queries),
       ["flowpacket:12"]
     );
 
     expect(queries[0]).toContain("has(evidence_refs, 'flowpacket:12')");
     expect(payload?.refs.cluster_id).toBe("cluster:SPY:1000:1120");
+  });
+});
+
+describe("smart-flow alert API projections", () => {
+  it("reads recent canonical smart-flow alert rows without legacy alert storage", async () => {
+    const projection = makeSmartFlowProjection();
+    const alert = smartFlowAlertFromProjection(projection);
+    if (!alert) {
+      throw new Error("expected non-abstained projection to derive an alert");
+    }
+    const queries: string[] = [];
+    const [payload] = await fetchRecentSmartFlowAlertEvents(
+      makeClickHouse([toSmartFlowAlertRecord(alert)], queries),
+      1
+    );
+
+    expect(queries[0]).toContain("smart_flow_alerts");
+    expect(queries[0]).not.toContain("FROM alerts");
+    expect(payload?.alert_id).toBe(alert.alert_id);
+    expect(payload?.trigger.kind).toBe("non_abstained_hypothesis");
+    expect(payload?.projection.refs.evidence_refs).toEqual(["flowpacket:12", "print:12"]);
+    expect(smartFlowAlertCursor(payload!)).toEqual({ ts: 1_000, seq: 12 });
+  });
+
+  it("queries smart-flow alerts after and before cursors", async () => {
+    const projection = makeSmartFlowProjection();
+    const alert = smartFlowAlertFromProjection(projection);
+    if (!alert) {
+      throw new Error("expected non-abstained projection to derive an alert");
+    }
+    const queries: string[] = [];
+    const client = makeClickHouse(
+      [
+        [toSmartFlowAlertRecord(alert)],
+        [toSmartFlowAlertRecord(alert)],
+        [toSmartFlowAlertRecord(alert)],
+        [toSmartFlowAlertRecord(alert)]
+      ],
+      queries
+    );
+
+    const [after] = await fetchSmartFlowAlertEventsAfter(client, 900, 10, 5);
+    const [before] = await fetchSmartFlowAlertEventsBefore(client, 1_100, 20, 5);
+
+    expect(after?.alert_id).toBe(alert.alert_id);
+    expect(before?.alert_id).toBe(alert.alert_id);
+    expect(queries[0]).toContain("(source_ts, seq) > (900, 10)");
+    expect(queries[1]).toContain("(source_ts, seq) < (1100, 20)");
+  });
+
+  it("keeps all smart-flow alert rows tied at a page boundary cursor", async () => {
+    const projection = makeSmartFlowProjection();
+    const first = smartFlowAlertFromProjection(projection, {
+      alert_id: "smartflow:alert:SPY",
+      trace_id: "smartflow:alert:SPY"
+    });
+    const second = smartFlowAlertFromProjection(
+      {
+        ...projection,
+        trace_id: "smartflow:hypothesis:cluster:QQQ:1000:1120",
+        refs: {
+          ...projection.refs,
+          trace_id: "smartflow:hypothesis:cluster:QQQ:1000:1120",
+          hypothesis_id: "hypothesis:cluster:QQQ:1000:1120",
+          insight_id: "smartflow:insight:hypothesis:cluster:QQQ:1000:1120",
+          cluster_id: "cluster:QQQ:1000:1120"
+        },
+        hypothesis: {
+          ...projection.hypothesis,
+          trace_id: "smartflow:hypothesis:cluster:QQQ:1000:1120",
+          event_id: "smartflow:hypothesis:cluster:QQQ:1000:1120",
+          hypothesis_id: "hypothesis:cluster:QQQ:1000:1120",
+          cluster_id: "cluster:QQQ:1000:1120",
+          underlying_id: "QQQ"
+        },
+        insight: {
+          ...projection.insight,
+          insight_id: "smartflow:insight:hypothesis:cluster:QQQ:1000:1120",
+          hypothesis_id: "hypothesis:cluster:QQQ:1000:1120",
+          underlying_id: "QQQ"
+        }
+      },
+      {
+        alert_id: "smartflow:alert:QQQ",
+        trace_id: "smartflow:alert:QQQ"
+      }
+    );
+    if (!first || !second) {
+      throw new Error("expected non-abstained projections to derive alerts");
+    }
+
+    const queries: string[] = [];
+    const payload = await fetchSmartFlowAlertEventsAfter(
+      makeClickHouse(
+        [
+          [toSmartFlowAlertRecord(first)],
+          [toSmartFlowAlertRecord(first), toSmartFlowAlertRecord(second)]
+        ],
+        queries
+      ),
+      900,
+      10,
+      1
+    );
+
+    expect(payload.map((alert) => alert.alert_id)).toEqual([
+      "smartflow:alert:QQQ",
+      "smartflow:alert:SPY"
+    ]);
+    expect(queries[1]).toContain("source_ts = 1000 AND seq = 12");
   });
 });
