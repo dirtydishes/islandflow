@@ -36,9 +36,11 @@ import {
 } from "./format";
 import { useOptionsTapeArraySource } from "./source";
 import {
-  getOptionsTapeDecorRowTint,
+  buildOptionsTapeSmartFlowContextByTraceId,
+  getOptionsTapeRowTintFromContext,
   getOptionsTapeRowTintClassName,
-  getOptionsTapeRowTintStyle
+  getOptionsTapeRowTintStyle,
+  getOptionsTapeSmartFlowSummary
 } from "./tinting";
 import type {
   FlowPacketFocusRequest,
@@ -89,23 +91,27 @@ const scopeToSourceScope = (scope: OptionsTapeScope): OptionsTapeSourceScope => 
 };
 
 const getContractFocusScope = (
-  print: OptionPrint
+  print: OptionPrint,
+  context?: OptionsTapeRowContext
 ): Extract<OptionsTapeScope, { mode: "contract" }> => ({
   mode: "contract",
   optionContractId: normalizeOptionsTapeContractId(print.option_contract_id),
-  underlyingId: getOptionsTapeUnderlying(print)
+  underlyingId: getOptionsTapeUnderlying(print),
+  smartFlow: context?.smartFlow
 });
 
 const getPacketFocusScope = (
   print: OptionPrint,
-  packet: FlowPacket
+  packet: FlowPacket,
+  context?: OptionsTapeRowContext
 ): Extract<OptionsTapeScope, { mode: "packet" }> => ({
   mode: "packet",
   packetId: packet.id,
   memberTraceIds: packet.members,
   optionContractId:
     getPacketContractId(packet) ?? normalizeOptionsTapeContractId(print.option_contract_id),
-  underlyingId: getOptionsTapeUnderlying(print)
+  underlyingId: getOptionsTapeUnderlying(print),
+  smartFlow: context?.smartFlow
 });
 
 const OptionsTapeSettings = ({
@@ -322,12 +328,27 @@ const renderScopeBand = ({
     return null;
   }
   const label = formatOptionsTapeContractLabel(scope.optionContractId);
+  const smartFlowSummary = scope.smartFlow
+    ? getOptionsTapeSmartFlowSummary(scope.smartFlow.projection)
+    : null;
   return (
     <div className={`options-tape-scope-band options-tape-scope-${scope.mode}`}>
-      <div>
-        <span>{scope.mode === "packet" ? "Packet prints" : "Contract flow"}</span>
-        <strong>{label}</strong>
-        {scope.mode === "packet" ? <em>{scope.packetId}</em> : null}
+      <div className="options-tape-scope-main">
+        <div className="options-tape-scope-focus">
+          <span>{scope.mode === "packet" ? "Packet prints" : "Contract flow"}</span>
+          <strong>{label}</strong>
+          {scope.mode === "packet" ? <em>{scope.packetId}</em> : null}
+        </div>
+        {smartFlowSummary ? (
+          <div className="options-tape-scope-smart-flow">
+            <span>Smart-flow</span>
+            <strong>{smartFlowSummary.hypothesis}</strong>
+            <em>
+              {smartFlowSummary.direction} / {smartFlowSummary.confidence} /{" "}
+              {smartFlowSummary.abstention}
+            </em>
+          </div>
+        ) : null}
       </div>
       <div className="options-tape-scope-actions">
         {scope.mode === "packet" ? (
@@ -349,6 +370,7 @@ const rowContextFromPrint = ({
   packetIdByOptionTraceId,
   flowPacketById,
   decorByTraceId,
+  smartFlowContextByTraceId,
   nbboByContractId,
   nbboByTraceId
 }: Pick<
@@ -361,6 +383,7 @@ const rowContextFromPrint = ({
   | "nbboByTraceId"
 > & {
   print: OptionPrint;
+  smartFlowContextByTraceId?: ReadonlyMap<string, OptionsTapeRowContext["smartFlow"]>;
 }): OptionsTapeRowContext => {
   const packet =
     flowPacketByTraceId?.get(print.trace_id) ??
@@ -377,6 +400,7 @@ const rowContextFromPrint = ({
           memberTraceIds: packet.members
         }
       : undefined,
+    smartFlow: smartFlowContextByTraceId?.get(print.trace_id),
     decor: decorByTraceId?.get(print.trace_id),
     nbbo
   };
@@ -397,6 +421,7 @@ export const OptionsTape = ({
   packetIdByOptionTraceId,
   flowPacketById,
   decorByTraceId,
+  smartFlowProjections,
   nbboByContractId,
   nbboByTraceId,
   focusedContractId,
@@ -422,6 +447,15 @@ export const OptionsTape = ({
     [activeFilters, sourceScope]
   );
   const templates = OPTIONS_TAPE_TEMPLATES_BY_MODE[mode];
+  const smartFlowContextByTraceId = useMemo(
+    () =>
+      buildOptionsTapeSmartFlowContextByTraceId({
+        projections: smartFlowProjections,
+        flowPacketById,
+        flowPacketByTraceId
+      }),
+    [flowPacketById, flowPacketByTraceId, smartFlowProjections]
+  );
 
   useEffect(() => {
     if (focusedContractId === null && scope.mode !== "global") {
@@ -437,6 +471,7 @@ export const OptionsTape = ({
         packetIdByOptionTraceId,
         flowPacketById,
         decorByTraceId,
+        smartFlowContextByTraceId,
         nbboByContractId,
         nbboByTraceId
       }),
@@ -446,12 +481,13 @@ export const OptionsTape = ({
       flowPacketByTraceId,
       nbboByContractId,
       nbboByTraceId,
-      packetIdByOptionTraceId
+      packetIdByOptionTraceId,
+      smartFlowContextByTraceId
     ]
   );
 
   const rowTintForPrint = useCallback(
-    (print: OptionPrint) => getOptionsTapeDecorRowTint(contextForPrint(print).decor),
+    (print: OptionPrint) => getOptionsTapeRowTintFromContext(contextForPrint(print)),
     [contextForPrint]
   );
 
@@ -476,15 +512,17 @@ export const OptionsTape = ({
     setScope({
       mode: "contract",
       optionContractId: scope.optionContractId,
-      underlyingId: scope.underlyingId
+      underlyingId: scope.underlyingId,
+      smartFlow: scope.smartFlow
     });
   }, [scope]);
 
   const activatePrint = useCallback(
     (event: DurableTapeFocusEvent<OptionPrint>) => {
-      const { print, packet } = contextForPrint(event.item);
+      const context = contextForPrint(event.item);
+      const { print, packet } = context;
       if (packet?.packet) {
-        const nextScope = getPacketFocusScope(print, packet.packet);
+        const nextScope = getPacketFocusScope(print, packet.packet, context);
         setScope(nextScope);
         onContractFocus?.(print);
         onPacketFocus?.(
@@ -492,7 +530,7 @@ export const OptionsTape = ({
         );
         return;
       }
-      setScope(getContractFocusScope(print));
+      setScope(getContractFocusScope(print, context));
       onContractFocus?.(print);
     },
     [contextForPrint, onContractFocus, onPacketFocus]
@@ -503,6 +541,9 @@ export const OptionsTape = ({
       const context = contextForPrint(item);
       const parsed = parseOptionContractId(item.option_contract_id);
       const linked = renderLinkedContext?.(context);
+      const smartFlowSummary = context.smartFlow
+        ? getOptionsTapeSmartFlowSummary(context.smartFlow.projection)
+        : null;
       const rows = [
         ["Contract", item.option_contract_id],
         ["Root", parsed?.root.toUpperCase() ?? getOptionsTapeUnderlying(item)],
@@ -517,7 +558,15 @@ export const OptionsTape = ({
         ["IV source", item.execution_iv_source ?? "--"],
         ["Signal", item.signal_profile ?? (item.signal_pass ? "signal" : "--")],
         ["Reasons", item.signal_reasons?.join(", ") || "--"],
-        ["Packet", context.packet?.packetId ?? "--"]
+        ["Packet", context.packet?.packetId ?? "--"],
+        ...(smartFlowSummary
+          ? [
+              ["Flow hypothesis", smartFlowSummary.hypothesis],
+              ["Flow direction", smartFlowSummary.direction],
+              ["Flow confidence", smartFlowSummary.confidence],
+              ["Flow abstention", smartFlowSummary.abstention]
+            ]
+          : [])
       ];
       return (
         <div className="options-tape-hover-content" aria-label="Options print detail">

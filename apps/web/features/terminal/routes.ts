@@ -36,6 +36,7 @@ export const buildDurableTapesRouteFeatures = (
   news: true,
   alerts: rawFallbackEnabled,
   durableRows: true,
+  smartFlow: rawFallbackEnabled,
   smartMoney: false,
   classifierHits: false,
   inferredDark: false,
@@ -67,6 +68,7 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         news: false,
         alerts: false,
         durableRows: false,
+        smartFlow: true,
         smartMoney: false,
         classifierHits: false,
         inferredDark: false,
@@ -93,6 +95,7 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         news: true,
         alerts: false,
         durableRows: false,
+        smartFlow: false,
         smartMoney: false,
         classifierHits: false,
         inferredDark: false,
@@ -122,6 +125,7 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         news: true,
         alerts: true,
         durableRows: false,
+        smartFlow: true,
         smartMoney: true,
         classifierHits: false,
         inferredDark: true,
@@ -231,8 +235,10 @@ export const getLiveManifest = (
   if (features.alerts) {
     subscriptions.push({ channel: "alerts", snapshot_limit: LIVE_HOT_WINDOW });
   }
-  if (features.smartMoney) {
+  if (features.smartFlow) {
     subscriptions.push({ channel: "smart-flow", snapshot_limit: LIVE_HOT_WINDOW });
+  }
+  if (features.smartMoney) {
     subscriptions.push({ channel: "smart-money", snapshot_limit: LIVE_HOT_WINDOW });
   }
   if (features.classifierHits) {

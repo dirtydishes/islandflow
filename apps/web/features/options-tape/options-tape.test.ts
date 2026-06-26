@@ -1,8 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import {
+  type FlowPacket,
   type FlowHypothesisType,
   FlowHypothesisTypeSchema,
   type OptionPrint,
+  type SmartFlowExplainabilityProjection,
   type SmartMoneyDirection
 } from "@islandflow/types";
 
@@ -26,11 +28,14 @@ import {
   getOptionsTapeSidePreset
 } from "./filters";
 import {
+  buildOptionsTapeSmartFlowContextByTraceId,
   getOptionsTapeDecorRowTint,
   getOptionsTapeEvidenceQualityBand,
   getOptionsTapePolicyConfidenceBand,
+  getOptionsTapeRowTintFromContext,
   getOptionsTapeRowTintClassName,
   getOptionsTapeRowTintStyle,
+  getOptionsTapeSmartFlowSummary,
   getOptionsTapeSmartFlowRowTint,
   type OptionsTapeSmartFlowTintInput,
   type OptionsTapeTintDirection,
@@ -233,6 +238,139 @@ describe("options tape helpers", () => {
 });
 
 describe("options tape row tint helpers", () => {
+  const makeFlowPacket = (overrides: Partial<FlowPacket> = {}): FlowPacket =>
+    ({
+      source_ts: 1_000,
+      ingest_ts: 1_001,
+      seq: 1,
+      trace_id: "flowpacket:trace:1",
+      id: "flowpacket:1",
+      members: ["member-1", "member-2"],
+      features: { option_contract_id: "SPY-2026-06-22-555-C" },
+      join_quality: {},
+      ...overrides
+    }) as FlowPacket;
+
+  const makeSmartFlowProjection = ({
+    abstained = false,
+    direction = "bullish",
+    evidenceQuality = 0.64,
+    hypothesisType = "directional_accumulation",
+    policyConfidence = 0.74,
+    refs = ["print-1"],
+    sourceReasons = [],
+    sourceTs = 1_000,
+    seq = 1
+  }: {
+    abstained?: boolean;
+    direction?: SmartMoneyDirection;
+    evidenceQuality?: number;
+    hypothesisType?: FlowHypothesisType;
+    policyConfidence?: number;
+    refs?: string[];
+    sourceReasons?: string[];
+    sourceTs?: number;
+    seq?: number;
+  } = {}): SmartFlowExplainabilityProjection =>
+    ({
+      source_ts: sourceTs,
+      ingest_ts: sourceTs + 1,
+      seq,
+      trace_id: `smart-flow:${seq}`,
+      source_channel: "smart-flow",
+      refs: {
+        trace_id: `smart-flow:${seq}`,
+        event_id: `event:${seq}`,
+        hypothesis_id: `hypothesis:${seq}`,
+        insight_id: `insight:${seq}`,
+        cluster_id: `cluster:${seq}`,
+        candidate_ids: [`candidate:${seq}`],
+        evidence_refs: refs
+      },
+      evidence: {
+        evidence_refs: refs,
+        evidence_quality: evidenceQuality,
+        penalties: []
+      },
+      hypothesis: {
+        source_ts: sourceTs,
+        ingest_ts: sourceTs + 1,
+        seq,
+        trace_id: `hypothesis:${seq}`,
+        schema_version: "smart-flow.contracts.v1",
+        policy_version: "smart-flow.policy.compat.v1",
+        model_version: "smart-flow.model.unscored.v1",
+        event_id: `event:${seq}`,
+        hypothesis_id: `hypothesis:${seq}`,
+        cluster_id: `cluster:${seq}`,
+        candidate_ids: [`candidate:${seq}`],
+        underlying_id: "SPY",
+        hypothesis_type: hypothesisType,
+        direction,
+        scores: {
+          schema_version: "smart-flow.contracts.v1",
+          policy_version: "smart-flow.policy.compat.v1",
+          model_version: "smart-flow.model.unscored.v1",
+          hypothesis_type: hypothesisType,
+          direction,
+          evidence_strength: evidenceQuality,
+          fit_score: policyConfidence,
+          penalty_score: 0,
+          penalties: [],
+          confidence: {
+            policy_confidence: policyConfidence,
+            evidence_quality: evidenceQuality,
+            hypothesis_margin: 0.2,
+            conviction: policyConfidence,
+            calibration_version: null
+          }
+        },
+        alternatives: [],
+        abstention: {
+          abstained,
+          reasons: abstained ? ["below_policy_threshold"] : ["not_abstained"],
+          source_reasons: sourceReasons
+        },
+        evidence_refs: refs,
+        generated_from: "flow_evidence_cluster"
+      },
+      insight: {
+        schema_version: "smart-flow.contracts.v1",
+        policy_version: "smart-flow.policy.compat.v1",
+        insight_id: `insight:${seq}`,
+        hypothesis_id: `hypothesis:${seq}`,
+        underlying_id: "SPY",
+        label: "Directional accumulation hypothesis",
+        summary: "Evidence-backed directional flow.",
+        direction,
+        confidence_band: "high",
+        confidence: policyConfidence,
+        evidence_refs: refs,
+        abstention: {
+          abstained,
+          reasons: abstained ? ["below_policy_threshold"] : ["not_abstained"],
+          source_reasons: sourceReasons
+        },
+        alternatives: []
+      },
+      abstention: {
+        abstained,
+        reasons: abstained ? ["below_policy_threshold"] : ["not_abstained"],
+        source_reasons: sourceReasons
+      },
+      alternatives: [],
+      versions: {
+        contract: "smart-flow.contracts.v1",
+        projection: "smart-flow.explainability-projection.v1",
+        policy: "smart-flow.policy.compat.v1",
+        model: "smart-flow.model.unscored.v1"
+      },
+      projection_version: "smart-flow.explainability-projection.v1",
+      policy_version: "smart-flow.policy.compat.v1",
+      model_version: "smart-flow.model.unscored.v1",
+      schema_version: "smart-flow.contracts.v1"
+    }) as SmartFlowExplainabilityProjection;
+
   const makeSmartFlowTintInput = ({
     abstained = false,
     direction = "bullish",
@@ -288,24 +426,45 @@ describe("options tape row tint helpers", () => {
     }
   });
 
-  it("maps direction states into semantic row tones", () => {
-    const cases: [SmartMoneyDirection, OptionsTapeTintDirection, OptionsTapeTintTone][] = [
-      ["bullish", "bullish", "green"],
-      ["bearish", "bearish", "red"],
-      ["neutral", "neutral", "blue"],
-      ["mixed", "mixed", "amber"],
-      ["unknown", "unknown", "neutral"]
+  it("maps smart-flow hypothesis types into semantic row hues", () => {
+    const cases: [FlowHypothesisType, OptionsTapeTintTone][] = [
+      ["directional_accumulation", "green"],
+      ["retail_attention_flow", "teal"],
+      ["event_positioning", "blue"],
+      ["volatility_supply", "copper"],
+      ["structure_arbitrage", "violet"],
+      ["hedge_rebalance", "cyan"],
+      ["unclear", "neutral"]
     ];
 
-    for (const [inputDirection, expectedDirection, expectedTone] of cases) {
+    for (const [hypothesisType, expectedTone] of cases) {
+      const tint = getOptionsTapeSmartFlowRowTint(
+        makeSmartFlowTintInput({ hypothesisType, direction: "bearish" })
+      );
+
+      expect(tint.metadata.hypothesisType).toBe(hypothesisType);
+      expect(tint.metadata.tone).toBe(expectedTone);
+      expect(tint.className).toContain(`classifier-${expectedTone}`);
+      expect(tint.className).toContain("options-tape-row-direction-bearish");
+    }
+  });
+
+  it("maps direction states into row metadata and modifier classes", () => {
+    const cases: [SmartMoneyDirection, OptionsTapeTintDirection][] = [
+      ["bullish", "bullish"],
+      ["bearish", "bearish"],
+      ["neutral", "neutral"],
+      ["mixed", "mixed"],
+      ["unknown", "unknown"]
+    ];
+
+    for (const [inputDirection, expectedDirection] of cases) {
       const tint = getOptionsTapeSmartFlowRowTint(
         makeSmartFlowTintInput({ direction: inputDirection })
       );
 
       expect(tint.metadata.direction).toBe(expectedDirection);
-      expect(tint.metadata.tone).toBe(expectedTone);
       expect(tint.className).toContain(`options-tape-row-direction-${expectedDirection}`);
-      expect(tint.className).toContain(`classifier-${expectedTone}`);
     }
   });
 
@@ -365,6 +524,77 @@ describe("options tape row tint helpers", () => {
     expect(tint.metadata.intensity).toBeLessThanOrEqual(0.36);
     expect(tint.className).toContain("options-tape-row-abstained");
     expect(tint.className).toContain("classifier-neutral");
+  });
+
+  it("maps smart-flow direct option-print refs and packet members to row contexts", () => {
+    const packet = makeFlowPacket({
+      id: "flowpacket:1",
+      trace_id: "flowpacket:trace:1",
+      members: ["member-1", "member-2"]
+    });
+    const projection = makeSmartFlowProjection({ refs: ["flowpacket:1", "direct-1"] });
+    const contexts = buildOptionsTapeSmartFlowContextByTraceId({
+      projections: [projection],
+      flowPacketById: new Map([[packet.id, packet]])
+    });
+
+    expect(contexts.get("direct-1")?.source).toBe("direct-print");
+    expect(contexts.get("direct-1")?.directPrintRefs).toEqual(["direct-1"]);
+    expect(contexts.get("member-1")?.source).toBe("packet-member");
+    expect(contexts.get("member-2")?.packetRefs).toEqual(["flowpacket:1"]);
+    expect(contexts.get("member-2")?.expandedPacketRefs).toEqual(["member-1", "member-2"]);
+  });
+
+  it("keeps direct smart-flow evidence ahead of packet expansion for the same row", () => {
+    const packet = makeFlowPacket({ id: "flowpacket:1", members: ["shared-print"] });
+    const projection = makeSmartFlowProjection({ refs: ["flowpacket:1", "shared-print"] });
+    const contexts = buildOptionsTapeSmartFlowContextByTraceId({
+      projections: [projection],
+      flowPacketById: new Map([[packet.id, packet]])
+    });
+
+    expect(contexts.get("shared-print")?.source).toBe("direct-print");
+  });
+
+  it("prefers smart-flow row tinting over legacy decor for the same print", () => {
+    const projection = makeSmartFlowProjection();
+    const tint = getOptionsTapeRowTintFromContext({
+      smartFlow: {
+        projection,
+        source: "direct-print",
+        evidenceRefs: ["print-1"],
+        directPrintRefs: ["print-1"],
+        packetRefs: [],
+        expandedPacketRefs: []
+      },
+      decor: {
+        family: "legacy",
+        tone: "red",
+        intensity: 1
+      }
+    });
+
+    expect(tint?.metadata.source).toBe("smart-flow");
+    expect(tint?.metadata.hypothesisType).toBe("directional_accumulation");
+    expect(tint?.className).toContain("options-tape-smart-flow-row");
+  });
+
+  it("summarizes smart-flow context for hover and scope labels", () => {
+    const summary = getOptionsTapeSmartFlowSummary(
+      makeSmartFlowProjection({
+        abstained: true,
+        policyConfidence: 0.81,
+        sourceReasons: ["policy confidence below threshold"]
+      })
+    );
+
+    expect(summary).toEqual({
+      hypothesis: "Directional accumulation",
+      direction: "abstained",
+      confidence: "81% high",
+      evidenceQuality: "64% usable",
+      abstention: "abstained: Policy Confidence Below Threshold"
+    });
   });
 
   it("maps existing options decor into DurableTape row hook outputs", () => {

@@ -3238,10 +3238,24 @@ h3 {
 }
 
 .options-tape-control-row > div:first-child,
-.options-tape-scope-band > div:first-child {
+.options-tape-scope-main,
+.options-tape-scope-focus,
+.options-tape-scope-smart-flow {
   min-width: 0;
   display: grid;
   gap: 3px;
+}
+
+.options-tape-scope-main {
+  flex: 1 1 auto;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.84fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.options-tape-scope-smart-flow {
+  border-left: 1px solid var(--border);
+  padding-left: 10px;
 }
 
 .options-tape-control-row span,
@@ -3268,6 +3282,12 @@ h3 {
   white-space: nowrap;
 }
 
+.options-tape-scope-smart-flow em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .options-tape-scope-band {
   border-top-color: oklch(0.78 0.12 74 / 0.36);
   background:
@@ -3280,6 +3300,28 @@ h3 {
   flex: 0 0 auto;
   align-items: center;
   gap: 6px;
+}
+
+@media (max-width: 720px) {
+  .options-tape-scope-band {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .options-tape-scope-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .options-tape-scope-smart-flow {
+    border-top: 1px solid var(--border);
+    border-left: 0;
+    padding-top: 8px;
+    padding-left: 0;
+  }
+
+  .options-tape-scope-actions {
+    justify-content: flex-end;
+  }
 }
 
 .options-tape-scope-actions button,
