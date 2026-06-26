@@ -1,10 +1,8 @@
 import type {
-  ClassifierHitEvent,
   FlowPacket,
   OptionNBBO,
   OptionPrint,
-  SmartFlowExplainabilityProjection,
-  SmartMoneyEvent
+  SmartFlowExplainabilityProjection
 } from "@islandflow/types";
 
 import { buildApiUrl, readErrorDetail } from "./transport";
@@ -29,9 +27,7 @@ export type OptionSupportRequest = {
 
 export type OptionSupportResult = {
   packets: FlowPacket[];
-  smartMoney: SmartMoneyEvent[];
   smartFlowProjections: SmartFlowExplainabilityProjection[];
-  classifierHits: ClassifierHitEvent[];
   nbboByTraceId: Record<string, OptionNBBO | null>;
 };
 
@@ -47,9 +43,7 @@ export type FlowPacketLookupResult = {
 
 type OptionSupportPayload = {
   packets?: FlowPacket[];
-  smart_money?: SmartMoneyEvent[];
   smart_flow?: SmartFlowExplainabilityProjection[];
-  classifier_hits?: ClassifierHitEvent[];
   nbbo_by_trace_id?: Record<string, OptionNBBO | null>;
 };
 
@@ -79,14 +73,6 @@ const DEFAULT_BACKOFF_MAX_MS = 30_000;
 
 const supportTraceKey = (traceId: string): string => `trace:${traceId}`;
 const supportNbboKey = (traceId: string): string => `nbbo:${traceId}`;
-
-const extractPacketIdFromTrace = (traceId: string): string | null => {
-  const index = traceId.indexOf("flowpacket:");
-  if (index < 0) {
-    return null;
-  }
-  return traceId.slice(index);
-};
 
 const getSmartFlowPacketRefs = (projection: SmartFlowExplainabilityProjection): string[] =>
   Array.from(
@@ -206,9 +192,7 @@ export class HydrationScheduler {
   private readonly flowPacketMisses: TtlCache<true>;
   private readonly supportPacketByTraceId: TtlCache<FlowPacket>;
   private readonly supportTraceMisses: TtlCache<true>;
-  private readonly supportSmartMoneyByPacketId: TtlCache<SmartMoneyEvent>;
   private readonly supportSmartFlowByPacketId: TtlCache<SmartFlowExplainabilityProjection[]>;
-  private readonly supportClassifierHitsByPacketId: TtlCache<ClassifierHitEvent[]>;
   private readonly supportNbboByTraceId: TtlCache<OptionNBBO>;
   private readonly supportNbboMisses: TtlCache<true>;
 
@@ -251,9 +235,7 @@ export class HydrationScheduler {
     this.flowPacketMisses = new TtlCache(maxEntries, negativeTtlMs, this.now);
     this.supportPacketByTraceId = new TtlCache(maxEntries, positiveTtlMs, this.now);
     this.supportTraceMisses = new TtlCache(maxEntries, negativeTtlMs, this.now);
-    this.supportSmartMoneyByPacketId = new TtlCache(maxEntries, positiveTtlMs, this.now);
     this.supportSmartFlowByPacketId = new TtlCache(maxEntries, positiveTtlMs, this.now);
-    this.supportClassifierHitsByPacketId = new TtlCache(maxEntries, positiveTtlMs, this.now);
     this.supportNbboByTraceId = new TtlCache(maxEntries, positiveTtlMs, this.now);
     this.supportNbboMisses = new TtlCache(maxEntries, negativeTtlMs, this.now);
   }
@@ -310,9 +292,7 @@ export class HydrationScheduler {
     this.flowPacketMisses.clear();
     this.supportPacketByTraceId.clear();
     this.supportTraceMisses.clear();
-    this.supportSmartMoneyByPacketId.clear();
     this.supportSmartFlowByPacketId.clear();
-    this.supportClassifierHitsByPacketId.clear();
     this.supportNbboByTraceId.clear();
     this.supportNbboMisses.clear();
     this.backoff.clear();
@@ -659,12 +639,6 @@ export class HydrationScheduler {
       }
     }
 
-    for (const event of payload.smart_money ?? []) {
-      for (const packetId of event.packet_ids ?? []) {
-        this.supportSmartMoneyByPacketId.set(packetId, event);
-      }
-    }
-
     for (const projection of payload.smart_flow ?? []) {
       for (const packetId of getSmartFlowPacketRefs(projection)) {
         const existing = this.supportSmartFlowByPacketId.getEntry(packetId)?.value ?? [];
@@ -673,18 +647,6 @@ export class HydrationScheduler {
         }
         this.supportSmartFlowByPacketId.set(packetId, [...existing, projection].slice(-24));
       }
-    }
-
-    for (const hit of payload.classifier_hits ?? []) {
-      const packetId = extractPacketIdFromTrace(hit.trace_id);
-      if (!packetId) {
-        continue;
-      }
-      const existing = this.supportClassifierHitsByPacketId.getEntry(packetId)?.value ?? [];
-      if (existing.some((item) => item.trace_id === hit.trace_id)) {
-        continue;
-      }
-      this.supportClassifierHitsByPacketId.set(packetId, [...existing, hit].slice(-24));
     }
 
     const nbboByTraceId = payload.nbbo_by_trace_id ?? {};
@@ -732,19 +694,10 @@ export class HydrationScheduler {
       packetIds.add(packet.id);
     }
 
-    const smartMoney = new Map<string, SmartMoneyEvent>();
     const smartFlowProjections = new Map<string, SmartFlowExplainabilityProjection>();
-    const classifierHits = new Map<string, ClassifierHitEvent>();
     for (const packetId of packetIds) {
-      const event = this.supportSmartMoneyByPacketId.getEntry(packetId)?.value;
-      if (event?.trace_id) {
-        smartMoney.set(event.trace_id, event);
-      }
       for (const projection of this.supportSmartFlowByPacketId.getEntry(packetId)?.value ?? []) {
         smartFlowProjections.set(projection.trace_id, projection);
-      }
-      for (const hit of this.supportClassifierHitsByPacketId.getEntry(packetId)?.value ?? []) {
-        classifierHits.set(hit.trace_id, hit);
       }
     }
 
@@ -760,9 +713,7 @@ export class HydrationScheduler {
 
     return {
       packets: Array.from(packets.values()),
-      smartMoney: Array.from(smartMoney.values()),
       smartFlowProjections: Array.from(smartFlowProjections.values()),
-      classifierHits: Array.from(classifierHits.values()),
       nbboByTraceId
     };
   }

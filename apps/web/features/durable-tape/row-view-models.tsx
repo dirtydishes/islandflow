@@ -282,8 +282,8 @@ const renderOptionHover = (row: DurableTapeOptionRowViewModel) => {
           <dd>{row.support.packet?.id ?? "--"}</dd>
         </div>
         <div>
-          <dt>Classifier</dt>
-          <dd>{row.support.classifier?.label ?? row.support.smart_money?.label ?? "--"}</dd>
+          <dt>Smart-flow</dt>
+          <dd>{smartFlowSummary?.hypothesis ?? row.cells.support ?? "smart-flow unavailable"}</dd>
         </div>
         {smartFlowSummary ? (
           <>

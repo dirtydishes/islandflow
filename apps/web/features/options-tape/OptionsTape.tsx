@@ -405,7 +405,6 @@ const rowContextFromPrint = ({
   flowPacketByTraceId,
   packetIdByOptionTraceId,
   flowPacketById,
-  decorByTraceId,
   smartFlowContextByTraceId,
   nbboByContractId,
   nbboByTraceId
@@ -414,7 +413,6 @@ const rowContextFromPrint = ({
   | "flowPacketByTraceId"
   | "packetIdByOptionTraceId"
   | "flowPacketById"
-  | "decorByTraceId"
   | "nbboByContractId"
   | "nbboByTraceId"
 > & {
@@ -437,7 +435,6 @@ const rowContextFromPrint = ({
         }
       : undefined,
     smartFlow: smartFlowContextByTraceId?.get(print.trace_id),
-    decor: decorByTraceId?.get(print.trace_id),
     nbbo
   };
 };
@@ -456,7 +453,6 @@ export const OptionsTape = ({
   flowPacketByTraceId,
   packetIdByOptionTraceId,
   flowPacketById,
-  decorByTraceId,
   smartFlowProjections,
   nbboByContractId,
   nbboByTraceId,
@@ -617,13 +613,11 @@ export const OptionsTape = ({
         flowPacketByTraceId: mergedFlowPacketByTraceId,
         packetIdByOptionTraceId: mergedPacketIdByOptionTraceId,
         flowPacketById: mergedFlowPacketById,
-        decorByTraceId,
         smartFlowContextByTraceId,
         nbboByContractId,
         nbboByTraceId: mergedNbboByTraceId
       }),
     [
-      decorByTraceId,
       mergedFlowPacketById,
       mergedFlowPacketByTraceId,
       mergedNbboByTraceId,

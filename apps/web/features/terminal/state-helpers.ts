@@ -1,21 +1,11 @@
 import type {
-  ClassifierHitEvent,
   EquityPrintJoin,
   FlowPacket,
   InferredDarkEvent,
   OptionPrint,
-  SmartMoneyEvent
 } from "@islandflow/types";
 
-import { classifierToneForFamily, smartMoneyToneForProfile } from "./format";
 import type { PinnedEntry } from "./types";
-
-const clamp = (value: number, min: number, max: number): number => {
-  if (!Number.isFinite(value)) {
-    return min;
-  }
-  return Math.max(min, Math.min(max, value));
-};
 
 export const normalizeContractId = (value: string): string => value.trim();
 
@@ -101,36 +91,7 @@ export const inferDarkUnderlying = (
   return null;
 };
 
-export type ClassifierDecor = {
-  hit?: ClassifierHitEvent;
-  smartMoney?: SmartMoneyEvent;
-  family: string;
-  tone: string;
-  intensity: number;
-};
-
-export const EMPTY_CLASSIFIER_HITS_BY_PACKET_ID = new Map<string, ClassifierHitEvent[]>();
 export const EMPTY_PACKET_ID_BY_OPTION_TRACE_ID = new Map<string, string>();
-export const EMPTY_CLASSIFIER_DECOR_BY_OPTION_TRACE_ID = new Map<string, ClassifierDecor>();
-
-export const buildClassifierDecor = (hit: ClassifierHitEvent): ClassifierDecor => ({
-  hit,
-  family: hit.classifier_id,
-  tone: classifierToneForFamily(hit.classifier_id),
-  intensity: clamp(hit.confidence, 0.25, 1)
-});
-
-export const buildSmartMoneyDecor = (event: SmartMoneyEvent): ClassifierDecor => {
-  const primaryScore =
-    event.profile_scores.find((score) => score.profile_id === event.primary_profile_id) ??
-    event.profile_scores[0];
-  return {
-    smartMoney: event,
-    family: event.primary_profile_id ?? primaryScore?.profile_id ?? "abstained",
-    tone: event.abstained ? "neutral" : smartMoneyToneForProfile(event.primary_profile_id),
-    intensity: clamp(primaryScore?.probability ?? 0.25, 0.25, 1)
-  };
-};
 
 export const upsertPinnedEntries = <T>(
   current: Map<string, PinnedEntry<T>>,

@@ -6,8 +6,7 @@ import type {
   FlowPacket,
   InferredDarkEvent,
   NewsStory,
-  SmartFlowExplainabilityProjection,
-  SmartMoneyEvent
+  SmartFlowExplainabilityProjection
 } from "@islandflow/types";
 import { parseOptionContractId } from "@islandflow/types";
 import {
@@ -62,7 +61,6 @@ import {
   smartFlowEvidenceQualityLabel,
   smartFlowHypothesisLabel,
   smartFlowWhyNotLabel,
-  smartMoneyProfileLabel,
   statusLabel
 } from "../format";
 import type { TerminalState } from "../state";
@@ -100,16 +98,13 @@ type CandleChartProps = {
   liveCandles?: EquityCandle[];
   liveOverlayPrints?: EquityPrint[];
   smartFlowProjections: SmartFlowExplainabilityProjection[];
-  smartMoneyEvents: SmartMoneyEvent[];
   inferredDark: InferredDarkEvent[];
   onSmartFlowClick: (projection: SmartFlowExplainabilityProjection) => void;
-  onSmartMoneyClick: (event: SmartMoneyEvent) => void;
   onInferredDarkClick: (event: InferredDarkEvent) => void;
 };
 
 type MarkerAction =
   | { kind: "smart-flow"; projection: SmartFlowExplainabilityProjection }
-  | { kind: "smart-money"; event: SmartMoneyEvent }
   | { kind: "dark"; event: InferredDarkEvent };
 
 export const CandleChart = ({
@@ -120,10 +115,8 @@ export const CandleChart = ({
   liveCandles = [],
   liveOverlayPrints = [],
   smartFlowProjections,
-  smartMoneyEvents,
   inferredDark,
   onSmartFlowClick,
-  onSmartMoneyClick,
   onInferredDarkClick
 }: CandleChartProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -139,7 +132,6 @@ export const CandleChart = ({
   const markerLookupRef = useRef<Map<string, MarkerAction>>(new Map());
   const [visibleRangeMs, setVisibleRangeMs] = useState<{ from: number; to: number } | null>(null);
   const onSmartFlowClickRef = useRef(onSmartFlowClick);
-  const onSmartMoneyClickRef = useRef(onSmartMoneyClick);
   const onDarkClickRef = useRef(onInferredDarkClick);
 
   const overlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -221,10 +213,6 @@ export const CandleChart = ({
   }, [onSmartFlowClick]);
 
   useEffect(() => {
-    onSmartMoneyClickRef.current = onSmartMoneyClick;
-  }, [onSmartMoneyClick]);
-
-  useEffect(() => {
     onDarkClickRef.current = onInferredDarkClick;
   }, [onInferredDarkClick]);
 
@@ -236,11 +224,7 @@ export const CandleChart = ({
       return { markers, lookup };
     }
 
-    const flowMarkerItems = getChartFlowMarkerItems(
-      smartFlowProjections,
-      smartMoneyEvents,
-      visibleRangeMs
-    );
+    const flowMarkerItems = getChartFlowMarkerItems(smartFlowProjections, visibleRangeMs);
     const { from, to } = visibleRangeMs;
     const inRangeDark = inferredDark
       .filter((event) => event.source_ts >= from && event.source_ts <= to)
@@ -261,51 +245,24 @@ export const CandleChart = ({
         : inRangeDark;
 
     for (const item of flowMarkerItems) {
-      if (item.kind === "smart-flow") {
-        const { projection } = item;
-        const direction = smartFlowDirectionTone(projection);
-        const markerId = `smart-flow:${projection.refs.hypothesis_id}:${projection.seq}`;
-        lookup.set(markerId, { kind: "smart-flow", projection });
-
-        markers.push({
-          id: markerId,
-          time: toChartTime(projection.source_ts),
-          position: direction === "bullish" ? "belowBar" : "aboveBar",
-          color:
-            direction === "bullish"
-              ? "#25c17a"
-              : direction === "bearish"
-                ? "#ff6b5f"
-                : "rgba(144, 160, 178, 0.9)",
-          shape:
-            direction === "bullish" ? "arrowUp" : direction === "bearish" ? "arrowDown" : "circle",
-          text: projection.abstention.abstained ? "ABS" : "HYP"
-        });
-        continue;
-      }
-
-      const { event } = item;
-      const direction = normalizeDirection(event.primary_direction);
-      const markerId = `smart-money:${event.trace_id}:${event.seq}`;
-      lookup.set(markerId, { kind: "smart-money", event });
+      const { projection } = item;
+      const direction = smartFlowDirectionTone(projection);
+      const markerId = `smart-flow:${projection.refs.hypothesis_id}:${projection.seq}`;
+      lookup.set(markerId, { kind: "smart-flow", projection });
 
       markers.push({
         id: markerId,
-        time: toChartTime(event.source_ts),
+        time: toChartTime(projection.source_ts),
         position: direction === "bullish" ? "belowBar" : "aboveBar",
         color:
           direction === "bullish"
-            ? "#2f6d4f"
+            ? "#25c17a"
             : direction === "bearish"
-              ? "#c46f2a"
-              : "rgba(111, 91, 57, 0.9)",
+              ? "#ff6b5f"
+              : "rgba(144, 160, 178, 0.9)",
         shape:
           direction === "bullish" ? "arrowUp" : direction === "bearish" ? "arrowDown" : "circle",
-        text: event.abstained
-          ? "ABS"
-          : event.primary_profile_id
-            ? event.primary_profile_id.slice(0, 3).toUpperCase()
-            : "SM"
+        text: projection.abstention.abstained ? "ABS" : "HYP"
       });
     }
 
@@ -351,7 +308,7 @@ export const CandleChart = ({
     }
 
     return { markers: cappedMarkers, lookup };
-  }, [smartFlowProjections, smartMoneyEvents, inferredDark, visibleRangeMs]);
+  }, [smartFlowProjections, inferredDark, visibleRangeMs]);
 
   useEffect(() => {
     if (!seriesRef.current) {
@@ -475,8 +432,6 @@ export const CandleChart = ({
       }
       if (action.kind === "smart-flow") {
         onSmartFlowClickRef.current(action.projection);
-      } else if (action.kind === "smart-money") {
-        onSmartMoneyClickRef.current(action.event);
       } else {
         onDarkClickRef.current(action.event);
       }
@@ -944,10 +899,8 @@ export const ChartPane = memo(({ state, title = "Chart" }: ChartPaneProps) => {
         liveCandles={state.liveSession.chartCandles}
         liveOverlayPrints={state.liveSession.chartOverlay}
         smartFlowProjections={state.chartSmartFlowProjections}
-        smartMoneyEvents={state.chartSmartMoneyEvents}
         inferredDark={state.chartInferredDark}
         onSmartFlowClick={state.handleSmartFlowMarkerClick}
-        onSmartMoneyClick={state.handleSmartMoneyMarkerClick}
         onInferredDarkClick={state.handleDarkMarkerClick}
       />
     </Pane>
@@ -983,11 +936,6 @@ const buildCommandDeckTickers = (state: TerminalState): CommandDeckTicker[] => {
   }
   for (const projection of state.filteredSmartFlowProjections.slice(0, 30)) {
     symbols.add(projection.hypothesis.underlying_id.toUpperCase());
-  }
-  if (state.filteredSmartFlowProjections.length === 0) {
-    for (const event of state.filteredSmartMoneyEvents.slice(0, 30)) {
-      symbols.add(event.underlying_id.toUpperCase());
-    }
   }
   for (const story of state.filteredNews.slice(0, 20)) {
     for (const symbol of story.resolved_symbols) {
@@ -1082,33 +1030,6 @@ const buildCommandPriorityRows = (state: TerminalState): CommandPriorityRow[] =>
     });
   }
 
-  if (state.filteredSmartFlowProjections.length === 0) {
-    for (const event of state.filteredSmartMoneyEvents.slice(0, 8)) {
-      const primaryScore =
-        event.profile_scores.find((score) => score.profile_id === event.primary_profile_id) ??
-        event.profile_scores[0];
-      const read =
-        primaryScore?.reasons[0] ??
-        (event.primary_profile_id
-          ? smartMoneyProfileLabel(event.primary_profile_id)
-          : event.event_kind);
-      rows.push({
-        key: `smart-${event.event_id}-${event.seq}`,
-        ts: event.source_ts,
-        symbol: event.underlying_id.toUpperCase(),
-        packet: event.packet_ids[0] ?? event.event_id,
-        read,
-        score: clampCommandScore((primaryScore?.probability ?? 0) * 100),
-        invalidation:
-          event.packet_ids.length > 0
-            ? `${event.packet_ids.length} packet${event.packet_ids.length === 1 ? "" : "s"}`
-            : `${formatFlowMetric(event.features.print_count)} prints`,
-        state: event.abstained ? "hold" : commandStateFromDirection(event.primary_direction),
-        onOpen: () => state.openFromSmartMoneyEvent(event)
-      });
-    }
-  }
-
   for (const alert of state.filteredAlerts.slice(0, 8)) {
     const direction = normalizeAlertDirection(alert.direction);
     rows.push({
@@ -1123,9 +1044,7 @@ const buildCommandPriorityRows = (state: TerminalState): CommandPriorityRow[] =>
       onOpen: () => {
         state.setSelectedNewsStory(null);
         state.setSelectedDarkEvent(null);
-        state.setSelectedClassifierHit(null);
         state.setSelectedSmartFlowProjection(null);
-        state.setSelectedSmartMoneyEvent(null);
         state.setSelectedAlert(alert);
       }
     });
@@ -1497,9 +1416,7 @@ export const EventContextPane = ({ state }: { state: TerminalState }) => {
           onSelectAlert={(alert) => {
             state.setSelectedNewsStory(null);
             state.setSelectedDarkEvent(null);
-            state.setSelectedClassifierHit(null);
             state.setSelectedSmartFlowProjection(null);
-            state.setSelectedSmartMoneyEvent(null);
             state.setSelectedAlert(alert);
           }}
           optionPrintByTraceId={state.optionPrintMap}

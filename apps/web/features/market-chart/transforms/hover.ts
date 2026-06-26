@@ -25,7 +25,7 @@ export type MarketChartOptionNotionalSummary = {
   count: number;
 };
 
-export type MarketChartFlowContextSource = "smart-flow" | "legacy-smart-money" | string;
+export type MarketChartFlowContextSource = "smart-flow" | string;
 
 export type MarketChartFlowContextInput = {
   timestampMs: number;
@@ -37,7 +37,6 @@ export type MarketChartFlowContextInput = {
   evidenceScore?: number | null;
   confidence?: number | null;
   whyNot?: string | null;
-  compatibility?: boolean;
   abstained?: boolean;
 };
 
@@ -310,8 +309,7 @@ export const buildFlowContextHoverRows = (
   const bucketItems = sortByBucketOrder(
     items.filter((item) => inHoverBucket(context, item.timestampMs))
   );
-  const smartFlowItems = bucketItems.filter((item) => item.source === "smart-flow");
-  const selected = (smartFlowItems.length ? smartFlowItems : bucketItems).at(-1);
+  const selected = bucketItems.filter((item) => item.source === "smart-flow").at(-1);
   if (!selected) {
     return [];
   }
@@ -323,12 +321,7 @@ export const buildFlowContextHoverRows = (
     : selected.direction && selected.direction !== "unknown"
       ? titleCase(selected.direction)
       : "Neutral/unknown";
-  const sourceLabel =
-    selected.source === "smart-flow"
-      ? "hypothesis"
-      : selected.compatibility
-        ? "compatibility fallback"
-        : "fallback";
+  const sourceLabel = "hypothesis";
   const label = selected.label ? ` · ${selected.label}` : "";
   const quality =
     selected.evidenceQuality ??

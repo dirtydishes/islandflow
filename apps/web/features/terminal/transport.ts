@@ -9,10 +9,7 @@ export type MessageType =
   | "flow-packet"
   | "smart-flow"
   | "smart-flow-alert"
-  | "smart-money"
-  | "inferred-dark"
-  | "classifier-hit"
-  | "alert";
+  | "inferred-dark";
 
 export type StreamMessage<T> = {
   type: MessageType;

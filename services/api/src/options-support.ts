@@ -1,16 +1,12 @@
 import {
   type ClickHouseClient,
-  fetchClassifierHitsByPacketIds,
   fetchFlowPacketsByMemberTraceIds,
-  fetchNearestOptionNBBOForPrints,
-  fetchSmartMoneyEventsByPacketIds
+  fetchNearestOptionNBBOForPrints
 } from "@islandflow/storage";
 import type {
-  ClassifierHitEvent,
   FlowPacket,
   OptionNBBO,
-  SmartFlowExplainabilityProjection,
-  SmartMoneyEvent
+  SmartFlowExplainabilityProjection
 } from "@islandflow/types";
 import { fetchSmartFlowExplainabilityByPacketIds } from "./smart-flow";
 
@@ -27,9 +23,7 @@ export type OptionsSupportLookupInput = {
 
 export type OptionsSupportLookupPayload = {
   packets: FlowPacket[];
-  smart_money: SmartMoneyEvent[];
   smart_flow: SmartFlowExplainabilityProjection[];
-  classifier_hits: ClassifierHitEvent[];
   nbbo_by_trace_id: Record<string, OptionNBBO | null>;
 };
 
@@ -38,14 +32,6 @@ export type OptionsSupportLookupDeps = {
     client: ClickHouseClient,
     traceIds: string[]
   ) => Promise<FlowPacket[]>;
-  fetchSmartMoneyEventsByPacketIds: (
-    client: ClickHouseClient,
-    packetIds: string[]
-  ) => Promise<SmartMoneyEvent[]>;
-  fetchClassifierHitsByPacketIds: (
-    client: ClickHouseClient,
-    packetIds: string[]
-  ) => Promise<ClassifierHitEvent[]>;
   fetchSmartFlowExplainabilityByPacketIds: (
     client: ClickHouseClient,
     packetIds: string[]
@@ -58,8 +44,6 @@ export type OptionsSupportLookupDeps = {
 
 const defaultOptionsSupportLookupDeps: OptionsSupportLookupDeps = {
   fetchFlowPacketsByMemberTraceIds,
-  fetchSmartMoneyEventsByPacketIds,
-  fetchClassifierHitsByPacketIds,
   fetchSmartFlowExplainabilityByPacketIds,
   fetchNearestOptionNBBOForPrints
 };
@@ -78,10 +62,8 @@ export const lookupOptionsSupport = async (
     );
   const packets = await packetsPromise;
   const packetIds = packets.map((packet) => packet.id);
-  const [smartMoney, smartFlow, classifierHits, nbboByTraceIdResult] = await Promise.all([
-    deps.fetchSmartMoneyEventsByPacketIds(client, packetIds),
+  const [smartFlow, nbboByTraceIdResult] = await Promise.all([
     deps.fetchSmartFlowExplainabilityByPacketIds(client, packetIds),
-    deps.fetchClassifierHitsByPacketIds(client, packetIds),
     nbboByTraceIdPromise
   ]);
   if (!nbboByTraceIdResult.ok) {
@@ -90,9 +72,7 @@ export const lookupOptionsSupport = async (
 
   return {
     packets,
-    smart_money: smartMoney,
     smart_flow: smartFlow,
-    classifier_hits: classifierHits,
     nbbo_by_trace_id: nbboByTraceIdResult.value
   };
 };

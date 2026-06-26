@@ -501,43 +501,18 @@ describe("LiveStateManager", () => {
       },
       join_quality: {}
     };
-    const classifierHit = {
-      source_ts: now + 10,
-      ingest_ts: now + 11,
-      seq: 9,
-      trace_id: "classifier:flowpacket:7",
-      classifier_id: "large_call",
-      confidence: 0.91,
-      direction: "bullish",
-      explanations: ["large premium"]
-    };
     const smartMoney = makeSmartMoneyEvent(now + 12);
     const smartFlow = makeSmartFlowProjection(smartMoney);
-    const alert = {
-      source_ts: now + 20,
-      ingest_ts: now + 21,
-      seq: 10,
-      trace_id: "alert:flowpacket:7",
-      score: 91,
-      severity: "high",
-      primary_profile_id: "institutional_directional",
-      hits: [
-        {
-          classifier_id: "large_call",
-          confidence: 0.91,
-          direction: "bullish",
-          explanations: ["large premium"]
-        }
-      ],
-      evidence_refs: ["flowpacket:7", "print:7"]
-    };
+    const alert = smartFlowAlertFromProjection(smartFlow, {
+      alert_id: "smartflow:alert:7",
+      trace_id: "smartflow:alert:7"
+    });
+    expect(alert).not.toBeNull();
 
     await manager.ingest("flow", flowPacket);
     await manager.ingest("options", optionPrint);
-    await manager.ingest("classifier-hits", classifierHit);
-    await manager.ingest("smart-money", smartMoney);
     await manager.ingest("smart-flow", smartFlow);
-    await manager.ingest("alerts", alert);
+    await manager.ingest("smart-flow-alerts", alert);
 
     const snapshot = await manager.getSnapshot({
       channel: "durable-rows",
@@ -549,7 +524,8 @@ describe("LiveStateManager", () => {
     const alertRow = rows.find((row) => row.lane === "alerts");
 
     expect(optionRow?.support.packet.id).toBe("flowpacket:7");
-    expect(optionRow?.support.smart_money.profile_id).toBe("institutional_directional");
+    expect(optionRow?.support.classifier).toBeNull();
+    expect(optionRow?.support.smart_money).toBeNull();
     expect(optionRow?.support.smart_flow.source_channel).toBe("smart-flow");
     expect(optionRow?.support.smart_flow.refs.evidence_refs).toEqual(["flowpacket:7", "print:7"]);
     expect(optionRow?.option.nbbo.source).toBe("print");
@@ -558,11 +534,11 @@ describe("LiveStateManager", () => {
 
     const deltaRows = manager.composeDurableRowsForEvent(
       { channel: "durable-rows", lanes: ["options"], snapshot_limit: 10 },
-      "classifier-hits",
-      classifierHit
+      "smart-flow",
+      smartFlow
     );
     expect(deltaRows).toHaveLength(1);
-    expect((deltaRows[0] as any).support.classifier.classifier_id).toBe("large_call");
+    expect((deltaRows[0] as any).support.smart_flow.source_channel).toBe("smart-flow");
   });
 
   it("reorders out-of-order live events without dropping newest-first semantics", async () => {

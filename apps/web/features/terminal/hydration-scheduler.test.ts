@@ -185,24 +185,6 @@ describe("HydrationScheduler", () => {
 
   it("batches option support requests and serves repeated traces from cache", async () => {
     const packet = makeFlowPacket("flowpacket:SPY-2026-06-26-500-C:1", ["print:1"]);
-    const smartMoney = {
-      trace_id: "smart-money:1",
-      packet_ids: [packet.id],
-      member_print_ids: ["print:1"],
-      profile_scores: [],
-      abstained: false,
-      source_ts: 1,
-      ingest_ts: 1,
-      seq: 1
-    } as any;
-    const classifierHit = {
-      trace_id: `classifier:${packet.id}`,
-      classifier_id: "large_call",
-      confidence: 0.9,
-      source_ts: 1,
-      ingest_ts: 1,
-      seq: 1
-    } as any;
     const smartFlow = makeSmartFlowProjection(packet.id);
     let requestCount = 0;
     const scheduler = new HydrationScheduler({
@@ -213,9 +195,7 @@ describe("HydrationScheduler", () => {
         expect(init?.signal).toBeUndefined();
         return jsonResponse({
           packets: [packet],
-          smart_money: [smartMoney],
           smart_flow: [smartFlow],
-          classifier_hits: [classifierHit],
           nbbo_by_trace_id: { "print:1": null }
         });
       }
@@ -231,9 +211,7 @@ describe("HydrationScheduler", () => {
 
     expect(requestCount).toBe(1);
     expect(left.packets.map((item) => item.id)).toEqual([packet.id]);
-    expect(left.smartMoney.map((item) => item.trace_id)).toEqual(["smart-money:1"]);
     expect(left.smartFlowProjections.map((item) => item.trace_id)).toEqual(["smartflow:1"]);
-    expect(left.classifierHits.map((item) => item.trace_id)).toEqual([classifierHit.trace_id]);
     expect(left.nbboByTraceId).toEqual({ "print:1": null });
     expect(right.packets.map((item) => item.id)).toEqual([packet.id]);
 
@@ -254,9 +232,7 @@ describe("HydrationScheduler", () => {
 
     await expect(scheduler.requestOptionSupport({ traceIds: ["print:missing"] })).resolves.toEqual({
       packets: [packet],
-      smartMoney: [],
       smartFlowProjections: [],
-      classifierHits: [],
       nbboByTraceId: {}
     });
     await scheduler.requestOptionSupport({ traceIds: ["print:missing"] });

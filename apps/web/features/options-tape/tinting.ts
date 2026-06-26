@@ -6,11 +6,7 @@ import {
   getSmartFlowPolicyConfidenceBand,
   getSmartFlowSummary,
   getSmartFlowTint,
-  getSmartFlowTintStyle as tintStyle,
   normalizeSmartFlowClassToken as normalizeClassToken,
-  normalizeSmartFlowDirection as normalizeTintDirection,
-  normalizeSmartFlowTintTone as normalizeTintTone,
-  roundSmartFlowUnit as roundUnit,
   type SmartFlowEvidenceQualityBand,
   type SmartFlowPolicyConfidenceBand,
   type SmartFlowSummary,
@@ -20,7 +16,6 @@ import {
   type SmartFlowTintTone
 } from "../smart-flow";
 import type {
-  OptionsTapeDecor,
   OptionsTapeRowContext,
   OptionsTapeSmartFlowContext,
   OptionsTapeSmartFlowRefSource
@@ -33,7 +28,7 @@ export type OptionsTapeEvidenceQualityBand = SmartFlowEvidenceQualityBand;
 export type OptionsTapeSmartFlowTintInput = SmartFlowTintInput;
 
 export type OptionsTapeRowTintMetadata = {
-  source: "decor" | "smart-flow";
+  source: "smart-flow";
   family: string;
   tone: OptionsTapeTintTone;
   intensity: number;
@@ -199,56 +194,15 @@ export const getOptionsTapeSmartFlowRowTint = (
   };
 };
 
-const getDecorDirection = (decor: OptionsTapeDecor): OptionsTapeTintDirection => {
-  if (decor.smartMoney?.abstained) {
-    return "abstained";
-  }
-  return normalizeTintDirection(decor.smartMoney?.primary_direction ?? decor.hit?.direction);
-};
-
-export const getOptionsTapeDecorRowTint = (
-  decor: OptionsTapeDecor | undefined
-): OptionsTapeRowTint | undefined => {
-  if (!decor) {
-    return undefined;
-  }
-  const direction = getDecorDirection(decor);
-  const abstained = direction === "abstained";
-  const tone = normalizeTintTone(decor.tone);
-  const intensity = roundUnit(abstained ? Math.min(0.28, decor.intensity) : decor.intensity);
-  return {
-    className: [
-      "options-tape-row-tinted",
-      "options-tape-decor-row",
-      `options-tape-row-direction-${direction}`,
-      abstained ? "options-tape-row-abstained" : "",
-      `classifier-${tone}`
-    ]
-      .filter(Boolean)
-      .join(" "),
-    style: tintStyle(intensity),
-    metadata: {
-      source: "decor",
-      family: decor.family,
-      tone,
-      intensity,
-      direction,
-      abstained,
-      abstentionReasons: decor.smartMoney?.suppressed_reasons ?? [],
-      sourceReasons: []
-    }
-  };
-};
-
 export const getOptionsTapeSmartFlowSummary = getSmartFlowSummary;
 
 export const getOptionsTapeRowTintFromContext = (
-  context: Pick<OptionsTapeRowContext, "smartFlow" | "decor">
+  context: Pick<OptionsTapeRowContext, "smartFlow">
 ): OptionsTapeRowTint | undefined => {
   if (context.smartFlow) {
     return getOptionsTapeSmartFlowRowTint(context.smartFlow.projection);
   }
-  return getOptionsTapeDecorRowTint(context.decor);
+  return undefined;
 };
 
 export const getOptionsTapeRowTintClassName = (

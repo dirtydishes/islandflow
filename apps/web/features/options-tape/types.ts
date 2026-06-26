@@ -1,11 +1,9 @@
 import type {
-  ClassifierHitEvent,
   FlowPacket,
   OptionFlowFilters,
   OptionNBBO,
   OptionPrint,
-  SmartFlowExplainabilityProjection,
-  SmartMoneyEvent
+  SmartFlowExplainabilityProjection
 } from "@islandflow/types";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 
@@ -74,14 +72,6 @@ export type FlowPacketFocusRequest = {
 
 export type OnPacketFocus = (request: FlowPacketFocusRequest) => void;
 
-export type OptionsTapeDecor = {
-  hit?: ClassifierHitEvent;
-  smartMoney?: SmartMoneyEvent;
-  family: string;
-  tone: string;
-  intensity: number;
-};
-
 export type OptionsTapeSmartFlowRefSource = "direct-print" | "packet-member";
 
 export type OptionsTapeSmartFlowContext = {
@@ -103,7 +93,6 @@ export type OptionsTapeRowContext = {
   print: OptionPrint;
   packet?: OptionsTapePacketContext;
   smartFlow?: OptionsTapeSmartFlowContext;
-  decor?: OptionsTapeDecor;
   nbbo?: OptionNBBO | null;
 };
 
@@ -121,7 +110,6 @@ export type OptionsTapeProps = {
   flowPacketByTraceId?: ReadonlyMap<string, FlowPacket>;
   packetIdByOptionTraceId?: ReadonlyMap<string, string>;
   flowPacketById?: ReadonlyMap<string, FlowPacket>;
-  decorByTraceId?: ReadonlyMap<string, OptionsTapeDecor>;
   smartFlowProjections?: readonly SmartFlowExplainabilityProjection[];
   nbboByContractId?: ReadonlyMap<string, OptionNBBO>;
   nbboByTraceId?: ReadonlyMap<string, OptionNBBO | null>;

@@ -44,7 +44,7 @@ describe("market chart lower-pane transforms", () => {
     });
   });
 
-  it("prefers smart-flow projections for signed direction bars", () => {
+  it("builds signed direction bars from smart-flow projections only", () => {
     const buckets = [candle(60_000), candle(120_000)];
     const layer = buildSmartDirectionBars(
       [
@@ -59,13 +59,6 @@ describe("market chart lower-pane transforms", () => {
           hypothesis: { direction: "bearish" }
         }
       ],
-      [
-        {
-          source_ts: 65_000,
-          primary_direction: "bearish",
-          features: { total_notional: 999 }
-        }
-      ],
       buckets
     );
 
@@ -74,7 +67,7 @@ describe("market chart lower-pane transforms", () => {
     expect(layer.points[0].payload).toEqual({ source: "smart-flow" });
   });
 
-  it("falls back to legacy smart-money per bucket when smart-flow is sparse", () => {
+  it("leaves sparse smart-flow buckets empty instead of falling back", () => {
     const buckets = [candle(60_000), candle(120_000), candle(180_000)];
     const layer = buildSmartDirectionBars(
       [
@@ -89,47 +82,24 @@ describe("market chart lower-pane transforms", () => {
           hypothesis: { direction: "bearish" }
         }
       ],
-      [
-        {
-          source_ts: 125_000,
-          primary_direction: "bearish",
-          features: { total_notional: 300 }
-        },
-        {
-          source_ts: 185_000,
-          primary_direction: "bullish",
-          features: { total_notional: 999 }
-        }
-      ],
       buckets
     );
 
-    expect(layer.points.map((point) => point.value)).toEqual([100, -300, -50]);
+    expect(layer.points.map((point) => point.value)).toEqual([100, 0, -50]);
     expect(layer.points.map((point) => point.payload)).toEqual([
       { source: "smart-flow" },
-      { source: "legacy-smart-money" },
+      { source: "smart-flow" },
       { source: "smart-flow" }
     ]);
   });
 
-  it("falls back to legacy smart-money events when smart-flow is unavailable", () => {
-    const layer = buildSmartDirectionBars(
-      [],
-      [
-        {
-          source_ts: 65_000,
-          primary_direction: "bearish",
-          features: { total_notional: 300 }
-        }
-      ],
-      [candle(60_000)]
+  it("marks smart-direction unavailable without smart-flow projections", () => {
+    const mode = resolveLowerPaneMode(
+      { lowerPane: { mode: "smart-direction" } },
+      { candles: true, smartDirection: false, allFlow: false }
     );
 
-    expect(layer.points[0]).toMatchObject({
-      value: -300,
-      direction: "bearish",
-      payload: { source: "legacy-smart-money" }
-    });
+    expect(mode).toBe("volume");
   });
 
   it("aggregates all-flow packet or option-print notional by bucket", () => {

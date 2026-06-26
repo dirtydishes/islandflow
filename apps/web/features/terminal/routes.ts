@@ -37,8 +37,6 @@ export const buildDurableTapesRouteFeatures = (
   alerts: true,
   durableRows: true,
   smartFlow: rawFallbackEnabled,
-  smartMoney: false,
-  classifierHits: false,
   inferredDark: false,
   equityJoins: false,
   equityCandles: false,
@@ -50,7 +48,7 @@ export const buildDurableTapesRouteFeatures = (
   showAlertsPane: true,
   showDarkPane: false,
   showChartPane: false,
-  needsClassifierDecor: false,
+  needsSmartFlowDecor: false,
   needsAlertEvidencePrefetch: false,
   needsDarkUnderlying: false
 });
@@ -69,8 +67,6 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         alerts: false,
         durableRows: false,
         smartFlow: true,
-        smartMoney: false,
-        classifierHits: false,
         inferredDark: false,
         equityJoins: false,
         equityCandles: false,
@@ -82,7 +78,7 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         showAlertsPane: false,
         showDarkPane: false,
         showChartPane: false,
-        needsClassifierDecor: true,
+        needsSmartFlowDecor: true,
         needsAlertEvidencePrefetch: false,
         needsDarkUnderlying: false
       };
@@ -96,8 +92,6 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         alerts: false,
         durableRows: false,
         smartFlow: false,
-        smartMoney: false,
-        classifierHits: false,
         inferredDark: false,
         equityJoins: false,
         equityCandles: false,
@@ -109,7 +103,7 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         showAlertsPane: false,
         showDarkPane: false,
         showChartPane: false,
-        needsClassifierDecor: false,
+        needsSmartFlowDecor: false,
         needsAlertEvidencePrefetch: false,
         needsDarkUnderlying: false
       };
@@ -126,8 +120,6 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         alerts: true,
         durableRows: false,
         smartFlow: true,
-        smartMoney: true,
-        classifierHits: false,
         inferredDark: true,
         equityJoins: true,
         equityCandles: true,
@@ -139,7 +131,7 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         showAlertsPane: true,
         showDarkPane: true,
         showChartPane: true,
-        needsClassifierDecor: true,
+        needsSmartFlowDecor: true,
         needsAlertEvidencePrefetch: true,
         needsDarkUnderlying: true
       };
@@ -237,12 +229,6 @@ export const getLiveManifest = (
   }
   if (features.smartFlow) {
     subscriptions.push({ channel: "smart-flow", snapshot_limit: LIVE_HOT_WINDOW });
-  }
-  if (features.smartMoney) {
-    subscriptions.push({ channel: "smart-money", snapshot_limit: LIVE_HOT_WINDOW });
-  }
-  if (features.classifierHits) {
-    subscriptions.push({ channel: "classifier-hits", snapshot_limit: LIVE_HOT_WINDOW });
   }
   if (features.inferredDark) {
     subscriptions.push({ channel: "inferred-dark", snapshot_limit: LIVE_HOT_WINDOW });

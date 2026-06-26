@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Smart-Flow Alerts Phase 05 Consumer Cutover</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #0e141a;
+        --panel-2: #111922;
+        --line: #26333f;
+        --line-strong: #72531c;
+        --text: #e8eef5;
+        --muted: #9aa8b6;
+        --faint: #748293;
+        --accent: #f5a623;
+        --green: #28c879;
+        --red: #ff6b5f;
+        --code: #05090d;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.55;
+      }
+
+      main {
+        width: min(1160px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 40px 0 64px;
+      }
+
+      header,
+      section {
+        border: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      header {
+        padding: 24px;
+      }
+
+      section {
+        margin-top: 14px;
+        padding: 20px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 920px;
+        font-size: 2.15rem;
+        line-height: 1.1;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        margin-bottom: 10px;
+        font-size: 1.08rem;
+        letter-spacing: 0;
+      }
+
+      p,
+      li {
+        color: var(--muted);
+      }
+
+      code,
+      pre {
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      }
+
+      code {
+        color: #fff0cf;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 1.1rem;
+      }
+
+      li + li {
+        margin-top: 6px;
+      }
+
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 18px;
+      }
+
+      .chip {
+        border: 1px solid var(--line-strong);
+        background: rgba(245, 166, 35, 0.1);
+        color: #ffe0a6;
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 650;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .tile {
+        border: 1px solid var(--line);
+        background: var(--panel-2);
+        padding: 14px;
+      }
+
+      .tile strong {
+        display: block;
+        margin-bottom: 6px;
+      }
+
+      .ok {
+        color: var(--green);
+        font-weight: 700;
+      }
+
+      .warn {
+        color: var(--accent);
+        font-weight: 700;
+      }
+
+      .note {
+        margin-bottom: 12px;
+      }
+
+      .diff-panel {
+        border: 1px solid var(--line);
+        background: var(--code);
+      }
+
+      .diff-panel[data-rich-ready="true"] .diff-fallback {
+        display: none;
+      }
+
+      .diff-rich {
+        display: none;
+      }
+
+      .diff-panel[data-rich-ready="true"] .diff-rich {
+        display: block;
+      }
+
+      .diff-fallback {
+        max-height: 720px;
+        margin: 0;
+        overflow: auto;
+        padding: 16px;
+        color: #dbe7f3;
+        font-size: 0.8rem;
+        line-height: 1.5;
+        white-space: pre-wrap;
+      }
+
+      @media (max-width: 780px) {
+        main {
+          width: min(100% - 20px, 1160px);
+          padding-top: 24px;
+        }
+
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Smart-Flow Alerts Phase 05 Consumer Cutover</h1>
+        <p>
+          Normal product consumers now use canonical <code>smart-flow</code> and
+          <code>smart-flow-alerts</code> surfaces. Legacy smart-money, classifier-hit,
+          and legacy alert feeds are removed from public runtime UI paths and explicit
+          transition responses cover old API routes.
+        </p>
+        <div class="meta">
+          <span class="chip">Beads islandflow-ghce.5</span>
+          <span class="chip">Branch lavender/smart-flow-alerts-05-consumer-cutover</span>
+          <span class="chip">Spec docs/implementation/smart-flow-alerts/05-consumer-cutover.md</span>
+        </div>
+      </header>
+
+      <section>
+        <h2>Implementation</h2>
+        <div class="grid">
+          <div class="tile">
+            <strong>Route and live manifest cutover</strong>
+            <p>Terminal route features subscribe to <code>smart-flow</code> and <code>smart-flow-alerts</code>. Normal UI live buffers, transport types, history paths, and route manifests no longer include <code>smart-money</code>, <code>classifier-hits</code>, or legacy <code>alerts</code>.</p>
+          </div>
+          <div class="tile">
+            <strong>Terminal and durable consumers</strong>
+            <p>Legacy classifier and smart-money drawers, row decoration, hydration, chart marker callbacks, and option support merges were removed. Durable option and alert rows now compose from canonical smart-flow projections and smart-flow alert events.</p>
+          </div>
+          <div class="tile">
+            <strong>Canonical chart and tape behavior</strong>
+            <p>Chart markers, lower-pane smart-direction bars, hover rows, and options tape tinting no longer silently fall back to legacy smart-money or classifier-hit data. Missing canonical data now appears as empty states or diagnostics.</p>
+          </div>
+          <div class="tile">
+            <strong>Transition API responses</strong>
+            <p>Old derived HTTP and websocket routes return explicit <code>410</code> deprecation payloads with canonical replacements. Live session subscriptions to legacy derived channels receive an error naming the replacement channel.</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Changed Files</h2>
+        <ul>
+          <li>Terminal cutover: <code>apps/web/features/terminal/*</code> route features, state, live buffers, transport, chart adapter, chart components, drawers, hydration scheduler, filters, and tests.</li>
+          <li>Consumer modules: durable tape row view models, market-chart lower-pane and hover transforms, options tape types/tinting, and related tests.</li>
+          <li>API cutover: <code>services/api/src/index.ts</code>, <code>durable-rows.ts</code>, <code>live.ts</code>, <code>options-support.ts</code>, plus new <code>legacy-derived-routes.ts</code> helper and tests.</li>
+          <li>Turn documentation: this closeout file in <code>docs/turns</code>.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Verification</h2>
+        <ul>
+          <li><span class="ok">Passed</span>: <code>bd show islandflow-ghce.5</code></li>
+          <li><span class="ok">Passed</span>: <code>bun test apps/web/app/terminal.test.ts apps/web/features/terminal</code> - 106 tests.</li>
+          <li><span class="ok">Passed</span>: <code>bun test apps/web/features/alerts apps/web/features/options-tape apps/web/features/market-chart</code> - 56 tests.</li>
+          <li><span class="ok">Passed</span>: <code>bun test services/api/tests</code> - 68 tests.</li>
+          <li><span class="ok">Passed</span>: <code>bun --cwd=apps/web run build</code>.</li>
+          <li><span class="ok">Passed</span>: exact runtime UI inventory found no legacy channel subscriptions, old route paths, or legacy event-type imports in <code>apps/web/app</code> or <code>apps/web/features</code>.</li>
+          <li><span class="ok">Passed</span>: broader API inventory shows only transition/internal legacy plumbing remains: live compatibility storage, NATS ingest fanout, alert context transition route, and explicit deprecation mappings.</li>
+          <li><span class="ok">Passed</span>: browser QA at 1440x900 and 390x844 for <code>/durable-tapes</code> and the dashboard alert-priority surface using a temporary mock API on <code>127.0.0.1:4105</code>. Outbound <code>/ws/live</code> subscriptions included <code>smart-flow-alerts</code> and, on dashboard, <code>smart-flow</code>; no <code>smart-money</code>, <code>classifier-hits</code>, or legacy <code>alerts</code> channels were sent. Screenshots: <code>/tmp/islandflow-phase05-browser-qa/durable-desktop.png</code>, <code>/tmp/islandflow-phase05-browser-qa/durable-mobile.png</code>, <code>/tmp/islandflow-phase05-browser-qa/dashboard-alerts-desktop.png</code>, <code>/tmp/islandflow-phase05-browser-qa/dashboard-alerts-mobile.png</code>.</li>
+          <li><span class="ok">Passed</span>: <code>git diff --check</code>.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p class="note">
+          The fallback unified diff is visible by default. The richer view mounts in the browser
+          with <code>PatchDiff</code> from <code>@pierre/diffs/react</code>; the fallback is hidden only
+          after that render succeeds.
+        </p>
+        <div class="diff-panel" data-rich-ready="false">
+          <div class="diff-rich" id="diff-rich"></div>
+          <pre class="diff-fallback" id="diff-fallback">diff --git a/apps/web/features/terminal/routes.ts b/apps/web/features/terminal/routes.ts
+index 6b8f3ef..53d9488 100644
+--- a/apps/web/features/terminal/routes.ts
++++ b/apps/web/features/terminal/routes.ts
+@@
+-  needsClassifierDecor: false,
++  needsSmartFlowDecor: false,
+@@
+-    subscriptions.push({ channel: "alerts", snapshot_limit: LIVE_HOT_WINDOW });
++    subscriptions.push({ channel: "smart-flow-alerts", snapshot_limit: LIVE_HOT_WINDOW });
+@@
+-    subscriptions.push({ channel: "classifier-hits", snapshot_limit: LIVE_HOT_WINDOW });
+-    subscriptions.push({ channel: "smart-money", snapshot_limit: LIVE_HOT_WINDOW });
++    subscriptions.push({ channel: "smart-flow", snapshot_limit: LIVE_HOT_WINDOW });
+
+diff --git a/apps/web/features/terminal/state.tsx b/apps/web/features/terminal/state.tsx
+index eaa07d5..15fc439 100644
+--- a/apps/web/features/terminal/state.tsx
++++ b/apps/web/features/terminal/state.tsx
+@@
+-import type { ClassifierHitEvent, SmartMoneyEvent } from "@islandflow/types";
++import type { SmartFlowAlertEvent, SmartFlowExplainabilityProjection } from "@islandflow/types";
+@@
+-  const [selectedClassifierHit, setSelectedClassifierHit] = useState&lt;ClassifierHitEvent | null&gt;(null);
+-  const [selectedSmartMoneyEvent, setSelectedSmartMoneyEvent] = useState&lt;SmartMoneyEvent | null&gt;(null);
+   const [selectedSmartFlowProjection, setSelectedSmartFlowProjection] =
+     useState&lt;SmartFlowExplainabilityProjection | null&gt;(null);
+@@
+-  const classifierHits = useTape&lt;ClassifierHitEvent&gt;({ latestPath: "/flow/classifier-hits" });
+-  const smartMoney = useTape&lt;SmartMoneyEvent&gt;({ latestPath: "/flow/smart-money" });
++  const smartFlow = useTape&lt;SmartFlowExplainabilityProjection&gt;({
++    wsPath: "/ws/smart-flow",
++    replayPath: "/replay/smart-flow",
++    latestPath: "/flow/smart-flow",
++    expectedType: "smart-flow"
++  });
+
+diff --git a/apps/web/features/market-chart/transforms/lower-pane.ts b/apps/web/features/market-chart/transforms/lower-pane.ts
+index 8451610..7b1a9f4 100644
+--- a/apps/web/features/market-chart/transforms/lower-pane.ts
++++ b/apps/web/features/market-chart/transforms/lower-pane.ts
+@@
+-export const buildSmartDirectionBars = (
+-  smartFlowProjections: readonly SmartFlowProjectionInput[],
+-  smartMoneyEvents: readonly SmartDirectionLegacyEventInput[],
+-  buckets: readonly MarketChartBucket[]
+-): MarketChartLowerPaneBar[] =&gt; {
++export const buildSmartDirectionBars = (
++  smartFlowProjections: readonly SmartFlowProjectionInput[],
++  buckets: readonly MarketChartBucket[]
++): MarketChartLowerPaneBar[] =&gt; {
+@@
+-    if (!projection) {
+-      return buildLegacySmartMoneyBar(bucket, smartMoneyEvents);
+-    }
++    if (!projection) {
++      return { bucket, value: 0, direction: "neutral", payload: { source: "smart-flow" } };
++    }
+
+diff --git a/services/api/src/legacy-derived-routes.ts b/services/api/src/legacy-derived-routes.ts
+new file mode 100644
+--- /dev/null
++++ b/services/api/src/legacy-derived-routes.ts
+@@
++const LEGACY_DERIVED_ROUTE_REPLACEMENTS: Record&lt;string, string&gt; = {
++  "/flow/smart-money": "/flow/smart-flow",
++  "/history/smart-money": "/history/smart-flow",
++  "/replay/smart-money": "/replay/smart-flow",
++  "/ws/smart-money": "/ws/smart-flow",
++  "/flow/classifier-hits": "/flow/smart-flow",
++  "/history/classifier-hits": "/history/smart-flow",
++  "/replay/classifier-hits": "/replay/smart-flow",
++  "/ws/classifier-hits": "/ws/smart-flow",
++  "/flow/alerts": "/flow/smart-flow-alerts",
++  "/history/alerts": "/history/smart-flow-alerts",
++  "/replay/alerts": "/replay/smart-flow-alerts",
++  "/ws/alerts": "/ws/smart-flow-alerts"
++};
+@@
++export const createLegacyDerivedRouteResponse = (pathname: string): Response | null =&gt; {
++  const replacement = getLegacyDerivedRouteReplacement(pathname);
++  if (!replacement) return null;
++  return new Response(JSON.stringify({
++    error: "legacy derived route deprecated",
++    replacement
++  }), { status: 410, headers: { "content-type": "application/json" } });
++};
+
+diff --git a/services/api/src/durable-rows.ts b/services/api/src/durable-rows.ts
+index 47aac13..7d5fe33 100644
+--- a/services/api/src/durable-rows.ts
++++ b/services/api/src/durable-rows.ts
+@@
+-  alerts: AlertEvent[];
+-  classifierHits: ClassifierHitEvent[];
+-  smartMoney: SmartMoneyEvent[];
++  alerts: SmartFlowAlertEvent[];
+@@
+-  support: { classifier: classifierHit, smart_money: smartMoney, smart_flow: smartFlow },
++  support: { classifier: null, smart_money: null, smart_flow: smartFlow },
+@@
+-    cells.support = classifierHit?.family ?? smartMoney?.profile_id ?? "support unavailable";
++    cells.support = smartFlow
++      ? smartFlow.hypothesis.hypothesis_type
++      : packet
++        ? "smart-flow unavailable"
++        : "packet unavailable";
+          </pre>
+        </div>
+      </section>
+
+      <section>
+        <h2>Risks</h2>
+        <ul>
+          <li><span class="warn">Browser QA note</span>: the managed API on port <code>4000</code> is production-like and was not restarted for this branch. To avoid competing for NATS durable consumers, browser QA used a temporary mock API that accepts canonical live subscriptions and rejects legacy ones. Branch API behavior is covered by <code>services/api/tests</code>.</li>
+          <li>Legacy storage helpers, ClickHouse tables, and internal ingest compatibility remain for Phase 06, as required by the phase boundary.</li>
+        </ul>
+      </section>
+    </main>
+
+    <script type="module">
+      const patch = document.getElementById("diff-fallback")?.textContent ?? "";
+      const richRoot = document.getElementById("diff-rich");
+      const panel = richRoot?.closest(".diff-panel");
+
+      if (patch && richRoot && panel) {
+        try {
+          const [{ createElement }, { createRoot }, { PatchDiff }] = await Promise.all([
+            import("https://esm.sh/react@18"),
+            import("https://esm.sh/react-dom@18/client"),
+            import("https://esm.sh/@pierre/diffs@1.2.2/react")
+          ]);
+          createRoot(richRoot).render(
+            createElement(PatchDiff, {
+              patch,
+              viewType: "unified",
+              overflow: "wrap"
+            })
+          );
+          panel.setAttribute("data-rich-ready", "true");
+        } catch (error) {
+          console.warn("Diffs rich renderer failed; keeping HTML fallback.", error);
+        }
+      }
+    </script>
+  </body>
+</html>

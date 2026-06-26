@@ -37,17 +37,6 @@ export type SmartDirectionProjectionInput = {
   } | null;
 };
 
-export type SmartDirectionLegacyEventInput = {
-  source_ts: number;
-  seq?: number;
-  primary_direction?: string | null;
-  abstained?: boolean | null;
-  features?: {
-    total_notional?: number | null;
-    total_premium?: number | null;
-  } | null;
-};
-
 export type AllFlowPacketInput = {
   source_ts: number;
   seq?: number;
@@ -67,7 +56,6 @@ export type MarketChartLowerPaneTransformInput = {
   candles: readonly MarketChartCandle[];
   buckets?: readonly MarketChartLowerPaneBucket[];
   smartFlowProjections?: readonly SmartDirectionProjectionInput[];
-  smartMoneyEvents?: readonly SmartDirectionLegacyEventInput[];
   flowPackets?: readonly AllFlowPacketInput[];
   optionPrints?: readonly AllFlowOptionPrintInput[];
 };
@@ -165,14 +153,6 @@ const projectionMagnitude = (projection: SmartDirectionProjectionInput): number 
   );
 };
 
-const legacyMagnitude = (event: SmartDirectionLegacyEventInput): number => {
-  return (
-    toFinitePositive(event.features?.total_notional) ??
-    toFinitePositive(event.features?.total_premium) ??
-    1
-  );
-};
-
 const allFlowPacketMagnitude = (packet: AllFlowPacketInput): number => {
   return (
     getFeatureNumber(packet.features, ["total_notional", "notional", "total_premium", "premium"]) ??
@@ -241,7 +221,6 @@ export const buildVolumeBars = (candles: readonly MarketChartCandle[]): MarketCh
 
 export const buildSmartDirectionBars = (
   projections: readonly SmartDirectionProjectionInput[],
-  smartMoneyEvents: readonly SmartDirectionLegacyEventInput[],
   buckets: readonly MarketChartLowerPaneBucket[]
 ): MarketChartLowerLayer => {
   const ranges = bucketRanges(toBuckets(buckets, []));
@@ -249,22 +228,11 @@ export const buildSmartDirectionBars = (
     const bucketProjections = projections.filter(
       (projection) => projection.source_ts >= start && projection.source_ts < end
     );
-    const useSmartFlow = bucketProjections.length > 0;
-    const source = useSmartFlow
-      ? bucketProjections
-      : smartMoneyEvents.filter((event) => event.source_ts >= start && event.source_ts < end);
-    const signed = source.reduce((sum, item) => {
-      if (useSmartFlow) {
-        const projection = item as SmartDirectionProjectionInput;
-        const direction = projection.abstention?.abstained
-          ? "neutral"
-          : normalizeDirection(projection.hypothesis?.direction);
-        return sum + projectionMagnitude(projection) * directionSign(direction);
-      }
-
-      const event = item as SmartDirectionLegacyEventInput;
-      const direction = event.abstained ? "neutral" : normalizeDirection(event.primary_direction);
-      return sum + legacyMagnitude(event) * directionSign(direction);
+    const signed = bucketProjections.reduce((sum, projection) => {
+      const direction = projection.abstention?.abstained
+        ? "neutral"
+        : normalizeDirection(projection.hypothesis?.direction);
+      return sum + projectionMagnitude(projection) * directionSign(direction);
     }, 0);
     const direction = directionFromSignedValue(signed);
 
@@ -275,7 +243,7 @@ export const buildSmartDirectionBars = (
       kind: "signed-direction" as const,
       direction,
       label: `${direction} flow direction`,
-      payload: { source: useSmartFlow ? "smart-flow" : "legacy-smart-money" }
+      payload: { source: "smart-flow" }
     };
   });
 
@@ -328,12 +296,11 @@ export const buildAllFlowBars = (
 export const getLowerPaneAvailableData = ({
   candles,
   smartFlowProjections = [],
-  smartMoneyEvents = [],
   flowPackets = [],
   optionPrints = []
 }: MarketChartLowerPaneTransformInput): MarketChartLowerPaneAvailableData => ({
   candles: candles.some((candle) => typeof candle.volume === "number"),
-  smartDirection: smartFlowProjections.length > 0 || smartMoneyEvents.length > 0,
+  smartDirection: smartFlowProjections.length > 0,
   allFlow: flowPackets.length > 0 || optionPrints.length > 0
 });
 
@@ -363,17 +330,13 @@ export const MARKET_CHART_LOWER_PANE_MODE_REGISTRY = [
     label: "Flow Direction",
     supportedKinds: ["signed-direction"],
     defaultVisible: true,
-    description: "Directional hypothesis bars from smart-flow, with legacy fallback.",
+    description: "Directional hypothesis bars from smart-flow.",
     isAvailable: (data) => data.smartDirection,
     transformId: "buildSmartDirectionBars",
     formatter: (value) => value.toLocaleString(),
     defaultRenderer: { series: "rounded-bars", signed: true, priceFormat: "price" },
     transform: (input) =>
-      buildSmartDirectionBars(
-        input.smartFlowProjections ?? [],
-        input.smartMoneyEvents ?? [],
-        toBuckets(input.buckets, input.candles)
-      )
+      buildSmartDirectionBars(input.smartFlowProjections ?? [], toBuckets(input.buckets, input.candles))
   },
   {
     id: "all-flow",

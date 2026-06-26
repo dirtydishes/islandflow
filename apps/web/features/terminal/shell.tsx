@@ -506,11 +506,9 @@ function SyntheticControlDock() {
 
 type TerminalDrawerClosedState = {
   selectedAlert: null;
-  selectedClassifierHit: null;
   selectedDarkEvent: null;
   selectedNewsStory: null;
   selectedSmartFlowProjection: null;
-  selectedSmartMoneyEvent: null;
 };
 
 type TerminalDrawerOpenState = Pick<
@@ -521,24 +519,16 @@ type TerminalDrawerOpenState = Pick<
   | "focusFlowPacketRequest"
   | "optionPrintMap"
   | "selectedAlert"
-  | "selectedClassifierEvidence"
-  | "selectedClassifierFlowPacket"
-  | "selectedClassifierHit"
   | "selectedDarkEvent"
   | "selectedDarkEvidence"
   | "selectedDarkUnderlying"
   | "selectedNewsStory"
   | "selectedSmartFlowEvidence"
   | "selectedSmartFlowProjection"
-  | "selectedSmartMoneyEvent"
-  | "selectedSmartMoneyEvidence"
-  | "selectedSmartMoneyFlowPacket"
   | "setSelectedAlert"
-  | "setSelectedClassifierHit"
   | "setSelectedDarkEvent"
   | "setSelectedNewsStory"
   | "setSelectedSmartFlowProjection"
-  | "setSelectedSmartMoneyEvent"
 >;
 
 export type TerminalDrawerState = TerminalDrawerClosedState | TerminalDrawerOpenState;
@@ -554,9 +544,7 @@ type TerminalChromeProps = TerminalAppShellProps;
 const EMPTY_TERMINAL_DRAWER_STATE: TerminalDrawerClosedState = {
   selectedAlert: null,
   selectedNewsStory: null,
-  selectedClassifierHit: null,
   selectedSmartFlowProjection: null,
-  selectedSmartMoneyEvent: null,
   selectedDarkEvent: null
 };
 
@@ -564,9 +552,7 @@ const selectTerminalDrawerState = (state: TerminalState): TerminalDrawerState =>
   if (
     !state.selectedAlert &&
     !state.selectedNewsStory &&
-    !state.selectedClassifierHit &&
     !state.selectedSmartFlowProjection &&
-    !state.selectedSmartMoneyEvent &&
     !state.selectedDarkEvent
   ) {
     return EMPTY_TERMINAL_DRAWER_STATE;
@@ -579,24 +565,16 @@ const selectTerminalDrawerState = (state: TerminalState): TerminalDrawerState =>
     focusFlowPacketRequest: state.focusFlowPacketRequest,
     optionPrintMap: state.optionPrintMap,
     selectedAlert: state.selectedAlert,
-    selectedClassifierEvidence: state.selectedClassifierEvidence,
-    selectedClassifierFlowPacket: state.selectedClassifierFlowPacket,
-    selectedClassifierHit: state.selectedClassifierHit,
     selectedDarkEvent: state.selectedDarkEvent,
     selectedDarkEvidence: state.selectedDarkEvidence,
     selectedDarkUnderlying: state.selectedDarkUnderlying,
     selectedNewsStory: state.selectedNewsStory,
     selectedSmartFlowEvidence: state.selectedSmartFlowEvidence,
     selectedSmartFlowProjection: state.selectedSmartFlowProjection,
-    selectedSmartMoneyEvent: state.selectedSmartMoneyEvent,
-    selectedSmartMoneyEvidence: state.selectedSmartMoneyEvidence,
-    selectedSmartMoneyFlowPacket: state.selectedSmartMoneyFlowPacket,
     setSelectedAlert: state.setSelectedAlert,
-    setSelectedClassifierHit: state.setSelectedClassifierHit,
     setSelectedDarkEvent: state.setSelectedDarkEvent,
     setSelectedNewsStory: state.setSelectedNewsStory,
-    setSelectedSmartFlowProjection: state.setSelectedSmartFlowProjection,
-    setSelectedSmartMoneyEvent: state.setSelectedSmartMoneyEvent
+    setSelectedSmartFlowProjection: state.setSelectedSmartFlowProjection
   };
 };
 

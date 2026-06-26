@@ -1,36 +1,28 @@
 "use client";
 
 import type {
-  ClassifierHitEvent,
   EquityPrintJoin,
-  FlowPacket,
   InferredDarkEvent,
   NewsStory,
-  SmartFlowExplainabilityProjection,
-  SmartMoneyEvent
+  SmartFlowExplainabilityProjection
 } from "@islandflow/types";
 
 import { AlertDetailDrawer } from "../../alerts";
 import { getSmartFlowEvidenceRefs } from "../evidence";
 import {
   decodeNewsText,
-  formatCompactUsd,
   smartFlowDirectionLabel,
   smartFlowDirectionTone,
   smartFlowEvidenceQualityLabel,
-  smartFlowHypothesisLabel,
-  smartMoneyProfileLabel
+  smartFlowHypothesisLabel
 } from "../format";
 import type { TerminalDrawersRenderer } from "../shell";
 import { formatDarkTrace, type DarkEvidenceItem, type EvidenceItem } from "../state-helpers";
 import {
   formatConfidence,
   formatDateTime,
-  formatFlowMetric,
   formatPrice,
   formatSize,
-  formatTime,
-  formatUsd,
   getJoinBoolean,
   getJoinNumber,
   getJoinString,
@@ -116,131 +108,6 @@ export const NewsDrawer = ({ story, onClose }: NewsDrawerProps) => {
   );
 };
 
-type ClassifierHitDrawerProps = {
-  hit: ClassifierHitEvent;
-  flowPacket: FlowPacket | null;
-  evidence: EvidenceItem[];
-  onClose: () => void;
-};
-
-export const ClassifierHitDrawer = ({
-  hit,
-  flowPacket,
-  evidence,
-  onClose
-}: ClassifierHitDrawerProps) => {
-  const direction = normalizeDirection(hit.direction);
-  const evidencePrints = evidence.filter((item) => item.kind === "print");
-  const unknownCount = evidence.filter((item) => item.kind === "unknown").length;
-
-  return (
-    <aside className="drawer">
-      <div className="drawer-header">
-        <div>
-          <p className="drawer-eyebrow">Classifier hit</p>
-          <h3>{humanizeClassifierId(hit.classifier_id)}</h3>
-          <p className="drawer-subtitle">{formatDateTime(hit.source_ts)}</p>
-        </div>
-        <button className="drawer-close" type="button" onClick={onClose}>
-          Close
-        </button>
-      </div>
-
-      <div className="drawer-meta">
-        <span className={`pill direction-${direction}`}>{direction}</span>
-        <span className="drawer-chip">Confidence {formatConfidence(hit.confidence)}</span>
-      </div>
-
-      <div className="drawer-section">
-        <h4>Explanation</h4>
-        {hit.explanations.length === 0 ? (
-          <p className="drawer-empty">No explanation strings captured for this hit.</p>
-        ) : (
-          <div className="drawer-list">
-            {hit.explanations.slice(0, 6).map((text, idx) => (
-              <div className="drawer-row" key={`${hit.trace_id}-${hit.seq}-ex-${idx}`}>
-                <p className="drawer-note">{text}</p>
-              </div>
-            ))}
-          </div>
-        )}
-        {hit.explanations.length > 6 ? (
-          <p className="drawer-empty">
-            +{hit.explanations.length - 6} more explanations not shown.
-          </p>
-        ) : null}
-      </div>
-
-      <div className="drawer-section">
-        <h4>Flow packet</h4>
-        {flowPacket ? (
-          <div className="drawer-row">
-            <div className="drawer-row-title">
-              {String(flowPacket.features.option_contract_id ?? flowPacket.id ?? "Flow packet")}
-            </div>
-            <div className="drawer-row-meta">
-              <span>
-                {formatFlowMetric(
-                  parseNumber(flowPacket.features.count, flowPacket.members.length)
-                )}{" "}
-                prints
-              </span>
-              <span>{formatFlowMetric(parseNumber(flowPacket.features.total_size, 0))} size</span>
-              <span>
-                Notional $
-                {formatUsd(
-                  parseNumber(
-                    flowPacket.features.total_notional,
-                    parseNumber(flowPacket.features.total_premium, 0) * 100
-                  )
-                )}
-              </span>
-            </div>
-            <p className="drawer-note">
-              Window {formatFlowMetric(parseNumber(flowPacket.features.window_ms, 0), "ms")} ·{" "}
-              {formatTime(parseNumber(flowPacket.features.start_ts, flowPacket.source_ts))} →{" "}
-              {formatTime(parseNumber(flowPacket.features.end_ts, flowPacket.source_ts))}
-            </p>
-          </div>
-        ) : (
-          <p className="drawer-empty">Flow packet not in the current live cache.</p>
-        )}
-      </div>
-
-      <div className="drawer-section">
-        <h4>Evidence prints</h4>
-        {evidencePrints.length === 0 ? (
-          <p className="drawer-empty">No linked option prints in the live cache yet.</p>
-        ) : (
-          <div className="drawer-list">
-            {evidencePrints.slice(0, 6).map((item) => (
-              <div className="drawer-row" key={item.id}>
-                <div className="drawer-row-title">{item.print.option_contract_id}</div>
-                <div className="drawer-row-meta">
-                  <span>${formatPrice(item.print.price)}</span>
-                  <span>{formatSize(item.print.size)}x</span>
-                  <span>{item.print.exchange}</span>
-                </div>
-                <p className="drawer-note">{formatTime(item.print.ts)}</p>
-              </div>
-            ))}
-          </div>
-        )}
-        {unknownCount > 0 ? (
-          <p className="drawer-empty">+{unknownCount} evidence prints not in cache.</p>
-        ) : null}
-      </div>
-    </aside>
-  );
-};
-
-type SmartMoneyDrawerProps = {
-  event: SmartMoneyEvent;
-  flowPacket: FlowPacket | null;
-  evidence: EvidenceItem[];
-  onClose: () => void;
-};
-
 type SmartFlowDrawerProps = {
   projection: SmartFlowExplainabilityProjection;
   evidence: EvidenceItem[];
@@ -295,9 +162,6 @@ export const SmartFlowDrawer = ({ projection, evidence, onClose }: SmartFlowDraw
         <div className="drawer-row">
           <div className="drawer-row-title">{projection.insight.label}</div>
           <p className="drawer-note">{projection.insight.summary}</p>
-          {projection.compatibility?.compatibility_only ? (
-            <p className="drawer-note">Compatibility projection from the legacy feed.</p>
-          ) : null}
         </div>
       </div>
 
@@ -464,105 +328,6 @@ export const SmartFlowDrawer = ({ projection, evidence, onClose }: SmartFlowDraw
   );
 };
 
-export const SmartMoneyDrawer = ({
-  event,
-  flowPacket,
-  evidence,
-  onClose
-}: SmartMoneyDrawerProps) => {
-  const primaryScore =
-    event.profile_scores.find((score) => score.profile_id === event.primary_profile_id) ??
-    event.profile_scores[0];
-  const direction = normalizeDirection(event.primary_direction);
-  const evidencePrints = evidence.filter((item) => item.kind === "print");
-  const unknownCount = evidence.filter((item) => item.kind === "unknown").length;
-
-  return (
-    <aside className="drawer">
-      <div className="drawer-header">
-        <div>
-          <p className="drawer-eyebrow">Compatibility flow profile</p>
-          <h3>{smartMoneyProfileLabel(event.primary_profile_id)}</h3>
-          <p className="drawer-subtitle">{formatDateTime(event.source_ts)}</p>
-        </div>
-        <button className="drawer-close" type="button" onClick={onClose}>
-          Close
-        </button>
-      </div>
-
-      <div className="drawer-meta">
-        <span className={`pill direction-${direction}`}>{direction}</span>
-        <span className="drawer-chip">
-          Legacy probability {primaryScore ? formatConfidence(primaryScore.probability) : "--"}
-        </span>
-        {event.abstained ? <span className="drawer-chip">Abstained</span> : null}
-      </div>
-
-      <div className="drawer-section">
-        <h4>Compatibility ladder</h4>
-        <div className="drawer-list">
-          {event.profile_scores.slice(0, 6).map((score) => (
-            <div className="drawer-row" key={`${event.event_id}-${score.profile_id}`}>
-              <div className="drawer-row-title">{smartMoneyProfileLabel(score.profile_id)}</div>
-              <div className="drawer-row-meta">
-                <span className={`pill direction-${normalizeDirection(score.direction)}`}>
-                  {normalizeDirection(score.direction)}
-                </span>
-                <span>{formatConfidence(score.probability)}</span>
-                <span>{score.confidence_band}</span>
-              </div>
-              {score.reasons[0] ? <p className="drawer-note">{score.reasons[0]}</p> : null}
-            </div>
-          ))}
-        </div>
-        {event.suppressed_reasons.length > 0 ? (
-          <p className="drawer-empty">Suppressed: {event.suppressed_reasons.join(", ")}</p>
-        ) : null}
-      </div>
-
-      <div className="drawer-section">
-        <h4>Parent event</h4>
-        <div className="drawer-row">
-          <div className="drawer-row-title">{event.underlying_id}</div>
-          <div className="drawer-row-meta">
-            <span>{formatFlowMetric(event.features.print_count)} prints</span>
-            <span>{formatFlowMetric(event.features.total_size)} size</span>
-            <span>${formatCompactUsd(event.features.total_premium)}</span>
-          </div>
-          <p className="drawer-note">
-            Window {formatFlowMetric(event.event_window_ms, "ms")} · {event.event_kind}
-          </p>
-        </div>
-        {flowPacket ? <p className="drawer-note">Flow packet {flowPacket.id}</p> : null}
-      </div>
-
-      <div className="drawer-section">
-        <h4>Evidence prints</h4>
-        {evidencePrints.length === 0 ? (
-          <p className="drawer-empty">No linked option prints in the live cache yet.</p>
-        ) : (
-          <div className="drawer-list">
-            {evidencePrints.slice(0, 6).map((item) => (
-              <div className="drawer-row" key={item.id}>
-                <div className="drawer-row-title">{item.print.option_contract_id}</div>
-                <div className="drawer-row-meta">
-                  <span>${formatPrice(item.print.price)}</span>
-                  <span>{formatSize(item.print.size)}x</span>
-                  <span>{item.print.exchange}</span>
-                </div>
-                <p className="drawer-note">{formatTime(item.print.ts)}</p>
-              </div>
-            ))}
-          </div>
-        )}
-        {unknownCount > 0 ? (
-          <p className="drawer-empty">+{unknownCount} evidence prints not in cache.</p>
-        ) : null}
-      </div>
-    </aside>
-  );
-};
-
 type DarkDrawerProps = {
   event: InferredDarkEvent;
   evidence: DarkEvidenceItem[];
@@ -696,29 +461,11 @@ export const renderTerminalDrawers: TerminalDrawersRenderer = (state) => (
       />
     ) : null}
 
-    {state.selectedClassifierHit ? (
-      <ClassifierHitDrawer
-        hit={state.selectedClassifierHit}
-        flowPacket={state.selectedClassifierFlowPacket}
-        evidence={state.selectedClassifierEvidence}
-        onClose={() => state.setSelectedClassifierHit(null)}
-      />
-    ) : null}
-
     {state.selectedSmartFlowProjection ? (
       <SmartFlowDrawer
         projection={state.selectedSmartFlowProjection}
         evidence={state.selectedSmartFlowEvidence}
         onClose={() => state.setSelectedSmartFlowProjection(null)}
-      />
-    ) : null}
-
-    {state.selectedSmartMoneyEvent ? (
-      <SmartMoneyDrawer
-        event={state.selectedSmartMoneyEvent}
-        flowPacket={state.selectedSmartMoneyFlowPacket}
-        evidence={state.selectedSmartMoneyEvidence}
-        onClose={() => state.setSelectedSmartMoneyEvent(null)}
       />
     ) : null}
 

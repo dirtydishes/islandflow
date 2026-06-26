@@ -133,7 +133,7 @@ export const MARKET_CHART_EXTENSION_REGISTRY: MarketChartExtensionRegistry = {
       label: "Flow Direction",
       supportedKinds: ["signed-direction"],
       defaultVisible: true,
-      description: "Directional hypothesis bars from smart-flow, with legacy fallback.",
+      description: "Directional hypothesis bars from smart-flow.",
       isAvailable: (data) => data.smartDirection,
       transformId: "buildSmartDirectionBars",
       formatter: (value) => value.toLocaleString(),

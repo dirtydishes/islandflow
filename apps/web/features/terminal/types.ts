@@ -17,8 +17,6 @@ export type RouteFeatures = {
   alerts: boolean;
   durableRows: boolean;
   smartFlow: boolean;
-  smartMoney: boolean;
-  classifierHits: boolean;
   inferredDark: boolean;
   equityJoins: boolean;
   equityCandles: boolean;
@@ -30,7 +28,7 @@ export type RouteFeatures = {
   showAlertsPane: boolean;
   showDarkPane: boolean;
   showChartPane: boolean;
-  needsClassifierDecor: boolean;
+  needsSmartFlowDecor: boolean;
   needsAlertEvidencePrefetch: boolean;
   needsDarkUnderlying: boolean;
 };

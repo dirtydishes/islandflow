@@ -35,7 +35,6 @@ import {
 } from "./support-hydration";
 import {
   buildOptionsTapeSmartFlowContextByTraceId,
-  getOptionsTapeDecorRowTint,
   getOptionsTapeRowTintFromContext,
   getOptionsTapeRowTintClassName,
   getOptionsTapeRowTintStyle,
@@ -468,7 +467,7 @@ describe("options tape row tint helpers", () => {
     expect(contexts.get("shared-print")?.source).toBe("direct-print");
   });
 
-  it("prefers smart-flow row tinting over legacy decor for the same print", () => {
+  it("maps smart-flow row tinting from canonical context", () => {
     const projection = makeSmartFlowProjection();
     const tint = getOptionsTapeRowTintFromContext({
       smartFlow: {
@@ -478,11 +477,6 @@ describe("options tape row tint helpers", () => {
         directPrintRefs: ["print-1"],
         packetRefs: [],
         expandedPacketRefs: []
-      },
-      decor: {
-        family: "legacy",
-        tone: "red",
-        intensity: 1
       }
     });
 
@@ -509,20 +503,11 @@ describe("options tape row tint helpers", () => {
     });
   });
 
-  it("maps existing options decor into DurableTape row hook outputs", () => {
-    const tint = getOptionsTapeDecorRowTint({
-      family: "institutional_directional",
-      tone: "green",
-      intensity: 0.7
-    });
+  it("does not tint rows without canonical smart-flow context", () => {
+    const tint = getOptionsTapeRowTintFromContext({});
 
-    expect(getOptionsTapeRowTintClassName(tint)).toContain("options-tape-decor-row");
-    expect(getOptionsTapeRowTintClassName(tint)).toContain("classifier-green");
-    expect(
-      (getOptionsTapeRowTintStyle(tint) as Record<string, string> | undefined)?.[
-        "--classifier-intensity"
-      ]
-    ).toBe("0.700");
+    expect(getOptionsTapeRowTintClassName(tint)).toBeUndefined();
+    expect(getOptionsTapeRowTintStyle(tint)).toBeUndefined();
   });
 
   it("requests support for loaded history rows and maps hydrated smart-flow into tint context", async () => {

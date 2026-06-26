@@ -1,12 +1,10 @@
 import type {
-  ClassifierHitEvent,
   FlowHypothesisType,
   OptionFlowFilters,
   OptionNbboSide,
   OptionPrint,
   SmartFlowAlertEvent,
-  SmartFlowExplainabilityProjection,
-  SmartMoneyProfileId
+  SmartFlowExplainabilityProjection
 } from "@islandflow/types";
 import { parseOptionContractId } from "@islandflow/types";
 import type { OptionContractDisplay, TapeMode, WsStatus } from "./types";
@@ -181,58 +179,6 @@ export const getAlertWindowAnchorTs = (
     alerts[0]?.source_ts ?? fallbackNow
   );
 };
-
-const SMART_MONEY_PROFILE_TONES: Record<SmartMoneyProfileId, string> = {
-  institutional_directional: "green",
-  retail_whale: "amber",
-  event_driven: "blue",
-  vol_seller: "copper",
-  arbitrage: "teal",
-  hedge_reactive: "magenta"
-};
-
-const CLASSIFIER_FAMILY_TONES: Record<string, string> = {
-  large_bullish_call_sweep: "green",
-  large_bearish_put_sweep: "red",
-  unusual_contract_spike: "amber",
-  large_call_sell_overwrite: "copper",
-  large_put_sell_write: "copper",
-  straddle: "blue",
-  strangle: "blue",
-  vertical_spread: "teal",
-  ladder_accumulation: "yellowgreen",
-  roll_up_down_out: "violet",
-  far_dated_conviction: "cyan",
-  zero_dte_gamma_punch: "magenta"
-};
-
-export const selectPrimaryClassifierHit = (
-  hits: readonly ClassifierHitEvent[]
-): ClassifierHitEvent | null => {
-  if (hits.length === 0) {
-    return null;
-  }
-  return [...hits].sort((a, b) => {
-    const confidenceDelta = b.confidence - a.confidence;
-    if (confidenceDelta !== 0) {
-      return confidenceDelta;
-    }
-    const tsDelta = b.source_ts - a.source_ts;
-    if (tsDelta !== 0) {
-      return tsDelta;
-    }
-    return b.seq - a.seq;
-  })[0];
-};
-
-export const classifierToneForFamily = (classifierId: string): string =>
-  CLASSIFIER_FAMILY_TONES[classifierId] ?? "neutral";
-
-export const smartMoneyToneForProfile = (profileId: SmartMoneyProfileId | null): string =>
-  profileId ? (SMART_MONEY_PROFILE_TONES[profileId] ?? "neutral") : "neutral";
-
-export const smartMoneyProfileLabel = (profileId: SmartMoneyProfileId | null): string =>
-  profileId ? humanizeClassifierId(profileId) : "Abstained";
 
 const SMART_FLOW_HYPOTHESIS_LABELS: Record<FlowHypothesisType, string> = {
   directional_accumulation: "Directional accumulation",
