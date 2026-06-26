@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { resolveDurableTapeComponentFeatures, resolveDurableTapeFeatures } from "./feature-flags";
+import { resolveDurableTapeRowDecoration } from "./row-hooks";
 
 describe("durable tape feature resolver", () => {
   it("expands default features in place", () => {
@@ -58,5 +59,46 @@ describe("durable tape feature resolver", () => {
     });
 
     expect(resolved.template).toBe("half");
+  });
+});
+
+describe("durable tape row hook resolver", () => {
+  const input = {
+    item: { id: "row-1" },
+    rowKey: "row-1",
+    index: 3
+  };
+
+  it("returns row class and style hooks when row tinting is enabled", () => {
+    const resolved = resolveDurableTapeRowDecoration({
+      enabled: true,
+      input,
+      getRowClassName: ({ rowKey, index }) => `row-${rowKey}-${index}`,
+      getRowStyle: ({ item }) => ({ opacity: item.id === "row-1" ? 0.8 : 1 })
+    });
+
+    expect(resolved).toEqual({
+      className: "row-row-1-3",
+      style: { opacity: 0.8 }
+    });
+  });
+
+  it("does not call row hooks when row tinting is disabled", () => {
+    let calls = 0;
+    const resolved = resolveDurableTapeRowDecoration({
+      enabled: false,
+      input,
+      getRowClassName: () => {
+        calls += 1;
+        return "should-not-apply";
+      },
+      getRowStyle: () => {
+        calls += 1;
+        return { opacity: 0.1 };
+      }
+    });
+
+    expect(resolved).toEqual({});
+    expect(calls).toBe(0);
   });
 });

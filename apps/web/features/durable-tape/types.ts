@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 export type DurableTapeCursor = {
   ts: number;
@@ -121,6 +121,20 @@ export type DurableTapeFocusEvent<TItem> = {
   index: number;
 };
 
+export type DurableTapeRowHookInput<TItem> = {
+  item: TItem;
+  rowKey: string;
+  index: number;
+};
+
+export type DurableTapeRowClassNameGetter<TItem> = (
+  input: DurableTapeRowHookInput<TItem>
+) => string | undefined;
+
+export type DurableTapeRowStyleGetter<TItem> = (
+  input: DurableTapeRowHookInput<TItem>
+) => CSSProperties | undefined;
+
 export type DurableTapeRowRenderer<TItem> = (input: {
   item: TItem;
   rowKey: string;
@@ -150,6 +164,8 @@ export type DurableTapeProps<TItem, TScope = unknown, TFilters = unknown> = {
   source: DurableTapeSource<TItem, TScope, TFilters>;
   renderRow: DurableTapeRowRenderer<TItem>;
   renderHover?: DurableTapeHoverRenderer<TItem>;
+  getRowClassName?: DurableTapeRowClassNameGetter<TItem>;
+  getRowStyle?: DurableTapeRowStyleGetter<TItem>;
   onFocus?: (event: DurableTapeFocusEvent<TItem>) => void;
   onActivate?: (event: DurableTapeFocusEvent<TItem>) => void;
   rowHeight?: number;

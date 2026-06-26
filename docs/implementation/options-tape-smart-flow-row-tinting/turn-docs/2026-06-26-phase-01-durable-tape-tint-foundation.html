@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Options Tape Smart-Flow Tinting Phase 01</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #0d141b;
+        --panel-2: #111820;
+        --line: rgba(230, 237, 244, 0.14);
+        --line-strong: rgba(245, 166, 35, 0.36);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --green: #25c17a;
+        --blue: #4da3ff;
+        --red: #ff6b5f;
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: linear-gradient(180deg, #0b1016 0%, var(--bg) 100%);
+        color: var(--text);
+        font: 15px/1.55 var(--sans);
+      }
+
+      main {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+
+      header {
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      .eyebrow,
+      h2,
+      .meta-label,
+      code,
+      pre {
+        font-family: var(--mono);
+      }
+
+      .eyebrow {
+        margin-bottom: 8px;
+        color: var(--accent);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 880px;
+        font-size: 2rem;
+        line-height: 1.08;
+        letter-spacing: 0;
+        text-wrap: balance;
+      }
+
+      .subtitle {
+        max-width: 82ch;
+        margin-top: 12px;
+        color: var(--muted);
+      }
+
+      .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 1px;
+        margin-top: 18px;
+        border: 1px solid var(--line);
+        background: var(--line);
+      }
+
+      .meta-cell {
+        min-width: 0;
+        padding: 10px 12px;
+        background: var(--panel-2);
+      }
+
+      .meta-label {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--faint);
+        font-size: 0.66rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      section {
+        padding: 20px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      h2 {
+        margin-bottom: 10px;
+        color: var(--accent);
+        font-size: 0.9rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      p {
+        max-width: 84ch;
+      }
+
+      p + p {
+        margin-top: 10px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 7px;
+      }
+
+      code {
+        padding: 0.08rem 0.28rem;
+        border: 1px solid rgba(245, 166, 35, 0.18);
+        border-radius: 5px;
+        background: rgba(245, 166, 35, 0.1);
+        color: #ffe0a3;
+        font-size: 0.9em;
+      }
+
+      .ok {
+        color: var(--green);
+      }
+
+      .note {
+        color: var(--blue);
+      }
+
+      .warn {
+        color: var(--red);
+      }
+
+      .diff-card {
+        border: 1px solid var(--line);
+        background: #070b10;
+      }
+
+      .diff-mount {
+        display: none;
+        min-height: 32px;
+      }
+
+      .diff-card.rendered .diff-mount {
+        display: block;
+      }
+
+      .diff-card.rendered .diff-fallback {
+        display: none;
+      }
+
+      .diff-fallback {
+        max-height: 560px;
+        overflow: auto;
+        margin: 0;
+        border: 0;
+        padding: 12px;
+        background: var(--panel);
+        color: var(--text);
+        font-size: 0.76rem;
+        line-height: 1.45;
+      }
+
+      .diff-fallback code {
+        border: 0;
+        padding: 0;
+        background: transparent;
+        color: inherit;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="eyebrow">Repository turn document | June 26, 2026</div>
+        <h1>Options Tape Smart-Flow Tinting Phase 01</h1>
+        <p class="subtitle">
+          Added the shared <code>DurableTape</code> row hook foundation and pure
+          <code>OptionsTape</code> tint helpers for smart-flow metadata, without changing live
+          subscriptions, API payloads, route composition, historical hydration, or durable option row
+          view models.
+        </p>
+        <div class="meta-grid" aria-label="Turn metadata">
+          <div class="meta-cell">
+            <span class="meta-label">Branch</span>
+            lavender/islandflow-xcdn.1-durable-tape-tint-foundation
+          </div>
+          <div class="meta-cell"><span class="meta-label">Beads</span>islandflow-xcdn.1</div>
+          <div class="meta-cell"><span class="meta-label">Phase</span>01 durable tape tint foundation</div>
+          <div class="meta-cell"><span class="meta-label">Status</span><span class="ok">PR-ready locally</span></div>
+        </div>
+      </header>
+
+      <section>
+        <h2>Outcome</h2>
+        <p>
+          <code>DurableTapeProps</code> now exposes <code>getRowClassName</code> and
+          <code>getRowStyle</code> hooks with typed row inputs containing <code>item</code>,
+          <code>rowKey</code>, and <code>index</code>. Hook resolution is gated by the existing
+          <code>rowTinting</code> feature flag, and the inline style merge keeps the virtual row
+          <code>height</code>, <code>transform</code>, and grid template authoritative.
+        </p>
+        <p>
+          <code>apps/web/features/options-tape/tinting.ts</code> adds pure helpers that map
+          smart-flow hypothesis type, direction, policy confidence, evidence quality, and abstention
+          reasons into row class/style/metadata. Existing <code>decorByTraceId</code> entries now use
+          the DurableTape row hooks, so the default feature pack keeps its behavior except that
+          <code>rowTinting</code> now controls visible row decoration.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changed Files</h2>
+        <ul>
+          <li><code>apps/web/features/durable-tape/types.ts</code></li>
+          <li><code>apps/web/features/durable-tape/row-hooks.ts</code></li>
+          <li><code>apps/web/features/durable-tape/components/DurableTape.tsx</code></li>
+          <li><code>apps/web/features/durable-tape/feature-flags.test.ts</code></li>
+          <li><code>apps/web/features/options-tape/tinting.ts</code></li>
+          <li><code>apps/web/features/options-tape/OptionsTape.tsx</code></li>
+          <li><code>apps/web/features/options-tape/options-tape.test.ts</code></li>
+          <li><code>apps/web/app/globals.css</code></li>
+          <li><code>.beads/issues.jsonl</code></li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Verification</h2>
+        <ul>
+          <li><span class="ok">Passed</span> <code>bun test apps/web/features/durable-tape apps/web/features/options-tape</code>: 56 tests, 180 assertions.</li>
+          <li><span class="ok">Passed</span> <code>bun --cwd=apps/web run build</code>: Next production build and TypeScript completed.</li>
+          <li>
+            <span class="ok">Passed</span> browser probes against local production <code>next start</code> on
+            <code>http://localhost:3100</code>: <code>/options</code> and dashboard options module at
+            <code>1440x1100</code> and <code>390x900</code>.
+          </li>
+          <li>
+            <span class="note">Note</span> local browser state was disconnected/no-history, so the probes verified responsive route/module rendering and table headers, not live smart-flow row color because live smart-flow wiring is Phase 02.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Risks</h2>
+        <ul>
+          <li>Phase 02 still owns subscribing options surfaces to smart-flow projections and deciding projection-to-row lookup keys.</li>
+          <li>Phase 03 still owns historical hydration and server-composed durable option row parity.</li>
+          <li>No API, route manifest, hydration scheduler, or model logic was changed in this phase.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p>
+          This section keeps the standard HTML unified diff visible by default. If browser module
+          loading succeeds, the same patch is rendered with <code>PatchDiff</code> from browser-side
+          <code>@pierre/diffs/react</code>.
+        </p>
+        <div class="diff-card" data-patch-diff>
+          <div class="diff-mount" aria-label="Rendered diff"></div>
+          <pre class="diff-fallback"><code>diff --git a/apps/web/features/durable-tape/types.ts b/apps/web/features/durable-tape/types.ts
+--- a/apps/web/features/durable-tape/types.ts
++++ b/apps/web/features/durable-tape/types.ts
+@@
++export type DurableTapeRowHookInput&lt;TItem&gt; = {
++  item: TItem;
++  rowKey: string;
++  index: number;
++};
++
++export type DurableTapeRowClassNameGetter&lt;TItem&gt; = (
++  input: DurableTapeRowHookInput&lt;TItem&gt;
++) =&gt; string | undefined;
++
++export type DurableTapeRowStyleGetter&lt;TItem&gt; = (
++  input: DurableTapeRowHookInput&lt;TItem&gt;
++) =&gt; CSSProperties | undefined;
+@@
++  getRowClassName?: DurableTapeRowClassNameGetter&lt;TItem&gt;;
++  getRowStyle?: DurableTapeRowStyleGetter&lt;TItem&gt;;
+
+diff --git a/apps/web/features/durable-tape/components/DurableTape.tsx b/apps/web/features/durable-tape/components/DurableTape.tsx
+--- a/apps/web/features/durable-tape/components/DurableTape.tsx
++++ b/apps/web/features/durable-tape/components/DurableTape.tsx
+@@
++              const rowDecoration = resolveDurableTapeRowDecoration({
++                enabled: resolvedFeatures.rowTinting,
++                input: { item, rowKey: key, index },
++                getRowClassName,
++                getRowStyle
++              });
+@@
++                  className={`durable-tape-row ${rowDecoration.className ?? ""}`.trim()}
++                  style={{
++                    ...rowDecoration.style,
++                    ...rowStyle,
++                    height: `${size}px`,
++                    transform: `translateY(${start}px)`
++                  }}
+
+diff --git a/apps/web/features/options-tape/tinting.ts b/apps/web/features/options-tape/tinting.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/options-tape/tinting.ts
+@@
++export const OPTIONS_TAPE_SMART_FLOW_HYPOTHESIS_TYPES = [
++  "directional_accumulation",
++  "retail_attention_flow",
++  "event_positioning",
++  "volatility_supply",
++  "structure_arbitrage",
++  "hedge_rebalance",
++  "unclear"
++] as const satisfies readonly FlowHypothesisType[];
+@@
++export const getOptionsTapeSmartFlowRowTint = (
++  projection: OptionsTapeSmartFlowTintInput
++): OptionsTapeRowTint =&gt; {
++  const hypothesisType = projection.hypothesis.hypothesis_type;
++  const abstained = projection.abstention.abstained;
++  const direction = abstained
++    ? "abstained"
++    : normalizeTintDirection(projection.hypothesis.direction);
++  const policyConfidence = roundUnit(
++    projection.hypothesis.scores.confidence.policy_confidence
++  );
++  const evidenceQuality = roundUnit(
++    projection.evidence?.evidence_quality ??
++      projection.hypothesis.scores.confidence.evidence_quality
++  );
++  return {
++    className: [
++      "options-tape-row-tinted",
++      "options-tape-smart-flow-row",
++      `options-tape-row-hypothesis-${normalizeClassToken(hypothesisType)}`,
++      `options-tape-row-direction-${direction}`,
++      abstained ? "options-tape-row-abstained" : "",
++      `classifier-${TONE_BY_DIRECTION[direction]}`
++    ].filter(Boolean).join(" "),
++    style: tintStyle(intensity),
++    metadata: { source: "smart-flow", family: hypothesisType, direction, abstained }
++  };
++};
+
+diff --git a/apps/web/features/options-tape/OptionsTape.tsx b/apps/web/features/options-tape/OptionsTape.tsx
+--- a/apps/web/features/options-tape/OptionsTape.tsx
++++ b/apps/web/features/options-tape/OptionsTape.tsx
+@@
++  const rowTintForPrint = useCallback(
++    (print: OptionPrint) =&gt; getOptionsTapeDecorRowTint(contextForPrint(print).decor),
++    [contextForPrint]
++  );
+@@
++        getRowClassName={({ item }) =&gt; getOptionsTapeRowTintClassName(rowTintForPrint(item))}
++        getRowStyle={({ item }) =&gt; getOptionsTapeRowTintStyle(rowTintForPrint(item))}
+
+diff --git a/apps/web/app/globals.css b/apps/web/app/globals.css
+--- a/apps/web/app/globals.css
++++ b/apps/web/app/globals.css
+@@
++.options-tape .durable-tape-row.options-tape-row-tinted {
++  background:
++    linear-gradient(
++      90deg,
++      rgba(
++        var(--classifier-rgb, 192, 200, 210),
++        calc(0.012 + var(--classifier-intensity, 0) * 0.065)
++      ),
++      transparent 64%
++    ),
++    transparent;
++  box-shadow: inset 0 0 0 1px
++    rgba(var(--classifier-rgb, 192, 200, 210), calc(0.12 + var(--classifier-intensity, 0) * 0.1));
++}
+</code></pre>
+        </div>
+      </section>
+    </main>
+
+    <script type="module">
+      import React from "https://esm.sh/react@19";
+      import { createRoot } from "https://esm.sh/react-dom@19/client";
+      import { PatchDiff } from "https://esm.sh/@pierre/diffs@1.2.2/react?deps=react@19,react-dom@19";
+
+      for (const card of document.querySelectorAll("[data-patch-diff]")) {
+        const source = card.querySelector(".diff-fallback code");
+        const target = card.querySelector(".diff-mount");
+        if (!source || !target) continue;
+        try {
+          createRoot(target).render(React.createElement(PatchDiff, { patch: source.textContent || "" }));
+          card.classList.add("rendered");
+        } catch (error) {
+          console.warn("Rich diff renderer failed; keeping HTML fallback.", error);
+        }
+      }
+    </script>
+  </body>
+</html>

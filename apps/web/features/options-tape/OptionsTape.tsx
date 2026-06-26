@@ -35,6 +35,11 @@ import {
   normalizeOptionsTapeContractId
 } from "./format";
 import { useOptionsTapeArraySource } from "./source";
+import {
+  getOptionsTapeDecorRowTint,
+  getOptionsTapeRowTintClassName,
+  getOptionsTapeRowTintStyle
+} from "./tinting";
 import type {
   FlowPacketFocusRequest,
   OptionsTapeMode,
@@ -445,6 +450,11 @@ export const OptionsTape = ({
     ]
   );
 
+  const rowTintForPrint = useCallback(
+    (print: OptionPrint) => getOptionsTapeDecorRowTint(contextForPrint(print).decor),
+    [contextForPrint]
+  );
+
   const clearScope = useCallback(() => {
     setScope(GLOBAL_SCOPE);
     onClearFocus?.();
@@ -543,7 +553,9 @@ export const OptionsTape = ({
         features={features}
         filters={sourceFilters}
         getCursor={getOptionsTapePrintCursor}
+        getRowClassName={({ item }) => getOptionsTapeRowTintClassName(rowTintForPrint(item))}
         getRowKey={getOptionsTapePrintKey}
+        getRowStyle={({ item }) => getOptionsTapeRowTintStyle(rowTintForPrint(item))}
         onActivate={activatePrint}
         renderHover={renderHover}
         renderRow={({ item, columns }) =>
