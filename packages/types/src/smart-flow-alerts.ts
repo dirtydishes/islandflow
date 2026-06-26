@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { EventMetaSchema, SmartMoneyDirectionSchema } from "./events";
+import { EventMetaSchema, SmartFlowDirectionSchema } from "./events";
 import {
   FlowHypothesisTypeSchema,
   SmartFlowContractVersionSchema,
@@ -27,10 +27,7 @@ export const isNativeNonAbstainedSmartFlowProjection = (
   projection.hypothesis.generated_from === "flow_evidence_cluster" &&
   projection.abstention.abstained === false &&
   projection.hypothesis.abstention.abstained === false &&
-  projection.insight.abstention.abstained === false &&
-  projection.compatibility === undefined &&
-  projection.hypothesis.compatibility === undefined &&
-  projection.insight.compatibility === undefined;
+  projection.insight.abstention.abstained === false;
 
 const NonAbstainedNativeSmartFlowProjectionSchema = SmartFlowExplainabilityProjectionSchema.refine(
   isNativeNonAbstainedSmartFlowProjection,
@@ -59,7 +56,7 @@ export const SmartFlowAlertEventSchema = EventMetaSchema.extend({
   insight_id: z.string().min(1),
   underlying_id: z.string().min(1),
   hypothesis_type: FlowHypothesisTypeSchema,
-  direction: SmartMoneyDirectionSchema,
+  direction: SmartFlowDirectionSchema,
   policy_confidence: z.number().min(0).max(1),
   evidence_quality: z.number().min(0).max(1),
   trigger: SmartFlowAlertTriggerSchema,

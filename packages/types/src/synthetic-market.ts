@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { SmartMoneyProfileId } from "./events";
+import type { SmartFlowProfileId } from "./events";
 import type { SyntheticMarketMode } from "./options-flow";
 import { SP500_SYMBOLS } from "./sp500";
 
@@ -25,15 +25,15 @@ const EVENT_SYMBOL_POOL = [
   "AMD",
   "AVGO"
 ] as const;
-const SMART_MONEY_PROFILE_IDS = [
+const SMART_FLOW_PROFILE_IDS = [
   "institutional_directional",
   "retail_whale",
   "event_driven",
   "vol_seller",
   "arbitrage",
   "hedge_reactive"
-] as const satisfies readonly SmartMoneyProfileId[];
-const SYNTHETIC_SCENARIO_FAMILY_IDS = [...SMART_MONEY_PROFILE_IDS, "neutral_noise"] as const;
+] as const satisfies readonly SmartFlowProfileId[];
+const SYNTHETIC_SCENARIO_FAMILY_IDS = [...SMART_FLOW_PROFILE_IDS, "neutral_noise"] as const;
 const REGIME_IDS = [
   "trend_up",
   "trend_down",
@@ -156,7 +156,7 @@ export type SyntheticUnderlyingState = {
 export type SyntheticScenarioWeightMap = Record<SyntheticScenarioFamilyId, number>;
 
 export type SyntheticCoverageState = {
-  profile_hit_counts: Record<SmartMoneyProfileId, number>;
+  profile_hit_counts: Record<SmartFlowProfileId, number>;
 };
 
 export type SyntheticBurstPulse = {
@@ -440,7 +440,7 @@ export const hashSyntheticSymbol = (value: string): number => {
   return hash;
 };
 
-export const buildEmptySyntheticProfileHitCounts = (): Record<SmartMoneyProfileId, number> => ({
+export const buildEmptySyntheticProfileHitCounts = (): Record<SmartFlowProfileId, number> => ({
   institutional_directional: 0,
   retail_whale: 0,
   event_driven: 0,
@@ -694,7 +694,7 @@ export const getSyntheticScenarioWeights = (
     neutral_noise: base.neutral_noise
   };
 
-  for (const profileId of SMART_MONEY_PROFILE_IDS) {
+  for (const profileId of SMART_FLOW_PROFILE_IDS) {
     weights[profileId] = roundTo(weights[profileId] * normalized.profile_weights[profileId], 4);
   }
 
@@ -721,7 +721,7 @@ export const getSyntheticScenarioWeights = (
 };
 
 export const getSyntheticCoverageBoost = (
-  profileId: SmartMoneyProfileId,
+  profileId: SmartFlowProfileId,
   coverageState: SyntheticCoverageState,
   control: Pick<SyntheticControlState, "coverage_assist" | "coverage_window_minutes">
 ): number => {
@@ -729,13 +729,13 @@ export const getSyntheticCoverageBoost = (
     return 1;
   }
 
-  const counts = SMART_MONEY_PROFILE_IDS.map(
+  const counts = SMART_FLOW_PROFILE_IDS.map(
     (candidate) => coverageState.profile_hit_counts[candidate] ?? 0
   );
   const targetCount = coverageState.profile_hit_counts[profileId] ?? 0;
   const maxCount = Math.max(...counts);
   const averageCount =
-    counts.reduce((sum, value) => sum + value, 0) / SMART_MONEY_PROFILE_IDS.length;
+    counts.reduce((sum, value) => sum + value, 0) / SMART_FLOW_PROFILE_IDS.length;
   if (maxCount <= 0) {
     return 1;
   }
@@ -787,5 +787,5 @@ export const SYNTHETIC_CONTROL_METADATA = {
   loadProfileIds: SYNTHETIC_LOAD_PROFILE_IDS,
   profileWeightValues: SYNTHETIC_PROFILE_WEIGHT_VALUES,
   coverageWindowValues: SYNTHETIC_COVERAGE_WINDOW_VALUES,
-  smartMoneyProfileIds: SMART_MONEY_PROFILE_IDS
+  smartFlowProfileIds: SMART_FLOW_PROFILE_IDS
 } as const;

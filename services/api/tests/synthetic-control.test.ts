@@ -9,6 +9,18 @@ import {
   resolveSyntheticBackendMode
 } from "../src/synthetic-control";
 
+const recordProjectionHit = (
+  hits: ReturnType<typeof createRollingSyntheticProfileHits>,
+  hypothesisType: string,
+  sourceTs: number
+) => {
+  recordSyntheticProfileHit(hits, {
+    source_ts: sourceTs,
+    abstention: { abstained: false, reasons: ["not_abstained"], source_reasons: [] },
+    hypothesis: { hypothesis_type: hypothesisType }
+  } as Parameters<typeof recordSyntheticProfileHit>[1]);
+};
+
 describe("synthetic control backend mode", () => {
   it("detects synthetic, mixed, and live hosted modes", () => {
     expect(resolveSyntheticBackendMode("synthetic", "synthetic")).toBe("synthetic");
@@ -26,18 +38,9 @@ describe("synthetic control rolling status", () => {
   it("tracks public-profile hits inside the rolling coverage window", () => {
     const hits = createRollingSyntheticProfileHits();
 
-    recordSyntheticProfileHit(hits, {
-      primary_profile_id: "event_driven",
-      source_ts: 1_000
-    });
-    recordSyntheticProfileHit(hits, {
-      primary_profile_id: "event_driven",
-      source_ts: 60_000
-    });
-    recordSyntheticProfileHit(hits, {
-      primary_profile_id: "arbitrage",
-      source_ts: 70_000
-    });
+    recordProjectionHit(hits, "event_positioning", 1_000);
+    recordProjectionHit(hits, "event_positioning", 60_000);
+    recordProjectionHit(hits, "structure_arbitrage", 70_000);
 
     expect(getSyntheticProfileHitCounts(hits, 11 * 60_000, 10)).toEqual({
       institutional_directional: 0,
@@ -51,10 +54,7 @@ describe("synthetic control rolling status", () => {
 
   it("builds derived status from the shared session engine", () => {
     const hits = createRollingSyntheticProfileHits();
-    recordSyntheticProfileHit(hits, {
-      primary_profile_id: "hedge_reactive",
-      source_ts: Date.parse("2026-01-14T18:00:00Z")
-    });
+    recordProjectionHit(hits, "hedge_rebalance", Date.parse("2026-01-14T18:00:00Z"));
 
     const derived = buildSyntheticDerivedStatus(
       Date.parse("2026-01-14T18:05:00Z"),

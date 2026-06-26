@@ -18,7 +18,7 @@ export const selectDurableTapesOptionsPane = (state: TerminalState) => ({
   rowViewModels: state.filteredDurableOptionRows,
   rowViewModelStatus: state.durableRows.status,
   smartFlowProjections: state.filteredSmartFlowProjections,
-  useRowViewModels: state.mode === "live" && state.filteredDurableOptionRows.length > 0
+  useRowViewModels: true
 });
 
 export const selectDurableTapesFlowPane = (state: TerminalState) => ({
@@ -46,7 +46,7 @@ export const selectDurableTapesAlertsPane = (state: TerminalState) => {
     rowViewModels: state.filteredDurableAlertRows,
     rowViewModelStatus: state.durableRows.status,
     selectedAlert,
-    useRowViewModels: false
+    useRowViewModels: true
   };
 };
 

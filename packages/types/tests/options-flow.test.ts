@@ -7,7 +7,7 @@ import {
 } from "../src/options-flow";
 
 const baseConfig: OptionsSignalConfig = {
-  mode: "smart-money",
+  mode: "smart-flow",
   minNotional: 10_000,
   etfMinNotional: 50_000,
   bidSideMinNotional: 25_000,
@@ -58,7 +58,7 @@ describe("options-flow helpers", () => {
     expect(metadata.is_etf).toBe(true);
   });
 
-  it("accepts and rejects smart-money thresholds at boundaries", () => {
+  it("accepts and rejects smart-flow thresholds at boundaries", () => {
     const acceptedAsk = evaluateOptionSignal(
       {
         size: 100,

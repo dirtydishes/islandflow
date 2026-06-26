@@ -74,7 +74,6 @@ describe("native smart-flow runtime", () => {
     );
 
     expect(projection?.source_channel).toBe("smart-flow");
-    expect(projection?.compatibility).toBeUndefined();
     expect(projection?.hypothesis.hypothesis_type).toBe("directional_accumulation");
     expect(projection?.refs.evidence_refs).toContain("flowpacket:runtime-directional");
     expect(projection?.refs.evidence_refs).toContain("print:runtime-0");
@@ -199,10 +198,10 @@ describe("native smart-flow runtime", () => {
         ...projection,
         insight: {
           ...projection.insight,
-          compatibility: {
-            compatibility_only: true,
-            legacy_event_id: "legacy:event:1",
-            legacy_channel: "smart-money"
+          abstention: {
+            abstained: true,
+            reasons: ["below_policy_threshold"],
+            source_reasons: ["nested insight abstained"]
           }
         }
       }

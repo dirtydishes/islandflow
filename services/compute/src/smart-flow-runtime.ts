@@ -46,8 +46,7 @@ const buildNativeSmartFlowProjectionsFromExtractions = (
 
   return clusters.map((cluster) =>
     smartFlowExplainabilityFromHypothesisEvent(
-      buildFlowHypothesisEventFromCluster(cluster, config.projection),
-      { source_channel: "smart-flow" }
+      buildFlowHypothesisEventFromCluster(cluster, config.projection)
     )
   );
 };

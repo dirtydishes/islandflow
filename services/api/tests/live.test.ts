@@ -1,15 +1,13 @@
 import { describe, expect, it } from "bun:test";
-import { type ClickHouseClient, toSmartFlowProjectionRecord } from "@islandflow/storage";
+import { type ClickHouseClient } from "@islandflow/storage";
 import {
   SMART_FLOW_CONTRACT_VERSION,
   SMART_FLOW_HYPOTHESIS_SCORE_MODEL_VERSION,
   SMART_FLOW_HYPOTHESIS_SCORE_POLICY_VERSION,
   type SmartFlowAlertEvent,
   type SmartFlowExplainabilityProjection,
-  type SmartMoneyEvent,
   smartFlowAlertFromProjection,
-  smartFlowExplainabilityFromHypothesisEvent,
-  smartFlowExplainabilityFromLegacySmartMoneyEvent
+  smartFlowExplainabilityFromHypothesisEvent
 } from "@islandflow/types";
 import {
   buildOptionSnapshotFilters,
@@ -66,81 +64,24 @@ const makeRedis = () => {
   };
 };
 
-const makeSmartMoneyEvent = (now = Date.now()): SmartMoneyEvent => ({
-  source_ts: now,
-  ingest_ts: now + 1,
-  seq: 7,
-  trace_id: "smartmoney:flowpacket:7",
-  event_id: "smartmoney:event:7",
-  packet_ids: ["flowpacket:7"],
-  member_print_ids: ["print:7"],
-  underlying_id: "SPY",
-  event_kind: "single_leg_event",
-  event_window_ms: 500,
-  features: {
-    contract_count: 1,
-    print_count: 2,
-    total_size: 500,
-    total_premium: 75_000,
-    total_notional: 7_500_000,
-    start_ts: now,
-    end_ts: now + 100,
-    window_ms: 500,
-    option_contract_id: "SPY-2025-01-17-450-C",
-    option_type: "C",
-    dte_days: 1,
-    moneyness: 1.01,
-    atm_proximity: 0.01,
-    aggressor_buy_ratio: 0.8,
-    aggressor_sell_ratio: 0.1,
-    aggressor_ratio: 0.9,
-    nbbo_coverage_ratio: 0.92,
-    nbbo_inside_ratio: 0.05,
-    nbbo_stale_ratio: 0,
-    quote_age_ms: 20,
-    venue_count: 2,
-    inter_fill_ms_mean: 80,
-    strike_count: 1,
-    strike_concentration: 1,
-    structure_legs: 0,
-    same_size_leg_symmetry: 0,
-    net_directional_bias: 0.7,
-    synthetic_iv_shock: null,
-    spread_widening: null,
-    underlying_move_bps: null,
-    days_to_event: null,
-    expiry_after_event: null,
-    pre_event_concentration: null,
-    special_print_ratio: 0
-  },
-  profile_scores: [
-    {
-      profile_id: "institutional_directional",
-      probability: 0.76,
-      confidence_band: "high",
-      direction: "bullish",
-      reasons: ["large_parent_event"]
-    },
-    {
-      profile_id: "hedge_reactive",
-      probability: 0.31,
-      confidence_band: "low",
-      direction: "neutral",
-      reasons: ["could_be_hedge_rebalance"]
-    }
-  ],
-  primary_profile_id: "institutional_directional",
-  primary_direction: "bullish",
-  abstained: false,
-  suppressed_reasons: []
-});
-
-const makeSmartFlowProjection = (event: SmartMoneyEvent): SmartFlowExplainabilityProjection => {
-  const clusterId = `cluster:${event.underlying_id}:${event.source_ts}:${event.source_ts + 60_000}`;
+const makeSmartFlowProjection = (
+  now = Date.now(),
+  overrides: {
+    seq?: number;
+    packetIds?: string[];
+    printIds?: string[];
+    underlyingId?: string;
+  } = {}
+): SmartFlowExplainabilityProjection => {
+  const seq = overrides.seq ?? 7;
+  const packetIds = overrides.packetIds ?? ["flowpacket:7"];
+  const printIds = overrides.printIds ?? ["print:7"];
+  const underlyingId = overrides.underlyingId ?? "SPY";
+  const clusterId = `cluster:${underlyingId}:${now}:${now + 60_000}`;
   return smartFlowExplainabilityFromHypothesisEvent({
-    source_ts: event.source_ts,
-    ingest_ts: event.ingest_ts,
-    seq: event.seq,
+    source_ts: now,
+    ingest_ts: now + 1,
+    seq,
     trace_id: `smartflow:hypothesis:${clusterId}`,
     schema_version: SMART_FLOW_CONTRACT_VERSION,
     policy_version: SMART_FLOW_HYPOTHESIS_SCORE_POLICY_VERSION,
@@ -148,16 +89,16 @@ const makeSmartFlowProjection = (event: SmartMoneyEvent): SmartFlowExplainabilit
     event_id: `smartflow:hypothesis:${clusterId}`,
     hypothesis_id: `hypothesis:${clusterId}`,
     cluster_id: clusterId,
-    candidate_ids: event.packet_ids.map((packetId) => `candidate:${packetId}`),
-    underlying_id: event.underlying_id,
+    candidate_ids: packetIds.map((packetId) => `candidate:${packetId}`),
+    underlying_id: underlyingId,
     hypothesis_type: "directional_accumulation",
-    direction: event.primary_direction,
+    direction: "bullish",
     scores: {
       schema_version: SMART_FLOW_CONTRACT_VERSION,
       policy_version: SMART_FLOW_HYPOTHESIS_SCORE_POLICY_VERSION,
       model_version: SMART_FLOW_HYPOTHESIS_SCORE_MODEL_VERSION,
       hypothesis_type: "directional_accumulation",
-      direction: event.primary_direction,
+      direction: "bullish",
       evidence_strength: 0.8,
       fit_score: 0.72,
       penalty_score: 0,
@@ -179,7 +120,7 @@ const makeSmartFlowProjection = (event: SmartMoneyEvent): SmartFlowExplainabilit
       }
     ],
     abstention: { abstained: false, reasons: ["not_abstained"], source_reasons: [] },
-    evidence_refs: [...event.packet_ids, ...event.member_print_ids],
+    evidence_refs: [...packetIds, ...printIds],
     generated_from: "flow_evidence_cluster"
   });
 };
@@ -198,7 +139,6 @@ describe("LiveStateManager", () => {
     expect(limits["smart-flow"]).toBe(300);
     expect(limits["smart-flow-alerts"]).toBe(300);
     expect(limits["equity-quotes"]).toBe(500);
-    expect(limits.alerts).toBe(300);
     expect(resolveGenericLiveLimits({} as NodeJS.ProcessEnv).options).toBe(100);
   });
 
@@ -288,9 +228,6 @@ describe("LiveStateManager", () => {
       flow: 2,
       "smart-flow": 10000,
       "smart-flow-alerts": 10000,
-      "smart-money": 10000,
-      "classifier-hits": 10000,
-      alerts: 10000,
       "inferred-dark": 10000
     });
 
@@ -346,7 +283,7 @@ describe("LiveStateManager", () => {
 
   it("stores smart-flow explainability projections as a canonical live channel", async () => {
     const now = Date.now();
-    const projection = makeSmartFlowProjection(makeSmartMoneyEvent(now));
+    const projection = makeSmartFlowProjection(now);
     const manager = new LiveStateManager(makeClickHouse(), null);
 
     await manager.ingest("smart-flow", projection);
@@ -370,7 +307,7 @@ describe("LiveStateManager", () => {
 
   it("stores smart-flow alerts as a canonical live channel", async () => {
     const now = Date.now();
-    const projection = makeSmartFlowProjection(makeSmartMoneyEvent(now));
+    const projection = makeSmartFlowProjection(now);
     const alert = smartFlowAlertFromProjection(projection);
     if (!alert) {
       throw new Error("expected non-abstained projection to derive an alert");
@@ -395,18 +332,15 @@ describe("LiveStateManager", () => {
 
   it("keeps same-cursor smart-flow alerts with distinct alert identities", async () => {
     const now = Date.now();
-    const first = smartFlowAlertFromProjection(makeSmartFlowProjection(makeSmartMoneyEvent(now)), {
+    const first = smartFlowAlertFromProjection(makeSmartFlowProjection(now), {
       alert_id: "smartflow:alert:SPY",
       trace_id: "smartflow:alert:SPY"
     });
     const second = smartFlowAlertFromProjection(
-      makeSmartFlowProjection({
-        ...makeSmartMoneyEvent(now),
-        trace_id: "smartmoney:flowpacket:8",
-        event_id: "smartmoney:event:8",
-        packet_ids: ["flowpacket:8"],
-        member_print_ids: ["print:8"],
-        underlying_id: "QQQ"
+      makeSmartFlowProjection(now, {
+        packetIds: ["flowpacket:8"],
+        printIds: ["print:8"],
+        underlyingId: "QQQ"
       }),
       {
         alert_id: "smartflow:alert:QQQ",
@@ -428,39 +362,6 @@ describe("LiveStateManager", () => {
       new Set(["smartflow:alert:SPY", "smartflow:alert:QQQ"])
     );
     expect(snapshot.watermark).toEqual({ ts: now, seq: 7 });
-  });
-
-  it("hydrates smart-flow snapshots from ClickHouse when Redis only has legacy compatibility rows", async () => {
-    const redis = makeRedis();
-    const now = Date.now();
-    const legacyProjection = smartFlowExplainabilityFromLegacySmartMoneyEvent(
-      makeSmartMoneyEvent(now - 1_000)
-    );
-    const nativeProjection = makeSmartFlowProjection(makeSmartMoneyEvent(now));
-    let smartFlowQueried = false;
-
-    await redis.lPush("live:smart-flow", JSON.stringify(legacyProjection));
-
-    const manager = new LiveStateManager(
-      makeClickHouse((query) => {
-        if (!query.includes("smart_flow_projections")) {
-          return [];
-        }
-        smartFlowQueried = true;
-        return [toSmartFlowProjectionRecord(nativeProjection)];
-      }),
-      redis as never
-    );
-
-    await manager.hydrate();
-    const snapshot = await manager.getSnapshot({ channel: "smart-flow" });
-    const [item] = snapshot.items as SmartFlowExplainabilityProjection[];
-    const [persisted] = await redis.lRange("live:smart-flow", 0, 0);
-
-    expect(smartFlowQueried).toBe(true);
-    expect(item?.source_channel).toBe("smart-flow");
-    expect(item?.compatibility).toBeUndefined();
-    expect(JSON.parse(persisted ?? "{}").source_channel).toBe("smart-flow");
   });
 
   it("composes durable option and alert row models from cached live windows", async () => {
@@ -501,8 +402,7 @@ describe("LiveStateManager", () => {
       },
       join_quality: {}
     };
-    const smartMoney = makeSmartMoneyEvent(now + 12);
-    const smartFlow = makeSmartFlowProjection(smartMoney);
+    const smartFlow = makeSmartFlowProjection(now + 12);
     const alert = smartFlowAlertFromProjection(smartFlow, {
       alert_id: "smartflow:alert:7",
       trace_id: "smartflow:alert:7"
@@ -524,8 +424,6 @@ describe("LiveStateManager", () => {
     const alertRow = rows.find((row) => row.lane === "alerts");
 
     expect(optionRow?.support.packet.id).toBe("flowpacket:7");
-    expect(optionRow?.support.classifier).toBeNull();
-    expect(optionRow?.support.smart_money).toBeNull();
     expect(optionRow?.support.smart_flow.source_channel).toBe("smart-flow");
     expect(optionRow?.support.smart_flow.refs.evidence_refs).toEqual(["flowpacket:7", "print:7"]);
     expect(optionRow?.option.nbbo.source).toBe("print");
@@ -553,9 +451,6 @@ describe("LiveStateManager", () => {
         flow: 3,
         "smart-flow": 300,
         "smart-flow-alerts": 300,
-        "smart-money": 300,
-        "classifier-hits": 300,
-        alerts: 300,
         "inferred-dark": 300
       },
       scopedCacheMaxKeys: 32,
@@ -668,7 +563,7 @@ describe("LiveStateManager", () => {
       is_etf: false,
       signal_pass: true,
       signal_reasons: ["keep:ask-side"],
-      signal_profile: "smart-money"
+      signal_profile: "smart-flow"
     });
     await manager.ingest("options", {
       source_ts: now + 10,
@@ -687,7 +582,7 @@ describe("LiveStateManager", () => {
       is_etf: true,
       signal_pass: true,
       signal_reasons: ["keep:ask-side"],
-      signal_profile: "smart-money"
+      signal_profile: "smart-flow"
     });
     await manager.ingest("flow", {
       source_ts: now + 20,

@@ -8,7 +8,7 @@ import { createSyntheticFixtureArtifacts } from "@islandflow/synthetic-market/fi
 import { buildExpectedOutputManifest } from "@islandflow/synthetic-market/manifest";
 import {
   type ExpectedConfidenceRange,
-  type ExpectedDerivedEvent,
+  type ExpectedPipelineEvent,
   type ScenarioAlertExpectation,
   type SmartFlowExpectedOutputManifest,
   SYNTHETIC_GROUND_TRUTH_LABELS_VERSION,
@@ -20,7 +20,7 @@ import type {
   FlowAbstentionReason,
   FlowEvidenceFactKind,
   FlowHypothesisType,
-  SmartMoneyDirection
+  SmartFlowDirection
 } from "@islandflow/types";
 import {
   compareSmartFlowReplayToExpectedManifest,
@@ -28,7 +28,7 @@ import {
   type SmartFlowReplayFixture
 } from "../src/smart-flow-replay-evaluation";
 
-const PRESENT_DERIVED_EVENTS: ExpectedDerivedEvent[] = [
+const PRESENT_PIPELINE_EVENTS: ExpectedPipelineEvent[] = [
   {
     event_kind: "flow_evidence_candidate",
     expectation: "present",
@@ -55,7 +55,7 @@ const PRESENT_DERIVED_EVENTS: ExpectedDerivedEvent[] = [
   }
 ];
 
-const NO_ALERT_DERIVED_EVENTS: ExpectedDerivedEvent[] = [
+const NO_ALERT_PIPELINE_EVENTS: ExpectedPipelineEvent[] = [
   {
     event_kind: "flow_evidence_candidate",
     expectation: "present",
@@ -282,7 +282,7 @@ const noisyEventFixture = (): SmartFlowReplayFixture => {
       )
     ],
     forbidden_evidence: [],
-    expected_derived_events: NO_ALERT_DERIVED_EVENTS
+    expected_pipeline_events: NO_ALERT_PIPELINE_EVENTS
   });
 
   return {
@@ -346,7 +346,7 @@ describe("smart-flow replay evaluation and golden signatures", () => {
           "The clean positive fixture should not depend on stale quote context."
         )
       ],
-      expected_derived_events: PRESENT_DERIVED_EVENTS
+      expected_pipeline_events: PRESENT_PIPELINE_EVENTS
     });
 
     const report = compareSmartFlowReplayToExpectedManifest(fixture, expected);
@@ -373,7 +373,7 @@ describe("smart-flow replay evaluation and golden signatures", () => {
       abstention_reasons: ["not_abstained"],
       required_evidence: [],
       forbidden_evidence: [],
-      expected_derived_events: PRESENT_DERIVED_EVENTS
+      expected_pipeline_events: PRESENT_PIPELINE_EVENTS
     });
 
     const report = compareSmartFlowReplayToExpectedManifest(fixture, expected);
@@ -420,7 +420,7 @@ describe("smart-flow replay evaluation and golden signatures", () => {
           "No-alert replay should never emit a high-confidence hypothesis."
         )
       ],
-      expected_derived_events: NO_ALERT_DERIVED_EVENTS
+      expected_pipeline_events: NO_ALERT_PIPELINE_EVENTS
     });
 
     const report = compareSmartFlowReplayToExpectedManifest(fixture, expected);
@@ -442,7 +442,7 @@ describe("smart-flow replay evaluation and golden signatures", () => {
       abstention_reasons: [],
       required_evidence: [],
       forbidden_evidence: [],
-      expected_derived_events: NO_ALERT_DERIVED_EVENTS
+      expected_pipeline_events: NO_ALERT_PIPELINE_EVENTS
     });
 
     const report = compareSmartFlowReplayToExpectedManifest(fixture, expected);
@@ -450,7 +450,7 @@ describe("smart-flow replay evaluation and golden signatures", () => {
     expect(report.matches).toBe(false);
     expect(report.mismatches.map((mismatch) => mismatch.kind)).toContain("false_positive");
     expect(report.mismatches.map((mismatch) => mismatch.kind)).toContain(
-      "derived_event_presence_mismatch"
+      "pipeline_event_presence_mismatch"
     );
   });
 
@@ -474,7 +474,7 @@ describe("smart-flow replay evaluation and golden signatures", () => {
         )
       ],
       forbidden_evidence: [],
-      expected_derived_events: NO_ALERT_DERIVED_EVENTS
+      expected_pipeline_events: NO_ALERT_PIPELINE_EVENTS
     });
 
     const report = compareSmartFlowReplayToExpectedManifest(fixture, expected);
@@ -493,12 +493,12 @@ const expectedManifest = (
     scenario_id: string;
     alert_expectation: ScenarioAlertExpectation;
     expected_class: FlowHypothesisType;
-    expected_direction: SmartMoneyDirection;
+    expected_direction: SmartFlowDirection;
     confidence_range: ExpectedConfidenceRange;
     abstention_reasons: FlowAbstentionReason[];
     required_evidence: SyntheticEvidenceRequirement[];
     forbidden_evidence: SyntheticEvidenceRequirement[];
-    expected_derived_events: ExpectedDerivedEvent[];
+    expected_pipeline_events: ExpectedPipelineEvent[];
   }
 ): SmartFlowExpectedOutputManifest => ({
   schema_version: SYNTHETIC_SMART_FLOW_EXPECTED_OUTPUTS_VERSION,
@@ -525,7 +525,7 @@ const expectedManifest = (
             ? "medium"
             : "low",
       confidence_range: input.confidence_range,
-      expected_derived_events: input.expected_derived_events,
+      expected_pipeline_events: input.expected_pipeline_events,
       required_evidence: input.required_evidence,
       forbidden_evidence: input.forbidden_evidence,
       abstention_reasons: input.abstention_reasons,

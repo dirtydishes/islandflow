@@ -319,7 +319,7 @@ describe("alert context hydration helpers", () => {
 
   it("finds flow-packet refs even when they are not first in alert evidence", () => {
     const alert = makeAlert({
-      evidence_refs: ["smartmoney:single_leg_event:flowpacket:1", "flowpacket:1", "print:1"]
+      evidence_refs: ["flowpacket:1", "print:1"]
     });
 
     expect(getAlertFlowPacketRefs(alert)).toEqual(["flowpacket:1"]);
@@ -345,7 +345,7 @@ describe("alert context hydration helpers", () => {
       join_quality: {}
     } as any;
     const alert = makeAlert({
-      evidence_refs: ["smartmoney:single_leg_event:flowpacket:1", "flowpacket:1", "print:1"]
+      evidence_refs: ["flowpacket:1", "print:1"]
     });
     const packets = new Map<string, typeof packet>([[packet.id, packet]]);
 
@@ -354,7 +354,7 @@ describe("alert context hydration helpers", () => {
 });
 
 describe("live manifest", () => {
-  it("includes live smart-flow on /options without legacy smart-money", () => {
+  it("includes live smart-flow on /options without the retired derived channel", () => {
     const filters = buildDefaultFlowFilters();
     const channels = getLiveManifest("/options", "SPY", 60000, filters).map(
       (subscription) => subscription.channel
@@ -362,12 +362,6 @@ describe("live manifest", () => {
 
     expect(channels).toEqual(["options", "nbbo", "flow", "smart-flow"]);
     expect(channels).not.toContain("smart-money");
-  });
-
-  it("keeps /tape as a compatibility alias for /options subscriptions", () => {
-    expect(getLiveManifest("/tape", "SPY", 60000, buildDefaultFlowFilters())).toEqual(
-      getLiveManifest("/options", "SPY", 60000, buildDefaultFlowFilters())
-    );
   });
 
   it("dedupes options subscriptions on /options", () => {
@@ -486,12 +480,10 @@ describe("live manifest", () => {
     expect(channels).not.toContain("equity-overlay");
   });
 
-  it("normalizes retired route subscriptions to the home manifest", () => {
+  it("normalizes unknown route subscriptions to the home manifest", () => {
     const home = getLiveManifest("/", "SPY", 60000, buildDefaultFlowFilters());
 
-    expect(getLiveManifest("/signals", "SPY", 60000, buildDefaultFlowFilters())).toEqual(home);
-    expect(getLiveManifest("/charts", "SPY", 60000, buildDefaultFlowFilters())).toEqual(home);
-    expect(getLiveManifest("/replay", "SPY", 60000, buildDefaultFlowFilters())).toEqual(home);
+    expect(getLiveManifest("/unknown", "SPY", 60000, buildDefaultFlowFilters())).toEqual(home);
   });
 
   it("uses 15m chart interval selections for dashboard candle subscriptions", () => {
@@ -699,19 +691,10 @@ describe("route feature map", () => {
     expect(features.alerts).toBe(false);
   });
 
-  it("keeps /tape route compatibility while normalizing to /options", () => {
-    expect(normalizeTerminalPathname("/tape")).toBe("/options");
-    expect(getTerminalNavCurrentHref("/tape")).toBe("/options");
-    expect(getRouteFeatures("/tape")).toEqual(getRouteFeatures("/options"));
-  });
-
-  it("normalizes retired terminal routes to the home feature surface", () => {
-    expect(normalizeTerminalPathname("/signals")).toBe("/");
-    expect(normalizeTerminalPathname("/charts")).toBe("/");
-    expect(normalizeTerminalPathname("/replay")).toBe("/");
-    expect(getRouteFeatures("/signals")).toEqual(getRouteFeatures("/"));
-    expect(getRouteFeatures("/charts")).toEqual(getRouteFeatures("/"));
-    expect(getRouteFeatures("/replay")).toEqual(getRouteFeatures("/"));
+  it("normalizes unknown terminal routes to the home feature surface", () => {
+    expect(normalizeTerminalPathname("/unknown")).toBe("/");
+    expect(getTerminalNavCurrentHref("/unknown")).toBe("/");
+    expect(getRouteFeatures("/unknown")).toEqual(getRouteFeatures("/"));
   });
 
   it("maps /news to the dedicated news pane", () => {
@@ -739,13 +722,13 @@ describe("route feature map", () => {
     expect(features.equityCandles).toBe(false);
   });
 
-  it("can enable raw durable-tapes fallback subscriptions when explicitly requested", () => {
-    const features = buildDurableTapesRouteFeatures(true);
+  it("keeps durable-tapes on server-composed rows only", () => {
+    const features = buildDurableTapesRouteFeatures();
 
-    expect(features.options).toBe(true);
+    expect(features.options).toBe(false);
     expect(features.alerts).toBe(true);
     expect(features.durableRows).toBe(true);
-    expect(features.smartFlow).toBe(true);
+    expect(features.smartFlow).toBe(false);
     expect(features.showOptionsPane).toBe(true);
     expect(features.showAlertsPane).toBe(true);
     expect(features.needsSmartFlowDecor).toBe(false);
@@ -932,7 +915,7 @@ describe("live tape pausable helpers", () => {
     expect(shouldRetainLiveSnapshotHistory("options", true, 0, 3)).toBe(true);
     expect(shouldRetainLiveSnapshotHistory("equities", true, 0, 2)).toBe(true);
     expect(shouldRetainLiveSnapshotHistory("smart-flow", true, 0, 2)).toBe(true);
-    expect(shouldRetainLiveSnapshotHistory("alerts", true, 0, 3)).toBe(false);
+    expect(shouldRetainLiveSnapshotHistory("smart-flow-alerts", true, 0, 3)).toBe(false);
     expect(shouldRetainLiveSnapshotHistory("options", true, 1, 3)).toBe(false);
     expect(shouldRetainLiveSnapshotHistory("options", false, 0, 3)).toBe(false);
   });

@@ -4,8 +4,6 @@ import {
   ensureKnownStreams,
   ensureSyntheticControlState,
   openSyntheticControlKv,
-  STREAM_ALERTS,
-  STREAM_CLASSIFIER_HITS,
   STREAM_EQUITY_CANDLES,
   STREAM_EQUITY_JOINS,
   STREAM_EQUITY_PRINTS,
@@ -17,9 +15,6 @@ import {
   STREAM_OPTION_SIGNAL_PRINTS,
   STREAM_SMART_FLOW,
   STREAM_SMART_FLOW_ALERTS,
-  STREAM_SMART_MONEY_EVENTS,
-  SUBJECT_ALERTS,
-  SUBJECT_CLASSIFIER_HITS,
   SUBJECT_EQUITY_CANDLES,
   SUBJECT_EQUITY_JOINS,
   SUBJECT_EQUITY_PRINTS,
@@ -31,7 +26,6 @@ import {
   SUBJECT_OPTION_SIGNAL_PRINTS,
   SUBJECT_SMART_FLOW,
   SUBJECT_SMART_FLOW_ALERTS,
-  SUBJECT_SMART_MONEY_EVENTS,
   subscribeJson,
   watchSyntheticControlState,
   writeSyntheticControlState
@@ -41,8 +35,6 @@ import { createLogger, createMetrics } from "@islandflow/observability";
 import type { EquityPrintQueryFilters } from "@islandflow/storage";
 import {
   createClickHouseClient,
-  ensureAlertsTable,
-  ensureClassifierHitsTable,
   ensureEquityCandlesTable,
   ensureEquityPrintJoinsTable,
   ensureEquityPrintsTable,
@@ -54,7 +46,6 @@ import {
   ensureOptionPrintsTable,
   ensureSmartFlowAlertsTable,
   ensureSmartFlowProjectionsTable,
-  ensureSmartMoneyEventsTable,
   fetchEquityCandlesAfter,
   fetchEquityCandlesRange,
   fetchEquityPrintJoinsAfter,
@@ -93,8 +84,6 @@ import {
   resolveSyntheticProfileControlState
 } from "@islandflow/synthetic-market/profiles";
 import {
-  AlertEventSchema,
-  ClassifierHitEventSchema,
   Cursor,
   EquityCandleSchema,
   EquityPrintJoinSchema,
@@ -118,16 +107,11 @@ import {
   OptionPrintSchema,
   SmartFlowAlertEventSchema,
   SmartFlowExplainabilityProjectionSchema,
-  SmartMoneyEventSchema,
   type SyntheticControlState,
   SyntheticControlStateSchema
 } from "@islandflow/types";
 import { createClient } from "redis";
 import { z } from "zod";
-import {
-  createLegacyDerivedRouteResponse,
-  getLegacyLiveSubscriptionReplacement
-} from "./legacy-derived-routes";
 import {
   createCorsPreflightResponse,
   DEFAULT_API_CORS_ORIGINS,
@@ -743,11 +727,8 @@ const run = async () => {
       STREAM_EQUITY_JOINS,
       STREAM_INFERRED_DARK,
       STREAM_FLOW_PACKETS,
-      STREAM_SMART_MONEY_EVENTS,
       STREAM_SMART_FLOW,
       STREAM_SMART_FLOW_ALERTS,
-      STREAM_CLASSIFIER_HITS,
-      STREAM_ALERTS,
       STREAM_NEWS
     ],
     { logger }
@@ -798,11 +779,8 @@ const run = async () => {
     await ensureEquityPrintJoinsTable(clickhouse);
     await ensureInferredDarkTable(clickhouse);
     await ensureFlowPacketsTable(clickhouse);
-    await ensureSmartMoneyEventsTable(clickhouse);
     await ensureSmartFlowProjectionsTable(clickhouse);
     await ensureSmartFlowAlertsTable(clickhouse);
-    await ensureClassifierHitsTable(clickhouse);
-    await ensureAlertsTable(clickhouse);
     await ensureNewsTable(clickhouse);
   });
 
@@ -915,11 +893,6 @@ const run = async () => {
       durableName: "api-flow-packets"
     },
     {
-      subject: SUBJECT_SMART_MONEY_EVENTS,
-      stream: STREAM_SMART_MONEY_EVENTS,
-      durableName: "api-smart-money-events"
-    },
-    {
       subject: SUBJECT_SMART_FLOW,
       stream: STREAM_SMART_FLOW,
       durableName: "api-smart-flow"
@@ -928,16 +901,6 @@ const run = async () => {
       subject: SUBJECT_SMART_FLOW_ALERTS,
       stream: STREAM_SMART_FLOW_ALERTS,
       durableName: "api-smart-flow-alerts"
-    },
-    {
-      subject: SUBJECT_CLASSIFIER_HITS,
-      stream: STREAM_CLASSIFIER_HITS,
-      durableName: "api-classifier-hits"
-    },
-    {
-      subject: SUBJECT_ALERTS,
-      stream: STREAM_ALERTS,
-      durableName: "api-alerts"
     },
     {
       subject: SUBJECT_NEWS,
@@ -1040,11 +1003,8 @@ const run = async () => {
   const equityJoinSubscription = await subscribeConsumerBinding("api-equity-joins");
   const inferredDarkSubscription = await subscribeConsumerBinding("api-inferred-dark");
   const flowSubscription = await subscribeConsumerBinding("api-flow-packets");
-  const smartMoneySubscription = await subscribeConsumerBinding("api-smart-money-events");
   const smartFlowSubscription = await subscribeConsumerBinding("api-smart-flow");
   const smartFlowAlertSubscription = await subscribeConsumerBinding("api-smart-flow-alerts");
-  const classifierHitSubscription = await subscribeConsumerBinding("api-classifier-hits");
-  const alertSubscription = await subscribeConsumerBinding("api-alerts");
   const newsSubscription = await subscribeConsumerBinding("api-news");
 
   const fanoutLive = async (
@@ -1306,28 +1266,13 @@ const run = async () => {
     }
   };
 
-  const pumpSmartMoney = async () => {
-    for await (const msg of smartMoneySubscription.messages) {
-      try {
-        const payload = SmartMoneyEventSchema.parse(smartMoneySubscription.decode(msg));
-        recordSyntheticProfileHit(syntheticProfileHits, payload);
-        await fanoutLive({ channel: "smart-money" }, payload, "smart-money");
-        msg.ack();
-      } catch (error) {
-        logger.error("failed to process smart money event", {
-          error: error instanceof Error ? error.message : String(error)
-        });
-        msg.term();
-      }
-    }
-  };
-
   const pumpSmartFlow = async () => {
     for await (const msg of smartFlowSubscription.messages) {
       try {
         const payload = SmartFlowExplainabilityProjectionSchema.parse(
           smartFlowSubscription.decode(msg)
         );
+        recordSyntheticProfileHit(syntheticProfileHits, payload);
         broadcast(smartFlowSockets, { type: "smart-flow", payload });
         await fanoutLive({ channel: "smart-flow" }, payload, "smart-flow");
         msg.ack();
@@ -1349,36 +1294,6 @@ const run = async () => {
         msg.ack();
       } catch (error) {
         logger.error("failed to process smart-flow alert", {
-          error: error instanceof Error ? error.message : String(error)
-        });
-        msg.term();
-      }
-    }
-  };
-
-  const pumpClassifierHits = async () => {
-    for await (const msg of classifierHitSubscription.messages) {
-      try {
-        const payload = ClassifierHitEventSchema.parse(classifierHitSubscription.decode(msg));
-        await fanoutLive({ channel: "classifier-hits" }, payload, "classifier-hits");
-        msg.ack();
-      } catch (error) {
-        logger.error("failed to process classifier hit", {
-          error: error instanceof Error ? error.message : String(error)
-        });
-        msg.term();
-      }
-    }
-  };
-
-  const pumpAlerts = async () => {
-    for await (const msg of alertSubscription.messages) {
-      try {
-        const payload = AlertEventSchema.parse(alertSubscription.decode(msg));
-        await fanoutLive({ channel: "alerts" }, payload, "alerts");
-        msg.ack();
-      } catch (error) {
-        logger.error("failed to process alert", {
           error: error instanceof Error ? error.message : String(error)
         });
         msg.term();
@@ -1410,11 +1325,8 @@ const run = async () => {
   void pumpEquityJoins();
   void pumpInferredDark();
   void pumpFlow();
-  void pumpSmartMoney();
   void pumpSmartFlow();
   void pumpSmartFlowAlerts();
-  void pumpClassifierHits();
-  void pumpAlerts();
   void pumpNews();
 
   const buildSyntheticStatusBody = () => {
@@ -1473,13 +1385,6 @@ const run = async () => {
 
         if (req.method === "OPTIONS") {
           return createCorsPreflightResponse(req, corsAllowedOrigins);
-        }
-
-        if (req.method === "GET") {
-          const legacyResponse = createLegacyDerivedRouteResponse(url.pathname);
-          if (legacyResponse) {
-            return legacyResponse;
-          }
         }
 
         if (req.method === "GET" && url.pathname === "/health") {
@@ -2134,14 +2039,6 @@ const run = async () => {
 
           for (const subscription of parsed.subscriptions) {
             LiveSubscriptionSchema.parse(subscription);
-            const replacement = getLegacyLiveSubscriptionReplacement(subscription.channel);
-            if (replacement) {
-              sendLiveMessage(socket, {
-                op: "error",
-                message: `legacy derived live channel deprecated; use ${replacement}`
-              });
-              continue;
-            }
             if (parsed.op === "unsubscribe") {
               unsubscribeSocket(socket, subscription);
               continue;

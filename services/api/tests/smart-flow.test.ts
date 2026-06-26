@@ -124,7 +124,7 @@ const makeSmartFlowProjection = () =>
   });
 
 describe("smart-flow API projections", () => {
-  it("reads recent canonical smart-flow projection rows without smart-money storage", async () => {
+  it("reads recent canonical smart-flow projection rows from canonical storage", async () => {
     const projection = makeSmartFlowProjection();
     const queries: string[] = [];
     const [payload] = await fetchRecentSmartFlowExplainability(

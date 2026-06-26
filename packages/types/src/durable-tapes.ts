@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { OptionNbboSideSchema, OptionTypeSchema } from "./options-flow";
-import { SmartFlowExplainabilityProjectionSchema } from "./smart-flow";
+import { FlowHypothesisTypeSchema, SmartFlowExplainabilityProjectionSchema } from "./smart-flow";
 
 export const DurableTapeComposedLaneSchema = z.enum(["options", "alerts"]);
 export type DurableTapeComposedLane = z.infer<typeof DurableTapeComposedLaneSchema>;
@@ -91,29 +91,6 @@ export const DurableTapeOptionRowViewModelSchema = DurableTapeRowBaseSchema.exte
         truncated: z.boolean().optional()
       })
       .nullable(),
-    classifier: z
-      .object({
-        trace_id: z.string().min(1),
-        classifier_id: z.string().min(1),
-        label: z.string().min(1),
-        direction: z.string().min(1).nullable(),
-        confidence: z.number().min(0).max(1).nullable(),
-        explanation: z.string().min(1).nullable()
-      })
-      .nullable(),
-    smart_money: z
-      .object({
-        trace_id: z.string().min(1),
-        event_id: z.string().min(1),
-        profile_id: z.string().min(1).nullable(),
-        label: z.string().min(1),
-        direction: z.string().min(1).nullable(),
-        confidence_band: z.string().min(1).nullable(),
-        probability: z.number().min(0).max(1).nullable(),
-        abstained: z.boolean(),
-        reasons: z.array(z.string().min(1))
-      })
-      .nullable(),
     smart_flow: SmartFlowExplainabilityProjectionSchema.nullable()
   })
 });
@@ -123,21 +100,18 @@ export const DurableTapeAlertRowViewModelSchema = DurableTapeRowBaseSchema.exten
   lane: z.literal("alerts"),
   alert: z.object({
     trace_id: z.string().min(1),
+    alert_id: z.string().min(1),
+    hypothesis_id: z.string().min(1),
+    insight_id: z.string().min(1),
     primary_label: z.string().min(1),
-    primary_profile_id: z.string().min(1).nullable(),
-    score: z.number(),
-    severity: z.string().min(1),
+    hypothesis_type: FlowHypothesisTypeSchema,
     direction: z.string().min(1),
-    hit_count: z.number().int().nonnegative(),
-    top_hit: z
-      .object({
-        classifier_id: z.string().min(1),
-        label: z.string().min(1),
-        direction: z.string().min(1).nullable(),
-        confidence: z.number().min(0).max(1).nullable(),
-        explanation: z.string().min(1).nullable()
-      })
-      .nullable()
+    policy_confidence: z.number().min(0).max(1),
+    evidence_quality: z.number().min(0).max(1),
+    confidence_band: z.enum(["high", "medium", "low"]),
+    evidence_quality_band: z.enum(["strong", "usable", "thin", "poor"]),
+    trigger_kind: z.string().min(1),
+    projection_trace_id: z.string().min(1)
   }),
   evidence: z.object({
     total_refs: z.number().int().nonnegative(),

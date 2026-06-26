@@ -13,7 +13,7 @@ import {
   SMART_FLOW_HYPOTHESIS_SCORE_MODEL_VERSION,
   SMART_FLOW_HYPOTHESIS_SCORE_POLICY_VERSION,
   type SmartFlowInsight,
-  type SmartMoneyDirection,
+  type SmartFlowDirection,
   smartFlowInsightFromHypothesisEvent
 } from "@islandflow/types";
 
@@ -40,7 +40,7 @@ export type FlowHypothesisProjection = {
 
 type ScoreDraft = {
   hypothesisType: FlowHypothesisType;
-  direction: SmartMoneyDirection;
+  direction: SmartFlowDirection;
   evidenceStrength: number;
   fitScore: number;
   penaltyScore: number;
@@ -323,7 +323,7 @@ const buildContext = (cluster: FlowEvidenceCluster): ScoreContext => {
   };
 };
 
-const inferDirectionalFlow = (context: ScoreContext): SmartMoneyDirection => {
+const inferDirectionalFlow = (context: ScoreContext): SmartFlowDirection => {
   const sellDominant = context.aggressiveSellRatio >= context.aggressiveBuyRatio + 0.12;
   const buyDominant = context.aggressiveBuyRatio >= context.aggressiveSellRatio + 0.12;
 
@@ -363,7 +363,7 @@ const flatDirectionPenalty = (
 const buildDraft = (
   context: ScoreContext,
   hypothesisType: FlowHypothesisType,
-  direction: SmartMoneyDirection,
+  direction: SmartFlowDirection,
   fitScore: number,
   contextStrength: number,
   extraPenalties: Array<FlowScorePenalty | null> = []

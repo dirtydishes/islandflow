@@ -101,7 +101,7 @@ export type SmartFlowGoldenMismatchKind =
   | "confidence_out_of_range"
   | "missing_required_evidence"
   | "forbidden_evidence_present"
-  | "derived_event_presence_mismatch"
+  | "pipeline_event_presence_mismatch"
   | "missing_abstention_reason"
   | "false_positive";
 
@@ -497,14 +497,14 @@ const compareExpectation = (
     }
   }
 
-  for (const derived of expectation.expected_derived_events) {
-    const present = derivedEventPresent(derived.event_kind, evaluation);
-    if ((derived.expectation === "present") !== present) {
+  for (const pipelineEvent of expectation.expected_pipeline_events) {
+    const present = pipelineEventPresent(pipelineEvent.event_kind, evaluation);
+    if ((pipelineEvent.expectation === "present") !== present) {
       mismatches.push({
         expectation_id: expectation.expected_output_id,
-        kind: "derived_event_presence_mismatch",
-        message: `Derived event ${derived.event_kind} presence did not match the golden expectation.`,
-        expected: derived.expectation,
+        kind: "pipeline_event_presence_mismatch",
+        message: `Pipeline event ${pipelineEvent.event_kind} presence did not match the golden expectation.`,
+        expected: pipelineEvent.expectation,
         actual: present ? "present" : "absent"
       });
     }
@@ -613,8 +613,8 @@ const compareValues = (
   return false;
 };
 
-const derivedEventPresent = (
-  eventKind: SmartFlowExpectedOutput["expected_derived_events"][number]["event_kind"],
+const pipelineEventPresent = (
+  eventKind: SmartFlowExpectedOutput["expected_pipeline_events"][number]["event_kind"],
   evaluation: SmartFlowReplayEvaluation
 ): boolean => {
   if (eventKind === "flow_evidence_candidate") {

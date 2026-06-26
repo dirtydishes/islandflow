@@ -1,6 +1,4 @@
 import type {
-  AlertEvent,
-  ClassifierHitEvent,
   EquityCandle,
   EquityPrint,
   EquityPrintJoin,
@@ -13,12 +11,9 @@ import type {
   OptionNBBO,
   OptionPrint,
   SmartFlowAlertEvent,
-  SmartFlowExplainabilityProjection,
-  SmartMoneyEvent
+  SmartFlowExplainabilityProjection
 } from "@islandflow/types";
 import {
-  AlertEventSchema,
-  ClassifierHitEventSchema,
   EquityCandleSchema,
   EquityPrintJoinSchema,
   EquityPrintSchema,
@@ -29,24 +24,8 @@ import {
   OptionNBBOSchema,
   OptionPrintSchema,
   SmartFlowAlertEventSchema,
-  SmartFlowExplainabilityProjectionSchema,
-  SmartMoneyEventSchema
+  SmartFlowExplainabilityProjectionSchema
 } from "@islandflow/types";
-import {
-  ALERTS_TABLE,
-  type AlertRecord,
-  alertsTableDDL,
-  alertsTableMigrations,
-  fromAlertRecord,
-  toAlertRecord
-} from "./alerts";
-import {
-  CLASSIFIER_HITS_TABLE,
-  type ClassifierHitRecord,
-  classifierHitsTableDDL,
-  fromClassifierHitRecord,
-  toClassifierHitRecord
-} from "./classifier-hits";
 import {
   EQUITY_CANDLES_TABLE,
   equityCandlesTableDDL,
@@ -101,13 +80,6 @@ import {
   smartFlowProjectionsTableDDL,
   toSmartFlowProjectionRecord
 } from "./smart-flow-projections";
-import {
-  fromSmartMoneyEventRecord,
-  SMART_MONEY_EVENTS_TABLE,
-  type SmartMoneyEventRecord,
-  smartMoneyEventsTableDDL,
-  toSmartMoneyEventRecord
-} from "./smart-money-events";
 
 export type ClickHouseOptions = {
   url: string;
@@ -370,12 +342,6 @@ export const ensureFlowPacketsTable = async (client: ClickHouseClient): Promise<
   });
 };
 
-export const ensureSmartMoneyEventsTable = async (client: ClickHouseClient): Promise<void> => {
-  await client.exec({
-    query: smartMoneyEventsTableDDL()
-  });
-};
-
 export const ensureSmartFlowProjectionsTable = async (client: ClickHouseClient): Promise<void> => {
   await client.exec({
     query: smartFlowProjectionsTableDDL()
@@ -386,21 +352,6 @@ export const ensureSmartFlowAlertsTable = async (client: ClickHouseClient): Prom
   await client.exec({
     query: smartFlowAlertsTableDDL()
   });
-};
-
-export const ensureClassifierHitsTable = async (client: ClickHouseClient): Promise<void> => {
-  await client.exec({
-    query: classifierHitsTableDDL()
-  });
-};
-
-export const ensureAlertsTable = async (client: ClickHouseClient): Promise<void> => {
-  await client.exec({
-    query: alertsTableDDL()
-  });
-  for (const query of alertsTableMigrations()) {
-    await client.exec({ query });
-  }
 };
 
 export const ensureNewsTable = async (client: ClickHouseClient): Promise<void> => {
@@ -505,18 +456,6 @@ export const insertFlowPacket = async (
   });
 };
 
-export const insertSmartMoneyEvent = async (
-  client: ClickHouseClient,
-  event: SmartMoneyEvent
-): Promise<void> => {
-  const record = toSmartMoneyEventRecord(event);
-  await client.insert({
-    table: SMART_MONEY_EVENTS_TABLE,
-    values: [record],
-    format: "JSONEachRow"
-  });
-};
-
 export const insertSmartFlowProjection = async (
   client: ClickHouseClient,
   projection: SmartFlowExplainabilityProjection
@@ -536,27 +475,6 @@ export const insertSmartFlowAlert = async (
   const record = toSmartFlowAlertRecord(alert);
   await client.insert({
     table: SMART_FLOW_ALERTS_TABLE,
-    values: [record],
-    format: "JSONEachRow"
-  });
-};
-
-export const insertClassifierHit = async (
-  client: ClickHouseClient,
-  hit: ClassifierHitEvent
-): Promise<void> => {
-  const record = toClassifierHitRecord(hit);
-  await client.insert({
-    table: CLASSIFIER_HITS_TABLE,
-    values: [record],
-    format: "JSONEachRow"
-  });
-};
-
-export const insertAlert = async (client: ClickHouseClient, alert: AlertEvent): Promise<void> => {
-  const record = toAlertRecord(alert);
-  await client.insert({
-    table: ALERTS_TABLE,
     values: [record],
     format: "JSONEachRow"
   });
@@ -704,13 +622,6 @@ export const enqueueFlowPacketInsert = (
   writer.enqueue(FLOW_PACKETS_TABLE, toFlowPacketRecord(packet));
 };
 
-export const enqueueSmartMoneyEventInsert = (
-  writer: ClickHouseBatchWriter,
-  event: SmartMoneyEvent
-): void => {
-  writer.enqueue(SMART_MONEY_EVENTS_TABLE, toSmartMoneyEventRecord(event));
-};
-
 export const enqueueSmartFlowProjectionInsert = (
   writer: ClickHouseBatchWriter,
   projection: SmartFlowExplainabilityProjection
@@ -723,17 +634,6 @@ export const enqueueSmartFlowAlertInsert = (
   alert: SmartFlowAlertEvent
 ): void => {
   writer.enqueue(SMART_FLOW_ALERTS_TABLE, toSmartFlowAlertRecord(alert));
-};
-
-export const enqueueClassifierHitInsert = (
-  writer: ClickHouseBatchWriter,
-  hit: ClassifierHitEvent
-): void => {
-  writer.enqueue(CLASSIFIER_HITS_TABLE, toClassifierHitRecord(hit));
-};
-
-export const enqueueAlertInsert = (writer: ClickHouseBatchWriter, alert: AlertEvent): void => {
-  writer.enqueue(ALERTS_TABLE, toAlertRecord(alert));
 };
 
 export const enqueueNewsStoryInsert = (writer: ClickHouseBatchWriter, story: NewsStory): void => {
@@ -856,6 +756,8 @@ const normalizeNumericFields = (
   return record;
 };
 
+const CANONICAL_SIGNAL_PROFILES = new Set(["smart-flow", "balanced", "all"]);
+
 const normalizeOptionRow = (row: unknown): unknown => {
   if (row && typeof row === "object") {
     const record = normalizeNumericFields(row as Record<string, unknown>, [
@@ -893,6 +795,13 @@ const normalizeOptionRow = (row: unknown): unknown => {
     if (record.signal_reasons == null) {
       record.signal_reasons = [];
     }
+    if (
+      record.signal_profile != null &&
+      (typeof record.signal_profile !== "string" ||
+        !CANONICAL_SIGNAL_PROFILES.has(record.signal_profile))
+    ) {
+      delete record.signal_profile;
+    }
     return record;
   }
 
@@ -913,13 +822,6 @@ export type OptionPrintQueryFilters = {
 export type EquityPrintQueryFilters = {
   underlyingIds?: string[];
   sinceTs?: number;
-};
-
-export type AlertContextBundle = {
-  alert: AlertEvent | null;
-  flow_packets: FlowPacket[];
-  option_prints: OptionPrint[];
-  missing_refs: string[];
 };
 
 const buildOptionPrintFilterConditions = (
@@ -1117,54 +1019,6 @@ const normalizeFlowPacketRow = (row: unknown): FlowPacketRecord | null => {
   };
 };
 
-const normalizeClassifierHitRow = (row: unknown): ClassifierHitRecord | null => {
-  if (!row || typeof row !== "object") {
-    return null;
-  }
-
-  const record = row as Record<string, unknown>;
-  return {
-    source_ts: coerceNumber(record.source_ts) as number,
-    ingest_ts: coerceNumber(record.ingest_ts) as number,
-    seq: coerceNumber(record.seq) as number,
-    trace_id: String(record.trace_id ?? ""),
-    classifier_id: String(record.classifier_id ?? ""),
-    confidence: Number(coerceNumber(record.confidence) ?? 0),
-    direction: String(record.direction ?? ""),
-    explanations_json: String(record.explanations_json ?? "[]")
-  };
-};
-
-const normalizeSmartMoneyEventRow = (row: unknown): SmartMoneyEventRecord | null => {
-  if (!row || typeof row !== "object") {
-    return null;
-  }
-
-  const record = row as Record<string, unknown>;
-  return {
-    source_ts: coerceNumber(record.source_ts) as number,
-    ingest_ts: coerceNumber(record.ingest_ts) as number,
-    seq: coerceNumber(record.seq) as number,
-    trace_id: String(record.trace_id ?? ""),
-    event_id: String(record.event_id ?? ""),
-    packet_ids: Array.isArray(record.packet_ids)
-      ? record.packet_ids.map((value) => String(value))
-      : [],
-    member_print_ids: Array.isArray(record.member_print_ids)
-      ? record.member_print_ids.map((value) => String(value))
-      : [],
-    underlying_id: String(record.underlying_id ?? ""),
-    event_kind: String(record.event_kind ?? ""),
-    event_window_ms: coerceNumber(record.event_window_ms) as number,
-    features_json: String(record.features_json ?? "{}"),
-    profile_scores_json: String(record.profile_scores_json ?? "[]"),
-    primary_profile_id: String(record.primary_profile_id ?? ""),
-    primary_direction: String(record.primary_direction ?? "unknown"),
-    abstained: Boolean(record.abstained),
-    suppressed_reasons_json: String(record.suppressed_reasons_json ?? "[]")
-  };
-};
-
 const normalizeStringArray = (value: unknown): string[] =>
   Array.isArray(value) ? value.map((entry) => String(entry)) : [];
 
@@ -1261,26 +1115,6 @@ const appendSmartFlowAlertBoundaryTies = async (
     const descending = timeOrder || alertOrder;
     return direction === "asc" ? -descending : descending;
   });
-};
-
-const normalizeAlertRow = (row: unknown): AlertRecord | null => {
-  if (!row || typeof row !== "object") {
-    return null;
-  }
-
-  const record = row as Record<string, unknown>;
-  return {
-    source_ts: coerceNumber(record.source_ts) as number,
-    ingest_ts: coerceNumber(record.ingest_ts) as number,
-    seq: coerceNumber(record.seq) as number,
-    trace_id: String(record.trace_id ?? ""),
-    score: Number(coerceNumber(record.score) ?? 0),
-    severity: String(record.severity ?? ""),
-    hits_json: String(record.hits_json ?? "[]"),
-    evidence_refs_json: String(record.evidence_refs_json ?? "[]"),
-    primary_profile_id: String(record.primary_profile_id ?? ""),
-    profile_scores_json: String(record.profile_scores_json ?? "[]")
-  };
 };
 
 const normalizeNewsRow = (row: unknown): NewsRecord | null => {
@@ -1448,41 +1282,6 @@ export const fetchRecentFlowPackets = async (
   return FlowPacketSchema.array().parse(packets);
 };
 
-export const fetchRecentClassifierHits = async (
-  client: ClickHouseClient,
-  limit: number
-): Promise<ClassifierHitEvent[]> => {
-  const safeLimit = clampLimit(limit);
-  const result = await client.query({
-    query: `SELECT * FROM ${CLASSIFIER_HITS_TABLE} ORDER BY source_ts DESC, seq DESC LIMIT ${safeLimit}`,
-    format: "JSONEachRow"
-  });
-
-  const rows = await result.json<unknown[]>();
-  const records = rows
-    .map(normalizeClassifierHitRow)
-    .filter((record): record is ClassifierHitRecord => record !== null);
-  const hits = records.map(fromClassifierHitRecord);
-  return ClassifierHitEventSchema.array().parse(hits);
-};
-
-export const fetchRecentSmartMoneyEvents = async (
-  client: ClickHouseClient,
-  limit: number
-): Promise<SmartMoneyEvent[]> => {
-  const safeLimit = clampLimit(limit);
-  const result = await client.query({
-    query: `SELECT * FROM ${SMART_MONEY_EVENTS_TABLE} ORDER BY source_ts DESC, seq DESC LIMIT ${safeLimit}`,
-    format: "JSONEachRow"
-  });
-
-  const rows = await result.json<unknown[]>();
-  const records = rows
-    .map(normalizeSmartMoneyEventRow)
-    .filter((record): record is SmartMoneyEventRecord => record !== null);
-  return SmartMoneyEventSchema.array().parse(records.map(fromSmartMoneyEventRecord));
-};
-
 export const fetchRecentSmartFlowProjections = async (
   client: ClickHouseClient,
   limit: number
@@ -1514,24 +1313,6 @@ export const fetchRecentSmartFlowAlerts = async (
 
   const rows = await result.json<unknown[]>();
   return smartFlowAlertEventsFromRows(rows);
-};
-
-export const fetchRecentAlerts = async (
-  client: ClickHouseClient,
-  limit: number
-): Promise<AlertEvent[]> => {
-  const safeLimit = clampLimit(limit);
-  const result = await client.query({
-    query: `SELECT * FROM ${ALERTS_TABLE} ORDER BY source_ts DESC, seq DESC LIMIT ${safeLimit}`,
-    format: "JSONEachRow"
-  });
-
-  const rows = await result.json<unknown[]>();
-  const records = rows
-    .map(normalizeAlertRow)
-    .filter((record): record is AlertRecord => record !== null);
-  const alerts = records.map(fromAlertRecord);
-  return AlertEventSchema.array().parse(alerts);
 };
 
 const latestNewsSelect = `
@@ -1576,105 +1357,6 @@ export const fetchRecentNews = async (
     .map(normalizeNewsRow)
     .filter((record): record is NewsRecord => record !== null);
   return NewsStorySchema.array().parse(records.map(fromNewsRecord));
-};
-
-const normalizeAlertEvidenceRefs = (refs: string[]): string[] => {
-  return Array.from(new Set(refs.map((ref) => ref.trim()).filter(Boolean)));
-};
-
-const flowPacketCandidatesFromRef = (ref: string): string[] => {
-  if (!ref) {
-    return [];
-  }
-  if (ref.startsWith("flowpacket:")) {
-    const raw = ref.slice("flowpacket:".length);
-    return raw ? [ref, raw] : [ref];
-  }
-  return [ref, `flowpacket:${ref}`];
-};
-
-const optionPrintCandidatesFromRef = (ref: string): string[] => {
-  if (!ref || ref.startsWith("flowpacket:")) {
-    return [];
-  }
-  return [ref];
-};
-
-export const fetchAlertContextByTraceId = async (
-  client: ClickHouseClient,
-  traceId: string
-): Promise<AlertContextBundle> => {
-  const normalizedTraceId = traceId.trim();
-  if (!normalizedTraceId) {
-    return {
-      alert: null,
-      flow_packets: [],
-      option_prints: [],
-      missing_refs: []
-    };
-  }
-
-  const alertResult = await client.query({
-    query: `SELECT * FROM ${ALERTS_TABLE} WHERE trace_id = ${quoteString(normalizedTraceId)} ORDER BY source_ts DESC, seq DESC LIMIT 1`,
-    format: "JSONEachRow"
-  });
-  const alertRows = await alertResult.json<unknown[]>();
-  const alertRecord = alertRows
-    .map(normalizeAlertRow)
-    .find((record): record is AlertRecord => record !== null);
-  const alert = alertRecord ? AlertEventSchema.parse(fromAlertRecord(alertRecord)) : null;
-
-  if (!alert) {
-    return {
-      alert: null,
-      flow_packets: [],
-      option_prints: [],
-      missing_refs: []
-    };
-  }
-
-  const refs = normalizeAlertEvidenceRefs(alert.evidence_refs);
-  const packetLookupIds = Array.from(new Set(refs.flatMap(flowPacketCandidatesFromRef)));
-  const printLookupIds = Array.from(new Set(refs.flatMap(optionPrintCandidatesFromRef)));
-
-  const [flowPackets, optionPrints] = await Promise.all([
-    packetLookupIds.length > 0
-      ? client
-          .query({
-            query: `SELECT * FROM ${FLOW_PACKETS_TABLE} WHERE id IN (${buildStringList(packetLookupIds)}) ORDER BY source_ts DESC, seq DESC LIMIT ${clampLookupLimit(packetLookupIds.length)}`,
-            format: "JSONEachRow"
-          })
-          .then(async (result) => {
-            const rows = await result.json<unknown[]>();
-            const records = rows
-              .map(normalizeFlowPacketRow)
-              .filter((record): record is FlowPacketRecord => record !== null);
-            return FlowPacketSchema.array().parse(records.map(fromFlowPacketRecord));
-          })
-      : Promise.resolve([]),
-    printLookupIds.length > 0
-      ? fetchOptionPrintsByTraceIds(client, printLookupIds)
-      : Promise.resolve([])
-  ]);
-
-  const packetIds = new Set(flowPackets.flatMap((packet) => [packet.id, packet.trace_id]));
-  const printIds = new Set(optionPrints.map((print) => print.trace_id));
-  const missingRefs = refs.filter((ref) => {
-    const packetResolved = flowPacketCandidatesFromRef(ref).some((candidate) =>
-      packetIds.has(candidate)
-    );
-    const printResolved = optionPrintCandidatesFromRef(ref).some((candidate) =>
-      printIds.has(candidate)
-    );
-    return !packetResolved && !printResolved;
-  });
-
-  return {
-    alert,
-    flow_packets: flowPackets,
-    option_prints: optionPrints,
-    missing_refs: missingRefs
-  };
 };
 
 export const fetchOptionPrintsAfter = async (
@@ -1908,51 +1590,6 @@ export const fetchFlowPacketsAfter = async (
   return FlowPacketSchema.array().parse(packets);
 };
 
-export const fetchClassifierHitsAfter = async (
-  client: ClickHouseClient,
-  afterTs: number,
-  afterSeq: number,
-  limit: number
-): Promise<ClassifierHitEvent[]> => {
-  const safeLimit = clampLimit(limit);
-  const safeAfterTs = clampCursor(afterTs);
-  const safeAfterSeq = clampCursor(afterSeq);
-
-  const result = await client.query({
-    query: `SELECT * FROM ${CLASSIFIER_HITS_TABLE} WHERE (source_ts, seq) > (${safeAfterTs}, ${safeAfterSeq}) ORDER BY source_ts ASC, seq ASC LIMIT ${safeLimit}`,
-    format: "JSONEachRow"
-  });
-
-  const rows = await result.json<unknown[]>();
-  const records = rows
-    .map(normalizeClassifierHitRow)
-    .filter((record): record is ClassifierHitRecord => record !== null);
-  const hits = records.map(fromClassifierHitRecord);
-  return ClassifierHitEventSchema.array().parse(hits);
-};
-
-export const fetchSmartMoneyEventsAfter = async (
-  client: ClickHouseClient,
-  afterTs: number,
-  afterSeq: number,
-  limit: number
-): Promise<SmartMoneyEvent[]> => {
-  const safeLimit = clampLimit(limit);
-  const safeAfterTs = clampCursor(afterTs);
-  const safeAfterSeq = clampCursor(afterSeq);
-
-  const result = await client.query({
-    query: `SELECT * FROM ${SMART_MONEY_EVENTS_TABLE} WHERE (source_ts, seq) > (${safeAfterTs}, ${safeAfterSeq}) ORDER BY source_ts ASC, seq ASC LIMIT ${safeLimit}`,
-    format: "JSONEachRow"
-  });
-
-  const rows = await result.json<unknown[]>();
-  const records = rows
-    .map(normalizeSmartMoneyEventRow)
-    .filter((record): record is SmartMoneyEventRecord => record !== null);
-  return SmartMoneyEventSchema.array().parse(records.map(fromSmartMoneyEventRecord));
-};
-
 export const fetchSmartFlowProjectionsAfter = async (
   client: ClickHouseClient,
   afterTs: number,
@@ -1999,29 +1636,6 @@ export const fetchSmartFlowAlertsAfter = async (
     safeLimit,
     "asc"
   );
-};
-
-export const fetchAlertsAfter = async (
-  client: ClickHouseClient,
-  afterTs: number,
-  afterSeq: number,
-  limit: number
-): Promise<AlertEvent[]> => {
-  const safeLimit = clampLimit(limit);
-  const safeAfterTs = clampCursor(afterTs);
-  const safeAfterSeq = clampCursor(afterSeq);
-
-  const result = await client.query({
-    query: `SELECT * FROM ${ALERTS_TABLE} WHERE (source_ts, seq) > (${safeAfterTs}, ${safeAfterSeq}) ORDER BY source_ts ASC, seq ASC LIMIT ${safeLimit}`,
-    format: "JSONEachRow"
-  });
-
-  const rows = await result.json<unknown[]>();
-  const records = rows
-    .map(normalizeAlertRow)
-    .filter((record): record is AlertRecord => record !== null);
-  const alerts = records.map(fromAlertRecord);
-  return AlertEventSchema.array().parse(alerts);
 };
 
 export const fetchNewsAfter = async (
@@ -2167,44 +1781,6 @@ export const fetchFlowPacketsBefore = async (
   return FlowPacketSchema.array().parse(records.map(fromFlowPacketRecord));
 };
 
-export const fetchClassifierHitsBefore = async (
-  client: ClickHouseClient,
-  beforeTs: number,
-  beforeSeq: number,
-  limit: number
-): Promise<ClassifierHitEvent[]> => {
-  const safeLimit = clampLimit(limit);
-  const result = await client.query({
-    query: `SELECT * FROM ${CLASSIFIER_HITS_TABLE} WHERE ${buildBeforeTupleCondition("source_ts", "seq", beforeTs, beforeSeq)} ORDER BY source_ts DESC, seq DESC LIMIT ${safeLimit}`,
-    format: "JSONEachRow"
-  });
-
-  const rows = await result.json<unknown[]>();
-  const records = rows
-    .map(normalizeClassifierHitRow)
-    .filter((record): record is ClassifierHitRecord => record !== null);
-  return ClassifierHitEventSchema.array().parse(records.map(fromClassifierHitRecord));
-};
-
-export const fetchSmartMoneyEventsBefore = async (
-  client: ClickHouseClient,
-  beforeTs: number,
-  beforeSeq: number,
-  limit: number
-): Promise<SmartMoneyEvent[]> => {
-  const safeLimit = clampLimit(limit);
-  const result = await client.query({
-    query: `SELECT * FROM ${SMART_MONEY_EVENTS_TABLE} WHERE ${buildBeforeTupleCondition("source_ts", "seq", beforeTs, beforeSeq)} ORDER BY source_ts DESC, seq DESC LIMIT ${safeLimit}`,
-    format: "JSONEachRow"
-  });
-
-  const rows = await result.json<unknown[]>();
-  const records = rows
-    .map(normalizeSmartMoneyEventRow)
-    .filter((record): record is SmartMoneyEventRecord => record !== null);
-  return SmartMoneyEventSchema.array().parse(records.map(fromSmartMoneyEventRecord));
-};
-
 export const fetchSmartFlowProjectionsBefore = async (
   client: ClickHouseClient,
   beforeTs: number,
@@ -2245,25 +1821,6 @@ export const fetchSmartFlowAlertsBefore = async (
     safeLimit,
     "desc"
   );
-};
-
-export const fetchAlertsBefore = async (
-  client: ClickHouseClient,
-  beforeTs: number,
-  beforeSeq: number,
-  limit: number
-): Promise<AlertEvent[]> => {
-  const safeLimit = clampLimit(limit);
-  const result = await client.query({
-    query: `SELECT * FROM ${ALERTS_TABLE} WHERE ${buildBeforeTupleCondition("source_ts", "seq", beforeTs, beforeSeq)} ORDER BY source_ts DESC, seq DESC LIMIT ${safeLimit}`,
-    format: "JSONEachRow"
-  });
-
-  const rows = await result.json<unknown[]>();
-  const records = rows
-    .map(normalizeAlertRow)
-    .filter((record): record is AlertRecord => record !== null);
-  return AlertEventSchema.array().parse(records.map(fromAlertRecord));
 };
 
 export const fetchNewsBefore = async (
@@ -2361,28 +1918,6 @@ export const fetchFlowPacketsByMemberTraceIds = async (
   return FlowPacketSchema.array().parse(records.map(fromFlowPacketRecord));
 };
 
-export const fetchSmartMoneyEventsByPacketIds = async (
-  client: ClickHouseClient,
-  packetIds: string[]
-): Promise<SmartMoneyEvent[]> => {
-  const ids = Array.from(new Set(packetIds.map((id) => id.trim()).filter(Boolean)));
-  if (ids.length === 0) {
-    return [];
-  }
-
-  const packetPredicates = ids.map((id) => `has(packet_ids, ${quoteString(id)})`);
-  const result = await client.query({
-    query: `SELECT * FROM ${SMART_MONEY_EVENTS_TABLE} WHERE ${packetPredicates.join(" OR ")} ORDER BY source_ts DESC, seq DESC LIMIT ${clampLookupLimit(ids.length * 4)}`,
-    format: "JSONEachRow"
-  });
-
-  const rows = await result.json<unknown[]>();
-  const records = rows
-    .map(normalizeSmartMoneyEventRow)
-    .filter((record): record is SmartMoneyEventRecord => record !== null);
-  return SmartMoneyEventSchema.array().parse(records.map(fromSmartMoneyEventRecord));
-};
-
 export const fetchSmartFlowProjectionsByPacketIds = async (
   client: ClickHouseClient,
   packetIds: string[]
@@ -2405,28 +1940,6 @@ export const fetchSmartFlowProjectionsByPacketIds = async (
   return SmartFlowExplainabilityProjectionSchema.array().parse(
     records.map(fromSmartFlowProjectionRecord)
   );
-};
-
-export const fetchClassifierHitsByPacketIds = async (
-  client: ClickHouseClient,
-  packetIds: string[]
-): Promise<ClassifierHitEvent[]> => {
-  const ids = Array.from(new Set(packetIds.map((id) => id.trim()).filter(Boolean)));
-  if (ids.length === 0) {
-    return [];
-  }
-
-  const tracePredicates = ids.map((id) => `position(trace_id, ${quoteString(id)}) > 0`);
-  const result = await client.query({
-    query: `SELECT * FROM ${CLASSIFIER_HITS_TABLE} WHERE ${tracePredicates.join(" OR ")} ORDER BY source_ts DESC, seq DESC LIMIT ${clampLookupLimit(ids.length * 4)}`,
-    format: "JSONEachRow"
-  });
-
-  const rows = await result.json<unknown[]>();
-  const records = rows
-    .map(normalizeClassifierHitRow)
-    .filter((record): record is ClassifierHitRecord => record !== null);
-  return ClassifierHitEventSchema.array().parse(records.map(fromClassifierHitRecord));
 };
 
 export const fetchNearestOptionNBBOForPrints = async (

@@ -2,15 +2,16 @@ import {
   SyntheticDerivedStatusSchema,
   buildEmptySyntheticProfileHitCounts,
   getSyntheticSessionState,
-  type SmartMoneyEvent,
-  type SmartMoneyProfileId,
+  type FlowHypothesisType,
+  type SmartFlowExplainabilityProjection,
+  type SmartFlowProfileId,
   type SyntheticControlState,
   type SyntheticDerivedStatus
 } from "@islandflow/types";
 
 export type SyntheticBackendMode = "synthetic" | "mixed" | "live";
 
-export type RollingSyntheticProfileHits = Record<SmartMoneyProfileId, number[]>;
+export type RollingSyntheticProfileHits = Record<SmartFlowProfileId, number[]>;
 
 export const createRollingSyntheticProfileHits = (): RollingSyntheticProfileHits => ({
   institutional_directional: [],
@@ -20,6 +21,15 @@ export const createRollingSyntheticProfileHits = (): RollingSyntheticProfileHits
   arbitrage: [],
   hedge_reactive: []
 });
+
+const HYPOTHESIS_PROFILE_MAP: Partial<Record<FlowHypothesisType, SmartFlowProfileId>> = {
+  directional_accumulation: "institutional_directional",
+  retail_attention_flow: "retail_whale",
+  event_positioning: "event_driven",
+  volatility_supply: "vol_seller",
+  structure_arbitrage: "arbitrage",
+  hedge_rebalance: "hedge_reactive"
+};
 
 export const resolveSyntheticBackendMode = (
   optionsAdapter: string,
@@ -50,22 +60,26 @@ export const getSyntheticBackendDisabledReason = (
 
 export const recordSyntheticProfileHit = (
   state: RollingSyntheticProfileHits,
-  event: Pick<SmartMoneyEvent, "primary_profile_id" | "source_ts">
+  projection: Pick<SmartFlowExplainabilityProjection, "hypothesis" | "source_ts" | "abstention">
 ): void => {
-  if (!event.primary_profile_id) {
+  if (projection.abstention.abstained) {
     return;
   }
-  state[event.primary_profile_id].push(event.source_ts);
+  const profileId = HYPOTHESIS_PROFILE_MAP[projection.hypothesis.hypothesis_type];
+  if (!profileId) {
+    return;
+  }
+  state[profileId].push(projection.source_ts);
 };
 
 export const getSyntheticProfileHitCounts = (
   state: RollingSyntheticProfileHits,
   now: number,
   coverageWindowMinutes: number
-): Record<SmartMoneyProfileId, number> => {
+): Record<SmartFlowProfileId, number> => {
   const floorTs = now - coverageWindowMinutes * 60_000;
   const counts = buildEmptySyntheticProfileHitCounts();
-  for (const profileId of Object.keys(state) as SmartMoneyProfileId[]) {
+  for (const profileId of Object.keys(state) as SmartFlowProfileId[]) {
     const retained = state[profileId].filter((ts) => ts >= floorTs);
     state[profileId] = retained;
     counts[profileId] = retained.length;

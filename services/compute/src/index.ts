@@ -3,8 +3,6 @@ import {
   connectJetStreamWithRetry,
   ensureKnownStreams,
   publishJson,
-  STREAM_ALERTS,
-  STREAM_CLASSIFIER_HITS,
   STREAM_EQUITY_JOINS,
   STREAM_EQUITY_PRINTS,
   STREAM_EQUITY_QUOTES,
@@ -14,9 +12,6 @@ import {
   STREAM_OPTION_SIGNAL_PRINTS,
   STREAM_SMART_FLOW,
   STREAM_SMART_FLOW_ALERTS,
-  STREAM_SMART_MONEY_EVENTS,
-  SUBJECT_ALERTS,
-  SUBJECT_CLASSIFIER_HITS,
   SUBJECT_EQUITY_JOINS,
   SUBJECT_EQUITY_PRINTS,
   SUBJECT_EQUITY_QUOTES,
@@ -26,41 +21,25 @@ import {
   SUBJECT_OPTION_SIGNAL_PRINTS,
   SUBJECT_SMART_FLOW,
   SUBJECT_SMART_FLOW_ALERTS,
-  SUBJECT_SMART_MONEY_EVENTS,
   subscribeJson
 } from "@islandflow/bus";
 import { readEnv } from "@islandflow/config";
 import { createLogger } from "@islandflow/observability";
 import {
-  createEmptyEventCalendarProvider,
-  type EventCalendarProvider,
-  loadEventCalendarProviderFromFile
-} from "@islandflow/refdata/event-calendar";
-import {
   ClickHouseBatchWriter,
   createClickHouseClient,
-  enqueueAlertInsert,
-  enqueueClassifierHitInsert,
   enqueueEquityPrintJoinInsert,
   enqueueFlowPacketInsert,
   enqueueInferredDarkInsert,
   enqueueSmartFlowAlertInsert,
   enqueueSmartFlowProjectionInsert,
-  enqueueSmartMoneyEventInsert,
-  ensureAlertsTable,
-  ensureClassifierHitsTable,
   ensureEquityPrintJoinsTable,
   ensureFlowPacketsTable,
   ensureInferredDarkTable,
   ensureSmartFlowAlertsTable,
-  ensureSmartFlowProjectionsTable,
-  ensureSmartMoneyEventsTable
+  ensureSmartFlowProjectionsTable
 } from "@islandflow/storage";
 import {
-  type AlertEvent,
-  AlertEventSchema,
-  type ClassifierHitEvent,
-  ClassifierHitEventSchema,
   type EquityPrint,
   type EquityPrintJoin,
   EquityPrintJoinSchema,
@@ -74,13 +53,9 @@ import {
   type OptionNBBO,
   OptionNBBOSchema,
   type OptionPrint,
-  OptionPrintSchema,
-  type SmartMoneyEvent,
-  SmartMoneyEventSchema
+  OptionPrintSchema
 } from "@islandflow/types";
 import { z } from "zod";
-import { scoreAlert } from "./alert-scoring";
-import type { ClassifierConfig } from "./classifiers";
 import { parseContractId } from "./contracts";
 import {
   createDarkInferenceState,
@@ -88,10 +63,6 @@ import {
   evaluateDarkInferences
 } from "./dark-inference";
 import { buildEquityPrintJoin, type EquityQuoteJoin } from "./equity-joins";
-import {
-  buildSmartMoneyEventFromPacket,
-  deriveClassifierHitsFromSmartMoneyEvent
-} from "./parent-events";
 import {
   createRedisClient,
   type RollingStatsConfig,
@@ -147,41 +118,10 @@ const envSchema = z.object({
   DARK_INFER_MIN_ACCUM_COUNT: z.coerce.number().int().positive().default(4),
   DARK_INFER_MIN_PRINT_SIZE: z.coerce.number().int().positive().default(200),
   DARK_INFER_MAX_EVIDENCE: z.coerce.number().int().positive().default(20),
-  DARK_INFER_MAX_SPREAD_PCT: z.coerce.number().positive().default(0.005),
-  CLASSIFIER_SWEEP_MIN_PREMIUM: z.coerce.number().positive().default(40_000),
-  CLASSIFIER_SWEEP_MIN_COUNT: z.coerce.number().int().positive().default(3),
-  CLASSIFIER_SWEEP_MIN_PREMIUM_Z: z.coerce.number().nonnegative().default(2),
-  CLASSIFIER_SPIKE_MIN_PREMIUM: z.coerce.number().positive().default(20_000),
-  CLASSIFIER_SPIKE_MIN_SIZE: z.coerce.number().int().positive().default(400),
-  CLASSIFIER_SPIKE_MIN_PREMIUM_Z: z.coerce.number().nonnegative().default(2.5),
-  CLASSIFIER_SPIKE_MIN_SIZE_Z: z.coerce.number().nonnegative().default(2),
-  CLASSIFIER_Z_MIN_SAMPLES: z.coerce.number().int().nonnegative().default(12),
-  CLASSIFIER_MIN_NBBO_COVERAGE: z.coerce.number().min(0).max(1).default(0.5),
-  CLASSIFIER_MIN_AGGRESSOR_RATIO: z.coerce.number().min(0).max(1).default(0.55),
-  CLASSIFIER_0DTE_MAX_ATM_PCT: z.coerce.number().min(0).max(1).default(0.01),
-  CLASSIFIER_0DTE_MIN_PREMIUM: z.coerce.number().positive().default(20_000),
-  CLASSIFIER_0DTE_MIN_SIZE: z.coerce.number().int().positive().default(400),
-  SMART_MONEY_EVENT_CALENDAR_PATH: z.string().optional()
+  DARK_INFER_MAX_SPREAD_PCT: z.coerce.number().positive().default(0.005)
 });
 
 const env = readEnv(envSchema);
-let eventCalendarProvider: EventCalendarProvider = createEmptyEventCalendarProvider();
-
-const classifierConfig: ClassifierConfig = {
-  sweepMinPremium: env.CLASSIFIER_SWEEP_MIN_PREMIUM,
-  sweepMinCount: env.CLASSIFIER_SWEEP_MIN_COUNT,
-  sweepMinPremiumZ: env.CLASSIFIER_SWEEP_MIN_PREMIUM_Z,
-  spikeMinPremium: env.CLASSIFIER_SPIKE_MIN_PREMIUM,
-  spikeMinSize: env.CLASSIFIER_SPIKE_MIN_SIZE,
-  spikeMinPremiumZ: env.CLASSIFIER_SPIKE_MIN_PREMIUM_Z,
-  spikeMinSizeZ: env.CLASSIFIER_SPIKE_MIN_SIZE_Z,
-  zMinSamples: env.CLASSIFIER_Z_MIN_SAMPLES,
-  minNbboCoverage: env.CLASSIFIER_MIN_NBBO_COVERAGE,
-  minAggressorRatio: env.CLASSIFIER_MIN_AGGRESSOR_RATIO,
-  zeroDteMaxAtmPct: env.CLASSIFIER_0DTE_MAX_ATM_PCT,
-  zeroDteMinPremium: env.CLASSIFIER_0DTE_MIN_PREMIUM,
-  zeroDteMinSize: env.CLASSIFIER_0DTE_MIN_SIZE
-};
 
 const darkInferenceConfig: DarkInferenceConfig = {
   windowMs: env.DARK_INFER_WINDOW_MS,
@@ -320,9 +260,6 @@ const emitCounters = {
   smartFlowProjections: 0,
   smartFlowAbstentions: 0,
   smartFlowAlerts: 0,
-  smartMoneyEvents: 0,
-  classifierHits: 0,
-  alerts: 0,
   equityJoins: 0,
   darkEvents: 0
 };
@@ -590,7 +527,6 @@ const emitStructurePacketIfNeeded = async (
   emitCounters.flowPackets += 1;
   emitCounters.structurePackets += 1;
   await emitNativeSmartFlow(js, batchWriter, validated);
-  await emitClassifiers(js, batchWriter, validated);
 };
 
 const applyDeliverPolicy = (
@@ -1110,7 +1046,6 @@ const flushCluster = async (
     await publishJson(js, SUBJECT_FLOW_PACKETS, validated);
     emitCounters.flowPackets += 1;
     await emitNativeSmartFlow(js, batchWriter, validated);
-    await emitClassifiers(js, batchWriter, validated);
   } catch (error) {
     if (isExpectedShutdownNatsError(error)) {
       logger.info("skipped flow packet publish during shutdown", {
@@ -1175,113 +1110,6 @@ const publishNativeSmartFlowFlush = async (
     }
   }
   flush.commit();
-};
-
-const emitClassifiers = async (
-  js: Awaited<ReturnType<typeof connectJetStreamWithRetry>>["js"],
-  batchWriter: ClickHouseBatchWriter,
-  packet: FlowPacket
-): Promise<void> => {
-  let smartMoneyEvent: SmartMoneyEvent;
-  try {
-    const underlyingId =
-      typeof packet.features.underlying_id === "string"
-        ? packet.features.underlying_id
-        : parseContractId(
-            typeof packet.features.option_contract_id === "string"
-              ? packet.features.option_contract_id
-              : ""
-          )?.root;
-    const referenceTs =
-      typeof packet.features.end_ts === "number" && Number.isFinite(packet.features.end_ts)
-        ? packet.features.end_ts
-        : packet.source_ts;
-    const eventCalendarMatch = underlyingId
-      ? eventCalendarProvider.findNextEvent(underlyingId, referenceTs)
-      : null;
-    smartMoneyEvent = SmartMoneyEventSchema.parse(
-      buildSmartMoneyEventFromPacket(packet, { eventCalendarMatch })
-    );
-    enqueueSmartMoneyEventInsert(batchWriter, smartMoneyEvent);
-    await publishJson(js, SUBJECT_SMART_MONEY_EVENTS, smartMoneyEvent);
-    emitCounters.smartMoneyEvents += 1;
-  } catch (error) {
-    if (isExpectedShutdownNatsError(error)) {
-      return;
-    }
-    logger.error("failed to emit smart money event", {
-      error: error instanceof Error ? error.message : String(error),
-      packet_id: packet.id
-    });
-    return;
-  }
-
-  const hits = deriveClassifierHitsFromSmartMoneyEvent(smartMoneyEvent);
-  if (hits.length === 0) {
-    return;
-  }
-
-  const hitEvents: ClassifierHitEvent[] = hits.map((hit) =>
-    ClassifierHitEventSchema.parse({
-      source_ts: packet.source_ts,
-      ingest_ts: packet.ingest_ts,
-      seq: packet.seq,
-      trace_id: `classifier:${hit.classifier_id}:${packet.id}`,
-      ...hit
-    })
-  );
-
-  for (const hit of hitEvents) {
-    try {
-      enqueueClassifierHitInsert(batchWriter, hit);
-      await publishJson(js, SUBJECT_CLASSIFIER_HITS, hit);
-      emitCounters.classifierHits += 1;
-    } catch (error) {
-      if (isExpectedShutdownNatsError(error)) {
-        continue;
-      }
-      logger.error("failed to emit classifier hit", {
-        error: error instanceof Error ? error.message : String(error),
-        classifier_id: hit.classifier_id,
-        packet_id: packet.id
-      });
-    }
-  }
-
-  const { score, severity } = scoreAlert(packet, hitEvents);
-  const alert: AlertEvent = AlertEventSchema.parse({
-    source_ts: packet.source_ts,
-    ingest_ts: packet.ingest_ts,
-    seq: packet.seq,
-    trace_id: `alert:${smartMoneyEvent.event_id}`,
-    score,
-    severity,
-    hits: hitEvents.map((hit) => ({
-      classifier_id: hit.classifier_id,
-      confidence: hit.confidence,
-      direction: hit.direction,
-      explanations: hit.explanations
-    })),
-    evidence_refs: [smartMoneyEvent.event_id, packet.id, ...packet.members],
-    ...(smartMoneyEvent.primary_profile_id
-      ? { primary_profile_id: smartMoneyEvent.primary_profile_id }
-      : {}),
-    profile_scores: smartMoneyEvent.profile_scores
-  });
-
-  try {
-    enqueueAlertInsert(batchWriter, alert);
-    await publishJson(js, SUBJECT_ALERTS, alert);
-    emitCounters.alerts += 1;
-  } catch (error) {
-    if (isExpectedShutdownNatsError(error)) {
-      return;
-    }
-    logger.error("failed to emit alert", {
-      error: error instanceof Error ? error.message : String(error),
-      packet_id: packet.id
-    });
-  }
 };
 
 const emitEquityJoin = async (
@@ -1389,13 +1217,10 @@ const run = async () => {
       STREAM_EQUITY_PRINTS,
       STREAM_EQUITY_QUOTES,
       STREAM_FLOW_PACKETS,
-      STREAM_SMART_MONEY_EVENTS,
       STREAM_SMART_FLOW,
       STREAM_SMART_FLOW_ALERTS,
       STREAM_EQUITY_JOINS,
-      STREAM_INFERRED_DARK,
-      STREAM_CLASSIFIER_HITS,
-      STREAM_ALERTS
+      STREAM_INFERRED_DARK
     ],
     { logger }
   );
@@ -1404,26 +1229,6 @@ const run = async () => {
     url: env.CLICKHOUSE_URL,
     database: env.CLICKHOUSE_DATABASE
   });
-
-  if (env.SMART_MONEY_EVENT_CALENDAR_PATH) {
-    try {
-      eventCalendarProvider = await loadEventCalendarProviderFromFile(
-        env.SMART_MONEY_EVENT_CALENDAR_PATH
-      );
-      logger.info("smart money event calendar loaded", {
-        path: env.SMART_MONEY_EVENT_CALENDAR_PATH
-      });
-    } catch (error) {
-      eventCalendarProvider = createEmptyEventCalendarProvider();
-      logger.warn(
-        "smart money event calendar unavailable; scoring will use neutral event features",
-        {
-          path: env.SMART_MONEY_EVENT_CALENDAR_PATH,
-          error: error instanceof Error ? error.message : String(error)
-        }
-      );
-    }
-  }
 
   const redis = createRedisClient(env.REDIS_URL);
   redis.on("error", (error) => {
@@ -1470,9 +1275,6 @@ const run = async () => {
       smart_flow_projections_emitted: emitCounters.smartFlowProjections,
       smart_flow_projections_abstained: emitCounters.smartFlowAbstentions,
       smart_flow_alerts_emitted: emitCounters.smartFlowAlerts,
-      smart_money_events_emitted: emitCounters.smartMoneyEvents,
-      classifier_hits_emitted: emitCounters.classifierHits,
-      alerts_emitted: emitCounters.alerts,
       equity_joins_emitted: emitCounters.equityJoins,
       dark_events_emitted: emitCounters.darkEvents,
       rolling_stats_cache_size: rollingStore.size
@@ -1482,9 +1284,6 @@ const run = async () => {
     emitCounters.smartFlowProjections = 0;
     emitCounters.smartFlowAbstentions = 0;
     emitCounters.smartFlowAlerts = 0;
-    emitCounters.smartMoneyEvents = 0;
-    emitCounters.classifierHits = 0;
-    emitCounters.alerts = 0;
     emitCounters.equityJoins = 0;
     emitCounters.darkEvents = 0;
   }, 60_000);
@@ -1494,13 +1293,10 @@ const run = async () => {
 
   await retry("clickhouse table init", 120, 500, async () => {
     await ensureFlowPacketsTable(clickhouse);
-    await ensureSmartMoneyEventsTable(clickhouse);
     await ensureSmartFlowProjectionsTable(clickhouse);
     await ensureSmartFlowAlertsTable(clickhouse);
     await ensureEquityPrintJoinsTable(clickhouse);
     await ensureInferredDarkTable(clickhouse);
-    await ensureClassifierHitsTable(clickhouse);
-    await ensureAlertsTable(clickhouse);
   });
 
   const durableName = "compute-option-prints";

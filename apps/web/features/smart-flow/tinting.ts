@@ -1,11 +1,11 @@
 import type {
   FlowHypothesisType,
   SmartFlowExplainabilityProjection,
-  SmartMoneyDirection
+  SmartFlowDirection
 } from "@islandflow/types";
 import type { CSSProperties } from "react";
 
-export type SmartFlowTintDirection = SmartMoneyDirection | "abstained";
+export type SmartFlowTintDirection = SmartFlowDirection | "abstained";
 
 export type SmartFlowTintTone =
   | "green"
