@@ -1,0 +1,594 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>QA Durable Tapes Demo Route</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #0d141b;
+        --panel-2: #111820;
+        --line: rgba(230, 237, 244, 0.14);
+        --line-strong: rgba(245, 166, 35, 0.36);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --green: #25c17a;
+        --red: #ff6b5f;
+        --blue: #4da3ff;
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: linear-gradient(180deg, #0b1016 0%, var(--bg) 100%);
+        color: var(--text);
+        font: 15px/1.55 var(--sans);
+      }
+
+      main {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+
+      header {
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      .eyebrow,
+      h2,
+      .meta-label,
+      code,
+      pre {
+        font-family: var(--mono);
+      }
+
+      .eyebrow {
+        margin-bottom: 8px;
+        color: var(--accent);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 900px;
+        font-size: 2rem;
+        line-height: 1.08;
+        letter-spacing: 0;
+        text-wrap: balance;
+      }
+
+      .subtitle {
+        max-width: 80ch;
+        margin-top: 12px;
+        color: var(--muted);
+      }
+
+      .meta-grid,
+      .qa-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 1px;
+        margin-top: 18px;
+        border: 1px solid var(--line);
+        background: var(--line);
+      }
+
+      .meta-cell,
+      .qa-cell {
+        min-width: 0;
+        padding: 10px 12px;
+        background: var(--panel-2);
+      }
+
+      .meta-label {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--faint);
+        font-size: 0.66rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      section {
+        padding: 20px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      h2 {
+        margin-bottom: 10px;
+        color: var(--accent);
+        font-size: 0.9rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      p {
+        max-width: 82ch;
+        color: var(--text);
+      }
+
+      p + p {
+        margin-top: 10px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 7px;
+      }
+
+      code {
+        padding: 0.08rem 0.28rem;
+        border: 1px solid rgba(245, 166, 35, 0.18);
+        border-radius: 5px;
+        background: rgba(245, 166, 35, 0.1);
+        color: #ffe0a3;
+        font-size: 0.9em;
+      }
+
+      .status-ok {
+        color: var(--green);
+      }
+
+      .status-note {
+        color: var(--blue);
+      }
+
+      .status-risk {
+        color: var(--red);
+      }
+
+      .diff-panel {
+        display: grid;
+        gap: 12px;
+      }
+
+      .diff-panel[data-rich-ready="true"] .diff-fallback {
+        display: none;
+      }
+
+      #rich-diff-root {
+        min-height: 32px;
+      }
+
+      .diff-fallback {
+        max-height: 620px;
+        overflow: auto;
+        margin: 0;
+        padding: 12px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--text);
+        font-size: 0.76rem;
+        line-height: 1.45;
+      }
+
+      .diff-note,
+      .qa-cell span {
+        color: var(--muted);
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "@pierre/diffs/react": "../../node_modules/@pierre/diffs/dist/react/index.js",
+          "react": "../../node_modules/react/index.js",
+          "react-dom/client": "../../node_modules/react-dom/client.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="eyebrow">Repository turn document</div>
+        <h1>QA Durable Tapes Demo Route</h1>
+        <p class="subtitle">
+          Replaced the hidden <code>/durable-tapes</code> experiment with a public
+          <code>/qa</code> route that renders every durable tape module as a deterministic QA demo
+          matrix.
+        </p>
+        <div class="meta-grid" aria-label="Turn metadata">
+          <div class="meta-cell"><span class="meta-label">Branch</span>main</div>
+          <div class="meta-cell"><span class="meta-label">Beads</span>islandflow-0nsi</div>
+          <div class="meta-cell"><span class="meta-label">Route Added</span>/qa</div>
+          <div class="meta-cell"><span class="meta-label">Route Removed</span>/durable-tapes</div>
+          <div class="meta-cell"><span class="meta-label">Modules</span>Chart, options, flow, equities, alerts, news</div>
+        </div>
+      </header>
+
+      <section>
+        <h2>Summary</h2>
+        <p>
+          The new QA page is exposed from <code>apps/web/app/qa/page.tsx</code> and renders through
+          <code>QaRoute</code>. The previous <code>apps/web/app/durable-tapes/page.tsx</code>
+          entrypoint was deleted outright, and terminal route normalization no longer treats
+          <code>/durable-tapes</code> as a known path.
+        </p>
+        <p>
+          <code>/qa</code> includes a section for each module. Every section has QA option chips and
+          three pinned default templates: full width, 2/3 width, and 1/3 width. The chart section
+          uses the reusable lightweight chart with fixture candles and the smart-flow direction bar
+          layer in the lower pane.
+        </p>
+      </section>
+
+      <section>
+        <h2>Implementation Notes</h2>
+        <ul>
+          <li>Added <code>apps/web/features/durable-tape/qa-page.tsx</code> with deterministic fixtures for option prints, flow packets, equity prints, smart-flow projections, alerts, news, candles, and lower-pane smart-flow bars.</li>
+          <li>Moved terminal routing to <code>/qa</code>, added the QA nav item, and kept the route feature set on server-composed durable rows without chart stream subscriptions.</li>
+          <li>Removed the old durable tapes route file instead of leaving a redirect or compatibility page.</li>
+          <li>Reworked the page CSS from one dashboard-style composition grid into repeated QA sections with a stable 3-column template matrix that collapses to one column on mobile.</li>
+          <li>Added a default-on <code>supportHydrationEnabled</code> prop to <code>OptionsTape</code> so deterministic QA fixtures can opt out of backend support hydration without changing production behavior.</li>
+          <li>Updated route and browser transport tests so route behavior, live manifest scope, and localhost API URL handling all use <code>/qa</code>.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Verification</h2>
+        <div class="qa-grid" aria-label="Quality gates">
+          <div class="qa-cell"><span class="meta-label">Focused Tests</span><span class="status-ok">pass</span> <code>bun test apps/web/app/terminal.test.ts apps/web/features/api-transport.test.ts apps/web/features/durable-tape/templates.test.ts</code></div>
+          <div class="qa-cell"><span class="meta-label">Full Test Suite</span><span class="status-ok">pass</span> <code>bun test</code> with 486 passing tests</div>
+          <div class="qa-cell"><span class="meta-label">Web Build</span><span class="status-ok">pass</span> <code>bun --cwd=apps/web run build</code></div>
+          <div class="qa-cell"><span class="meta-label">Route Check</span><span class="status-ok">pass</span> <code>/qa</code> returned 200 and <code>/durable-tapes</code> returned 404 on the dev server</div>
+          <div class="qa-cell"><span class="meta-label">Playwright</span><span class="status-ok">pass</span> desktop 1440x1100 and mobile 390x900 screenshots were captured and inspected</div>
+          <div class="qa-cell"><span class="meta-label">Diff Check</span><span class="status-ok">pass</span> <code>git diff --check</code></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Browser QA</h2>
+        <ul>
+          <li><span class="status-ok">Desktop:</span> the full matrix rendered all six sections with populated fixture rows; the chart canvases painted, including the lower smart-flow bar pane.</li>
+          <li><span class="status-ok">Mobile:</span> full, 2/3, and 1/3 previews stacked cleanly; tape rows remained readable and no header or option-chip overlap was visible.</li>
+          <li><span class="status-ok">Console:</span> an initial options-support hydration fetch was removed by disabling support hydration for the fixture page; the final Playwright pass logged only the <code>/qa</code> 200 response.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <div class="diff-panel" id="diff-panel">
+          <p class="diff-note">
+            The standard unified fallback is visible by default. The richer view attempts to render
+            the same patch with browser-side <code>PatchDiff</code> from
+            <code>@pierre/diffs/react</code>, following the Diffs documentation for patch text. No
+            SSR or preload diff exports are used.
+          </p>
+          <div id="rich-diff-root" hidden></div>
+          <pre class="diff-fallback" id="diff-fallback"><code>diff --git a/apps/web/app/durable-tapes/page.tsx b/apps/web/app/durable-tapes/page.tsx
+deleted file mode 100644
+--- a/apps/web/app/durable-tapes/page.tsx
++++ /dev/null
+@@
+-import { DurableTapesExampleRoute } from "../terminal";
+-
+-export const dynamic = "force-dynamic";
+-
+-export default function Page() {
+-  return &lt;DurableTapesExampleRoute /&gt;;
+-}
+diff --git a/apps/web/app/qa/page.tsx b/apps/web/app/qa/page.tsx
+new file mode 100644
+--- /dev/null
++++ b/apps/web/app/qa/page.tsx
+@@
++import { QaRoute } from "../terminal";
++
++export const dynamic = "force-dynamic";
++
++export default function Page() {
++  return &lt;QaRoute /&gt;;
++}
+diff --git a/apps/web/app/terminal.tsx b/apps/web/app/terminal.tsx
+--- a/apps/web/app/terminal.tsx
++++ b/apps/web/app/terminal.tsx
+@@
+-import { AlertsModule } from "../features/alerts";
+-import { DurableTapeAlertRowsPane, DurableTapeOptionRowsPane } from "../features/durable-tape";
++import { DurableTapesQaRoute } from "../features/durable-tape/qa-page";
+@@
+-export function DurableTapesExampleRoute() {
+-  return (
+-    &lt;PageFrame title="Durable Tapes" eyebrow="QA" variant="durable-tapes"&gt;
+-      ...
+-    &lt;/PageFrame&gt;
+-  );
++export function QaRoute() {
++  return &lt;DurableTapesQaRoute /&gt;;
+ }
+diff --git a/apps/web/features/terminal/routes.ts b/apps/web/features/terminal/routes.ts
+--- a/apps/web/features/terminal/routes.ts
++++ b/apps/web/features/terminal/routes.ts
+@@
+-const DURABLE_TAPES_PATH = "/durable-tapes";
+-const KNOWN_TERMINAL_PATHS = new Set([CANONICAL_OPTIONS_PATH, "/news", DURABLE_TAPES_PATH]);
++const QA_PATH = "/qa";
++const KNOWN_TERMINAL_PATHS = new Set([CANONICAL_OPTIONS_PATH, "/news", QA_PATH]);
+@@
+-    case DURABLE_TAPES_PATH:
++    case QA_PATH:
+       return buildDurableTapesRouteFeatures();
+@@
+   { href: "/", label: "Dashboard" },
+   { href: "/options", label: "Options" },
+-  { href: "/news", label: "News" }
++  { href: "/news", label: "News" },
++  { href: "/qa", label: "QA" }
+ ] as const;
+diff --git a/apps/web/features/options-tape/OptionsTape.tsx b/apps/web/features/options-tape/OptionsTape.tsx
+--- a/apps/web/features/options-tape/OptionsTape.tsx
++++ b/apps/web/features/options-tape/OptionsTape.tsx
+@@
+   smartFlowProjections,
+   nbboByContractId,
+   nbboByTraceId,
++  supportHydrationEnabled = true,
+   focusedContractId,
+@@
+   const supportHydratedSource = useMemo(
+-    () =&gt; createOptionsTapeSupportHydratingSource(activeSource, hydrateSupportRows),
+-    [activeSource, hydrateSupportRows]
++    () =&gt;
++      supportHydrationEnabled
++        ? createOptionsTapeSupportHydratingSource(activeSource, hydrateSupportRows)
++        : activeSource,
++    [activeSource, hydrateSupportRows, supportHydrationEnabled]
+   );
+diff --git a/apps/web/features/durable-tape/qa-page.tsx b/apps/web/features/durable-tape/qa-page.tsx
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/durable-tape/qa-page.tsx
+@@
++const QA_TEMPLATE_LANES = [
++  { id: "full", label: "Full", caption: "Default full template" },
++  { id: "twoThirds", label: "2/3", caption: "Default two-thirds template" },
++  { id: "oneThird", label: "1/3", caption: "Default one-third template" }
++];
+@@
++const QA_CHART_LOWER_SERIES = buildLowerPaneSeries("smart-direction", {
++  candles: QA_CHART_CANDLES,
++  smartFlowProjections: QA_CHART_PROJECTIONS
++});
+@@
++export const DurableTapesQaRoute = () =&gt; {
++  const optionPrints = QA_OPTION_PRINTS;
++  const flowPackets = QA_FLOW_PACKETS;
++  const equityPrints = QA_EQUITY_PRINTS;
++  const smartFlowProjections = QA_SMART_FLOW_PROJECTIONS;
++  const alerts = QA_ALERTS;
++  const newsStories = QA_NEWS_STORIES;
++
++  return (
++    &lt;PageFrame title="Durable Tapes QA" eyebrow="QA" variant="qa"&gt;
++      &lt;QaSection title="Lightweight Chart" options={["lightweight-charts", "smart-direction bars"]}&gt;
++        &lt;QaTemplateMatrix renderPreview={(template) =&gt; &lt;QAMarketChartPreview template={template} /&gt;} /&gt;
++      &lt;/QaSection&gt;
++      &lt;QaSection title="Options Tape" options={["templates pinned", "row tinting", "filters"]} /&gt;
++      &lt;QaSection title="Flow Packets" options={["templates pinned", "packet focus"]} /&gt;
++      &lt;QaSection title="Equities Tape" options={["templates pinned", "ticker focus"]} /&gt;
++      &lt;QaSection title="Alerts" options={["templates pinned", "alert detail"]} /&gt;
++      &lt;QaSection title="News Wire" options={["templates pinned", "story detail"]} /&gt;
++    &lt;/PageFrame&gt;
++  );
++};
+diff --git a/apps/web/app/globals.css b/apps/web/app/globals.css
+--- a/apps/web/app/globals.css
++++ b/apps/web/app/globals.css
+@@
+-.page-shell-durable-tapes {
++.page-shell-qa {
+   --route-accent: var(--accent);
+   --route-accent-soft: var(--accent-soft);
+   --route-line: oklch(0.78 0.12 74 / 0.22);
+ }
+@@
++.durable-tapes-template-matrix {
++  display: grid;
++  grid-template-columns: repeat(3, minmax(0, 1fr));
++  gap: 8px;
++}
++
++.durable-tapes-template-frame-full {
++  grid-column: 1 / -1;
++}
++
++.durable-tapes-template-frame-two-thirds {
++  grid-column: span 2;
++}
++
++.durable-tapes-template-frame-one-third {
++  grid-column: span 1;
++}</code></pre>
+        </div>
+      </section>
+    </main>
+
+    <script type="text/plain" id="diff-source">diff --git a/apps/web/app/durable-tapes/page.tsx b/apps/web/app/durable-tapes/page.tsx
+deleted file mode 100644
+--- a/apps/web/app/durable-tapes/page.tsx
++++ /dev/null
+@@
+-import { DurableTapesExampleRoute } from "../terminal";
+-
+-export const dynamic = "force-dynamic";
+-
+-export default function Page() {
+-  return <DurableTapesExampleRoute />;
+-}
+diff --git a/apps/web/app/qa/page.tsx b/apps/web/app/qa/page.tsx
+new file mode 100644
+--- /dev/null
++++ b/apps/web/app/qa/page.tsx
+@@
++import { QaRoute } from "../terminal";
++
++export const dynamic = "force-dynamic";
++
++export default function Page() {
++  return <QaRoute />;
++}
+diff --git a/apps/web/app/terminal.tsx b/apps/web/app/terminal.tsx
+--- a/apps/web/app/terminal.tsx
++++ b/apps/web/app/terminal.tsx
+@@
+-import { AlertsModule } from "../features/alerts";
+-import { DurableTapeAlertRowsPane, DurableTapeOptionRowsPane } from "../features/durable-tape";
++import { DurableTapesQaRoute } from "../features/durable-tape/qa-page";
+@@
+-export function DurableTapesExampleRoute() {
+-  return (
+-    <PageFrame title="Durable Tapes" eyebrow="QA" variant="durable-tapes">
+-      ...
+-    </PageFrame>
+-  );
++export function QaRoute() {
++  return <DurableTapesQaRoute />;
+ }
+diff --git a/apps/web/features/terminal/routes.ts b/apps/web/features/terminal/routes.ts
+--- a/apps/web/features/terminal/routes.ts
++++ b/apps/web/features/terminal/routes.ts
+@@
+-const DURABLE_TAPES_PATH = "/durable-tapes";
+-const KNOWN_TERMINAL_PATHS = new Set([CANONICAL_OPTIONS_PATH, "/news", DURABLE_TAPES_PATH]);
++const QA_PATH = "/qa";
++const KNOWN_TERMINAL_PATHS = new Set([CANONICAL_OPTIONS_PATH, "/news", QA_PATH]);
+@@
+-    case DURABLE_TAPES_PATH:
++    case QA_PATH:
+       return buildDurableTapesRouteFeatures();
+@@
+   { href: "/", label: "Dashboard" },
+   { href: "/options", label: "Options" },
+-  { href: "/news", label: "News" }
++  { href: "/news", label: "News" },
++  { href: "/qa", label: "QA" }
+ ] as const;
+diff --git a/apps/web/features/options-tape/OptionsTape.tsx b/apps/web/features/options-tape/OptionsTape.tsx
+--- a/apps/web/features/options-tape/OptionsTape.tsx
++++ b/apps/web/features/options-tape/OptionsTape.tsx
+@@
+   smartFlowProjections,
+   nbboByContractId,
+   nbboByTraceId,
++  supportHydrationEnabled = true,
+   focusedContractId,
+@@
+   const supportHydratedSource = useMemo(
+-    () => createOptionsTapeSupportHydratingSource(activeSource, hydrateSupportRows),
+-    [activeSource, hydrateSupportRows]
++    () =>
++      supportHydrationEnabled
++        ? createOptionsTapeSupportHydratingSource(activeSource, hydrateSupportRows)
++        : activeSource,
++    [activeSource, hydrateSupportRows, supportHydrationEnabled]
+   );
+diff --git a/apps/web/features/durable-tape/qa-page.tsx b/apps/web/features/durable-tape/qa-page.tsx
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/durable-tape/qa-page.tsx
+@@
++const QA_TEMPLATE_LANES = [
++  { id: "full", label: "Full", caption: "Default full template" },
++  { id: "twoThirds", label: "2/3", caption: "Default two-thirds template" },
++  { id: "oneThird", label: "1/3", caption: "Default one-third template" }
++];
+@@
++const QA_CHART_LOWER_SERIES = buildLowerPaneSeries("smart-direction", {
++  candles: QA_CHART_CANDLES,
++  smartFlowProjections: QA_CHART_PROJECTIONS
++});
+@@
++export const DurableTapesQaRoute = () => {
++  const optionPrints = QA_OPTION_PRINTS;
++  const flowPackets = QA_FLOW_PACKETS;
++  const equityPrints = QA_EQUITY_PRINTS;
++  const smartFlowProjections = QA_SMART_FLOW_PROJECTIONS;
++  const alerts = QA_ALERTS;
++  const newsStories = QA_NEWS_STORIES;
++
++  return (
++    <PageFrame title="Durable Tapes QA" eyebrow="QA" variant="qa">
++      <QaSection title="Lightweight Chart" options={["lightweight-charts", "smart-direction bars"]}>
++        <QaTemplateMatrix renderPreview={(template) => <QAMarketChartPreview template={template} />} />
++      </QaSection>
++      <QaSection title="Options Tape" options={["templates pinned", "row tinting", "filters"]} />
++      <QaSection title="Flow Packets" options={["templates pinned", "packet focus"]} />
++      <QaSection title="Equities Tape" options={["templates pinned", "ticker focus"]} />
++      <QaSection title="Alerts" options={["templates pinned", "alert detail"]} />
++      <QaSection title="News Wire" options={["templates pinned", "story detail"]} />
++    </PageFrame>
++  );
++};
+diff --git a/apps/web/app/globals.css b/apps/web/app/globals.css
+--- a/apps/web/app/globals.css
++++ b/apps/web/app/globals.css
+@@
+-.page-shell-durable-tapes {
++.page-shell-qa {
+   --route-accent: var(--accent);
+   --route-accent-soft: var(--accent-soft);
+   --route-line: oklch(0.78 0.12 74 / 0.22);
+ }
+@@
++.durable-tapes-template-matrix {
++  display: grid;
++  grid-template-columns: repeat(3, minmax(0, 1fr));
++  gap: 8px;
++}
++
++.durable-tapes-template-frame-full {
++  grid-column: 1 / -1;
++}
++
++.durable-tapes-template-frame-two-thirds {
++  grid-column: span 2;
++}
++
++.durable-tapes-template-frame-one-third {
++  grid-column: span 1;
++}</script>
+    <script type="module">
+      const panel = document.getElementById("diff-panel");
+      const target = document.getElementById("rich-diff-root");
+      const fallback = document.getElementById("diff-fallback");
+      const source = document.getElementById("diff-source")?.textContent ?? "";
+
+      try {
+        const [{ createElement }, { createRoot }, { PatchDiff }] = await Promise.all([
+          import("react"),
+          import("react-dom/client"),
+          import("@pierre/diffs/react")
+        ]);
+        createRoot(target).render(createElement(PatchDiff, { patch: source }));
+        target.hidden = false;
+        panel.dataset.richReady = "true";
+      } catch (error) {
+        fallback.dataset.richError = String(error);
+      }
+    </script>
+  </body>
+</html>
