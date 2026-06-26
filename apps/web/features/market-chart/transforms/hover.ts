@@ -1,3 +1,4 @@
+import { formatEasternTime } from "../../time-format";
 import type {
   MarketChartDirection,
   MarketChartHoverContext,
@@ -88,13 +89,13 @@ const titleCase = (value: string): string =>
     .join(" ");
 
 const formatHoverTime = (timestampMs: number, intervalMs: number): string => {
-  const date = new Date(timestampMs);
-  const time = date.toLocaleString(undefined, {
+  const time = formatEasternTime(timestampMs, {
     month: "short",
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
-    ...(intervalMs < 60_000 ? { second: "2-digit" } : {})
+    ...(intervalMs < 60_000 ? { second: "2-digit" } : {}),
+    timeZoneName: "short"
   });
   return `${time} · ${formatIntervalLabel(intervalMs)}`;
 };

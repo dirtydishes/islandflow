@@ -12,17 +12,14 @@ import {
 import { type ChangeEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
-  buildTimeframeToolbarModel,
   buildDirectionalOptionNotionalRows,
   buildFlowContextHoverRows,
   buildLowerPaneSeries,
+  buildTimeframeToolbarModel,
   DEFAULT_MARKET_CHART_SETTINGS,
   formatIntervalLabel,
   getLowerPaneAvailableData,
   MarketChart,
-  MarketChartSettings,
-  MarketChartSection,
-  resolveLowerPaneMode,
   type MarketChartCandle,
   type MarketChartFlowContextInput,
   type MarketChartHoverRowProvider,
@@ -30,13 +27,17 @@ import {
   type MarketChartOptionFlowInput,
   type MarketChartOverlay,
   type MarketChartRange,
+  MarketChartSection,
+  MarketChartSettings,
   type MarketChartSettingsAction,
   type MarketChartStatus,
   normalizeMarketChartCandles,
+  resolveLowerPaneMode,
   toChartTime,
   useMarketChartSettings
 } from "../market-chart";
 import { getChartFlowMarkerItems } from "./charts/markers";
+import { formatTimeWithZone } from "./components/ui-helpers";
 import { SUPPORTED_CANDLE_INTERVAL_MS } from "./config";
 import {
   smartFlowDirectionLabel,
@@ -46,11 +47,10 @@ import {
   smartFlowWhyNotLabel,
   statusLabel
 } from "./format";
-import { extractUnderlying, normalizeContractId } from "./state-helpers";
 import type { TerminalState } from "./state";
+import { extractUnderlying, normalizeContractId } from "./state-helpers";
 import { buildApiUrl, readErrorDetail } from "./transport";
 import type { TapeMode, WsStatus } from "./types";
-import { formatTime } from "./components/ui-helpers";
 
 export type TerminalMarketChartMarkerPayload =
   | { kind: "smart-flow"; projection: SmartFlowExplainabilityProjection }
@@ -848,7 +848,7 @@ export const TerminalMarketChartSection = memo(
               <span>{statusLabel(status, false, state.mode)}</span>
             </div>
             <span className="chart-meta-time">
-              {lastUpdate ? `Updated ${formatTime(lastUpdate)}` : "Waiting for data"}
+              {lastUpdate ? `Updated ${formatTimeWithZone(lastUpdate)}` : "Waiting for data"}
             </span>
           </div>
         }

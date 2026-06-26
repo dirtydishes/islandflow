@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>QA Ingest Investigation and Eastern Time Display</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #08090b;
+        --panel: #12161a;
+        --panel-2: #181e23;
+        --panel-3: #0d1114;
+        --text: #edf2f7;
+        --muted: #a7b1bd;
+        --faint: #7d8894;
+        --line: #ffffff1c;
+        --line-strong: #ffffff2e;
+        --green: #35c978;
+        --amber: #f2b84b;
+        --red: #ff6f61;
+        --cyan: #77c7e8;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+        --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--sans);
+      }
+
+      main {
+        width: min(1120px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 34px 0 54px;
+      }
+
+      header,
+      section {
+        border: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      header {
+        padding: 22px;
+      }
+
+      section {
+        margin-top: 14px;
+        padding: 18px 20px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 880px;
+        font-family: var(--mono);
+        font-size: 1.42rem;
+        line-height: 1.18;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+
+      h2,
+      .eyebrow,
+      .meta-label {
+        font-family: var(--mono);
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+      }
+
+      h2,
+      .eyebrow {
+        color: var(--amber);
+        font-size: 0.72rem;
+        font-weight: 700;
+      }
+
+      h2 {
+        margin-bottom: 12px;
+      }
+
+      h3 {
+        font-size: 0.92rem;
+      }
+
+      p,
+      li {
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.56;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+
+      li + li {
+        margin-top: 6px;
+      }
+
+      code {
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 0.86em;
+      }
+
+      .subtitle {
+        margin-top: 10px;
+        max-width: 90ch;
+      }
+
+      .meta-grid,
+      .check-grid,
+      .finding-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+        gap: 10px;
+      }
+
+      .meta-grid {
+        margin-top: 18px;
+      }
+
+      .meta-card,
+      .check,
+      .finding {
+        border: 1px solid var(--line);
+        background: var(--panel-3);
+        padding: 12px;
+      }
+
+      .meta-label {
+        display: block;
+        margin-bottom: 7px;
+        color: var(--faint);
+        font-size: 0.68rem;
+      }
+
+      .finding strong,
+      .check strong {
+        display: block;
+        margin-bottom: 7px;
+        color: var(--text);
+        font-size: 0.9rem;
+      }
+
+      .check strong {
+        color: var(--green);
+        font-family: var(--mono);
+        font-size: 0.76rem;
+      }
+
+      .check.warn strong {
+        color: var(--amber);
+      }
+
+      .finding p,
+      .check p {
+        font-size: 0.84rem;
+      }
+
+      .pill {
+        display: inline-block;
+        margin-right: 8px;
+        color: var(--cyan);
+        font-family: var(--mono);
+        font-size: 0.76rem;
+      }
+
+      .diff-card {
+        margin-top: 14px;
+        border: 1px solid var(--line-strong);
+        background: #090d10;
+        overflow: hidden;
+      }
+
+      .diff-card h3 {
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--line);
+        background: var(--panel-2);
+        font-family: var(--mono);
+        font-size: 0.82rem;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+      }
+
+      .rich-diff {
+        display: none;
+        overflow: auto;
+        background: #0b1016;
+      }
+
+      .diff-card.rendered .rich-diff {
+        display: block;
+      }
+
+      .diff-card.rendered .diff-fallback {
+        display: none;
+      }
+
+      .diff-fallback {
+        margin: 0;
+        overflow: auto;
+        padding: 12px 14px;
+        color: #d7e1ec;
+        background: #0b1016;
+        font-family: var(--mono);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .patch-source {
+        display: none;
+      }
+
+      @media (max-width: 720px) {
+        main {
+          width: min(100% - 20px, 1120px);
+          padding-top: 20px;
+        }
+
+        header,
+        section {
+          padding: 14px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="eyebrow">Repository turn note</div>
+        <h1>QA ingest investigation and Eastern time display</h1>
+        <p class="subtitle">
+          Investigated the live QA deployment around the reported 10:30am stop, found ingestion was still running, and changed the web UI to present market timestamps in America/New_York time so UTC chart labels do not read like local stops.
+        </p>
+        <div class="meta-grid" aria-label="Turn metadata">
+          <div class="meta-card"><span class="meta-label">Branch</span>main</div>
+          <div class="meta-card"><span class="meta-label">Beads</span>islandflow-s1a7</div>
+          <div class="meta-card"><span class="meta-label">Scope</span>QA triage, chart ticks, tape timestamps</div>
+        </div>
+      </header>
+
+      <section>
+        <h2>Incident Readout</h2>
+        <div class="finding-grid">
+          <div class="finding">
+            <strong>No ingest stop at 10:30 EDT</strong>
+            <p>Journals for ingest and compute continued through <code>2026-06-26 10:30 EDT</code>. ClickHouse 5-minute buckets also had normal options, equities, and candle rows in the matching <code>2026-06-26 14:30 UTC</code> bucket.</p>
+          </div>
+          <div class="finding">
+            <strong>The 2:30 label was UTC</strong>
+            <p>The chart-visible <code>14:30</code> or 2:30 value maps to <code>10:30 EDT</code> on June 26. The data path stores timestamps in UTC milliseconds; the UI was formatting several surfaces with viewer-local defaults or chart defaults.</p>
+          </div>
+          <div class="finding">
+            <strong>Synthetic mode is expected</strong>
+            <p>Both options and equities ingest services are configured with synthetic adapters on this QA instance. Fresh public options, equities, candles, and flow packet endpoints returned current rows during inspection.</p>
+          </div>
+          <div class="finding">
+            <strong>Separate noisy service issue</strong>
+            <p>The wrapper <code>islandflow-clickhouse.service</code> is restart-looping because distro <code>clickhouse-server.service</code> already owns the port. The active ClickHouse server is still serving the app successfully.</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Changes Made</h2>
+        <ul>
+          <li>Added a shared <code>apps/web/features/time-format.ts</code> module that always formats dates and times in <code>America/New_York</code>.</li>
+          <li>Wired market chart tick labels and chart hover labels through the Eastern formatter. Hover text includes the actual daylight/standard abbreviation from <code>Intl</code>, for example <code>EDT</code> in June.</li>
+          <li>Moved tape rows, alerts, flow packet metadata, news timestamps, terminal status text, and replay controls onto the same Eastern formatter.</li>
+          <li>Added tests that pin the reported <code>2026-06-26T14:30Z</code> timestamp to <code>10:30 AM EDT</code> and guard Eastern-day comparisons around UTC midnight.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <div class="check-grid">
+          <div class="check"><strong>Passed</strong><p><code>bun test apps/web/features</code>, 150 feature tests.</p></div>
+          <div class="check"><strong>Passed</strong><p><code>bun test apps/web/features/time-format.test.ts apps/web/features/market-chart/transforms/candles.test.ts apps/web/features/market-chart/transforms/hover.test.ts</code>, 16 focused tests.</p></div>
+          <div class="check"><strong>Passed</strong><p><code>bun --cwd=apps/web run build</code>, Next.js production build.</p></div>
+          <div class="check"><strong>Passed</strong><p><code>bunx biome check</code> on the touched web files after formatting.</p></div>
+          <div class="check warn"><strong>Existing repo issue</strong><p><code>bun run check</code> still fails on unrelated pre-existing Biome import-order diagnostics outside this change set.</p></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p>Each snippet has a standard unified diff fallback. When browser module loading succeeds, the fallback is replaced by <code>PatchDiff</code> from the browser-side <code>@pierre/diffs/react</code> package.</p>
+
+        <article class="diff-card">
+          <h3>Shared Eastern formatter</h3>
+          <div class="rich-diff" aria-label="Rendered diff"></div>
+          <pre class="diff-fallback"><code>diff --git a/apps/web/features/time-format.ts b/apps/web/features/time-format.ts
+new file mode 100644
+@@
++export const EASTERN_TIME_ZONE = "America/New_York";
++export const EASTERN_TIME_LABEL = "ET";
++
++const formatterCache = new Map&lt;string, Intl.DateTimeFormat&gt;();
++
++const getFormatter = (
++  options: Intl.DateTimeFormatOptions,
++  locale = "en-US"
++): Intl.DateTimeFormat =&gt; {
++  const normalizedOptions = { ...options, timeZone: EASTERN_TIME_ZONE };
++  const key = JSON.stringify(
++    Object.entries(normalizedOptions).sort(([left], [right]) =&gt; left.localeCompare(right))
++  );
++  const cached = formatterCache.get(key);
++  if (cached) return cached;
++  const formatter = new Intl.DateTimeFormat(locale, normalizedOptions);
++  formatterCache.set(key, formatter);
++  return formatter;
++};
++
++export const formatEasternTime = (
++  ts: number,
++  options: Intl.DateTimeFormatOptions = {},
++  locale = "en-US"
++): string =&gt; getFormatter({ hour: "numeric", minute: "2-digit", ...options }, locale).format(new Date(ts));
++
++export const isSameEasternDay = (left: number, right: number): boolean =&gt;
++  getEasternDateKey(left) === getEasternDateKey(right);</code></pre>
+          <script type="text/plain" class="patch-source">diff --git a/apps/web/features/time-format.ts b/apps/web/features/time-format.ts
+new file mode 100644
+@@
++export const EASTERN_TIME_ZONE = "America/New_York";
++export const EASTERN_TIME_LABEL = "ET";
++
++const formatterCache = new Map<string, Intl.DateTimeFormat>();
++
++const getFormatter = (
++  options: Intl.DateTimeFormatOptions,
++  locale = "en-US"
++): Intl.DateTimeFormat => {
++  const normalizedOptions = { ...options, timeZone: EASTERN_TIME_ZONE };
++  const key = JSON.stringify(
++    Object.entries(normalizedOptions).sort(([left], [right]) => left.localeCompare(right))
++  );
++  const cached = formatterCache.get(key);
++  if (cached) return cached;
++  const formatter = new Intl.DateTimeFormat(locale, normalizedOptions);
++  formatterCache.set(key, formatter);
++  return formatter;
++};
++
++export const formatEasternTime = (
++  ts: number,
++  options: Intl.DateTimeFormatOptions = {},
++  locale = "en-US"
++): string => getFormatter({ hour: "numeric", minute: "2-digit", ...options }, locale).format(new Date(ts));
++
++export const isSameEasternDay = (left: number, right: number): boolean =>
++  getEasternDateKey(left) === getEasternDateKey(right);</script>
+        </article>
+
+        <article class="diff-card">
+          <h3>Chart ticks and hover labels</h3>
+          <div class="rich-diff" aria-label="Rendered diff"></div>
+          <pre class="diff-fallback"><code>diff --git a/apps/web/features/market-chart/transforms/time.ts b/apps/web/features/market-chart/transforms/time.ts
+@@
+ import type { BusinessDay, UTCTimestamp } from "lightweight-charts";
++import { formatEasternDate, formatEasternTime } from "../../time-format";
+@@
++export const formatChartTickTime = (value: ChartTimeLike, tickMarkType?: unknown): string =&gt; {
++  const timestampMs = chartTimeToMs(value);
++  if (timestampMs === null) return "";
++
++  switch (normalizeTickKind(tickMarkType)) {
++    case "year":
++      return formatEasternDate(timestampMs, { year: "numeric", month: undefined, day: undefined });
++    case "month":
++      return formatEasternDate(timestampMs, { year: undefined, month: "short", day: undefined });
++    case "day":
++      return formatEasternDate(timestampMs, { year: undefined, month: "short", day: "numeric" });
++    case "time-with-seconds":
++      return formatEasternTime(timestampMs, { hour: "numeric", minute: "2-digit", second: "2-digit" });
++    case "time":
++      return formatEasternTime(timestampMs, { hour: "numeric", minute: "2-digit" });
++  }
++};
+
+diff --git a/apps/web/features/market-chart/defaults.ts b/apps/web/features/market-chart/defaults.ts
+@@
+     timeScale: {
+       borderColor: tokens.border,
+-      timeVisible: true
++      timeVisible: true,
++      tickMarkFormatter: formatChartTickTime
+     },
+
+diff --git a/apps/web/features/market-chart/transforms/hover.ts b/apps/web/features/market-chart/transforms/hover.ts
+@@
+-const formatHoverTime = (timestampMs: number, intervalMs: number): string =&gt; {
+-  const time = new Date(timestampMs).toLocaleString([], { ... });
++const formatHoverTime = (timestampMs: number, intervalMs: number): string =&gt; {
++  const time = formatEasternTime(timestampMs, {
++    month: "short",
++    day: "2-digit",
++    hour: "2-digit",
++    minute: "2-digit",
++    ...(intervalMs &lt; 60_000 ? { second: "2-digit" } : {}),
++    timeZoneName: "short"
++  });
+   return `${time} · ${formatIntervalLabel(intervalMs)}`;
+ };</code></pre>
+          <script type="text/plain" class="patch-source">diff --git a/apps/web/features/market-chart/transforms/time.ts b/apps/web/features/market-chart/transforms/time.ts
+@@
+ import type { BusinessDay, UTCTimestamp } from "lightweight-charts";
++import { formatEasternDate, formatEasternTime } from "../../time-format";
+@@
++export const formatChartTickTime = (value: ChartTimeLike, tickMarkType?: unknown): string => {
++  const timestampMs = chartTimeToMs(value);
++  if (timestampMs === null) return "";
++
++  switch (normalizeTickKind(tickMarkType)) {
++    case "year":
++      return formatEasternDate(timestampMs, { year: "numeric", month: undefined, day: undefined });
++    case "month":
++      return formatEasternDate(timestampMs, { year: undefined, month: "short", day: undefined });
++    case "day":
++      return formatEasternDate(timestampMs, { year: undefined, month: "short", day: "numeric" });
++    case "time-with-seconds":
++      return formatEasternTime(timestampMs, { hour: "numeric", minute: "2-digit", second: "2-digit" });
++    case "time":
++      return formatEasternTime(timestampMs, { hour: "numeric", minute: "2-digit" });
++  }
++};
+
+diff --git a/apps/web/features/market-chart/defaults.ts b/apps/web/features/market-chart/defaults.ts
+@@
+     timeScale: {
+       borderColor: tokens.border,
+-      timeVisible: true
++      timeVisible: true,
++      tickMarkFormatter: formatChartTickTime
+     },
+
+diff --git a/apps/web/features/market-chart/transforms/hover.ts b/apps/web/features/market-chart/transforms/hover.ts
+@@
+-const formatHoverTime = (timestampMs: number, intervalMs: number): string => {
+-  const time = new Date(timestampMs).toLocaleString([], { ... });
++const formatHoverTime = (timestampMs: number, intervalMs: number): string => {
++  const time = formatEasternTime(timestampMs, {
++    month: "short",
++    day: "2-digit",
++    hour: "2-digit",
++    minute: "2-digit",
++    ...(intervalMs < 60_000 ? { second: "2-digit" } : {}),
++    timeZoneName: "short"
++  });
+   return `${time} · ${formatIntervalLabel(intervalMs)}`;
+ };</script>
+        </article>
+
+        <article class="diff-card">
+          <h3>Tape and status timestamps</h3>
+          <div class="rich-diff" aria-label="Rendered diff"></div>
+          <pre class="diff-fallback"><code>diff --git a/apps/web/features/options-tape/format.ts b/apps/web/features/options-tape/format.ts
+@@
+ import type { OptionNBBO, OptionPrint } from "@islandflow/types";
+ import { parseOptionContractId } from "@islandflow/types";
++import { formatEasternTime } from "../time-format";
+@@
+ export const formatOptionsTapeTime = (ts: number): string =&gt;
+-  new Date(ts).toLocaleTimeString([], {
++  formatEasternTime(ts, {
+     hour: "2-digit",
+     minute: "2-digit",
+     second: "2-digit"
+   });
+
+diff --git a/apps/web/features/terminal/components/charts.tsx b/apps/web/features/terminal/components/charts.tsx
+@@
+-          {lastUpdate ? `Updated ${formatTime(lastUpdate)}` : "Waiting for data"}
++          {lastUpdate ? `Updated ${formatTimeWithZone(lastUpdate)}` : "Waiting for data"}
+         </span></code></pre>
+          <script type="text/plain" class="patch-source">diff --git a/apps/web/features/options-tape/format.ts b/apps/web/features/options-tape/format.ts
+@@
+ import type { OptionNBBO, OptionPrint } from "@islandflow/types";
+ import { parseOptionContractId } from "@islandflow/types";
++import { formatEasternTime } from "../time-format";
+@@
+ export const formatOptionsTapeTime = (ts: number): string =>
+-  new Date(ts).toLocaleTimeString([], {
++  formatEasternTime(ts, {
+     hour: "2-digit",
+     minute: "2-digit",
+     second: "2-digit"
+   });
+
+diff --git a/apps/web/features/terminal/components/charts.tsx b/apps/web/features/terminal/components/charts.tsx
+@@
+-          {lastUpdate ? `Updated ${formatTime(lastUpdate)}` : "Waiting for data"}
++          {lastUpdate ? `Updated ${formatTimeWithZone(lastUpdate)}` : "Waiting for data"}
+         </span></script>
+        </article>
+      </section>
+    </main>
+
+    <script type="module">
+      import React from "https://esm.sh/react@19";
+      import { createRoot } from "https://esm.sh/react-dom@19/client";
+      import { PatchDiff } from "https://esm.sh/@pierre/diffs@1.2.2/react?deps=react@19,react-dom@19";
+
+      for (const card of document.querySelectorAll(".diff-card")) {
+        const target = card.querySelector(".rich-diff");
+        const source = card.querySelector(".patch-source");
+        if (!target || !source) continue;
+        try {
+          createRoot(target).render(React.createElement(PatchDiff, { patch: source.textContent || "" }));
+          card.classList.add("rendered");
+        } catch (error) {
+          console.warn("Rich diff renderer failed; keeping HTML fallback.", error);
+        }
+      }
+    </script>
+  </body>
+</html>

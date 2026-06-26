@@ -1,4 +1,5 @@
 import type { EquityPrint } from "@islandflow/types";
+import { formatEasternTime, formatEasternTimestampWithMs } from "../time-format";
 
 export const getEquityPrintKey = (print: EquityPrint): string =>
   print.trace_id || `${print.ts}:${print.seq}:${print.underlying_id}`;
@@ -11,8 +12,7 @@ export const getEquityPrintCursor = (print: EquityPrint): { ts: number; seq: num
 export const getEquityPrintNotional = (print: EquityPrint): number => print.price * print.size;
 
 export const formatEquityTapeTime = (ts: number): string => {
-  const date = new Date(ts);
-  return date.toLocaleTimeString(undefined, {
+  return formatEasternTime(ts, {
     hour12: false,
     hour: "2-digit",
     minute: "2-digit",
@@ -21,14 +21,12 @@ export const formatEquityTapeTime = (ts: number): string => {
 };
 
 export const formatEquityTapeTimestamp = (ts: number): string => {
-  const date = new Date(ts);
-  const ms = String(date.getMilliseconds()).padStart(3, "0");
-  return `${date.toLocaleDateString()} ${date.toLocaleTimeString(undefined, {
+  return formatEasternTimestampWithMs(ts, {
     hour12: false,
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit"
-  })}.${ms}`;
+  });
 };
 
 export const formatEquityTapePrice = (value: number): string => {

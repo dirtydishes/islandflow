@@ -4,7 +4,14 @@ import type {
   MarketChartCandlestickData,
   MarketChartPriceSeries
 } from "../../market-chart";
-import { chartTimeToMs, formatIntervalLabel, toChartCandle, toChartTime } from "../../market-chart";
+import {
+  chartTimeToMs,
+  formatChartTickTime,
+  formatIntervalLabel,
+  toChartCandle,
+  toChartTime
+} from "../../market-chart";
+import { EASTERN_TIME_LABEL, formatEasternDateTime, formatEasternTime } from "../../time-format";
 import { decodeNewsText, formatOptionContractLabel } from "../format";
 import { normalizeContractId } from "../state-helpers";
 
@@ -18,7 +25,14 @@ export type EquityOverlayPoint = {
 };
 
 export type ChartCandle = MarketChartCandlestickData;
-export { type ChartTimeLike, chartTimeToMs, formatIntervalLabel, toChartCandle, toChartTime };
+export {
+  type ChartTimeLike,
+  chartTimeToMs,
+  formatChartTickTime,
+  formatIntervalLabel,
+  toChartCandle,
+  toChartTime
+};
 
 export const clamp = (value: number, min: number, max: number): number => {
   if (!Number.isFinite(value)) {
@@ -56,9 +70,14 @@ export const formatSize = (size: number): string => {
   return size.toLocaleString();
 };
 
-export const formatTime = (ts: number): string => {
-  return new Date(ts).toLocaleTimeString();
-};
+export const formatTime = (ts: number): string =>
+  formatEasternTime(ts, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
+
+export const formatTimeWithZone = (ts: number): string => `${formatTime(ts)} ${EASTERN_TIME_LABEL}`;
 
 export const formatConfidence = (value: number): string => `${Math.round(value * 100)}%`;
 
@@ -108,10 +127,12 @@ export const formatContractLabel = (value: string): string => {
   return normalized;
 };
 
-export const formatDateTime = (ts: number): string => {
-  const date = new Date(ts);
-  return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
-};
+export const formatDateTime = (ts: number): string =>
+  formatEasternDateTime(ts, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
 
 export const sanitizeNewsHtml = (
   value: string

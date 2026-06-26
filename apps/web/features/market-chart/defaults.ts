@@ -3,6 +3,11 @@ import type {
   ChartOptions,
   DeepPartial
 } from "lightweight-charts";
+import { formatChartTickTime } from "./transforms/time";
+import {
+  DEFAULT_MARKET_CHART_INTERVALS,
+  DEFAULT_TIMEFRAME_FAVORITE_IDS
+} from "./transforms/timeframes";
 import type {
   MarketChartExtensionRegistry,
   MarketChartLayoutPreset,
@@ -10,10 +15,6 @@ import type {
   MarketChartThemeOptions,
   MarketChartThemeTokens
 } from "./types";
-import {
-  DEFAULT_MARKET_CHART_INTERVALS,
-  DEFAULT_TIMEFRAME_FAVORITE_IDS
-} from "./transforms/timeframes";
 
 export { DEFAULT_MARKET_CHART_INTERVALS };
 
@@ -236,7 +237,8 @@ export const createMarketChartOptions = (
     },
     timeScale: {
       borderColor: tokens.border,
-      timeVisible: true
+      timeVisible: true,
+      tickMarkFormatter: formatChartTickTime
     },
     rightPriceScale: {
       borderColor: tokens.border

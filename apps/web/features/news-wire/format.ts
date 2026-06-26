@@ -1,4 +1,5 @@
 import type { NewsStory } from "@islandflow/types";
+import { formatEasternDateTime, formatEasternTime, isSameEasternDay } from "../time-format";
 
 const NEWS_TEXT_ENTITIES: Record<string, string> = {
   amp: "&",
@@ -9,32 +10,20 @@ const NEWS_TEXT_ENTITIES: Record<string, string> = {
   quot: '"'
 };
 
-const isSameLocalDay = (left: number, right: number): boolean => {
-  const a = new Date(left);
-  const b = new Date(right);
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
-};
-
 export const formatNewsTimestamp = (ts: number, now = Date.now()): string => {
-  const date = new Date(ts);
-  return isSameLocalDay(ts, now)
-    ? date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
-    : date.toLocaleString([], {
+  return isSameEasternDay(ts, now)
+    ? formatEasternTime(ts, { hour: "numeric", minute: "2-digit" })
+    : formatEasternDateTime(ts, {
         month: "short",
         day: "numeric",
         minute: "2-digit",
-        hour: "numeric"
+        hour: "numeric",
+        second: undefined,
+        year: undefined
       });
 };
 
-export const formatNewsDateTime = (ts: number): string => {
-  const date = new Date(ts);
-  return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
-};
+export const formatNewsDateTime = (ts: number): string => formatEasternDateTime(ts);
 
 export const decodeNewsText = (value: string): string =>
   value.replace(/&(#\d+|#x[\da-f]+|[a-z][\da-z]+);/gi, (match, entity: string) => {

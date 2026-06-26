@@ -74,6 +74,7 @@ import {
   chartTimeToMs,
   clamp,
   type EquityOverlayPoint,
+  formatChartTickTime,
   formatConfidence,
   formatContractLabel,
   formatFlowMetric,
@@ -82,6 +83,7 @@ import {
   formatPrice,
   formatSize,
   formatTime,
+  formatTimeWithZone,
   humanizeClassifierId,
   normalizeDirection,
   parseNumber,
@@ -363,7 +365,8 @@ export const CandleChart = ({
       timeScale: {
         borderColor: "rgba(144, 160, 178, 0.24)",
         timeVisible: true,
-        secondsVisible: intervalMs < 60000
+        secondsVisible: intervalMs < 60000,
+        tickMarkFormatter: formatChartTickTime
       },
       rightPriceScale: {
         borderColor: "rgba(144, 160, 178, 0.24)"
@@ -746,7 +749,7 @@ export const CandleChart = ({
           <span>{statusText}</span>
         </div>
         <span className="chart-meta-time">
-          {lastUpdate ? `Updated ${formatTime(lastUpdate)}` : "Waiting for data"}
+          {lastUpdate ? `Updated ${formatTimeWithZone(lastUpdate)}` : "Waiting for data"}
         </span>
         <button
           className={`overlay-toggle${overlayEnabled ? " overlay-toggle-on" : ""}`}

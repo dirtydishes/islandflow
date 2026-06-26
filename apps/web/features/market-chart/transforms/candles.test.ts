@@ -5,7 +5,9 @@ import {
   toChartCandle,
   toHeikinAshiCandles
 } from "./candles";
-import { chartTimeToMs, formatIntervalLabel, toChartTime } from "./time";
+import { chartTimeToMs, formatChartTickTime, formatIntervalLabel, toChartTime } from "./time";
+
+const normalizeSpaces = (value: string): string => value.replace(/\s+/g, " ");
 
 describe("market chart candle transforms", () => {
   it("normalizes shared candle shape without terminal state", () => {
@@ -117,5 +119,13 @@ describe("market chart candle transforms", () => {
     expect(chartTimeToMs("2026-06-21T00:00:00.000Z")).toBe(Date.UTC(2026, 5, 21));
     expect(chartTimeToMs({ year: 2026, month: 6, day: 21 })).toBe(Date.UTC(2026, 5, 21));
     expect(chartTimeToMs({ year: 2026, month: 13, day: 21 })).toBeNull();
+  });
+
+  it("formats chart ticks in Eastern time", () => {
+    const ts = Math.floor(Date.UTC(2026, 5, 26, 14, 30, 15) / 1000);
+
+    expect(normalizeSpaces(formatChartTickTime(ts))).toBe("10:30 AM");
+    expect(normalizeSpaces(formatChartTickTime(ts, 4))).toBe("10:30:15 AM");
+    expect(formatChartTickTime(ts, 2)).toBe("Jun 26");
   });
 });

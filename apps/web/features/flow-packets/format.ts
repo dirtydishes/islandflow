@@ -1,6 +1,7 @@
 import type { FlowPacket, OptionFlowFilters } from "@islandflow/types";
 import { matchesFlowPacketFilters } from "@islandflow/types";
 
+import { formatEasternTime, formatEasternTimestampWithMs } from "../time-format";
 import type { FlowPacketsTapeScope, NormalizedFlowPacketsTapeScope } from "./types";
 
 type FeatureValue = FlowPacket["features"][string] | undefined;
@@ -124,8 +125,7 @@ export const getFlowPacketStructureLabel = (packet: FlowPacket): string => {
 };
 
 export const formatFlowPacketTime = (ts: number): string => {
-  const date = new Date(ts);
-  return date.toLocaleTimeString(undefined, {
+  return formatEasternTime(ts, {
     hour12: false,
     hour: "2-digit",
     minute: "2-digit",
@@ -134,9 +134,12 @@ export const formatFlowPacketTime = (ts: number): string => {
 };
 
 export const formatFlowPacketTimestamp = (ts: number): string => {
-  const date = new Date(ts);
-  const ms = String(date.getMilliseconds()).padStart(3, "0");
-  return `${date.toLocaleDateString()} ${formatFlowPacketTime(ts)}.${ms}`;
+  return formatEasternTimestampWithMs(ts, {
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
 };
 
 export const formatFlowPacketNumber = (value: number): string => {

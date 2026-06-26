@@ -26,7 +26,7 @@ import {
 } from "../filters";
 import { statusLabel } from "../format";
 import type { TapeMode, WsStatus } from "../types";
-import { formatTime } from "./ui-helpers";
+import { formatTimeWithZone } from "./ui-helpers";
 
 type TapeStatusProps = {
   status: WsStatus;
@@ -58,7 +58,7 @@ export const TapeStatus = ({
       <span className="status-inline-label">{label}</span>
       {mode === "replay" ? (
         <span className="status-inline-meta">
-          Replay time {replayTime ? formatTime(replayTime) : "—"}
+          Replay time {replayTime ? formatTimeWithZone(replayTime) : "—"}
         </span>
       ) : null}
       <span

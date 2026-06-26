@@ -9,7 +9,7 @@ import type {
 import Link from "next/link";
 import * as nextNavigation from "next/navigation";
 import { memo, type ReactNode, useEffect, useId, useRef, useState } from "react";
-
+import { formatEasternTime } from "../time-format";
 import { isSyntheticAdminVisible } from "./config";
 import { normalizeTickerFilterInput, TICKER_FILTER_INPUT_MAX_LENGTH } from "./filters";
 import { getTerminalNavCurrentHref, NAV_ITEMS } from "./routes";
@@ -23,9 +23,12 @@ import {
   useTerminalStateStore
 } from "./state";
 
-const formatTime = (ts: number): string => {
-  return new Date(ts).toLocaleTimeString();
-};
+const formatTime = (ts: number): string =>
+  formatEasternTime(ts, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
 
 type SyntheticAdminStatusResponse = {
   enabled: boolean;

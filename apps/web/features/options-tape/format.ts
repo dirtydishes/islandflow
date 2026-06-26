@@ -1,5 +1,6 @@
 import type { OptionNBBO, OptionPrint } from "@islandflow/types";
 import { parseOptionContractId } from "@islandflow/types";
+import { formatEasternTime } from "../time-format";
 
 export const normalizeOptionsTapeContractId = (value: string): string => value.trim();
 
@@ -74,7 +75,7 @@ export const formatOptionsTapeDteLabel = (contractId: string, now = Date.now()):
 };
 
 export const formatOptionsTapeTime = (ts: number): string =>
-  new Date(ts).toLocaleTimeString([], {
+  formatEasternTime(ts, {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit"

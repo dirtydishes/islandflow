@@ -7,6 +7,7 @@ import {
   humanizeSmartFlowToken,
   normalizeSmartFlowDirection
 } from "../smart-flow";
+import { formatEasternTime, formatEasternTimestampWithMs } from "../time-format";
 
 export const normalizeAlertDirection = (
   value: string | null | undefined
@@ -29,17 +30,18 @@ export const getAlertWindowAnchorTs = (
 };
 
 export const formatAlertTime = (ts: number): string =>
-  new Date(ts).toLocaleTimeString([], {
+  formatEasternTime(ts, {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit"
   });
 
-export const formatAlertDateTime = (ts: number): string => {
-  const date = new Date(ts);
-  const ms = String(date.getMilliseconds()).padStart(3, "0");
-  return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}.${ms}`;
-};
+export const formatAlertDateTime = (ts: number): string =>
+  formatEasternTimestampWithMs(ts, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
 
 export const formatAlertConfidence = (value: number): string =>
   Number.isFinite(value) ? `${Math.round(value * 100)}%` : "--";

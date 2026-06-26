@@ -1,4 +1,5 @@
 import type { BusinessDay, UTCTimestamp } from "lightweight-charts";
+import { formatEasternDate, formatEasternTime } from "../../time-format";
 import { MARKET_CHART_TIMEFRAME_REGISTRY } from "./timeframes";
 
 export type ChartTimeLike = number | string | BusinessDay;
@@ -34,6 +35,64 @@ export const chartTimeToMs = (value: ChartTimeLike): number | null => {
   }
 
   return null;
+};
+
+type ChartTickKind = "year" | "month" | "day" | "time" | "time-with-seconds";
+
+const normalizeTickKind = (tickMarkType: unknown): ChartTickKind => {
+  if (typeof tickMarkType === "number") {
+    switch (tickMarkType) {
+      case 0:
+        return "year";
+      case 1:
+        return "month";
+      case 2:
+        return "day";
+      case 4:
+        return "time-with-seconds";
+      default:
+        return "time";
+    }
+  }
+
+  const normalized = String(tickMarkType ?? "").toLowerCase();
+  if (normalized.includes("year")) {
+    return "year";
+  }
+  if (normalized.includes("month")) {
+    return "month";
+  }
+  if (normalized.includes("day")) {
+    return "day";
+  }
+  if (normalized.includes("second")) {
+    return "time-with-seconds";
+  }
+  return "time";
+};
+
+export const formatChartTickTime = (value: ChartTimeLike, tickMarkType?: unknown): string => {
+  const timestampMs = chartTimeToMs(value);
+  if (timestampMs === null) {
+    return "";
+  }
+
+  switch (normalizeTickKind(tickMarkType)) {
+    case "year":
+      return formatEasternDate(timestampMs, { year: "numeric", month: undefined, day: undefined });
+    case "month":
+      return formatEasternDate(timestampMs, { year: undefined, month: "short", day: undefined });
+    case "day":
+      return formatEasternDate(timestampMs, { year: undefined, month: "short", day: "numeric" });
+    case "time-with-seconds":
+      return formatEasternTime(timestampMs, {
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit"
+      });
+    case "time":
+      return formatEasternTime(timestampMs, { hour: "numeric", minute: "2-digit" });
+  }
 };
 
 export const formatIntervalLabel = (

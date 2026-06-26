@@ -7,6 +7,7 @@ import type {
   SmartFlowExplainabilityProjection
 } from "@islandflow/types";
 import { parseOptionContractId } from "@islandflow/types";
+import { formatEasternDateTime, formatEasternTime, isSameEasternDay } from "../time-format";
 import type { OptionContractDisplay, TapeMode, WsStatus } from "./types";
 
 const formatPrice = (price: number): string => {
@@ -98,25 +99,16 @@ export const formatOptionContractLabel = (value: string): OptionContractDisplay 
   };
 };
 
-const isSameLocalDay = (left: number, right: number): boolean => {
-  const a = new Date(left);
-  const b = new Date(right);
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
-};
-
 export const formatNewsTimestamp = (ts: number, now = Date.now()): string => {
-  const date = new Date(ts);
-  return isSameLocalDay(ts, now)
-    ? date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
-    : date.toLocaleString([], {
+  return isSameEasternDay(ts, now)
+    ? formatEasternTime(ts, { hour: "numeric", minute: "2-digit" })
+    : formatEasternDateTime(ts, {
         month: "short",
         day: "numeric",
         hour: "numeric",
-        minute: "2-digit"
+        minute: "2-digit",
+        second: undefined,
+        year: undefined
       });
 };
 
