@@ -4,6 +4,7 @@ import type {
   OptionFlowFilters,
   OptionNBBO,
   OptionPrint,
+  SmartFlowExplainabilityProjection,
   SmartMoneyEvent
 } from "@islandflow/types";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
@@ -35,6 +36,7 @@ export type OptionsTapeScope =
       mode: "contract";
       optionContractId: string;
       underlyingId?: string;
+      smartFlow?: OptionsTapeSmartFlowContext;
     }
   | {
       mode: "packet";
@@ -42,6 +44,7 @@ export type OptionsTapeScope =
       memberTraceIds: string[];
       optionContractId: string;
       underlyingId?: string;
+      smartFlow?: OptionsTapeSmartFlowContext;
     };
 
 export type OptionsTapeSourceScope = {
@@ -79,6 +82,17 @@ export type OptionsTapeDecor = {
   intensity: number;
 };
 
+export type OptionsTapeSmartFlowRefSource = "direct-print" | "packet-member";
+
+export type OptionsTapeSmartFlowContext = {
+  projection: SmartFlowExplainabilityProjection;
+  source: OptionsTapeSmartFlowRefSource;
+  evidenceRefs: string[];
+  directPrintRefs: string[];
+  packetRefs: string[];
+  expandedPacketRefs: string[];
+};
+
 export type OptionsTapePacketContext = {
   packet: FlowPacket;
   packetId: string;
@@ -88,6 +102,7 @@ export type OptionsTapePacketContext = {
 export type OptionsTapeRowContext = {
   print: OptionPrint;
   packet?: OptionsTapePacketContext;
+  smartFlow?: OptionsTapeSmartFlowContext;
   decor?: OptionsTapeDecor;
   nbbo?: OptionNBBO | null;
 };
@@ -107,6 +122,7 @@ export type OptionsTapeProps = {
   packetIdByOptionTraceId?: ReadonlyMap<string, string>;
   flowPacketById?: ReadonlyMap<string, FlowPacket>;
   decorByTraceId?: ReadonlyMap<string, OptionsTapeDecor>;
+  smartFlowProjections?: readonly SmartFlowExplainabilityProjection[];
   nbboByContractId?: ReadonlyMap<string, OptionNBBO>;
   nbboByTraceId?: ReadonlyMap<string, OptionNBBO | null>;
   focusedContractId?: string | null;

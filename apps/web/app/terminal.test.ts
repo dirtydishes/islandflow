@@ -172,6 +172,7 @@ describe("durable tapes pane selectors", () => {
       filteredFlow: flowPackets,
       filteredNews: newsStories,
       filteredOptions: [basePrint],
+      filteredSmartFlowProjections: [],
       flowFilters: filters,
       flowPacketMap: new Map(),
       focusAlertContract: noop,
@@ -229,6 +230,40 @@ describe("durable tapes pane selectors", () => {
         selectDurableTapesNewsPane(nextState)
       )
     ).toBe(true);
+  });
+
+  it("maps live smart-flow projections into the durable-tapes OptionsTape fallback pane", () => {
+    const projection = { trace_id: "smart-flow:1", seq: 1 } as any;
+    const baseState = {
+      classifierDecorByOptionTraceId: new Map(),
+      clearSelectedInstrument: () => {},
+      durableRows: { status: "connected" },
+      filteredDurableOptionRows: [],
+      filteredOptions: [],
+      filteredSmartFlowProjections: [projection],
+      flowFilters: buildDefaultFlowFilters(),
+      flowPacketMap: new Map(),
+      focusFlowPacketRequest: () => {},
+      focusOptionContract: () => {},
+      historicalNbboByTraceId: new Map(),
+      mode: "live",
+      nbboMap: new Map(),
+      packetIdByOptionTraceId: new Map(),
+      selectedInstrument: null,
+      setFlowFilters: () => {}
+    } as any;
+    const nextState = {
+      ...baseState,
+      filteredSmartFlowProjections: [{ trace_id: "smart-flow:2", seq: 2 } as any]
+    } as any;
+
+    expect(selectDurableTapesOptionsPane(baseState).smartFlowProjections).toEqual([projection]);
+    expect(
+      shallowEqualTerminalSelection(
+        selectDurableTapesOptionsPane(baseState),
+        selectDurableTapesOptionsPane(nextState)
+      )
+    ).toBe(false);
   });
 });
 
@@ -312,13 +347,14 @@ describe("alert context hydration helpers", () => {
 });
 
 describe("live manifest", () => {
-  it("includes only options channels on /options", () => {
+  it("includes live smart-flow on /options without legacy smart-money", () => {
     const filters = buildDefaultFlowFilters();
     const channels = getLiveManifest("/options", "SPY", 60000, filters).map(
       (subscription) => subscription.channel
     );
 
-    expect(channels).toEqual(["options", "nbbo", "flow"]);
+    expect(channels).toEqual(["options", "nbbo", "flow", "smart-flow"]);
+    expect(channels).not.toContain("smart-money");
   });
 
   it("keeps /tape as a compatibility alias for /options subscriptions", () => {
@@ -651,6 +687,8 @@ describe("route feature map", () => {
     expect(features.showEquitiesPane).toBe(false);
     expect(features.showFlowPane).toBe(true);
     expect(features.needsClassifierDecor).toBe(true);
+    expect(features.smartFlow).toBe(true);
+    expect(features.smartMoney).toBe(false);
     expect(features.alerts).toBe(false);
   });
 
@@ -700,6 +738,7 @@ describe("route feature map", () => {
     expect(features.options).toBe(true);
     expect(features.alerts).toBe(true);
     expect(features.durableRows).toBe(true);
+    expect(features.smartFlow).toBe(true);
     expect(features.showOptionsPane).toBe(true);
     expect(features.showAlertsPane).toBe(true);
     expect(features.needsClassifierDecor).toBe(false);

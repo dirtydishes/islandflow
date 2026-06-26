@@ -19,6 +19,7 @@ export const selectDurableTapesOptionsPane = (state: TerminalState) => ({
   prints: state.filteredOptions,
   rowViewModels: state.filteredDurableOptionRows,
   rowViewModelStatus: state.durableRows.status,
+  smartFlowProjections: state.filteredSmartFlowProjections,
   useRowViewModels: state.mode === "live" && state.filteredDurableOptionRows.length > 0
 });
 

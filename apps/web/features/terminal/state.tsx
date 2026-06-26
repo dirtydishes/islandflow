@@ -1958,7 +1958,7 @@ export const useTerminalState = () => {
   ]);
 
   const filteredSmartFlowProjections = useMemo(() => {
-    if (!routeFeatures.smartMoney) {
+    if (!routeFeatures.smartFlow) {
       return EMPTY_SMART_FLOW_EXPLAINABILITY;
     }
     if (tickerSet.size === 0) {
@@ -1967,7 +1967,7 @@ export const useTerminalState = () => {
     return smartFlowFeed.items.filter((projection) =>
       matchesTicker(projection.hypothesis.underlying_id)
     );
-  }, [matchesTicker, smartFlowFeed.items, tickerSet, routeFeatures.smartMoney]);
+  }, [matchesTicker, smartFlowFeed.items, tickerSet, routeFeatures.smartFlow]);
 
   const filteredSmartMoneyEvents = useMemo(() => {
     if (!routeFeatures.smartMoney) {
@@ -2131,8 +2131,10 @@ export const useTerminalState = () => {
     if (routeFeatures.durableRows) {
       updates.push(durableRowsFeed.lastUpdate);
     }
-    if (routeFeatures.smartMoney || routeFeatures.showChartPane) {
+    if (routeFeatures.smartFlow || routeFeatures.showChartPane) {
       updates.push(smartFlowFeed.lastUpdate);
+    }
+    if (routeFeatures.smartMoney || routeFeatures.showChartPane) {
       updates.push(smartMoneyFeed.lastUpdate);
     }
     if (routeFeatures.classifierHits) {
@@ -2155,6 +2157,7 @@ export const useTerminalState = () => {
     routeFeatures.alerts,
     routeFeatures.showAlertsPane,
     routeFeatures.durableRows,
+    routeFeatures.smartFlow,
     routeFeatures.smartMoney,
     routeFeatures.showChartPane,
     routeFeatures.classifierHits,

@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Options Tape Smart-Flow Tinting Phase 02</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #0d141b;
+        --panel-2: #111820;
+        --line: rgba(230, 237, 244, 0.14);
+        --line-strong: rgba(245, 166, 35, 0.36);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --green: #25c17a;
+        --blue: #4da3ff;
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: linear-gradient(180deg, #0b1016 0%, var(--bg) 100%);
+        color: var(--text);
+        font: 15px/1.55 var(--sans);
+      }
+
+      main {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+
+      header {
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      .eyebrow,
+      h2,
+      .meta-label,
+      code,
+      pre {
+        font-family: var(--mono);
+      }
+
+      .eyebrow {
+        margin-bottom: 8px;
+        color: var(--accent);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 900px;
+        font-size: 2rem;
+        line-height: 1.08;
+        letter-spacing: 0;
+        text-wrap: balance;
+      }
+
+      .subtitle {
+        max-width: 84ch;
+        margin-top: 12px;
+        color: var(--muted);
+      }
+
+      .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 1px;
+        margin-top: 18px;
+        border: 1px solid var(--line);
+        background: var(--line);
+      }
+
+      .meta-cell {
+        min-width: 0;
+        padding: 10px 12px;
+        background: var(--panel-2);
+      }
+
+      .meta-label {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--faint);
+        font-size: 0.66rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      section {
+        padding: 20px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      h2 {
+        margin-bottom: 10px;
+        color: var(--accent);
+        font-size: 0.9rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      p {
+        max-width: 84ch;
+      }
+
+      p + p {
+        margin-top: 10px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 7px;
+      }
+
+      code {
+        padding: 0.08rem 0.28rem;
+        border: 1px solid rgba(245, 166, 35, 0.18);
+        border-radius: 5px;
+        background: rgba(245, 166, 35, 0.1);
+        color: #ffe0a3;
+        font-size: 0.9em;
+      }
+
+      .ok {
+        color: var(--green);
+      }
+
+      .note {
+        color: var(--blue);
+      }
+
+      .diff-card {
+        border: 1px solid var(--line);
+        background: #070b10;
+      }
+
+      .diff-mount {
+        display: none;
+        min-height: 32px;
+      }
+
+      .diff-card.rendered .diff-mount {
+        display: block;
+      }
+
+      .diff-card.rendered .diff-fallback {
+        display: none;
+      }
+
+      .diff-fallback {
+        max-height: 560px;
+        overflow: auto;
+        margin: 0;
+        border: 0;
+        padding: 12px;
+        background: var(--panel);
+        color: var(--text);
+        font-size: 0.76rem;
+        line-height: 1.45;
+      }
+
+      .diff-fallback code {
+        border: 0;
+        padding: 0;
+        background: transparent;
+        color: inherit;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="eyebrow">Repository turn document | June 26, 2026</div>
+        <h1>Options Tape Smart-Flow Tinting Phase 02</h1>
+        <p class="subtitle">
+          Wired live smart-flow projections into <code>OptionsTape</code> for current live rows,
+          including direct option-print evidence refs, known <code>FlowPacket.members</code>
+          expansion, hover context, and focused packet or contract scope labels. Historical
+          loaded-row completeness remains Phase 03.
+        </p>
+        <div class="meta-grid" aria-label="Turn metadata">
+          <div class="meta-cell">
+            <span class="meta-label">Branch</span>
+            lavender/islandflow-xcdn.2-live-smart-flow-coloring
+          </div>
+          <div class="meta-cell"><span class="meta-label">Beads</span>islandflow-xcdn.2</div>
+          <div class="meta-cell"><span class="meta-label">Phase</span>02 live smart-flow coloring</div>
+          <div class="meta-cell"><span class="meta-label">Status</span><span class="ok">Reviewer verification passed locally</span></div>
+        </div>
+      </header>
+
+      <section>
+        <h2>Outcome</h2>
+        <p>
+          <code>/options</code> now subscribes to <code>smart-flow</code> through an explicit
+          route feature without enabling the legacy <code>smart-money</code> subscription. Dashboard
+          Recent Contracts, the OPRA route, and the durable-tapes <code>OptionsTape</code> fallback
+          receive filtered live smart-flow projections.
+        </p>
+        <p>
+          <code>OptionsTape</code> builds a deterministic projection-to-print map locally in the
+          options-tape domain. Direct option-print refs decorate those prints, packet refs expand
+          through known <code>FlowPacket.members</code>, newer projections win on collisions, and
+          direct print evidence wins over packet expansion for the same row. Smart-flow row tinting
+          takes precedence over legacy classifier or smart-money decor.
+        </p>
+        <p>
+          Smart-flow hue is keyed by hypothesis type, direction remains a row modifier and context
+          label, policy confidence controls intensity, and abstention lowers intensity with explicit
+          row context. Hover details and the packet or contract focus band show hypothesis,
+          direction, confidence, and abstention state when smart-flow context is present.
+        </p>
+      </section>
+
+      <section>
+        <h2>Reviewer Pass</h2>
+        <p>
+          Thermo-nuclear code quality review found no blocking structural regression, no file-size
+          threshold crossing, no wrong-layer smart-flow leakage, and no Phase 03 scope widening.
+          The projection-to-row mapping remains local to the options-tape domain and route
+          subscriptions use an explicit <code>smartFlow</code> feature separate from legacy
+          <code>smartMoney</code>.
+        </p>
+        <p>
+          Safe reviewer repair: the focused packet or contract scope band now switches to the
+          two-column smart-flow layout only when a smart-flow summary exists. Normal focus scopes
+          keep a single flexible label column instead of losing width to an empty smart-flow track.
+        </p>
+        <p>
+          Forgejo CLI status inspection still fails on this host because <code>fj pr status 86</code>
+          cannot parse the Actions job URL returned by Forgejo. CI is checked through the Forgejo
+          commit-status API instead, and the final pushed reviewer head passed before callback.
+        </p>
+      </section>
+
+      <section>
+        <h2>Changed Files</h2>
+        <ul>
+          <li><code>apps/web/features/options-tape/OptionsTape.tsx</code></li>
+          <li><code>apps/web/features/options-tape/types.ts</code></li>
+          <li><code>apps/web/features/options-tape/tinting.ts</code></li>
+          <li><code>apps/web/features/options-tape/options-tape.test.ts</code></li>
+          <li><code>apps/web/features/terminal/routes.ts</code></li>
+          <li><code>apps/web/features/terminal/types.ts</code></li>
+          <li><code>apps/web/features/terminal/state.tsx</code></li>
+          <li><code>apps/web/features/terminal/pane-state.ts</code></li>
+          <li><code>apps/web/app/terminal.tsx</code></li>
+          <li><code>apps/web/app/terminal.test.ts</code></li>
+          <li><code>apps/web/app/globals.css</code></li>
+          <li><code>.beads/issues.jsonl</code></li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Verification</h2>
+        <ul>
+          <li><span class="ok">Passed</span> <code>bun test apps/web/app/terminal.test.ts apps/web/features/options-tape</code>: 116 tests, 375 assertions.</li>
+          <li><span class="ok">Passed</span> <code>bun run fmt:check</code>: Biome checked 352 files with no fixes applied.</li>
+          <li><span class="ok">Passed</span> <code>bun --cwd=apps/web run build</code>: Next production build and TypeScript completed.</li>
+          <li><span class="ok">Passed</span> headless Chromium browser probes against local branch server <code>http://127.0.0.1:3100</code>: <code>/options</code> desktop and mobile, plus dashboard <code>/</code> desktop.</li>
+          <li><span class="ok">Passed</span> delayed <code>/options</code> probe with the local API origin: live option rows rendered, and DOM output included <code>options-tape-smart-flow-row</code> classes.</li>
+          <li><span class="ok">Passed</span> Forgejo commit-status API for the final pushed PR head: <code>CI / Validate (pull_request)</code> succeeded.</li>
+          <li><span class="note">Note</span> the first empty-state browser probe used the default <code>127.0.0.1:4000</code> API origin and exposed a local API binding mismatch; the clean pass used <code>NEXT_PUBLIC_API_URL=http://172.18.0.1:4000</code> on the app's CORS-friendly QA port.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Risks</h2>
+        <ul>
+          <li>Smart-flow row coloring in this PR applies to live <code>OptionsTape</code> rows only.</li>
+          <li>Hydration scheduler support, loaded historical row tinting, and server-composed durable option row parity remain Phase 03.</li>
+          <li>No API, storage, scoring, calibration, or model logic was changed.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p>
+          This section keeps the standard HTML unified diff visible by default. If browser module
+          loading succeeds, the same patch is rendered with <code>PatchDiff</code> from browser-side
+          <code>@pierre/diffs/react</code>.
+        </p>
+        <div class="diff-card" data-patch-diff>
+          <div class="diff-mount" aria-label="Rendered diff"></div>
+          <pre class="diff-fallback"><code>diff --git a/apps/web/features/terminal/types.ts b/apps/web/features/terminal/types.ts
+--- a/apps/web/features/terminal/types.ts
++++ b/apps/web/features/terminal/types.ts
+@@
+   alerts: boolean;
+   durableRows: boolean;
++  smartFlow: boolean;
+   smartMoney: boolean;
+
+diff --git a/apps/web/features/terminal/routes.ts b/apps/web/features/terminal/routes.ts
+--- a/apps/web/features/terminal/routes.ts
++++ b/apps/web/features/terminal/routes.ts
+@@
+         durableRows: false,
++        smartFlow: true,
+         smartMoney: false,
+@@
+-  if (features.smartMoney) {
++  if (features.smartFlow) {
+     subscriptions.push({ channel: "smart-flow", snapshot_limit: LIVE_HOT_WINDOW });
++  }
++  if (features.smartMoney) {
+     subscriptions.push({ channel: "smart-money", snapshot_limit: LIVE_HOT_WINDOW });
+   }
+
+diff --git a/apps/web/features/options-tape/types.ts b/apps/web/features/options-tape/types.ts
+--- a/apps/web/features/options-tape/types.ts
++++ b/apps/web/features/options-tape/types.ts
+@@
++export type OptionsTapeSmartFlowContext = {
++  projection: SmartFlowExplainabilityProjection;
++  source: "direct-print" | "packet-member";
++  evidenceRefs: string[];
++  directPrintRefs: string[];
++  packetRefs: string[];
++  expandedPacketRefs: string[];
++};
+@@
++  smartFlowProjections?: readonly SmartFlowExplainabilityProjection[];
+
+diff --git a/apps/web/features/options-tape/tinting.ts b/apps/web/features/options-tape/tinting.ts
+--- a/apps/web/features/options-tape/tinting.ts
++++ b/apps/web/features/options-tape/tinting.ts
+@@
++const TONE_BY_HYPOTHESIS: Record&lt;FlowHypothesisType, OptionsTapeTintTone&gt; = {
++  directional_accumulation: "green",
++  retail_attention_flow: "teal",
++  event_positioning: "blue",
++  volatility_supply: "copper",
++  structure_arbitrage: "violet",
++  hedge_rebalance: "cyan",
++  unclear: "neutral"
++};
+@@
++export const buildOptionsTapeSmartFlowContextByTraceId = ({
++  projections = [],
++  flowPacketById,
++  flowPacketByTraceId
++}: OptionsTapeSmartFlowContextMapInput): Map&lt;string, OptionsTapeSmartFlowContext&gt; =&gt; {
++  const map = new Map&lt;string, OptionsTapeSmartFlowContext&gt;();
++  for (const projection of projections) {
++    const directPrintRefs = getOptionsTapeSmartFlowOptionPrintRefs(projection);
++    const packetRefs = getOptionsTapeSmartFlowPacketRefs(projection);
++    const expandedPacketRefs = uniqueNonEmpty(
++      packetRefs.flatMap(
++        (ref) =&gt; resolveSmartFlowPacketRef(ref, flowPacketById, flowPacketByTraceId)?.members ?? []
++      )
++    );
++    for (const traceId of expandedPacketRefs) assign(traceId, "packet-member");
++    for (const traceId of directPrintRefs) assign(traceId, "direct-print");
++  }
++  return map;
++};
+@@
++export const getOptionsTapeRowTintFromContext = (
++  context: Pick&lt;OptionsTapeRowContext, "smartFlow" | "decor"&gt;
++): OptionsTapeRowTint | undefined =&gt; {
++  if (context.smartFlow) {
++    return getOptionsTapeSmartFlowRowTint(context.smartFlow.projection);
++  }
++  return getOptionsTapeDecorRowTint(context.decor);
++};
+
+diff --git a/apps/web/features/options-tape/OptionsTape.tsx b/apps/web/features/options-tape/OptionsTape.tsx
+--- a/apps/web/features/options-tape/OptionsTape.tsx
++++ b/apps/web/features/options-tape/OptionsTape.tsx
+@@
++  const smartFlowContextByTraceId = useMemo(
++    () =&gt;
++      buildOptionsTapeSmartFlowContextByTraceId({
++        projections: smartFlowProjections,
++        flowPacketById,
++        flowPacketByTraceId
++      }),
++    [flowPacketById, flowPacketByTraceId, smartFlowProjections]
++  );
+@@
+-    (print: OptionPrint) =&gt; getOptionsTapeDecorRowTint(contextForPrint(print).decor),
++    (print: OptionPrint) =&gt; getOptionsTapeRowTintFromContext(contextForPrint(print)),
+@@
++              ["Flow hypothesis", smartFlowSummary.hypothesis],
++              ["Flow direction", smartFlowSummary.direction],
++              ["Flow confidence", smartFlowSummary.confidence],
++              ["Flow abstention", smartFlowSummary.abstention]
+
+diff --git a/apps/web/app/terminal.tsx b/apps/web/app/terminal.tsx
+--- a/apps/web/app/terminal.tsx
++++ b/apps/web/app/terminal.tsx
+@@
++            smartFlowProjections={state.filteredSmartFlowProjections}
+
+diff --git a/apps/web/app/terminal.test.ts b/apps/web/app/terminal.test.ts
+--- a/apps/web/app/terminal.test.ts
++++ b/apps/web/app/terminal.test.ts
+@@
+-    expect(channels).toEqual(["options", "nbbo", "flow"]);
++    expect(channels).toEqual(["options", "nbbo", "flow", "smart-flow"]);
++    expect(channels).not.toContain("smart-money");
+</code></pre>
+        </div>
+      </section>
+    </main>
+
+    <script type="module">
+      import React from "https://esm.sh/react@19";
+      import { createRoot } from "https://esm.sh/react-dom@19/client";
+      import { PatchDiff } from "https://esm.sh/@pierre/diffs@1.2.2/react?deps=react@19,react-dom@19";
+
+      for (const card of document.querySelectorAll("[data-patch-diff]")) {
+        const source = card.querySelector(".diff-fallback code");
+        const target = card.querySelector(".diff-mount");
+        if (!source || !target) continue;
+        try {
+          createRoot(target).render(React.createElement(PatchDiff, { patch: source.textContent || "" }));
+          card.classList.add("rendered");
+        } catch (error) {
+          console.warn("Rich diff renderer failed; keeping HTML fallback.", error);
+        }
+      }
+    </script>
+  </body>
+</html>
