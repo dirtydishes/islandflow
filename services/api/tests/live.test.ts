@@ -10,6 +10,7 @@ import {
   isLiveItemFresh,
   LiveStateManager,
   resolveGenericLiveLimits,
+  resolveLiveStateConfig,
   shouldFanoutLiveEvent
 } from "../src/live";
 
@@ -394,6 +395,8 @@ describe("LiveStateManager", () => {
 
     expect(optionRow?.support.packet.id).toBe("flowpacket:7");
     expect(optionRow?.support.smart_money.profile_id).toBe("institutional_directional");
+    expect(optionRow?.support.smart_flow.source_channel).toBe("smart-money");
+    expect(optionRow?.support.smart_flow.refs.evidence_refs).toEqual(["flowpacket:7", "print:7"]);
     expect(optionRow?.option.nbbo.source).toBe("print");
     expect(alertRow?.evidence.primary_packet.id).toBe("flowpacket:7");
     expect(alertRow?.evidence.preview_prints[0]?.trace_id).toBe("print:7");
@@ -711,7 +714,11 @@ describe("LiveStateManager", () => {
   });
 
   it("caps generic options snapshots at the 100-row hot head by default", async () => {
-    const manager = new LiveStateManager(makeClickHouse(), null);
+    const manager = new LiveStateManager(
+      makeClickHouse(),
+      null,
+      resolveLiveStateConfig({} as NodeJS.ProcessEnv)
+    );
     const now = Date.now();
 
     for (let seq = 1; seq <= 150; seq += 1) {

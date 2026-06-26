@@ -3,6 +3,7 @@ import type {
   FlowPacket,
   OptionNBBO,
   OptionPrint,
+  SmartFlowExplainabilityProjection,
   SmartMoneyEvent
 } from "@islandflow/types";
 
@@ -29,6 +30,7 @@ export type OptionSupportRequest = {
 export type OptionSupportResult = {
   packets: FlowPacket[];
   smartMoney: SmartMoneyEvent[];
+  smartFlowProjections: SmartFlowExplainabilityProjection[];
   classifierHits: ClassifierHitEvent[];
   nbboByTraceId: Record<string, OptionNBBO | null>;
 };
@@ -46,6 +48,7 @@ export type FlowPacketLookupResult = {
 type OptionSupportPayload = {
   packets?: FlowPacket[];
   smart_money?: SmartMoneyEvent[];
+  smart_flow?: SmartFlowExplainabilityProjection[];
   classifier_hits?: ClassifierHitEvent[];
   nbbo_by_trace_id?: Record<string, OptionNBBO | null>;
 };
@@ -84,6 +87,18 @@ const extractPacketIdFromTrace = (traceId: string): string | null => {
   }
   return traceId.slice(index);
 };
+
+const getSmartFlowPacketRefs = (projection: SmartFlowExplainabilityProjection): string[] =>
+  Array.from(
+    new Set(
+      [
+        projection.refs.cluster_id,
+        ...(projection.refs.evidence_refs ?? []),
+        ...(projection.evidence.evidence_refs ?? []),
+        ...(projection.hypothesis.evidence_refs ?? [])
+      ].filter((ref): ref is string => Boolean(ref?.startsWith("flowpacket:")))
+    )
+  );
 
 export const normalizeHydrationIds = (ids: Iterable<string | null | undefined>): string[] =>
   Array.from(new Set(Array.from(ids, (id) => id?.trim() ?? "").filter(Boolean))).sort();
@@ -192,6 +207,7 @@ export class HydrationScheduler {
   private readonly supportPacketByTraceId: TtlCache<FlowPacket>;
   private readonly supportTraceMisses: TtlCache<true>;
   private readonly supportSmartMoneyByPacketId: TtlCache<SmartMoneyEvent>;
+  private readonly supportSmartFlowByPacketId: TtlCache<SmartFlowExplainabilityProjection[]>;
   private readonly supportClassifierHitsByPacketId: TtlCache<ClassifierHitEvent[]>;
   private readonly supportNbboByTraceId: TtlCache<OptionNBBO>;
   private readonly supportNbboMisses: TtlCache<true>;
@@ -236,6 +252,7 @@ export class HydrationScheduler {
     this.supportPacketByTraceId = new TtlCache(maxEntries, positiveTtlMs, this.now);
     this.supportTraceMisses = new TtlCache(maxEntries, negativeTtlMs, this.now);
     this.supportSmartMoneyByPacketId = new TtlCache(maxEntries, positiveTtlMs, this.now);
+    this.supportSmartFlowByPacketId = new TtlCache(maxEntries, positiveTtlMs, this.now);
     this.supportClassifierHitsByPacketId = new TtlCache(maxEntries, positiveTtlMs, this.now);
     this.supportNbboByTraceId = new TtlCache(maxEntries, positiveTtlMs, this.now);
     this.supportNbboMisses = new TtlCache(maxEntries, negativeTtlMs, this.now);
@@ -294,6 +311,7 @@ export class HydrationScheduler {
     this.supportPacketByTraceId.clear();
     this.supportTraceMisses.clear();
     this.supportSmartMoneyByPacketId.clear();
+    this.supportSmartFlowByPacketId.clear();
     this.supportClassifierHitsByPacketId.clear();
     this.supportNbboByTraceId.clear();
     this.supportNbboMisses.clear();
@@ -647,6 +665,16 @@ export class HydrationScheduler {
       }
     }
 
+    for (const projection of payload.smart_flow ?? []) {
+      for (const packetId of getSmartFlowPacketRefs(projection)) {
+        const existing = this.supportSmartFlowByPacketId.getEntry(packetId)?.value ?? [];
+        if (existing.some((item) => item.trace_id === projection.trace_id)) {
+          continue;
+        }
+        this.supportSmartFlowByPacketId.set(packetId, [...existing, projection].slice(-24));
+      }
+    }
+
     for (const hit of payload.classifier_hits ?? []) {
       const packetId = extractPacketIdFromTrace(hit.trace_id);
       if (!packetId) {
@@ -705,11 +733,15 @@ export class HydrationScheduler {
     }
 
     const smartMoney = new Map<string, SmartMoneyEvent>();
+    const smartFlowProjections = new Map<string, SmartFlowExplainabilityProjection>();
     const classifierHits = new Map<string, ClassifierHitEvent>();
     for (const packetId of packetIds) {
       const event = this.supportSmartMoneyByPacketId.getEntry(packetId)?.value;
       if (event?.trace_id) {
         smartMoney.set(event.trace_id, event);
+      }
+      for (const projection of this.supportSmartFlowByPacketId.getEntry(packetId)?.value ?? []) {
+        smartFlowProjections.set(projection.trace_id, projection);
       }
       for (const hit of this.supportClassifierHitsByPacketId.getEntry(packetId)?.value ?? []) {
         classifierHits.set(hit.trace_id, hit);
@@ -729,6 +761,7 @@ export class HydrationScheduler {
     return {
       packets: Array.from(packets.values()),
       smartMoney: Array.from(smartMoney.values()),
+      smartFlowProjections: Array.from(smartFlowProjections.values()),
       classifierHits: Array.from(classifierHits.values()),
       nbboByTraceId
     };

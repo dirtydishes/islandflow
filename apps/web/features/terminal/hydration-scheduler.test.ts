@@ -42,6 +42,31 @@ const makeFlowPacket = (id: string, members: string[]) =>
     join_quality: {}
   }) as any;
 
+const makeSmartFlowProjection = (packetId: string, traceId = "smartflow:1") =>
+  ({
+    trace_id: traceId,
+    source_ts: 1,
+    ingest_ts: 1,
+    seq: 1,
+    refs: {
+      trace_id: traceId,
+      event_id: "smartflow:event:1",
+      hypothesis_id: "hypothesis:1",
+      insight_id: "smartflow:insight:1",
+      cluster_id: packetId,
+      candidate_ids: [`candidate:${packetId}`],
+      evidence_refs: [packetId, "print:1"]
+    },
+    evidence: {
+      evidence_refs: [packetId, "print:1"],
+      evidence_quality: 0.82,
+      penalties: []
+    },
+    hypothesis: {
+      evidence_refs: [packetId, "print:1"]
+    }
+  }) as any;
+
 describe("hydration scheduler keys", () => {
   it("builds stable sorted keys for missing ids and nbbo context", () => {
     expect(stableHydrationKey(["b", "a", "a", " "])).toBe("a\nb");
@@ -178,6 +203,7 @@ describe("HydrationScheduler", () => {
       ingest_ts: 1,
       seq: 1
     } as any;
+    const smartFlow = makeSmartFlowProjection(packet.id);
     let requestCount = 0;
     const scheduler = new HydrationScheduler({
       batchDelayMs: 0,
@@ -188,6 +214,7 @@ describe("HydrationScheduler", () => {
         return jsonResponse({
           packets: [packet],
           smart_money: [smartMoney],
+          smart_flow: [smartFlow],
           classifier_hits: [classifierHit],
           nbbo_by_trace_id: { "print:1": null }
         });
@@ -205,11 +232,34 @@ describe("HydrationScheduler", () => {
     expect(requestCount).toBe(1);
     expect(left.packets.map((item) => item.id)).toEqual([packet.id]);
     expect(left.smartMoney.map((item) => item.trace_id)).toEqual(["smart-money:1"]);
+    expect(left.smartFlowProjections.map((item) => item.trace_id)).toEqual(["smartflow:1"]);
     expect(left.classifierHits.map((item) => item.trace_id)).toEqual([classifierHit.trace_id]);
     expect(left.nbboByTraceId).toEqual({ "print:1": null });
     expect(right.packets.map((item) => item.id)).toEqual([packet.id]);
 
     await scheduler.requestOptionSupport({ traceIds: ["print:1"] });
+    expect(requestCount).toBe(1);
+  });
+
+  it("keeps missing smart-flow support bounded while packet support is cached", async () => {
+    const packet = makeFlowPacket("flowpacket:SPY-2026-06-26-500-C:miss", ["print:missing"]);
+    let requestCount = 0;
+    const scheduler = new HydrationScheduler({
+      batchDelayMs: 0,
+      fetcher: async () => {
+        requestCount += 1;
+        return jsonResponse({ packets: [packet] });
+      }
+    });
+
+    await expect(scheduler.requestOptionSupport({ traceIds: ["print:missing"] })).resolves.toEqual({
+      packets: [packet],
+      smartMoney: [],
+      smartFlowProjections: [],
+      classifierHits: [],
+      nbboByTraceId: {}
+    });
+    await scheduler.requestOptionSupport({ traceIds: ["print:missing"] });
     expect(requestCount).toBe(1);
   });
 

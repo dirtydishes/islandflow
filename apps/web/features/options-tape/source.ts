@@ -5,12 +5,12 @@ import { OptionPrintSchema } from "@islandflow/types";
 import { useEffect, useMemo, useRef } from "react";
 
 import { buildBrowserApiUrl } from "../api-transport";
-import {
-  createDurableTapeInitialHistoryCursor,
-  type DurableTapeCursor,
-  type DurableTapeHistoryPage,
-  type DurableTapeSource
-} from "../durable-tape";
+import { createDurableTapeInitialHistoryCursor } from "../durable-tape/history";
+import type {
+  DurableTapeCursor,
+  DurableTapeHistoryPage,
+  DurableTapeSource
+} from "../durable-tape/types";
 import { filterOptionsTapePrints, getOptionsTapeQueryParams } from "./filters";
 import type {
   OptionsTapeHistoryResponse,

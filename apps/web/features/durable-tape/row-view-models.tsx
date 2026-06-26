@@ -12,6 +12,17 @@ import type { FlowPacketFocusRequest } from "../flow-packets";
 import { DurableTape } from "./components/DurableTape";
 import { createDurableTapeInitialHistoryCursor } from "./history";
 import {
+  getOptionsTapeRowTintClassName,
+  getOptionsTapeRowTintFromContext,
+  getOptionsTapeRowTintStyle,
+  getOptionsTapeSmartFlowEvidenceRefs,
+  getOptionsTapeSmartFlowOptionPrintRefs,
+  getOptionsTapeSmartFlowPacketRefs,
+  getOptionsTapeSmartFlowSummary,
+  type OptionsTapeRowTint
+} from "../options-tape/tinting";
+import type { OptionsTapeSmartFlowContext } from "../options-tape/types";
+import {
   type DurableTapeColumnDefinition,
   type DurableTapeFeatureInput,
   type DurableTapeSource,
@@ -178,6 +189,42 @@ const optionPrintFromRow = (row: DurableTapeOptionRowViewModel): OptionPrint => 
   signal_profile: row.option.signal?.profile as OptionPrint["signal_profile"]
 });
 
+const getDurableOptionRowSmartFlowContext = (
+  row: DurableTapeOptionRowViewModel
+): OptionsTapeSmartFlowContext | undefined => {
+  const projection = row.support.smart_flow;
+  if (!projection) {
+    return undefined;
+  }
+  const evidenceRefs = getOptionsTapeSmartFlowEvidenceRefs(projection);
+  const directPrintRefs = getOptionsTapeSmartFlowOptionPrintRefs(projection);
+  const packetRefs = getOptionsTapeSmartFlowPacketRefs(projection);
+  const expandedPacketRefs =
+    row.support.packet && packetRefs.includes(row.support.packet.id)
+      ? row.support.packet.member_trace_ids
+      : [];
+  const traceId = row.option.trace_id;
+  if (!directPrintRefs.includes(traceId) && !expandedPacketRefs.includes(traceId)) {
+    return undefined;
+  }
+
+  return {
+    projection,
+    source: directPrintRefs.includes(traceId) ? "direct-print" : "packet-member",
+    evidenceRefs,
+    directPrintRefs,
+    packetRefs,
+    expandedPacketRefs
+  };
+};
+
+export const getDurableOptionRowTint = (
+  row: DurableTapeOptionRowViewModel
+): OptionsTapeRowTint | undefined =>
+  getOptionsTapeRowTintFromContext({
+    smartFlow: getDurableOptionRowSmartFlowContext(row)
+  });
+
 const renderOptionRow = ({
   row,
   columns
@@ -211,37 +258,54 @@ const renderBadgeList = (row: DurableTapeRowViewModel): ReactNode =>
     </div>
   ) : null;
 
-const renderOptionHover = (row: DurableTapeOptionRowViewModel) => (
-  <div className="options-tape-hover-content" aria-label="Server-composed option row detail">
-    <dl>
-      <div>
-        <dt>Contract</dt>
-        <dd>{row.option.option_contract_id}</dd>
-      </div>
-      <div>
-        <dt>Trace</dt>
-        <dd>{row.option.trace_id}</dd>
-      </div>
-      <div>
-        <dt>NBBO</dt>
-        <dd>{row.cells.nbbo ?? "--"}</dd>
-      </div>
-      <div>
-        <dt>Packet</dt>
-        <dd>{row.support.packet?.id ?? "--"}</dd>
-      </div>
-      <div>
-        <dt>Classifier</dt>
-        <dd>{row.support.classifier?.label ?? row.support.smart_money?.label ?? "--"}</dd>
-      </div>
-      <div>
-        <dt>Evidence</dt>
-        <dd>{row.evidence_summary?.label ?? "--"}</dd>
-      </div>
-    </dl>
-    {renderBadgeList(row)}
-  </div>
-);
+const renderOptionHover = (row: DurableTapeOptionRowViewModel) => {
+  const smartFlowSummary = row.support.smart_flow
+    ? getOptionsTapeSmartFlowSummary(row.support.smart_flow)
+    : null;
+  return (
+    <div className="options-tape-hover-content" aria-label="Server-composed option row detail">
+      <dl>
+        <div>
+          <dt>Contract</dt>
+          <dd>{row.option.option_contract_id}</dd>
+        </div>
+        <div>
+          <dt>Trace</dt>
+          <dd>{row.option.trace_id}</dd>
+        </div>
+        <div>
+          <dt>NBBO</dt>
+          <dd>{row.cells.nbbo ?? "--"}</dd>
+        </div>
+        <div>
+          <dt>Packet</dt>
+          <dd>{row.support.packet?.id ?? "--"}</dd>
+        </div>
+        <div>
+          <dt>Classifier</dt>
+          <dd>{row.support.classifier?.label ?? row.support.smart_money?.label ?? "--"}</dd>
+        </div>
+        {smartFlowSummary ? (
+          <>
+            <div>
+              <dt>Flow hypothesis</dt>
+              <dd>{smartFlowSummary.hypothesis}</dd>
+            </div>
+            <div>
+              <dt>Flow confidence</dt>
+              <dd>{smartFlowSummary.confidence}</dd>
+            </div>
+          </>
+        ) : null}
+        <div>
+          <dt>Evidence</dt>
+          <dd>{row.evidence_summary?.label ?? "--"}</dd>
+        </div>
+      </dl>
+      {renderBadgeList(row)}
+    </div>
+  );
+};
 
 export const DurableTapeOptionRowsPane = ({
   rows,
@@ -270,7 +334,11 @@ export const DurableTapeOptionRowsPane = ({
         columns={OPTION_ROW_COLUMNS}
         features={features}
         getCursor={getRowCursor}
+        getRowClassName={({ item }) =>
+          getOptionsTapeRowTintClassName(getDurableOptionRowTint(item))
+        }
         getRowKey={getRowKey}
+        getRowStyle={({ item }) => getOptionsTapeRowTintStyle(getDurableOptionRowTint(item))}
         onActivate={({ item }) => {
           const print = optionPrintFromRow(item);
           onContractFocus?.(print);
