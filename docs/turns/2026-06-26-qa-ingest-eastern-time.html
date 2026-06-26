@@ -288,7 +288,7 @@
           <li>Moved tape rows, alerts, flow packet metadata, news timestamps, terminal status text, and replay controls onto the same Eastern formatter.</li>
           <li>Added tests that pin the reported <code>2026-06-26T14:30Z</code> timestamp to <code>10:30 AM EDT</code> and guard Eastern-day comparisons around UTC midnight.</li>
           <li>Changed <code>/qa</code> route features so the route subscribes to the live feeds it renders: options, NBBO, equities, flow, news, alerts, smart-flow, durable rows, and equity candles.</li>
-          <li>Rewired <code>DurableTapesQaRoute</code> to feed its template matrix from live terminal selectors and live chart candles instead of the static 10:30 fixture arrays.</li>
+          <li>Rewired <code>DurableTapesQaRoute</code> to feed its template matrix from live terminal selectors and REST-bootstrapped/live chart candles instead of the static 10:30 fixture arrays.</li>
         </ul>
       </section>
 
@@ -564,9 +564,12 @@ diff --git a/apps/web/features/durable-tape/qa-page.tsx b/apps/web/features/dura
 +  const smartFlowProjections = optionsPane.smartFlowProjections;
 +  const alerts = alertsPane.alerts;
 +  const newsStories = newsPane.stories;
++  const fetchedChartCandles = useQaChartCandleBootstrap();
++  const chartCandleInput =
++    state.liveSession.chartCandles.length &gt; 0 ? state.liveSession.chartCandles : fetchedChartCandles;
 +  const chartCandles = useMemo(
-+    () =&gt; normalizeMarketChartCandles(state.liveSession.chartCandles),
-+    [state.liveSession.chartCandles]
++    () =&gt; normalizeMarketChartCandles(chartCandleInput),
++    [chartCandleInput]
 +  );
 @@
 -          candles={QA_CHART_CANDLES}
@@ -619,9 +622,12 @@ diff --git a/apps/web/features/durable-tape/qa-page.tsx b/apps/web/features/dura
 +  const smartFlowProjections = optionsPane.smartFlowProjections;
 +  const alerts = alertsPane.alerts;
 +  const newsStories = newsPane.stories;
++  const fetchedChartCandles = useQaChartCandleBootstrap();
++  const chartCandleInput =
++    state.liveSession.chartCandles.length > 0 ? state.liveSession.chartCandles : fetchedChartCandles;
 +  const chartCandles = useMemo(
-+    () => normalizeMarketChartCandles(state.liveSession.chartCandles),
-+    [state.liveSession.chartCandles]
++    () => normalizeMarketChartCandles(chartCandleInput),
++    [chartCandleInput]
 +  );
 @@
 -          candles={QA_CHART_CANDLES}
