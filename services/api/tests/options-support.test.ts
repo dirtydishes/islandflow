@@ -1,10 +1,13 @@
 import { describe, expect, it } from "bun:test";
 import type { ClickHouseClient } from "@islandflow/storage";
 import {
+  SMART_FLOW_CONTRACT_VERSION,
+  SMART_FLOW_HYPOTHESIS_SCORE_MODEL_VERSION,
+  SMART_FLOW_HYPOTHESIS_SCORE_POLICY_VERSION,
   type FlowPacket,
   type SmartFlowExplainabilityProjection,
   type SmartMoneyEvent,
-  smartFlowExplainabilityFromLegacySmartMoneyEvent
+  smartFlowExplainabilityFromHypothesisEvent
 } from "@islandflow/types";
 import { lookupOptionsSupport } from "../src/options-support";
 
@@ -86,10 +89,47 @@ const makeSmartMoneyEvent = (): SmartMoneyEvent => ({
 
 const makeSmartFlowProjection = (
   smartMoney: SmartMoneyEvent
-): SmartFlowExplainabilityProjection => ({
-  ...smartFlowExplainabilityFromLegacySmartMoneyEvent(smartMoney),
-  source_channel: "smart-flow"
-});
+): SmartFlowExplainabilityProjection => {
+  const clusterId = `cluster:${smartMoney.underlying_id}:${smartMoney.source_ts}:${smartMoney.source_ts + 60_000}`;
+  return smartFlowExplainabilityFromHypothesisEvent({
+    source_ts: smartMoney.source_ts,
+    ingest_ts: smartMoney.ingest_ts,
+    seq: smartMoney.seq,
+    trace_id: `smartflow:hypothesis:${clusterId}`,
+    schema_version: SMART_FLOW_CONTRACT_VERSION,
+    policy_version: SMART_FLOW_HYPOTHESIS_SCORE_POLICY_VERSION,
+    model_version: SMART_FLOW_HYPOTHESIS_SCORE_MODEL_VERSION,
+    event_id: `smartflow:hypothesis:${clusterId}`,
+    hypothesis_id: `hypothesis:${clusterId}`,
+    cluster_id: clusterId,
+    candidate_ids: smartMoney.packet_ids.map((packetId) => `candidate:${packetId}`),
+    underlying_id: smartMoney.underlying_id,
+    hypothesis_type: "directional_accumulation",
+    direction: smartMoney.primary_direction,
+    scores: {
+      schema_version: SMART_FLOW_CONTRACT_VERSION,
+      policy_version: SMART_FLOW_HYPOTHESIS_SCORE_POLICY_VERSION,
+      model_version: SMART_FLOW_HYPOTHESIS_SCORE_MODEL_VERSION,
+      hypothesis_type: "directional_accumulation",
+      direction: smartMoney.primary_direction,
+      evidence_strength: 0.8,
+      fit_score: 0.72,
+      penalty_score: 0,
+      penalties: [],
+      confidence: {
+        policy_confidence: 0.76,
+        evidence_quality: 0.84,
+        hypothesis_margin: 0.28,
+        conviction: 0.72,
+        calibration_version: null
+      }
+    },
+    alternatives: [],
+    abstention: { abstained: false, reasons: ["not_abstained"], source_reasons: [] },
+    evidence_refs: [...smartMoney.packet_ids, ...smartMoney.member_print_ids],
+    generated_from: "flow_evidence_cluster"
+  });
+};
 
 describe("options support lookup", () => {
   it("projects smart_flow beside packet, smart-money, classifier, and nbbo support", async () => {

@@ -367,9 +367,7 @@ export const ensureSmartMoneyEventsTable = async (client: ClickHouseClient): Pro
   });
 };
 
-export const ensureSmartFlowProjectionsTable = async (
-  client: ClickHouseClient
-): Promise<void> => {
+export const ensureSmartFlowProjectionsTable = async (client: ClickHouseClient): Promise<void> => {
   await client.exec({
     query: smartFlowProjectionsTableDDL()
   });

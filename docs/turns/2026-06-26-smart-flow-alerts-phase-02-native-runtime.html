@@ -196,7 +196,10 @@
           Runtime smart-flow now has its own bus stream, persisted ClickHouse read model,
           compute emitter, API fetchers, and live-cache ingestion path. The old smart-money,
           classifier-hit, and alert emitters remain in place for comparison and rollback, but the
-          API smart-flow routes no longer project from <code>SmartMoneyEvent</code> storage.
+          API smart-flow routes no longer project from <code>SmartMoneyEvent</code> storage. Reviewer
+          repairs tightened the native runtime so it emits completed smart-flow windows with replay-style
+          clustering semantics, keeps pending windows retriable until publish succeeds, and rejects legacy
+          compatibility rows from the live smart-flow cache.
         </p>
       </section>
 
@@ -213,13 +216,23 @@
           </div>
           <div class="tile">
             <strong>Compute runtime</strong>
-            <p>Added a deep runtime builder that turns a <code>FlowPacket</code> into native explainability projections through evidence, clusters, scoring, and projection in one call.</p>
+            <p>Added a deep runtime builder that buffers <code>FlowPacket</code> evidence by smart-flow window, emits completed windows through the shared evidence, cluster, scoring, and projection pipeline, and flushes pending windows during shutdown.</p>
           </div>
           <div class="tile">
             <strong>API and live</strong>
             <p>Smart-flow recent, history, replay, websocket, live-cache, durable rows, and option support now read native projections directly.</p>
           </div>
         </div>
+      </section>
+
+      <section>
+        <h2>Reviewer Repairs</h2>
+        <ul>
+          <li>Changed compute native smart-flow from per-packet projection to a stateful windowed runtime so same-window packets produce one replay-equivalent cluster projection.</li>
+          <li>Made native smart-flow projection publish failures propagate instead of being logged and swallowed, and retained clusters until a flush succeeds so later events can retry.</li>
+          <li>Filtered live smart-flow cache hydration and ingest to native projections only; stale legacy compatibility rows now fall back to ClickHouse canonical rows.</li>
+          <li>Added storage, runtime, live-cache, and support tests covering canonical smart-flow round-trip, windowed runtime equivalence, stale Redis fallback, and true native fixture shapes.</li>
+        </ul>
       </section>
 
       <section>
@@ -232,6 +245,9 @@
           <li><span class="ok">Passed</span>: <code>bun test packages/storage/tests</code></li>
           <li><span class="ok">Passed</span>: <code>bun test packages/bus/tests/jetstream.test.ts</code></li>
           <li><span class="ok">Passed</span>: <code>bun run typecheck</code></li>
+          <li><span class="ok">Passed</span>: <code>bun run fmt:check</code></li>
+          <li><span class="ok">Passed</span>: <code>git diff --check</code></li>
+          <li><span class="ok">Passed</span>: <code>bun test services/compute/tests/smart-flow-runtime.test.ts services/api/tests/live.test.ts services/api/tests/options-support.test.ts packages/storage/tests/smart-flow-projections.test.ts</code> during reviewer repair.</li>
         </ul>
       </section>
 
@@ -278,24 +294,43 @@ diff --git a/services/api/src/smart-flow.ts b/services/api/src/smart-flow.ts
 diff --git a/services/compute/src/smart-flow-runtime.ts b/services/compute/src/smart-flow-runtime.ts
 new file mode 100644
 @@
-+export const buildNativeSmartFlowProjectionsFromPacket = (
-+  packet: FlowPacket,
-+  config: NativeSmartFlowRuntimeConfig = {}
-+): SmartFlowExplainabilityProjection[] =&gt; {
-+  const extraction = buildFlowEvidenceCandidateFromPacket(packet);
-+  const { clusters } = buildFlowEvidenceClusters([extraction], {
-+    windowMs: 60_000,
-+    includeRejectedCandidates: true,
-+    ...config.cluster
-+  });
++export class NativeSmartFlowRuntime {
++  private readonly pending = new Map&lt;string, FlowEvidenceCandidateExtraction&gt;();
 +
-+  return clusters.map((cluster) =&gt;
-+    smartFlowExplainabilityFromHypothesisEvent(
-+      buildFlowHypothesisEventFromCluster(cluster, config.projection),
-+      { source_channel: "smart-flow" }
-+    )
-+  );
++  ingest(packet: FlowPacket): NativeSmartFlowProjectionFlush {
++    const extraction = buildFlowEvidenceCandidateFromPacket(packet);
++    this.pending.set(extraction.candidate.candidate_id, extraction);
++    return this.collectReady(extraction.candidate.observed_at_ts);
++  }
++
++  collectReady(upToTs: number): NativeSmartFlowProjectionFlush {
++    const cutoffTs = windowStartFor(upToTs, this.windowMs);
++    return this.collect((extraction) =&gt; {
++      return windowEndFor(extraction.candidate.observed_at_ts, this.windowMs) &lt;= cutoffTs;
++    });
++  }
++}
+
+diff --git a/services/api/src/live.ts b/services/api/src/live.ts
+@@
++const parseNativeSmartFlowProjection = (value: unknown) =&gt; {
++  const projection = SmartFlowExplainabilityProjectionSchema.parse(value);
++  if (projection.source_channel !== "smart-flow" || projection.compatibility?.compatibility_only) {
++    throw new Error("cached smart-flow projection is not native");
++  }
++  return projection;
 +};
++
+@@
+   "smart-flow": {
+     redisKey: "live:smart-flow",
+     cursorField: "smart-flow",
+     limit: limits["smart-flow"],
+-    parse: (value) =&gt; SmartFlowExplainabilityProjectionSchema.parse(value),
++    parse: parseNativeSmartFlowProjection,
+     cursor: smartFlowCursor,
+     fetchRecent: fetchRecentSmartFlowExplainability
+   },
 
 diff --git a/services/api/src/index.ts b/services/api/src/index.ts
 @@
@@ -339,6 +374,7 @@ diff --git a/services/api/src/index.ts b/services/api/src/index.ts
         <h2>Risks</h2>
         <ul>
           <li>Existing deployments need the new stream and table reconciled before native smart-flow data appears in live APIs.</li>
+          <li>Runtime smart-flow projections now emit when their 60-second smart-flow window closes, so the current window can remain pending until a later packet or graceful shutdown flushes it.</li>
           <li>Legacy smart-money emitters intentionally remain, so consumers can still compare old and new rows during the next phases.</li>
           <li>No alert-surface migration was included; that remains phase 03 and later work.</li>
         </ul>

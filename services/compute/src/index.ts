@@ -94,7 +94,7 @@ import {
   RollingWindowStore,
   type RollingWindowStoreConfig
 } from "./rolling-stats";
-import { buildNativeSmartFlowProjectionsFromPacket } from "./smart-flow-runtime";
+import { NativeSmartFlowRuntime, type NativeSmartFlowProjectionFlush } from "./smart-flow-runtime";
 import {
   buildStructureFlowPacket,
   type LegEvidence,
@@ -320,6 +320,7 @@ const emitCounters = {
   equityJoins: 0,
   darkEvents: 0
 };
+const nativeSmartFlowRuntime = new NativeSmartFlowRuntime();
 
 const rollingKey = (metric: string, contractId: string): string => {
   return `rolling:${metric}:${contractId}`;
@@ -1020,7 +1021,19 @@ const flushCluster = async (
       features.structure_rights = summary.rights;
     }
 
-    await emitStructurePacketIfNeeded(js, batchWriter, legs, summary, currentLeg.contractId);
+    try {
+      await emitStructurePacketIfNeeded(js, batchWriter, legs, summary, currentLeg.contractId);
+    } catch (error) {
+      if (isExpectedShutdownNatsError(error)) {
+        logger.info("skipped structure packet publish during shutdown", {
+          contract: currentLeg.contractId,
+          error: getErrorCode(error) ?? (error instanceof Error ? error.message : String(error))
+        });
+        return;
+      }
+      cluster.flushed = false;
+      throw error;
+    }
 
     const rootKey = buildRootKey(currentLeg);
     const rootCandidates = [
@@ -1030,13 +1043,25 @@ const flushCluster = async (
     const rollLegs = [currentLeg, ...rootCandidates];
     const rollSummary = summarizeStructure(rollLegs);
     if (rollSummary?.type === "roll") {
-      await emitStructurePacketIfNeeded(
-        js,
-        batchWriter,
-        rollLegs,
-        rollSummary,
-        currentLeg.contractId
-      );
+      try {
+        await emitStructurePacketIfNeeded(
+          js,
+          batchWriter,
+          rollLegs,
+          rollSummary,
+          currentLeg.contractId
+        );
+      } catch (error) {
+        if (isExpectedShutdownNatsError(error)) {
+          logger.info("skipped structure roll packet publish during shutdown", {
+            contract: currentLeg.contractId,
+            error: getErrorCode(error) ?? (error instanceof Error ? error.message : String(error))
+          });
+          return;
+        }
+        cluster.flushed = false;
+        throw error;
+      }
     }
 
     storeRecentLeg(currentLeg, anchorTs);
@@ -1100,25 +1125,43 @@ const emitNativeSmartFlow = async (
   batchWriter: ClickHouseBatchWriter,
   packet: FlowPacket
 ): Promise<void> => {
+  const flush = nativeSmartFlowRuntime.ingest(packet);
   try {
-    const projections = buildNativeSmartFlowProjectionsFromPacket(packet);
-    for (const projection of projections) {
-      enqueueSmartFlowProjectionInsert(batchWriter, projection);
-      await publishJson(js, SUBJECT_SMART_FLOW, projection);
-      emitCounters.smartFlowProjections += 1;
-      if (projection.abstention.abstained) {
-        emitCounters.smartFlowAbstentions += 1;
-      }
-    }
+    await publishNativeSmartFlowFlush(js, batchWriter, flush);
   } catch (error) {
     if (isExpectedShutdownNatsError(error)) {
-      return;
+      throw error;
     }
     logger.error("failed to emit native smart-flow projection", {
       error: error instanceof Error ? error.message : String(error),
-      packet_id: packet.id
+      packet_id: packet.id,
+      projection_count: flush.projections.length
     });
+    throw error;
   }
+};
+
+const flushNativeSmartFlow = async (
+  js: Awaited<ReturnType<typeof connectJetStreamWithRetry>>["js"],
+  batchWriter: ClickHouseBatchWriter
+): Promise<void> => {
+  await publishNativeSmartFlowFlush(js, batchWriter, nativeSmartFlowRuntime.collectAll());
+};
+
+const publishNativeSmartFlowFlush = async (
+  js: Awaited<ReturnType<typeof connectJetStreamWithRetry>>["js"],
+  batchWriter: ClickHouseBatchWriter,
+  flush: NativeSmartFlowProjectionFlush
+): Promise<void> => {
+  for (const projection of flush.projections) {
+    enqueueSmartFlowProjectionInsert(batchWriter, projection);
+    await publishJson(js, SUBJECT_SMART_FLOW, projection);
+    emitCounters.smartFlowProjections += 1;
+    if (projection.abstention.abstained) {
+      emitCounters.smartFlowAbstentions += 1;
+    }
+  }
+  flush.commit();
 };
 
 const emitClassifiers = async (
@@ -1308,8 +1351,8 @@ const flushEligibleClusters = async (
     }
 
     if (currentTs - cluster.endTs > env.CLUSTER_WINDOW_MS) {
-      clusters.delete(contractId);
       await flushCluster(js, batchWriter, rollingStore, cluster);
+      clusters.delete(contractId);
     }
   }
 };
@@ -1829,6 +1872,7 @@ const run = async () => {
         await flushCluster(js, batchWriter, rollingStore, cluster);
       }
       clusters.clear();
+      await flushNativeSmartFlow(js, batchWriter);
       await batchWriter.close();
       await rollingStore.flushToRedis(redis);
 
@@ -1896,7 +1940,6 @@ const run = async () => {
       } else if (print.ts - existing.startTs <= env.CLUSTER_WINDOW_MS) {
         updateCluster(existing, print);
       } else {
-        clusters.delete(print.option_contract_id);
         await flushCluster(js, batchWriter, rollingStore, existing);
         clusters.set(print.option_contract_id, buildCluster(print));
       }

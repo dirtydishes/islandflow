@@ -462,11 +462,11 @@ const buildDurableOptionRow = (
         ? humanizeToken(smartFlow.hypothesis.hypothesis_type)
         : smartMoney
           ? humanizeToken(smartMoney.primary_profile_id)
-        : classifier
-          ? humanizeToken(classifier.classifier_id)
-          : packet
-            ? "packet"
-            : "--"
+          : classifier
+            ? humanizeToken(classifier.classifier_id)
+            : packet
+              ? "packet"
+              : "--"
     },
     option: {
       trace_id: print.trace_id,

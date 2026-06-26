@@ -299,6 +299,14 @@ const parseCursor = (value: string | null): Cursor | null => {
   }
 };
 
+const parseNativeSmartFlowProjection = (value: unknown) => {
+  const projection = SmartFlowExplainabilityProjectionSchema.parse(value);
+  if (projection.source_channel !== "smart-flow" || projection.compatibility?.compatibility_only) {
+    throw new Error("cached smart-flow projection is not native");
+  }
+  return projection;
+};
+
 const getGenericConfig = (
   limits: GenericLiveLimits
 ): {
@@ -365,7 +373,7 @@ const getGenericConfig = (
     redisKey: "live:smart-flow",
     cursorField: "smart-flow",
     limit: limits["smart-flow"],
-    parse: (value) => SmartFlowExplainabilityProjectionSchema.parse(value),
+    parse: parseNativeSmartFlowProjection,
     cursor: smartFlowCursor,
     fetchRecent: fetchRecentSmartFlowExplainability
   },
