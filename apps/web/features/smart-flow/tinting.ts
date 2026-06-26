@@ -152,9 +152,8 @@ export const humanizeSmartFlowToken = (value: string): string => {
   return normalized.replace(/\b\w/g, (match) => match.toUpperCase());
 };
 
-export const getSmartFlowHypothesisTone = (
-  hypothesisType: FlowHypothesisType
-): SmartFlowTintTone => TONE_BY_HYPOTHESIS[hypothesisType];
+export const getSmartFlowHypothesisTone = (hypothesisType: FlowHypothesisType): SmartFlowTintTone =>
+  TONE_BY_HYPOTHESIS[hypothesisType];
 
 export const getSmartFlowHypothesisLabel = (hypothesisType: FlowHypothesisType): string =>
   SMART_FLOW_HYPOTHESIS_LABELS[hypothesisType];
