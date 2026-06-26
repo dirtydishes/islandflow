@@ -4,7 +4,7 @@ This runbook is for deliberately wiping durable market-data history from ClickHo
 
 ## When To Use
 
-Use this only when an operator has decided that existing option, equity, flow, and derived-event history should be discarded and rebuilt from fresh ingest.
+Use this only when an operator has decided that existing option, equity, flow, smart-flow, and smart-flow-alert history should be discarded and rebuilt from fresh ingest.
 
 Before running a reset:
 
@@ -26,9 +26,8 @@ docker compose exec clickhouse clickhouse-client --query "TRUNCATE TABLE IF EXIS
 docker compose exec clickhouse clickhouse-client --query "TRUNCATE TABLE IF EXISTS equity_quotes"
 docker compose exec clickhouse clickhouse-client --query "TRUNCATE TABLE IF EXISTS equity_print_joins"
 docker compose exec clickhouse clickhouse-client --query "TRUNCATE TABLE IF EXISTS flow_packets"
-docker compose exec clickhouse clickhouse-client --query "TRUNCATE TABLE IF EXISTS smart_money_events"
-docker compose exec clickhouse clickhouse-client --query "TRUNCATE TABLE IF EXISTS classifier_hits"
-docker compose exec clickhouse clickhouse-client --query "TRUNCATE TABLE IF EXISTS alerts"
+docker compose exec clickhouse clickhouse-client --query "TRUNCATE TABLE IF EXISTS smart_flow_projections"
+docker compose exec clickhouse clickhouse-client --query "TRUNCATE TABLE IF EXISTS smart_flow_alerts"
 docker compose exec clickhouse clickhouse-client --query "TRUNCATE TABLE IF EXISTS inferred_dark_events"
 ```
 

@@ -1,6 +1,6 @@
 # Implementing Smart-Flow Alerts And Legacy Removal
 
-This directory is the active implementation guide for replacing legacy smart-money, classifier-hit, and legacy-alert paths with canonical smart-flow hypothesis alerts.
+This directory tracks the completed migration to canonical smart-flow hypothesis alerts and records the final path-removal phases.
 
 Human-readable plan: [`plan.html`](./plan.html).
 
@@ -34,12 +34,11 @@ Phase issues:
 
 ## Current Implementation Facts
 
-- Smart-flow contracts, scoring, replay evaluation, and UI explainability foundations already exist.
-- Runtime API smart-flow fetchers still project from stored `SmartMoneyEvent` rows.
-- Compute still emits legacy smart-money events, classifier hits, and legacy alerts.
-- `AlertsModule` currently consumes legacy `AlertEvent` with score/severity/hits.
-- Options Tape has smart-flow tint semantics that should become a shared frontend module before alerts adopt them.
-- Old derived history will be dropped at final cutover instead of backfilled.
+- Smart-flow contracts, scoring, replay evaluation, UI explainability, and shared tint foundations exist.
+- Runtime API smart-flow fetchers read canonical smart-flow projection storage.
+- Compute emits canonical smart-flow projections and smart-flow alerts.
+- `AlertsModule`, durable tapes, terminal state, and live transport consume canonical `SmartFlowAlertEvent` rows.
+- Legacy derived history is intentionally dropped at final cutover instead of backfilled.
 
 ## How To Pick Up Work
 
