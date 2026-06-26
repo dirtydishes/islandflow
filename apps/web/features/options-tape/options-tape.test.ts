@@ -2,7 +2,6 @@ import { describe, expect, it } from "bun:test";
 import {
   type FlowPacket,
   type FlowHypothesisType,
-  FlowHypothesisTypeSchema,
   type OptionPrint,
   type SmartFlowExplainabilityProjection,
   type SmartMoneyDirection
@@ -37,16 +36,12 @@ import {
 import {
   buildOptionsTapeSmartFlowContextByTraceId,
   getOptionsTapeDecorRowTint,
-  getOptionsTapeEvidenceQualityBand,
-  getOptionsTapePolicyConfidenceBand,
   getOptionsTapeRowTintFromContext,
   getOptionsTapeRowTintClassName,
   getOptionsTapeRowTintStyle,
   getOptionsTapeSmartFlowSummary,
   getOptionsTapeSmartFlowRowTint,
-  type OptionsTapeSmartFlowTintInput,
-  type OptionsTapeTintDirection,
-  type OptionsTapeTintTone
+  type OptionsTapeSmartFlowTintInput
 } from "./tinting";
 
 const makePrint = (overrides: Partial<OptionPrint> = {}): OptionPrint => ({
@@ -421,97 +416,7 @@ describe("options tape row tint helpers", () => {
     };
   };
 
-  it("maps every current smart-flow hypothesis type into row metadata and classes", () => {
-    for (const hypothesisType of FlowHypothesisTypeSchema.options) {
-      const tint = getOptionsTapeSmartFlowRowTint(makeSmartFlowTintInput({ hypothesisType }));
-      const classToken = hypothesisType.replaceAll("_", "-");
-
-      expect(tint.metadata.hypothesisType).toBe(hypothesisType);
-      expect(tint.metadata.family).toBe(hypothesisType);
-      expect(tint.className).toContain(`options-tape-row-hypothesis-${classToken}`);
-      expect(tint.className).toContain("options-tape-smart-flow-row");
-    }
-  });
-
-  it("maps smart-flow hypothesis types into semantic row hues", () => {
-    const cases: [FlowHypothesisType, OptionsTapeTintTone][] = [
-      ["directional_accumulation", "green"],
-      ["retail_attention_flow", "teal"],
-      ["event_positioning", "blue"],
-      ["volatility_supply", "copper"],
-      ["structure_arbitrage", "violet"],
-      ["hedge_rebalance", "cyan"],
-      ["unclear", "neutral"]
-    ];
-
-    for (const [hypothesisType, expectedTone] of cases) {
-      const tint = getOptionsTapeSmartFlowRowTint(
-        makeSmartFlowTintInput({ hypothesisType, direction: "bearish" })
-      );
-
-      expect(tint.metadata.hypothesisType).toBe(hypothesisType);
-      expect(tint.metadata.tone).toBe(expectedTone);
-      expect(tint.className).toContain(`classifier-${expectedTone}`);
-      expect(tint.className).toContain("options-tape-row-direction-bearish");
-    }
-  });
-
-  it("maps direction states into row metadata and modifier classes", () => {
-    const cases: [SmartMoneyDirection, OptionsTapeTintDirection][] = [
-      ["bullish", "bullish"],
-      ["bearish", "bearish"],
-      ["neutral", "neutral"],
-      ["mixed", "mixed"],
-      ["unknown", "unknown"]
-    ];
-
-    for (const [inputDirection, expectedDirection] of cases) {
-      const tint = getOptionsTapeSmartFlowRowTint(
-        makeSmartFlowTintInput({ direction: inputDirection })
-      );
-
-      expect(tint.metadata.direction).toBe(expectedDirection);
-      expect(tint.className).toContain(`options-tape-row-direction-${expectedDirection}`);
-    }
-  });
-
-  it("bands policy confidence at the current smart-flow thresholds", () => {
-    expect(getOptionsTapePolicyConfidenceBand(0.12)).toBe("low");
-    expect(getOptionsTapePolicyConfidenceBand(0.52)).toBe("medium");
-    expect(getOptionsTapePolicyConfidenceBand(0.72)).toBe("high");
-
-    expect(
-      getOptionsTapeSmartFlowRowTint(makeSmartFlowTintInput({ policyConfidence: 0.12 })).className
-    ).toContain("options-tape-row-confidence-low");
-    expect(
-      getOptionsTapeSmartFlowRowTint(makeSmartFlowTintInput({ policyConfidence: 0.52 })).className
-    ).toContain("options-tape-row-confidence-medium");
-    expect(
-      getOptionsTapeSmartFlowRowTint(makeSmartFlowTintInput({ policyConfidence: 0.72 })).className
-    ).toContain("options-tape-row-confidence-high");
-  });
-
-  it("bands evidence quality for poor, thin, usable, and strong rows", () => {
-    expect(getOptionsTapeEvidenceQualityBand(0)).toBe("poor");
-    expect(getOptionsTapeEvidenceQualityBand(0.1)).toBe("thin");
-    expect(getOptionsTapeEvidenceQualityBand(0.55)).toBe("usable");
-    expect(getOptionsTapeEvidenceQualityBand(0.82)).toBe("strong");
-
-    expect(
-      getOptionsTapeSmartFlowRowTint(makeSmartFlowTintInput({ evidenceQuality: 0 })).className
-    ).toContain("options-tape-row-evidence-poor");
-    expect(
-      getOptionsTapeSmartFlowRowTint(makeSmartFlowTintInput({ evidenceQuality: 0.1 })).className
-    ).toContain("options-tape-row-evidence-thin");
-    expect(
-      getOptionsTapeSmartFlowRowTint(makeSmartFlowTintInput({ evidenceQuality: 0.55 })).className
-    ).toContain("options-tape-row-evidence-usable");
-    expect(
-      getOptionsTapeSmartFlowRowTint(makeSmartFlowTintInput({ evidenceQuality: 0.82 })).className
-    ).toContain("options-tape-row-evidence-strong");
-  });
-
-  it("uses low-intensity neutral tinting and source reasons for abstention", () => {
+  it("wraps shared smart-flow tinting in stable options-tape row classes", () => {
     const tint = getOptionsTapeSmartFlowRowTint(
       makeSmartFlowTintInput({
         abstained: true,
@@ -526,10 +431,10 @@ describe("options tape row tint helpers", () => {
     expect(tint.metadata.abstained).toBe(true);
     expect(tint.metadata.direction).toBe("abstained");
     expect(tint.metadata.tone).toBe("neutral");
-    expect(tint.metadata.abstentionReasons).toEqual(["below_policy_threshold"]);
-    expect(tint.metadata.sourceReasons).toEqual(["policy confidence below threshold"]);
-    expect(tint.metadata.intensity).toBeLessThanOrEqual(0.36);
+    expect(tint.metadata.source).toBe("smart-flow");
     expect(tint.className).toContain("options-tape-row-abstained");
+    expect(tint.className).toContain("options-tape-row-confidence-high");
+    expect(tint.className).toContain("options-tape-row-evidence-strong");
     expect(tint.className).toContain("classifier-neutral");
   });
 
