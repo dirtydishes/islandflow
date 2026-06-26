@@ -13,7 +13,7 @@ import type {
   DurableTapeFeatureInput,
   DurableTapeSource,
   DurableTapeTemplateId
-} from "../durable-tape";
+} from "../durable-tape/types";
 
 export type OptionsTapeColumnId =
   | "time"

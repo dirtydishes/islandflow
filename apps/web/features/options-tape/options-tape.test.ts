@@ -8,7 +8,9 @@ import {
   type SmartMoneyDirection
 } from "@islandflow/types";
 
-import { createDurableTapeInitialHistoryCursor, selectDurableTapeTemplate } from "../durable-tape";
+import { getDurableOptionRowTint } from "../durable-tape/row-view-models";
+import { createDurableTapeInitialHistoryCursor } from "../durable-tape/history";
+import { selectDurableTapeTemplate } from "../durable-tape/templates";
 import {
   formatOptionsTapeContractLabel,
   formatOptionsTapeDteLabel,
@@ -27,6 +29,11 @@ import {
   getOptionsTapeScopeFilters,
   getOptionsTapeSidePreset
 } from "./filters";
+import {
+  buildOptionsTapeSupportPacketMaps,
+  buildOptionsTapeSupportRequest,
+  createOptionsTapeSupportHydratingSource
+} from "./support-hydration";
 import {
   buildOptionsTapeSmartFlowContextByTraceId,
   getOptionsTapeDecorRowTint,
@@ -611,5 +618,106 @@ describe("options tape row tint helpers", () => {
         "--classifier-intensity"
       ]
     ).toBe("0.700");
+  });
+
+  it("requests support for loaded history rows and maps hydrated smart-flow into tint context", async () => {
+    const historyPrint = makePrint({
+      trace_id: "older-history",
+      execution_nbbo_side: undefined,
+      nbbo_side: undefined
+    });
+    const hydratedRows: string[][] = [];
+    const source = createOptionsTapeSupportHydratingSource(
+      {
+        subscribe: () => ({
+          getSnapshot: () => [],
+          unsubscribe: () => {}
+        }),
+        loadOlder: async () => ({
+          items: [historyPrint],
+          nextCursor: null,
+          exhausted: true
+        })
+      },
+      (rows) => hydratedRows.push(rows.map((row) => row.trace_id))
+    );
+
+    const page = await source.loadOlder({ ts: 2_000, seq: 2 }, {});
+    expect(page.items.map((row) => row.trace_id)).toEqual(["older-history"]);
+    expect(hydratedRows).toEqual([["older-history"]]);
+
+    const request = buildOptionsTapeSupportRequest(page.items, {
+      smartFlowContextByTraceId: new Map(),
+      nbboByTraceId: new Map()
+    });
+    expect(request.traceIds).toEqual(["older-history"]);
+    expect(request.nbboContext).toEqual([
+      {
+        trace_id: "older-history",
+        option_contract_id: "SPY-2026-06-22-555-C",
+        ts: 1_000
+      }
+    ]);
+
+    const packet = makeFlowPacket({ id: "flowpacket:history", members: ["older-history"] });
+    const packetMaps = buildOptionsTapeSupportPacketMaps([packet]);
+    const projection = makeSmartFlowProjection({
+      refs: ["flowpacket:history", "older-history"]
+    });
+    const contexts = buildOptionsTapeSmartFlowContextByTraceId({
+      projections: [projection],
+      flowPacketById: packetMaps.flowPacketById,
+      flowPacketByTraceId: packetMaps.flowPacketByTraceId
+    });
+    const tint = getOptionsTapeRowTintFromContext({
+      smartFlow: contexts.get("older-history")
+    });
+
+    expect(tint?.metadata.source).toBe("smart-flow");
+    expect(tint?.className).toContain("options-tape-smart-flow-row");
+  });
+
+  it("uses the same smart-flow tint helper for durable option rows", () => {
+    const projection = makeSmartFlowProjection({
+      refs: ["flowpacket:durable", "durable-print"]
+    });
+    const row = {
+      id: "options:durable-print:1",
+      lane: "options",
+      source: "server",
+      ts: 1_000,
+      seq: 1,
+      source_ts: 1_000,
+      ingest_ts: 1_001,
+      cells: {},
+      badges: [],
+      option: {
+        trace_id: "durable-print",
+        option_contract_id: "SPY-2026-06-22-555-C",
+        price: 1.25,
+        size: 100,
+        premium: 12_500,
+        side: "A",
+        exchange: "CBOE",
+        nbbo: null
+      },
+      support: {
+        packet: {
+          id: "flowpacket:durable",
+          member_trace_ids: ["durable-print"],
+          member_count: 1
+        },
+        classifier: null,
+        smart_money: null,
+        smart_flow: projection
+      }
+    } as never;
+
+    const durableTint = getDurableOptionRowTint(row);
+    const canonicalTint = getOptionsTapeSmartFlowRowTint(projection);
+
+    expect(durableTint?.metadata).toEqual(canonicalTint.metadata);
+    expect(durableTint?.className).toBe(canonicalTint.className);
+    expect(durableTint?.style).toEqual(canonicalTint.style);
   });
 });

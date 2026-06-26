@@ -17,6 +17,7 @@ import {
   type OptionPrint,
   type SmartMoneyEvent
 } from "@islandflow/types";
+import { projectSmartFlowExplainability } from "./smart-flow";
 
 const DURABLE_ROW_DEFAULT_LANES: DurableTapeComposedLane[] = ["options", "alerts"];
 const DURABLE_ROW_MAX_REFS = 32;
@@ -367,6 +368,7 @@ const buildDurableOptionRow = (
     ? selectPrimaryClassifierHit(lookups.classifierHitsByPacketId.get(packet.id) ?? [])
     : null;
   const smartMoney = packet ? (lookups.smartMoneyByPacketId.get(packet.id) ?? null) : null;
+  const smartFlow = smartMoney ? (projectSmartFlowExplainability([smartMoney])[0] ?? null) : null;
   const premium = getOptionPremium(print);
   const side = print.execution_nbbo_side ?? print.nbbo_side ?? null;
   const nbbo = resolveOptionNbbo(print, lookups.nbboByContractId);
@@ -482,7 +484,8 @@ const buildDurableOptionRow = (
             abstained: smartMoney.abstained,
             reasons: primarySmartMoneyScore?.reasons ?? smartMoney.suppressed_reasons ?? []
           }
-        : null
+        : null,
+      smart_flow: smartFlow
     },
     badges,
     evidence_summary: {

@@ -1,6 +1,12 @@
 "use client";
 
-import type { FlowPacket, OptionFlowFilters, OptionPrint } from "@islandflow/types";
+import type {
+  FlowPacket,
+  OptionFlowFilters,
+  OptionNBBO,
+  OptionPrint,
+  SmartFlowExplainabilityProjection
+} from "@islandflow/types";
 import { parseOptionContractId } from "@islandflow/types";
 import {
   type Dispatch,
@@ -12,7 +18,13 @@ import {
   useState
 } from "react";
 
-import { DurableTape, type DurableTapeFocusEvent } from "../durable-tape";
+import { DurableTape } from "../durable-tape/components/DurableTape";
+import type { DurableTapeFocusEvent } from "../durable-tape/types";
+import {
+  stableHydrationKey,
+  stableOptionSupportNbboKey,
+  terminalHydrationScheduler
+} from "../terminal/hydration-scheduler";
 import {
   OPTIONS_TAPE_COLUMNS,
   OPTIONS_TAPE_TEMPLATES_BY_MODE,
@@ -36,6 +48,13 @@ import {
 } from "./format";
 import { useOptionsTapeArraySource } from "./source";
 import {
+  buildOptionsTapeSupportPacketMaps,
+  buildOptionsTapeSupportRequest,
+  createOptionsTapeSupportHydratingSource,
+  mergeOptionsTapeSmartFlowProjections,
+  mergeOptionsTapeSupportPackets
+} from "./support-hydration";
+import {
   buildOptionsTapeSmartFlowContextByTraceId,
   getOptionsTapeRowTintFromContext,
   getOptionsTapeRowTintClassName,
@@ -53,6 +72,10 @@ import type {
 
 const DEFAULT_TITLE = "Options Tape";
 const OPTIONS_TAPE_DEFAULT_FEATURES = ["default", { key: "settingsGear", enabled: false }] as const;
+const EMPTY_FLOW_PACKET_BY_ID = new Map<string, FlowPacket>();
+const EMPTY_FLOW_PACKET_BY_TRACE_ID = new Map<string, FlowPacket>();
+const EMPTY_PACKET_ID_BY_OPTION_TRACE_ID = new Map<string, string>();
+const EMPTY_NBBO_BY_TRACE_ID = new Map<string, OptionNBBO | null>();
 
 const GLOBAL_SCOPE: OptionsTapeScope = { mode: "global" };
 
@@ -113,6 +136,19 @@ const getPacketFocusScope = (
   underlyingId: getOptionsTapeUnderlying(print),
   smartFlow: context?.smartFlow
 });
+
+const mergeMaps = <K, V>(
+  left: ReadonlyMap<K, V> | undefined,
+  right: ReadonlyMap<K, V> | undefined
+): ReadonlyMap<K, V> | undefined => {
+  if (!left?.size) {
+    return right?.size ? right : undefined;
+  }
+  if (!right?.size) {
+    return left;
+  }
+  return new Map([...left, ...right]);
+};
 
 const OptionsTapeSettings = ({
   filters,
@@ -440,6 +476,19 @@ export const OptionsTape = ({
   const [scope, setScope] = useState<OptionsTapeScope>(GLOBAL_SCOPE);
   const tapeSource = useOptionsTapeArraySource({ prints, options: sourceOptions });
   const activeSource = source ?? tapeSource;
+  const mountedRef = useRef(true);
+  const supportContextRef = useRef({
+    smartFlowContextByTraceId: new Map<string, OptionsTapeRowContext["smartFlow"]>(),
+    nbboByTraceId: EMPTY_NBBO_BY_TRACE_ID as ReadonlyMap<string, OptionNBBO | null>
+  });
+  const pendingSupportRequestKeysRef = useRef(new Set<string>());
+  const [hydratedPackets, setHydratedPackets] = useState<FlowPacket[]>([]);
+  const [hydratedSmartFlowProjections, setHydratedSmartFlowProjections] = useState<
+    SmartFlowExplainabilityProjection[]
+  >([]);
+  const [hydratedNbboByTraceId, setHydratedNbboByTraceId] = useState<
+    Map<string, OptionNBBO | null>
+  >(() => new Map());
   const mode = deriveMode(scope);
   const sourceScope = useMemo(() => scopeToSourceScope(scope), [scope]);
   const sourceFilters = useMemo(
@@ -447,14 +496,114 @@ export const OptionsTape = ({
     [activeFilters, sourceScope]
   );
   const templates = OPTIONS_TAPE_TEMPLATES_BY_MODE[mode];
+  const hydratedPacketMaps = useMemo(
+    () => buildOptionsTapeSupportPacketMaps(hydratedPackets),
+    [hydratedPackets]
+  );
+  const mergedFlowPacketById = useMemo(
+    () => mergeMaps(flowPacketById, hydratedPacketMaps.flowPacketById) ?? EMPTY_FLOW_PACKET_BY_ID,
+    [flowPacketById, hydratedPacketMaps.flowPacketById]
+  );
+  const mergedFlowPacketByTraceId = useMemo(
+    () =>
+      mergeMaps(flowPacketByTraceId, hydratedPacketMaps.flowPacketByTraceId) ??
+      EMPTY_FLOW_PACKET_BY_TRACE_ID,
+    [flowPacketByTraceId, hydratedPacketMaps.flowPacketByTraceId]
+  );
+  const mergedPacketIdByOptionTraceId = useMemo(
+    () =>
+      mergeMaps(packetIdByOptionTraceId, hydratedPacketMaps.packetIdByOptionTraceId) ??
+      EMPTY_PACKET_ID_BY_OPTION_TRACE_ID,
+    [packetIdByOptionTraceId, hydratedPacketMaps.packetIdByOptionTraceId]
+  );
+  const mergedNbboByTraceId = useMemo(
+    () => mergeMaps(hydratedNbboByTraceId, nbboByTraceId) ?? EMPTY_NBBO_BY_TRACE_ID,
+    [hydratedNbboByTraceId, nbboByTraceId]
+  );
+  const mergedSmartFlowProjections = useMemo(
+    () =>
+      mergeOptionsTapeSmartFlowProjections(
+        smartFlowProjections ?? [],
+        hydratedSmartFlowProjections
+      ),
+    [hydratedSmartFlowProjections, smartFlowProjections]
+  );
   const smartFlowContextByTraceId = useMemo(
     () =>
       buildOptionsTapeSmartFlowContextByTraceId({
-        projections: smartFlowProjections,
-        flowPacketById,
-        flowPacketByTraceId
+        projections: mergedSmartFlowProjections,
+        flowPacketById: mergedFlowPacketById,
+        flowPacketByTraceId: mergedFlowPacketByTraceId
       }),
-    [flowPacketById, flowPacketByTraceId, smartFlowProjections]
+    [mergedFlowPacketById, mergedFlowPacketByTraceId, mergedSmartFlowProjections]
+  );
+
+  useEffect(
+    () => () => {
+      mountedRef.current = false;
+    },
+    []
+  );
+
+  useEffect(() => {
+    supportContextRef.current = {
+      smartFlowContextByTraceId,
+      nbboByTraceId: mergedNbboByTraceId
+    };
+  }, [mergedNbboByTraceId, smartFlowContextByTraceId]);
+
+  const hydrateSupportRows = useCallback((rows: readonly OptionPrint[]) => {
+    const request = buildOptionsTapeSupportRequest(rows, supportContextRef.current);
+    const traceKey = stableHydrationKey(request.traceIds ?? []);
+    const nbboKey = stableOptionSupportNbboKey(request.nbboContext ?? []);
+    if (!traceKey && !nbboKey) {
+      return;
+    }
+    const requestKey = `${traceKey}\n\n${nbboKey}`;
+    if (pendingSupportRequestKeysRef.current.has(requestKey)) {
+      return;
+    }
+    pendingSupportRequestKeysRef.current.add(requestKey);
+
+    void terminalHydrationScheduler
+      .requestOptionSupport(request)
+      .then((payload) => {
+        if (!mountedRef.current) {
+          return;
+        }
+        if (payload.packets.length > 0) {
+          setHydratedPackets((current) =>
+            mergeOptionsTapeSupportPackets(current, payload.packets)
+          );
+        }
+        if (payload.smartFlowProjections.length > 0) {
+          setHydratedSmartFlowProjections((current) =>
+            mergeOptionsTapeSmartFlowProjections(current, payload.smartFlowProjections)
+          );
+        }
+        if (Object.keys(payload.nbboByTraceId).length > 0) {
+          setHydratedNbboByTraceId((current) => {
+            const next = new Map(current);
+            for (const [traceId, quote] of Object.entries(payload.nbboByTraceId)) {
+              next.set(traceId, quote);
+            }
+            return next;
+          });
+        }
+      })
+      .catch((error) => {
+        if (mountedRef.current) {
+          console.warn("Failed to hydrate options tape row support", error);
+        }
+      })
+      .finally(() => {
+        pendingSupportRequestKeysRef.current.delete(requestKey);
+      });
+  }, []);
+
+  const supportHydratedSource = useMemo(
+    () => createOptionsTapeSupportHydratingSource(activeSource, hydrateSupportRows),
+    [activeSource, hydrateSupportRows]
   );
 
   useEffect(() => {
@@ -467,21 +616,21 @@ export const OptionsTape = ({
     (print: OptionPrint) =>
       rowContextFromPrint({
         print,
-        flowPacketByTraceId,
-        packetIdByOptionTraceId,
-        flowPacketById,
+        flowPacketByTraceId: mergedFlowPacketByTraceId,
+        packetIdByOptionTraceId: mergedPacketIdByOptionTraceId,
+        flowPacketById: mergedFlowPacketById,
         decorByTraceId,
         smartFlowContextByTraceId,
         nbboByContractId,
-        nbboByTraceId
+        nbboByTraceId: mergedNbboByTraceId
       }),
     [
       decorByTraceId,
-      flowPacketById,
-      flowPacketByTraceId,
+      mergedFlowPacketById,
+      mergedFlowPacketByTraceId,
+      mergedNbboByTraceId,
+      mergedPacketIdByOptionTraceId,
       nbboByContractId,
-      nbboByTraceId,
-      packetIdByOptionTraceId,
       smartFlowContextByTraceId
     ]
   );
@@ -616,7 +765,7 @@ export const OptionsTape = ({
         rowHeight={rowHeight}
         overscan={overscan}
         scope={sourceScope}
-        source={activeSource}
+        source={supportHydratedSource}
         template={template}
         templates={templates}
         title={title}

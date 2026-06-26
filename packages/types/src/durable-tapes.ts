@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { OptionNbboSideSchema, OptionTypeSchema } from "./options-flow";
+import { SmartFlowExplainabilityProjectionSchema } from "./smart-flow";
 
 export const DurableTapeComposedLaneSchema = z.enum(["options", "alerts"]);
 export type DurableTapeComposedLane = z.infer<typeof DurableTapeComposedLaneSchema>;
@@ -112,7 +113,8 @@ export const DurableTapeOptionRowViewModelSchema = DurableTapeRowBaseSchema.exte
         abstained: z.boolean(),
         reasons: z.array(z.string().min(1))
       })
-      .nullable()
+      .nullable(),
+    smart_flow: SmartFlowExplainabilityProjectionSchema.nullable()
   })
 });
 export type DurableTapeOptionRowViewModel = z.infer<typeof DurableTapeOptionRowViewModelSchema>;

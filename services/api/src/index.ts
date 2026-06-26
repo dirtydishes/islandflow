@@ -54,7 +54,6 @@ import {
   fetchAlertsBefore,
   fetchClassifierHitsAfter,
   fetchClassifierHitsBefore,
-  fetchClassifierHitsByPacketIds,
   fetchEquityCandlesAfter,
   fetchEquityCandlesRange,
   fetchEquityPrintJoinsAfter,
@@ -68,10 +67,8 @@ import {
   fetchFlowPacketById,
   fetchFlowPacketsAfter,
   fetchFlowPacketsBefore,
-  fetchFlowPacketsByMemberTraceIds,
   fetchInferredDarkAfter,
   fetchInferredDarkBefore,
-  fetchNearestOptionNBBOForPrints,
   fetchNewsAfter,
   fetchNewsBefore,
   fetchOptionNBBOAfter,
@@ -92,7 +89,6 @@ import {
   fetchRecentSmartMoneyEvents,
   fetchSmartMoneyEventsAfter,
   fetchSmartMoneyEventsBefore,
-  fetchSmartMoneyEventsByPacketIds,
   insertNewsStory
 } from "@islandflow/storage";
 import {
@@ -148,6 +144,7 @@ import {
   parseOptionPrintTraceLookupParams
 } from "./option-print-lookup";
 import { getOptionPrintQueryErrorStatus, parseOptionPrintQuery } from "./option-queries";
+import { lookupOptionsSupport } from "./options-support";
 import { ApiRateLimiter, buildRateLimitResponse, recordRateLimitRejection } from "./rate-limit";
 import {
   fetchRecentSmartFlowExplainability,
@@ -1882,25 +1879,13 @@ const run = async () => {
           const startedAt = Date.now();
           try {
             const body = optionsSupportLookupSchema.parse(await readJsonBody(req));
-            const packets = await fetchFlowPacketsByMemberTraceIds(clickhouse, body.trace_ids);
-            const packetIds = packets.map((packet) => packet.id);
-            const [smartMoney, classifierHits, nbboByTraceId] = await Promise.all([
-              fetchSmartMoneyEventsByPacketIds(clickhouse, packetIds),
-              fetchClassifierHitsByPacketIds(clickhouse, packetIds),
-              fetchNearestOptionNBBOForPrints(clickhouse, body.nbbo_context)
-            ]);
+            const payload = await lookupOptionsSupport(clickhouse, body);
             metrics.timing("api.lookup.options_support_ms", Date.now() - startedAt, {
               status: "ok",
               trace_id_count: String(body.trace_ids.length),
               nbbo_context_count: String(body.nbbo_context.length)
             });
-            return jsonResponse({
-              packets,
-              smart_money: smartMoney,
-              smart_flow: projectSmartFlowExplainability(smartMoney),
-              classifier_hits: classifierHits,
-              nbbo_by_trace_id: nbboByTraceId
-            });
+            return jsonResponse(payload);
           } catch (error) {
             metrics.timing("api.lookup.options_support_ms", Date.now() - startedAt, {
               status: error instanceof z.ZodError ? "invalid" : "error"

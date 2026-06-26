@@ -702,6 +702,9 @@ export const useTerminalState = () => {
     Map<string, PinnedEntry<EquityPrintJoin>>
   >(() => new Map());
   const [optionSupportSmartMoney, setOptionSupportSmartMoney] = useState<SmartMoneyEvent[]>([]);
+  const [optionSupportSmartFlowProjections, setOptionSupportSmartFlowProjections] = useState<
+    SmartFlowExplainabilityProjection[]
+  >([]);
   const [optionSupportClassifierHits, setOptionSupportClassifierHits] = useState<
     ClassifierHitEvent[]
   >([]);
@@ -1013,6 +1016,14 @@ export const useTerminalState = () => {
             Boolean(item && item.trace_id)
           );
           setOptionSupportSmartMoney((prev) =>
+            mergeNewest(filtered, prev, PINNED_EVIDENCE_MAX_ITEMS)
+          );
+        }
+        if (payload.smartFlowProjections.length) {
+          const filtered = payload.smartFlowProjections.filter(
+            (item): item is SmartFlowExplainabilityProjection => Boolean(item && item.trace_id)
+          );
+          setOptionSupportSmartFlowProjections((prev) =>
             mergeNewest(filtered, prev, PINNED_EVIDENCE_MAX_ITEMS)
           );
         }
@@ -1961,13 +1972,24 @@ export const useTerminalState = () => {
     if (!routeFeatures.smartFlow) {
       return EMPTY_SMART_FLOW_EXPLAINABILITY;
     }
+    const items = mergeNewest(
+      smartFlowFeed.items,
+      optionSupportSmartFlowProjections,
+      PINNED_EVIDENCE_MAX_ITEMS
+    );
     if (tickerSet.size === 0) {
-      return smartFlowFeed.items;
+      return items;
     }
-    return smartFlowFeed.items.filter((projection) =>
+    return items.filter((projection) =>
       matchesTicker(projection.hypothesis.underlying_id)
     );
-  }, [matchesTicker, smartFlowFeed.items, tickerSet, routeFeatures.smartFlow]);
+  }, [
+    matchesTicker,
+    optionSupportSmartFlowProjections,
+    smartFlowFeed.items,
+    tickerSet,
+    routeFeatures.smartFlow
+  ]);
 
   const filteredSmartMoneyEvents = useMemo(() => {
     if (!routeFeatures.smartMoney) {

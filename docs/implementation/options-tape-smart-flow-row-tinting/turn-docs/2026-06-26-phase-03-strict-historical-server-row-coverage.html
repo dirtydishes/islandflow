@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Options Tape Smart-Flow Tinting Phase 03</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #0d141b;
+        --panel-2: #111820;
+        --line: rgba(230, 237, 244, 0.14);
+        --line-strong: rgba(245, 166, 35, 0.36);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --green: #25c17a;
+        --blue: #4da3ff;
+        --red: #ff6b5f;
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: linear-gradient(180deg, #0b1016 0%, var(--bg) 100%);
+        color: var(--text);
+        font: 15px/1.55 var(--sans);
+      }
+
+      main {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+
+      header {
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      .eyebrow,
+      h2,
+      .meta-label,
+      code,
+      pre {
+        font-family: var(--mono);
+      }
+
+      .eyebrow {
+        margin-bottom: 8px;
+        color: var(--accent);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 900px;
+        font-size: 2rem;
+        line-height: 1.08;
+        letter-spacing: 0;
+        text-wrap: balance;
+      }
+
+      .subtitle {
+        max-width: 84ch;
+        margin-top: 12px;
+        color: var(--muted);
+      }
+
+      .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 1px;
+        margin-top: 18px;
+        border: 1px solid var(--line);
+        background: var(--line);
+      }
+
+      .meta-cell {
+        min-width: 0;
+        padding: 10px 12px;
+        background: var(--panel-2);
+      }
+
+      .meta-label {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--faint);
+        font-size: 0.66rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      section {
+        padding: 20px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      h2 {
+        margin-bottom: 10px;
+        color: var(--accent);
+        font-size: 0.9rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      p {
+        max-width: 84ch;
+      }
+
+      p + p {
+        margin-top: 10px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 7px;
+      }
+
+      code {
+        padding: 0.08rem 0.28rem;
+        border: 1px solid rgba(245, 166, 35, 0.18);
+        border-radius: 5px;
+        background: rgba(245, 166, 35, 0.1);
+        color: #ffe0a3;
+        font-size: 0.9em;
+      }
+
+      .ok {
+        color: var(--green);
+      }
+
+      .note {
+        color: var(--blue);
+      }
+
+      .warn {
+        color: var(--red);
+      }
+
+      .diff-card {
+        border: 1px solid var(--line);
+        background: #070b10;
+      }
+
+      .diff-mount {
+        display: none;
+        min-height: 32px;
+      }
+
+      .diff-card.rendered .diff-mount {
+        display: block;
+      }
+
+      .diff-card.rendered .diff-fallback {
+        display: none;
+      }
+
+      .diff-fallback {
+        max-height: 560px;
+        overflow: auto;
+        margin: 0;
+        border: 0;
+        padding: 12px;
+        background: var(--panel);
+        color: var(--text);
+        font-size: 0.76rem;
+        line-height: 1.45;
+      }
+
+      .diff-fallback code {
+        border: 0;
+        padding: 0;
+        background: transparent;
+        color: inherit;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="eyebrow">Repository turn document | June 26, 2026</div>
+        <h1>Options Tape Smart-Flow Tinting Phase 03</h1>
+        <p class="subtitle">
+          Completed strict historical and server-row coverage by carrying
+          <code>smart_flow</code> through option support hydration, loaded history rows, server
+          durable option rows, and the canonical options-tape tint helper.
+        </p>
+        <div class="meta-grid" aria-label="Turn metadata">
+          <div class="meta-cell">
+            <span class="meta-label">Branch</span>
+            lavender/islandflow-xcdn.3-strict-historical-server-row-coverage
+          </div>
+          <div class="meta-cell"><span class="meta-label">Beads</span>islandflow-xcdn.3</div>
+          <div class="meta-cell"><span class="meta-label">Phase</span>03 strict historical server-row coverage</div>
+          <div class="meta-cell"><span class="meta-label">Status</span><span class="ok">PR-ready locally</span></div>
+        </div>
+      </header>
+
+      <section>
+        <h2>Outcome</h2>
+        <p>
+          <code>/lookup/options-support</code> now returns projected
+          <code>smart_flow</code> explainability beside packets, smart-money, classifier hits, and
+          NBBO. The frontend hydration scheduler caches those projections by packet ref and exposes
+          them as <code>smartFlowProjections</code>.
+        </p>
+        <p>
+          <code>OptionsTape</code> now hydrates reusable visible tape rows, including rows returned
+          from <code>loadOlder</code> history pages. Hydrated packets, NBBO, and smart-flow
+          projections are merged into the same context builder used for live rows, so older loaded
+          history rows can tint when packet or hypothesis evidence is discoverable.
+        </p>
+        <p>
+          Durable option row payloads now include typed <code>support.smart_flow</code>, and
+          <code>DurableTapeOptionRowsPane</code> calls the same
+          <code>getOptionsTapeRowTint...</code> helpers as <code>OptionsTape</code> instead of
+          maintaining separate tint rules.
+        </p>
+      </section>
+
+      <section>
+        <h2>Proof</h2>
+        <ul>
+          <li>
+            Historical row hydration:
+            <code>apps/web/features/options-tape/options-tape.test.ts</code> asserts that
+            <code>createOptionsTapeSupportHydratingSource</code> hydrates <code>loadOlder</code>
+            rows, builds a support request for the older trace id, and maps the hydrated
+            smart-flow projection into an <code>options-tape-smart-flow-row</code> tint.
+          </li>
+          <li>
+            Durable row tint parity:
+            <code>apps/web/features/options-tape/options-tape.test.ts</code> compares
+            <code>getDurableOptionRowTint(row)</code> to
+            <code>getOptionsTapeSmartFlowRowTint(projection)</code> and expects identical metadata,
+            class name, and style.
+          </li>
+          <li>
+            Durable server payload:
+            <code>services/api/tests/live.test.ts</code> asserts durable option rows expose
+            <code>support.smart_flow.source_channel</code> and
+            <code>support.smart_flow.refs.evidence_refs</code>.
+          </li>
+          <li>
+            Bounded cache behavior:
+            <code>apps/web/features/terminal/hydration-scheduler.test.ts</code> proves repeated
+            support requests reuse a single lookup, return <code>smartFlowProjections</code>, and
+            keep smart-flow misses bounded when packet support is already cached.
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Verification</h2>
+        <ul>
+          <li><span class="ok">Passed</span> <code>bun test apps/web/features/terminal/hydration-scheduler.test.ts apps/web/features/options-tape</code></li>
+          <li><span class="ok">Passed</span> <code>bun test services/api/tests</code></li>
+          <li><span class="ok">Passed</span> <code>bun test</code></li>
+          <li><span class="ok">Passed</span> <code>bun --cwd=apps/web run build</code></li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Browser QA</h2>
+        <p>
+          Started only the web dev server on <code>http://localhost:3001</code> with
+          <code>NEXT_PUBLIC_API_URL=http://172.18.0.1:4000</code>, leaving the existing
+          production-like web/API services untouched. Captured desktop and mobile screenshots for
+          <code>/options</code> and the dashboard options module.
+        </p>
+        <p>
+          Screenshots rendered the OPRA Intake, OPRA Tape, Market Command, Recent Contracts, and
+          dashboard options module without app-level overlap at 1440x900 and 390x844. The dev
+          server emitted the pre-existing React hydration warning for the ticker input caret style;
+          the rerun did not reproduce the earlier failed history fetch once the API origin was
+          pointed at the reachable listener.
+        </p>
+      </section>
+
+      <section>
+        <h2>Known Risks</h2>
+        <p>
+          The host API was connected but live option feeds were waiting during QA, so the browser
+          pass validates route/module rendering and layout rather than live tinted market rows. Row
+          tint semantics for historical and durable rows are covered by focused unit/API tests.
+        </p>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <div class="diff-card" data-patch-diff>
+          <div class="diff-mount" aria-label="Rich diff rendering"></div>
+          <pre class="diff-fallback"><code>diff --git a/apps/web/features/terminal/hydration-scheduler.ts b/apps/web/features/terminal/hydration-scheduler.ts
+--- a/apps/web/features/terminal/hydration-scheduler.ts
++++ b/apps/web/features/terminal/hydration-scheduler.ts
+@@
+-  smartMoney: SmartMoneyEvent[];
++  smartMoney: SmartMoneyEvent[];
++  smartFlowProjections: SmartFlowExplainabilityProjection[];
+@@
++  private readonly supportSmartFlowByPacketId = new Map&lt;string, CacheEntry&lt;SmartFlowExplainabilityProjection[]&gt;&gt;();
+@@
+-    return { packets, smartMoney, classifierHits, nbboByTraceId };
++    return { packets, smartMoney, smartFlowProjections, classifierHits, nbboByTraceId };
+
+diff --git a/apps/web/features/options-tape/support-hydration.ts b/apps/web/features/options-tape/support-hydration.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/options-tape/support-hydration.ts
+@@
++export const OPTIONS_TAPE_SUPPORT_BATCH_LIMIT = 250;
++export const OPTIONS_TAPE_SUPPORT_CACHE_LIMIT = 2_000;
++export const buildOptionsTapeSupportRequest = (
++  prints: readonly OptionPrint[],
++  context: OptionsTapeSupportRequestContext = {}
++): OptionSupportRequest =&gt; { /* bounded trace and nbbo support request builder */ };
++export const createOptionsTapeSupportHydratingSource = &lt;TScope, TFilters&gt;(
++  source: DurableTapeSource&lt;OptionPrint, TScope, TFilters&gt;,
++  hydrateRows: (rows: readonly OptionPrint[]) =&gt; void
++): DurableTapeSource&lt;OptionPrint, TScope, TFilters&gt; =&gt; ({
++  subscribe: (input) =&gt; { /* hydrates snapshots and listeners */ },
++  loadOlder: async (cursor, input) =&gt; {
++    const page = await source.loadOlder(cursor, input);
++    hydrateRows(page.items);
++    return page;
++  }
++});
+
+diff --git a/services/api/src/options-support.ts b/services/api/src/options-support.ts
+new file mode 100644
+--- /dev/null
++++ b/services/api/src/options-support.ts
+@@
++export type OptionsSupportLookupPayload = {
++  packets: FlowPacket[];
++  smart_money: SmartMoneyEvent[];
++  smart_flow: SmartFlowExplainabilityProjection[];
++  classifier_hits: ClassifierHitEvent[];
++  nbbo_by_trace_id: Record&lt;string, OptionNBBO | null&gt;;
++};
++export const lookupOptionsSupport = async (...) =&gt; {
++  const packets = await deps.fetchFlowPacketsByMemberTraceIds(client, input.trace_ids);
++  const packetIds = packets.map((packet) =&gt; packet.id);
++  const [smartMoney, classifierHits, nbboByTraceId] = await Promise.all([...]);
++  return {
++    packets,
++    smart_money: smartMoney,
++    smart_flow: projectSmartFlowExplainability(smartMoney),
++    classifier_hits: classifierHits,
++    nbbo_by_trace_id: nbboByTraceId
++  };
++};
+
+diff --git a/packages/types/src/durable-tapes.ts b/packages/types/src/durable-tapes.ts
+--- a/packages/types/src/durable-tapes.ts
++++ b/packages/types/src/durable-tapes.ts
+@@
+   support: z.object({
+     packet: DurableOptionRowPacketSupportSchema.nullable(),
+     classifier: DurableOptionRowClassifierSupportSchema.nullable(),
+-    smart_money: DurableOptionRowSmartMoneySupportSchema.nullable()
++    smart_money: DurableOptionRowSmartMoneySupportSchema.nullable(),
++    smart_flow: SmartFlowExplainabilityProjectionSchema.nullable()
+   })
+
+diff --git a/apps/web/features/durable-tape/row-view-models.tsx b/apps/web/features/durable-tape/row-view-models.tsx
+--- a/apps/web/features/durable-tape/row-view-models.tsx
++++ b/apps/web/features/durable-tape/row-view-models.tsx
+@@
++export const getDurableOptionRowTint = (
++  row: DurableTapeOptionRowViewModel
++): OptionsTapeRowTint | undefined =&gt;
++  getOptionsTapeRowTintFromContext({
++    smartFlow: getDurableOptionRowSmartFlowContext(row)
++  });
+@@
++        getRowClassName={({ item }) =&gt;
++          getOptionsTapeRowTintClassName(getDurableOptionRowTint(item))
++        }
++        getRowStyle={({ item }) =&gt; getOptionsTapeRowTintStyle(getDurableOptionRowTint(item))}
+
+diff --git a/apps/web/features/options-tape/options-tape.test.ts b/apps/web/features/options-tape/options-tape.test.ts
+--- a/apps/web/features/options-tape/options-tape.test.ts
++++ b/apps/web/features/options-tape/options-tape.test.ts
+@@
++  it("requests support for loaded history rows and maps hydrated smart-flow into tint context", async () =&gt; {
++    const source = createOptionsTapeSupportHydratingSource(...);
++    const page = await source.loadOlder({ ts: 2_000, seq: 2 }, {});
++    expect(hydratedRows).toEqual([["older-history"]]);
++    const tint = getOptionsTapeRowTintFromContext({ smartFlow: contexts.get("older-history") });
++    expect(tint?.metadata.source).toBe("smart-flow");
++  });
++  it("uses the same smart-flow tint helper for durable option rows", () =&gt; {
++    expect(getDurableOptionRowTint(row)?.metadata).toEqual(
++      getOptionsTapeSmartFlowRowTint(projection).metadata
++    );
++  });
+</code></pre>
+        </div>
+      </section>
+    </main>
+
+    <script type="module">
+      import React from "https://esm.sh/react@19";
+      import { createRoot } from "https://esm.sh/react-dom@19/client";
+      import { PatchDiff } from "https://esm.sh/@pierre/diffs@1.2.2/react?deps=react@19,react-dom@19";
+
+      for (const card of document.querySelectorAll("[data-patch-diff]")) {
+        const source = card.querySelector(".diff-fallback code");
+        const target = card.querySelector(".diff-mount");
+        if (!source || !target) continue;
+        try {
+          createRoot(target).render(React.createElement(PatchDiff, { patch: source.textContent || "" }));
+          card.classList.add("rendered");
+        } catch (error) {
+          console.warn("Rich diff renderer failed; keeping HTML fallback.", error);
+        }
+      }
+    </script>
+  </body>
+</html>
