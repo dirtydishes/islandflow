@@ -1,0 +1,1463 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>anatomy of an options print</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg-core: #06080b;
+        --bg-elevated: #0b1016;
+        --bg-pane: #111820;
+        --bg-pane-2: #0d141b;
+        --bg-soft: #ffffff08;
+        --border-subtle: #ffffff14;
+        --border-strong: #ffffff2a;
+        --border-accent: #ffb13059;
+        --text-primary: #e6edf4;
+        --text-body: #ced8e4;
+        --text-dim: #9aabba;
+        --text-faint: #718093;
+        --signal-amber: #f5a623;
+        --signal-amber-soft: #f5a6231f;
+        --confirm-green: #25c17a;
+        --confirm-green-soft: #25c17a1f;
+        --risk-red: #ff6b5f;
+        --risk-red-soft: #ff6b5f24;
+        --info-blue: #4da3ff;
+        --info-blue-soft: #4da3ff24;
+        --mono:
+          "IBM Plex Mono", "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+        --sans:
+          "IBM Plex Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg-core);
+        color: var(--text-body);
+        font-family: var(--sans);
+        font-size: 15px;
+        line-height: 1.55;
+      }
+
+      a {
+        color: var(--info-blue);
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      code,
+      .mono {
+        font-family: var(--mono);
+        font-size: 0.92em;
+      }
+
+      code {
+        color: var(--text-primary);
+        background: var(--bg-soft);
+        border: 1px solid var(--border-subtle);
+        border-radius: 4px;
+        padding: 1px 4px;
+        overflow-wrap: anywhere;
+      }
+
+      .shell {
+        min-height: 100vh;
+        display: grid;
+        grid-template-columns: 260px minmax(0, 1fr);
+      }
+
+      .rail {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        overflow: auto;
+        border-right: 1px solid var(--border-subtle);
+        background: var(--bg-elevated);
+        padding: 20px 16px;
+      }
+
+      .rail h2 {
+        margin: 0 0 14px;
+        color: var(--text-primary);
+        font-family: var(--mono);
+        font-size: 0.75rem;
+        line-height: 1.2;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .rail nav {
+        display: grid;
+        gap: 4px;
+      }
+
+      .rail a {
+        display: block;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        color: var(--text-dim);
+        font-family: var(--mono);
+        font-size: 0.75rem;
+        line-height: 1.25;
+        padding: 9px 10px;
+      }
+
+      .rail a:hover,
+      .rail a:focus-visible {
+        border-color: var(--border-subtle);
+        background: var(--bg-soft);
+        color: var(--text-primary);
+        outline: none;
+        text-decoration: none;
+      }
+
+      main {
+        min-width: 0;
+      }
+
+      .hero {
+        border-bottom: 1px solid var(--border-subtle);
+        background: var(--bg-core);
+        padding: 48px 48px 28px;
+      }
+
+      .hero-inner {
+        max-width: 1180px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        color: var(--text-primary);
+        line-height: 1.12;
+        text-wrap: balance;
+      }
+
+      h1 {
+        max-width: 780px;
+        margin: 0;
+        font-size: 3rem;
+        font-weight: 780;
+        letter-spacing: 0;
+      }
+
+      .dek {
+        max-width: 74ch;
+        margin: 16px 0 0;
+        color: var(--text-body);
+        font-size: 1rem;
+        text-wrap: pretty;
+      }
+
+      .source-line {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 22px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        border: 1px solid var(--border-subtle);
+        border-radius: 999px;
+        background: var(--bg-soft);
+        color: var(--text-primary);
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        line-height: 1;
+        padding: 5px 8px;
+      }
+
+      .content {
+        max-width: 1180px;
+        padding: 28px 48px 64px;
+      }
+
+      .section {
+        border-top: 1px solid var(--border-subtle);
+        padding: 36px 0;
+      }
+
+      .section:first-child {
+        border-top: 0;
+      }
+
+      .section > h2 {
+        margin: 0 0 12px;
+        font-size: 1.65rem;
+        font-weight: 740;
+      }
+
+      .section > p {
+        max-width: 76ch;
+        margin: 0 0 18px;
+      }
+
+      .caption {
+        color: var(--text-dim);
+        font-size: 0.88rem;
+      }
+
+      .two-col,
+      .three-col {
+        display: grid;
+        gap: 14px;
+      }
+
+      .two-col {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .three-col {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .panel {
+        border: 1px solid var(--border-subtle);
+        border-radius: 8px;
+        background: var(--bg-pane);
+        padding: 16px;
+      }
+
+      .panel h3 {
+        margin: 0 0 10px;
+        font-size: 1rem;
+        font-weight: 720;
+      }
+
+      .panel p {
+        margin: 0;
+      }
+
+      .panel p + p,
+      .panel ul + p,
+      .panel p + ul {
+        margin-top: 10px;
+      }
+
+      .panel ul,
+      .section ul {
+        margin: 10px 0 0;
+        padding-left: 18px;
+      }
+
+      .panel li,
+      .section li {
+        margin: 6px 0;
+      }
+
+      .diagram {
+        border: 1px solid var(--border-subtle);
+        border-radius: 8px;
+        background: var(--bg-pane-2);
+        padding: 16px;
+        overflow-x: auto;
+      }
+
+      .pipeline {
+        display: grid;
+        grid-template-columns: repeat(8, minmax(150px, 1fr));
+        gap: 8px;
+        min-width: 1040px;
+      }
+
+      .node {
+        position: relative;
+        min-height: 118px;
+        border: 1px solid var(--border-subtle);
+        border-radius: 8px;
+        background: var(--bg-pane);
+        padding: 12px;
+      }
+
+      .node:not(:last-child)::after {
+        position: absolute;
+        top: 50%;
+        right: -9px;
+        width: 9px;
+        height: 1px;
+        background: var(--border-accent);
+        content: "";
+      }
+
+      .node strong {
+        display: block;
+        margin-bottom: 8px;
+        color: var(--text-primary);
+      }
+
+      .node span {
+        display: block;
+        color: var(--text-dim);
+        font-size: 0.86rem;
+      }
+
+      .node .mono {
+        color: var(--signal-amber);
+        font-size: 0.72rem;
+      }
+
+      .table-wrap {
+        border: 1px solid var(--border-subtle);
+        border-radius: 8px;
+        overflow-x: auto;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 720px;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--border-subtle);
+        padding: 10px 12px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--text-primary);
+        background: var(--bg-elevated);
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      td:first-child {
+        color: var(--text-primary);
+        font-family: var(--mono);
+        white-space: nowrap;
+      }
+
+      .side-rail {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+
+      .side-row {
+        display: grid;
+        grid-template-columns: 86px 1fr 86px;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .side-label {
+        color: var(--text-primary);
+        font-family: var(--mono);
+        font-size: 0.78rem;
+      }
+
+      .market-line {
+        position: relative;
+        min-height: 44px;
+        border: 1px solid var(--border-subtle);
+        border-radius: 8px;
+        background:
+          linear-gradient(90deg, var(--risk-red-soft) 0 22%, transparent 22% 78%, var(--confirm-green-soft) 78% 100%),
+          var(--bg-elevated);
+      }
+
+      .market-line::before,
+      .market-line::after {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 1px;
+        background: var(--border-strong);
+        content: "";
+      }
+
+      .market-line::before {
+        left: 36%;
+      }
+
+      .market-line::after {
+        right: 36%;
+      }
+
+      .tick {
+        position: absolute;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        border: 1px solid var(--border-accent);
+        border-radius: 999px;
+        background: var(--signal-amber-soft);
+        color: var(--text-primary);
+        font-family: var(--mono);
+        font-size: 0.7rem;
+        padding: 4px 7px;
+      }
+
+      .tick.bid {
+        left: 36%;
+      }
+
+      .tick.ask {
+        left: 64%;
+      }
+
+      .tick.trade-bb {
+        left: 12%;
+      }
+
+      .tick.trade-mid {
+        left: 50%;
+      }
+
+      .tick.trade-aa {
+        left: 88%;
+      }
+
+      .formula {
+        display: grid;
+        gap: 8px;
+        border: 1px solid var(--border-subtle);
+        border-radius: 8px;
+        background: var(--bg-pane-2);
+        padding: 14px;
+      }
+
+      .formula-line {
+        display: grid;
+        grid-template-columns: 170px 1fr 64px;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .formula-label {
+        color: var(--text-primary);
+        font-family: var(--mono);
+        font-size: 0.78rem;
+      }
+
+      .bar {
+        height: 10px;
+        border: 1px solid var(--border-subtle);
+        border-radius: 999px;
+        background: var(--bg-core);
+        overflow: hidden;
+      }
+
+      .bar > span {
+        display: block;
+        height: 100%;
+        background: var(--signal-amber);
+      }
+
+      .bar.green > span {
+        background: var(--confirm-green);
+      }
+
+      .bar.blue > span {
+        background: var(--info-blue);
+      }
+
+      .bar.red > span {
+        background: var(--risk-red);
+      }
+
+      .matrix {
+        display: grid;
+        grid-template-columns: 190px repeat(4, minmax(130px, 1fr));
+        border: 1px solid var(--border-subtle);
+        border-radius: 8px;
+        overflow-x: auto;
+      }
+
+      .matrix > div {
+        border-right: 1px solid var(--border-subtle);
+        border-bottom: 1px solid var(--border-subtle);
+        padding: 10px;
+        min-height: 58px;
+      }
+
+      .matrix > div:nth-child(5n) {
+        border-right: 0;
+      }
+
+      .matrix .head {
+        background: var(--bg-elevated);
+        color: var(--text-primary);
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .matrix .name {
+        color: var(--text-primary);
+        font-weight: 700;
+      }
+
+      .flow-steps {
+        display: grid;
+        gap: 10px;
+        counter-reset: step;
+      }
+
+      .flow-step {
+        display: grid;
+        grid-template-columns: 42px 1fr;
+        gap: 12px;
+        align-items: start;
+        border: 1px solid var(--border-subtle);
+        border-radius: 8px;
+        background: var(--bg-pane);
+        padding: 12px;
+      }
+
+      .flow-step::before {
+        counter-increment: step;
+        content: counter(step);
+        display: grid;
+        place-items: center;
+        width: 30px;
+        height: 30px;
+        border: 1px solid var(--border-accent);
+        border-radius: 999px;
+        color: var(--signal-amber);
+        font-family: var(--mono);
+        font-size: 0.76rem;
+      }
+
+      .flow-step h3 {
+        margin: 0 0 4px;
+        font-size: 0.96rem;
+      }
+
+      .flow-step p {
+        margin: 0;
+      }
+
+      .callout {
+        border: 1px solid var(--border-accent);
+        border-radius: 8px;
+        background: var(--signal-amber-soft);
+        color: var(--text-primary);
+        padding: 14px 16px;
+      }
+
+      .callout p {
+        margin: 0;
+      }
+
+      .source-list {
+        columns: 2;
+        column-gap: 28px;
+        margin: 12px 0 0;
+        padding-left: 18px;
+      }
+
+      .source-list li {
+        break-inside: avoid;
+      }
+
+      .source-list code {
+        white-space: normal;
+      }
+
+      svg {
+        display: block;
+        max-width: 100%;
+        height: auto;
+      }
+
+      .svg-label {
+        fill: var(--text-primary);
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .svg-copy {
+        fill: var(--text-dim);
+        font-family: var(--sans);
+        font-size: 12px;
+      }
+
+      .svg-node {
+        fill: #111820;
+        stroke: #ffffff24;
+        stroke-width: 1;
+        rx: 8;
+      }
+
+      .svg-accent {
+        stroke: var(--signal-amber);
+        stroke-width: 2;
+        fill: none;
+      }
+
+      .svg-muted {
+        stroke: #ffffff30;
+        stroke-width: 1.5;
+        fill: none;
+      }
+
+      @media (max-width: 920px) {
+        .shell {
+          display: block;
+        }
+
+        .rail {
+          position: static;
+          height: auto;
+          border-right: 0;
+          border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .rail nav {
+          grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        }
+
+        .hero,
+        .content {
+          padding-left: 20px;
+          padding-right: 20px;
+        }
+
+        h1 {
+          font-size: 2.3rem;
+        }
+
+        .two-col,
+        .three-col {
+          grid-template-columns: 1fr;
+        }
+
+        .source-list {
+          columns: 1;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="rail" aria-label="Document navigation">
+        <h2>anatomy map</h2>
+        <nav>
+          <a href="#print">print record</a>
+          <a href="#topology">pipeline topology</a>
+          <a href="#enrichment">enrichment</a>
+          <a href="#signal">signal gate</a>
+          <a href="#packets">flow packets</a>
+          <a href="#smart-money">smart money</a>
+          <a href="#smart-flow">smart-flow</a>
+          <a href="#alerts">alerts</a>
+          <a href="#storage-api">storage and API</a>
+          <a href="#ui">web surfaces</a>
+          <a href="#source-ledger">source ledger</a>
+        </nav>
+      </aside>
+
+      <main>
+        <header class="hero">
+          <div class="hero-inner">
+            <h1>anatomy of an options print</h1>
+            <p class="dek">
+              One options execution starts as an OPRA-style trade message. Islandflow turns it into
+              an enriched print, keeps or rejects it for the signal tape, clusters it into flow
+              packets, projects legacy smart-money compatibility events, exposes smart-flow
+              explainability, and fires an alert only when scored evidence survives the guards.
+            </p>
+            <div class="source-line" aria-label="Document scope">
+              <span class="chip">source audited: repo implementation</span>
+              <span class="chip">runtime: Bun + NATS JetStream + ClickHouse + Redis</span>
+              <span class="chip">primary route: /options</span>
+              <span class="chip">compatibility channel: smart-money</span>
+              <span class="chip">canonical vocabulary: smart-flow</span>
+            </div>
+          </div>
+        </header>
+
+        <div class="content">
+          <section id="print" class="section">
+            <h2>The print record</h2>
+            <p>
+              The canonical <code>OptionPrint</code> is not just a trade. It is a trade plus
+              execution context, quote context, derived contract metadata, and signal gating state.
+              The raw fields give provenance; the enriched fields let later stages reason without
+              rejoining every quote on the client.
+            </p>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Field group</th>
+                    <th>What it contains</th>
+                    <th>Why the pipeline needs it</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Provenance</td>
+                    <td><code>source_ts</code>, <code>ingest_ts</code>, <code>seq</code>, <code>trace_id</code></td>
+                    <td>Orders live, replay, history, and evidence lookups by deterministic cursor.</td>
+                  </tr>
+                  <tr>
+                    <td>Execution</td>
+                    <td><code>ts</code>, <code>option_contract_id</code>, <code>price</code>, <code>size</code>, <code>exchange</code>, <code>conditions</code></td>
+                    <td>Defines the actual print, contract, venue, and special handling context.</td>
+                  </tr>
+                  <tr>
+                    <td>Derived contract</td>
+                    <td><code>underlying_id</code>, <code>option_type</code>, <code>notional</code>, <code>is_etf</code></td>
+                    <td>Normalizes OCC or dashed contracts and separates ETF thresholds from single-stock thresholds.</td>
+                  </tr>
+                  <tr>
+                    <td>Option NBBO</td>
+                    <td><code>execution_nbbo_bid</code>, <code>execution_nbbo_ask</code>, <code>execution_nbbo_age_ms</code>, <code>execution_nbbo_side</code></td>
+                    <td>Answers whether the print occurred at ask, above ask, bid, below bid, mid, stale, or missing quote context.</td>
+                  </tr>
+                  <tr>
+                    <td>Underlying context</td>
+                    <td><code>execution_underlying_mid</code>, <code>execution_underlying_spread</code>, <code>execution_underlying_age_ms</code></td>
+                    <td>Lets packets reason about stock movement, quote quality, and chart-linked evidence.</td>
+                  </tr>
+                  <tr>
+                    <td>Volatility context</td>
+                    <td><code>execution_iv</code>, <code>execution_iv_source</code></td>
+                    <td>Feeds volatility-supply and synthetic pressure interpretations when present.</td>
+                  </tr>
+                  <tr>
+                    <td>Signal gate</td>
+                    <td><code>signal_pass</code>, <code>signal_reasons</code>, <code>signal_profile</code></td>
+                    <td>Explains why a print is visible in the signal tape or kept out of it.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="topology" class="section">
+            <h2>Pipeline topology</h2>
+            <p>
+              The live pipeline is event-sourced. Adapters publish raw prints and quotes, ingest
+              writes enriched option prints, compute derives packets and alerts, API hydrates hot
+              caches and history, and the web client consumes scoped live snapshots.
+            </p>
+
+            <div class="diagram" aria-label="End to end pipeline">
+              <div class="pipeline">
+                <div class="node">
+                  <strong>Adapters</strong>
+                  <span>synthetic, Alpaca, Databento, IBKR</span>
+                  <span class="mono">option prints + NBBO</span>
+                </div>
+                <div class="node">
+                  <strong>Ingest options</strong>
+                  <span>joins latest quote context and evaluates signal rules</span>
+                  <span class="mono">option_signal_prints</span>
+                </div>
+                <div class="node">
+                  <strong>JetStream</strong>
+                  <span>raw and derived durable event streams</span>
+                  <span class="mono">manual ack consumers</span>
+                </div>
+                <div class="node">
+                  <strong>Compute</strong>
+                  <span>clusters prints, joins quotes, builds packets and structures</span>
+                  <span class="mono">flow_packets</span>
+                </div>
+                <div class="node">
+                  <strong>Reasoning</strong>
+                  <span>smart-money profile compatibility and smart-flow scoring toolkit</span>
+                  <span class="mono">smart_money_events</span>
+                </div>
+                <div class="node">
+                  <strong>Alerts</strong>
+                  <span>classifier hits become scored alert events</span>
+                  <span class="mono">alerts</span>
+                </div>
+                <div class="node">
+                  <strong>API</strong>
+                  <span>REST, history, replay, websocket, Redis hot heads</span>
+                  <span class="mono">/flow/* /history/* /ws/*</span>
+                </div>
+                <div class="node">
+                  <strong>Web</strong>
+                  <span>OPRA tape, flow packets, chart markers, alert detail drawers</span>
+                  <span class="mono">/options and dashboard</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="two-col" style="margin-top: 14px">
+              <div class="panel">
+                <h3>Raw streams</h3>
+                <p>
+                  <code>option_prints</code>, <code>option_nbbo</code>, <code>equity_prints</code>,
+                  and <code>equity_quotes</code> keep source events with raw-stream retention.
+                </p>
+              </div>
+              <div class="panel">
+                <h3>Derived streams</h3>
+                <p>
+                  <code>option_signal_prints</code>, <code>flow_packets</code>,
+                  <code>smart_money_events</code>, <code>classifier_hits</code>, and
+                  <code>alerts</code> keep compute products with derived-stream retention.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section id="enrichment" class="section">
+            <h2>Print enrichment</h2>
+            <p>
+              <code>ingest-options</code> keeps short quote histories by contract and underlying.
+              On each print it selects the latest option NBBO and equity quote at or before the
+              trade timestamp, derives metadata, records execution context, and only then evaluates
+              the signal policy.
+            </p>
+
+            <div class="three-col">
+              <div class="panel">
+                <h3>Contract parse</h3>
+                <p>
+                  The parser accepts dashed contracts and OCC-style symbols. It extracts root,
+                  expiry, strike, and right, then maps <code>C</code> to call and
+                  <code>P</code> to put.
+                </p>
+              </div>
+              <div class="panel">
+                <h3>Quote join</h3>
+                <p>
+                  Option and equity quote histories keep up to 64 items per key. The selected quote
+                  is the latest item at or before the print timestamp.
+                </p>
+              </div>
+              <div class="panel">
+                <h3>Signal inputs</h3>
+                <p>
+                  Notional is <code>price * size * 100</code>. Quote side, ETF status, conditions,
+                  size, and notional drive the downstream keep or reject reasons.
+                </p>
+              </div>
+            </div>
+
+            <div class="diagram" style="margin-top: 14px" aria-label="NBBO side classification">
+              <h3 style="margin-top: 0">NBBO side classification</h3>
+              <p class="caption">
+                The tolerance is <code>max(0.01, spread * 0.05)</code>. Trades outside the ask or
+                bid by more than that tolerance become <code>AA</code> or <code>BB</code>.
+              </p>
+              <div class="side-rail">
+                <div class="side-row">
+                  <span class="side-label">BB</span>
+                  <div class="market-line">
+                    <span class="tick trade-bb">trade</span>
+                    <span class="tick bid">bid</span>
+                    <span class="tick ask">ask</span>
+                  </div>
+                  <span class="side-label">below bid</span>
+                </div>
+                <div class="side-row">
+                  <span class="side-label">MID</span>
+                  <div class="market-line">
+                    <span class="tick bid">bid</span>
+                    <span class="tick trade-mid">trade</span>
+                    <span class="tick ask">ask</span>
+                  </div>
+                  <span class="side-label">inside</span>
+                </div>
+                <div class="side-row">
+                  <span class="side-label">AA</span>
+                  <div class="market-line">
+                    <span class="tick bid">bid</span>
+                    <span class="tick ask">ask</span>
+                    <span class="tick trade-aa">trade</span>
+                  </div>
+                  <span class="side-label">above ask</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="signal" class="section">
+            <h2>Signal gate</h2>
+            <p>
+              The options tape defaults to signal view. The gate is deterministic and explainable:
+              every reject or keep path emits a reason string, so the UI can show why a print made
+              it through.
+            </p>
+
+            <div class="two-col">
+              <div class="panel">
+                <h3>Reject rules</h3>
+                <ul>
+                  <li><code>reject:min-notional</code> when notional is below the active profile minimum.</li>
+                  <li><code>reject:etf-min-notional</code> for ETF underlyings below the ETF premium floor.</li>
+                  <li><code>reject:bid-side-min-notional</code> for bid-side flow below the bid-side floor.</li>
+                  <li><code>reject:mid-min-notional</code> for mid prints without sweep or ISO context.</li>
+                  <li><code>reject:missing-nbbo-min-notional</code> when quote context is missing or stale below its higher floor.</li>
+                  <li><code>reject:no-signal-rule</code> when the print clears floors but lacks any positive keep rule.</li>
+                </ul>
+              </div>
+              <div class="panel">
+                <h3>Keep rules</h3>
+                <ul>
+                  <li><code>keep:auto-large</code> for very large premium, currently 100,000 in smart-money mode.</li>
+                  <li><code>keep:ask-side</code> for ask-side or above-ask prints above the profile minimum.</li>
+                  <li><code>keep:sweep-or-iso</code> for sweep or ISO prints above the sweep floor.</li>
+                  <li><code>keep:large-contract-count</code> for large contract count with enough premium.</li>
+                  <li><code>mode:all</code> bypasses signal filtering when explicitly selected.</li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="table-wrap" style="margin-top: 14px">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Profile</th>
+                    <th>Intent</th>
+                    <th>Important thresholds</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>smart-money</td>
+                    <td>Strict default for OPRA signal prints.</td>
+                    <td>10k minimum, 50k ETF floor, 25k bid-side floor, 20k mid floor, 50k missing or stale quote floor, 100k auto keep.</td>
+                  </tr>
+                  <tr>
+                    <td>balanced</td>
+                    <td>Lower-friction mode that relaxes floors without going raw.</td>
+                    <td>5k minimum, 25k ETF floor, 15k bid-side floor, 12.5k mid floor, 25k missing or stale quote floor, 75k auto keep.</td>
+                  </tr>
+                  <tr>
+                    <td>all</td>
+                    <td>Raw inspection mode.</td>
+                    <td>All prints pass with <code>mode:all</code>.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="packets" class="section">
+            <h2>Flow packets</h2>
+            <p>
+              Compute consumes the signal-print stream and groups nearby prints by contract. The
+              default cluster window is 500 ms. When a contract has been quiet long enough, the
+              cluster flushes as a <code>FlowPacket</code>, writes to ClickHouse, publishes to
+              JetStream, and immediately enters the alert path.
+            </p>
+
+            <div class="diagram" aria-label="Flow packet formation">
+              <svg viewBox="0 0 980 310" role="img" aria-labelledby="packet-title packet-desc">
+                <title id="packet-title">Flow packet formation</title>
+                <desc id="packet-desc">
+                  Prints inside a cluster window aggregate into a flow packet with quote and rolling-stat features.
+                </desc>
+                <defs>
+                  <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+                    <path d="M0,0 L0,6 L9,3 z" fill="#f5a623" />
+                  </marker>
+                </defs>
+                <rect class="svg-node" x="30" y="44" width="250" height="210" />
+                <text class="svg-label" x="52" y="76">contract cluster</text>
+                <text class="svg-copy" x="52" y="104">same option_contract_id</text>
+                <line class="svg-muted" x1="58" y1="148" x2="240" y2="148" />
+                <circle cx="78" cy="148" r="8" fill="#25c17a" />
+                <circle cx="125" cy="148" r="8" fill="#25c17a" />
+                <circle cx="174" cy="148" r="8" fill="#f5a623" />
+                <circle cx="218" cy="148" r="8" fill="#ff6b5f" />
+                <text class="svg-copy" x="52" y="190">500 ms default window</text>
+                <text class="svg-copy" x="52" y="216">members are print trace ids</text>
+
+                <path class="svg-accent" d="M300 150 H410" marker-end="url(#arrow)" />
+
+                <rect class="svg-node" x="430" y="32" width="230" height="236" />
+                <text class="svg-label" x="452" y="64">packet features</text>
+                <text class="svg-copy" x="452" y="96">total_size</text>
+                <text class="svg-copy" x="452" y="122">total_premium</text>
+                <text class="svg-copy" x="452" y="148">NBBO side counts</text>
+                <text class="svg-copy" x="452" y="174">coverage and aggression</text>
+                <text class="svg-copy" x="452" y="200">rolling z-scores</text>
+                <text class="svg-copy" x="452" y="226">structure summary</text>
+
+                <path class="svg-accent" d="M680 150 H790" marker-end="url(#arrow)" />
+
+                <rect class="svg-node" x="810" y="44" width="140" height="210" />
+                <text class="svg-label" x="832" y="76">emit</text>
+                <text class="svg-copy" x="832" y="108">ClickHouse row</text>
+                <text class="svg-copy" x="832" y="134">JetStream event</text>
+                <text class="svg-copy" x="832" y="160">smart-money</text>
+                <text class="svg-copy" x="832" y="186">classifier hits</text>
+                <text class="svg-copy" x="832" y="212">alert if hit</text>
+              </svg>
+            </div>
+
+            <div class="two-col" style="margin-top: 14px">
+              <div class="panel">
+                <h3>Single-contract packets</h3>
+                <p>
+                  The packet id is built from contract id, start timestamp, and end timestamp. Its
+                  features include first and last price, window bounds, member count, premium,
+                  notional, NBBO counts, quote context, underlying move, IV shock, special-print
+                  count, and rolling baselines.
+                </p>
+              </div>
+              <div class="panel">
+                <h3>Structure packets</h3>
+                <p>
+                  Recent legs by root and expiry are summarized into straddles, strangles,
+                  verticals, ladders, and rolls. Structure packets use pseudo contract ids and
+                  include aggregate NBBO placement, same-size symmetry, roll strikes, and roll
+                  expiries.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section id="smart-money" class="section">
+            <h2>Smart-money compatibility</h2>
+            <p>
+              The live alert path still emits <code>SmartMoneyEvent</code> records. In current
+              contracts, smart money is compatibility language, not a canonical hidden-participant
+              claim. The event is a scored profile projection from packet features, with explicit
+              suppression guards and abstention.
+            </p>
+
+            <div class="matrix" role="table" aria-label="Smart money profile matrix">
+              <div class="head">Profile</div>
+              <div class="head">Primary evidence</div>
+              <div class="head">Direction</div>
+              <div class="head">Weakener</div>
+              <div class="head">Output</div>
+
+              <div class="name">institutional_directional</div>
+              <div>premium, burst, quote quality, aggressive side</div>
+              <div>call or put side plus buy/sell dominance</div>
+              <div>short-dated OTM retail guard, stale context</div>
+              <div>profile score, direction, reasons</div>
+
+              <div class="name">retail_whale</div>
+              <div>short-dated OTM calls, burst pattern, lower premium</div>
+              <div>same inference as packet side</div>
+              <div>complex structure can compete later in smart-flow</div>
+              <div>attention-flow style compatibility label</div>
+
+              <div class="name">event_driven</div>
+              <div>event calendar proximity, premium, spread widening</div>
+              <div>direction or neutral when unknown</div>
+              <div>missing event timing</div>
+              <div>event-positioning profile score</div>
+
+              <div class="name">vol_seller</div>
+              <div>sell-side premium, straddle or strangle context</div>
+              <div>neutral</div>
+              <div>weak sell skew or small premium</div>
+              <div>short-vol profile score</div>
+
+              <div class="name">arbitrage</div>
+              <div>multi-leg structure, same-size symmetry, flat bias</div>
+              <div>neutral</div>
+              <div>directional skew</div>
+              <div>structure-arbitrage profile score</div>
+
+              <div class="name">hedge_reactive</div>
+              <div>short-dated ATM context, underlying move, size</div>
+              <div>underlying move or packet side</div>
+              <div>no linked underlying movement</div>
+              <div>hedge-rebalance profile score</div>
+            </div>
+
+            <div class="callout" style="margin-top: 14px">
+              <p>
+                Suppression happens before alerting. Special, complex, cross, auction, opening,
+                closing, stale quote, missing quote, and inside-market contexts can force the event
+                to abstain. An abstained event produces no classifier hits, so it cannot fire an
+                alert.
+              </p>
+            </div>
+          </section>
+
+          <section id="smart-flow" class="section">
+            <h2>Smart-flow scoring</h2>
+            <p>
+              Smart-flow is the canonical vocabulary for evidence-backed hypotheses. The current API
+              exposes smart-flow explainability by projecting persisted smart-money events, while
+              the compute package also contains the richer candidate, cluster, hypothesis, and replay
+              scoring machinery used for evaluation and migration.
+            </p>
+
+            <div class="two-col">
+              <div class="panel">
+                <h3>Canonical object chain</h3>
+                <ul>
+                  <li><code>FlowObservationRef</code> points to packet, print, quote, news, event, or label evidence.</li>
+                  <li><code>FlowEvidenceFact</code> gives a labeled, traceable fact with refs.</li>
+                  <li><code>FlowCandidate</code> wraps one packet with feature vector, quality, and eligibility.</li>
+                  <li><code>FlowEvidenceCluster</code> groups candidates by underlying and time window.</li>
+                  <li><code>FlowHypothesisEvent</code> selects a scored hypothesis or abstains.</li>
+                  <li><code>SmartFlowInsight</code> turns the event into UI-facing summary language.</li>
+                </ul>
+              </div>
+              <div class="panel">
+                <h3>Evidence quality</h3>
+                <p>
+                  Quality combines quote coverage, stale ratio, and completeness. Grades are
+                  <code>strong</code>, <code>usable</code>, <code>thin</code>, and
+                  <code>poor</code>. Candidate eligibility can accept, reject, or down-weight a
+                  packet before it becomes a cluster.
+                </p>
+              </div>
+            </div>
+
+            <div class="formula" style="margin-top: 14px" aria-label="Smart-flow score vector">
+              <div class="formula-line">
+                <span class="formula-label">fit score</span>
+                <div class="bar blue"><span style="width: 68%"></span></div>
+                <span class="mono">0.68</span>
+              </div>
+              <div class="formula-line">
+                <span class="formula-label">evidence strength</span>
+                <div class="bar green"><span style="width: 61%"></span></div>
+                <span class="mono">0.61</span>
+              </div>
+              <div class="formula-line">
+                <span class="formula-label">penalty score</span>
+                <div class="bar red"><span style="width: 28%"></span></div>
+                <span class="mono">0.28</span>
+              </div>
+              <div class="formula-line">
+                <span class="formula-label">policy confidence</span>
+                <div class="bar"><span style="width: 52%"></span></div>
+                <span class="mono">0.52</span>
+              </div>
+              <div class="formula-line">
+                <span class="formula-label">hypothesis margin</span>
+                <div class="bar"><span style="width: 14%"></span></div>
+                <span class="mono">0.14</span>
+              </div>
+            </div>
+
+            <div class="three-col" style="margin-top: 14px">
+              <div class="panel">
+                <h3>Hypotheses</h3>
+                <p>
+                  The scorer ranks directional accumulation, retail attention flow, event
+                  positioning, volatility supply, structure arbitrage, hedge rebalance, and unclear.
+                </p>
+              </div>
+              <div class="panel">
+                <h3>Penalties</h3>
+                <p>
+                  Stale quotes, wide quotes, inside-market context, complex prints, low premium,
+                  weak aggression, missing context, conflicting direction, and structure context
+                  reduce confidence.
+                </p>
+              </div>
+              <div class="panel">
+                <h3>Abstention</h3>
+                <p>
+                  The projection abstains when evidence is insufficient, confidence is below policy,
+                  the margin is too small, penalties are too large, or the best answer is
+                  <code>unclear</code>.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section id="alerts" class="section">
+            <h2>How an alert fires</h2>
+            <p>
+              Alerts are packet-level events. They are not emitted from every option print, and they
+              are not emitted from an abstained smart-money event. The runtime path is compact:
+              packet flush, compatibility profile, classifier hit, alert score, storage, publish,
+              fanout.
+            </p>
+
+            <div class="flow-steps">
+              <div class="flow-step">
+                <div>
+                  <h3>Packet flushes</h3>
+                  <p>
+                    <code>flushCluster</code> builds a <code>FlowPacket</code>, stores it, publishes
+                    it, and calls <code>emitClassifiers</code>.
+                  </p>
+                </div>
+              </div>
+              <div class="flow-step">
+                <div>
+                  <h3>Smart-money event is built</h3>
+                  <p>
+                    <code>buildSmartMoneyEventFromPacket</code> computes profile scores and
+                    suppression. If the event abstains, the alert path ends.
+                  </p>
+                </div>
+              </div>
+              <div class="flow-step">
+                <div>
+                  <h3>Classifier hits are derived</h3>
+                  <p>
+                    <code>deriveClassifierHitsFromSmartMoneyEvent</code> maps the primary profile,
+                    plus any profile at or above 0.50, to classifier-hit records. No hits means no
+                    alert.
+                  </p>
+                </div>
+              </div>
+              <div class="flow-step">
+                <div>
+                  <h3>Score and severity are calculated</h3>
+                  <p>
+                    <code>scoreAlert</code> clamps premium, confidence, and hit-count components
+                    into a score from 0 to 100, then maps it to low, medium, or high.
+                  </p>
+                </div>
+              </div>
+              <div class="flow-step">
+                <div>
+                  <h3>The alert is persisted and published</h3>
+                  <p>
+                    The alert stores hits, profile scores, primary profile, and evidence refs:
+                    smart-money event id, packet id, and every member print trace id.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div class="formula" style="margin-top: 14px">
+              <div class="formula-line">
+                <span class="formula-label">premium score</span>
+                <div class="bar"><span style="width: 70%"></span></div>
+                <span class="mono">max 70</span>
+              </div>
+              <div class="formula-line">
+                <span class="formula-label">confidence score</span>
+                <div class="bar green"><span style="width: 20%"></span></div>
+                <span class="mono">max 20</span>
+              </div>
+              <div class="formula-line">
+                <span class="formula-label">hit score</span>
+                <div class="bar blue"><span style="width: 20%"></span></div>
+                <span class="mono">max 20</span>
+              </div>
+            </div>
+            <p class="caption" style="margin-top: 10px">
+              Formula: <code>score = clamp(round(premium / 1000), 0, 70) + round(maxConfidence * 20) + min(20, hits * 5)</code>.
+              Severity is high at 80 or more, medium at 45 or more, and low below 45.
+            </p>
+          </section>
+
+          <section id="storage-api" class="section">
+            <h2>Storage and API</h2>
+            <p>
+              ClickHouse is the historical source of truth. Redis is a hot-head cache for live
+              snapshots and cursors. The API serves current head, older history, replay-after
+              windows, direct support lookups, and websocket feeds.
+            </p>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Surface</th>
+                    <th>Routes</th>
+                    <th>Purpose</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Option prints</td>
+                    <td><code>/prints/options</code>, <code>/history/options</code>, <code>/replay/options</code>, <code>/ws/options</code></td>
+                    <td>Latest, older, replay-after, and live option tape events with signal/raw filters.</td>
+                  </tr>
+                  <tr>
+                    <td>Flow packets</td>
+                    <td><code>/flow/packets</code>, <code>/history/flow</code>, <code>/replay/flow</code>, <code>/ws/flow</code></td>
+                    <td>Packet tape, inspect-member workflows, and chart-linked evidence.</td>
+                  </tr>
+                  <tr>
+                    <td>Smart-flow</td>
+                    <td><code>/flow/smart-flow</code>, <code>/history/smart-flow</code>, <code>/replay/smart-flow</code>, <code>/ws/smart-flow</code></td>
+                    <td>Explainability projections with hypothesis, insight, evidence refs, penalties, and alternatives.</td>
+                  </tr>
+                  <tr>
+                    <td>Classifier hits</td>
+                    <td><code>/flow/classifier-hits</code>, <code>/history/classifier-hits</code>, <code>/replay/classifier-hits</code>, <code>/ws/classifier-hits</code></td>
+                    <td>Per-classifier signal records used by alert details and compatibility views.</td>
+                  </tr>
+                  <tr>
+                    <td>Alerts</td>
+                    <td><code>/flow/alerts</code>, <code>/history/alerts</code>, <code>/replay/alerts</code>, <code>/ws/alerts</code></td>
+                    <td>Scored alert events for dashboard and durable alert lanes.</td>
+                  </tr>
+                  <tr>
+                    <td>Evidence hydration</td>
+                    <td><code>/flow/alerts/:trace_id/context</code>, <code>/option-prints/by-trace</code>, <code>/lookup/options-support</code></td>
+                    <td>Loads packet, print, NBBO, smart-money, smart-flow, and classifier context for drawers and linked rows.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="two-col" style="margin-top: 14px">
+              <div class="panel">
+                <h3>Columnar print storage</h3>
+                <p>
+                  <code>option_prints</code> stores execution context in first-class columns and
+                  uses a bloom-filter index on <code>trace_id</code> for bounded evidence lookup.
+                </p>
+              </div>
+              <div class="panel">
+                <h3>JSON feature storage</h3>
+                <p>
+                  <code>flow_packets</code>, <code>smart_money_events</code>, and
+                  <code>alerts</code> store feature and evidence payloads as JSON alongside ordered
+                  source cursors.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section id="ui" class="section">
+            <h2>Web surfaces</h2>
+            <p>
+              The web app does not treat prints as isolated rows. The OPRA intake route keeps the
+              tape, packet focus, NBBO context, smart-flow evidence, and alert evidence connected so
+              users can move from a row to the supporting events.
+            </p>
+
+            <div class="three-col">
+              <div class="panel">
+                <h3>OPRA intake</h3>
+                <p>
+                  <code>/options</code> subscribes to options, NBBO, and flow packets. The options
+                  tape supports signal/raw view, side/type/security/premium filters, contract focus,
+                  and packet-member focus.
+                </p>
+              </div>
+              <div class="panel">
+                <h3>Flow packet tape</h3>
+                <p>
+                  Packet rows expose total premium, notional, member count, quote state, aggression
+                  ratios, structure labels, and an inspect action that focuses member prints.
+                </p>
+              </div>
+              <div class="panel">
+                <h3>Alert detail</h3>
+                <p>
+                  Alert drawers hydrate persisted context by trace id, then show classifier hits,
+                  the backing packet, member prints, missing refs, and focus actions for packet,
+                  contract, and equity.
+                </p>
+              </div>
+            </div>
+
+            <div class="diagram" style="margin-top: 14px" aria-label="UI evidence navigation">
+              <svg viewBox="0 0 940 270" role="img" aria-labelledby="ui-title ui-desc">
+                <title id="ui-title">UI evidence navigation</title>
+                <desc id="ui-desc">
+                  Selecting options, packets, smart-flow markers, or alerts pins related evidence in the UI.
+                </desc>
+                <defs>
+                  <marker id="ui-arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+                    <path d="M0,0 L0,6 L9,3 z" fill="#f5a623" />
+                  </marker>
+                </defs>
+                <rect class="svg-node" x="34" y="42" width="170" height="80" />
+                <text class="svg-label" x="56" y="76">option row</text>
+                <text class="svg-copy" x="56" y="100">trace id + contract</text>
+
+                <rect class="svg-node" x="34" y="152" width="170" height="80" />
+                <text class="svg-label" x="56" y="186">packet row</text>
+                <text class="svg-copy" x="56" y="210">member print ids</text>
+
+                <rect class="svg-node" x="318" y="42" width="190" height="80" />
+                <text class="svg-label" x="340" y="76">support lookup</text>
+                <text class="svg-copy" x="340" y="100">/lookup/options-support</text>
+
+                <rect class="svg-node" x="318" y="152" width="190" height="80" />
+                <text class="svg-label" x="340" y="186">alert context</text>
+                <text class="svg-copy" x="340" y="210">/flow/alerts/:trace/context</text>
+
+                <rect class="svg-node" x="626" y="38" width="250" height="196" />
+                <text class="svg-label" x="648" y="72">evidence view</text>
+                <text class="svg-copy" x="648" y="104">packet focus</text>
+                <text class="svg-copy" x="648" y="130">contract focus</text>
+                <text class="svg-copy" x="648" y="156">chart smart-flow markers</text>
+                <text class="svg-copy" x="648" y="182">alert detail drawer</text>
+                <text class="svg-copy" x="648" y="208">pinned packet and print refs</text>
+
+                <path class="svg-accent" d="M212 82 H300" marker-end="url(#ui-arrow)" />
+                <path class="svg-accent" d="M212 192 H300" marker-end="url(#ui-arrow)" />
+                <path class="svg-accent" d="M520 82 H608" marker-end="url(#ui-arrow)" />
+                <path class="svg-accent" d="M520 192 H608" marker-end="url(#ui-arrow)" />
+              </svg>
+            </div>
+          </section>
+
+          <section id="source-ledger" class="section">
+            <h2>Source ledger</h2>
+            <p>
+              This page is grounded in the current repo implementation. These are the main files
+              that define the pipeline described above.
+            </p>
+            <ul class="source-list">
+              <li><code>packages/types/src/events.ts</code></li>
+              <li><code>packages/types/src/options-flow.ts</code></li>
+              <li><code>packages/types/src/smart-flow.ts</code></li>
+              <li><code>packages/bus/src/streams.ts</code></li>
+              <li><code>services/ingest-options/src/enrichment.ts</code></li>
+              <li><code>services/ingest-options/src/index.ts</code></li>
+              <li><code>services/compute/src/index.ts</code></li>
+              <li><code>services/compute/src/parent-events.ts</code></li>
+              <li><code>services/compute/src/alert-scoring.ts</code></li>
+              <li><code>services/compute/src/smart-flow-evidence.ts</code></li>
+              <li><code>services/compute/src/smart-flow-clusters.ts</code></li>
+              <li><code>services/compute/src/smart-flow-scoring.ts</code></li>
+              <li><code>packages/storage/src/option-prints.ts</code></li>
+              <li><code>packages/storage/src/flow-packets.ts</code></li>
+              <li><code>packages/storage/src/smart-money-events.ts</code></li>
+              <li><code>packages/storage/src/alerts.ts</code></li>
+              <li><code>services/api/src/index.ts</code></li>
+              <li><code>services/api/src/live.ts</code></li>
+              <li><code>services/api/src/smart-flow.ts</code></li>
+              <li><code>apps/web/features/options-tape/OptionsTape.tsx</code></li>
+              <li><code>apps/web/features/flow-packets/FlowPacketsTape.tsx</code></li>
+              <li><code>apps/web/features/alerts/AlertsModule.tsx</code></li>
+              <li><code>apps/web/features/terminal/routes.ts</code></li>
+              <li><code>apps/web/features/terminal/evidence.ts</code></li>
+            </ul>
+          </section>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>
