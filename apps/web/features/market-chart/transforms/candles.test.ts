@@ -96,6 +96,35 @@ describe("market chart candle transforms", () => {
     });
   });
 
+  it("drops intrabar range outliers that would flatten the chart scale", () => {
+    const candles = normalizeMarketChartCandles([
+      {
+        ts: 60_000,
+        open: 182.17,
+        high: 497.99,
+        low: 181.67,
+        close: 181.67,
+        volume: 21_362,
+        seq: 1
+      },
+      {
+        ts: 120_000,
+        open: 182.02,
+        high: 182.12,
+        low: 181.77,
+        close: 181.95,
+        volume: 23_223,
+        seq: 2
+      }
+    ]);
+
+    expect(candles).toHaveLength(1);
+    expect(candles[0]).toMatchObject({
+      timestampMs: 120_000,
+      close: 181.95
+    });
+  });
+
   it("derives candle direction from open and close", () => {
     expect(deriveCandleDirection(10, 11)).toBe("bullish");
     expect(deriveCandleDirection(10, 9)).toBe("bearish");

@@ -42,9 +42,21 @@ export const normalizeMarketChartCandle = (candle: MarketChartCandleInput): Mark
   };
 };
 
-const isRenderableCandle = (candle: MarketChartCandle): boolean =>
-  [candle.timestampMs, candle.open, candle.high, candle.low, candle.close].every(Number.isFinite) &&
-  candle.high >= candle.low;
+const MAX_INTRABAR_RANGE_MULTIPLE = 1.5;
+
+const isRenderableCandle = (candle: MarketChartCandle): boolean => {
+  if (
+    ![candle.timestampMs, candle.open, candle.high, candle.low, candle.close].every(
+      Number.isFinite
+    ) ||
+    candle.high < candle.low ||
+    candle.low <= 0
+  ) {
+    return false;
+  }
+
+  return candle.high / candle.low <= MAX_INTRABAR_RANGE_MULTIPLE;
+};
 
 const compareCandlesForChart = (a: MarketChartCandle, b: MarketChartCandle): number => {
   const timeDelta = a.time - b.time;
