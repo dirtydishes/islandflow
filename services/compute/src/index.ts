@@ -76,8 +76,7 @@ import {
   type OptionPrint,
   OptionPrintSchema,
   type SmartMoneyEvent,
-  SmartMoneyEventSchema,
-  smartFlowAlertFromProjection
+  SmartMoneyEventSchema
 } from "@islandflow/types";
 import { z } from "zod";
 import { scoreAlert } from "./alert-scoring";
@@ -99,6 +98,7 @@ import {
   RollingWindowStore,
   type RollingWindowStoreConfig
 } from "./rolling-stats";
+import { planSmartFlowAlertEmissions } from "./smart-flow-alerts";
 import { type NativeSmartFlowProjectionFlush, NativeSmartFlowRuntime } from "./smart-flow-runtime";
 import {
   buildStructureFlowPacket,
@@ -1159,14 +1159,15 @@ const publishNativeSmartFlowFlush = async (
   batchWriter: ClickHouseBatchWriter,
   flush: NativeSmartFlowProjectionFlush
 ): Promise<void> => {
-  for (const projection of flush.projections) {
+  const emissions = planSmartFlowAlertEmissions(flush.projections);
+
+  for (const { projection, alert } of emissions) {
     enqueueSmartFlowProjectionInsert(batchWriter, projection);
     await publishJson(js, SUBJECT_SMART_FLOW, projection);
     emitCounters.smartFlowProjections += 1;
     if (projection.abstention.abstained) {
       emitCounters.smartFlowAbstentions += 1;
     }
-    const alert = smartFlowAlertFromProjection(projection);
     if (alert) {
       enqueueSmartFlowAlertInsert(batchWriter, alert);
       await publishJson(js, SUBJECT_SMART_FLOW_ALERTS, alert);

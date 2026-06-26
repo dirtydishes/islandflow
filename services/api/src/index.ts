@@ -1035,89 +1035,30 @@ const run = async () => {
     }
   };
 
-  const optionSubscription = await subscribeWithReset(
-    consumerBindings[0].subject,
-    consumerBindings[0].stream,
-    consumerBindings[0].durableName
-  );
+  const subscribeConsumerBinding = (
+    durableName: (typeof consumerBindings)[number]["durableName"]
+  ) => {
+    const binding = consumerBindings.find((entry) => entry.durableName === durableName);
+    if (!binding) {
+      throw new Error(`Missing API consumer binding: ${durableName}`);
+    }
+    return subscribeWithReset(binding.subject, binding.stream, binding.durableName);
+  };
 
-  const optionNbboSubscription = await subscribeWithReset(
-    consumerBindings[1].subject,
-    consumerBindings[1].stream,
-    consumerBindings[1].durableName
-  );
-
-  const equitySubscription = await subscribeWithReset(
-    consumerBindings[2].subject,
-    consumerBindings[2].stream,
-    consumerBindings[2].durableName
-  );
-
-  const equityQuoteSubscription = await subscribeWithReset(
-    consumerBindings[3].subject,
-    consumerBindings[3].stream,
-    consumerBindings[3].durableName
-  );
-
-  const equityCandleSubscription = await subscribeWithReset(
-    consumerBindings[4].subject,
-    consumerBindings[4].stream,
-    consumerBindings[4].durableName
-  );
-
-  const equityJoinSubscription = await subscribeWithReset(
-    consumerBindings[5].subject,
-    consumerBindings[5].stream,
-    consumerBindings[5].durableName
-  );
-
-  const inferredDarkSubscription = await subscribeWithReset(
-    consumerBindings[6].subject,
-    consumerBindings[6].stream,
-    consumerBindings[6].durableName
-  );
-
-  const flowSubscription = await subscribeWithReset(
-    consumerBindings[7].subject,
-    consumerBindings[7].stream,
-    consumerBindings[7].durableName
-  );
-
-  const smartMoneySubscription = await subscribeWithReset(
-    consumerBindings[8].subject,
-    consumerBindings[8].stream,
-    consumerBindings[8].durableName
-  );
-
-  const smartFlowSubscription = await subscribeWithReset(
-    consumerBindings[9].subject,
-    consumerBindings[9].stream,
-    consumerBindings[9].durableName
-  );
-
-  const smartFlowAlertSubscription = await subscribeWithReset(
-    consumerBindings[10].subject,
-    consumerBindings[10].stream,
-    consumerBindings[10].durableName
-  );
-
-  const classifierHitSubscription = await subscribeWithReset(
-    consumerBindings[11].subject,
-    consumerBindings[11].stream,
-    consumerBindings[11].durableName
-  );
-
-  const alertSubscription = await subscribeWithReset(
-    consumerBindings[12].subject,
-    consumerBindings[12].stream,
-    consumerBindings[12].durableName
-  );
-
-  const newsSubscription = await subscribeWithReset(
-    consumerBindings[13].subject,
-    consumerBindings[13].stream,
-    consumerBindings[13].durableName
-  );
+  const optionSubscription = await subscribeConsumerBinding("api-option-prints");
+  const optionNbboSubscription = await subscribeConsumerBinding("api-option-nbbo");
+  const equitySubscription = await subscribeConsumerBinding("api-equity-prints");
+  const equityQuoteSubscription = await subscribeConsumerBinding("api-equity-quotes");
+  const equityCandleSubscription = await subscribeConsumerBinding("api-equity-candles");
+  const equityJoinSubscription = await subscribeConsumerBinding("api-equity-joins");
+  const inferredDarkSubscription = await subscribeConsumerBinding("api-inferred-dark");
+  const flowSubscription = await subscribeConsumerBinding("api-flow-packets");
+  const smartMoneySubscription = await subscribeConsumerBinding("api-smart-money-events");
+  const smartFlowSubscription = await subscribeConsumerBinding("api-smart-flow");
+  const smartFlowAlertSubscription = await subscribeConsumerBinding("api-smart-flow-alerts");
+  const classifierHitSubscription = await subscribeConsumerBinding("api-classifier-hits");
+  const alertSubscription = await subscribeConsumerBinding("api-alerts");
+  const newsSubscription = await subscribeConsumerBinding("api-news");
 
   const fanoutLive = async (
     subscription: LiveSubscription,

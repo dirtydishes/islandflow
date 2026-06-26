@@ -111,6 +111,7 @@ type GenericFeedConfig = {
   limit: number;
   parse: (value: unknown) => any;
   cursor: (item: any) => Cursor;
+  identity?: (item: any) => string;
   fetchRecent: (clickhouse: ClickHouseClient, limit: number) => Promise<any[]>;
 };
 
@@ -393,6 +394,7 @@ const getGenericConfig = (
     limit: limits["smart-flow-alerts"],
     parse: (value) => SmartFlowAlertEventSchema.parse(value),
     cursor: smartFlowAlertCursor,
+    identity: (item) => item.alert_id,
     fetchRecent: fetchRecentSmartFlowAlertEvents
   },
   "classifier-hits": {
@@ -446,6 +448,11 @@ const compareCursors = (a: Cursor, b: Cursor): number => b.ts - a.ts || b.seq - 
 const sortGenericItems = <T>(items: T[], cursorOf: (item: T) => Cursor): T[] =>
   [...items].sort((a, b) => compareCursors(cursorOf(a), cursorOf(b)));
 
+const cursorIdentity = <T>(item: T, cursorOf: (item: T) => Cursor): string => {
+  const cursor = cursorOf(item);
+  return `${cursor.ts}:${cursor.seq}`;
+};
+
 const keepNewestNbboByContract = <T extends { option_contract_id: string }>(
   items: T[],
   cursorOf: (item: T) => Cursor,
@@ -463,6 +470,20 @@ const keepNewestNbboByContract = <T extends { option_contract_id: string }>(
   return sortGenericItems(Array.from(latestByContract.values()), cursorOf).slice(0, limit);
 };
 
+const dedupeGenericItems = <T>(
+  items: T[],
+  cursorOf: (item: T) => Cursor,
+  identityOf?: (item: T) => string
+): T[] => {
+  const deduped = new Map<string, T>();
+
+  for (const item of items) {
+    deduped.set(identityOf?.(item) ?? cursorIdentity(item, cursorOf), item);
+  }
+
+  return Array.from(deduped.values());
+};
+
 const normalizeGenericItems = <T>(
   channel: LiveGenericChannel,
   items: T[],
@@ -476,7 +497,10 @@ const normalizeGenericItems = <T>(
     );
   }
 
-  return sortGenericItems(items, config.cursor).slice(0, config.limit);
+  return sortGenericItems(
+    dedupeGenericItems(items, config.cursor, config.identity),
+    config.cursor
+  ).slice(0, config.limit);
 };
 
 const isWithinLiveFeedLookback = (
@@ -611,17 +635,18 @@ const candleCursorField = (underlyingId: string, intervalMs: number): string =>
 const overlayRedisKey = (underlyingId: string): string => `live:equity-overlay:${underlyingId}`;
 const overlayCursorField = (underlyingId: string): string => `equities:${underlyingId}`;
 
-const dropMatchingCursor = <T>(items: T[], target: Cursor, cursorOf: (item: T) => Cursor): T[] =>
-  items.filter((item) => compareCursors(cursorOf(item), target) !== 0);
-
 const insertNewestFirst = <T>(
   items: T[],
   item: T,
   cursorOf: (item: T) => Cursor,
-  limit: number
+  limit: number,
+  identityOf?: (item: T) => string
 ): { items: T[]; outOfOrder: boolean } => {
   const cursor = cursorOf(item);
-  const deduped = dropMatchingCursor(items, cursor, cursorOf);
+  const identity = identityOf?.(item) ?? cursorIdentity(item, cursorOf);
+  const deduped = items.filter(
+    (entry) => (identityOf?.(entry) ?? cursorIdentity(entry, cursorOf)) !== identity
+  );
   const head = deduped[0];
   const outOfOrder = head ? compareCursors(cursor, cursorOf(head)) > 0 : false;
 
@@ -1167,7 +1192,8 @@ export class LiveStateManager {
                 this.genericItems.get(channel) ?? [],
                 parsed,
                 config.cursor,
-                config.limit
+                config.limit,
+                config.identity
               );
 
         if (nextState.outOfOrder) {

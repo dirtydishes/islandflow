@@ -1221,6 +1221,48 @@ const normalizeSmartFlowAlertRow = (row: unknown): SmartFlowAlertRecord | null =
   };
 };
 
+const smartFlowAlertEventsFromRows = (rows: unknown[]): SmartFlowAlertEvent[] => {
+  const records = rows
+    .map(normalizeSmartFlowAlertRow)
+    .filter((record): record is SmartFlowAlertRecord => record !== null);
+  return SmartFlowAlertEventSchema.array().parse(records.map(fromSmartFlowAlertRecord));
+};
+
+const appendSmartFlowAlertBoundaryTies = async (
+  client: ClickHouseClient,
+  alerts: SmartFlowAlertEvent[],
+  limit: number,
+  direction: "asc" | "desc"
+): Promise<SmartFlowAlertEvent[]> => {
+  if (alerts.length < limit) {
+    return alerts;
+  }
+
+  const boundary = alerts.at(-1);
+  if (!boundary) {
+    return alerts;
+  }
+
+  const order = direction === "asc" ? "ASC" : "DESC";
+  const result = await client.query({
+    query: `SELECT * FROM ${SMART_FLOW_ALERTS_TABLE} WHERE source_ts = ${boundary.source_ts} AND seq = ${boundary.seq} ORDER BY source_ts ${order}, seq ${order}, alert_id ${order}`,
+    format: "JSONEachRow"
+  });
+  const boundaryTies = smartFlowAlertEventsFromRows(await result.json<unknown[]>());
+  const byAlertId = new Map<string, SmartFlowAlertEvent>();
+
+  for (const alert of [...alerts, ...boundaryTies]) {
+    byAlertId.set(alert.alert_id, alert);
+  }
+
+  return [...byAlertId.values()].sort((left, right) => {
+    const timeOrder = right.source_ts - left.source_ts || right.seq - left.seq;
+    const alertOrder = right.alert_id.localeCompare(left.alert_id);
+    const descending = timeOrder || alertOrder;
+    return direction === "asc" ? -descending : descending;
+  });
+};
+
 const normalizeAlertRow = (row: unknown): AlertRecord | null => {
   if (!row || typeof row !== "object") {
     return null;
@@ -1466,15 +1508,12 @@ export const fetchRecentSmartFlowAlerts = async (
 ): Promise<SmartFlowAlertEvent[]> => {
   const safeLimit = clampLimit(limit);
   const result = await client.query({
-    query: `SELECT * FROM ${SMART_FLOW_ALERTS_TABLE} ORDER BY source_ts DESC, seq DESC LIMIT ${safeLimit}`,
+    query: `SELECT * FROM ${SMART_FLOW_ALERTS_TABLE} ORDER BY source_ts DESC, seq DESC, alert_id DESC LIMIT ${safeLimit}`,
     format: "JSONEachRow"
   });
 
   const rows = await result.json<unknown[]>();
-  const records = rows
-    .map(normalizeSmartFlowAlertRow)
-    .filter((record): record is SmartFlowAlertRecord => record !== null);
-  return SmartFlowAlertEventSchema.array().parse(records.map(fromSmartFlowAlertRecord));
+  return smartFlowAlertEventsFromRows(rows);
 };
 
 export const fetchRecentAlerts = async (
@@ -1949,15 +1988,17 @@ export const fetchSmartFlowAlertsAfter = async (
   const safeAfterSeq = clampCursor(afterSeq);
 
   const result = await client.query({
-    query: `SELECT * FROM ${SMART_FLOW_ALERTS_TABLE} WHERE (source_ts, seq) > (${safeAfterTs}, ${safeAfterSeq}) ORDER BY source_ts ASC, seq ASC LIMIT ${safeLimit}`,
+    query: `SELECT * FROM ${SMART_FLOW_ALERTS_TABLE} WHERE (source_ts, seq) > (${safeAfterTs}, ${safeAfterSeq}) ORDER BY source_ts ASC, seq ASC, alert_id ASC LIMIT ${safeLimit}`,
     format: "JSONEachRow"
   });
 
   const rows = await result.json<unknown[]>();
-  const records = rows
-    .map(normalizeSmartFlowAlertRow)
-    .filter((record): record is SmartFlowAlertRecord => record !== null);
-  return SmartFlowAlertEventSchema.array().parse(records.map(fromSmartFlowAlertRecord));
+  return appendSmartFlowAlertBoundaryTies(
+    client,
+    smartFlowAlertEventsFromRows(rows),
+    safeLimit,
+    "asc"
+  );
 };
 
 export const fetchAlertsAfter = async (
@@ -2193,15 +2234,17 @@ export const fetchSmartFlowAlertsBefore = async (
 ): Promise<SmartFlowAlertEvent[]> => {
   const safeLimit = clampLimit(limit);
   const result = await client.query({
-    query: `SELECT * FROM ${SMART_FLOW_ALERTS_TABLE} WHERE ${buildBeforeTupleCondition("source_ts", "seq", beforeTs, beforeSeq)} ORDER BY source_ts DESC, seq DESC LIMIT ${safeLimit}`,
+    query: `SELECT * FROM ${SMART_FLOW_ALERTS_TABLE} WHERE ${buildBeforeTupleCondition("source_ts", "seq", beforeTs, beforeSeq)} ORDER BY source_ts DESC, seq DESC, alert_id DESC LIMIT ${safeLimit}`,
     format: "JSONEachRow"
   });
 
   const rows = await result.json<unknown[]>();
-  const records = rows
-    .map(normalizeSmartFlowAlertRow)
-    .filter((record): record is SmartFlowAlertRecord => record !== null);
-  return SmartFlowAlertEventSchema.array().parse(records.map(fromSmartFlowAlertRecord));
+  return appendSmartFlowAlertBoundaryTies(
+    client,
+    smartFlowAlertEventsFromRows(rows),
+    safeLimit,
+    "desc"
+  );
 };
 
 export const fetchAlertsBefore = async (

@@ -393,6 +393,43 @@ describe("LiveStateManager", () => {
     );
   });
 
+  it("keeps same-cursor smart-flow alerts with distinct alert identities", async () => {
+    const now = Date.now();
+    const first = smartFlowAlertFromProjection(makeSmartFlowProjection(makeSmartMoneyEvent(now)), {
+      alert_id: "smartflow:alert:SPY",
+      trace_id: "smartflow:alert:SPY"
+    });
+    const second = smartFlowAlertFromProjection(
+      makeSmartFlowProjection({
+        ...makeSmartMoneyEvent(now),
+        trace_id: "smartmoney:flowpacket:8",
+        event_id: "smartmoney:event:8",
+        packet_ids: ["flowpacket:8"],
+        member_print_ids: ["print:8"],
+        underlying_id: "QQQ"
+      }),
+      {
+        alert_id: "smartflow:alert:QQQ",
+        trace_id: "smartflow:alert:QQQ"
+      }
+    );
+    if (!first || !second) {
+      throw new Error("expected non-abstained projections to derive alerts");
+    }
+    const manager = new LiveStateManager(makeClickHouse(), null);
+
+    await manager.ingest("smart-flow-alerts", first);
+    await manager.ingest("smart-flow-alerts", second);
+
+    const snapshot = await manager.getSnapshot({ channel: "smart-flow-alerts" });
+
+    expect(snapshot.items).toHaveLength(2);
+    expect(new Set((snapshot.items as SmartFlowAlertEvent[]).map((item) => item.alert_id))).toEqual(
+      new Set(["smartflow:alert:SPY", "smartflow:alert:QQQ"])
+    );
+    expect(snapshot.watermark).toEqual({ ts: now, seq: 7 });
+  });
+
   it("hydrates smart-flow snapshots from ClickHouse when Redis only has legacy compatibility rows", async () => {
     const redis = makeRedis();
     const now = Date.now();

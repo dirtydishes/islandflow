@@ -90,6 +90,83 @@ describe("smart-flow alert contracts", () => {
     expect(smartFlowAlertFromProjection(projection)).toBeNull();
   });
 
+  it("does not derive alerts from nested-abstained or compatibility projections", () => {
+    const projection = makeProjection();
+
+    expect(
+      smartFlowAlertFromProjection({
+        ...projection,
+        hypothesis: {
+          ...projection.hypothesis,
+          abstention: {
+            abstained: true,
+            reasons: ["below_policy_threshold"],
+            source_reasons: ["nested hypothesis abstained"]
+          }
+        }
+      })
+    ).toBeNull();
+
+    expect(
+      smartFlowAlertFromProjection({
+        ...projection,
+        insight: {
+          ...projection.insight,
+          compatibility: {
+            compatibility_only: true,
+            legacy_event_id: "legacy:event:1",
+            legacy_channel: "smart-money"
+          }
+        }
+      })
+    ).toBeNull();
+
+    expect(
+      smartFlowAlertFromProjection({
+        ...projection,
+        hypothesis: {
+          ...projection.hypothesis,
+          generated_from: "legacy_smart_money_event",
+          compatibility: {
+            compatibility_only: true,
+            legacy_event_id: "legacy:event:1",
+            legacy_channel: "smart-money"
+          }
+        }
+      })
+    ).toBeNull();
+  });
+
+  it("rejects alerts whose denormalized fields drift from the source projection", () => {
+    const projection = makeProjection();
+    const alert = smartFlowAlertFromProjection(projection);
+    if (!alert) {
+      throw new Error("expected non-abstained projection to derive an alert");
+    }
+
+    expect(
+      SmartFlowAlertEventSchema.safeParse({
+        ...alert,
+        hypothesis_id: "hypothesis:other"
+      }).success
+    ).toBe(false);
+    expect(
+      SmartFlowAlertEventSchema.safeParse({
+        ...alert,
+        evidence_refs: ["flowpacket:other"]
+      }).success
+    ).toBe(false);
+    expect(
+      SmartFlowAlertEventSchema.safeParse({
+        ...alert,
+        trigger: {
+          ...alert.trigger,
+          projection_trace_id: "smartflow:hypothesis:other"
+        }
+      }).success
+    ).toBe(false);
+  });
+
   it("rejects malformed legacy alert payloads and legacy keys on canonical alerts", () => {
     const projection = makeProjection();
     const alert = smartFlowAlertFromProjection(projection);

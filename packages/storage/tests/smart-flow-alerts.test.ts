@@ -66,6 +66,7 @@ describe("smart-flow alert storage helpers", () => {
     expect(ddl).toContain("CREATE TABLE IF NOT EXISTS");
     expect(ddl).toContain(SMART_FLOW_ALERTS_TABLE);
     expect(ddl).toContain("alert_json String");
+    expect(ddl).toContain("ORDER BY (source_ts, seq, alert_id)");
   });
 
   it("round-trips canonical alerts while exposing query columns", () => {

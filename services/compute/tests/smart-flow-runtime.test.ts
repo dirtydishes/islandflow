@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { smartFlowAlertFromProjection } from "@islandflow/types";
+import { planSmartFlowAlertEmissions } from "../src/smart-flow-alerts";
 import {
   buildNativeSmartFlowProjectionsFromPacket,
   buildNativeSmartFlowProjectionsFromPackets,
@@ -127,6 +128,87 @@ describe("native smart-flow runtime", () => {
     expect(alert).not.toHaveProperty("score");
     expect(alert).not.toHaveProperty("severity");
     expect(alert).not.toHaveProperty("hits");
+  });
+
+  it("plans smart-flow alert emissions before compute side effects", () => {
+    const [projection] = buildNativeSmartFlowProjectionsFromPacket(
+      buildFlowPacket({
+        id: "flowpacket:runtime-alert-plan",
+        source_ts: 40_000,
+        ingest_ts: 40_010,
+        seq: 44,
+        members: Array.from({ length: 8 }, (_, index) => `print:runtime-alert-plan-${index}`),
+        features: {
+          option_contract_id: "SPY-2025-02-21-450-C",
+          underlying_id: "SPY",
+          count: 8,
+          total_size: 2200,
+          total_premium: 180_000,
+          start_ts: 39_800,
+          end_ts: 40_000,
+          nbbo_bid: 1.2,
+          nbbo_ask: 1.24,
+          nbbo_mid: 1.22,
+          nbbo_spread: 0.04,
+          nbbo_coverage_ratio: 1,
+          nbbo_aggressive_ratio: 0.82,
+          nbbo_aggressive_buy_ratio: 0.78,
+          nbbo_aggressive_sell_ratio: 0.04,
+          nbbo_inside_ratio: 0.05,
+          underlying_bid: 449.9,
+          underlying_ask: 450.1,
+          underlying_mid: 450,
+          underlying_spread: 0.2
+        }
+      })
+    );
+    if (!projection) {
+      throw new Error("expected directional packet to emit a projection");
+    }
+
+    const [planned] = planSmartFlowAlertEmissions([projection]);
+
+    expect(planned?.projection).toBe(projection);
+    expect(planned?.alert?.alert_id).toBe(`smartflow:alert:${projection.refs.hypothesis_id}`);
+  });
+
+  it("rejects invalid smart-flow alert plans before any flush publish loop can start", () => {
+    const [projection] = buildNativeSmartFlowProjectionsFromPacket(
+      buildFlowPacket({
+        id: "flowpacket:runtime-alert-invalid-plan",
+        source_ts: 50_000,
+        features: {
+          option_contract_id: "SPY-2025-02-21-450-C",
+          underlying_id: "SPY",
+          count: 8,
+          total_size: 2200,
+          total_premium: 180_000,
+          nbbo_coverage_ratio: 1,
+          nbbo_aggressive_ratio: 0.82,
+          nbbo_aggressive_buy_ratio: 0.78,
+          nbbo_aggressive_sell_ratio: 0.04
+        }
+      })
+    );
+    if (!projection) {
+      throw new Error("expected directional packet to emit a projection");
+    }
+
+    const [planned] = planSmartFlowAlertEmissions([
+      {
+        ...projection,
+        insight: {
+          ...projection.insight,
+          compatibility: {
+            compatibility_only: true,
+            legacy_event_id: "legacy:event:1",
+            legacy_channel: "smart-money"
+          }
+        }
+      }
+    ]);
+
+    expect(planned?.alert).toBeNull();
   });
 
   it("persists abstention state for weak rejected packets", () => {

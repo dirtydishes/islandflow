@@ -44,29 +44,30 @@ CREATE TABLE IF NOT EXISTS ${SMART_FLOW_ALERTS_TABLE} (
   alert_json String
 )
 ENGINE = MergeTree
-ORDER BY (source_ts, seq)
+ORDER BY (source_ts, seq, alert_id)
 `;
 };
 
 export const toSmartFlowAlertRecord = (alert: SmartFlowAlertEvent): SmartFlowAlertRecord => {
+  const parsed = SmartFlowAlertEventSchema.parse(alert);
   return {
-    source_ts: alert.source_ts,
-    ingest_ts: alert.ingest_ts,
-    seq: alert.seq,
-    trace_id: alert.trace_id,
-    schema_version: alert.schema_version,
-    alert_id: alert.alert_id,
-    hypothesis_id: alert.hypothesis_id,
-    insight_id: alert.insight_id,
-    underlying_id: alert.underlying_id,
-    hypothesis_type: alert.hypothesis_type,
-    direction: alert.direction,
-    policy_confidence: alert.policy_confidence,
-    evidence_quality: alert.evidence_quality,
-    trigger_kind: alert.trigger.kind,
-    projection_trace_id: alert.trigger.projection_trace_id,
-    evidence_refs: alert.evidence_refs,
-    alert_json: JSON.stringify(alert)
+    source_ts: parsed.source_ts,
+    ingest_ts: parsed.ingest_ts,
+    seq: parsed.seq,
+    trace_id: parsed.trace_id,
+    schema_version: parsed.schema_version,
+    alert_id: parsed.alert_id,
+    hypothesis_id: parsed.hypothesis_id,
+    insight_id: parsed.insight_id,
+    underlying_id: parsed.underlying_id,
+    hypothesis_type: parsed.hypothesis_type,
+    direction: parsed.direction,
+    policy_confidence: parsed.policy_confidence,
+    evidence_quality: parsed.evidence_quality,
+    trigger_kind: parsed.trigger.kind,
+    projection_trace_id: parsed.trigger.projection_trace_id,
+    evidence_refs: parsed.evidence_refs,
+    alert_json: JSON.stringify(parsed)
   };
 };
 
