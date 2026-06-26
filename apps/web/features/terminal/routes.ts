@@ -5,8 +5,8 @@ import { LIVE_HOT_WINDOW, LIVE_OPTIONS_HEAD_LIMIT, SUPPORTED_CANDLE_INTERVAL_MS 
 import type { EquityScope, OptionScope, RouteFeatures } from "./types";
 
 const CANONICAL_OPTIONS_PATH = "/options";
-const DURABLE_TAPES_PATH = "/durable-tapes";
-const KNOWN_TERMINAL_PATHS = new Set([CANONICAL_OPTIONS_PATH, "/news", DURABLE_TAPES_PATH]);
+const QA_PATH = "/qa";
+const KNOWN_TERMINAL_PATHS = new Set([CANONICAL_OPTIONS_PATH, "/news", QA_PATH]);
 
 export const normalizeTerminalPathname = (pathname: string): string => {
   return KNOWN_TERMINAL_PATHS.has(pathname) ? pathname : "/";
@@ -91,7 +91,7 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
         needsAlertEvidencePrefetch: false,
         needsDarkUnderlying: false
       };
-    case DURABLE_TAPES_PATH:
+    case QA_PATH:
       return buildDurableTapesRouteFeatures();
     case "/":
     default:
@@ -129,7 +129,8 @@ export const getTerminalNavCurrentHref = (pathname: string): string => {
 export const NAV_ITEMS = [
   { href: "/", label: "Dashboard" },
   { href: "/options", label: "Options" },
-  { href: "/news", label: "News" }
+  { href: "/news", label: "News" },
+  { href: "/qa", label: "QA" }
 ] as const;
 
 export const appendLiveScopeParams = (

@@ -113,6 +113,7 @@ export type OptionsTapeProps = {
   smartFlowProjections?: readonly SmartFlowExplainabilityProjection[];
   nbboByContractId?: ReadonlyMap<string, OptionNBBO>;
   nbboByTraceId?: ReadonlyMap<string, OptionNBBO | null>;
+  supportHydrationEnabled?: boolean;
   focusedContractId?: string | null;
   onContractFocus?: (print: OptionPrint) => void;
   onPacketFocus?: OnPacketFocus;

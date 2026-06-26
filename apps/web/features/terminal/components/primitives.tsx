@@ -108,7 +108,7 @@ export const TapeControls = ({
   );
 };
 
-type PageFrameVariant = "default" | "dashboard" | "options" | "news" | "durable-tapes";
+type PageFrameVariant = "default" | "dashboard" | "options" | "news" | "qa";
 
 type PageFrameProps = {
   title: string;

@@ -456,6 +456,7 @@ export const OptionsTape = ({
   smartFlowProjections,
   nbboByContractId,
   nbboByTraceId,
+  supportHydrationEnabled = true,
   focusedContractId,
   onContractFocus,
   onPacketFocus,
@@ -596,8 +597,11 @@ export const OptionsTape = ({
   }, []);
 
   const supportHydratedSource = useMemo(
-    () => createOptionsTapeSupportHydratingSource(activeSource, hydrateSupportRows),
-    [activeSource, hydrateSupportRows]
+    () =>
+      supportHydrationEnabled
+        ? createOptionsTapeSupportHydratingSource(activeSource, hydrateSupportRows)
+        : activeSource,
+    [activeSource, hydrateSupportRows, supportHydrationEnabled]
   );
 
   useEffect(() => {

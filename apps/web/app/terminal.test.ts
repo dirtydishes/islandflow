@@ -230,7 +230,7 @@ describe("durable tapes pane selectors", () => {
     ).toBe(true);
   });
 
-  it("maps live smart-flow projections into the durable-tapes OptionsTape fallback pane", () => {
+  it("maps live smart-flow projections into the QA OptionsTape fallback pane", () => {
     const projection = { trace_id: "smart-flow:1", seq: 1 } as any;
     const baseState = {
       clearSelectedInstrument: () => {},
@@ -461,9 +461,9 @@ describe("live manifest", () => {
     ).toEqual(["news"]);
   });
 
-  it("subscribes /durable-tapes to server rows and canonical alert feed by default", () => {
+  it("subscribes /qa to server rows and canonical alert feed by default", () => {
     const filters = buildDefaultFlowFilters();
-    const manifest = getLiveManifest("/durable-tapes", "SPY", 60000, filters);
+    const manifest = getLiveManifest("/qa", "SPY", 60000, filters);
     const channels = manifest.map((subscription) => subscription.channel);
 
     expect(channels).toEqual(["durable-rows", "equities", "flow", "news", "smart-flow-alerts"]);
@@ -528,8 +528,8 @@ describe("live manifest", () => {
   });
 
   it("resets server-composed durable rows when their scope changes", () => {
-    const current = getLiveManifest("/durable-tapes", "SPY", 60_000, buildDefaultFlowFilters());
-    const next = getLiveManifest("/durable-tapes", "SPY", 60_000, buildDefaultFlowFilters(), {
+    const current = getLiveManifest("/qa", "SPY", 60_000, buildDefaultFlowFilters());
+    const next = getLiveManifest("/qa", "SPY", 60_000, buildDefaultFlowFilters(), {
       underlying_ids: ["SPY"]
     });
 
@@ -695,6 +695,7 @@ describe("route feature map", () => {
     expect(normalizeTerminalPathname("/unknown")).toBe("/");
     expect(getTerminalNavCurrentHref("/unknown")).toBe("/");
     expect(getRouteFeatures("/unknown")).toEqual(getRouteFeatures("/"));
+    expect(normalizeTerminalPathname("/durable-tapes")).toBe("/");
   });
 
   it("maps /news to the dedicated news pane", () => {
@@ -704,10 +705,10 @@ describe("route feature map", () => {
     expect(features.showAlertsPane).toBe(false);
   });
 
-  it("maps /durable-tapes to all durable module panes while keeping chart feeds off", () => {
-    const features = getRouteFeatures("/durable-tapes");
-    expect(normalizeTerminalPathname("/durable-tapes")).toBe("/durable-tapes");
-    expect(getTerminalNavCurrentHref("/durable-tapes")).toBe("/durable-tapes");
+  it("maps /qa to all durable module panes while keeping chart feeds off", () => {
+    const features = getRouteFeatures("/qa");
+    expect(normalizeTerminalPathname("/qa")).toBe("/qa");
+    expect(getTerminalNavCurrentHref("/qa")).toBe("/qa");
     expect(features.showOptionsPane).toBe(true);
     expect(features.showFlowPane).toBe(true);
     expect(features.showEquitiesPane).toBe(true);
@@ -722,7 +723,7 @@ describe("route feature map", () => {
     expect(features.equityCandles).toBe(false);
   });
 
-  it("keeps durable-tapes on server-composed rows only", () => {
+  it("keeps QA on server-composed rows only", () => {
     const features = buildDurableTapesRouteFeatures();
 
     expect(features.options).toBe(false);
@@ -787,11 +788,12 @@ describe("dark underlying route dependency helper", () => {
 });
 
 describe("terminal navigation", () => {
-  it("exposes Dashboard, Options, and News as top-level destinations", () => {
+  it("exposes Dashboard, Options, News, and QA as top-level destinations", () => {
     expect(NAV_ITEMS).toEqual([
       { href: "/", label: "Dashboard" },
       { href: "/options", label: "Options" },
-      { href: "/news", label: "News" }
+      { href: "/news", label: "News" },
+      { href: "/qa", label: "QA" }
     ]);
   });
 });

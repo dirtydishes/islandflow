@@ -39,7 +39,7 @@ describe("browser API transport builders", () => {
 
   it("uses the local API port for blank-env localhost pages", () => {
     delete process.env.NEXT_PUBLIC_API_URL;
-    setWindowLocation("http://localhost:3000/durable-tapes");
+    setWindowLocation("http://localhost:3000/qa");
 
     expect(buildBrowserApiUrl("/history/options")).toBe("http://localhost:4000/history/options");
     expect(buildBrowserWsUrl("/ws/live")).toBe("ws://localhost:4000/ws/live");
@@ -47,7 +47,7 @@ describe("browser API transport builders", () => {
 
   it("keeps IPv6 loopback pages on the local API port", () => {
     delete process.env.NEXT_PUBLIC_API_URL;
-    setWindowLocation("http://[::1]:3000/durable-tapes");
+    setWindowLocation("http://[::1]:3000/qa");
 
     expect(buildBrowserApiUrl("/history/options")).toBe("http://[::1]:4000/history/options");
     expect(buildBrowserWsUrl("/ws/live")).toBe("ws://[::1]:4000/ws/live");
@@ -55,7 +55,7 @@ describe("browser API transport builders", () => {
 
   it("uses same-origin app paths for blank-env production pages", () => {
     delete process.env.NEXT_PUBLIC_API_URL;
-    setWindowLocation("https://app.example.test/durable-tapes");
+    setWindowLocation("https://app.example.test/qa");
 
     expect(buildBrowserApiUrl("/history/options")).toBe("https://app.example.test/history/options");
     expect(buildBrowserWsUrl("/ws/live")).toBe("wss://app.example.test/ws/live");
@@ -63,14 +63,14 @@ describe("browser API transport builders", () => {
 
   it("keeps NEXT_PUBLIC_API_URL as an explicit override and clears base path state", () => {
     process.env.NEXT_PUBLIC_API_URL = "https://api.example.test/base?x=1#frag";
-    setWindowLocation("https://app.example.test/durable-tapes");
+    setWindowLocation("https://app.example.test/qa");
 
     expect(buildBrowserApiUrl("/prints/options")).toBe("https://api.example.test/prints/options");
     expect(buildBrowserWsUrl("/ws/live")).toBe("wss://api.example.test/ws/live");
   });
 
   it("normalizes websocket overrides without downgrading wss origins", () => {
-    setWindowLocation("https://app.example.test/durable-tapes");
+    setWindowLocation("https://app.example.test/qa");
 
     expect(buildBrowserWsUrl("/ws/live", "http://127.0.0.1:4000")).toBe(
       "ws://127.0.0.1:4000/ws/live"
