@@ -4,10 +4,12 @@ import {
   SMART_FLOW_CONTRACT_VERSION,
   SMART_FLOW_HYPOTHESIS_SCORE_MODEL_VERSION,
   SMART_FLOW_HYPOTHESIS_SCORE_POLICY_VERSION,
+  type SmartFlowAlertEvent,
   type SmartFlowExplainabilityProjection,
   type SmartMoneyEvent,
-  smartFlowExplainabilityFromLegacySmartMoneyEvent,
-  smartFlowExplainabilityFromHypothesisEvent
+  smartFlowAlertFromProjection,
+  smartFlowExplainabilityFromHypothesisEvent,
+  smartFlowExplainabilityFromLegacySmartMoneyEvent
 } from "@islandflow/types";
 import {
   buildOptionSnapshotFilters,
@@ -194,6 +196,7 @@ describe("LiveStateManager", () => {
     expect(limits.nbbo).toBe(100000);
     expect(limits.flow).toBe(500);
     expect(limits["smart-flow"]).toBe(300);
+    expect(limits["smart-flow-alerts"]).toBe(300);
     expect(limits["equity-quotes"]).toBe(500);
     expect(limits.alerts).toBe(300);
     expect(resolveGenericLiveLimits({} as NodeJS.ProcessEnv).options).toBe(100);
@@ -284,6 +287,7 @@ describe("LiveStateManager", () => {
       "equity-joins": 10000,
       flow: 2,
       "smart-flow": 10000,
+      "smart-flow-alerts": 10000,
       "smart-money": 10000,
       "classifier-hits": 10000,
       alerts: 10000,
@@ -362,6 +366,31 @@ describe("LiveStateManager", () => {
     expect((snapshot.items as Array<typeof projection>)[0]?.alternatives[0]?.reasons).toEqual([
       "could_be_hedge_rebalance"
     ]);
+  });
+
+  it("stores smart-flow alerts as a canonical live channel", async () => {
+    const now = Date.now();
+    const projection = makeSmartFlowProjection(makeSmartMoneyEvent(now));
+    const alert = smartFlowAlertFromProjection(projection);
+    if (!alert) {
+      throw new Error("expected non-abstained projection to derive an alert");
+    }
+    const manager = new LiveStateManager(makeClickHouse(), null);
+
+    await manager.ingest("smart-flow-alerts", alert);
+
+    const snapshot = await manager.getSnapshot({ channel: "smart-flow-alerts" });
+
+    expect(snapshot.items).toHaveLength(1);
+    expect(snapshot.watermark).toEqual({ ts: now, seq: 7 });
+    expect(snapshot.next_before).toEqual({ ts: now, seq: 7 });
+    expect((snapshot.items as SmartFlowAlertEvent[])[0]?.alert_id).toBe(alert.alert_id);
+    expect((snapshot.items as SmartFlowAlertEvent[])[0]?.trigger.kind).toBe(
+      "non_abstained_hypothesis"
+    );
+    expect((snapshot.items as SmartFlowAlertEvent[])[0]?.projection.source_channel).toBe(
+      "smart-flow"
+    );
   });
 
   it("hydrates smart-flow snapshots from ClickHouse when Redis only has legacy compatibility rows", async () => {
@@ -510,6 +539,7 @@ describe("LiveStateManager", () => {
         "equity-joins": 500,
         flow: 3,
         "smart-flow": 300,
+        "smart-flow-alerts": 300,
         "smart-money": 300,
         "classifier-hits": 300,
         alerts: 300,

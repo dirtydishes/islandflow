@@ -42,6 +42,7 @@ import {
   OptionNBBOSchema,
   type OptionPrint,
   OptionPrintSchema,
+  SmartFlowAlertEventSchema,
   SmartFlowExplainabilityProjectionSchema,
   SmartMoneyEventSchema
 } from "@islandflow/types";
@@ -53,6 +54,7 @@ import {
   type DurableRowsSubscription
 } from "./durable-rows";
 import { fetchRecentSmartFlowExplainability, smartFlowCursor } from "./smart-flow";
+import { fetchRecentSmartFlowAlertEvents, smartFlowAlertCursor } from "./smart-flow-alerts";
 
 const CURSOR_HASH_KEY = "live:cursors";
 export const LIVE_FEED_LOOKBACK_MS = 24 * 60 * 60 * 1000;
@@ -70,6 +72,7 @@ const GENERIC_LIMIT_ENV_KEYS: Record<LiveGenericChannel, string> = {
   "equity-joins": "LIVE_LIMIT_EQUITY_JOINS",
   flow: "LIVE_LIMIT_FLOW",
   "smart-flow": "LIVE_LIMIT_SMART_FLOW",
+  "smart-flow-alerts": "LIVE_LIMIT_SMART_FLOW_ALERTS",
   "smart-money": "LIVE_LIMIT_SMART_MONEY",
   "classifier-hits": "LIVE_LIMIT_CLASSIFIER_HITS",
   alerts: "LIVE_LIMIT_ALERTS",
@@ -90,6 +93,7 @@ const DEFAULT_LIVE_LIMITS: GenericLiveLimits = {
   "equity-joins": 500,
   flow: 500,
   "smart-flow": 300,
+  "smart-flow-alerts": 300,
   "smart-money": 300,
   "classifier-hits": 300,
   alerts: 300,
@@ -213,6 +217,11 @@ export const resolveGenericLiveLimits = (
       "smart-flow",
       env.LIVE_LIMIT_DEFAULT ? liveLimitDefault : DEFAULT_LIVE_LIMITS["smart-flow"]
     ),
+    "smart-flow-alerts": parseGenericLimit(
+      env,
+      "smart-flow-alerts",
+      env.LIVE_LIMIT_DEFAULT ? liveLimitDefault : DEFAULT_LIVE_LIMITS["smart-flow-alerts"]
+    ),
     "smart-money": parseGenericLimit(
       env,
       "smart-money",
@@ -250,6 +259,7 @@ const extractFreshnessTs = (channel: LiveGenericChannel, item: any): number | nu
       return typeof item.ts === "number" ? item.ts : null;
     case "flow":
     case "smart-flow":
+    case "smart-flow-alerts":
     case "smart-money":
     case "classifier-hits":
     case "alerts":
@@ -376,6 +386,14 @@ const getGenericConfig = (
     parse: parseNativeSmartFlowProjection,
     cursor: smartFlowCursor,
     fetchRecent: fetchRecentSmartFlowExplainability
+  },
+  "smart-flow-alerts": {
+    redisKey: "live:smart-flow-alerts",
+    cursorField: "smart-flow-alerts",
+    limit: limits["smart-flow-alerts"],
+    parse: (value) => SmartFlowAlertEventSchema.parse(value),
+    cursor: smartFlowAlertCursor,
+    fetchRecent: fetchRecentSmartFlowAlertEvents
   },
   "classifier-hits": {
     redisKey: "live:classifier-hits",

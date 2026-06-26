@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { smartFlowAlertFromProjection } from "@islandflow/types";
 import {
   buildNativeSmartFlowProjectionsFromPacket,
   buildNativeSmartFlowProjectionsFromPackets,
@@ -78,6 +79,56 @@ describe("native smart-flow runtime", () => {
     expect(projection?.refs.evidence_refs).toContain("print:runtime-0");
   });
 
+  it("derives smart-flow alerts from non-abstained native projections", () => {
+    const [projection] = buildNativeSmartFlowProjectionsFromPacket(
+      buildFlowPacket({
+        id: "flowpacket:runtime-alert",
+        source_ts: 30_000,
+        ingest_ts: 30_010,
+        seq: 43,
+        members: Array.from({ length: 8 }, (_, index) => `print:runtime-alert-${index}`),
+        features: {
+          option_contract_id: "SPY-2025-02-21-450-C",
+          underlying_id: "SPY",
+          count: 8,
+          total_size: 2200,
+          total_premium: 180_000,
+          start_ts: 29_800,
+          end_ts: 30_000,
+          nbbo_bid: 1.2,
+          nbbo_ask: 1.24,
+          nbbo_mid: 1.22,
+          nbbo_spread: 0.04,
+          nbbo_coverage_ratio: 1,
+          nbbo_aggressive_ratio: 0.82,
+          nbbo_aggressive_buy_ratio: 0.78,
+          nbbo_aggressive_sell_ratio: 0.04,
+          nbbo_inside_ratio: 0.05,
+          underlying_bid: 449.9,
+          underlying_ask: 450.1,
+          underlying_mid: 450,
+          underlying_spread: 0.2
+        }
+      })
+    );
+    if (!projection) {
+      throw new Error("expected directional packet to emit a projection");
+    }
+
+    const alert = smartFlowAlertFromProjection(projection);
+
+    expect(alert).not.toBeNull();
+    expect(alert?.trigger.kind).toBe("non_abstained_hypothesis");
+    expect(alert?.projection).toEqual(projection);
+    expect(alert?.policy_confidence).toBe(
+      projection.hypothesis.scores.confidence.policy_confidence
+    );
+    expect(alert?.evidence_quality).toBe(projection.hypothesis.scores.confidence.evidence_quality);
+    expect(alert).not.toHaveProperty("score");
+    expect(alert).not.toHaveProperty("severity");
+    expect(alert).not.toHaveProperty("hits");
+  });
+
   it("persists abstention state for weak rejected packets", () => {
     const [projection] = buildNativeSmartFlowProjectionsFromPacket(
       buildFlowPacket({
@@ -98,6 +149,7 @@ describe("native smart-flow runtime", () => {
     expect(projection?.source_channel).toBe("smart-flow");
     expect(projection?.abstention.abstained).toBe(true);
     expect(projection?.hypothesis.hypothesis_type).toBe("unclear");
+    expect(projection ? smartFlowAlertFromProjection(projection) : null).toBeNull();
   });
 
   it("emits completed windows with the same cluster shape as replay-style batch evaluation", () => {

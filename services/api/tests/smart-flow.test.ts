@@ -1,11 +1,16 @@
 import { describe, expect, it } from "bun:test";
-import { type ClickHouseClient, toSmartFlowProjectionRecord } from "@islandflow/storage";
+import {
+  type ClickHouseClient,
+  toSmartFlowAlertRecord,
+  toSmartFlowProjectionRecord
+} from "@islandflow/storage";
 import {
   SMART_FLOW_CONTRACT_VERSION,
   SMART_FLOW_HYPOTHESIS_SCORE_MODEL_VERSION,
   SMART_FLOW_HYPOTHESIS_SCORE_POLICY_VERSION,
   SMART_FLOW_MODEL_VERSION,
   SMART_FLOW_POLICY_VERSION,
+  smartFlowAlertFromProjection,
   smartFlowExplainabilityFromHypothesisEvent
 } from "@islandflow/types";
 import {
@@ -13,6 +18,12 @@ import {
   fetchSmartFlowExplainabilityByPacketIds,
   smartFlowCursor
 } from "../src/smart-flow";
+import {
+  fetchRecentSmartFlowAlertEvents,
+  fetchSmartFlowAlertEventsAfter,
+  fetchSmartFlowAlertEventsBefore,
+  smartFlowAlertCursor
+} from "../src/smart-flow-alerts";
 
 const makeClickHouse = (rows: unknown[], queries: string[] = []): ClickHouseClient =>
   ({
@@ -120,5 +131,45 @@ describe("smart-flow API projections", () => {
 
     expect(queries[0]).toContain("has(evidence_refs, 'flowpacket:12')");
     expect(payload?.refs.cluster_id).toBe("cluster:SPY:1000:1120");
+  });
+});
+
+describe("smart-flow alert API projections", () => {
+  it("reads recent canonical smart-flow alert rows without legacy alert storage", async () => {
+    const projection = makeSmartFlowProjection();
+    const alert = smartFlowAlertFromProjection(projection);
+    if (!alert) {
+      throw new Error("expected non-abstained projection to derive an alert");
+    }
+    const queries: string[] = [];
+    const [payload] = await fetchRecentSmartFlowAlertEvents(
+      makeClickHouse([toSmartFlowAlertRecord(alert)], queries),
+      1
+    );
+
+    expect(queries[0]).toContain("smart_flow_alerts");
+    expect(queries[0]).not.toContain("FROM alerts");
+    expect(payload?.alert_id).toBe(alert.alert_id);
+    expect(payload?.trigger.kind).toBe("non_abstained_hypothesis");
+    expect(payload?.projection.refs.evidence_refs).toEqual(["flowpacket:12", "print:12"]);
+    expect(smartFlowAlertCursor(payload!)).toEqual({ ts: 1_000, seq: 12 });
+  });
+
+  it("queries smart-flow alerts after and before cursors", async () => {
+    const projection = makeSmartFlowProjection();
+    const alert = smartFlowAlertFromProjection(projection);
+    if (!alert) {
+      throw new Error("expected non-abstained projection to derive an alert");
+    }
+    const queries: string[] = [];
+    const client = makeClickHouse([toSmartFlowAlertRecord(alert)], queries);
+
+    const [after] = await fetchSmartFlowAlertEventsAfter(client, 900, 10, 5);
+    const [before] = await fetchSmartFlowAlertEventsBefore(client, 1_100, 20, 5);
+
+    expect(after?.alert_id).toBe(alert.alert_id);
+    expect(before?.alert_id).toBe(alert.alert_id);
+    expect(queries[0]).toContain("(source_ts, seq) > (900, 10)");
+    expect(queries[1]).toContain("(source_ts, seq) < (1100, 20)");
   });
 });

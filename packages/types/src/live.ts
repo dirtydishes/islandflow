@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DurableTapeComposedLaneSchema, DurableTapeRowViewModelSchema } from "./durable-tapes";
 import {
   AlertEventSchema,
   ClassifierHitEventSchema,
@@ -13,9 +14,9 @@ import {
   OptionPrintSchema,
   SmartMoneyEventSchema
 } from "./events";
-import { DurableTapeComposedLaneSchema, DurableTapeRowViewModelSchema } from "./durable-tapes";
 import { OptionFlowFiltersSchema, optionFlowFilterKey } from "./options-flow";
 import { SmartFlowExplainabilityProjectionSchema } from "./smart-flow";
+import { SmartFlowAlertEventSchema } from "./smart-flow-alerts";
 
 export const CursorSchema = z.object({
   ts: z.number().int().nonnegative(),
@@ -32,6 +33,7 @@ export const LiveGenericChannelSchema = z.enum([
   "equity-joins",
   "flow",
   "smart-flow",
+  "smart-flow-alerts",
   "smart-money",
   "classifier-hits",
   "alerts",
@@ -47,6 +49,7 @@ export const LiveChannelSchema = z.enum([
   "equity-joins",
   "flow",
   "smart-flow",
+  "smart-flow-alerts",
   "smart-money",
   "classifier-hits",
   "alerts",
@@ -104,6 +107,7 @@ export const LiveSubscriptionSchema = z.discriminatedUnion("channel", [
       "nbbo",
       "equity-quotes",
       "equity-joins",
+      "smart-flow-alerts",
       "classifier-hits",
       "alerts",
       "inferred-dark",
@@ -145,6 +149,7 @@ const livePayloadSchemas = {
   "equity-joins": EquityPrintJoinSchema,
   flow: FlowPacketSchema,
   "smart-flow": SmartFlowExplainabilityProjectionSchema,
+  "smart-flow-alerts": SmartFlowAlertEventSchema,
   "smart-money": SmartMoneyEventSchema,
   "classifier-hits": ClassifierHitEventSchema,
   alerts: AlertEventSchema,

@@ -13,6 +13,7 @@ import {
   STREAM_OPTION_NBBO,
   STREAM_OPTION_SIGNAL_PRINTS,
   STREAM_SMART_FLOW,
+  STREAM_SMART_FLOW_ALERTS,
   STREAM_SMART_MONEY_EVENTS,
   SUBJECT_ALERTS,
   SUBJECT_CLASSIFIER_HITS,
@@ -24,6 +25,7 @@ import {
   SUBJECT_OPTION_NBBO,
   SUBJECT_OPTION_SIGNAL_PRINTS,
   SUBJECT_SMART_FLOW,
+  SUBJECT_SMART_FLOW_ALERTS,
   SUBJECT_SMART_MONEY_EVENTS,
   subscribeJson
 } from "@islandflow/bus";
@@ -42,6 +44,7 @@ import {
   enqueueEquityPrintJoinInsert,
   enqueueFlowPacketInsert,
   enqueueInferredDarkInsert,
+  enqueueSmartFlowAlertInsert,
   enqueueSmartFlowProjectionInsert,
   enqueueSmartMoneyEventInsert,
   ensureAlertsTable,
@@ -49,6 +52,7 @@ import {
   ensureEquityPrintJoinsTable,
   ensureFlowPacketsTable,
   ensureInferredDarkTable,
+  ensureSmartFlowAlertsTable,
   ensureSmartFlowProjectionsTable,
   ensureSmartMoneyEventsTable
 } from "@islandflow/storage";
@@ -72,7 +76,8 @@ import {
   type OptionPrint,
   OptionPrintSchema,
   type SmartMoneyEvent,
-  SmartMoneyEventSchema
+  SmartMoneyEventSchema,
+  smartFlowAlertFromProjection
 } from "@islandflow/types";
 import { z } from "zod";
 import { scoreAlert } from "./alert-scoring";
@@ -94,7 +99,7 @@ import {
   RollingWindowStore,
   type RollingWindowStoreConfig
 } from "./rolling-stats";
-import { NativeSmartFlowRuntime, type NativeSmartFlowProjectionFlush } from "./smart-flow-runtime";
+import { type NativeSmartFlowProjectionFlush, NativeSmartFlowRuntime } from "./smart-flow-runtime";
 import {
   buildStructureFlowPacket,
   type LegEvidence,
@@ -314,6 +319,7 @@ const emitCounters = {
   structurePackets: 0,
   smartFlowProjections: 0,
   smartFlowAbstentions: 0,
+  smartFlowAlerts: 0,
   smartMoneyEvents: 0,
   classifierHits: 0,
   alerts: 0,
@@ -1160,6 +1166,12 @@ const publishNativeSmartFlowFlush = async (
     if (projection.abstention.abstained) {
       emitCounters.smartFlowAbstentions += 1;
     }
+    const alert = smartFlowAlertFromProjection(projection);
+    if (alert) {
+      enqueueSmartFlowAlertInsert(batchWriter, alert);
+      await publishJson(js, SUBJECT_SMART_FLOW_ALERTS, alert);
+      emitCounters.smartFlowAlerts += 1;
+    }
   }
   flush.commit();
 };
@@ -1378,6 +1390,7 @@ const run = async () => {
       STREAM_FLOW_PACKETS,
       STREAM_SMART_MONEY_EVENTS,
       STREAM_SMART_FLOW,
+      STREAM_SMART_FLOW_ALERTS,
       STREAM_EQUITY_JOINS,
       STREAM_INFERRED_DARK,
       STREAM_CLASSIFIER_HITS,
@@ -1455,6 +1468,7 @@ const run = async () => {
       structure_packets_emitted: emitCounters.structurePackets,
       smart_flow_projections_emitted: emitCounters.smartFlowProjections,
       smart_flow_projections_abstained: emitCounters.smartFlowAbstentions,
+      smart_flow_alerts_emitted: emitCounters.smartFlowAlerts,
       smart_money_events_emitted: emitCounters.smartMoneyEvents,
       classifier_hits_emitted: emitCounters.classifierHits,
       alerts_emitted: emitCounters.alerts,
@@ -1466,6 +1480,7 @@ const run = async () => {
     emitCounters.structurePackets = 0;
     emitCounters.smartFlowProjections = 0;
     emitCounters.smartFlowAbstentions = 0;
+    emitCounters.smartFlowAlerts = 0;
     emitCounters.smartMoneyEvents = 0;
     emitCounters.classifierHits = 0;
     emitCounters.alerts = 0;
@@ -1480,6 +1495,7 @@ const run = async () => {
     await ensureFlowPacketsTable(clickhouse);
     await ensureSmartMoneyEventsTable(clickhouse);
     await ensureSmartFlowProjectionsTable(clickhouse);
+    await ensureSmartFlowAlertsTable(clickhouse);
     await ensureEquityPrintJoinsTable(clickhouse);
     await ensureInferredDarkTable(clickhouse);
     await ensureClassifierHitsTable(clickhouse);
