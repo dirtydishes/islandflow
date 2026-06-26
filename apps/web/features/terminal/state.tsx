@@ -1980,9 +1980,7 @@ export const useTerminalState = () => {
     if (tickerSet.size === 0) {
       return items;
     }
-    return items.filter((projection) =>
-      matchesTicker(projection.hypothesis.underlying_id)
-    );
+    return items.filter((projection) => matchesTicker(projection.hypothesis.underlying_id));
   }, [
     matchesTicker,
     optionSupportSmartFlowProjections,

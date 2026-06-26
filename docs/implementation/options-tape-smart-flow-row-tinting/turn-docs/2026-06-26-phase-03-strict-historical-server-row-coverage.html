@@ -272,11 +272,37 @@
       </section>
 
       <section>
+        <h2>Reviewer Pass</h2>
+        <p>
+          Thermo-nuclear review found no blocking structural regression in the Phase 03 row-tinting
+          shape: support hydration stays behind the scheduler cache, durable and reusable options
+          rows share the canonical tint helper, and durable server payloads expose typed
+          <code>support.smart_flow</code> instead of a catch-all object.
+        </p>
+        <p>
+          One scoped repair was made during review: <code>lookupOptionsSupport</code> now starts the
+          independent NBBO lookup before waiting for packet support, while still delaying
+          packet-dependent smart-money and classifier lookups until packet ids are known. A focused
+          regression test proves the NBBO branch starts without waiting on packet support.
+        </p>
+        <p>
+          Forgejo run <code>#347</code> on the worker commit failed at <code>fmt:check</code> for
+          three formatting-only files. The reviewer pass applied Biome formatting to the touched
+          files before rerunning the local CI-equivalent gates.
+        </p>
+      </section>
+
+      <section>
         <h2>Verification</h2>
         <ul>
+          <li><span class="ok">Passed</span> <code>bun run fmt:check</code></li>
+          <li><span class="ok">Passed</span> <code>bun run lint</code></li>
+          <li><span class="ok">Passed</span> <code>bun run typecheck</code></li>
           <li><span class="ok">Passed</span> <code>bun test apps/web/features/terminal/hydration-scheduler.test.ts apps/web/features/options-tape</code></li>
           <li><span class="ok">Passed</span> <code>bun test services/api/tests</code></li>
           <li><span class="ok">Passed</span> <code>bun test</code></li>
+          <li><span class="ok">Passed</span> CI public-route guard snippet expecting <code>DEPLOY_PUBLIC_APP_URL=&lt;production-app-origin&gt;</code></li>
+          <li><span class="ok">Passed</span> <code>bun run check:docker-workspace</code></li>
           <li><span class="ok">Passed</span> <code>bun --cwd=apps/web run build</code></li>
         </ul>
       </section>
@@ -360,15 +386,23 @@ new file mode 100644
 +  nbbo_by_trace_id: Record&lt;string, OptionNBBO | null&gt;;
 +};
 +export const lookupOptionsSupport = async (...) =&gt; {
-+  const packets = await deps.fetchFlowPacketsByMemberTraceIds(client, input.trace_ids);
++  const packetsPromise = deps.fetchFlowPacketsByMemberTraceIds(client, input.trace_ids);
++  const nbboByTraceIdPromise = deps
++    .fetchNearestOptionNBBOForPrints(client, input.nbbo_context)
++    .then(
++      (value) =&gt; ({ ok: true as const, value }),
++      (error: unknown) =&gt; ({ ok: false as const, error })
++    );
++  const packets = await packetsPromise;
 +  const packetIds = packets.map((packet) =&gt; packet.id);
-+  const [smartMoney, classifierHits, nbboByTraceId] = await Promise.all([...]);
++  const [smartMoney, classifierHits, nbboByTraceIdResult] = await Promise.all([...]);
++  if (!nbboByTraceIdResult.ok) throw nbboByTraceIdResult.error;
 +  return {
 +    packets,
 +    smart_money: smartMoney,
 +    smart_flow: projectSmartFlowExplainability(smartMoney),
 +    classifier_hits: classifierHits,
-+    nbbo_by_trace_id: nbboByTraceId
++    nbbo_by_trace_id: nbboByTraceIdResult.value
 +  };
 +};
 
@@ -415,6 +449,20 @@ diff --git a/apps/web/features/options-tape/options-tape.test.ts b/apps/web/feat
 +    expect(getDurableOptionRowTint(row)?.metadata).toEqual(
 +      getOptionsTapeSmartFlowRowTint(projection).metadata
 +    );
++  });
+
+diff --git a/services/api/tests/options-support.test.ts b/services/api/tests/options-support.test.ts
+--- a/services/api/tests/options-support.test.ts
++++ b/services/api/tests/options-support.test.ts
+@@
++  it("starts independent nbbo lookup without waiting for packet support", async () =&gt; {
++    const lookup = lookupOptionsSupport(...);
++    expect(nbboStarted).toBe(true);
++    releasePacketLookup();
++    await expect(lookup).resolves.toMatchObject({
++      smart_money: [smartMoney],
++      nbbo_by_trace_id: { "print:1": null }
++    });
 +  });
 </code></pre>
         </div>

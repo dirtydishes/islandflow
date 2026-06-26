@@ -116,4 +116,46 @@ describe("options support lookup", () => {
     expect(payload.smart_flow[0]?.refs.evidence_refs).toEqual(["flowpacket:1", "print:1"]);
     expect(payload.nbbo_by_trace_id).toEqual({ "print:1": null });
   });
+
+  it("starts independent nbbo lookup without waiting for packet support", async () => {
+    const packet = makePacket();
+    const smartMoney = makeSmartMoneyEvent();
+    let releasePacketLookup!: () => void;
+    const packetLookupGate = new Promise<void>((resolve) => {
+      releasePacketLookup = resolve;
+    });
+    let nbboStarted = false;
+
+    const lookup = lookupOptionsSupport(
+      clickhouse,
+      {
+        trace_ids: ["print:1"],
+        nbbo_context: [{ trace_id: "print:1", option_contract_id: "SPY-2025-01-17-450-C", ts: 1 }]
+      },
+      {
+        fetchFlowPacketsByMemberTraceIds: async () => {
+          await packetLookupGate;
+          return [packet];
+        },
+        fetchSmartMoneyEventsByPacketIds: async () => [smartMoney],
+        fetchClassifierHitsByPacketIds: async () => [],
+        fetchNearestOptionNBBOForPrints: async () => {
+          nbboStarted = true;
+          return { "print:1": null };
+        }
+      }
+    );
+
+    try {
+      expect(nbboStarted).toBe(true);
+    } finally {
+      releasePacketLookup();
+    }
+
+    await expect(lookup).resolves.toMatchObject({
+      packets: [packet],
+      smart_money: [smartMoney],
+      nbbo_by_trace_id: { "print:1": null }
+    });
+  });
 });

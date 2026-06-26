@@ -64,19 +64,29 @@ export const lookupOptionsSupport = async (
   input: OptionsSupportLookupInput,
   deps: OptionsSupportLookupDeps = defaultOptionsSupportLookupDeps
 ): Promise<OptionsSupportLookupPayload> => {
-  const packets = await deps.fetchFlowPacketsByMemberTraceIds(client, input.trace_ids);
+  const packetsPromise = deps.fetchFlowPacketsByMemberTraceIds(client, input.trace_ids);
+  const nbboByTraceIdPromise = deps
+    .fetchNearestOptionNBBOForPrints(client, input.nbbo_context)
+    .then(
+      (value) => ({ ok: true as const, value }),
+      (error: unknown) => ({ ok: false as const, error })
+    );
+  const packets = await packetsPromise;
   const packetIds = packets.map((packet) => packet.id);
-  const [smartMoney, classifierHits, nbboByTraceId] = await Promise.all([
+  const [smartMoney, classifierHits, nbboByTraceIdResult] = await Promise.all([
     deps.fetchSmartMoneyEventsByPacketIds(client, packetIds),
     deps.fetchClassifierHitsByPacketIds(client, packetIds),
-    deps.fetchNearestOptionNBBOForPrints(client, input.nbbo_context)
+    nbboByTraceIdPromise
   ]);
+  if (!nbboByTraceIdResult.ok) {
+    throw nbboByTraceIdResult.error;
+  }
 
   return {
     packets,
     smart_money: smartMoney,
     smart_flow: projectSmartFlowExplainability(smartMoney),
     classifier_hits: classifierHits,
-    nbbo_by_trace_id: nbboByTraceId
+    nbbo_by_trace_id: nbboByTraceIdResult.value
   };
 };

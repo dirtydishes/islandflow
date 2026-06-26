@@ -572,9 +572,7 @@ export const OptionsTape = ({
           return;
         }
         if (payload.packets.length > 0) {
-          setHydratedPackets((current) =>
-            mergeOptionsTapeSupportPackets(current, payload.packets)
-          );
+          setHydratedPackets((current) => mergeOptionsTapeSupportPackets(current, payload.packets));
         }
         if (payload.smartFlowProjections.length > 0) {
           setHydratedSmartFlowProjections((current) =>

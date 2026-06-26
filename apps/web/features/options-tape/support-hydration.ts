@@ -52,10 +52,7 @@ export const buildOptionsTapeSupportRequest = (
       continue;
     }
 
-    if (
-      traceIds.size < traceLimit &&
-      !context.smartFlowContextByTraceId?.has(traceId)
-    ) {
+    if (traceIds.size < traceLimit && !context.smartFlowContextByTraceId?.has(traceId)) {
       traceIds.add(traceId);
     }
 
@@ -148,10 +145,7 @@ export const mergeOptionsTapeSupportPackets = (
     .slice(0, limit);
 };
 
-export const createOptionsTapeSupportHydratingSource = <
-  TScope,
-  TFilters
->(
+export const createOptionsTapeSupportHydratingSource = <TScope, TFilters>(
   source: DurableTapeSource<OptionPrint, TScope, TFilters>,
   hydrateRows: (rows: readonly OptionPrint[]) => void
 ): DurableTapeSource<OptionPrint, TScope, TFilters> => {
