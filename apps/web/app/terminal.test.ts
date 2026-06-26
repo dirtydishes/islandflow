@@ -461,22 +461,32 @@ describe("live manifest", () => {
     ).toEqual(["news"]);
   });
 
-  it("subscribes /qa to server rows and canonical alert feed by default", () => {
+  it("subscribes /qa to the live feeds rendered by the QA page", () => {
     const filters = buildDefaultFlowFilters();
     const manifest = getLiveManifest("/qa", "SPY", 60000, filters);
     const channels = manifest.map((subscription) => subscription.channel);
 
-    expect(channels).toEqual(["durable-rows", "equities", "flow", "news", "smart-flow-alerts"]);
+    expect(channels).toEqual([
+      "options",
+      "durable-rows",
+      "nbbo",
+      "equities",
+      "flow",
+      "news",
+      "smart-flow-alerts",
+      "smart-flow",
+      "equity-candles"
+    ]);
+    expect(manifest.find((subscription) => subscription.channel === "options")).toMatchObject({
+      filters
+    });
     expect(manifest.find((subscription) => subscription.channel === "durable-rows")).toMatchObject({
       lanes: ["options", "alerts"],
       filters
     });
     expect(manifest.find((subscription) => subscription.channel === "flow")?.filters).toBe(filters);
-    expect(channels).not.toContain("options");
     expect(channels).not.toContain("alerts");
-    expect(channels).not.toContain("nbbo");
     expect(channels).not.toContain("classifier-hits");
-    expect(channels).not.toContain("equity-candles");
     expect(channels).not.toContain("equity-overlay");
   });
 
@@ -533,7 +543,10 @@ describe("live manifest", () => {
       underlying_ids: ["SPY"]
     });
 
-    expect(Array.from(getLiveSubscriptionResetChannels(current, next))).toEqual(["durable-rows"]);
+    expect(Array.from(getLiveSubscriptionResetChannels(current, next))).toEqual([
+      "options",
+      "durable-rows"
+    ]);
   });
 });
 
@@ -705,7 +718,7 @@ describe("route feature map", () => {
     expect(features.showAlertsPane).toBe(false);
   });
 
-  it("maps /qa to all durable module panes while keeping chart feeds off", () => {
+  it("maps /qa to live durable module panes and chart feeds", () => {
     const features = getRouteFeatures("/qa");
     expect(normalizeTerminalPathname("/qa")).toBe("/qa");
     expect(getTerminalNavCurrentHref("/qa")).toBe("/qa");
@@ -714,25 +727,28 @@ describe("route feature map", () => {
     expect(features.showEquitiesPane).toBe(true);
     expect(features.showNewsPane).toBe(true);
     expect(features.showAlertsPane).toBe(true);
-    expect(features.options).toBe(false);
+    expect(features.options).toBe(true);
+    expect(features.nbbo).toBe(true);
     expect(features.alerts).toBe(true);
     expect(features.durableRows).toBe(true);
-    expect(features.needsSmartFlowDecor).toBe(false);
+    expect(features.smartFlow).toBe(true);
+    expect(features.needsSmartFlowDecor).toBe(true);
     expect(features.needsAlertEvidencePrefetch).toBe(false);
-    expect(features.showChartPane).toBe(false);
-    expect(features.equityCandles).toBe(false);
+    expect(features.showChartPane).toBe(true);
+    expect(features.equityCandles).toBe(true);
   });
 
-  it("keeps QA on server-composed rows only", () => {
+  it("keeps QA on live pane subscriptions with durable rows enabled", () => {
     const features = buildDurableTapesRouteFeatures();
 
-    expect(features.options).toBe(false);
+    expect(features.options).toBe(true);
+    expect(features.nbbo).toBe(true);
     expect(features.alerts).toBe(true);
     expect(features.durableRows).toBe(true);
-    expect(features.smartFlow).toBe(false);
+    expect(features.smartFlow).toBe(true);
     expect(features.showOptionsPane).toBe(true);
     expect(features.showAlertsPane).toBe(true);
-    expect(features.needsSmartFlowDecor).toBe(false);
+    expect(features.needsSmartFlowDecor).toBe(true);
     expect(features.needsAlertEvidencePrefetch).toBe(false);
   });
 });

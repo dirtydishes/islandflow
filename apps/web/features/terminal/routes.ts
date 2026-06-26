@@ -13,17 +13,17 @@ export const normalizeTerminalPathname = (pathname: string): string => {
 };
 
 export const buildDurableTapesRouteFeatures = (): RouteFeatures => ({
-  options: false,
-  nbbo: false,
+  options: true,
+  nbbo: true,
   equities: true,
   flow: true,
   news: true,
   alerts: true,
   durableRows: true,
-  smartFlow: false,
+  smartFlow: true,
   inferredDark: false,
   equityJoins: false,
-  equityCandles: false,
+  equityCandles: true,
   equityOverlay: false,
   showOptionsPane: true,
   showEquitiesPane: true,
@@ -31,8 +31,8 @@ export const buildDurableTapesRouteFeatures = (): RouteFeatures => ({
   showNewsPane: true,
   showAlertsPane: true,
   showDarkPane: false,
-  showChartPane: false,
-  needsSmartFlowDecor: false,
+  showChartPane: true,
+  needsSmartFlowDecor: true,
   needsAlertEvidencePrefetch: false,
   needsDarkUnderlying: false
 });

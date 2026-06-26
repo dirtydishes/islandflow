@@ -245,12 +245,12 @@
         <div class="eyebrow">Repository turn note</div>
         <h1>QA ingest investigation and Eastern time display</h1>
         <p class="subtitle">
-          Investigated the live QA deployment around the reported 10:30am stop, found ingestion was still running, and changed the web UI to present market timestamps in America/New_York time so UTC chart labels do not read like local stops.
+          Investigated the live QA deployment around the reported 10:30am stop, found backend ingestion was still running, then corrected the visible <code>/qa</code> page after screenshots showed it was rendering hardcoded fixture data anchored at 10:30 AM Eastern.
         </p>
         <div class="meta-grid" aria-label="Turn metadata">
           <div class="meta-card"><span class="meta-label">Branch</span>main</div>
-          <div class="meta-card"><span class="meta-label">Beads</span>islandflow-s1a7</div>
-          <div class="meta-card"><span class="meta-label">Scope</span>QA triage, chart ticks, tape timestamps</div>
+          <div class="meta-card"><span class="meta-label">Beads</span>islandflow-s1a7, islandflow-wswo</div>
+          <div class="meta-card"><span class="meta-label">Scope</span>QA triage, live QA route, chart ticks, tape timestamps</div>
         </div>
       </header>
 
@@ -273,6 +273,10 @@
             <strong>Separate noisy service issue</strong>
             <p>The wrapper <code>islandflow-clickhouse.service</code> is restart-looping because distro <code>clickhouse-server.service</code> already owns the port. The active ClickHouse server is still serving the app successfully.</p>
           </div>
+          <div class="finding">
+            <strong>Follow-up: the visible QA page was static</strong>
+            <p>Screenshots showed <code>/qa</code> still topping out at <code>10:30 AM EDT</code>. The route was subscribing to live shell feeds but rendered hardcoded <code>QA_*</code> fixture arrays anchored at <code>2026-06-26T14:30:00Z</code>.</p>
+          </div>
         </div>
       </section>
 
@@ -283,6 +287,8 @@
           <li>Wired market chart tick labels and chart hover labels through the Eastern formatter. Hover text includes the actual daylight/standard abbreviation from <code>Intl</code>, for example <code>EDT</code> in June.</li>
           <li>Moved tape rows, alerts, flow packet metadata, news timestamps, terminal status text, and replay controls onto the same Eastern formatter.</li>
           <li>Added tests that pin the reported <code>2026-06-26T14:30Z</code> timestamp to <code>10:30 AM EDT</code> and guard Eastern-day comparisons around UTC midnight.</li>
+          <li>Changed <code>/qa</code> route features so the route subscribes to the live feeds it renders: options, NBBO, equities, flow, news, alerts, smart-flow, durable rows, and equity candles.</li>
+          <li>Rewired <code>DurableTapesQaRoute</code> to feed its template matrix from live terminal selectors and live chart candles instead of the static 10:30 fixture arrays.</li>
         </ul>
       </section>
 
@@ -292,6 +298,7 @@
           <div class="check"><strong>Passed</strong><p><code>bun test apps/web/features</code>, 150 feature tests.</p></div>
           <div class="check"><strong>Passed</strong><p><code>bun test apps/web/features/time-format.test.ts apps/web/features/market-chart/transforms/candles.test.ts apps/web/features/market-chart/transforms/hover.test.ts</code>, 16 focused tests.</p></div>
           <div class="check"><strong>Passed</strong><p><code>bun --cwd=apps/web run build</code>, Next.js production build.</p></div>
+          <div class="check"><strong>Passed</strong><p><code>bun test apps/web/app/terminal.test.ts</code>, including the updated <code>/qa</code> live manifest and route feature assertions.</p></div>
           <div class="check"><strong>Passed</strong><p><code>bunx biome check</code> on the touched web files after formatting.</p></div>
           <div class="check warn"><strong>Existing repo issue</strong><p><code>bun run check</code> still fails on unrelated pre-existing Biome import-order diagnostics outside this change set.</p></div>
         </div>
@@ -508,6 +515,121 @@ diff --git a/apps/web/features/terminal/components/charts.tsx b/apps/web/feature
 -          {lastUpdate ? `Updated ${formatTime(lastUpdate)}` : "Waiting for data"}
 +          {lastUpdate ? `Updated ${formatTimeWithZone(lastUpdate)}` : "Waiting for data"}
          </span></script>
+        </article>
+
+        <article class="diff-card">
+          <h3>Live QA page wiring</h3>
+          <div class="rich-diff" aria-label="Rendered diff"></div>
+          <pre class="diff-fallback"><code>diff --git a/apps/web/features/terminal/routes.ts b/apps/web/features/terminal/routes.ts
+@@
+ export const buildDurableTapesRouteFeatures = (): RouteFeatures =&gt; ({
+-  options: false,
+-  nbbo: false,
++  options: true,
++  nbbo: true,
+   equities: true,
+   flow: true,
+   news: true,
+   alerts: true,
+   durableRows: true,
+-  smartFlow: false,
++  smartFlow: true,
+@@
+-  equityCandles: false,
++  equityCandles: true,
+@@
+-  showChartPane: false,
+-  needsSmartFlowDecor: false,
++  showChartPane: true,
++  needsSmartFlowDecor: true,
+ });
+
+diff --git a/apps/web/features/durable-tape/qa-page.tsx b/apps/web/features/durable-tape/qa-page.tsx
+@@
+-  const [qaFlowFilters, setQaFlowFilters] = useState&lt;OptionFlowFilters&gt;(QA_FLOW_FILTERS);
+-  const optionPrints = QA_OPTION_PRINTS;
+-  const flowPackets = QA_FLOW_PACKETS;
+-  const equityPrints = QA_EQUITY_PRINTS;
+-  const smartFlowProjections = QA_SMART_FLOW_PROJECTIONS;
+-  const alerts = QA_ALERTS;
+-  const newsStories = QA_NEWS_STORIES;
++  const optionsPane = selectDurableTapesOptionsPane(state);
++  const flowPane = selectDurableTapesFlowPane(state);
++  const equitiesPane = selectDurableTapesEquitiesPane(state);
++  const alertsPane = selectDurableTapesAlertsPane(state);
++  const newsPane = selectDurableTapesNewsPane(state);
++  const optionPrints = optionsPane.prints;
++  const flowPackets = flowPane.packets;
++  const equityPrints = equitiesPane.prints;
++  const smartFlowProjections = optionsPane.smartFlowProjections;
++  const alerts = alertsPane.alerts;
++  const newsStories = newsPane.stories;
++  const chartCandles = useMemo(
++    () =&gt; normalizeMarketChartCandles(state.liveSession.chartCandles),
++    [state.liveSession.chartCandles]
++  );
+@@
+-          candles={QA_CHART_CANDLES}
+-          lowerSeries={QA_CHART_LOWER_SERIES}
+-          status="live"
++          candles={candles}
++          lowerSeries={lowerSeries}
++          status={status}</code></pre>
+          <script type="text/plain" class="patch-source">diff --git a/apps/web/features/terminal/routes.ts b/apps/web/features/terminal/routes.ts
+@@
+ export const buildDurableTapesRouteFeatures = (): RouteFeatures => ({
+-  options: false,
+-  nbbo: false,
++  options: true,
++  nbbo: true,
+   equities: true,
+   flow: true,
+   news: true,
+   alerts: true,
+   durableRows: true,
+-  smartFlow: false,
++  smartFlow: true,
+@@
+-  equityCandles: false,
++  equityCandles: true,
+@@
+-  showChartPane: false,
+-  needsSmartFlowDecor: false,
++  showChartPane: true,
++  needsSmartFlowDecor: true,
+ });
+
+diff --git a/apps/web/features/durable-tape/qa-page.tsx b/apps/web/features/durable-tape/qa-page.tsx
+@@
+-  const [qaFlowFilters, setQaFlowFilters] = useState<OptionFlowFilters>(QA_FLOW_FILTERS);
+-  const optionPrints = QA_OPTION_PRINTS;
+-  const flowPackets = QA_FLOW_PACKETS;
+-  const equityPrints = QA_EQUITY_PRINTS;
+-  const smartFlowProjections = QA_SMART_FLOW_PROJECTIONS;
+-  const alerts = QA_ALERTS;
+-  const newsStories = QA_NEWS_STORIES;
++  const optionsPane = selectDurableTapesOptionsPane(state);
++  const flowPane = selectDurableTapesFlowPane(state);
++  const equitiesPane = selectDurableTapesEquitiesPane(state);
++  const alertsPane = selectDurableTapesAlertsPane(state);
++  const newsPane = selectDurableTapesNewsPane(state);
++  const optionPrints = optionsPane.prints;
++  const flowPackets = flowPane.packets;
++  const equityPrints = equitiesPane.prints;
++  const smartFlowProjections = optionsPane.smartFlowProjections;
++  const alerts = alertsPane.alerts;
++  const newsStories = newsPane.stories;
++  const chartCandles = useMemo(
++    () => normalizeMarketChartCandles(state.liveSession.chartCandles),
++    [state.liveSession.chartCandles]
++  );
+@@
+-          candles={QA_CHART_CANDLES}
+-          lowerSeries={QA_CHART_LOWER_SERIES}
+-          status="live"
++          candles={candles}
++          lowerSeries={lowerSeries}
++          status={status}</script>
         </article>
       </section>
     </main>
