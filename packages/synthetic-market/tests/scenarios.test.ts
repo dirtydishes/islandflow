@@ -36,7 +36,7 @@ describe("synthetic scenario catalog labels and expected outputs", () => {
       expect(scenario.event_selectors.length).toBeGreaterThanOrEqual(3);
       expect(scenario.expected_output.required_evidence.length).toBeGreaterThan(0);
       expect(scenario.expected_output.forbidden_evidence.length).toBeGreaterThan(0);
-      expect(scenario.expected_output.expected_derived_events.length).toBeGreaterThan(0);
+      expect(scenario.expected_output.expected_pipeline_events.length).toBeGreaterThan(0);
     }
   });
 
@@ -113,7 +113,7 @@ describe("synthetic scenario catalog labels and expected outputs", () => {
     expect(noAlert?.expected_class).toBe("unclear");
     expect(noAlert?.expected_direction).toBe("unknown");
     expect(noAlert?.false_positive_penalty.severity).toBe("high");
-    expect(noAlert?.expected_derived_events).toContainEqual(
+    expect(noAlert?.expected_pipeline_events).toContainEqual(
       expect.objectContaining({
         event_kind: "flow_hypothesis_event",
         expectation: "absent"

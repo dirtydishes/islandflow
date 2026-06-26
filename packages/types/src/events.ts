@@ -118,7 +118,7 @@ export const OptionPrintSchema = EventMetaSchema.merge(
     signal_reasons: z.array(z.string().min(1)).optional(),
     signal_profile: z.preprocess(
       (value) => (value === null ? undefined : value),
-      OptionsSignalModeSchema.optional().catch(undefined)
+      OptionsSignalModeSchema.optional()
     )
   })
 );
@@ -201,7 +201,7 @@ export const FlowPacketSchema = EventMetaSchema.merge(
 
 export type FlowPacket = z.infer<typeof FlowPacketSchema>;
 
-export const SmartMoneyProfileIdSchema = z.enum([
+export const SmartFlowProfileIdSchema = z.enum([
   "institutional_directional",
   "retail_whale",
   "event_driven",
@@ -210,9 +210,9 @@ export const SmartMoneyProfileIdSchema = z.enum([
   "hedge_reactive"
 ]);
 
-export type SmartMoneyProfileId = z.infer<typeof SmartMoneyProfileIdSchema>;
+export type SmartFlowProfileId = z.infer<typeof SmartFlowProfileIdSchema>;
 
-export const SmartMoneyDirectionSchema = z.enum([
+export const SmartFlowDirectionSchema = z.enum([
   "bullish",
   "bearish",
   "neutral",
@@ -220,21 +220,11 @@ export const SmartMoneyDirectionSchema = z.enum([
   "unknown"
 ]);
 
-export type SmartMoneyDirection = z.infer<typeof SmartMoneyDirectionSchema>;
+export type SmartFlowDirection = z.infer<typeof SmartFlowDirectionSchema>;
 
-export const SmartMoneyConfidenceBandSchema = z.enum(["low", "medium", "high"]);
+export const SmartFlowConfidenceBandSchema = z.enum(["low", "medium", "high"]);
 
-export type SmartMoneyConfidenceBand = z.infer<typeof SmartMoneyConfidenceBandSchema>;
-
-export const SmartMoneyProfileScoreSchema = z.object({
-  profile_id: SmartMoneyProfileIdSchema,
-  probability: z.number().min(0).max(1),
-  confidence_band: SmartMoneyConfidenceBandSchema,
-  direction: SmartMoneyDirectionSchema,
-  reasons: z.array(z.string().min(1))
-});
-
-export type SmartMoneyProfileScore = z.infer<typeof SmartMoneyProfileScoreSchema>;
+export type SmartFlowConfidenceBand = z.infer<typeof SmartFlowConfidenceBandSchema>;
 
 export const InferredDarkEventSchema = EventMetaSchema.merge(
   z.object({

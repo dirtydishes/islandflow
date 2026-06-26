@@ -4,7 +4,7 @@ import {
   type FlowHypothesisType,
   type OptionPrint,
   type SmartFlowExplainabilityProjection,
-  type SmartMoneyDirection
+  type SmartFlowDirection
 } from "@islandflow/types";
 
 import { getDurableOptionRowTint } from "../durable-tape/row-view-models";
@@ -264,7 +264,7 @@ describe("options tape row tint helpers", () => {
     seq = 1
   }: {
     abstained?: boolean;
-    direction?: SmartMoneyDirection;
+    direction?: SmartFlowDirection;
     evidenceQuality?: number;
     hypothesisType?: FlowHypothesisType;
     policyConfidence?: number;
@@ -382,7 +382,7 @@ describe("options tape row tint helpers", () => {
     sourceReasons = []
   }: {
     abstained?: boolean;
-    direction?: SmartMoneyDirection;
+    direction?: SmartFlowDirection;
     evidenceQuality?: number;
     hypothesisType?: FlowHypothesisType;
     policyConfidence?: number;

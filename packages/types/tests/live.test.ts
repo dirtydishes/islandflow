@@ -76,6 +76,19 @@ describe("live protocol types", () => {
     expect(parsed.subscriptions).toHaveLength(6);
   });
 
+  it("rejects retired derived live channels", () => {
+    const retiredChannels = ["smart-money", "classifier-hits", "alerts"];
+
+    for (const channel of retiredChannels) {
+      expect(() =>
+        LiveClientMessageSchema.parse({
+          op: "subscribe",
+          subscriptions: [{ channel }]
+        })
+      ).toThrow();
+    }
+  });
+
   it("validates snapshot and event server messages", () => {
     const cursor = CursorSchema.parse({ ts: 100, seq: 2 });
     const snapshot = LiveServerMessageSchema.parse({
@@ -102,26 +115,25 @@ describe("live protocol types", () => {
         cells: {
           time: "00:00:00",
           symbol: "SPY",
-          kind: "Large Call",
-          score: 91,
+          kind: "Directional accumulation hypothesis",
+          confidence: "91%",
           state: "high / bullish"
         },
-        badges: [{ kind: "severity", label: "high", tone: "high" }],
+        badges: [{ kind: "confidence", label: "high", tone: "high" }],
         alert: {
           trace_id: "alert-1",
-          primary_label: "Large Call",
-          primary_profile_id: null,
-          score: 91,
-          severity: "high",
+          alert_id: "smartflow:alert:1",
+          hypothesis_id: "hypothesis:1",
+          insight_id: "insight:1",
+          primary_label: "Directional accumulation hypothesis",
+          hypothesis_type: "directional_accumulation",
           direction: "bullish",
-          hit_count: 1,
-          top_hit: {
-            classifier_id: "large_call",
-            label: "Large Call",
-            direction: "bullish",
-            confidence: 0.91,
-            explanation: "large premium"
-          }
+          policy_confidence: 0.91,
+          evidence_quality: 0.76,
+          confidence_band: "high",
+          evidence_quality_band: "strong",
+          trigger_kind: "non_abstained_hypothesis",
+          projection_trace_id: "smart-flow:1"
         },
         evidence: {
           total_refs: 1,

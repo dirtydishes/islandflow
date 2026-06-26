@@ -78,7 +78,8 @@ describe("option-prints storage helpers", () => {
                 execution_iv: "0.42",
                 execution_iv_source: "synthetic_pressure_model",
                 signal_reasons: ["large_notional"],
-                signal_pass: 1
+                signal_pass: 1,
+                signal_profile: "retired_profile"
               }
             ] as T;
           }
@@ -122,6 +123,7 @@ describe("option-prints storage helpers", () => {
     expect(rows[0].execution_underlying_spot).toBe(450.05);
     expect(rows[0].execution_iv).toBe(0.42);
     expect(rows[0].signal_reasons).toEqual(["large_notional"]);
+    expect(rows[0].signal_profile).toBeUndefined();
   });
 
   it("returns an empty trace lookup without querying ClickHouse", async () => {

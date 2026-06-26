@@ -1,9 +1,5 @@
 import { z } from "zod";
-import {
-  EventMetaSchema,
-  SmartMoneyConfidenceBandSchema,
-  SmartMoneyDirectionSchema
-} from "./events";
+import { EventMetaSchema, SmartFlowConfidenceBandSchema, SmartFlowDirectionSchema } from "./events";
 
 export const SMART_FLOW_CONTRACT_VERSION = "smart-flow.contracts.v1";
 export const SMART_FLOW_POLICY_VERSION = "smart-flow.policy.v1";
@@ -274,7 +270,7 @@ export const FlowHypothesisScoreVectorSchema = z.object({
   policy_version: SmartFlowPolicyVersionSchema,
   model_version: SmartFlowModelVersionSchema,
   hypothesis_type: FlowHypothesisTypeSchema,
-  direction: SmartMoneyDirectionSchema,
+  direction: SmartFlowDirectionSchema,
   evidence_strength: z.number().min(0).max(1),
   fit_score: z.number().min(0).max(1),
   penalty_score: z.number().min(0).max(1),
@@ -286,7 +282,7 @@ export type FlowHypothesisScoreVector = z.infer<typeof FlowHypothesisScoreVector
 
 export const FlowAlternativeHypothesisSchema = z.object({
   hypothesis_type: FlowHypothesisTypeSchema,
-  direction: SmartMoneyDirectionSchema,
+  direction: SmartFlowDirectionSchema,
   score: z.number().min(0).max(1),
   reasons: z.array(z.string().min(1))
 });
@@ -304,7 +300,7 @@ export const FlowHypothesisEventSchema = EventMetaSchema.merge(
     candidate_ids: z.array(z.string().min(1)),
     underlying_id: z.string().min(1),
     hypothesis_type: FlowHypothesisTypeSchema,
-    direction: SmartMoneyDirectionSchema,
+    direction: SmartFlowDirectionSchema,
     scores: FlowHypothesisScoreVectorSchema,
     alternatives: z.array(FlowAlternativeHypothesisSchema),
     abstention: FlowAbstentionSchema,
@@ -323,8 +319,8 @@ export const SmartFlowInsightSchema = z.object({
   underlying_id: z.string().min(1),
   label: z.string().min(1),
   summary: z.string().min(1),
-  direction: SmartMoneyDirectionSchema,
-  confidence_band: SmartMoneyConfidenceBandSchema,
+  direction: SmartFlowDirectionSchema,
+  confidence_band: SmartFlowConfidenceBandSchema,
   confidence: z.number().min(0).max(1),
   evidence_refs: z.array(z.string().min(1)),
   abstention: FlowAbstentionSchema,
@@ -394,7 +390,7 @@ const hypothesisLabels: Record<FlowHypothesisType, string> = {
 
 const confidenceBandFromConfidence = (
   confidence: number
-): z.infer<typeof SmartMoneyConfidenceBandSchema> => {
+): z.infer<typeof SmartFlowConfidenceBandSchema> => {
   if (confidence >= 0.72) {
     return "high";
   }

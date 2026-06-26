@@ -219,7 +219,11 @@
           </div>
           <div class="tile">
             <strong>UI support payloads finalized</strong>
-            <p>Durable option rows no longer include classifier or smart-money support fields. Alert-bearing web surfaces populate from canonical alert rows and smart-flow projection support.</p>
+            <p>Durable option rows no longer include classifier or smart-money support fields. Durable alert rows no longer expose legacy classifier-hit placeholders. Alert-bearing web surfaces populate from canonical alert rows and smart-flow projection support.</p>
+          </div>
+          <div class="tile">
+            <strong>Reviewer repair</strong>
+            <p>The review pass removed leftover legacy alert-row fields, deleted route aliases and raw durable fallback wiring, renamed active smart-flow support contracts, updated current anatomy copy, and added regressions that reject retired live channels.</p>
           </div>
         </div>
       </section>
@@ -229,6 +233,7 @@
         <ul>
           <li>Deleted legacy runtime modules and tests: storage helpers, API transition route helper, compute classifiers, alert scoring, parent events, smart-money evaluation, and their focused tests.</li>
           <li>Updated canonical contracts in <code>packages/types</code>, bus stream definitions, API live state, durable rows, synthetic controls, ingest defaults, and focused tests.</li>
+          <li>Reviewer repair updated durable alert row contracts, API row composition, terminal route wiring, synthetic scenario manifests, smart-flow taxonomy names, live protocol tests, and current anatomy documentation.</li>
           <li>Updated current-facing docs: <code>README.md</code>, <code>docs/anatomy.html</code>, <code>docs/clickhouse-reset-runbook.md</code>, and the smart-flow-alerts implementation guide.</li>
           <li>Turn documentation: this closeout file in <code>docs/turns</code>.</li>
         </ul>
@@ -238,10 +243,14 @@
         <h2>Verification</h2>
         <ul>
           <li><span class="ok">Passed</span>: <code>bd show islandflow-ghce.6</code>.</li>
-          <li><span class="ok">Passed</span>: <code>bun test</code> - 492 tests.</li>
+          <li><span class="ok">Passed</span>: <code>bun test</code> - 486 tests.</li>
+          <li><span class="ok">Passed</span>: reviewer focused regression over live protocol, durable rows, route aliases, storage normalization, synthetic fixtures, and replay evaluation - 188 tests.</li>
           <li><span class="ok">Passed</span>: <code>bun --cwd=apps/web run build</code>.</li>
-          <li><span class="ok">Passed</span>: required grep/import audit over <code>packages services apps/web</code>. Remaining matches are canonical <code>SmartFlowAlertEvent</code> names, because the audit pattern contains <code>AlertEvent</code> as a substring.</li>
-          <li><span class="ok">Passed</span>: broader runtime cleanup audit found no legacy storage imports, route helpers, classifier modules, transition aliases, or support fields. One test-only guard still asserts canonical smart-flow queries do not hit <code>smart_money_events</code>.</li>
+          <li><span class="ok">Passed</span>: <code>bun run typecheck</code>.</li>
+          <li><span class="ok">Passed</span>: <code>bun run fmt:check</code>.</li>
+          <li><span class="ok">Passed</span>: <code>git diff --check</code>.</li>
+          <li><span class="ok">Passed</span>: required grep/import audit over <code>packages services apps/web</code>. Remaining matches are canonical <code>SmartFlowAlertEvent</code> names plus explicit negative tests for retired channels.</li>
+          <li><span class="ok">Passed</span>: broader runtime cleanup audit found no legacy storage imports, route helpers, classifier modules, transition aliases, support fields, schema/type names, or legacy env knobs. One test-only guard still asserts canonical smart-flow queries do not hit <code>smart_money_events</code>.</li>
           <li><span class="ok">Passed</span>: browser QA at 1440x900 and 390x844 for <code>/durable-tapes</code> and <code>/</code> using temporary mock API <code>127.0.0.1:4106</code> and local web port <code>3100</code>. Alert rows populated, legacy text was absent, and horizontal overflow was 0. Screenshots: <code>/tmp/islandflow-phase06-browser-qa/durable-desktop.png</code>, <code>/tmp/islandflow-phase06-browser-qa/durable-mobile.png</code>, <code>/tmp/islandflow-phase06-browser-qa/dashboard-desktop.png</code>, <code>/tmp/islandflow-phase06-browser-qa/dashboard-mobile.png</code>.</li>
           <li><span class="ok">Passed</span>: browser QA websocket subscriptions used canonical <code>smart-flow-alerts</code>, <code>smart-flow</code>, and <code>durable-rows</code> channels. No <code>smart-money</code>, <code>classifier-hits</code>, or legacy <code>alerts</code> channels were sent.</li>
         </ul>
@@ -251,6 +260,8 @@
         <h2>Allowed Audit Inventory</h2>
         <ul>
           <li><code>SmartFlowAlertEvent</code> and <code>SmartFlowAlertEventSchema</code> in runtime code are canonical smart-flow alert contracts. They match the required grep only because <code>AlertEvent</code> is a substring.</li>
+          <li><code>packages/types/tests/live.test.ts</code> keeps explicit negative protocol cases for <code>smart-money</code>, <code>classifier-hits</code>, and <code>alerts</code>.</li>
+          <li><code>apps/web/app/terminal.test.ts</code> keeps explicit negative route-manifest cases for <code>smart-money</code> and <code>classifier-hits</code>.</li>
           <li><code>services/api/tests/smart-flow.test.ts</code> keeps one deletion guard: <code>expect(queries[0]).not.toContain("smart_money_events")</code>. It is test-only and proves canonical storage is used.</li>
           <li>Historical implementation docs and older turn documents still name retired paths as migration history. Current-facing docs were updated to canonical paths.</li>
         </ul>
@@ -397,13 +408,56 @@ index aed387b..d9b720a 100644
    enqueueSmartFlowAlertInsert(batchWriter, plan.alert);
  }
 
+diff --git a/apps/web/features/terminal/routes.ts b/apps/web/features/terminal/routes.ts
+--- a/apps/web/features/terminal/routes.ts
++++ b/apps/web/features/terminal/routes.ts
+@@
+-const TAPE_COMPAT_PATH = "/tape";
+ const DURABLE_TAPES_PATH = "/durable-tapes";
+-const KNOWN_TERMINAL_PATHS = new Set([CANONICAL_OPTIONS_PATH, TAPE_COMPAT_PATH, "/news", DURABLE_TAPES_PATH]);
++const KNOWN_TERMINAL_PATHS = new Set([CANONICAL_OPTIONS_PATH, "/news", DURABLE_TAPES_PATH]);
+@@
+-  if (pathname === TAPE_COMPAT_PATH) return CANONICAL_OPTIONS_PATH;
+   return KNOWN_TERMINAL_PATHS.has(pathname) ? pathname : "/";
+@@
+-export const buildDurableTapesRouteFeatures = (rawFallbackEnabled = DURABLE_TAPES_RAW_FALLBACK_ENABLED): RouteFeatures =&gt; ({
+-  options: rawFallbackEnabled,
+-  smartFlow: rawFallbackEnabled,
++export const buildDurableTapesRouteFeatures = (): RouteFeatures =&gt; ({
++  options: false,
++  smartFlow: false,
+   durableRows: true,
+   alerts: true
+ });
+
 diff --git a/packages/types/src/durable-tapes.ts b/packages/types/src/durable-tapes.ts
 index 5f0c04d..e844cbb 100644
 --- a/packages/types/src/durable-tapes.ts
 +++ b/packages/types/src/durable-tapes.ts
 @@
-   support: z.object({
-     packet: z.object({ ... }).nullable(),
+  alert: z.object({
+    trace_id: z.string().min(1),
+    alert_id: z.string().min(1),
+    hypothesis_id: z.string().min(1),
+    insight_id: z.string().min(1),
+    primary_label: z.string().min(1),
+-    primary_profile_id: z.string().min(1).nullable(),
+-    score: z.number(),
+-    severity: z.string().min(1),
+-    hit_count: z.number().int().nonnegative(),
+-    top_hit: z.object({ classifier_id: z.string().min(1), ... }).nullable()
++    hypothesis_type: FlowHypothesisTypeSchema,
++    direction: z.string().min(1),
++    policy_confidence: z.number().min(0).max(1),
++    evidence_quality: z.number().min(0).max(1),
++    confidence_band: z.enum(["high", "medium", "low"]),
++    evidence_quality_band: z.enum(["strong", "usable", "thin", "poor"]),
++    trigger_kind: z.string().min(1),
++    projection_trace_id: z.string().min(1)
+  }),
+@@
+  support: z.object({
+    packet: z.object({ ... }).nullable(),
 -    classifier: z.object({ classifier_id: z.string().min(1), confidence: z.number().nullable() }).nullable(),
 -    smart_money: z.object({ event_id: z.string().min(1), profile_id: z.string().nullable() }).nullable(),
      smart_flow: SmartFlowExplainabilityProjectionSchema.nullable()

@@ -4,23 +4,24 @@ import {
   type FlowHypothesisType,
   type OptionNBBO,
   type OptionPrint,
-  type SmartMoneyProfileId
+  type SmartFlowProfileId
 } from "@islandflow/types";
 import { buildNativeSmartFlowProjectionsFromPacket } from "../../compute/src/smart-flow-runtime";
 import {
   buildSyntheticBurstForTest,
   buildSyntheticFlowPacketForTest,
   createSyntheticOptionsAdapter,
-  listSyntheticSmartMoneyScenariosForTest,
+  listSyntheticSmartFlowScenariosForTest,
   updateSyntheticIvForTest
 } from "../src/adapters/synthetic";
 
 const FORBIDDEN_LABEL_FIELDS = ["scenario_id", "label", "hiddenLabel", "labels", "source_kind"];
 
-const STABLE_SYNTHETIC_PROFILE_HYPOTHESES: Partial<Record<SmartMoneyProfileId, FlowHypothesisType>> = {
-  institutional_directional: "directional_accumulation",
-  retail_whale: "retail_attention_flow"
-};
+const STABLE_SYNTHETIC_PROFILE_HYPOTHESES: Partial<Record<SmartFlowProfileId, FlowHypothesisType>> =
+  {
+    institutional_directional: "directional_accumulation",
+    retail_whale: "retail_attention_flow"
+  };
 
 const totalBurstNotional = (burst: {
   legs: Array<{
@@ -128,7 +129,7 @@ describe("synthetic options IV model", () => {
 
 describe("synthetic smart-flow scenarios", () => {
   it("provides deterministic labeled parent-event templates for all core profiles plus noise", () => {
-    const scenarios = listSyntheticSmartMoneyScenariosForTest();
+    const scenarios = listSyntheticSmartFlowScenariosForTest();
 
     expect(scenarios.map((scenario) => scenario.id)).toEqual([
       "institutional_directional",
@@ -143,14 +144,14 @@ describe("synthetic smart-flow scenarios", () => {
 
   it("projects labeled scenarios through canonical smart-flow contracts", () => {
     const now = Date.parse("2026-01-02T15:00:00Z");
-    const scenarios = listSyntheticSmartMoneyScenariosForTest().filter(
+    const scenarios = listSyntheticSmartFlowScenariosForTest().filter(
       (scenario) => scenario.label !== "neutral_noise"
     );
 
     for (const scenario of scenarios) {
       const { packet, hiddenLabel } = buildSyntheticFlowPacketForTest(scenario.id, now);
       const [projection] = buildNativeSmartFlowProjectionsFromPacket(packet);
-      const expected = STABLE_SYNTHETIC_PROFILE_HYPOTHESES[scenario.label as SmartMoneyProfileId];
+      const expected = STABLE_SYNTHETIC_PROFILE_HYPOTHESES[scenario.label as SmartFlowProfileId];
 
       expect(projection, scenario.id).toBeDefined();
       expect(projection?.source_channel, scenario.id).toBe("smart-flow");

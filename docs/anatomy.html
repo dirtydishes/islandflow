@@ -1052,7 +1052,7 @@
               explicit penalties, alternatives, and abstention reasons with the projection.
             </p>
 
-            <div class="matrix" role="table" aria-label="Smart money profile matrix">
+            <div class="matrix" role="table" aria-label="Smart-flow hypothesis matrix">
               <div class="head">Profile</div>
               <div class="head">Primary evidence</div>
               <div class="head">Direction</div>
@@ -1063,37 +1063,37 @@
               <div>premium, burst, quote quality, aggressive side</div>
               <div>call or put side plus buy/sell dominance</div>
               <div>short-dated OTM retail guard, stale context</div>
-              <div>profile score, direction, reasons</div>
+              <div>hypothesis confidence, direction, reasons</div>
 
               <div class="name">retail_whale</div>
               <div>short-dated OTM calls, burst pattern, lower premium</div>
               <div>same inference as packet side</div>
               <div>complex structure can compete later in smart-flow</div>
-              <div>attention-flow style compatibility label</div>
+              <div>retail attention-flow hypothesis confidence</div>
 
               <div class="name">event_driven</div>
               <div>event calendar proximity, premium, spread widening</div>
               <div>direction or neutral when unknown</div>
               <div>missing event timing</div>
-              <div>event-positioning profile score</div>
+              <div>event-positioning hypothesis confidence</div>
 
               <div class="name">vol_seller</div>
               <div>sell-side premium, straddle or strangle context</div>
               <div>neutral</div>
               <div>weak sell skew or small premium</div>
-              <div>short-vol profile score</div>
+              <div>short-vol hypothesis confidence</div>
 
               <div class="name">arbitrage</div>
               <div>multi-leg structure, same-size symmetry, flat bias</div>
               <div>neutral</div>
               <div>directional skew</div>
-              <div>structure-arbitrage profile score</div>
+              <div>structure-arbitrage hypothesis confidence</div>
 
               <div class="name">hedge_reactive</div>
               <div>short-dated ATM context, underlying move, size</div>
               <div>underlying move or packet side</div>
               <div>no linked underlying movement</div>
-              <div>hedge-rebalance profile score</div>
+              <div>hedge-rebalance hypothesis confidence</div>
             </div>
 
             <div class="callout" style="margin-top: 14px">
@@ -1222,7 +1222,7 @@
               </div>
               <div class="flow-step">
                 <div>
-                  <h3>Smart-flow alert is derived</h3>
+                  <h3>Smart-flow alert is projected</h3>
                   <p>
                     A non-abstained projection becomes a <code>SmartFlowAlertEvent</code> with the
                     same hypothesis, confidence, evidence quality, and evidence refs.
@@ -1262,7 +1262,7 @@
                 <span class="mono">max 20</span>
               </div>
               <div class="formula-line">
-                <span class="formula-label">hit score</span>
+                <span class="formula-label">evidence score</span>
                 <div class="bar blue"><span style="width: 20%"></span></div>
                 <span class="mono">max 20</span>
               </div>
@@ -1366,9 +1366,9 @@
               <div class="panel">
                 <h3>Alert detail</h3>
                 <p>
-                  Alert drawers hydrate persisted context by trace id, then show classifier hits,
-                  the backing projection, packet, member prints, missing refs, and focus actions
-                  for packet, contract, and equity.
+                  Alert drawers hydrate persisted context by trace id, then show the canonical
+                  smart-flow alert, backing projection evidence, packet, member prints, missing refs,
+                  and focus actions for packet, contract, and equity.
                 </p>
               </div>
             </div>

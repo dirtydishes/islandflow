@@ -364,7 +364,7 @@ export const DurableTapeOptionRowsPane = ({
   );
 };
 
-type AlertRowColumnId = "time" | "symbol" | "kind" | "score" | "state" | "evidence";
+type AlertRowColumnId = "time" | "symbol" | "kind" | "confidence" | "state" | "evidence";
 
 const ALERT_ROW_COLUMNS: DurableTapeColumnDefinition<
   DurableTapeAlertRowViewModel,
@@ -392,19 +392,19 @@ const ALERT_ROW_COLUMNS: DurableTapeColumnDefinition<
     render: (row) => row.cells.kind ?? row.alert.primary_label
   },
   {
-    id: "score",
-    label: "SCORE",
+    id: "confidence",
+    label: "CONF",
     minWidth: 66,
     align: "end",
-    className: "alerts-cell-score durable-tape-cell-number",
-    render: (row) => row.cells.score ?? "--"
+    className: "alerts-cell-confidence durable-tape-cell-number",
+    render: (row) => row.cells.confidence ?? `${Math.round(row.alert.policy_confidence * 100)}%`
   },
   {
     id: "state",
     label: "STATE",
     minWidth: 86,
     className: "alerts-cell-state",
-    render: (row) => row.cells.state ?? `${row.alert.severity} / ${row.alert.direction}`
+    render: (row) => row.cells.state ?? `${row.alert.confidence_band} / ${row.alert.direction}`
   },
   {
     id: "evidence",
@@ -416,18 +416,18 @@ const ALERT_ROW_COLUMNS: DurableTapeColumnDefinition<
 ];
 
 const ALERT_ROW_TEMPLATES: DurableTapeTemplate<AlertRowColumnId>[] = [
-  { id: "full", columns: ["time", "symbol", "kind", "score", "state", "evidence"] },
-  { id: "twoThirds", columns: ["time", "symbol", "kind", "score", "state"] },
-  { id: "half", columns: ["time", "symbol", "score", "state"] },
+  { id: "full", columns: ["time", "symbol", "kind", "confidence", "state", "evidence"] },
+  { id: "twoThirds", columns: ["time", "symbol", "kind", "confidence", "state"] },
+  { id: "half", columns: ["time", "symbol", "confidence", "state"] },
   { id: "oneThird", columns: ["time", "symbol", "state"] },
   { id: "micro", columns: ["symbol", "state"] }
 ];
 
 const renderAlertStateCell = (row: DurableTapeAlertRowViewModel): ReactNode => (
   <span
-    className={`alerts-state alerts-state-${row.alert.severity} direction-${row.alert.direction}`}
+    className={`alerts-state alerts-state-${row.alert.confidence_band} direction-${row.alert.direction}`}
   >
-    {row.alert.severity} / {row.alert.direction}
+    {row.alert.confidence_band} / {row.alert.direction}
   </span>
 );
 
@@ -462,8 +462,8 @@ const renderAlertDetail = (row: DurableTapeAlertRowViewModel) => (
         <p>{row.cells.time}</p>
       </div>
       <div className="alerts-detail-score">
-        <span>Score</span>
-        <strong>{Math.round(row.alert.score)}</strong>
+        <span>Confidence</span>
+        <strong>{Math.round(row.alert.policy_confidence * 100)}%</strong>
       </div>
     </div>
     {renderBadgeList(row)}

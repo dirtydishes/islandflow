@@ -4,8 +4,8 @@ import type {
   FlowAbstentionReason,
   FlowEvidenceFactKind,
   FlowHypothesisType,
-  SmartMoneyConfidenceBand,
-  SmartMoneyDirection
+  SmartFlowConfidenceBand,
+  SmartFlowDirection
 } from "@islandflow/types";
 import { toDeterministicJson } from "./fixtures";
 import {
@@ -40,7 +40,7 @@ export type SyntheticScenarioFamily =
 
 export type ScenarioAlertExpectation = "alert" | "no_alert" | "abstain" | "suppress";
 
-export type ScenarioDerivedEventKind =
+export type ScenarioPipelineEventKind =
   | "flow_evidence_candidate"
   | "flow_evidence_cluster"
   | "flow_hypothesis_event"
@@ -87,8 +87,8 @@ export type ExpectedConfidenceRange = {
   max: number;
 };
 
-export type ExpectedDerivedEvent = {
-  event_kind: ScenarioDerivedEventKind;
+export type ExpectedPipelineEvent = {
+  event_kind: ScenarioPipelineEventKind;
   expectation: "present" | "absent";
   required_fields: string[];
   notes: string;
@@ -97,12 +97,12 @@ export type ExpectedDerivedEvent = {
 export type ScenarioExpectedOutputTemplate = {
   alert_expectation: ScenarioAlertExpectation;
   expected_class: FlowHypothesisType;
-  expected_direction: SmartMoneyDirection;
-  confidence_band: SmartMoneyConfidenceBand;
+  expected_direction: SmartFlowDirection;
+  confidence_band: SmartFlowConfidenceBand;
   confidence_range: ExpectedConfidenceRange;
   required_evidence: SyntheticEvidenceRequirement[];
   forbidden_evidence: SyntheticEvidenceRequirement[];
-  expected_derived_events: ExpectedDerivedEvent[];
+  expected_pipeline_events: ExpectedPipelineEvent[];
   abstention_reasons: FlowAbstentionReason[];
   false_positive_penalty: FalsePositivePenalty;
 };
@@ -129,8 +129,8 @@ export type GroundTruthLabel = {
   family: SyntheticScenarioFamily;
   event_refs: ScenarioEventRef[];
   expected_class: FlowHypothesisType;
-  expected_direction: SmartMoneyDirection;
-  confidence_band: SmartMoneyConfidenceBand;
+  expected_direction: SmartFlowDirection;
+  confidence_band: SmartFlowConfidenceBand;
   required_evidence: SyntheticEvidenceRequirement[];
   forbidden_evidence: SyntheticEvidenceRequirement[];
   false_positive_penalty: FalsePositivePenalty;
@@ -150,10 +150,10 @@ export type SmartFlowExpectedOutput = {
   label_id: string;
   alert_expectation: ScenarioAlertExpectation;
   expected_class: FlowHypothesisType;
-  expected_direction: SmartMoneyDirection;
-  confidence_band: SmartMoneyConfidenceBand;
+  expected_direction: SmartFlowDirection;
+  confidence_band: SmartFlowConfidenceBand;
   confidence_range: ExpectedConfidenceRange;
-  expected_derived_events: ExpectedDerivedEvent[];
+  expected_pipeline_events: ExpectedPipelineEvent[];
   required_evidence: SyntheticEvidenceRequirement[];
   forbidden_evidence: SyntheticEvidenceRequirement[];
   abstention_reasons: FlowAbstentionReason[];
@@ -215,7 +215,7 @@ export const DEFAULT_SYNTHETIC_SCENARIO_FIXTURE_ARTIFACT_LAYOUT: SyntheticScenar
     smart_flow_outputs_path: "smart-flow-expected-outputs.json"
   };
 
-const requiredDerivedEvents: ExpectedDerivedEvent[] = [
+const requiredPipelineEvents: ExpectedPipelineEvent[] = [
   {
     event_kind: "flow_evidence_candidate",
     expectation: "present",
@@ -236,7 +236,7 @@ const requiredDerivedEvents: ExpectedDerivedEvent[] = [
   }
 ];
 
-const noAlertDerivedEvents: ExpectedDerivedEvent[] = [
+const noAlertPipelineEvents: ExpectedPipelineEvent[] = [
   {
     event_kind: "flow_evidence_candidate",
     expectation: "present",
@@ -389,7 +389,7 @@ export const SYNTHETIC_SCENARIO_CATALOG: readonly ScenarioInjection[] = [
           "A stale-quote explanation would contradict this clean directional case."
         )
       ],
-      expected_derived_events: requiredDerivedEvents,
+      expected_pipeline_events: requiredPipelineEvents,
       abstention_reasons: ["not_abstained"],
       false_positive_penalty: {
         score: 0.15,
@@ -484,7 +484,7 @@ export const SYNTHETIC_SCENARIO_CATALOG: readonly ScenarioInjection[] = [
           "Complex spread context should suppress retail-attention interpretation."
         )
       ],
-      expected_derived_events: requiredDerivedEvents,
+      expected_pipeline_events: requiredPipelineEvents,
       abstention_reasons: ["not_abstained"],
       false_positive_penalty: {
         score: 0.35,
@@ -580,7 +580,7 @@ export const SYNTHETIC_SCENARIO_CATALOG: readonly ScenarioInjection[] = [
           "Expected outputs should not revive old certainty language."
         )
       ],
-      expected_derived_events: requiredDerivedEvents,
+      expected_pipeline_events: requiredPipelineEvents,
       abstention_reasons: ["not_abstained"],
       false_positive_penalty: {
         score: 0.45,
@@ -674,7 +674,7 @@ export const SYNTHETIC_SCENARIO_CATALOG: readonly ScenarioInjection[] = [
           "The output should not call this a bullish directional accumulation case."
         )
       ],
-      expected_derived_events: requiredDerivedEvents,
+      expected_pipeline_events: requiredPipelineEvents,
       abstention_reasons: ["not_abstained"],
       false_positive_penalty: {
         score: 0.4,
@@ -770,7 +770,7 @@ export const SYNTHETIC_SCENARIO_CATALOG: readonly ScenarioInjection[] = [
           "Retail burst evidence would change the expected class."
         )
       ],
-      expected_derived_events: requiredDerivedEvents,
+      expected_pipeline_events: requiredPipelineEvents,
       abstention_reasons: ["not_abstained"],
       false_positive_penalty: {
         score: 0.35,
@@ -865,7 +865,7 @@ export const SYNTHETIC_SCENARIO_CATALOG: readonly ScenarioInjection[] = [
           "Event positioning should not explain this calm structure case."
         )
       ],
-      expected_derived_events: requiredDerivedEvents,
+      expected_pipeline_events: requiredPipelineEvents,
       abstention_reasons: ["not_abstained"],
       false_positive_penalty: {
         score: 0.3,
@@ -986,7 +986,7 @@ export const SYNTHETIC_SCENARIO_CATALOG: readonly ScenarioInjection[] = [
           "Wide noisy context must not produce a high-confidence alert."
         )
       ],
-      expected_derived_events: noAlertDerivedEvents,
+      expected_pipeline_events: noAlertPipelineEvents,
       abstention_reasons: ["inside_market_context", "below_policy_threshold"],
       false_positive_penalty: {
         score: 0.9,
@@ -1068,7 +1068,7 @@ export const buildSmartFlowExpectedOutputManifest = (
         expected_direction: scenarioInjection.expected_output.expected_direction,
         confidence_band: scenarioInjection.expected_output.confidence_band,
         confidence_range: scenarioInjection.expected_output.confidence_range,
-        expected_derived_events: scenarioInjection.expected_output.expected_derived_events,
+        expected_pipeline_events: scenarioInjection.expected_output.expected_pipeline_events,
         required_evidence: scenarioInjection.expected_output.required_evidence,
         forbidden_evidence: scenarioInjection.expected_output.forbidden_evidence,
         abstention_reasons: scenarioInjection.expected_output.abstention_reasons,

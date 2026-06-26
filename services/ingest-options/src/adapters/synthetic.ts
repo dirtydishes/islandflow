@@ -19,7 +19,7 @@ import {
   hashSyntheticSymbol,
   type OptionNBBO,
   type OptionPrint,
-  type SmartMoneyProfileId,
+  type SmartFlowProfileId,
   SP500_SYMBOLS,
   type SyntheticControlState,
   type SyntheticMarketMode
@@ -100,7 +100,7 @@ type WeightedValue<T> = {
   weight: number;
 };
 
-type CoverageWindowState = Record<SmartMoneyProfileId, number[]>;
+type CoverageWindowState = Record<SmartFlowProfileId, number[]>;
 
 type SyntheticOptionsProfile = {
   burstRunRange: [number, number];
@@ -115,8 +115,8 @@ export type SyntheticContractIvState = {
 };
 
 export type PricePlacement = "AA" | "A" | "MID" | "B" | "BB";
-export type SyntheticScenarioLabel = SmartMoneyProfileId | "neutral_noise";
-export type SyntheticSmartMoneyScenario = {
+export type SyntheticScenarioLabel = SmartFlowProfileId | "neutral_noise";
+export type SyntheticSmartFlowScenario = {
   id: string;
   label: SyntheticScenarioLabel;
   hiddenLabel: string;
@@ -131,7 +131,7 @@ const EXPIRY_OFFSETS = [0, 1, 7, 14, 28, 45, 60, 90];
 const EXCHANGES = ["CBOE", "PHLX", "ISE", "ARCA", "BOX", "MIAX"];
 const CONDITIONS = ["SWEEP", "ISO", "FILL", "TEST"];
 const SYNTHETIC_SYMBOLS = ["SPY", ...(SP500_SYMBOLS as readonly string[])];
-const SMART_MONEY_SCENARIO_IDS = [
+const SMART_FLOW_SCENARIO_IDS = [
   "institutional_directional",
   "retail_whale",
   "event_driven",
@@ -761,8 +761,8 @@ const SYNTHETIC_PROFILES: Record<SyntheticMarketMode, SyntheticOptionsProfile> =
   }
 };
 
-const SMART_MONEY_TEMPLATE_SCENARIOS: Record<
-  Exclude<(typeof SMART_MONEY_SCENARIO_IDS)[number], "neutral_noise">,
+const SMART_FLOW_TEMPLATE_SCENARIOS: Record<
+  Exclude<(typeof SMART_FLOW_SCENARIO_IDS)[number], "neutral_noise">,
   string
 > = {
   institutional_directional: "call_sweep",
@@ -915,7 +915,7 @@ const getCoverageCounts = (
 ) => {
   const floorTs = now - control.coverage_window_minutes * 60_000;
   const counts = buildEmptySyntheticProfileHitCounts();
-  for (const profileId of Object.keys(coverageState) as SmartMoneyProfileId[]) {
+  for (const profileId of Object.keys(coverageState) as SmartFlowProfileId[]) {
     coverageState[profileId] = coverageState[profileId].filter((ts) => ts >= floorTs);
     counts[profileId] = coverageState[profileId].length;
   }
@@ -1190,20 +1190,20 @@ const pickPlacement = (burst: Burst, index: number): PricePlacement => {
   return pickWeightedValue(placementOptions, burst.seed + index * 11);
 };
 
-export const listSyntheticSmartMoneyScenariosForTest = (): SyntheticSmartMoneyScenario[] =>
-  SMART_MONEY_SCENARIO_IDS.map((id) => ({
+export const listSyntheticSmartFlowScenariosForTest = (): SyntheticSmartFlowScenario[] =>
+  SMART_FLOW_SCENARIO_IDS.map((id) => ({
     id,
     label: id,
     hiddenLabel:
       id === "neutral_noise"
         ? "single_print_mid"
-        : SMART_MONEY_TEMPLATE_SCENARIOS[
-            id as Exclude<(typeof SMART_MONEY_SCENARIO_IDS)[number], "neutral_noise">
+        : SMART_FLOW_TEMPLATE_SCENARIOS[
+            id as Exclude<(typeof SMART_FLOW_SCENARIO_IDS)[number], "neutral_noise">
           ]
   }));
 
-export const buildSyntheticSmartMoneyBurstForTest = (
-  scenarioId: (typeof SMART_MONEY_SCENARIO_IDS)[number],
+export const buildSyntheticSmartFlowBurstForTest = (
+  scenarioId: (typeof SMART_FLOW_SCENARIO_IDS)[number],
   now: number
 ): Burst => {
   const control = {
@@ -1241,18 +1241,18 @@ export const buildSyntheticSmartMoneyBurstForTest = (
       : profile.scenarios.find(
           (candidate) =>
             candidate.id ===
-            SMART_MONEY_TEMPLATE_SCENARIOS[
-              scenarioId as Exclude<(typeof SMART_MONEY_SCENARIO_IDS)[number], "neutral_noise">
+            SMART_FLOW_TEMPLATE_SCENARIOS[
+              scenarioId as Exclude<(typeof SMART_FLOW_SCENARIO_IDS)[number], "neutral_noise">
             ]
         )!;
   return buildBurst(1, now, mode, profile, control, coverageState, scenario);
 };
 
 export const buildSyntheticFlowPacketForTest = (
-  scenarioId: (typeof SMART_MONEY_SCENARIO_IDS)[number],
+  scenarioId: (typeof SMART_FLOW_SCENARIO_IDS)[number],
   now: number
 ): { packet: FlowPacket; hiddenLabel: string } => {
-  const burst = buildSyntheticSmartMoneyBurstForTest(scenarioId, now);
+  const burst = buildSyntheticSmartFlowBurstForTest(scenarioId, now);
   const primaryLeg = burst.legs[0]!;
   const corporateEventOffset = Number(burst.flowFeatures.corporate_event_ts_offset_days ?? 0);
   const totalSize = burst.legs.reduce((sum, leg) => sum + leg.baseSize * burst.cycles, 0);
@@ -1350,7 +1350,7 @@ export const buildSyntheticFlowPacketForTest = (
     packet: {
       source_ts: now,
       ingest_ts: now,
-      seq: SMART_MONEY_SCENARIO_IDS.indexOf(scenarioId) + 1,
+      seq: SMART_FLOW_SCENARIO_IDS.indexOf(scenarioId) + 1,
       trace_id: `synthetic-smart-flow:${scenarioId}`,
       id: `synthetic-smart-flow:${scenarioId}:${now}`,
       members: Array.from(

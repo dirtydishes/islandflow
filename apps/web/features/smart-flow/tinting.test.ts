@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   FlowHypothesisTypeSchema,
   type FlowHypothesisType,
-  type SmartMoneyDirection
+  type SmartFlowDirection
 } from "@islandflow/types";
 
 import {
@@ -27,7 +27,7 @@ const makeSmartFlowTintInput = ({
   sourceReasons = []
 }: {
   abstained?: boolean;
-  direction?: SmartMoneyDirection;
+  direction?: SmartFlowDirection;
   evidenceQuality?: number;
   hypothesisType?: FlowHypothesisType;
   policyConfidence?: number;
@@ -90,7 +90,7 @@ describe("smart-flow tinting", () => {
   });
 
   it("maps direction states into tint metadata", () => {
-    const cases: [SmartMoneyDirection, SmartFlowTintDirection][] = [
+    const cases: [SmartFlowDirection, SmartFlowTintDirection][] = [
       ["bullish", "bullish"],
       ["bearish", "bearish"],
       ["neutral", "neutral"],

@@ -1,42 +1,26 @@
 import type { LiveSubscription, OptionFlowFilters } from "@islandflow/types";
 import { getSubscriptionKey as getLiveSubscriptionKey } from "@islandflow/types";
 import { normalizeTimeframeIntervalMs } from "../market-chart";
-import {
-  DURABLE_TAPES_RAW_FALLBACK_ENABLED,
-  LIVE_HOT_WINDOW,
-  LIVE_OPTIONS_HEAD_LIMIT,
-  SUPPORTED_CANDLE_INTERVAL_MS
-} from "./config";
+import { LIVE_HOT_WINDOW, LIVE_OPTIONS_HEAD_LIMIT, SUPPORTED_CANDLE_INTERVAL_MS } from "./config";
 import type { EquityScope, OptionScope, RouteFeatures } from "./types";
 
 const CANONICAL_OPTIONS_PATH = "/options";
-const TAPE_COMPAT_PATH = "/tape";
 const DURABLE_TAPES_PATH = "/durable-tapes";
-const KNOWN_TERMINAL_PATHS = new Set([
-  CANONICAL_OPTIONS_PATH,
-  TAPE_COMPAT_PATH,
-  "/news",
-  DURABLE_TAPES_PATH
-]);
+const KNOWN_TERMINAL_PATHS = new Set([CANONICAL_OPTIONS_PATH, "/news", DURABLE_TAPES_PATH]);
 
 export const normalizeTerminalPathname = (pathname: string): string => {
-  if (pathname === TAPE_COMPAT_PATH) {
-    return CANONICAL_OPTIONS_PATH;
-  }
   return KNOWN_TERMINAL_PATHS.has(pathname) ? pathname : "/";
 };
 
-export const buildDurableTapesRouteFeatures = (
-  rawFallbackEnabled = DURABLE_TAPES_RAW_FALLBACK_ENABLED
-): RouteFeatures => ({
-  options: rawFallbackEnabled,
+export const buildDurableTapesRouteFeatures = (): RouteFeatures => ({
+  options: false,
   nbbo: false,
   equities: true,
   flow: true,
   news: true,
   alerts: true,
   durableRows: true,
-  smartFlow: rawFallbackEnabled,
+  smartFlow: false,
   inferredDark: false,
   equityJoins: false,
   equityCandles: false,

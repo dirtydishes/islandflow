@@ -756,6 +756,8 @@ const normalizeNumericFields = (
   return record;
 };
 
+const CANONICAL_SIGNAL_PROFILES = new Set(["smart-flow", "balanced", "all"]);
+
 const normalizeOptionRow = (row: unknown): unknown => {
   if (row && typeof row === "object") {
     const record = normalizeNumericFields(row as Record<string, unknown>, [
@@ -792,6 +794,13 @@ const normalizeOptionRow = (row: unknown): unknown => {
     }
     if (record.signal_reasons == null) {
       record.signal_reasons = [];
+    }
+    if (
+      record.signal_profile != null &&
+      (typeof record.signal_profile !== "string" ||
+        !CANONICAL_SIGNAL_PROFILES.has(record.signal_profile))
+    ) {
+      delete record.signal_profile;
     }
     return record;
   }

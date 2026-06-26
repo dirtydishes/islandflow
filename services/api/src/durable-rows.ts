@@ -184,14 +184,29 @@ const buildDurableRowLookups = (context: DurableRowCompositionContext): DurableR
   smartFlowByPacketId: buildSmartFlowByPacketId(context.smartFlowProjections)
 });
 
-const normalizeAlertSeverity = (alert: SmartFlowAlertEvent): "high" | "medium" | "low" => {
-  if (alert.policy_confidence >= 0.72 && alert.evidence_quality >= 0.55) {
+const confidenceBandForAlert = (alert: SmartFlowAlertEvent): "high" | "medium" | "low" => {
+  if (alert.policy_confidence >= 0.72) {
     return "high";
   }
-  if (alert.policy_confidence >= 0.52 || alert.evidence_quality >= 0.45) {
+  if (alert.policy_confidence >= 0.52) {
     return "medium";
   }
   return "low";
+};
+
+const evidenceQualityBandForAlert = (
+  alert: SmartFlowAlertEvent
+): "strong" | "usable" | "thin" | "poor" => {
+  if (alert.evidence_quality >= 0.75) {
+    return "strong";
+  }
+  if (alert.evidence_quality >= 0.55) {
+    return "usable";
+  }
+  if (alert.evidence_quality > 0) {
+    return "thin";
+  }
+  return "poor";
 };
 
 const normalizeDirection = (
@@ -432,15 +447,16 @@ const buildDurableAlertRow = (
     (firstPreviewPrint
       ? extractUnderlyingFromContract(firstPreviewPrint.option_contract_id)
       : null);
-  const severity = normalizeAlertSeverity(alert);
+  const confidenceBand = confidenceBandForAlert(alert);
+  const evidenceQualityBand = evidenceQualityBandForAlert(alert);
   const direction = normalizeDirection(alert.direction);
   const primaryLabel = humanizeToken(alert.hypothesis_type);
   const badges = [
-    { kind: "severity", label: severity, tone: severity },
+    { kind: "confidence", label: confidenceBand, tone: confidenceBand },
     { kind: "direction", label: direction, tone: direction },
     {
       kind: "evidence",
-      label: `${alert.evidence_refs.length} refs`,
+      label: evidenceQualityBand,
       tone: missingRefs.length > 0 ? "warning" : "neutral"
     }
   ];
@@ -458,19 +474,24 @@ const buildDurableAlertRow = (
       time: formatTimeCell(alert.source_ts),
       symbol: underlying ?? "ALERT",
       kind: primaryLabel,
-      score: Math.round(alert.policy_confidence * 100),
-      state: `${severity} / ${direction}`,
+      confidence: `${Math.round(alert.policy_confidence * 100)}%`,
+      state: `${confidenceBand} / ${direction}`,
       evidence: `${availableRefs.length}/${alert.evidence_refs.length} refs`
     },
     alert: {
       trace_id: alert.trace_id,
+      alert_id: alert.alert_id,
+      hypothesis_id: alert.hypothesis_id,
+      insight_id: alert.insight_id,
       primary_label: primaryLabel,
-      primary_profile_id: null,
-      score: alert.policy_confidence * 100,
-      severity,
+      hypothesis_type: alert.hypothesis_type,
       direction,
-      hit_count: 1,
-      top_hit: null
+      policy_confidence: alert.policy_confidence,
+      evidence_quality: alert.evidence_quality,
+      confidence_band: confidenceBand,
+      evidence_quality_band: evidenceQualityBand,
+      trigger_kind: alert.trigger.kind,
+      projection_trace_id: alert.trigger.projection_trace_id
     },
     evidence: {
       total_refs: alert.evidence_refs.length,

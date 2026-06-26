@@ -94,7 +94,7 @@ describe("synthetic scenario catalog and labels", () => {
     expect(label?.confidence_band).toBe("low");
     expect(expectedOutput?.alert_expectation).toBe("no_alert");
     expect(expectedOutput?.false_positive_penalty.severity).toBe("high");
-    expect(expectedOutput?.expected_derived_events).toContainEqual(
+    expect(expectedOutput?.expected_pipeline_events).toContainEqual(
       expect.objectContaining({
         event_kind: "flow_hypothesis_event",
         expectation: "absent"

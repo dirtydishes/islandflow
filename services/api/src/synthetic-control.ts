@@ -4,14 +4,14 @@ import {
   getSyntheticSessionState,
   type FlowHypothesisType,
   type SmartFlowExplainabilityProjection,
-  type SmartMoneyProfileId,
+  type SmartFlowProfileId,
   type SyntheticControlState,
   type SyntheticDerivedStatus
 } from "@islandflow/types";
 
 export type SyntheticBackendMode = "synthetic" | "mixed" | "live";
 
-export type RollingSyntheticProfileHits = Record<SmartMoneyProfileId, number[]>;
+export type RollingSyntheticProfileHits = Record<SmartFlowProfileId, number[]>;
 
 export const createRollingSyntheticProfileHits = (): RollingSyntheticProfileHits => ({
   institutional_directional: [],
@@ -22,7 +22,7 @@ export const createRollingSyntheticProfileHits = (): RollingSyntheticProfileHits
   hedge_reactive: []
 });
 
-const HYPOTHESIS_PROFILE_MAP: Partial<Record<FlowHypothesisType, SmartMoneyProfileId>> = {
+const HYPOTHESIS_PROFILE_MAP: Partial<Record<FlowHypothesisType, SmartFlowProfileId>> = {
   directional_accumulation: "institutional_directional",
   retail_attention_flow: "retail_whale",
   event_positioning: "event_driven",
@@ -76,10 +76,10 @@ export const getSyntheticProfileHitCounts = (
   state: RollingSyntheticProfileHits,
   now: number,
   coverageWindowMinutes: number
-): Record<SmartMoneyProfileId, number> => {
+): Record<SmartFlowProfileId, number> => {
   const floorTs = now - coverageWindowMinutes * 60_000;
   const counts = buildEmptySyntheticProfileHitCounts();
-  for (const profileId of Object.keys(state) as SmartMoneyProfileId[]) {
+  for (const profileId of Object.keys(state) as SmartFlowProfileId[]) {
     const retained = state[profileId].filter((ts) => ts >= floorTs);
     state[profileId] = retained;
     counts[profileId] = retained.length;
