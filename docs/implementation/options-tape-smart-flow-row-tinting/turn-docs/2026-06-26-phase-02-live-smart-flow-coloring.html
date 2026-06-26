@@ -253,7 +253,7 @@
         <p>
           Forgejo CLI status inspection still fails on this host because <code>fj pr status 86</code>
           cannot parse the Actions job URL returned by Forgejo. CI is checked through the Forgejo
-          commit-status API instead.
+          commit-status API instead, and the final pushed reviewer head passed before callback.
         </p>
       </section>
 
@@ -279,9 +279,11 @@
         <h2>Verification</h2>
         <ul>
           <li><span class="ok">Passed</span> <code>bun test apps/web/app/terminal.test.ts apps/web/features/options-tape</code>: 116 tests, 375 assertions.</li>
+          <li><span class="ok">Passed</span> <code>bun run fmt:check</code>: Biome checked 352 files with no fixes applied.</li>
           <li><span class="ok">Passed</span> <code>bun --cwd=apps/web run build</code>: Next production build and TypeScript completed.</li>
           <li><span class="ok">Passed</span> headless Chromium browser probes against local branch server <code>http://127.0.0.1:3100</code>: <code>/options</code> desktop and mobile, plus dashboard <code>/</code> desktop.</li>
           <li><span class="ok">Passed</span> delayed <code>/options</code> probe with the local API origin: live option rows rendered, and DOM output included <code>options-tape-smart-flow-row</code> classes.</li>
+          <li><span class="ok">Passed</span> Forgejo commit-status API for the final pushed PR head: <code>CI / Validate (pull_request)</code> succeeded.</li>
           <li><span class="note">Note</span> the first empty-state browser probe used the default <code>127.0.0.1:4000</code> API origin and exposed a local API binding mismatch; the clean pass used <code>NEXT_PUBLIC_API_URL=http://172.18.0.1:4000</code> on the app's CORS-friendly QA port.</li>
         </ul>
       </section>
