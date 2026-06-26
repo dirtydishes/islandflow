@@ -2,15 +2,12 @@ import { z } from "zod";
 import {
   EventMetaSchema,
   SmartMoneyConfidenceBandSchema,
-  SmartMoneyDirectionSchema,
-  type SmartMoneyEvent,
-  type SmartMoneyProfileId,
-  SmartMoneyProfileIdSchema
+  SmartMoneyDirectionSchema
 } from "./events";
 
 export const SMART_FLOW_CONTRACT_VERSION = "smart-flow.contracts.v1";
-export const SMART_FLOW_POLICY_VERSION = "smart-flow.policy.compat.v1";
-export const SMART_FLOW_MODEL_VERSION = "smart-flow.model.unscored.v1";
+export const SMART_FLOW_POLICY_VERSION = "smart-flow.policy.v1";
+export const SMART_FLOW_MODEL_VERSION = "smart-flow.model.rules.v1";
 export const SMART_FLOW_HYPOTHESIS_SCORE_POLICY_VERSION = "smart-flow.hypothesis-score.policy.v1";
 export const SMART_FLOW_HYPOTHESIS_SCORE_MODEL_VERSION = "smart-flow.hypothesis-score.rules.v1";
 export const SMART_FLOW_EXPLAINABILITY_PROJECTION_VERSION =
@@ -296,15 +293,6 @@ export const FlowAlternativeHypothesisSchema = z.object({
 
 export type FlowAlternativeHypothesis = z.infer<typeof FlowAlternativeHypothesisSchema>;
 
-export const SmartFlowLegacyCompatibilitySchema = z.object({
-  compatibility_only: z.literal(true),
-  legacy_event_id: z.string().min(1).optional(),
-  legacy_profile_id: SmartMoneyProfileIdSchema.nullable().optional(),
-  legacy_channel: z.literal("smart-money").optional()
-});
-
-export type SmartFlowLegacyCompatibility = z.infer<typeof SmartFlowLegacyCompatibilitySchema>;
-
 export const FlowHypothesisEventSchema = EventMetaSchema.merge(
   z.object({
     schema_version: SmartFlowContractVersionSchema,
@@ -321,12 +309,7 @@ export const FlowHypothesisEventSchema = EventMetaSchema.merge(
     alternatives: z.array(FlowAlternativeHypothesisSchema),
     abstention: FlowAbstentionSchema,
     evidence_refs: z.array(z.string().min(1)),
-    generated_from: z.enum([
-      "flow_evidence_cluster",
-      "legacy_smart_money_event",
-      "synthetic_fixture"
-    ]),
-    compatibility: SmartFlowLegacyCompatibilitySchema.optional()
+    generated_from: z.enum(["flow_evidence_cluster", "synthetic_fixture"])
   })
 );
 
@@ -345,26 +328,13 @@ export const SmartFlowInsightSchema = z.object({
   confidence: z.number().min(0).max(1),
   evidence_refs: z.array(z.string().min(1)),
   abstention: FlowAbstentionSchema,
-  alternatives: z.array(FlowAlternativeHypothesisSchema),
-  compatibility: SmartFlowLegacyCompatibilitySchema.optional()
+  alternatives: z.array(FlowAlternativeHypothesisSchema)
 });
 
 export type SmartFlowInsight = z.infer<typeof SmartFlowInsightSchema>;
 
 export const SmartFlowInsightProjectionSchema = SmartFlowInsightSchema;
 export type SmartFlowInsightProjection = SmartFlowInsight;
-
-/**
- * @deprecated Use SmartFlowInsightSchema. Smart money is compatibility language,
- * not a canonical hidden-participant claim.
- */
-export const SmartMoneyInsightSchema = SmartFlowInsightSchema;
-
-/**
- * @deprecated Use SmartFlowInsight. Smart money is compatibility language,
- * not a canonical hidden-participant claim.
- */
-export type SmartMoneyInsight = SmartFlowInsight;
 
 export const SmartFlowExplainabilityRefsSchema = z.object({
   trace_id: z.string().min(1),
@@ -373,8 +343,7 @@ export const SmartFlowExplainabilityRefsSchema = z.object({
   insight_id: z.string().min(1),
   cluster_id: z.string().min(1),
   candidate_ids: z.array(z.string().min(1)),
-  evidence_refs: z.array(z.string().min(1)),
-  legacy_event_id: z.string().min(1).optional()
+  evidence_refs: z.array(z.string().min(1))
 });
 
 export type SmartFlowExplainabilityRefs = z.infer<typeof SmartFlowExplainabilityRefsSchema>;
@@ -393,7 +362,7 @@ export const SmartFlowExplainabilityProjectionSchema = EventMetaSchema.merge(
     projection_version: z.literal(SMART_FLOW_EXPLAINABILITY_PROJECTION_VERSION),
     policy_version: SmartFlowPolicyVersionSchema,
     model_version: SmartFlowModelVersionSchema,
-    source_channel: z.enum(["smart-flow", "smart-money"]),
+    source_channel: z.literal("smart-flow"),
     versions: z.object({
       contract: SmartFlowContractVersionSchema,
       projection: z.literal(SMART_FLOW_EXPLAINABILITY_PROJECTION_VERSION),
@@ -405,23 +374,13 @@ export const SmartFlowExplainabilityProjectionSchema = EventMetaSchema.merge(
     hypothesis: FlowHypothesisEventSchema,
     insight: SmartFlowInsightSchema,
     abstention: FlowAbstentionSchema,
-    alternatives: z.array(FlowAlternativeHypothesisSchema),
-    compatibility: SmartFlowLegacyCompatibilitySchema.optional()
+    alternatives: z.array(FlowAlternativeHypothesisSchema)
   })
 );
 
 export type SmartFlowExplainabilityProjection = z.infer<
   typeof SmartFlowExplainabilityProjectionSchema
 >;
-
-const profileToHypothesisType: Record<SmartMoneyProfileId, FlowHypothesisType> = {
-  institutional_directional: "directional_accumulation",
-  retail_whale: "retail_attention_flow",
-  event_driven: "event_positioning",
-  vol_seller: "volatility_supply",
-  arbitrage: "structure_arbitrage",
-  hedge_reactive: "hedge_rebalance"
-};
 
 const hypothesisLabels: Record<FlowHypothesisType, string> = {
   directional_accumulation: "Directional accumulation hypothesis",
@@ -431,13 +390,6 @@ const hypothesisLabels: Record<FlowHypothesisType, string> = {
   structure_arbitrage: "Structure-arbitrage hypothesis",
   hedge_rebalance: "Hedge-rebalance hypothesis",
   unclear: "No clear flow hypothesis"
-};
-
-const clampUnit = (value: number): number => {
-  if (!Number.isFinite(value)) {
-    return 0;
-  }
-  return Math.max(0, Math.min(1, value));
 };
 
 const confidenceBandFromConfidence = (
@@ -483,19 +435,17 @@ export const smartFlowInsightFromHypothesisEvent = (
     confidence,
     evidence_refs: hypothesis.evidence_refs,
     abstention: hypothesis.abstention,
-    alternatives: hypothesis.alternatives,
-    ...(hypothesis.compatibility ? { compatibility: hypothesis.compatibility } : {})
+    alternatives: hypothesis.alternatives
   });
 };
 
 export const smartFlowExplainabilityFromHypothesisEvent = (
   hypothesis: FlowHypothesisEvent,
-  options: { insight_id?: string; source_channel?: "smart-flow" | "smart-money" } = {}
+  options: { insight_id?: string } = {}
 ): SmartFlowExplainabilityProjection => {
   const insight = smartFlowInsightFromHypothesisEvent(hypothesis, {
     insight_id: options.insight_id
   });
-  const compatibility = hypothesis.compatibility ?? insight.compatibility;
 
   return SmartFlowExplainabilityProjectionSchema.parse({
     source_ts: hypothesis.source_ts,
@@ -506,7 +456,7 @@ export const smartFlowExplainabilityFromHypothesisEvent = (
     projection_version: SMART_FLOW_EXPLAINABILITY_PROJECTION_VERSION,
     policy_version: hypothesis.policy_version,
     model_version: hypothesis.model_version,
-    source_channel: options.source_channel ?? (compatibility ? "smart-money" : "smart-flow"),
+    source_channel: "smart-flow",
     versions: {
       contract: hypothesis.schema_version,
       projection: SMART_FLOW_EXPLAINABILITY_PROJECTION_VERSION,
@@ -520,8 +470,7 @@ export const smartFlowExplainabilityFromHypothesisEvent = (
       insight_id: insight.insight_id,
       cluster_id: hypothesis.cluster_id,
       candidate_ids: hypothesis.candidate_ids,
-      evidence_refs: hypothesis.evidence_refs,
-      ...(compatibility?.legacy_event_id ? { legacy_event_id: compatibility.legacy_event_id } : {})
+      evidence_refs: hypothesis.evidence_refs
     },
     evidence: {
       evidence_refs: hypothesis.evidence_refs,
@@ -531,168 +480,6 @@ export const smartFlowExplainabilityFromHypothesisEvent = (
     hypothesis,
     insight,
     abstention: hypothesis.abstention,
-    alternatives: hypothesis.alternatives,
-    ...(compatibility ? { compatibility } : {})
-  });
-};
-
-const evidenceQualityFromLegacyEvent = (event: SmartMoneyEvent): EvidenceQuality => {
-  const coverage = clampUnit(event.features.nbbo_coverage_ratio);
-  const stale = clampUnit(event.features.nbbo_stale_ratio);
-  const qualityScore = clampUnit(coverage - stale);
-  const grade: EvidenceQualityGrade =
-    qualityScore >= 0.82
-      ? "strong"
-      : qualityScore >= 0.55
-        ? "usable"
-        : qualityScore > 0
-          ? "thin"
-          : "poor";
-
-  return EvidenceQualitySchema.parse({
-    schema_version: SMART_FLOW_CONTRACT_VERSION,
-    grade,
-    quality_score: qualityScore,
-    coverage_ratio: coverage,
-    stale_ratio: stale,
-    completeness_score: coverage,
-    caveats: event.suppressed_reasons
-  });
-};
-
-const mapLegacyAbstentionReason = (reason: string): FlowAbstentionReason => {
-  if (reason === "stale_or_missing_quote_context") {
-    return "stale_quote_context";
-  }
-  if (reason === "inside_market_or_cross_like_execution") {
-    return "inside_market_context";
-  }
-  if (reason === "special_print_or_complex_context") {
-    return "complex_or_special_print_context";
-  }
-  return "other";
-};
-
-const mapLegacyPenaltyKind = (reason: string): FlowScorePenaltyKind => {
-  if (reason === "stale_or_missing_quote_context") {
-    return "stale_quote_context";
-  }
-  if (reason === "inside_market_or_cross_like_execution") {
-    return "inside_market_context";
-  }
-  if (reason === "special_print_or_complex_context") {
-    return "complex_or_special_print_context";
-  }
-  return "other";
-};
-
-const abstentionFromLegacyEvent = (event: SmartMoneyEvent): FlowAbstention => {
-  const reasons = event.abstained
-    ? event.suppressed_reasons.map(mapLegacyAbstentionReason)
-    : ["not_abstained"];
-
-  return FlowAbstentionSchema.parse({
-    abstained: event.abstained,
-    reasons: reasons.length > 0 ? reasons : ["below_policy_threshold"],
-    source_reasons: event.suppressed_reasons
-  });
-};
-
-const hypothesisTypeFromLegacyProfile = (
-  profileId: SmartMoneyProfileId | null
-): FlowHypothesisType => {
-  return profileId ? profileToHypothesisType[profileId] : "unclear";
-};
-
-export const flowHypothesisEventFromLegacySmartMoneyEvent = (
-  event: SmartMoneyEvent
-): FlowHypothesisEvent => {
-  const primaryScore =
-    event.profile_scores.find((score) => score.profile_id === event.primary_profile_id) ??
-    event.profile_scores[0] ??
-    null;
-  const evidenceQuality = evidenceQualityFromLegacyEvent(event);
-  const policyConfidence = event.abstained ? 0 : clampUnit(primaryScore?.probability ?? 0);
-  const hypothesisType = hypothesisTypeFromLegacyProfile(event.primary_profile_id);
-  const evidenceRefs = [...event.packet_ids, ...event.member_print_ids];
-
-  return FlowHypothesisEventSchema.parse({
-    source_ts: event.source_ts,
-    ingest_ts: event.ingest_ts,
-    seq: event.seq,
-    trace_id: event.trace_id,
-    schema_version: SMART_FLOW_CONTRACT_VERSION,
-    policy_version: SMART_FLOW_POLICY_VERSION,
-    model_version: SMART_FLOW_MODEL_VERSION,
-    event_id: `smartflow:hypothesis:${event.event_id}`,
-    hypothesis_id: `hypothesis:${event.event_id}`,
-    cluster_id: `cluster:${event.event_id}`,
-    candidate_ids: event.packet_ids.map((packetId) => `candidate:${packetId}`),
-    underlying_id: event.underlying_id,
-    hypothesis_type: hypothesisType,
-    direction: event.primary_direction,
-    scores: {
-      schema_version: SMART_FLOW_CONTRACT_VERSION,
-      policy_version: SMART_FLOW_POLICY_VERSION,
-      model_version: SMART_FLOW_MODEL_VERSION,
-      hypothesis_type: hypothesisType,
-      direction: event.primary_direction,
-      evidence_strength: evidenceQuality.quality_score,
-      fit_score: clampUnit(primaryScore?.probability ?? 0),
-      penalty_score: event.suppressed_reasons.length > 0 ? 1 : 0,
-      penalties: event.suppressed_reasons.map((reason, index) => ({
-        penalty_id: `penalty:${event.event_id}:legacy:${index}:${reason}`,
-        kind: mapLegacyPenaltyKind(reason),
-        score: 1,
-        reason: `Legacy suppression guard: ${reason}.`,
-        evidence_refs: evidenceRefs
-      })),
-      confidence: {
-        policy_confidence: policyConfidence,
-        evidence_quality: evidenceQuality.quality_score,
-        hypothesis_margin: 0,
-        conviction: policyConfidence,
-        calibration_version: null
-      }
-    },
-    alternatives: event.profile_scores
-      .filter((score) => score.profile_id !== event.primary_profile_id)
-      .slice(0, 3)
-      .map((score) => ({
-        hypothesis_type: profileToHypothesisType[score.profile_id],
-        direction: score.direction,
-        score: score.probability,
-        reasons: score.reasons
-      })),
-    abstention: abstentionFromLegacyEvent(event),
-    evidence_refs: evidenceRefs,
-    generated_from: "legacy_smart_money_event",
-    compatibility: {
-      compatibility_only: true,
-      legacy_event_id: event.event_id,
-      legacy_profile_id: event.primary_profile_id,
-      legacy_channel: "smart-money"
-    }
-  });
-};
-
-export const smartFlowInsightFromLegacySmartMoneyEvent = (
-  event: SmartMoneyEvent
-): SmartFlowInsight => {
-  const hypothesis = flowHypothesisEventFromLegacySmartMoneyEvent(event);
-
-  return smartFlowInsightFromHypothesisEvent(hypothesis, {
-    insight_id: `smartflow:insight:${event.event_id}`
-  });
-};
-
-export const smartFlowExplainabilityFromLegacySmartMoneyEvent = (
-  event: SmartMoneyEvent
-): SmartFlowExplainabilityProjection => {
-  const hypothesis = flowHypothesisEventFromLegacySmartMoneyEvent(event);
-
-  return smartFlowExplainabilityFromHypothesisEvent(hypothesis, {
-    insight_id: `smartflow:insight:${event.event_id}`,
-    source_channel: "smart-money"
+    alternatives: hypothesis.alternatives
   });
 };

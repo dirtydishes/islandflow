@@ -574,10 +574,10 @@ export const SYNTHETIC_SCENARIO_CATALOG: readonly ScenarioInjection[] = [
         req(
           "no-certainty-language",
           "other",
-          "legacy_smart_money_certainty",
+          "legacy_certainty_language",
           "present",
           true,
-          "Expected outputs should not revive old smart-money certainty language."
+          "Expected outputs should not revive old certainty language."
         )
       ],
       expected_derived_events: requiredDerivedEvents,

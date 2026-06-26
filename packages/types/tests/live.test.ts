@@ -81,7 +81,7 @@ describe("live protocol types", () => {
     const snapshot = LiveServerMessageSchema.parse({
       op: "snapshot",
       snapshot: {
-        subscription: { channel: "alerts" },
+        subscription: { channel: "smart-flow-alerts" },
         items: [],
         watermark: cursor,
         next_before: null

@@ -299,8 +299,8 @@ describe("options tape row tint helpers", () => {
         seq,
         trace_id: `hypothesis:${seq}`,
         schema_version: "smart-flow.contracts.v1",
-        policy_version: "smart-flow.policy.compat.v1",
-        model_version: "smart-flow.model.unscored.v1",
+        policy_version: "smart-flow.policy.v1",
+        model_version: "smart-flow.model.rules.v1",
         event_id: `event:${seq}`,
         hypothesis_id: `hypothesis:${seq}`,
         cluster_id: `cluster:${seq}`,
@@ -310,8 +310,8 @@ describe("options tape row tint helpers", () => {
         direction,
         scores: {
           schema_version: "smart-flow.contracts.v1",
-          policy_version: "smart-flow.policy.compat.v1",
-          model_version: "smart-flow.model.unscored.v1",
+          policy_version: "smart-flow.policy.v1",
+          model_version: "smart-flow.model.rules.v1",
           hypothesis_type: hypothesisType,
           direction,
           evidence_strength: evidenceQuality,
@@ -337,7 +337,7 @@ describe("options tape row tint helpers", () => {
       },
       insight: {
         schema_version: "smart-flow.contracts.v1",
-        policy_version: "smart-flow.policy.compat.v1",
+        policy_version: "smart-flow.policy.v1",
         insight_id: `insight:${seq}`,
         hypothesis_id: `hypothesis:${seq}`,
         underlying_id: "SPY",
@@ -363,12 +363,12 @@ describe("options tape row tint helpers", () => {
       versions: {
         contract: "smart-flow.contracts.v1",
         projection: "smart-flow.explainability-projection.v1",
-        policy: "smart-flow.policy.compat.v1",
-        model: "smart-flow.model.unscored.v1"
+        policy: "smart-flow.policy.v1",
+        model: "smart-flow.model.rules.v1"
       },
       projection_version: "smart-flow.explainability-projection.v1",
-      policy_version: "smart-flow.policy.compat.v1",
-      model_version: "smart-flow.model.unscored.v1",
+      policy_version: "smart-flow.policy.v1",
+      model_version: "smart-flow.model.rules.v1",
       schema_version: "smart-flow.contracts.v1"
     }) as SmartFlowExplainabilityProjection;
 
@@ -595,8 +595,6 @@ describe("options tape row tint helpers", () => {
           member_trace_ids: [],
           member_count: 250
         },
-        classifier: null,
-        smart_money: null,
         smart_flow: projection
       }
     } as never;

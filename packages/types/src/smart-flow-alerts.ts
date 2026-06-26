@@ -27,10 +27,7 @@ export const isNativeNonAbstainedSmartFlowProjection = (
   projection.hypothesis.generated_from === "flow_evidence_cluster" &&
   projection.abstention.abstained === false &&
   projection.hypothesis.abstention.abstained === false &&
-  projection.insight.abstention.abstained === false &&
-  projection.compatibility === undefined &&
-  projection.hypothesis.compatibility === undefined &&
-  projection.insight.compatibility === undefined;
+  projection.insight.abstention.abstained === false;
 
 const NonAbstainedNativeSmartFlowProjectionSchema = SmartFlowExplainabilityProjectionSchema.refine(
   isNativeNonAbstainedSmartFlowProjection,

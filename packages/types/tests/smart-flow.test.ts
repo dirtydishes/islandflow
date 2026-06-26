@@ -1,10 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import type { SmartMoneyEvent } from "../src/events";
 import {
   FlowCandidateSchema,
   FlowEvidenceClusterSchema,
   FlowHypothesisEventSchema,
-  flowHypothesisEventFromLegacySmartMoneyEvent,
   SMART_FLOW_CONTRACT_VERSION,
   SMART_FLOW_EXPLAINABILITY_PROJECTION_VERSION,
   SMART_FLOW_HYPOTHESIS_SCORE_MODEL_VERSION,
@@ -13,11 +11,8 @@ import {
   SMART_FLOW_POLICY_VERSION,
   SmartFlowExplainabilityProjectionSchema,
   SmartFlowInsightSchema,
-  SmartMoneyInsightSchema,
   smartFlowExplainabilityFromHypothesisEvent,
-  smartFlowExplainabilityFromLegacySmartMoneyEvent,
-  smartFlowInsightFromHypothesisEvent,
-  smartFlowInsightFromLegacySmartMoneyEvent
+  smartFlowInsightFromHypothesisEvent
 } from "../src/smart-flow";
 
 const observationRef = {
@@ -36,75 +31,6 @@ const evidenceQuality = {
   stale_ratio: 0.02,
   completeness_score: 0.95,
   caveats: []
-};
-
-const legacyEvent: SmartMoneyEvent = {
-  source_ts: 10,
-  ingest_ts: 20,
-  seq: 1,
-  trace_id: "smartmoney:flowpacket:1",
-  event_id: "smartmoney:single_leg_event:flowpacket:1",
-  packet_ids: ["flowpacket:1"],
-  member_print_ids: ["print:1"],
-  underlying_id: "SPY",
-  event_kind: "single_leg_event",
-  event_window_ms: 500,
-  features: {
-    contract_count: 1,
-    print_count: 3,
-    total_size: 900,
-    total_premium: 75_000,
-    total_notional: 7_500_000,
-    start_ts: 10,
-    end_ts: 10,
-    window_ms: 500,
-    option_contract_id: "SPY-2025-01-17-450-C",
-    option_type: "C",
-    dte_days: 1,
-    moneyness: 1,
-    atm_proximity: 0.01,
-    aggressor_buy_ratio: 0.7,
-    aggressor_sell_ratio: 0.1,
-    aggressor_ratio: 0.8,
-    nbbo_coverage_ratio: 0.9,
-    nbbo_inside_ratio: 0.1,
-    nbbo_stale_ratio: 0,
-    quote_age_ms: 20,
-    venue_count: 2,
-    inter_fill_ms_mean: 100,
-    strike_count: 1,
-    strike_concentration: 1,
-    structure_legs: 0,
-    same_size_leg_symmetry: 0,
-    net_directional_bias: 0.6,
-    synthetic_iv_shock: null,
-    spread_widening: null,
-    underlying_move_bps: null,
-    days_to_event: null,
-    expiry_after_event: null,
-    pre_event_concentration: null,
-    special_print_ratio: 0
-  },
-  profile_scores: [
-    {
-      profile_id: "institutional_directional",
-      probability: 0.74,
-      confidence_band: "high",
-      direction: "bullish",
-      reasons: ["large_parent_event"]
-    },
-    {
-      profile_id: "retail_whale",
-      probability: 0.35,
-      confidence_band: "low",
-      direction: "bullish",
-      reasons: ["burst_print_pattern"]
-    }
-  ],
-  primary_profile_id: "institutional_directional",
-  primary_direction: "bullish",
-  abstained: false,
-  suppressed_reasons: []
 };
 
 describe("smart-flow contracts", () => {
@@ -270,7 +196,6 @@ describe("smart-flow contracts", () => {
 
     const insight = smartFlowInsightFromHypothesisEvent(parsed);
     expect(insight.hypothesis_id).toBe(parsed.hypothesis_id);
-    expect(insight.compatibility).toBeUndefined();
     expect(insight.summary).toContain("Alternative explanations considered");
 
     const explainability = smartFlowExplainabilityFromHypothesisEvent(parsed);
@@ -281,25 +206,6 @@ describe("smart-flow contracts", () => {
     expect(explainability.evidence.penalties[0]?.kind).toBe("wide_quote_context");
     expect(explainability.alternatives[0]?.hypothesis_type).toBe("hedge_rebalance");
     expect(explainability.abstention.abstained).toBe(false);
-    expect(SmartFlowExplainabilityProjectionSchema.parse(explainability)).toEqual(explainability);
-  });
-
-  it("projects legacy smart-money events into compatibility-only smart-flow insights", () => {
-    const hypothesis = flowHypothesisEventFromLegacySmartMoneyEvent(legacyEvent);
-    const insight = smartFlowInsightFromLegacySmartMoneyEvent(legacyEvent);
-    const explainability = smartFlowExplainabilityFromLegacySmartMoneyEvent(legacyEvent);
-
-    expect(hypothesis.hypothesis_type).toBe("directional_accumulation");
-    expect(hypothesis.compatibility?.compatibility_only).toBe(true);
-    expect(hypothesis.compatibility?.legacy_profile_id).toBe("institutional_directional");
-    expect(insight.label).toBe("Directional accumulation hypothesis");
-    expect(insight.confidence).toBe(0.74);
-    expect(explainability.source_channel).toBe("smart-money");
-    expect(explainability.refs.legacy_event_id).toBe(legacyEvent.event_id);
-    expect(explainability.hypothesis.generated_from).toBe("legacy_smart_money_event");
-    expect(explainability.compatibility?.legacy_channel).toBe("smart-money");
-    expect(SmartFlowInsightSchema.parse(insight)).toEqual(insight);
-    expect(SmartMoneyInsightSchema.parse(insight)).toEqual(insight);
     expect(SmartFlowExplainabilityProjectionSchema.parse(explainability)).toEqual(explainability);
   });
 });

@@ -16,7 +16,7 @@ export type OptionFlowView = z.infer<typeof OptionFlowViewSchema>;
 export const OptionSecurityTypeSchema = z.enum(["stock", "etf"]);
 export type OptionSecurityType = z.infer<typeof OptionSecurityTypeSchema>;
 
-export const OptionsSignalModeSchema = z.enum(["smart-money", "balanced", "all"]);
+export const OptionsSignalModeSchema = z.enum(["smart-flow", "balanced", "all"]);
 export type OptionsSignalMode = z.infer<typeof OptionsSignalModeSchema>;
 
 export const OptionFlowFiltersSchema = z.object({

@@ -118,7 +118,7 @@ export const OptionPrintSchema = EventMetaSchema.merge(
     signal_reasons: z.array(z.string().min(1)).optional(),
     signal_profile: z.preprocess(
       (value) => (value === null ? undefined : value),
-      OptionsSignalModeSchema.optional()
+      OptionsSignalModeSchema.optional().catch(undefined)
     )
   })
 );
@@ -222,53 +222,9 @@ export const SmartMoneyDirectionSchema = z.enum([
 
 export type SmartMoneyDirection = z.infer<typeof SmartMoneyDirectionSchema>;
 
-export const SmartMoneyEventKindSchema = z.enum(["single_leg_event", "multi_leg_event"]);
-
-export type SmartMoneyEventKind = z.infer<typeof SmartMoneyEventKindSchema>;
-
 export const SmartMoneyConfidenceBandSchema = z.enum(["low", "medium", "high"]);
 
 export type SmartMoneyConfidenceBand = z.infer<typeof SmartMoneyConfidenceBandSchema>;
-
-export const SmartMoneyFeaturesSchema = z.object({
-  contract_count: z.number().int().nonnegative(),
-  print_count: z.number().int().nonnegative(),
-  total_size: z.number().nonnegative(),
-  total_premium: z.number().nonnegative(),
-  total_notional: z.number().nonnegative(),
-  start_ts: z.number().int().nonnegative(),
-  end_ts: z.number().int().nonnegative(),
-  window_ms: z.number().int().nonnegative(),
-  option_contract_id: z.string().min(1).optional(),
-  option_type: z.enum(["C", "P"]).optional(),
-  dte_days: z.number().nonnegative().nullable(),
-  moneyness: z.number().nullable(),
-  atm_proximity: z.number().nullable(),
-  aggressor_buy_ratio: z.number().min(0).max(1),
-  aggressor_sell_ratio: z.number().min(0).max(1),
-  aggressor_ratio: z.number().min(0).max(1),
-  nbbo_coverage_ratio: z.number().min(0).max(1),
-  nbbo_inside_ratio: z.number().min(0).max(1),
-  nbbo_stale_ratio: z.number().min(0).max(1),
-  quote_age_ms: z.number().nonnegative().nullable(),
-  venue_count: z.number().int().nonnegative(),
-  inter_fill_ms_mean: z.number().nonnegative().nullable(),
-  strike_count: z.number().int().nonnegative(),
-  strike_concentration: z.number().min(0).max(1),
-  structure_type: z.string().optional(),
-  structure_legs: z.number().int().nonnegative(),
-  same_size_leg_symmetry: z.number().min(0).max(1),
-  net_directional_bias: z.number().min(-1).max(1),
-  synthetic_iv_shock: z.number().nullable(),
-  spread_widening: z.number().nullable(),
-  underlying_move_bps: z.number().nullable(),
-  days_to_event: z.number().nullable(),
-  expiry_after_event: z.boolean().nullable(),
-  pre_event_concentration: z.number().min(0).max(1).nullable(),
-  special_print_ratio: z.number().min(0).max(1)
-});
-
-export type SmartMoneyFeatures = z.infer<typeof SmartMoneyFeaturesSchema>;
 
 export const SmartMoneyProfileScoreSchema = z.object({
   profile_id: SmartMoneyProfileIdSchema,
@@ -279,55 +235,6 @@ export const SmartMoneyProfileScoreSchema = z.object({
 });
 
 export type SmartMoneyProfileScore = z.infer<typeof SmartMoneyProfileScoreSchema>;
-
-/**
- * Compatibility event shape for the current smart-money feeds.
- * Canonical inference language lives in smart-flow contracts.
- */
-export const SmartMoneyEventSchema = EventMetaSchema.merge(
-  z.object({
-    event_id: z.string().min(1),
-    packet_ids: z.array(z.string().min(1)),
-    member_print_ids: z.array(z.string().min(1)),
-    underlying_id: z.string().min(1),
-    event_kind: SmartMoneyEventKindSchema,
-    event_window_ms: z.number().int().nonnegative(),
-    features: SmartMoneyFeaturesSchema,
-    profile_scores: z.array(SmartMoneyProfileScoreSchema),
-    primary_profile_id: SmartMoneyProfileIdSchema.nullable(),
-    primary_direction: SmartMoneyDirectionSchema,
-    abstained: z.boolean(),
-    suppressed_reasons: z.array(z.string().min(1))
-  })
-);
-
-export type SmartMoneyEvent = z.infer<typeof SmartMoneyEventSchema>;
-
-export const ClassifierHitSchema = z.object({
-  classifier_id: z.string().min(1),
-  confidence: z.number().min(0).max(1),
-  direction: z.string().min(1),
-  explanations: z.array(z.string().min(1))
-});
-
-export type ClassifierHit = z.infer<typeof ClassifierHitSchema>;
-
-export const ClassifierHitEventSchema = EventMetaSchema.merge(ClassifierHitSchema);
-
-export type ClassifierHitEvent = z.infer<typeof ClassifierHitEventSchema>;
-
-export const AlertEventSchema = EventMetaSchema.merge(
-  z.object({
-    score: z.number(),
-    severity: z.string().min(1),
-    hits: z.array(ClassifierHitSchema),
-    evidence_refs: z.array(z.string().min(1)),
-    primary_profile_id: SmartMoneyProfileIdSchema.optional(),
-    profile_scores: z.array(SmartMoneyProfileScoreSchema).optional()
-  })
-);
-
-export type AlertEvent = z.infer<typeof AlertEventSchema>;
 
 export const InferredDarkEventSchema = EventMetaSchema.merge(
   z.object({

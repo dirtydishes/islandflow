@@ -90,7 +90,7 @@ describe("smart-flow alert contracts", () => {
     expect(smartFlowAlertFromProjection(projection)).toBeNull();
   });
 
-  it("does not derive alerts from nested-abstained or compatibility projections", () => {
+  it("does not derive alerts from nested-abstained or non-cluster projections", () => {
     const projection = makeProjection();
 
     expect(
@@ -112,10 +112,10 @@ describe("smart-flow alert contracts", () => {
         ...projection,
         insight: {
           ...projection.insight,
-          compatibility: {
-            compatibility_only: true,
-            legacy_event_id: "legacy:event:1",
-            legacy_channel: "smart-money"
+          abstention: {
+            abstained: true,
+            reasons: ["below_policy_threshold"],
+            source_reasons: ["nested insight abstained"]
           }
         }
       })
@@ -126,12 +126,7 @@ describe("smart-flow alert contracts", () => {
         ...projection,
         hypothesis: {
           ...projection.hypothesis,
-          generated_from: "legacy_smart_money_event",
-          compatibility: {
-            compatibility_only: true,
-            legacy_event_id: "legacy:event:1",
-            legacy_channel: "smart-money"
-          }
+          generated_from: "synthetic_fixture"
         }
       })
     ).toBeNull();

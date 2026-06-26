@@ -1,21 +1,4 @@
-import type { ClassifierConfig, ClassifierHit } from "../src/classifiers";
 import type { FlowPacket } from "@islandflow/types";
-
-export const TEST_CLASSIFIER_CONFIG: ClassifierConfig = {
-  sweepMinPremium: 40_000,
-  sweepMinCount: 3,
-  sweepMinPremiumZ: 2,
-  spikeMinPremium: 20_000,
-  spikeMinSize: 400,
-  spikeMinPremiumZ: 2.5,
-  spikeMinSizeZ: 2,
-  zMinSamples: 12,
-  minNbboCoverage: 0.5,
-  minAggressorRatio: 0.55,
-  zeroDteMaxAtmPct: 0.01,
-  zeroDteMinPremium: 20_000,
-  zeroDteMinSize: 400
-};
 
 export const buildFlowPacket = (
   opts: {
@@ -63,8 +46,4 @@ export const buildFlowPacket = (
       ...opts.join_quality
     }
   };
-};
-
-export const getHit = (hits: ClassifierHit[], id: string): ClassifierHit | null => {
-  return hits.find((hit) => hit.classifier_id === id) ?? null;
 };

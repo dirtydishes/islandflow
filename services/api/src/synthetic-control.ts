@@ -2,7 +2,8 @@ import {
   SyntheticDerivedStatusSchema,
   buildEmptySyntheticProfileHitCounts,
   getSyntheticSessionState,
-  type SmartMoneyEvent,
+  type FlowHypothesisType,
+  type SmartFlowExplainabilityProjection,
   type SmartMoneyProfileId,
   type SyntheticControlState,
   type SyntheticDerivedStatus
@@ -20,6 +21,15 @@ export const createRollingSyntheticProfileHits = (): RollingSyntheticProfileHits
   arbitrage: [],
   hedge_reactive: []
 });
+
+const HYPOTHESIS_PROFILE_MAP: Partial<Record<FlowHypothesisType, SmartMoneyProfileId>> = {
+  directional_accumulation: "institutional_directional",
+  retail_attention_flow: "retail_whale",
+  event_positioning: "event_driven",
+  volatility_supply: "vol_seller",
+  structure_arbitrage: "arbitrage",
+  hedge_rebalance: "hedge_reactive"
+};
 
 export const resolveSyntheticBackendMode = (
   optionsAdapter: string,
@@ -50,12 +60,16 @@ export const getSyntheticBackendDisabledReason = (
 
 export const recordSyntheticProfileHit = (
   state: RollingSyntheticProfileHits,
-  event: Pick<SmartMoneyEvent, "primary_profile_id" | "source_ts">
+  projection: Pick<SmartFlowExplainabilityProjection, "hypothesis" | "source_ts" | "abstention">
 ): void => {
-  if (!event.primary_profile_id) {
+  if (projection.abstention.abstained) {
     return;
   }
-  state[event.primary_profile_id].push(event.source_ts);
+  const profileId = HYPOTHESIS_PROFILE_MAP[projection.hypothesis.hypothesis_type];
+  if (!profileId) {
+    return;
+  }
+  state[profileId].push(projection.source_ts);
 };
 
 export const getSyntheticProfileHitCounts = (

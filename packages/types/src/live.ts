@@ -1,8 +1,6 @@
 import { z } from "zod";
 import { DurableTapeComposedLaneSchema, DurableTapeRowViewModelSchema } from "./durable-tapes";
 import {
-  AlertEventSchema,
-  ClassifierHitEventSchema,
   EquityCandleSchema,
   EquityPrintJoinSchema,
   EquityPrintSchema,
@@ -11,8 +9,7 @@ import {
   InferredDarkEventSchema,
   NewsStorySchema,
   OptionNBBOSchema,
-  OptionPrintSchema,
-  SmartMoneyEventSchema
+  OptionPrintSchema
 } from "./events";
 import { OptionFlowFiltersSchema, optionFlowFilterKey } from "./options-flow";
 import { SmartFlowExplainabilityProjectionSchema } from "./smart-flow";
@@ -34,9 +31,6 @@ export const LiveGenericChannelSchema = z.enum([
   "flow",
   "smart-flow",
   "smart-flow-alerts",
-  "smart-money",
-  "classifier-hits",
-  "alerts",
   "inferred-dark",
   "news"
 ]);
@@ -50,9 +44,6 @@ export const LiveChannelSchema = z.enum([
   "flow",
   "smart-flow",
   "smart-flow-alerts",
-  "smart-money",
-  "classifier-hits",
-  "alerts",
   "inferred-dark",
   "news",
   "durable-rows",
@@ -95,10 +86,6 @@ export const LiveSubscriptionSchema = z.discriminatedUnion("channel", [
     snapshot_limit: z.number().int().positive().optional()
   }),
   z.object({
-    channel: z.literal("smart-money"),
-    snapshot_limit: z.number().int().positive().optional()
-  }),
-  z.object({
     channel: z.literal("smart-flow"),
     snapshot_limit: z.number().int().positive().optional()
   }),
@@ -108,8 +95,6 @@ export const LiveSubscriptionSchema = z.discriminatedUnion("channel", [
       "equity-quotes",
       "equity-joins",
       "smart-flow-alerts",
-      "classifier-hits",
-      "alerts",
       "inferred-dark",
       "news"
     ]),
@@ -150,9 +135,6 @@ const livePayloadSchemas = {
   flow: FlowPacketSchema,
   "smart-flow": SmartFlowExplainabilityProjectionSchema,
   "smart-flow-alerts": SmartFlowAlertEventSchema,
-  "smart-money": SmartMoneyEventSchema,
-  "classifier-hits": ClassifierHitEventSchema,
-  alerts: AlertEventSchema,
   "inferred-dark": InferredDarkEventSchema,
   news: NewsStorySchema,
   "durable-rows": DurableTapeRowViewModelSchema,

@@ -88,10 +88,8 @@ describe("smart-flow hypothesis scoring", () => {
     expect(hypothesis.alternatives.map((entry) => entry.hypothesis_type)).toContain(
       "retail_attention_flow"
     );
-    expect(hypothesis.compatibility).toBeUndefined();
     expect(insight.hypothesis_id).toBe(hypothesis.hypothesis_id);
     expect(insight.alternatives).toEqual(hypothesis.alternatives);
-    expect(insight.compatibility).toBeUndefined();
   });
 
   it("preserves quote, inside-market, and low-premium negative evidence as penalties", () => {

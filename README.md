@@ -33,7 +33,7 @@ The system is currently focused on:
 
 - canonical event schemas for options, NBBO, equities, equity quotes, news, derived flow, alerts, candles, inferred-dark events, and live transport;
 - deterministic synthetic market data and fixture generation for repeatable testing;
-- compute services that reconstruct parent events, flow packets, smart-flow/smart-money hypotheses, alerts, and equity print-to-quote joins;
+- compute services that reconstruct parent events, flow packets, smart-flow hypotheses, smart-flow alerts, and equity print-to-quote joins;
 - server-side candle aggregation and replayable historical streams;
 - cursor-based API surfaces for live, history, and replay workflows;
 - reusable durable tape modules for options, flow packets, equities, alerts, and news;
@@ -58,7 +58,7 @@ These are active construction areas, not stable product features.
 | Options ingest | Synthetic, Alpaca options, Databento sidecar replay, and IBKR sidecar bridge paths. |
 | Equities ingest | Synthetic and Alpaca equities trades/quotes paths. |
 | News ingest | Alpaca news backfill and websocket publication. |
-| Compute | Parent-event reconstruction, flow packets, smart-flow/smart-money scoring, classifier compatibility events, alerts, rolling stats, inferred-dark signals, and equity joins. |
+| Compute | Parent-event reconstruction, flow packets, smart-flow scoring, smart-flow alerts, rolling stats, inferred-dark signals, and equity joins. |
 | Candles | Server-side equity OHLC aggregation, ClickHouse persistence, optional Redis cache, and NATS publication. |
 | Replay | ClickHouse and synthetic-fixture replay paths with ordered multi-stream publication controls. |
 | API | REST endpoints, cursor history/replay endpoints, live cache hydration, synthetic controls, and WebSocket live channels. |
@@ -85,7 +85,7 @@ These are active construction areas, not stable product features.
 | `apps/web` | Next.js web app and terminal UI. |
 | `apps/desktop` | Electron shell that wraps the hosted or local web app. |
 | `services/api` | REST, history/replay, live cache, websocket, and synthetic-control gateway. |
-| `services/compute` | Parent-event reconstruction, flow packets, smart-flow/smart-money, alerts, inferred-dark, and equity joins. |
+| `services/compute` | Parent-event reconstruction, flow packets, smart-flow, smart-flow alerts, inferred-dark, and equity joins. |
 | `services/candles` | Equity candle aggregation and publication. |
 | `services/ingest-options` | Options print/NBBO ingest adapters. |
 | `services/ingest-equities` | Equity trade/quote ingest adapters. |
@@ -109,11 +109,11 @@ These are active construction areas, not stable product features.
 The API is intentionally not stable yet, but the current gateway exposes these families:
 
 - Health: `GET /health`
-- Current/live cache reads: `/prints/options`, `/prints/equities`, `/prints/equities/range`, `/candles/equities`, `/flow/packets`, `/flow/smart-money`, `/flow/smart-flow`, `/flow/classifier-hits`, `/flow/alerts`, `/news`
-- Cursor history: `/history/options`, `/history/nbbo`, `/history/equities`, `/history/equity-quotes`, `/history/equity-joins`, `/history/flow`, `/history/smart-money`, `/history/smart-flow`, `/history/classifier-hits`, `/history/alerts`, `/history/inferred-dark`, `/history/news`
-- Replay reads: `/replay/options`, `/replay/nbbo`, `/replay/equities`, `/replay/equity-quotes`, `/replay/equity-candles`, `/replay/equity-joins`, `/replay/inferred-dark`, `/replay/flow`, `/replay/smart-money`, `/replay/smart-flow`, `/replay/classifier-hits`, `/replay/alerts`
-- Detail hydration: `/flow/packets/:id`, `/flow/alerts/:traceId/context`
-- WebSockets: `/ws/live` plus channel-specific sockets for options, NBBO, equities, candles, quotes, joins, inferred-dark, flow, classifier hits, smart-money, smart-flow, and alerts
+- Current/live cache reads: `/prints/options`, `/prints/equities`, `/prints/equities/range`, `/candles/equities`, `/flow/packets`, `/flow/smart-flow`, `/flow/smart-flow-alerts`, `/news`
+- Cursor history: `/history/options`, `/history/nbbo`, `/history/equities`, `/history/equity-quotes`, `/history/equity-joins`, `/history/flow`, `/history/smart-flow`, `/history/smart-flow-alerts`, `/history/inferred-dark`, `/history/news`
+- Replay reads: `/replay/options`, `/replay/nbbo`, `/replay/equities`, `/replay/equity-quotes`, `/replay/equity-candles`, `/replay/equity-joins`, `/replay/inferred-dark`, `/replay/flow`, `/replay/smart-flow`, `/replay/smart-flow-alerts`
+- Detail hydration: `/flow/packets/:id`, `/option-prints/by-trace`, `/lookup/options-support`
+- WebSockets: `/ws/live` plus channel-specific sockets for options, NBBO, equities, candles, quotes, joins, inferred-dark, flow, smart-flow, and smart-flow-alerts
 
 Option print reads support signal/raw views and filter parameters used by the terminal UI. These contracts are evolving with the durable-tapes and performance work.
 
@@ -135,33 +135,26 @@ Current routes are implementation and validation surfaces, not finished product 
 
 The durable UI direction is dense, restrained, evidence-first, and stable under live update pressure. It should feel like an instrument panel, not a promotional trading app.
 
-## Smart-Flow And Smart-Money Direction
+## Smart-Flow Direction
 
-Islandflow is moving away from a single binary "smart money" label. The current direction separates:
+Islandflow separates:
 
 - facts: observed prints, quotes, timestamps, sizes, prices, venue/provider metadata;
 - evidence: NBBO alignment, premium/notional concentration, quote freshness, burst timing, moneyness/DTE context, event proximity, cross-signal linkage;
-- hypotheses: participant-style interpretations such as institutional directional flow, retail whale activity, event-driven positioning, volatility selling, arbitrage-like structures, and hedge-reactive activity;
+- hypotheses: interpretations such as directional accumulation, retail attention flow, event positioning, volatility supply, structure arbitrage, and hedge rebalancing;
 - confidence and abstention: explicit uncertainty when evidence is weak, stale, missing, or ambiguous.
 
-Current smart-money compatibility surfaces remain, but newer smart-flow work is trying to make the data model more honest and inspectable.
-
-Primary smart-money paths today:
-
-```text
-/flow/smart-money
-/history/smart-money
-/replay/smart-money
-/ws/smart-money
-```
-
-Smart-flow paths are being developed alongside them:
+Canonical smart-flow paths:
 
 ```text
 /flow/smart-flow
 /history/smart-flow
 /replay/smart-flow
 /ws/smart-flow
+/flow/smart-flow-alerts
+/history/smart-flow-alerts
+/replay/smart-flow-alerts
+/ws/smart-flow-alerts
 ```
 
 ## Local Development
@@ -422,7 +415,7 @@ Active implementation plans live under `docs/implementation`:
 | Stream | Entry point |
 | --- | --- |
 | Synthetic market data | `docs/implementation/synthetic-market-data/00-roadmap.md` |
-| Smart money / smart flow | `docs/implementation/smart-money/00-roadmap.md` |
+| Smart-flow alerts and legacy removal | `docs/implementation/smart-flow-alerts/IMPLEMENT.md` |
 | Reusable market chart | `docs/implementation/lightweight-charts/IMPLEMENT.md` |
 | Durable tape modules | `docs/implementation/durable-tapes/IMPLEMENT.md` |
 | Durable-tapes performance hardening | `docs/implementation/durable-tapes-performance/IMPLEMENT.md` |

@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Smart-Flow Alerts Phase 06 Legacy Deletion</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #0e141a;
+        --panel-2: #111922;
+        --line: #26333f;
+        --line-strong: #72531c;
+        --text: #e8eef5;
+        --muted: #9aa8b6;
+        --faint: #748293;
+        --accent: #f5a623;
+        --green: #28c879;
+        --red: #ff6b5f;
+        --code: #05090d;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.55;
+      }
+
+      main {
+        width: min(1160px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 40px 0 64px;
+      }
+
+      header,
+      section {
+        border: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      header {
+        padding: 24px;
+      }
+
+      section {
+        margin-top: 14px;
+        padding: 20px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 920px;
+        font-size: 2.15rem;
+        line-height: 1.1;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        margin-bottom: 10px;
+        font-size: 1.08rem;
+        letter-spacing: 0;
+      }
+
+      p,
+      li {
+        color: var(--muted);
+      }
+
+      code,
+      pre {
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      }
+
+      code {
+        color: #fff0cf;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 1.1rem;
+      }
+
+      li + li {
+        margin-top: 6px;
+      }
+
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 18px;
+      }
+
+      .chip {
+        border: 1px solid var(--line-strong);
+        background: rgba(245, 166, 35, 0.1);
+        color: #ffe0a6;
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 650;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .tile {
+        border: 1px solid var(--line);
+        background: var(--panel-2);
+        padding: 14px;
+      }
+
+      .tile strong {
+        display: block;
+        margin-bottom: 6px;
+      }
+
+      .ok {
+        color: var(--green);
+        font-weight: 700;
+      }
+
+      .warn {
+        color: var(--accent);
+        font-weight: 700;
+      }
+
+      .note {
+        margin-bottom: 12px;
+      }
+
+      .diff-panel {
+        border: 1px solid var(--line);
+        background: var(--code);
+      }
+
+      .diff-panel[data-rich-ready="true"] .diff-fallback {
+        display: none;
+      }
+
+      .diff-rich {
+        display: none;
+      }
+
+      .diff-panel[data-rich-ready="true"] .diff-rich {
+        display: block;
+      }
+
+      .diff-fallback {
+        max-height: 720px;
+        margin: 0;
+        overflow: auto;
+        padding: 16px;
+        color: #dbe7f3;
+        font-size: 0.8rem;
+        line-height: 1.5;
+        white-space: pre-wrap;
+      }
+
+      @media (max-width: 780px) {
+        main {
+          width: min(100% - 20px, 1160px);
+          padding-top: 24px;
+        }
+
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Smart-Flow Alerts Phase 06 Legacy Deletion</h1>
+        <p>
+          The final migration phase removes the old derived emitters, transport channels,
+          API routes, websocket paths, storage helpers, ClickHouse table wiring, and product
+          support fields. Runtime code now carries canonical <code>smart-flow</code> projections
+          and <code>smart-flow-alerts</code> only; old derived history is intentionally dropped.
+        </p>
+        <div class="meta">
+          <span class="chip">Beads islandflow-ghce.6</span>
+          <span class="chip">Branch lavender/smart-flow-alerts-06-legacy-deletion</span>
+          <span class="chip">Spec docs/implementation/smart-flow-alerts/06-legacy-deletion-history-drop.md</span>
+        </div>
+      </header>
+
+      <section>
+        <h2>Implementation</h2>
+        <div class="grid">
+          <div class="tile">
+            <strong>Legacy contracts and streams deleted</strong>
+            <p>Removed old derived event schemas, bus subjects, stream catalog entries, live channel schemas, transition aliases, and tests that existed only for the retired event family.</p>
+          </div>
+          <div class="tile">
+            <strong>Storage and API narrowed</strong>
+            <p>Deleted legacy storage modules and helpers, removed API registration for old REST and websocket paths, and left canonical smart-flow plus smart-flow-alert history/replay fetchers intact.</p>
+          </div>
+          <div class="tile">
+            <strong>Compute emits canonical outputs only</strong>
+            <p>Removed classifier, old alert-scoring, parent-event compatibility, and smart-money evaluation paths from compute startup and packet flush handling.</p>
+          </div>
+          <div class="tile">
+            <strong>UI support payloads finalized</strong>
+            <p>Durable option rows no longer include classifier or smart-money support fields. Alert-bearing web surfaces populate from canonical alert rows and smart-flow projection support.</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Changed Files</h2>
+        <ul>
+          <li>Deleted legacy runtime modules and tests: storage helpers, API transition route helper, compute classifiers, alert scoring, parent events, smart-money evaluation, and their focused tests.</li>
+          <li>Updated canonical contracts in <code>packages/types</code>, bus stream definitions, API live state, durable rows, synthetic controls, ingest defaults, and focused tests.</li>
+          <li>Updated current-facing docs: <code>README.md</code>, <code>docs/anatomy.html</code>, <code>docs/clickhouse-reset-runbook.md</code>, and the smart-flow-alerts implementation guide.</li>
+          <li>Turn documentation: this closeout file in <code>docs/turns</code>.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Verification</h2>
+        <ul>
+          <li><span class="ok">Passed</span>: <code>bd show islandflow-ghce.6</code>.</li>
+          <li><span class="ok">Passed</span>: <code>bun test</code> - 492 tests.</li>
+          <li><span class="ok">Passed</span>: <code>bun --cwd=apps/web run build</code>.</li>
+          <li><span class="ok">Passed</span>: required grep/import audit over <code>packages services apps/web</code>. Remaining matches are canonical <code>SmartFlowAlertEvent</code> names, because the audit pattern contains <code>AlertEvent</code> as a substring.</li>
+          <li><span class="ok">Passed</span>: broader runtime cleanup audit found no legacy storage imports, route helpers, classifier modules, transition aliases, or support fields. One test-only guard still asserts canonical smart-flow queries do not hit <code>smart_money_events</code>.</li>
+          <li><span class="ok">Passed</span>: browser QA at 1440x900 and 390x844 for <code>/durable-tapes</code> and <code>/</code> using temporary mock API <code>127.0.0.1:4106</code> and local web port <code>3100</code>. Alert rows populated, legacy text was absent, and horizontal overflow was 0. Screenshots: <code>/tmp/islandflow-phase06-browser-qa/durable-desktop.png</code>, <code>/tmp/islandflow-phase06-browser-qa/durable-mobile.png</code>, <code>/tmp/islandflow-phase06-browser-qa/dashboard-desktop.png</code>, <code>/tmp/islandflow-phase06-browser-qa/dashboard-mobile.png</code>.</li>
+          <li><span class="ok">Passed</span>: browser QA websocket subscriptions used canonical <code>smart-flow-alerts</code>, <code>smart-flow</code>, and <code>durable-rows</code> channels. No <code>smart-money</code>, <code>classifier-hits</code>, or legacy <code>alerts</code> channels were sent.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Allowed Audit Inventory</h2>
+        <ul>
+          <li><code>SmartFlowAlertEvent</code> and <code>SmartFlowAlertEventSchema</code> in runtime code are canonical smart-flow alert contracts. They match the required grep only because <code>AlertEvent</code> is a substring.</li>
+          <li><code>services/api/tests/smart-flow.test.ts</code> keeps one deletion guard: <code>expect(queries[0]).not.toContain("smart_money_events")</code>. It is test-only and proves canonical storage is used.</li>
+          <li>Historical implementation docs and older turn documents still name retired paths as migration history. Current-facing docs were updated to canonical paths.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p class="note">
+          The fallback unified diff is visible by default. The richer view mounts in the browser
+          with <code>PatchDiff</code> from <code>@pierre/diffs/react</code>; the fallback is hidden only
+          after that render succeeds.
+        </p>
+        <div class="diff-panel" data-rich-ready="false">
+          <div class="diff-rich" id="diff-rich"></div>
+          <pre class="diff-fallback" id="diff-fallback">diff --git a/packages/bus/src/subjects.ts b/packages/bus/src/subjects.ts
+index 6e17207..47e36ed 100644
+--- a/packages/bus/src/subjects.ts
++++ b/packages/bus/src/subjects.ts
+@@
+-export const STREAM_SMART_MONEY_EVENTS = "SMART_MONEY_EVENTS";
+-export const SUBJECT_SMART_MONEY_EVENTS = "events.flow.smart_money";
+-export const STREAM_CLASSIFIER_HITS = "CLASSIFIER_HITS";
+-export const SUBJECT_CLASSIFIER_HITS = "events.flow.classifier_hits";
+-export const STREAM_ALERTS = "ALERTS";
+-export const SUBJECT_ALERTS = "events.alerts";
+
+diff --git a/packages/types/src/events.ts b/packages/types/src/events.ts
+index 8c17326..09c420a 100644
+--- a/packages/types/src/events.ts
++++ b/packages/types/src/events.ts
+@@
+-export const SmartMoneyEventSchema = EventMetaSchema.extend({
+-  schema_version: z.literal("smart-money.v1"),
+-  event_id: z.string().min(1),
+-  packet_ids: z.array(z.string().min(1)),
+-  member_print_ids: z.array(z.string().min(1)),
+-  features: SmartMoneyFeaturesSchema,
+-  profile_scores: z.array(SmartMoneyProfileScoreSchema),
+-  primary_profile_id: SmartMoneyProfileIdSchema.nullable(),
+-  primary_direction: SmartMoneyDirectionSchema,
+-  abstained: z.boolean(),
+-  suppressed_reasons: z.array(z.string().min(1))
+-});
+-export type SmartMoneyEvent = z.infer&lt;typeof SmartMoneyEventSchema&gt;;
+-
+-export const ClassifierHitEventSchema = EventMetaSchema.extend({
+-  schema_version: z.literal("classifier-hit.v1"),
+-  classifier_id: z.string().min(1),
+-  confidence: z.number().min(0).max(1),
+-  direction: SmartMoneyDirectionSchema,
+-  explanations: z.array(z.string().min(1))
+-});
+-export type ClassifierHitEvent = z.infer&lt;typeof ClassifierHitEventSchema&gt;;
+-
+-export const AlertEventSchema = EventMetaSchema.extend({
+-  schema_version: z.literal("alert.v1"),
+-  alert_id: z.string().min(1),
+-  score: z.number().min(0).max(100),
+-  severity: AlertSeveritySchema,
+-  hits: z.array(ClassifierHitSchema),
+-  evidence_refs: z.array(z.string().min(1))
+-});
+-export type AlertEvent = z.infer&lt;typeof AlertEventSchema&gt;;
+
+diff --git a/packages/storage/src/clickhouse.ts b/packages/storage/src/clickhouse.ts
+index 00e2590..23c78e6 100644
+--- a/packages/storage/src/clickhouse.ts
++++ b/packages/storage/src/clickhouse.ts
+@@
+-import type {
+-  AlertEvent,
+-  ClassifierHitEvent,
+-  SmartMoneyEvent
+-} from "@islandflow/types";
++import type {
++  SmartFlowAlertEvent,
++  SmartFlowExplainabilityProjection
++} from "@islandflow/types";
+@@
+-export const ensureSmartMoneyEventsTable = async (client: ClickHouseClient): Promise&lt;void&gt; =&gt; {
+-  await client.exec({ query: smartMoneyEventsTableDDL() });
+-};
+-
+-export const ensureClassifierHitsTable = async (client: ClickHouseClient): Promise&lt;void&gt; =&gt; {
+-  await client.exec({ query: classifierHitsTableDDL() });
+-};
+-
+-export const ensureAlertsTable = async (client: ClickHouseClient): Promise&lt;void&gt; =&gt; {
+-  await client.exec({ query: alertsTableDDL() });
+-  for (const query of alertsTableMigrations()) await client.exec({ query });
+-};
+@@
+-export const insertSmartMoneyEvent = async (client: ClickHouseClient, event: SmartMoneyEvent): Promise&lt;void&gt; =&gt; { ... };
+-export const insertClassifierHit = async (client: ClickHouseClient, hit: ClassifierHitEvent): Promise&lt;void&gt; =&gt; { ... };
+-export const insertAlert = async (client: ClickHouseClient, alert: AlertEvent): Promise&lt;void&gt; =&gt; { ... };
+
+diff --git a/services/api/src/index.ts b/services/api/src/index.ts
+index 1cc962c..ddde22e 100644
+--- a/services/api/src/index.ts
++++ b/services/api/src/index.ts
+@@
+-import {
+-  STREAM_ALERTS,
+-  STREAM_CLASSIFIER_HITS,
+-  STREAM_SMART_MONEY_EVENTS,
+-  SUBJECT_ALERTS,
+-  SUBJECT_CLASSIFIER_HITS,
+-  SUBJECT_SMART_MONEY_EVENTS
+-} from "@islandflow/bus";
+@@
+-import { createLegacyDerivedRouteResponse } from "./legacy-derived-routes";
+@@
+-const legacyDerivedRouteResponse = createLegacyDerivedRouteResponse(url.pathname);
+-if (legacyDerivedRouteResponse) {
+-  return legacyDerivedRouteResponse;
+-}
+@@
+ if (req.method === "GET" &amp;&amp; url.pathname === "/flow/smart-flow-alerts") {
+   const data = await fetchRecentSmartFlowAlertEvents(clickhouse, limit);
+   return json({ data });
+ }
+
+diff --git a/services/compute/src/index.ts b/services/compute/src/index.ts
+index aed387b..d9b720a 100644
+--- a/services/compute/src/index.ts
++++ b/services/compute/src/index.ts
+@@
+-import { scoreAlert } from "./alert-scoring";
+-import { deriveClassifierHitsFromSmartMoneyEvent } from "./classifiers";
+-import { buildParentEventFromPrint } from "./parent-events";
+-import { buildSmartMoneyEventFromPacket } from "./smart-money-evaluation";
+@@
+-const emitClassifiers = async (packet: FlowPacket) =&gt; {
+-  const smartMoney = buildSmartMoneyEventFromPacket(packet, classifierConfig);
+-  enqueueSmartMoneyEventInsert(batchWriter, smartMoney);
+-  for (const hit of deriveClassifierHitsFromSmartMoneyEvent(smartMoney, classifierConfig)) {
+-    enqueueClassifierHitInsert(batchWriter, hit);
+-    enqueueAlertInsert(batchWriter, scoreAlert(hit, smartMoney));
+-  }
+-};
+@@
+ const plan = planSmartFlowAlertEmission(projection);
+ if (plan.alert) {
+   enqueueSmartFlowAlertInsert(batchWriter, plan.alert);
+ }
+
+diff --git a/packages/types/src/durable-tapes.ts b/packages/types/src/durable-tapes.ts
+index 5f0c04d..e844cbb 100644
+--- a/packages/types/src/durable-tapes.ts
++++ b/packages/types/src/durable-tapes.ts
+@@
+   support: z.object({
+     packet: z.object({ ... }).nullable(),
+-    classifier: z.object({ classifier_id: z.string().min(1), confidence: z.number().nullable() }).nullable(),
+-    smart_money: z.object({ event_id: z.string().min(1), profile_id: z.string().nullable() }).nullable(),
+     smart_flow: SmartFlowExplainabilityProjectionSchema.nullable()
+   })
+ });
+          </pre>
+        </div>
+      </section>
+
+      <section>
+        <h2>Risks</h2>
+        <ul>
+          <li><span class="warn">History drop</span>: old derived rows are not backfilled or served through hidden compatibility endpoints by design. Rollback is deployment rollback or replay from raw market data.</li>
+          <li>No destructive ClickHouse table drop was run on the host. Code no longer initializes, writes, reads, or exposes the retired tables.</li>
+        </ul>
+      </section>
+    </main>
+
+    <script type="module">
+      const patch = document.getElementById("diff-fallback")?.textContent ?? "";
+      const richRoot = document.getElementById("diff-rich");
+      const panel = richRoot?.closest(".diff-panel");
+
+      if (patch && richRoot && panel) {
+        try {
+          const [{ createElement, useEffect }, { createRoot }, { PatchDiff }] = await Promise.all([
+            import("https://esm.sh/react@18"),
+            import("https://esm.sh/react-dom@18/client"),
+            import("https://esm.sh/@pierre/diffs@1.2.2/react")
+          ]);
+          const DiffView = () => {
+            useEffect(() => {
+              panel.setAttribute("data-rich-ready", "true");
+            }, []);
+            return createElement(PatchDiff, {
+              patch,
+              viewType: "unified",
+              overflow: "wrap"
+            });
+          };
+          createRoot(richRoot).render(createElement(DiffView));
+        } catch (error) {
+          console.warn("Diffs rich renderer failed; keeping HTML fallback.", error);
+        }
+      }
+    </script>
+  </body>
+</html>

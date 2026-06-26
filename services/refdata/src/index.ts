@@ -12,8 +12,7 @@ const logger = createLogger({ service });
 
 logger.info("service starting");
 
-const eventCalendarPath =
-  process.env.REFDATA_EVENT_CALENDAR_PATH ?? process.env.SMART_MONEY_EVENT_CALENDAR_PATH;
+const eventCalendarPath = process.env.REFDATA_EVENT_CALENDAR_PATH;
 const eventCalendarProvider =
   process.env.REFDATA_EVENT_CALENDAR_PROVIDER ?? process.env.EVENT_CALENDAR_PROVIDER;
 const refreshMs = Math.max(
@@ -38,9 +37,7 @@ const getAlphaVantageOptions = (): AlphaVantageEarningsCalendarOptions | null =>
 
 const refreshEventCalendar = async (): Promise<void> => {
   if (!eventCalendarPath) {
-    logger.warn(
-      "event calendar refresh disabled; missing SMART_MONEY_EVENT_CALENDAR_PATH or REFDATA_EVENT_CALENDAR_PATH"
-    );
+    logger.warn("event calendar refresh disabled; missing REFDATA_EVENT_CALENDAR_PATH");
     return;
   }
   if (eventCalendarProvider !== "alpha_vantage") {

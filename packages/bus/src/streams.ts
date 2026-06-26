@@ -1,6 +1,4 @@
 import {
-  STREAM_ALERTS,
-  STREAM_CLASSIFIER_HITS,
   STREAM_EQUITY_CANDLES,
   STREAM_EQUITY_JOINS,
   STREAM_EQUITY_PRINTS,
@@ -13,9 +11,6 @@ import {
   STREAM_OPTION_SIGNAL_PRINTS,
   STREAM_SMART_FLOW,
   STREAM_SMART_FLOW_ALERTS,
-  STREAM_SMART_MONEY_EVENTS,
-  SUBJECT_ALERTS,
-  SUBJECT_CLASSIFIER_HITS,
   SUBJECT_EQUITY_CANDLES,
   SUBJECT_EQUITY_JOINS,
   SUBJECT_EQUITY_PRINTS,
@@ -27,8 +22,7 @@ import {
   SUBJECT_OPTION_PRINTS,
   SUBJECT_OPTION_SIGNAL_PRINTS,
   SUBJECT_SMART_FLOW,
-  SUBJECT_SMART_FLOW_ALERTS,
-  SUBJECT_SMART_MONEY_EVENTS
+  SUBJECT_SMART_FLOW_ALERTS
 } from "./subjects";
 
 export type StreamRetentionClass = "raw" | "derived";
@@ -54,11 +48,6 @@ export const STREAM_CATALOG: readonly KnownStreamDefinition[] = [
   { name: STREAM_INFERRED_DARK, subject: SUBJECT_INFERRED_DARK, retentionClass: "derived" },
   { name: STREAM_FLOW_PACKETS, subject: SUBJECT_FLOW_PACKETS, retentionClass: "derived" },
   {
-    name: STREAM_SMART_MONEY_EVENTS,
-    subject: SUBJECT_SMART_MONEY_EVENTS,
-    retentionClass: "derived"
-  },
-  {
     name: STREAM_SMART_FLOW,
     subject: SUBJECT_SMART_FLOW,
     retentionClass: "derived"
@@ -68,8 +57,6 @@ export const STREAM_CATALOG: readonly KnownStreamDefinition[] = [
     subject: SUBJECT_SMART_FLOW_ALERTS,
     retentionClass: "derived"
   },
-  { name: STREAM_CLASSIFIER_HITS, subject: SUBJECT_CLASSIFIER_HITS, retentionClass: "derived" },
-  { name: STREAM_ALERTS, subject: SUBJECT_ALERTS, retentionClass: "derived" },
   { name: STREAM_NEWS, subject: SUBJECT_NEWS, retentionClass: "derived" }
 ];
 

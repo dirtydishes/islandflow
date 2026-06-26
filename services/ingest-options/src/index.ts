@@ -103,7 +103,7 @@ const envSchema = z.object({
   EMIT_INTERVAL_MS: z.coerce.number().int().positive().default(1000),
   SYNTHETIC_MARKET_MODE: z.string().default("realistic"),
   SYNTHETIC_OPTIONS_MODE: z.string().default(""),
-  OPTIONS_SIGNAL_MODE: z.enum(["smart-money", "balanced", "all"]).default("smart-money"),
+  OPTIONS_SIGNAL_MODE: z.enum(["smart-flow", "balanced", "all"]).default("smart-flow"),
   OPTIONS_SIGNAL_MIN_NOTIONAL: z.coerce.number().nonnegative().default(10_000),
   OPTIONS_SIGNAL_ETF_MIN_NOTIONAL: z.coerce.number().nonnegative().default(50_000),
   OPTIONS_SIGNAL_BID_SIDE_MIN_NOTIONAL: z.coerce.number().nonnegative().default(25_000),

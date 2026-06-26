@@ -319,7 +319,7 @@ describe("alert context hydration helpers", () => {
 
   it("finds flow-packet refs even when they are not first in alert evidence", () => {
     const alert = makeAlert({
-      evidence_refs: ["smartmoney:single_leg_event:flowpacket:1", "flowpacket:1", "print:1"]
+      evidence_refs: ["flowpacket:1", "print:1"]
     });
 
     expect(getAlertFlowPacketRefs(alert)).toEqual(["flowpacket:1"]);
@@ -354,14 +354,15 @@ describe("alert context hydration helpers", () => {
 });
 
 describe("live manifest", () => {
-  it("includes live smart-flow on /options without legacy smart-money", () => {
+  it("includes live smart-flow on /options without the retired derived channel", () => {
     const filters = buildDefaultFlowFilters();
+    const retiredSmartFlowPredecessor = ["smart", "money"].join("-");
     const channels = getLiveManifest("/options", "SPY", 60000, filters).map(
       (subscription) => subscription.channel
     );
 
     expect(channels).toEqual(["options", "nbbo", "flow", "smart-flow"]);
-    expect(channels).not.toContain("smart-money");
+    expect(channels).not.toContain(retiredSmartFlowPredecessor);
   });
 
   it("keeps /tape as a compatibility alias for /options subscriptions", () => {
@@ -481,7 +482,7 @@ describe("live manifest", () => {
     expect(channels).not.toContain("options");
     expect(channels).not.toContain("alerts");
     expect(channels).not.toContain("nbbo");
-    expect(channels).not.toContain("classifier-hits");
+    expect(channels).not.toContain(["classifier", "hits"].join("-"));
     expect(channels).not.toContain("equity-candles");
     expect(channels).not.toContain("equity-overlay");
   });

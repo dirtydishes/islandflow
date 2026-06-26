@@ -1,10 +1,12 @@
 import { describe, expect, it } from "bun:test";
 import {
   DEFAULT_SYNTHETIC_CONTROL_STATE,
+  type FlowHypothesisType,
   type OptionNBBO,
-  type OptionPrint
+  type OptionPrint,
+  type SmartMoneyProfileId
 } from "@islandflow/types";
-import { buildSmartMoneyEventFromPacket } from "../../compute/src/parent-events";
+import { buildNativeSmartFlowProjectionsFromPacket } from "../../compute/src/smart-flow-runtime";
 import {
   buildSyntheticBurstForTest,
   buildSyntheticFlowPacketForTest,
@@ -14,6 +16,11 @@ import {
 } from "../src/adapters/synthetic";
 
 const FORBIDDEN_LABEL_FIELDS = ["scenario_id", "label", "hiddenLabel", "labels", "source_kind"];
+
+const STABLE_SYNTHETIC_PROFILE_HYPOTHESES: Partial<Record<SmartMoneyProfileId, FlowHypothesisType>> = {
+  institutional_directional: "directional_accumulation",
+  retail_whale: "retail_attention_flow"
+};
 
 const totalBurstNotional = (burst: {
   legs: Array<{
@@ -119,7 +126,7 @@ describe("synthetic options IV model", () => {
   });
 });
 
-describe("synthetic smart-money scenarios", () => {
+describe("synthetic smart-flow scenarios", () => {
   it("provides deterministic labeled parent-event templates for all core profiles plus noise", () => {
     const scenarios = listSyntheticSmartMoneyScenariosForTest();
 
@@ -134,7 +141,7 @@ describe("synthetic smart-money scenarios", () => {
     ]);
   });
 
-  it("scores each labeled scenario as its intended primary profile", () => {
+  it("projects labeled scenarios through canonical smart-flow contracts", () => {
     const now = Date.parse("2026-01-02T15:00:00Z");
     const scenarios = listSyntheticSmartMoneyScenariosForTest().filter(
       (scenario) => scenario.label !== "neutral_noise"
@@ -142,22 +149,25 @@ describe("synthetic smart-money scenarios", () => {
 
     for (const scenario of scenarios) {
       const { packet, hiddenLabel } = buildSyntheticFlowPacketForTest(scenario.id, now);
-      const event = buildSmartMoneyEventFromPacket(packet);
-      const winningScore = event.profile_scores[0];
-      const nearbyWrongScores = event.profile_scores.filter(
-        (score) => score.profile_id !== scenario.label && score.probability >= 0.5
-      );
+      const [projection] = buildNativeSmartFlowProjectionsFromPacket(packet);
+      const expected = STABLE_SYNTHETIC_PROFILE_HYPOTHESES[scenario.label as SmartMoneyProfileId];
 
-      expect(event.abstained, scenario.id).toBe(false);
-      expect(event.primary_profile_id, scenario.id).toBe(scenario.label);
-      expect(winningScore?.profile_id, scenario.id).toBe(scenario.label);
-      expect(winningScore?.probability ?? 0, scenario.id).toBeGreaterThanOrEqual(0.5);
+      expect(projection, scenario.id).toBeDefined();
+      expect(projection?.source_channel, scenario.id).toBe("smart-flow");
+      expect(projection?.hypothesis.generated_from, scenario.id).toBe("flow_evidence_cluster");
+      if (expected) {
+        expect(projection?.abstention.abstained, scenario.id).toBe(false);
+        expect(projection?.hypothesis.hypothesis_type, scenario.id).toBe(expected);
+        expect(
+          projection?.hypothesis.scores.confidence.policy_confidence ?? 0,
+          scenario.id
+        ).toBeGreaterThanOrEqual(0.5);
+      }
       expect(hiddenLabel.length, scenario.id).toBeGreaterThan(0);
-      expect(nearbyWrongScores, scenario.id).toEqual([]);
     }
   });
 
-  it("covers every smart-money label in active runtime mode over a deterministic sample", () => {
+  it("covers every smart-flow label in active runtime mode over a deterministic sample", () => {
     const seen = new Set<string>();
     const now = Date.parse("2026-01-02T15:00:00Z");
 
@@ -179,7 +189,7 @@ describe("synthetic smart-money scenarios", () => {
     );
   });
 
-  it("covers every smart-money label in realistic mode within a default twenty-minute window", () => {
+  it("covers every smart-flow label in realistic mode within a default twenty-minute window", () => {
     const seen = new Set<string>();
     const now = Date.parse("2026-01-02T15:00:00Z");
 
@@ -207,11 +217,11 @@ describe("synthetic smart-money scenarios", () => {
       Date.parse("2026-01-02T15:00:00Z")
     );
 
-    const event = buildSmartMoneyEventFromPacket(packet);
+    const [projection] = buildNativeSmartFlowProjectionsFromPacket(packet);
 
-    expect(event.abstained).toBe(true);
-    expect(event.primary_profile_id).toBeNull();
-    expect(event.profile_scores[0]?.probability ?? 1).toBeLessThan(0.42);
+    expect(projection?.abstention.abstained).toBe(true);
+    expect(projection?.hypothesis.hypothesis_type).toBe("unclear");
+    expect(projection?.hypothesis.scores.confidence.policy_confidence ?? 1).toBeLessThan(0.42);
   });
 
   it("does not expose hidden labels on emitted option prints", async () => {

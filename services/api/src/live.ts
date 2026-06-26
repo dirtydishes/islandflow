@@ -2,8 +2,6 @@ import { createMetrics } from "@islandflow/observability";
 import type { EquityPrintQueryFilters, OptionPrintQueryFilters } from "@islandflow/storage";
 import {
   type ClickHouseClient,
-  fetchRecentAlerts,
-  fetchRecentClassifierHits,
   fetchRecentEquityCandles,
   fetchRecentEquityPrintJoins,
   fetchRecentEquityPrints,
@@ -12,12 +10,9 @@ import {
   fetchRecentInferredDark,
   fetchRecentNews,
   fetchRecentOptionNBBO,
-  fetchRecentOptionPrints,
-  fetchRecentSmartMoneyEvents
+  fetchRecentOptionPrints
 } from "@islandflow/storage";
 import {
-  AlertEventSchema,
-  ClassifierHitEventSchema,
   type Cursor,
   CursorSchema,
   type EquityCandle,
@@ -43,8 +38,7 @@ import {
   type OptionPrint,
   OptionPrintSchema,
   SmartFlowAlertEventSchema,
-  SmartFlowExplainabilityProjectionSchema,
-  SmartMoneyEventSchema
+  SmartFlowExplainabilityProjectionSchema
 } from "@islandflow/types";
 import type { RedisClientType } from "redis";
 import {
@@ -73,9 +67,6 @@ const GENERIC_LIMIT_ENV_KEYS: Record<LiveGenericChannel, string> = {
   flow: "LIVE_LIMIT_FLOW",
   "smart-flow": "LIVE_LIMIT_SMART_FLOW",
   "smart-flow-alerts": "LIVE_LIMIT_SMART_FLOW_ALERTS",
-  "smart-money": "LIVE_LIMIT_SMART_MONEY",
-  "classifier-hits": "LIVE_LIMIT_CLASSIFIER_HITS",
-  alerts: "LIVE_LIMIT_ALERTS",
   "inferred-dark": "LIVE_LIMIT_INFERRED_DARK",
   news: "LIVE_LIMIT_NEWS"
 };
@@ -94,9 +85,6 @@ const DEFAULT_LIVE_LIMITS: GenericLiveLimits = {
   flow: 500,
   "smart-flow": 300,
   "smart-flow-alerts": 300,
-  "smart-money": 300,
-  "classifier-hits": 300,
-  alerts: 300,
   "inferred-dark": 300,
   news: 100
 };
@@ -223,21 +211,6 @@ export const resolveGenericLiveLimits = (
       "smart-flow-alerts",
       env.LIVE_LIMIT_DEFAULT ? liveLimitDefault : DEFAULT_LIVE_LIMITS["smart-flow-alerts"]
     ),
-    "smart-money": parseGenericLimit(
-      env,
-      "smart-money",
-      env.LIVE_LIMIT_DEFAULT ? liveLimitDefault : DEFAULT_LIVE_LIMITS["smart-money"]
-    ),
-    "classifier-hits": parseGenericLimit(
-      env,
-      "classifier-hits",
-      env.LIVE_LIMIT_DEFAULT ? liveLimitDefault : DEFAULT_LIVE_LIMITS["classifier-hits"]
-    ),
-    alerts: parseGenericLimit(
-      env,
-      "alerts",
-      env.LIVE_LIMIT_DEFAULT ? liveLimitDefault : DEFAULT_LIVE_LIMITS.alerts
-    ),
     "inferred-dark": parseGenericLimit(
       env,
       "inferred-dark",
@@ -261,9 +234,6 @@ const extractFreshnessTs = (channel: LiveGenericChannel, item: any): number | nu
     case "flow":
     case "smart-flow":
     case "smart-flow-alerts":
-    case "smart-money":
-    case "classifier-hits":
-    case "alerts":
     case "inferred-dark":
       return typeof item.source_ts === "number" ? item.source_ts : null;
     case "news":
@@ -312,7 +282,7 @@ const parseCursor = (value: string | null): Cursor | null => {
 
 const parseNativeSmartFlowProjection = (value: unknown) => {
   const projection = SmartFlowExplainabilityProjectionSchema.parse(value);
-  if (projection.source_channel !== "smart-flow" || projection.compatibility?.compatibility_only) {
+  if (projection.source_channel !== "smart-flow") {
     throw new Error("cached smart-flow projection is not native");
   }
   return projection;
@@ -372,14 +342,6 @@ const getGenericConfig = (
     cursor: (item) => ({ ts: item.source_ts, seq: item.seq }),
     fetchRecent: fetchRecentFlowPackets
   },
-  "smart-money": {
-    redisKey: "live:smart-money",
-    cursorField: "smart-money",
-    limit: limits["smart-money"],
-    parse: (value) => SmartMoneyEventSchema.parse(value),
-    cursor: (item) => ({ ts: item.source_ts, seq: item.seq }),
-    fetchRecent: fetchRecentSmartMoneyEvents
-  },
   "smart-flow": {
     redisKey: "live:smart-flow",
     cursorField: "smart-flow",
@@ -396,22 +358,6 @@ const getGenericConfig = (
     cursor: smartFlowAlertCursor,
     identity: (item) => item.alert_id,
     fetchRecent: fetchRecentSmartFlowAlertEvents
-  },
-  "classifier-hits": {
-    redisKey: "live:classifier-hits",
-    cursorField: "classifier-hits",
-    limit: limits["classifier-hits"],
-    parse: (value) => ClassifierHitEventSchema.parse(value),
-    cursor: (item) => ({ ts: item.source_ts, seq: item.seq }),
-    fetchRecent: fetchRecentClassifierHits
-  },
-  alerts: {
-    redisKey: "live:alerts",
-    cursorField: "alerts",
-    limit: limits.alerts,
-    parse: (value) => AlertEventSchema.parse(value),
-    cursor: (item) => ({ ts: item.source_ts, seq: item.seq }),
-    fetchRecent: fetchRecentAlerts
   },
   "inferred-dark": {
     redisKey: "live:inferred-dark",

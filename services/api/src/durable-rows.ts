@@ -387,8 +387,6 @@ const buildDurableOptionRow = (
     },
     support: {
       packet: packetSummary(packet),
-      classifier: null,
-      smart_money: null,
       smart_flow: smartFlow
     },
     badges,

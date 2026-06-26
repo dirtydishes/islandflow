@@ -1306,6 +1306,7 @@ export const buildSyntheticFlowPacketForTest = (
     flowFeatures.nbbo_spread_z = 0.18;
     flowFeatures.venue_count = 2;
     flowFeatures.corporate_event_ts = now + 7 * MS_PER_DAY;
+    flowFeatures.days_to_event = 7;
   }
   if (scenarioId === "vol_seller") {
     flowFeatures.same_size_leg_symmetry = 0.58;
@@ -1350,8 +1351,8 @@ export const buildSyntheticFlowPacketForTest = (
       source_ts: now,
       ingest_ts: now,
       seq: SMART_MONEY_SCENARIO_IDS.indexOf(scenarioId) + 1,
-      trace_id: `synthetic-smart-money:${scenarioId}`,
-      id: `synthetic-smart-money:${scenarioId}:${now}`,
+      trace_id: `synthetic-smart-flow:${scenarioId}`,
+      id: `synthetic-smart-flow:${scenarioId}:${now}`,
       members: Array.from(
         { length: burst.printCount },
         (_, index) =>

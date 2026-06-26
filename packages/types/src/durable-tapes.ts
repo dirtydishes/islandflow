@@ -91,29 +91,6 @@ export const DurableTapeOptionRowViewModelSchema = DurableTapeRowBaseSchema.exte
         truncated: z.boolean().optional()
       })
       .nullable(),
-    classifier: z
-      .object({
-        trace_id: z.string().min(1),
-        classifier_id: z.string().min(1),
-        label: z.string().min(1),
-        direction: z.string().min(1).nullable(),
-        confidence: z.number().min(0).max(1).nullable(),
-        explanation: z.string().min(1).nullable()
-      })
-      .nullable(),
-    smart_money: z
-      .object({
-        trace_id: z.string().min(1),
-        event_id: z.string().min(1),
-        profile_id: z.string().min(1).nullable(),
-        label: z.string().min(1),
-        direction: z.string().min(1).nullable(),
-        confidence_band: z.string().min(1).nullable(),
-        probability: z.number().min(0).max(1).nullable(),
-        abstained: z.boolean(),
-        reasons: z.array(z.string().min(1))
-      })
-      .nullable(),
     smart_flow: SmartFlowExplainabilityProjectionSchema.nullable()
   })
 });
