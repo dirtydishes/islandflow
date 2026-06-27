@@ -1,4 +1,6 @@
 import type {
+  DurableTapeSmartFlowSupport,
+  DurableTapeSmartFlowSupportStatus,
   FlowPacket,
   OptionNBBO,
   OptionPrint,
@@ -25,9 +27,17 @@ export type OptionSupportRequest = {
   nbboContext?: OptionSupportNbboContext[];
 };
 
+export type OptionSmartFlowSupportResolution = {
+  packet: FlowPacket | null;
+  smart_flow_status: DurableTapeSmartFlowSupportStatus;
+  smart_flow_unavailable_reason?: string;
+  smart_flow: DurableTapeSmartFlowSupport | null;
+};
+
 export type OptionSupportResult = {
   packets: FlowPacket[];
   smartFlowProjections: SmartFlowExplainabilityProjection[];
+  smartFlowSupportByTraceId: Map<string, OptionSmartFlowSupportResolution>;
   nbboByTraceId: Record<string, OptionNBBO | null>;
 };
 
@@ -44,6 +54,7 @@ export type FlowPacketLookupResult = {
 type OptionSupportPayload = {
   packets?: FlowPacket[];
   smart_flow?: SmartFlowExplainabilityProjection[];
+  support_by_trace_id?: Record<string, OptionSmartFlowSupportResolution>;
   nbbo_by_trace_id?: Record<string, OptionNBBO | null>;
 };
 
@@ -190,6 +201,7 @@ export class HydrationScheduler {
   private readonly optionPrintMisses: TtlCache<true>;
   private readonly flowPacketById: TtlCache<FlowPacket>;
   private readonly flowPacketMisses: TtlCache<true>;
+  private readonly supportByTraceId: TtlCache<OptionSmartFlowSupportResolution>;
   private readonly supportPacketByTraceId: TtlCache<FlowPacket>;
   private readonly supportTraceMisses: TtlCache<true>;
   private readonly supportSmartFlowByPacketId: TtlCache<SmartFlowExplainabilityProjection[]>;
@@ -233,6 +245,7 @@ export class HydrationScheduler {
     this.optionPrintMisses = new TtlCache(maxEntries, negativeTtlMs, this.now);
     this.flowPacketById = new TtlCache(maxEntries, positiveTtlMs, this.now);
     this.flowPacketMisses = new TtlCache(maxEntries, negativeTtlMs, this.now);
+    this.supportByTraceId = new TtlCache(maxEntries, positiveTtlMs, this.now);
     this.supportPacketByTraceId = new TtlCache(maxEntries, positiveTtlMs, this.now);
     this.supportTraceMisses = new TtlCache(maxEntries, negativeTtlMs, this.now);
     this.supportSmartFlowByPacketId = new TtlCache(maxEntries, positiveTtlMs, this.now);
@@ -290,6 +303,7 @@ export class HydrationScheduler {
     this.optionPrintMisses.clear();
     this.flowPacketById.clear();
     this.flowPacketMisses.clear();
+    this.supportByTraceId.clear();
     this.supportPacketByTraceId.clear();
     this.supportTraceMisses.clear();
     this.supportSmartFlowByPacketId.clear();
@@ -503,6 +517,7 @@ export class HydrationScheduler {
 
   private queueSupportTrace(traceId: string): Promise<void> {
     if (
+      this.supportByTraceId.has(traceId) ||
       this.supportPacketByTraceId.has(traceId) ||
       this.supportTraceMisses.has(traceId) ||
       this.isBackedOff("optionSupport")
@@ -627,15 +642,20 @@ export class HydrationScheduler {
     requestedNbboContext: OptionSupportNbboContext[]
   ): void {
     for (const packet of payload.packets ?? []) {
-      this.cacheFlowPacket(packet);
-      if (packet.id) {
-        this.supportPacketByTraceId.set(packet.id, packet);
-      }
-      if (packet.trace_id) {
-        this.supportPacketByTraceId.set(packet.trace_id, packet);
-      }
-      for (const member of packet.members ?? []) {
-        this.supportPacketByTraceId.set(member, packet);
+      this.cacheSupportPacket(packet);
+    }
+
+    for (const [traceId, support] of Object.entries(payload.support_by_trace_id ?? {})) {
+      this.supportByTraceId.set(traceId, {
+        packet: support.packet ?? null,
+        smart_flow_status: support.smart_flow_status,
+        ...(support.smart_flow_unavailable_reason
+          ? { smart_flow_unavailable_reason: support.smart_flow_unavailable_reason }
+          : {}),
+        smart_flow: support.smart_flow ?? null
+      });
+      if (support.packet) {
+        this.cacheSupportPacket(support.packet, [traceId]);
       }
     }
 
@@ -664,9 +684,21 @@ export class HydrationScheduler {
     }
 
     for (const traceId of requestedTraceIds) {
-      if (!this.supportPacketByTraceId.has(traceId)) {
+      if (!this.supportByTraceId.has(traceId) && !this.supportPacketByTraceId.has(traceId)) {
         this.supportTraceMisses.set(traceId, true);
       }
+    }
+  }
+
+  private cacheSupportPacket(packet: FlowPacket, traceIds: readonly string[] = []): void {
+    this.cacheFlowPacket(packet);
+    for (const traceId of normalizeHydrationIds([
+      packet.id,
+      packet.trace_id,
+      ...packet.members,
+      ...traceIds
+    ])) {
+      this.supportPacketByTraceId.set(traceId, packet);
     }
   }
 
@@ -685,8 +717,13 @@ export class HydrationScheduler {
   ): OptionSupportResult {
     const packets = new Map<string, FlowPacket>();
     const packetIds = new Set<string>();
+    const smartFlowSupportByTraceId = new Map<string, OptionSmartFlowSupportResolution>();
     for (const traceId of traceIds) {
-      const packet = this.supportPacketByTraceId.getEntry(traceId)?.value;
+      const support = this.supportByTraceId.getEntry(traceId)?.value;
+      if (support) {
+        smartFlowSupportByTraceId.set(traceId, support);
+      }
+      const packet = support?.packet ?? this.supportPacketByTraceId.getEntry(traceId)?.value;
       if (!packet?.id) {
         continue;
       }
@@ -714,6 +751,7 @@ export class HydrationScheduler {
     return {
       packets: Array.from(packets.values()),
       smartFlowProjections: Array.from(smartFlowProjections.values()),
+      smartFlowSupportByTraceId,
       nbboByTraceId
     };
   }

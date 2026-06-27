@@ -322,7 +322,6 @@ export const DurableTapesQaRoute = () => {
                 packetIdByOptionTraceId={optionsPane.packetIdByOptionTraceId}
                 prints={optionPrints}
                 rowHeight={34}
-                smartFlowProjections={smartFlowProjections}
                 template={template}
                 title="Options Tape"
               />

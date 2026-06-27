@@ -176,7 +176,6 @@ export function OverviewRoute() {
             packetIdByOptionTraceId={state.packetIdByOptionTraceId}
             prints={state.filteredOptions.slice(0, 36)}
             rowHeight={34}
-            smartFlowProjections={state.filteredSmartFlowProjections}
             template="half"
             title="Recent Contracts"
           />
@@ -254,7 +253,6 @@ export function OptionsRoute() {
             onPacketFocus={state.focusFlowPacketRequest}
             packetIdByOptionTraceId={state.packetIdByOptionTraceId}
             prints={state.filteredOptions}
-            smartFlowProjections={state.filteredSmartFlowProjections}
             title="OPRA Tape"
           />
         </div>

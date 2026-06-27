@@ -1,4 +1,6 @@
 import type {
+  DurableTapeSmartFlowSupport,
+  DurableTapeSmartFlowSupportStatus,
   FlowPacket,
   OptionFlowFilters,
   OptionNBBO,
@@ -100,12 +102,21 @@ export type OptionsTapeSmartFlowProjection = Pick<
 };
 
 export type OptionsTapeSmartFlowContext = {
+  support: DurableTapeSmartFlowSupport;
+  tintEligible: boolean;
   projection: OptionsTapeSmartFlowProjection;
   source: OptionsTapeSmartFlowRefSource;
   evidenceRefs: string[];
   directPrintRefs: string[];
   packetRefs: string[];
   expandedPacketRefs: string[];
+};
+
+export type OptionsTapeSmartFlowSupportResolution = {
+  packet: FlowPacket | null;
+  smart_flow_status: DurableTapeSmartFlowSupportStatus;
+  smart_flow_unavailable_reason?: string;
+  smart_flow: DurableTapeSmartFlowSupport | null;
 };
 
 export type OptionsTapePacketContext = {
@@ -135,7 +146,7 @@ export type OptionsTapeProps = {
   flowPacketByTraceId?: ReadonlyMap<string, FlowPacket>;
   packetIdByOptionTraceId?: ReadonlyMap<string, string>;
   flowPacketById?: ReadonlyMap<string, FlowPacket>;
-  smartFlowProjections?: readonly SmartFlowExplainabilityProjection[];
+  smartFlowSupportByTraceId?: ReadonlyMap<string, OptionsTapeSmartFlowSupportResolution>;
   nbboByContractId?: ReadonlyMap<string, OptionNBBO>;
   nbboByTraceId?: ReadonlyMap<string, OptionNBBO | null>;
   supportHydrationEnabled?: boolean;

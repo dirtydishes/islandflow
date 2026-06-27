@@ -67,6 +67,35 @@ const makeSmartFlowProjection = (packetId: string, traceId = "smartflow:1") =>
     }
   }) as any;
 
+const makeSmartFlowSupportResolution = (packet: any, smartFlow: any) => ({
+  packet,
+  smart_flow_status: "matched",
+  smart_flow: {
+    status: "matched",
+    source_channel: "smart-flow",
+    projection_id: smartFlow.refs.event_id,
+    projection_trace_id: smartFlow.trace_id,
+    packet_id: packet.id,
+    match_source: "packet_member",
+    tint_eligible: true,
+    hypothesis_type: "directional_accumulation",
+    direction: "bullish",
+    confidence: 0.82,
+    evidence_quality: 0.82,
+    abstained: false,
+    refs: {
+      evidence_refs: smartFlow.refs.evidence_refs,
+      packet_refs: [packet.id],
+      option_print_refs: ["print:1"]
+    },
+    counts: {
+      evidence_refs: smartFlow.refs.evidence_refs.length,
+      flow_packets: 1,
+      option_prints: 1
+    }
+  }
+});
+
 describe("hydration scheduler keys", () => {
   it("builds stable sorted keys for missing ids and nbbo context", () => {
     expect(stableHydrationKey(["b", "a", "a", " "])).toBe("a\nb");
@@ -196,6 +225,9 @@ describe("HydrationScheduler", () => {
         return jsonResponse({
           packets: [packet],
           smart_flow: [smartFlow],
+          support_by_trace_id: {
+            "print:1": makeSmartFlowSupportResolution(packet, smartFlow)
+          },
           nbbo_by_trace_id: { "print:1": null }
         });
       }
@@ -212,8 +244,12 @@ describe("HydrationScheduler", () => {
     expect(requestCount).toBe(1);
     expect(left.packets.map((item) => item.id)).toEqual([packet.id]);
     expect(left.smartFlowProjections.map((item) => item.trace_id)).toEqual(["smartflow:1"]);
+    expect(left.smartFlowSupportByTraceId.get("print:1")?.smart_flow?.projection_trace_id).toBe(
+      "smartflow:1"
+    );
     expect(left.nbboByTraceId).toEqual({ "print:1": null });
     expect(right.packets.map((item) => item.id)).toEqual([packet.id]);
+    expect(right.smartFlowSupportByTraceId.get("print:1")?.smart_flow_status).toBe("matched");
 
     await scheduler.requestOptionSupport({ traceIds: ["print:1"] });
     expect(requestCount).toBe(1);
@@ -233,6 +269,7 @@ describe("HydrationScheduler", () => {
     await expect(scheduler.requestOptionSupport({ traceIds: ["print:missing"] })).resolves.toEqual({
       packets: [packet],
       smartFlowProjections: [],
+      smartFlowSupportByTraceId: new Map(),
       nbboByTraceId: {}
     });
     await scheduler.requestOptionSupport({ traceIds: ["print:missing"] });

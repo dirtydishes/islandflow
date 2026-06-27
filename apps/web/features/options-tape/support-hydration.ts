@@ -1,9 +1,4 @@
-import type {
-  FlowPacket,
-  OptionNBBO,
-  OptionPrint,
-  SmartFlowExplainabilityProjection
-} from "@islandflow/types";
+import type { FlowPacket, OptionNBBO, OptionPrint } from "@islandflow/types";
 
 import type {
   DurableTapeCursor,
@@ -20,7 +15,7 @@ export const OPTIONS_TAPE_SUPPORT_BATCH_LIMIT = 250;
 export const OPTIONS_TAPE_SUPPORT_CACHE_LIMIT = 2_000;
 
 export type OptionsTapeSupportRequestContext = {
-  smartFlowContextByTraceId?: ReadonlyMap<string, unknown>;
+  smartFlowSupportByTraceId?: ReadonlyMap<string, unknown>;
   nbboByTraceId?: ReadonlyMap<string, OptionNBBO | null>;
   traceLimit?: number;
   nbboLimit?: number;
@@ -52,7 +47,7 @@ export const buildOptionsTapeSupportRequest = (
       continue;
     }
 
-    if (traceIds.size < traceLimit && !context.smartFlowContextByTraceId?.has(traceId)) {
+    if (traceIds.size < traceLimit && !context.smartFlowSupportByTraceId?.has(traceId)) {
       traceIds.add(traceId);
     }
 
@@ -101,31 +96,6 @@ export const buildOptionsTapeSupportPacketMaps = (
   }
 
   return { flowPacketById, flowPacketByTraceId, packetIdByOptionTraceId };
-};
-
-const getProjectionKey = (projection: SmartFlowExplainabilityProjection): string =>
-  projection.trace_id || projection.refs.event_id || projection.refs.hypothesis_id;
-
-export const mergeOptionsTapeSmartFlowProjections = (
-  current: readonly SmartFlowExplainabilityProjection[],
-  incoming: readonly SmartFlowExplainabilityProjection[],
-  limit = OPTIONS_TAPE_SUPPORT_CACHE_LIMIT
-): SmartFlowExplainabilityProjection[] => {
-  const byKey = new Map<string, SmartFlowExplainabilityProjection>();
-  for (const projection of [...current, ...incoming]) {
-    const key = getProjectionKey(projection);
-    const existing = byKey.get(key);
-    if (
-      !existing ||
-      projection.source_ts > existing.source_ts ||
-      (projection.source_ts === existing.source_ts && projection.seq >= existing.seq)
-    ) {
-      byKey.set(key, projection);
-    }
-  }
-  return Array.from(byKey.values())
-    .sort((left, right) => right.source_ts - left.source_ts || right.seq - left.seq)
-    .slice(0, limit);
 };
 
 export const mergeOptionsTapeSupportPackets = (
