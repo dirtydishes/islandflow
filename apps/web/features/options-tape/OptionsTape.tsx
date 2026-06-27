@@ -1,12 +1,6 @@
 "use client";
 
-import type {
-  FlowPacket,
-  OptionFlowFilters,
-  OptionNBBO,
-  OptionPrint,
-  SmartFlowExplainabilityProjection
-} from "@islandflow/types";
+import type { FlowPacket, OptionFlowFilters, OptionNBBO, OptionPrint } from "@islandflow/types";
 import { parseOptionContractId } from "@islandflow/types";
 import {
   type Dispatch,
@@ -51,14 +45,13 @@ import {
   buildOptionsTapeSupportPacketMaps,
   buildOptionsTapeSupportRequest,
   createOptionsTapeSupportHydratingSource,
-  mergeOptionsTapeSmartFlowProjections,
   mergeOptionsTapeSupportPackets
 } from "./support-hydration";
 import {
-  buildOptionsTapeSmartFlowContextByTraceId,
-  getOptionsTapeRowTintFromContext,
   getOptionsTapeRowTintClassName,
+  getOptionsTapeRowTintFromContext,
   getOptionsTapeRowTintStyle,
+  getOptionsTapeSmartFlowContextFromSupport,
   getOptionsTapeSmartFlowSummary
 } from "./tinting";
 import type {
@@ -67,6 +60,7 @@ import type {
   OptionsTapeProps,
   OptionsTapeRowContext,
   OptionsTapeScope,
+  OptionsTapeSmartFlowSupportResolution,
   OptionsTapeSourceScope
 } from "./types";
 
@@ -76,6 +70,10 @@ const EMPTY_FLOW_PACKET_BY_ID = new Map<string, FlowPacket>();
 const EMPTY_FLOW_PACKET_BY_TRACE_ID = new Map<string, FlowPacket>();
 const EMPTY_PACKET_ID_BY_OPTION_TRACE_ID = new Map<string, string>();
 const EMPTY_NBBO_BY_TRACE_ID = new Map<string, OptionNBBO | null>();
+const EMPTY_SMART_FLOW_SUPPORT_BY_TRACE_ID = new Map<
+  string,
+  OptionsTapeSmartFlowSupportResolution
+>();
 
 const GLOBAL_SCOPE: OptionsTapeScope = { mode: "global" };
 
@@ -405,7 +403,7 @@ const rowContextFromPrint = ({
   flowPacketByTraceId,
   packetIdByOptionTraceId,
   flowPacketById,
-  smartFlowContextByTraceId,
+  smartFlowSupportByTraceId,
   nbboByContractId,
   nbboByTraceId
 }: Pick<
@@ -417,9 +415,11 @@ const rowContextFromPrint = ({
   | "nbboByTraceId"
 > & {
   print: OptionPrint;
-  smartFlowContextByTraceId?: ReadonlyMap<string, OptionsTapeRowContext["smartFlow"]>;
+  smartFlowSupportByTraceId?: ReadonlyMap<string, OptionsTapeSmartFlowSupportResolution>;
 }): OptionsTapeRowContext => {
+  const supportResolution = smartFlowSupportByTraceId?.get(print.trace_id);
   const packet =
+    supportResolution?.packet ??
     flowPacketByTraceId?.get(print.trace_id) ??
     flowPacketById?.get(packetIdByOptionTraceId?.get(print.trace_id) ?? "");
   const nbbo =
@@ -434,7 +434,11 @@ const rowContextFromPrint = ({
           memberTraceIds: packet.members
         }
       : undefined,
-    smartFlow: smartFlowContextByTraceId?.get(print.trace_id),
+    smartFlow: getOptionsTapeSmartFlowContextFromSupport({
+      optionTraceId: print.trace_id,
+      supportResolution,
+      packetMemberTraceIds: packet?.members
+    }),
     nbbo
   };
 };
@@ -453,7 +457,7 @@ export const OptionsTape = ({
   flowPacketByTraceId,
   packetIdByOptionTraceId,
   flowPacketById,
-  smartFlowProjections,
+  smartFlowSupportByTraceId,
   nbboByContractId,
   nbboByTraceId,
   supportHydrationEnabled = true,
@@ -475,14 +479,17 @@ export const OptionsTape = ({
   const activeSource = source ?? tapeSource;
   const mountedRef = useRef(true);
   const supportContextRef = useRef({
-    smartFlowContextByTraceId: new Map<string, OptionsTapeRowContext["smartFlow"]>(),
+    smartFlowSupportByTraceId: EMPTY_SMART_FLOW_SUPPORT_BY_TRACE_ID as ReadonlyMap<
+      string,
+      OptionsTapeSmartFlowSupportResolution
+    >,
     nbboByTraceId: EMPTY_NBBO_BY_TRACE_ID as ReadonlyMap<string, OptionNBBO | null>
   });
   const pendingSupportRequestKeysRef = useRef(new Set<string>());
   const [hydratedPackets, setHydratedPackets] = useState<FlowPacket[]>([]);
-  const [hydratedSmartFlowProjections, setHydratedSmartFlowProjections] = useState<
-    SmartFlowExplainabilityProjection[]
-  >([]);
+  const [hydratedSmartFlowSupportByTraceId, setHydratedSmartFlowSupportByTraceId] = useState<
+    Map<string, OptionsTapeSmartFlowSupportResolution>
+  >(() => new Map());
   const [hydratedNbboByTraceId, setHydratedNbboByTraceId] = useState<
     Map<string, OptionNBBO | null>
   >(() => new Map());
@@ -517,22 +524,11 @@ export const OptionsTape = ({
     () => mergeMaps(hydratedNbboByTraceId, nbboByTraceId) ?? EMPTY_NBBO_BY_TRACE_ID,
     [hydratedNbboByTraceId, nbboByTraceId]
   );
-  const mergedSmartFlowProjections = useMemo(
+  const mergedSmartFlowSupportByTraceId = useMemo(
     () =>
-      mergeOptionsTapeSmartFlowProjections(
-        smartFlowProjections ?? [],
-        hydratedSmartFlowProjections
-      ),
-    [hydratedSmartFlowProjections, smartFlowProjections]
-  );
-  const smartFlowContextByTraceId = useMemo(
-    () =>
-      buildOptionsTapeSmartFlowContextByTraceId({
-        projections: mergedSmartFlowProjections,
-        flowPacketById: mergedFlowPacketById,
-        flowPacketByTraceId: mergedFlowPacketByTraceId
-      }),
-    [mergedFlowPacketById, mergedFlowPacketByTraceId, mergedSmartFlowProjections]
+      mergeMaps(smartFlowSupportByTraceId, hydratedSmartFlowSupportByTraceId) ??
+      EMPTY_SMART_FLOW_SUPPORT_BY_TRACE_ID,
+    [hydratedSmartFlowSupportByTraceId, smartFlowSupportByTraceId]
   );
 
   useEffect(
@@ -544,10 +540,10 @@ export const OptionsTape = ({
 
   useEffect(() => {
     supportContextRef.current = {
-      smartFlowContextByTraceId,
+      smartFlowSupportByTraceId: mergedSmartFlowSupportByTraceId,
       nbboByTraceId: mergedNbboByTraceId
     };
-  }, [mergedNbboByTraceId, smartFlowContextByTraceId]);
+  }, [mergedNbboByTraceId, mergedSmartFlowSupportByTraceId]);
 
   const hydrateSupportRows = useCallback((rows: readonly OptionPrint[]) => {
     const request = buildOptionsTapeSupportRequest(rows, supportContextRef.current);
@@ -571,10 +567,18 @@ export const OptionsTape = ({
         if (payload.packets.length > 0) {
           setHydratedPackets((current) => mergeOptionsTapeSupportPackets(current, payload.packets));
         }
-        if (payload.smartFlowProjections.length > 0) {
-          setHydratedSmartFlowProjections((current) =>
-            mergeOptionsTapeSmartFlowProjections(current, payload.smartFlowProjections)
-          );
+        if (payload.smartFlowSupportByTraceId.size > 0) {
+          setHydratedSmartFlowSupportByTraceId((current) => {
+            const next = new Map(current);
+            let changed = false;
+            for (const [traceId, support] of payload.smartFlowSupportByTraceId) {
+              if (support.smart_flow_status === "matched" && support.smart_flow) {
+                next.set(traceId, support);
+                changed = true;
+              }
+            }
+            return changed ? next : current;
+          });
         }
         if (Object.keys(payload.nbboByTraceId).length > 0) {
           setHydratedNbboByTraceId((current) => {
@@ -617,7 +621,7 @@ export const OptionsTape = ({
         flowPacketByTraceId: mergedFlowPacketByTraceId,
         packetIdByOptionTraceId: mergedPacketIdByOptionTraceId,
         flowPacketById: mergedFlowPacketById,
-        smartFlowContextByTraceId,
+        smartFlowSupportByTraceId: mergedSmartFlowSupportByTraceId,
         nbboByContractId,
         nbboByTraceId: mergedNbboByTraceId
       }),
@@ -626,8 +630,8 @@ export const OptionsTape = ({
       mergedFlowPacketByTraceId,
       mergedNbboByTraceId,
       mergedPacketIdByOptionTraceId,
-      nbboByContractId,
-      smartFlowContextByTraceId
+      mergedSmartFlowSupportByTraceId,
+      nbboByContractId
     ]
   );
 

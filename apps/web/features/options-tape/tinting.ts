@@ -1,4 +1,4 @@
-import type { FlowPacket } from "@islandflow/types";
+import type { DurableTapeSmartFlowSupport } from "@islandflow/types";
 import type { CSSProperties } from "react";
 
 import {
@@ -19,7 +19,8 @@ import type {
   OptionsTapeRowContext,
   OptionsTapeSmartFlowContext,
   OptionsTapeSmartFlowProjection,
-  OptionsTapeSmartFlowRefSource
+  OptionsTapeSmartFlowRefSource,
+  OptionsTapeSmartFlowSupportResolution
 } from "./types";
 
 export type OptionsTapeTintDirection = SmartFlowTintDirection;
@@ -38,124 +39,139 @@ export type OptionsTapeRowTint = {
 
 export type OptionsTapeSmartFlowSummary = SmartFlowSummary;
 
-export type OptionsTapeSmartFlowContextMapInput = {
-  projections?: readonly OptionsTapeSmartFlowProjection[];
-  flowPacketById?: ReadonlyMap<string, FlowPacket>;
-  flowPacketByTraceId?: ReadonlyMap<string, FlowPacket>;
-};
-
 const uniqueNonEmpty = (items: readonly string[]): string[] =>
   Array.from(new Set(items.map((item) => item.trim()).filter(Boolean)));
-
-export const getOptionsTapeSmartFlowEvidenceRefs = (
-  projection: OptionsTapeSmartFlowProjection
-): string[] =>
-  uniqueNonEmpty([
-    ...projection.refs.evidence_refs,
-    ...projection.evidence.evidence_refs,
-    ...projection.hypothesis.evidence_refs
-  ]);
 
 export const isOptionsTapeSmartFlowPacketRef = (ref: string): boolean =>
   ref.startsWith("flowpacket:");
 
-export const getOptionsTapeSmartFlowOptionPrintRefs = (
-  projection: OptionsTapeSmartFlowProjection
+export const getOptionsTapeSmartFlowSupportEvidenceRefs = (
+  support: DurableTapeSmartFlowSupport
+): string[] => uniqueNonEmpty(support.refs.evidence_refs);
+
+export const getOptionsTapeSmartFlowSupportOptionPrintRefs = (
+  support: DurableTapeSmartFlowSupport
 ): string[] =>
-  getOptionsTapeSmartFlowEvidenceRefs(projection).filter(
-    (ref) => !isOptionsTapeSmartFlowPacketRef(ref)
+  uniqueNonEmpty(
+    support.refs.option_print_refs.length > 0
+      ? support.refs.option_print_refs
+      : support.refs.evidence_refs.filter((ref) => !isOptionsTapeSmartFlowPacketRef(ref))
   );
 
-export const getOptionsTapeSmartFlowPacketRefs = (
-  projection: OptionsTapeSmartFlowProjection
+export const getOptionsTapeSmartFlowSupportPacketRefs = (
+  support: DurableTapeSmartFlowSupport
 ): string[] =>
-  getOptionsTapeSmartFlowEvidenceRefs(projection).filter(isOptionsTapeSmartFlowPacketRef);
-
-const resolveSmartFlowPacketRef = (
-  ref: string,
-  flowPacketById?: ReadonlyMap<string, FlowPacket>,
-  flowPacketByTraceId?: ReadonlyMap<string, FlowPacket>
-): FlowPacket | undefined => flowPacketById?.get(ref) ?? flowPacketByTraceId?.get(ref);
-
-const compareProjectionRecency = (
-  left: OptionsTapeSmartFlowProjection,
-  right: OptionsTapeSmartFlowProjection
-): number => {
-  const sourceDelta = (left.source_ts ?? 0) - (right.source_ts ?? 0);
-  if (sourceDelta !== 0) {
-    return sourceDelta;
-  }
-  return (left.seq ?? 0) - (right.seq ?? 0);
-};
-
-const SMART_FLOW_REF_SOURCE_RANK: Record<OptionsTapeSmartFlowRefSource, number> = {
-  "packet-member": 1,
-  "direct-print": 2
-};
-
-const shouldReplaceSmartFlowContext = (
-  current: OptionsTapeSmartFlowContext | undefined,
-  nextProjection: OptionsTapeSmartFlowProjection,
-  nextSource: OptionsTapeSmartFlowRefSource
-): boolean => {
-  if (!current) {
-    return true;
-  }
-  const recency = compareProjectionRecency(nextProjection, current.projection);
-  if (recency !== 0) {
-    return recency > 0;
-  }
-  return SMART_FLOW_REF_SOURCE_RANK[nextSource] > SMART_FLOW_REF_SOURCE_RANK[current.source];
-};
-
-export const buildOptionsTapeSmartFlowContextByTraceId = ({
-  projections = [],
-  flowPacketById,
-  flowPacketByTraceId
-}: OptionsTapeSmartFlowContextMapInput): Map<string, OptionsTapeSmartFlowContext> => {
-  const map = new Map<string, OptionsTapeSmartFlowContext>();
-
-  for (const projection of projections) {
-    const evidenceRefs = getOptionsTapeSmartFlowEvidenceRefs(projection);
-    const directPrintRefs = getOptionsTapeSmartFlowOptionPrintRefs(projection);
-    const packetRefs = getOptionsTapeSmartFlowPacketRefs(projection);
-    const expandedPacketRefs = uniqueNonEmpty(
-      packetRefs.flatMap(
-        (ref) => resolveSmartFlowPacketRef(ref, flowPacketById, flowPacketByTraceId)?.members ?? []
-      )
-    );
-
-    const assign = (traceId: string, source: OptionsTapeSmartFlowRefSource) => {
-      if (!shouldReplaceSmartFlowContext(map.get(traceId), projection, source)) {
-        return;
-      }
-      map.set(traceId, {
-        projection,
-        source,
-        evidenceRefs,
-        directPrintRefs,
-        packetRefs,
-        expandedPacketRefs
-      });
-    };
-
-    for (const traceId of expandedPacketRefs) {
-      assign(traceId, "packet-member");
-    }
-    for (const traceId of directPrintRefs) {
-      assign(traceId, "direct-print");
-    }
-  }
-
-  return map;
-};
+  uniqueNonEmpty(
+    support.refs.packet_refs.length > 0
+      ? support.refs.packet_refs
+      : support.refs.evidence_refs.filter(isOptionsTapeSmartFlowPacketRef)
+  );
 
 export const getOptionsTapePolicyConfidenceBand = getSmartFlowPolicyConfidenceBand;
 export const getOptionsTapeEvidenceQualityBand = getSmartFlowEvidenceQualityBand;
 
+const SUPPORT_SOURCE_TO_CONTEXT_SOURCE: Record<
+  DurableTapeSmartFlowSupport["match_source"],
+  OptionsTapeSmartFlowRefSource
+> = {
+  direct_print: "direct-print",
+  packet_member: "packet-member"
+};
+
+export const isOptionsTapeSmartFlowProjectionTintEligible = (
+  projection: OptionsTapeSmartFlowTintInput
+): boolean =>
+  !projection.abstention.abstained && projection.hypothesis.hypothesis_type !== "unclear";
+
+export const isOptionsTapeSmartFlowSupportTintEligible = (
+  support: DurableTapeSmartFlowSupport | null | undefined
+): support is DurableTapeSmartFlowSupport =>
+  Boolean(
+    support && support.tint_eligible && !support.abstained && support.hypothesis_type !== "unclear"
+  );
+
+export const smartFlowSupportToOptionsTapeProjection = (
+  support: DurableTapeSmartFlowSupport
+): OptionsTapeSmartFlowProjection => {
+  const abstentionReasons: OptionsTapeSmartFlowProjection["abstention"]["reasons"] =
+    support.abstained ? ["other"] : ["not_abstained"];
+  return {
+    trace_id: support.projection_trace_id,
+    refs: {
+      evidence_refs: support.refs.evidence_refs
+    },
+    evidence: {
+      evidence_refs: support.refs.evidence_refs,
+      evidence_quality: support.evidence_quality
+    },
+    hypothesis: {
+      evidence_refs: support.refs.evidence_refs,
+      hypothesis_type: support.hypothesis_type,
+      direction: support.direction,
+      scores: {
+        confidence: {
+          policy_confidence: support.confidence,
+          evidence_quality: support.evidence_quality
+        }
+      }
+    },
+    abstention: {
+      abstained: support.abstained,
+      reasons: abstentionReasons,
+      source_reasons: []
+    }
+  };
+};
+
+export const getOptionsTapeSmartFlowContextFromSupport = ({
+  optionTraceId,
+  supportResolution,
+  smartFlow,
+  packetMemberTraceIds = []
+}: {
+  optionTraceId: string;
+  supportResolution?: OptionsTapeSmartFlowSupportResolution | null;
+  smartFlow?: DurableTapeSmartFlowSupport | null;
+  packetMemberTraceIds?: readonly string[];
+}): OptionsTapeSmartFlowContext | undefined => {
+  const support = smartFlow ?? supportResolution?.smart_flow;
+  if (!support) {
+    return undefined;
+  }
+
+  const evidenceRefs = getOptionsTapeSmartFlowSupportEvidenceRefs(support);
+  const directPrintRefs = uniqueNonEmpty([
+    ...getOptionsTapeSmartFlowSupportOptionPrintRefs(support),
+    ...(support.match_source === "direct_print" ? [optionTraceId] : [])
+  ]);
+  const packetRefs = uniqueNonEmpty([
+    ...getOptionsTapeSmartFlowSupportPacketRefs(support),
+    ...(support.packet_id ? [support.packet_id] : []),
+    ...(supportResolution?.packet?.id ? [supportResolution.packet.id] : [])
+  ]);
+  const expandedPacketRefs = uniqueNonEmpty([
+    ...packetMemberTraceIds,
+    ...(supportResolution?.packet?.members ?? [])
+  ]);
+
+  return {
+    support,
+    tintEligible: isOptionsTapeSmartFlowSupportTintEligible(support),
+    projection: smartFlowSupportToOptionsTapeProjection(support),
+    source: SUPPORT_SOURCE_TO_CONTEXT_SOURCE[support.match_source],
+    evidenceRefs,
+    directPrintRefs,
+    packetRefs,
+    expandedPacketRefs
+  };
+};
+
 export const getOptionsTapeSmartFlowRowTint = (
   projection: OptionsTapeSmartFlowTintInput
-): OptionsTapeRowTint => {
+): OptionsTapeRowTint | undefined => {
+  if (!isOptionsTapeSmartFlowProjectionTintEligible(projection)) {
+    return undefined;
+  }
   const smartFlowTint = getSmartFlowTint(projection);
   const { metadata } = smartFlowTint;
   const hypothesisClass = normalizeClassToken(metadata.hypothesisType);
@@ -186,7 +202,7 @@ export const getOptionsTapeSmartFlowSummary = getSmartFlowSummary;
 export const getOptionsTapeRowTintFromContext = (
   context: Pick<OptionsTapeRowContext, "smartFlow">
 ): OptionsTapeRowTint | undefined => {
-  if (context.smartFlow) {
+  if (context.smartFlow?.tintEligible) {
     return getOptionsTapeSmartFlowRowTint(context.smartFlow.projection);
   }
   return undefined;

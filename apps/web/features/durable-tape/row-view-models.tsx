@@ -4,7 +4,6 @@ import type {
   DurableTapeAlertRowViewModel,
   DurableTapeOptionRowViewModel,
   DurableTapeRowViewModel,
-  DurableTapeSmartFlowSupport,
   OptionPrint
 } from "@islandflow/types";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
@@ -14,16 +13,11 @@ import {
   getOptionsTapeRowTintClassName,
   getOptionsTapeRowTintFromContext,
   getOptionsTapeRowTintStyle,
-  getOptionsTapeSmartFlowEvidenceRefs,
-  getOptionsTapeSmartFlowOptionPrintRefs,
-  getOptionsTapeSmartFlowPacketRefs,
+  getOptionsTapeSmartFlowContextFromSupport,
   getOptionsTapeSmartFlowSummary,
   type OptionsTapeRowTint
 } from "../options-tape/tinting";
-import type {
-  OptionsTapeSmartFlowContext,
-  OptionsTapeSmartFlowProjection
-} from "../options-tape/types";
+import type { OptionsTapeSmartFlowContext } from "../options-tape/types";
 import { DurableTape } from "./components/DurableTape";
 import { createDurableTapeInitialHistoryCursor } from "./history";
 import {
@@ -193,39 +187,6 @@ const optionPrintFromRow = (row: DurableTapeOptionRowViewModel): OptionPrint => 
   signal_profile: row.option.signal?.profile as OptionPrint["signal_profile"]
 });
 
-const smartFlowSupportToProjection = (
-  support: DurableTapeSmartFlowSupport
-): OptionsTapeSmartFlowProjection => {
-  const abstentionReasons: OptionsTapeSmartFlowProjection["abstention"]["reasons"] =
-    support.abstained ? ["other"] : ["not_abstained"];
-  return {
-    trace_id: support.projection_trace_id,
-    refs: {
-      evidence_refs: support.refs.evidence_refs
-    },
-    evidence: {
-      evidence_refs: support.refs.evidence_refs,
-      evidence_quality: support.evidence_quality
-    },
-    hypothesis: {
-      evidence_refs: support.refs.evidence_refs,
-      hypothesis_type: support.hypothesis_type,
-      direction: support.direction,
-      scores: {
-        confidence: {
-          policy_confidence: support.confidence,
-          evidence_quality: support.evidence_quality
-        }
-      }
-    },
-    abstention: {
-      abstained: support.abstained,
-      reasons: abstentionReasons,
-      source_reasons: []
-    }
-  };
-};
-
 const getDurableOptionRowSmartFlowContext = (
   row: DurableTapeOptionRowViewModel
 ): OptionsTapeSmartFlowContext | undefined => {
@@ -233,36 +194,16 @@ const getDurableOptionRowSmartFlowContext = (
   if (!support) {
     return undefined;
   }
-  const projection = smartFlowSupportToProjection(support);
-  const evidenceRefs = getOptionsTapeSmartFlowEvidenceRefs(projection);
-  const directPrintRefs = getOptionsTapeSmartFlowOptionPrintRefs(projection);
-  const packetRefs = getOptionsTapeSmartFlowPacketRefs(projection);
-  const hasDirectPrintRef = directPrintRefs.includes(row.option.trace_id);
-  const hasAttachedPacketRef = Boolean(
-    row.support.packet && packetRefs.includes(row.support.packet.id)
-  );
-  const expandedPacketRefs =
-    row.support.packet && hasAttachedPacketRef ? row.support.packet.member_trace_ids : [];
-  if (!hasDirectPrintRef && !hasAttachedPacketRef) {
-    return undefined;
-  }
-
-  return {
-    projection,
-    source: hasDirectPrintRef ? "direct-print" : "packet-member",
-    evidenceRefs,
-    directPrintRefs,
-    packetRefs,
-    expandedPacketRefs
-  };
+  return getOptionsTapeSmartFlowContextFromSupport({
+    optionTraceId: row.option.trace_id,
+    smartFlow: support,
+    packetMemberTraceIds: row.support.packet?.member_trace_ids ?? []
+  });
 };
 
 export const getDurableOptionRowTint = (
   row: DurableTapeOptionRowViewModel
 ): OptionsTapeRowTint | undefined => {
-  if (row.support.smart_flow?.tint_eligible === false) {
-    return undefined;
-  }
   return getOptionsTapeRowTintFromContext({
     smartFlow: getDurableOptionRowSmartFlowContext(row)
   });
@@ -302,8 +243,9 @@ const renderBadgeList = (row: DurableTapeRowViewModel): ReactNode =>
   ) : null;
 
 const renderOptionHover = (row: DurableTapeOptionRowViewModel) => {
-  const smartFlowSummary = row.support.smart_flow
-    ? getOptionsTapeSmartFlowSummary(smartFlowSupportToProjection(row.support.smart_flow))
+  const smartFlowContext = getDurableOptionRowSmartFlowContext(row);
+  const smartFlowSummary = smartFlowContext
+    ? getOptionsTapeSmartFlowSummary(smartFlowContext.projection)
     : null;
   return (
     <div className="options-tape-hover-content" aria-label="Server-composed option row detail">

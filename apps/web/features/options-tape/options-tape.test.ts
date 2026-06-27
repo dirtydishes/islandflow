@@ -29,15 +29,14 @@ import {
   getOptionsTapeSidePreset
 } from "./filters";
 import {
-  buildOptionsTapeSupportPacketMaps,
   buildOptionsTapeSupportRequest,
   createOptionsTapeSupportHydratingSource
 } from "./support-hydration";
 import {
-  buildOptionsTapeSmartFlowContextByTraceId,
   getOptionsTapeRowTintClassName,
   getOptionsTapeRowTintFromContext,
   getOptionsTapeRowTintStyle,
+  getOptionsTapeSmartFlowContextFromSupport,
   getOptionsTapeSmartFlowRowTint,
   getOptionsTapeSmartFlowSummary,
   type OptionsTapeSmartFlowTintInput
@@ -450,74 +449,69 @@ describe("options tape row tint helpers", () => {
     };
   };
 
-  it("wraps shared smart-flow tinting in stable options-tape row classes", () => {
+  it("wraps eligible shared smart-flow tinting in stable options-tape row classes", () => {
     const tint = getOptionsTapeSmartFlowRowTint(
       makeSmartFlowTintInput({
-        abstained: true,
         direction: "bullish",
         evidenceQuality: 0.92,
-        policyConfidence: 0.9,
-        reasons: ["below_policy_threshold", "not_abstained"],
-        sourceReasons: ["policy confidence below threshold"]
+        policyConfidence: 0.9
       })
     );
 
-    expect(tint.metadata.abstained).toBe(true);
-    expect(tint.metadata.direction).toBe("abstained");
-    expect(tint.metadata.tone).toBe("neutral");
-    expect(tint.metadata.source).toBe("smart-flow");
-    expect(tint.className).toContain("options-tape-row-abstained");
-    expect(tint.className).toContain("options-tape-row-confidence-high");
-    expect(tint.className).toContain("options-tape-row-evidence-strong");
-    expect(tint.className).toContain("smart-flow-tone-neutral");
+    expect(tint?.metadata.abstained).toBe(false);
+    expect(tint?.metadata.direction).toBe("bullish");
+    expect(tint?.metadata.tone).toBe("green");
+    expect(tint?.metadata.source).toBe("smart-flow");
+    expect(tint?.className).toContain("options-tape-row-confidence-high");
+    expect(tint?.className).toContain("options-tape-row-evidence-strong");
+    expect(tint?.className).toContain("smart-flow-tone-green");
   });
 
-  it("maps smart-flow direct option-print refs and packet members to row contexts", () => {
+  it("maps compact direct smart-flow support to row context and tint", () => {
+    const projection = makeSmartFlowProjection({ refs: ["print-1"] });
+    const support = makeDurableSmartFlowSupport(projection);
+    const context = getOptionsTapeSmartFlowContextFromSupport({
+      optionTraceId: "print-1",
+      supportResolution: {
+        packet: null,
+        smart_flow_status: "matched",
+        smart_flow: support
+      }
+    });
+    const tint = getOptionsTapeRowTintFromContext({
+      smartFlow: context
+    });
+
+    expect(context?.source).toBe("direct-print");
+    expect(context?.directPrintRefs).toEqual(["print-1"]);
+    expect(tint?.metadata.source).toBe("smart-flow");
+    expect(tint?.metadata.hypothesisType).toBe("directional_accumulation");
+    expect(tint?.className).toContain("options-tape-smart-flow-row");
+  });
+
+  it("maps compact packet-member support without projection reconstruction", () => {
     const packet = makeFlowPacket({
       id: "flowpacket:1",
       trace_id: "flowpacket:trace:1",
       members: ["member-1", "member-2"]
     });
-    const projection = makeSmartFlowProjection({ refs: ["flowpacket:1", "direct-1"] });
-    const contexts = buildOptionsTapeSmartFlowContextByTraceId({
-      projections: [projection],
-      flowPacketById: new Map([[packet.id, packet]])
-    });
-
-    expect(contexts.get("direct-1")?.source).toBe("direct-print");
-    expect(contexts.get("direct-1")?.directPrintRefs).toEqual(["direct-1"]);
-    expect(contexts.get("member-1")?.source).toBe("packet-member");
-    expect(contexts.get("member-2")?.packetRefs).toEqual(["flowpacket:1"]);
-    expect(contexts.get("member-2")?.expandedPacketRefs).toEqual(["member-1", "member-2"]);
-  });
-
-  it("keeps direct smart-flow evidence ahead of packet expansion for the same row", () => {
-    const packet = makeFlowPacket({ id: "flowpacket:1", members: ["shared-print"] });
-    const projection = makeSmartFlowProjection({ refs: ["flowpacket:1", "shared-print"] });
-    const contexts = buildOptionsTapeSmartFlowContextByTraceId({
-      projections: [projection],
-      flowPacketById: new Map([[packet.id, packet]])
-    });
-
-    expect(contexts.get("shared-print")?.source).toBe("direct-print");
-  });
-
-  it("maps smart-flow row tinting from canonical context", () => {
-    const projection = makeSmartFlowProjection();
-    const tint = getOptionsTapeRowTintFromContext({
-      smartFlow: {
-        projection,
-        source: "direct-print",
-        evidenceRefs: ["print-1"],
-        directPrintRefs: ["print-1"],
-        packetRefs: [],
-        expandedPacketRefs: []
+    const projection = makeSmartFlowProjection({ refs: ["flowpacket:1"] });
+    const support = makeDurableSmartFlowSupport(projection);
+    const context = getOptionsTapeSmartFlowContextFromSupport({
+      optionTraceId: "member-2",
+      supportResolution: {
+        packet,
+        smart_flow_status: "matched",
+        smart_flow: support
       }
     });
 
-    expect(tint?.metadata.source).toBe("smart-flow");
-    expect(tint?.metadata.hypothesisType).toBe("directional_accumulation");
-    expect(tint?.className).toContain("options-tape-smart-flow-row");
+    expect(context?.source).toBe("packet-member");
+    expect(context?.packetRefs).toEqual(["flowpacket:1"]);
+    expect(context?.expandedPacketRefs).toEqual(["member-1", "member-2"]);
+    expect(getOptionsTapeRowTintFromContext({ smartFlow: context })?.className).toContain(
+      "options-tape-smart-flow-row"
+    );
   });
 
   it("summarizes smart-flow context for hover and scope labels", () => {
@@ -572,7 +566,7 @@ describe("options tape row tint helpers", () => {
     expect(hydratedRows).toEqual([["older-history"]]);
 
     const request = buildOptionsTapeSupportRequest(page.items, {
-      smartFlowContextByTraceId: new Map(),
+      smartFlowSupportByTraceId: new Map(),
       nbboByTraceId: new Map()
     });
     expect(request.traceIds).toEqual(["older-history"]);
@@ -585,17 +579,20 @@ describe("options tape row tint helpers", () => {
     ]);
 
     const packet = makeFlowPacket({ id: "flowpacket:history", members: ["older-history"] });
-    const packetMaps = buildOptionsTapeSupportPacketMaps([packet]);
     const projection = makeSmartFlowProjection({
       refs: ["flowpacket:history", "older-history"]
     });
-    const contexts = buildOptionsTapeSmartFlowContextByTraceId({
-      projections: [projection],
-      flowPacketById: packetMaps.flowPacketById,
-      flowPacketByTraceId: packetMaps.flowPacketByTraceId
+    const support = makeDurableSmartFlowSupport(projection);
+    const context = getOptionsTapeSmartFlowContextFromSupport({
+      optionTraceId: "older-history",
+      supportResolution: {
+        packet,
+        smart_flow_status: "matched",
+        smart_flow: support
+      }
     });
     const tint = getOptionsTapeRowTintFromContext({
-      smartFlow: contexts.get("older-history")
+      smartFlow: context
     });
 
     expect(tint?.metadata.source).toBe("smart-flow");
@@ -639,9 +636,36 @@ describe("options tape row tint helpers", () => {
     const durableTint = getDurableOptionRowTint(row);
     const canonicalTint = getOptionsTapeSmartFlowRowTint(projection);
 
-    expect(durableTint?.metadata).toEqual(canonicalTint.metadata);
-    expect(durableTint?.className).toBe(canonicalTint.className);
-    expect(durableTint?.style).toEqual(canonicalTint.style);
+    expect(canonicalTint).toBeDefined();
+    expect(durableTint?.metadata).toEqual(canonicalTint?.metadata);
+    expect(durableTint?.className).toBe(canonicalTint?.className);
+    expect(durableTint?.style).toEqual(canonicalTint?.style);
+  });
+
+  it("keeps abstained and unclear support as context without row tint", () => {
+    const abstained = makeDurableSmartFlowSupport(
+      makeSmartFlowProjection({ abstained: true, refs: ["print-1"] })
+    );
+    const unclear = makeDurableSmartFlowSupport(
+      makeSmartFlowProjection({ hypothesisType: "unclear", refs: ["print-2"] })
+    );
+    const abstainedContext = getOptionsTapeSmartFlowContextFromSupport({
+      optionTraceId: "print-1",
+      smartFlow: abstained
+    });
+    const unclearContext = getOptionsTapeSmartFlowContextFromSupport({
+      optionTraceId: "print-2",
+      smartFlow: unclear
+    });
+
+    expect(abstainedContext).toBeDefined();
+    expect(unclearContext).toBeDefined();
+    expect(
+      abstainedContext && getOptionsTapeSmartFlowSummary(abstainedContext.projection).direction
+    ).toBe("abstained");
+    expect(unclearContext?.projection.hypothesis.hypothesis_type).toBe("unclear");
+    expect(getOptionsTapeRowTintFromContext({ smartFlow: abstainedContext })).toBeUndefined();
+    expect(getOptionsTapeRowTintFromContext({ smartFlow: unclearContext })).toBeUndefined();
   });
 
   it("does not tint durable option rows when compact support is not tint eligible", () => {

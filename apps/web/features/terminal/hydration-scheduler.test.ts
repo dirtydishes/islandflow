@@ -67,6 +67,35 @@ const makeSmartFlowProjection = (packetId: string, traceId = "smartflow:1") =>
     }
   }) as any;
 
+const makeSmartFlowSupportResolution = (packet: any, smartFlow: any) => ({
+  packet,
+  smart_flow_status: "matched",
+  smart_flow: {
+    status: "matched",
+    source_channel: "smart-flow",
+    projection_id: smartFlow.refs.event_id,
+    projection_trace_id: smartFlow.trace_id,
+    packet_id: packet.id,
+    match_source: "packet_member",
+    tint_eligible: true,
+    hypothesis_type: "directional_accumulation",
+    direction: "bullish",
+    confidence: 0.82,
+    evidence_quality: 0.82,
+    abstained: false,
+    refs: {
+      evidence_refs: smartFlow.refs.evidence_refs,
+      packet_refs: [packet.id],
+      option_print_refs: ["print:1"]
+    },
+    counts: {
+      evidence_refs: smartFlow.refs.evidence_refs.length,
+      flow_packets: 1,
+      option_prints: 1
+    }
+  }
+});
+
 describe("hydration scheduler keys", () => {
   it("builds stable sorted keys for missing ids and nbbo context", () => {
     expect(stableHydrationKey(["b", "a", "a", " "])).toBe("a\nb");
@@ -195,7 +224,9 @@ describe("HydrationScheduler", () => {
         expect(init?.signal).toBeUndefined();
         return jsonResponse({
           packets: [packet],
-          smart_flow: [smartFlow],
+          support_by_trace_id: {
+            "print:1": makeSmartFlowSupportResolution(packet, smartFlow)
+          },
           nbbo_by_trace_id: { "print:1": null }
         });
       }
@@ -211,32 +242,134 @@ describe("HydrationScheduler", () => {
 
     expect(requestCount).toBe(1);
     expect(left.packets.map((item) => item.id)).toEqual([packet.id]);
-    expect(left.smartFlowProjections.map((item) => item.trace_id)).toEqual(["smartflow:1"]);
+    expect(left.smartFlowSupportByTraceId.get("print:1")?.smart_flow?.projection_trace_id).toBe(
+      "smartflow:1"
+    );
     expect(left.nbboByTraceId).toEqual({ "print:1": null });
     expect(right.packets.map((item) => item.id)).toEqual([packet.id]);
+    expect(right.smartFlowSupportByTraceId.get("print:1")?.smart_flow_status).toBe("matched");
 
     await scheduler.requestOptionSupport({ traceIds: ["print:1"] });
     expect(requestCount).toBe(1);
   });
 
-  it("keeps missing smart-flow support bounded while packet support is cached", async () => {
+  it("does not treat cached packet membership as compact support for unrequested members", async () => {
+    const packet = makeFlowPacket("flowpacket:SPY-2026-06-26-500-C:1", ["print:1", "print:2"]);
+    const smartFlow = makeSmartFlowProjection(packet.id);
+    const requestedTraceIds: string[][] = [];
+    const scheduler = new HydrationScheduler({
+      batchDelayMs: 0,
+      fetcher: async (_input, init) => {
+        const body = JSON.parse(String(init?.body ?? "{}")) as { trace_ids?: string[] };
+        const traceIds = body.trace_ids ?? [];
+        requestedTraceIds.push(traceIds);
+        return jsonResponse({
+          packets: [packet],
+          support_by_trace_id: Object.fromEntries(
+            traceIds.map((traceId) => [traceId, makeSmartFlowSupportResolution(packet, smartFlow)])
+          )
+        });
+      }
+    });
+
+    await scheduler.requestOptionSupport({ traceIds: ["print:1"] });
+    const second = await scheduler.requestOptionSupport({ traceIds: ["print:2"] });
+
+    expect(requestedTraceIds).toEqual([["print:1"], ["print:2"]]);
+    expect(second.smartFlowSupportByTraceId.get("print:2")?.smart_flow_status).toBe("matched");
+  });
+
+  it("keeps explicit unavailable smart-flow support bounded while packet support is cached", async () => {
     const packet = makeFlowPacket("flowpacket:SPY-2026-06-26-500-C:miss", ["print:missing"]);
     let requestCount = 0;
     const scheduler = new HydrationScheduler({
       batchDelayMs: 0,
       fetcher: async () => {
         requestCount += 1;
-        return jsonResponse({ packets: [packet] });
+        return jsonResponse({
+          packets: [packet],
+          support_by_trace_id: {
+            "print:missing": {
+              packet,
+              smart_flow_status: "smart_flow_unavailable",
+              smart_flow_unavailable_reason:
+                "no smart-flow projection references the hydrated packet or direct option print",
+              smart_flow: null
+            }
+          }
+        });
       }
     });
 
-    await expect(scheduler.requestOptionSupport({ traceIds: ["print:missing"] })).resolves.toEqual({
+    const first = await scheduler.requestOptionSupport({ traceIds: ["print:missing"] });
+    expect(first).toEqual({
       packets: [packet],
-      smartFlowProjections: [],
+      smartFlowSupportByTraceId: new Map([
+        [
+          "print:missing",
+          {
+            packet,
+            smart_flow_status: "smart_flow_unavailable",
+            smart_flow_unavailable_reason:
+              "no smart-flow projection references the hydrated packet or direct option print",
+            smart_flow: null
+          }
+        ]
+      ]),
       nbboByTraceId: {}
     });
     await scheduler.requestOptionSupport({ traceIds: ["print:missing"] });
     expect(requestCount).toBe(1);
+  });
+
+  it("retries unavailable smart-flow support after the negative ttl", async () => {
+    let now = 0;
+    let requestCount = 0;
+    const packet = makeFlowPacket("flowpacket:SPY-2026-06-26-500-C:retry", ["print:retry"]);
+    const smartFlow = makeSmartFlowProjection(packet.id);
+    const scheduler = new HydrationScheduler({
+      batchDelayMs: 0,
+      negativeTtlMs: 10,
+      now: () => now,
+      fetcher: async () => {
+        requestCount += 1;
+        return jsonResponse({
+          packets: [packet],
+          support_by_trace_id:
+            requestCount === 1
+              ? {
+                  "print:retry": {
+                    packet,
+                    smart_flow_status: "smart_flow_unavailable",
+                    smart_flow_unavailable_reason:
+                      "no smart-flow projection references the hydrated packet or direct option print",
+                    smart_flow: null
+                  }
+                }
+              : {
+                  "print:retry": makeSmartFlowSupportResolution(packet, smartFlow)
+                }
+        });
+      }
+    });
+
+    expect(
+      (
+        await scheduler.requestOptionSupport({ traceIds: ["print:retry"] })
+      ).smartFlowSupportByTraceId.get("print:retry")?.smart_flow_status
+    ).toBe("smart_flow_unavailable");
+
+    now = 5;
+    await scheduler.requestOptionSupport({ traceIds: ["print:retry"] });
+    expect(requestCount).toBe(1);
+
+    now = 11;
+    expect(
+      (
+        await scheduler.requestOptionSupport({ traceIds: ["print:retry"] })
+      ).smartFlowSupportByTraceId.get("print:retry")?.smart_flow_status
+    ).toBe("matched");
+    expect(requestCount).toBe(2);
   });
 
   it("keeps option support nbbo hits on the positive ttl and misses on the negative ttl", async () => {
