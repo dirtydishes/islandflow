@@ -87,7 +87,7 @@ Install `@pierre/diffs` in the target repo if missing. Every storyboard diff mus
 
 | Beads Issue | Phase | Phase Doc | Depends On | Status |
 |---|---|---|---|---|
-| `islandflow-j06e.1` | 01 - Server-side smart-flow support resolver | `docs/implementation/options-smart-flow-support-triage/01-server-side-support-resolver.md` | None | In progress |
+| `islandflow-j06e.1` | 01 - Server-side smart-flow support resolver | `docs/implementation/options-smart-flow-support-triage/01-server-side-support-resolver.md` | None | Open |
 | `islandflow-j06e.2` | 02 - Row support rendering and tint parity | `docs/implementation/options-smart-flow-support-triage/02-row-support-rendering-tint-parity.md` | `islandflow-j06e.1` | Open, blocked |
 | `islandflow-j06e.3` | 03 - Packet and contract scope interactions | `docs/implementation/options-smart-flow-support-triage/03-packet-contract-scope-interactions.md` | `islandflow-j06e.2` | Open, blocked |
 | `islandflow-j06e.4` | 04 - QA diagnostics and module settings | `docs/implementation/options-smart-flow-support-triage/04-qa-diagnostics-module-settings.md` | `islandflow-j06e.3` | Open, blocked |
