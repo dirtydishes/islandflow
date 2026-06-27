@@ -87,8 +87,10 @@ describe("smart-flow projection storage helpers", () => {
 
     const [payload] = await fetchSmartFlowProjectionsByEvidenceRefs(client, ["print:1"]);
 
-    expect(queries[0]).toContain("has(evidence_refs, 'print:1')");
-    expect(queries[0]).toContain("ORDER BY source_ts DESC, seq DESC");
+    expect(queries[0]).toContain("arrayJoin(evidence_refs) AS matched_ref");
+    expect(queries[0]).toContain("hasAny(evidence_refs, ['print:1'])");
+    expect(queries[0]).toContain("ORDER BY matched_ref ASC, source_ts DESC, seq DESC");
+    expect(queries[0]).toContain("LIMIT 4 BY matched_ref");
     expect(payload?.refs.evidence_refs).toEqual(["flowpacket:1", "print:1"]);
   });
 });

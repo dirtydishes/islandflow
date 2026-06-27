@@ -151,7 +151,8 @@ describe("smart-flow API projections", () => {
       ["flowpacket:12"]
     );
 
-    expect(queries[0]).toContain("has(evidence_refs, 'flowpacket:12')");
+    expect(queries[0]).toContain("hasAny(evidence_refs, ['flowpacket:12'])");
+    expect(queries[0]).toContain("LIMIT 4 BY matched_ref");
     expect(payload?.refs.cluster_id).toBe("cluster:SPY:1000:1120");
   });
 });

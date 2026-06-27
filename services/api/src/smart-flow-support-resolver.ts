@@ -261,27 +261,7 @@ const toSmartFlowSupport = ({
       evidence_refs: evidenceRefs.length,
       flow_packets: packetRefs.length,
       option_prints: optionPrintRefs.length
-    },
-    evidence: {
-      evidence_refs: evidenceRefs.slice(0, SMART_FLOW_SUPPORT_MAX_REFS),
-      evidence_quality: projection.evidence.evidence_quality
-    },
-    hypothesis: {
-      hypothesis_id: projection.refs.hypothesis_id,
-      hypothesis_type: hypothesisType,
-      direction: projection.hypothesis.direction,
-      evidence_refs: evidenceRefs.slice(0, SMART_FLOW_SUPPORT_MAX_REFS),
-      scores: {
-        confidence: {
-          policy_confidence: confidence.policy_confidence,
-          evidence_quality: confidence.evidence_quality,
-          hypothesis_margin: confidence.hypothesis_margin,
-          conviction: confidence.conviction,
-          calibration_version: confidence.calibration_version
-        }
-      }
-    },
-    abstention: projection.abstention
+    }
   };
 };
 

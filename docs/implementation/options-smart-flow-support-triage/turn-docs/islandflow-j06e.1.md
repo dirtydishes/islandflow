@@ -52,23 +52,35 @@ Reviewer skill:
 
 `thermo-nuclear-code-quality-review`
 
-Not started. A separate reviewer thread owns review and CI closeout.
+Completed in the review thread.
+
+Review findings repaired:
+
+- Durable-row snapshots resolved smart-flow support before subscription filtering, so the resolver's 250-trace cap could omit a visible scoped row. Snapshot support resolution now uses the same bounded, filtered option window that can be composed into option rows.
+- Smart-flow projection evidence lookup used one global recency `LIMIT`, which could crowd out quieter refs and negative-cache false misses. Storage lookup now bounds results per requested evidence ref with `arrayJoin(evidence_refs)` and `LIMIT 4 BY matched_ref`.
+- `support.smart_flow` carried nested projection detail (`evidence`, `hypothesis`, `abstention`) despite the compact row contract. The durable row payload now keeps compact identifiers, match source, confidence, eligibility, refs, and counts only; the web row adapter derives the minimal tint input locally from those compact fields.
+- Durable option row tinting ignored server `tint_eligible`, so `unclear` support could still receive row tint classes. The durable tint helper now returns no tint when compact support is not tint eligible.
+
+Findings remaining:
+
+None.
 
 ## CI And Gates
 
 CI owner: reviewer/verification agents
 
-Current CI state: `local-green`
+Current CI state: `ci-repaired-and-green`
 
 Evidence:
 
 - `bunx biome check --write <touched files>`: passed, fixed touched-file formatting/import order.
 - `bunx biome check <touched files>`: passed.
 - `bun run typecheck`: passed.
-- `bun test services/api/tests`: passed, 69 tests.
+- `bun test services/api/tests`: passed, 70 tests.
 - `bun test packages/storage`: passed, 32 tests.
-- `bun test`: passed, 500 tests.
+- `bun test`: passed, 502 tests.
 - `bun run check`: failed on pre-existing repo-wide import-order diagnostics outside this phase; touched files passed the scoped Biome check above.
+- `fj pr status 94 --wait`: unavailable due the known Forgejo CLI actions-job URL parser issue; reviewer used `fj actions tasks -R forgejo --page 1` as the fallback CI source.
 
 ## PR And Commits
 
@@ -79,6 +91,7 @@ URL: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/94`
 Commits:
 
 - `2f62329393b5d139fcbe57f2b53ff6fa627feaf9` - add options smart-flow support resolver
+- reviewer repair commit on `lavender/islandflow-j06e-1-support-resolver` - tighten support resolver review findings
 
 ## Beads Updates
 
@@ -89,6 +102,8 @@ Issue created under `islandflow-j06e`.
 2026-06-27 status correction: `islandflow-j06e.1` was reset to `open` along with the other child issues under `islandflow-j06e`.
 
 2026-06-27 implementation update: server-side support resolver implemented on `lavender/islandflow-j06e-1-support-resolver`; issue left open for orchestrator closeout.
+
+2026-06-27 review update: reviewer repaired the server-side support resolver windowing, evidence-ref storage lookup, compact row contract, and tint eligibility drift; issue left open for orchestrator closeout.
 
 ## Follow-Ups Filed
 
@@ -104,4 +119,4 @@ None.
 
 ## Closeout
 
-Implementation local gates passed. Forgejo PR `#94` is open for review.
+Review repairs passed local gates. Forgejo PR `#94` remains open for orchestrator merge/closeout.

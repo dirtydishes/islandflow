@@ -45,12 +45,15 @@ import {
   composeDurableRowSnapshot,
   composeDurableRowsForEvent,
   type DurableRowCompositionContext,
-  type DurableRowsSubscription
+  type DurableRowsSubscription,
+  selectDurableOptionSnapshotPrints,
+  wantsDurableOptionRows
 } from "./durable-rows";
 import { fetchRecentSmartFlowExplainability, smartFlowCursor } from "./smart-flow";
 import { fetchRecentSmartFlowAlertEvents, smartFlowAlertCursor } from "./smart-flow-alerts";
 import {
   createSmartFlowSupportResolver,
+  SMART_FLOW_SUPPORT_MAX_TRACE_IDS,
   type SmartFlowSupportResolver
 } from "./smart-flow-support-resolver";
 
@@ -745,8 +748,18 @@ export class LiveStateManager {
     subscription: DurableRowsSubscription
   ): Promise<FeedSnapshot<unknown>> {
     const context = this.getDurableRowCompositionContext();
+    if (!wantsDurableOptionRows(subscription)) {
+      return composeDurableRowSnapshot(subscription, context, this.durableRowsConfiguredLimit());
+    }
+
+    const optionPrints = selectDurableOptionSnapshotPrints(
+      subscription,
+      context,
+      this.durableRowsConfiguredLimit(),
+      SMART_FLOW_SUPPORT_MAX_TRACE_IDS
+    );
     const smartFlowSupport = await this.smartFlowSupportResolver.resolve(this.clickhouse, {
-      optionTraceIds: context.optionPrints.map((print) => print.trace_id),
+      optionTraceIds: optionPrints.map((print) => print.trace_id),
       hotPackets: context.flowPackets,
       hotSmartFlowProjections: context.smartFlowProjections,
       allowStorageFallback: true
@@ -755,6 +768,7 @@ export class LiveStateManager {
       subscription,
       {
         ...context,
+        optionPrints,
         smartFlowSupportByTraceId: smartFlowSupport.supportByTraceId
       },
       this.durableRowsConfiguredLimit()

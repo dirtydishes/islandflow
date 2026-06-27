@@ -232,6 +232,24 @@ const matchesDurableOptionSubscription = (
   return subscription.underlying_ids.map((value) => value.toUpperCase()).includes(underlying);
 };
 
+export const wantsDurableOptionRows = (subscription: DurableRowsSubscription): boolean =>
+  !subscription.lanes?.length || subscription.lanes.includes("options");
+
+export const selectDurableOptionSnapshotPrints = (
+  subscription: DurableRowsSubscription,
+  context: DurableRowCompositionContext,
+  configuredLimit: number,
+  maxOptions: number
+): OptionPrint[] => {
+  if (!wantsDurableOptionRows(subscription)) {
+    return [];
+  }
+  const limit = Math.min(snapshotLimitForDurableRows(subscription, configuredLimit), maxOptions);
+  return context.optionPrints
+    .filter((print) => matchesDurableOptionSubscription(print, subscription))
+    .slice(0, limit);
+};
+
 const matchesDurableAlertSubscription = (
   row: DurableTapeAlertRowViewModel,
   subscription: DurableRowsSubscription

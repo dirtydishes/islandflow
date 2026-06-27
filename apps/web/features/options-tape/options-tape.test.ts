@@ -1,14 +1,14 @@
 import { describe, expect, it } from "bun:test";
 import {
-  type FlowPacket,
+  type DurableTapeSmartFlowSupport,
   type FlowHypothesisType,
+  type FlowPacket,
   type OptionPrint,
-  type SmartFlowExplainabilityProjection,
-  type SmartFlowDirection
+  type SmartFlowDirection,
+  type SmartFlowExplainabilityProjection
 } from "@islandflow/types";
-
-import { getDurableOptionRowTint } from "../durable-tape/row-view-models";
 import { createDurableTapeInitialHistoryCursor } from "../durable-tape/history";
+import { getDurableOptionRowTint } from "../durable-tape/row-view-models";
 import { selectDurableTapeTemplate } from "../durable-tape/templates";
 import {
   formatOptionsTapeContractLabel,
@@ -35,11 +35,11 @@ import {
 } from "./support-hydration";
 import {
   buildOptionsTapeSmartFlowContextByTraceId,
-  getOptionsTapeRowTintFromContext,
   getOptionsTapeRowTintClassName,
+  getOptionsTapeRowTintFromContext,
   getOptionsTapeRowTintStyle,
-  getOptionsTapeSmartFlowSummary,
   getOptionsTapeSmartFlowRowTint,
+  getOptionsTapeSmartFlowSummary,
   type OptionsTapeSmartFlowTintInput
 } from "./tinting";
 
@@ -372,6 +372,41 @@ describe("options tape row tint helpers", () => {
       schema_version: "smart-flow.contracts.v1"
     }) as SmartFlowExplainabilityProjection;
 
+  const makeDurableSmartFlowSupport = (
+    projection: SmartFlowExplainabilityProjection,
+    overrides: Partial<DurableTapeSmartFlowSupport> = {}
+  ): DurableTapeSmartFlowSupport => {
+    const evidenceRefs = projection.refs.evidence_refs;
+    const packetRefs = evidenceRefs.filter((ref) => ref.startsWith("flowpacket:"));
+    const optionPrintRefs = evidenceRefs.filter((ref) => !ref.startsWith("flowpacket:"));
+    return {
+      status: "matched",
+      source_channel: "smart-flow",
+      projection_id: projection.refs.event_id,
+      projection_trace_id: projection.trace_id,
+      packet_id: packetRefs[0] ?? null,
+      match_source: packetRefs.length > 0 ? "packet_member" : "direct_print",
+      tint_eligible:
+        !projection.abstention.abstained && projection.hypothesis.hypothesis_type !== "unclear",
+      hypothesis_type: projection.hypothesis.hypothesis_type,
+      direction: projection.hypothesis.direction,
+      confidence: projection.hypothesis.scores.confidence.policy_confidence,
+      evidence_quality: projection.hypothesis.scores.confidence.evidence_quality,
+      abstained: projection.abstention.abstained,
+      refs: {
+        evidence_refs: evidenceRefs,
+        packet_refs: packetRefs,
+        option_print_refs: optionPrintRefs
+      },
+      counts: {
+        evidence_refs: evidenceRefs.length,
+        flow_packets: packetRefs.length,
+        option_prints: optionPrintRefs.length
+      },
+      ...overrides
+    };
+  };
+
   const makeSmartFlowTintInput = ({
     abstained = false,
     direction = "bullish",
@@ -569,6 +604,7 @@ describe("options tape row tint helpers", () => {
 
   it("uses the same smart-flow tint helper for durable option rows", () => {
     const projection = makeSmartFlowProjection({ refs: ["flowpacket:durable"] });
+    const support = makeDurableSmartFlowSupport(projection);
     const row = {
       id: "options:durable-print:1",
       lane: "options",
@@ -595,7 +631,8 @@ describe("options tape row tint helpers", () => {
           member_trace_ids: [],
           member_count: 250
         },
-        smart_flow: projection
+        smart_flow_status: "matched",
+        smart_flow: support
       }
     } as never;
 
@@ -605,5 +642,45 @@ describe("options tape row tint helpers", () => {
     expect(durableTint?.metadata).toEqual(canonicalTint.metadata);
     expect(durableTint?.className).toBe(canonicalTint.className);
     expect(durableTint?.style).toEqual(canonicalTint.style);
+  });
+
+  it("does not tint durable option rows when compact support is not tint eligible", () => {
+    const projection = makeSmartFlowProjection({
+      hypothesisType: "unclear",
+      refs: ["flowpacket:durable"]
+    });
+    const support = makeDurableSmartFlowSupport(projection, { tint_eligible: false });
+    const row = {
+      id: "options:durable-print:1",
+      lane: "options",
+      source: "server",
+      ts: 1_000,
+      seq: 1,
+      source_ts: 1_000,
+      ingest_ts: 1_001,
+      cells: {},
+      badges: [],
+      option: {
+        trace_id: "durable-print",
+        option_contract_id: "SPY-2026-06-22-555-C",
+        price: 1.25,
+        size: 100,
+        premium: 12_500,
+        side: "A",
+        exchange: "CBOE",
+        nbbo: null
+      },
+      support: {
+        packet: {
+          id: "flowpacket:durable",
+          member_trace_ids: [],
+          member_count: 250
+        },
+        smart_flow_status: "matched",
+        smart_flow: support
+      }
+    } as never;
+
+    expect(getDurableOptionRowTint(row)).toBeUndefined();
   });
 });
