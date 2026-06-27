@@ -59,11 +59,15 @@ Evidence:
 
 ## PR And Commits
 
-Pending Forgejo PR creation after commit/push.
+- Forgejo PR: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/95`
+- Branch: `lavender/islandflow-j06e-2-row-support-tint`
+- Implementation commit: `c6c1f54` - `render options smart flow support from row payloads`
 
 ## Beads Updates
 
-Issue created under `islandflow-j06e`, depends on `islandflow-j06e.1`, and was already claimed/in progress for this implementation thread. Implementation thread will not close it.
+Issue created under `islandflow-j06e`, depends on `islandflow-j06e.1`, and was already claimed/in progress for this implementation thread.
+
+Updated notes with branch, PR, local gates, and implementation-thread closeout state. Implementation thread did not close the issue.
 
 ## Follow-Ups Filed
 
@@ -79,4 +83,4 @@ None.
 
 ## Closeout
 
-Pending commit, push, Forgejo PR, and implementation callback.
+Forgejo PR opened. Pending final doc checkpoint push, `bd dolt push`, clean status verification, and implementation callback.
