@@ -73,6 +73,10 @@ Findings repaired:
   parent focus bookkeeping during the same activation. Repair: external clear
   handling now only reacts to an actual focused-contract-to-null transition, and
   row activation applies the in-place scope after parent focus callbacks.
+- Forgejo pull-request task `#405` failed in `Check formatting` on the repaired
+  head. Repair: applied Biome formatting to the affected packet-scope UI/API
+  files and replaced lint-warned `Object.prototype.hasOwnProperty.call(...)`
+  uses with `Object.hasOwn(...)` in the packet history source.
 
 Findings remaining:
 
@@ -82,16 +86,22 @@ None.
 
 CI owner: reviewer/verification agents
 
-Current CI state: `local-gates-passed-after-review-repair`
+Current CI state: `local-ci-gates-passed-after-review-and-formatting-repairs`
 
 Evidence:
 
-- `bun test apps/web/features/options-tape` - passed after review repair,
-  20 tests, 76 assertions.
-- `bun test services/api/tests` - passed after review repair, 72 tests,
-  262 assertions.
-- `bun --cwd=apps/web run build` - passed after review repair.
-- `git diff --check` - passed after review repair.
+- `bun run fmt:check` - passed after formatting repair.
+- `bun run lint` - passed after formatting repair, no warnings.
+- `bun run typecheck` - passed after formatting repair.
+- `bun test` - passed after formatting repair, 508 tests, 7420 assertions.
+- `bun run check:public-api-routes` - produced the expected
+  `DEPLOY_PUBLIC_APP_URL=<production-app-origin>` guard failure.
+- `bun run check:docker-workspace` - passed after formatting repair.
+- `bun --cwd=apps/web run build` - passed after formatting repair.
+- Earlier scoped repair gates also passed:
+  `bun test apps/web/features/options-tape` (20 tests, 76 assertions),
+  `bun test services/api/tests` (72 tests, 262 assertions), and
+  `git diff --check`.
 - Browser verification: `/options` desktop and mobile packet-scope interaction
   passed against local Next dev on `http://127.0.0.1:3101` with intercepted
   branch-shaped API responses. The probe verified:
@@ -107,7 +117,14 @@ Evidence:
     rejects as an invalid relative URL.
   - `fj actions tasks -R forgejo --page 1` showed pull-request tasks `#402`
     and `#403` failing on implementation commits `0331e79` and `9b2fe0c`.
-    Final repaired-head CI verification is performed after the reviewer push.
+- Forgejo CI repair evidence:
+  - Pull-request task `#405` on head `4e8c702` failed at `Check formatting`.
+    The run page identified job id `461`; the step log showed Biome formatting
+    failures in `apps/web/app/globals.css`,
+    `apps/web/features/options-tape/OptionsTape.tsx`, and
+    `services/api/src/option-queries.ts`.
+  - Final repaired-head CI verification is performed after the reviewer pushes
+    the formatting and doc-evidence repairs.
 
 ## PR And Commits
 
@@ -116,6 +133,8 @@ Evidence:
 - Implementation commit: `0331e79` - `add packet-backed options scope`
 - Implementation doc commit: `9b2fe0c` - `document packet scope publication`
 - Reviewer repair commit: `a72199a` - `repair packet scope review findings`
+- Reviewer doc commit: `4e8c702` - `record packet scope review repairs`
+- Reviewer CI repair commit: `cabe300` - `repair ci formatting failures`
 
 ## Beads Updates
 
@@ -135,5 +154,5 @@ None.
 
 ## Closeout
 
-Review repairs are complete locally. Reviewer publication, `bd dolt push`, and
-final Forgejo CI verification remain before callback.
+Review and CI repairs are complete locally. Reviewer publication, `bd dolt push`,
+and final Forgejo CI verification remain before callback.
