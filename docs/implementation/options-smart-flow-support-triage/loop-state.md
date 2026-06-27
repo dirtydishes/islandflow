@@ -70,3 +70,5 @@ Blocked: no
 2026-06-27: Implementation callback reported PR `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/96` ready on branch `lavender/islandflow-j06e-3-packet-contract-scope`; orchestrator is launching thermo-nuclear review and CI ownership.
 
 2026-06-27: Review callback reported PR `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/96` repaired with Forgejo Validate task `#406` green at `853f5e5cfb`; orchestrator merged PR #96, closed `islandflow-j06e.3`, and selected next ready issue `islandflow-j06e.4`.
+
+2026-06-27: Orchestrator claimed `islandflow-j06e.4`, prepared branch `lavender/islandflow-j06e-4-qa-diagnostics-settings`, and assigned worktree `/home/delta/.codex/worktrees/options-smart-flow-support-04-qa-settings` for the implementation thread.
