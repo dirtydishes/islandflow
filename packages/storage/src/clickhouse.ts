@@ -2004,6 +2004,89 @@ export const fetchOptionPrintsByTraceIds = async (
   return OptionPrintSchema.array().parse(rows.map(normalizeOptionRow));
 };
 
+export type FlowPacketOptionPrintsPage = {
+  packet: FlowPacket | null;
+  data: OptionPrint[];
+  pinned: OptionPrint | null;
+};
+
+const normalizePinnedTraceId = (traceId: string | undefined): string | null => {
+  const normalized = traceId?.trim();
+  return normalized ? normalized : null;
+};
+
+const buildLatestPacketMemberPrintsQuery = ({
+  packetId,
+  traceIdFilter
+}: {
+  packetId: string;
+  traceIdFilter?: string;
+}): string => {
+  const packetMembersSubquery = `SELECT arrayJoin(members) FROM (SELECT members FROM ${FLOW_PACKETS_TABLE} WHERE id = ${quoteString(packetId)} ORDER BY source_ts DESC, seq DESC LIMIT 1)`;
+  const filters = [`trace_id IN (${packetMembersSubquery})`];
+  if (traceIdFilter) {
+    filters.push(`trace_id = ${quoteString(traceIdFilter)}`);
+  }
+  return `SELECT * FROM ${OPTION_PRINTS_TABLE} WHERE ${filters.join(" AND ")} ORDER BY ts DESC, seq DESC LIMIT 1 BY trace_id`;
+};
+
+export const fetchOptionPrintsForFlowPacketBefore = async (
+  client: ClickHouseClient,
+  packetId: string,
+  beforeTs: number,
+  beforeSeq: number,
+  limit: number,
+  pinnedTraceId?: string
+): Promise<FlowPacketOptionPrintsPage> => {
+  const normalizedPacketId = packetId.trim();
+  if (!normalizedPacketId) {
+    return { packet: null, data: [], pinned: null };
+  }
+
+  const packet = await fetchFlowPacketById(client, normalizedPacketId);
+  if (!packet || packet.members.length === 0) {
+    return { packet, data: [], pinned: null };
+  }
+
+  const safeLimit = clampLimit(limit);
+  const packetMemberPrintsQuery = buildLatestPacketMemberPrintsQuery({
+    packetId: normalizedPacketId
+  });
+  const result = await client.query({
+    query: `SELECT * FROM (${packetMemberPrintsQuery}) WHERE ${buildBeforeTupleCondition("ts", "seq", beforeTs, beforeSeq)} ORDER BY ts DESC, seq DESC LIMIT ${safeLimit}`,
+    format: "JSONEachRow",
+    ...OPTION_PRINT_QUERY_BOUNDS
+  });
+
+  const rows = await result.json<unknown[]>();
+  const data = OptionPrintSchema.array().parse(rows.map(normalizeOptionRow));
+  const normalizedPinnedTraceId = normalizePinnedTraceId(pinnedTraceId);
+  const pinnedFromPage =
+    normalizedPinnedTraceId && packet.members.includes(normalizedPinnedTraceId)
+      ? (data.find((print) => print.trace_id === normalizedPinnedTraceId) ?? null)
+      : null;
+  const pinned =
+    pinnedFromPage ??
+    (normalizedPinnedTraceId && packet.members.includes(normalizedPinnedTraceId)
+      ? (OptionPrintSchema.array().parse(
+          (
+            await (
+              await client.query({
+                query: `SELECT * FROM (${buildLatestPacketMemberPrintsQuery({
+                  packetId: normalizedPacketId,
+                  traceIdFilter: normalizedPinnedTraceId
+                })}) LIMIT 1`,
+                format: "JSONEachRow",
+                ...OPTION_PRINT_QUERY_BOUNDS
+              })
+            ).json<unknown[]>()
+          ).map(normalizeOptionRow)
+        )[0] ?? null)
+      : null);
+
+  return { packet, data, pinned };
+};
+
 export const fetchEquityPrintJoinsByIds = async (
   client: ClickHouseClient,
   ids: string[]

@@ -1,7 +1,7 @@
 "use client";
 
-import type { OptionFlowFilters, OptionPrint } from "@islandflow/types";
-import { OptionPrintSchema } from "@islandflow/types";
+import type { FlowPacket, OptionFlowFilters, OptionPrint } from "@islandflow/types";
+import { FlowPacketSchema, OptionPrintSchema } from "@islandflow/types";
 import { useEffect, useMemo, useRef } from "react";
 
 import { buildBrowserApiUrl } from "../api-transport";
@@ -28,6 +28,12 @@ export const buildOptionsTapeApiUrl = (path: string, apiBaseUrl?: string): strin
 const parseOptionPrints = (items: unknown[]): OptionPrint[] =>
   OptionPrintSchema.array().parse(items);
 
+const parseOptionPrint = (item: unknown): OptionPrint | null =>
+  item ? OptionPrintSchema.parse(item) : null;
+
+const parseFlowPacket = (item: unknown): FlowPacket | null =>
+  item ? FlowPacketSchema.parse(item) : null;
+
 type OptionsTapeArrayListener = {
   scope: OptionsTapeSourceScope | undefined;
   filters: OptionFlowFilters | undefined;
@@ -36,11 +42,28 @@ type OptionsTapeArrayListener = {
 
 const parseHistoryResponse = async (response: Response): Promise<OptionsTapeHistoryResponse> => {
   const payload = (await response.json()) as OptionsTapeHistoryResponse;
+  const hasPacket = Object.hasOwn(payload, "packet");
+  const hasPinned = Object.hasOwn(payload, "pinned");
   return {
     data: parseOptionPrints(payload.data ?? []),
-    next_before: payload.next_before ?? null
+    next_before: payload.next_before ?? null,
+    packet: hasPacket ? parseFlowPacket(payload.packet ?? null) : undefined,
+    pinned: hasPinned ? parseOptionPrint(payload.pinned ?? null) : undefined
   };
 };
+
+const prependPinnedPrint = (
+  prints: readonly OptionPrint[],
+  pinned: OptionPrint | null | undefined
+): OptionPrint[] => {
+  if (!pinned) {
+    return [...prints];
+  }
+  return [pinned, ...prints.filter((print) => print.trace_id !== pinned.trace_id)];
+};
+
+const shouldBypassLiveSnapshot = (scope: OptionsTapeSourceScope | undefined): boolean =>
+  Boolean(scope?.packetId || scope?.optionContractId);
 
 export const loadOptionsTapeHistoryPage = async ({
   cursor,
@@ -71,7 +94,14 @@ export const loadOptionsTapeHistoryPage = async ({
     }
 
     const payload = await parseHistoryResponse(response);
-    const filtered = filterOptionsTapePrints(payload.data ?? [], scope, filters);
+    if (Object.hasOwn(payload, "packet")) {
+      options?.onPacketHydrated?.(payload.packet ?? null);
+    }
+    const filtered = filterOptionsTapePrints(
+      prependPinnedPrint(payload.data ?? [], payload.pinned),
+      scope,
+      filters
+    );
     if (filtered.length > 0 || !payload.next_before) {
       return {
         items: filtered,
@@ -114,8 +144,15 @@ export const useOptionsTapeArraySource = ({
   return useMemo(
     () => ({
       subscribe: ({ scope, filters }) => ({
-        getSnapshot: () => filterOptionsTapePrints(printsRef.current, scope, filters),
+        getSnapshot: () =>
+          shouldBypassLiveSnapshot(scope)
+            ? []
+            : filterOptionsTapePrints(printsRef.current, scope, filters),
         listen: (listener) => {
+          if (shouldBypassLiveSnapshot(scope)) {
+            listener([]);
+            return () => {};
+          }
           const entry = { scope, filters, listener };
           listenersRef.current.add(entry);
           listener(filterOptionsTapePrints(printsRef.current, scope, filters));

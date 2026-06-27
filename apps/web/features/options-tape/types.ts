@@ -43,6 +43,7 @@ export type OptionsTapeScope =
       packetId: string;
       memberTraceIds: string[];
       optionContractId: string;
+      selectedTraceId?: string;
       underlyingId?: string;
       smartFlow?: OptionsTapeSmartFlowContext;
     };
@@ -50,12 +51,16 @@ export type OptionsTapeScope =
 export type OptionsTapeSourceScope = {
   optionContractId?: string;
   underlyingIds?: string[];
+  packetId?: string;
   packetMemberTraceIds?: string[];
+  selectedTraceId?: string;
 };
 
 export type OptionsTapeHistoryResponse = {
   data?: OptionPrint[];
   next_before?: { ts: number; seq: number } | null;
+  packet?: FlowPacket | null;
+  pinned?: OptionPrint | null;
 };
 
 export type OptionsTapeSourceOptions = {
@@ -63,6 +68,7 @@ export type OptionsTapeSourceOptions = {
   historyPageSize?: number;
   maxFilteredHistoryPages?: number;
   fetcher?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+  onPacketHydrated?: (packet: FlowPacket | null) => void;
 };
 
 export type FlowPacketFocusRequest = {

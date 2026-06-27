@@ -11,7 +11,9 @@ describe("parseOptionPrintQuery", () => {
     expect(parseOptionPrintQuery(url)).toEqual({
       scope: {
         underlyingIds: ["AAPL", "MSFT"],
-        optionContractId: undefined
+        optionContractId: undefined,
+        flowPacketId: undefined,
+        pinnedTraceId: undefined
       },
       flowFilters: {
         view: "signal",
@@ -29,7 +31,8 @@ describe("parseOptionPrintQuery", () => {
         underlyingIds: ["AAPL", "MSFT"],
         optionContractId: undefined
       },
-      isContractDrilldown: false
+      isContractDrilldown: false,
+      isPacketScope: false
     });
   });
 
@@ -41,7 +44,9 @@ describe("parseOptionPrintQuery", () => {
     expect(parseOptionPrintQuery(url)).toEqual({
       scope: {
         underlyingIds: ["AAPL"],
-        optionContractId: "AAPL-2025-01-17-200-C"
+        optionContractId: "AAPL-2025-01-17-200-C",
+        flowPacketId: undefined,
+        pinnedTraceId: undefined
       },
       flowFilters: {
         view: "signal",
@@ -54,7 +59,36 @@ describe("parseOptionPrintQuery", () => {
         view: "raw",
         optionContractId: "AAPL-2025-01-17-200-C"
       },
-      isContractDrilldown: true
+      isContractDrilldown: true,
+      isPacketScope: false
+    });
+  });
+
+  it("marks packet scope requests and strips broad filters from storage filters", () => {
+    const url = new URL(
+      "http://localhost/history/options?view=signal&side=A&type=call&flow_packet_id=flowpacket%3A1&pinned_trace_id=print%3A2&option_contract_id=SPY-2026-06-22-555-C"
+    );
+
+    expect(parseOptionPrintQuery(url)).toEqual({
+      scope: {
+        underlyingIds: undefined,
+        optionContractId: "SPY-2026-06-22-555-C",
+        flowPacketId: "flowpacket:1",
+        pinnedTraceId: "print:2"
+      },
+      flowFilters: {
+        view: "signal",
+        securityTypes: ["stock"],
+        nbboSides: ["A"],
+        optionTypes: ["call"],
+        minNotional: undefined
+      },
+      storageFilters: {
+        view: "raw",
+        optionContractId: "SPY-2026-06-22-555-C"
+      },
+      isContractDrilldown: true,
+      isPacketScope: true
     });
   });
 

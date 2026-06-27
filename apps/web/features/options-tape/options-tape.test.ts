@@ -61,6 +61,19 @@ const makePrint = (overrides: Partial<OptionPrint> = {}): OptionPrint => ({
   ...overrides
 });
 
+const makeFlowPacket = (overrides: Partial<FlowPacket> = {}): FlowPacket =>
+  ({
+    source_ts: 1_000,
+    ingest_ts: 1_001,
+    seq: 1,
+    trace_id: "flowpacket:trace:1",
+    id: "flowpacket:1",
+    members: ["member-1", "member-2"],
+    features: { option_contract_id: "SPY-2026-06-22-555-C" },
+    join_quality: {},
+    ...overrides
+  }) as FlowPacket;
+
 describe("options tape helpers", () => {
   it("formats primary contract labels for 0DTE and dated expiries", () => {
     const now = new Date("2026-06-22T13:30:00").getTime();
@@ -155,6 +168,23 @@ describe("options tape helpers", () => {
     );
   });
 
+  it("serializes packet scope query params with a pinned clicked trace", () => {
+    const params = getOptionsTapeQueryParams(
+      {
+        packetId: "flowpacket:1",
+        selectedTraceId: "member-2",
+        optionContractId: "SPY-2026-06-22-555-C"
+      },
+      undefined,
+      25
+    );
+
+    expect(params.get("limit")).toBe("25");
+    expect(params.get("flow_packet_id")).toBe("flowpacket:1");
+    expect(params.get("pinned_trace_id")).toBe("member-2");
+    expect(params.get("option_contract_id")).toBe("SPY-2026-06-22-555-C");
+  });
+
   it("filters history pages to packet member trace ids", async () => {
     const requestedUrls: string[] = [];
     const page = await loadOptionsTapeHistoryPage({
@@ -184,6 +214,47 @@ describe("options tape helpers", () => {
     expect(page.exhausted).toBe(true);
   });
 
+  it("loads packet scope rows from API and places the clicked print first", async () => {
+    const packet = makeFlowPacket({ members: ["clicked", "member-2"] });
+    const requestedUrls: string[] = [];
+    const hydratedPackets: Array<FlowPacket | null> = [];
+    const page = await loadOptionsTapeHistoryPage({
+      cursor: { ts: 2_000, seq: 2 },
+      scope: {
+        packetId: "flowpacket:1",
+        selectedTraceId: "clicked",
+        optionContractId: "SPY-2026-06-22-555-C"
+      },
+      options: {
+        apiBaseUrl: "https://api.example.test",
+        historyPageSize: 30,
+        onPacketHydrated: (hydratedPacket) => hydratedPackets.push(hydratedPacket),
+        fetcher: async (url) => {
+          requestedUrls.push(url.toString());
+          return Response.json({
+            packet,
+            pinned: makePrint({ trace_id: "clicked", seq: 7 }),
+            data: [
+              makePrint({
+                trace_id: "member-2",
+                seq: 8,
+                option_contract_id: "SPY-2026-06-22-560-C"
+              }),
+              makePrint({ trace_id: "clicked", seq: 7 })
+            ],
+            next_before: { ts: 1_000, seq: 7 }
+          });
+        }
+      }
+    });
+
+    expect(requestedUrls[0]).toContain("flow_packet_id=flowpacket%3A1");
+    expect(requestedUrls[0]).toContain("pinned_trace_id=clicked");
+    expect(page.items.map((print) => print.trace_id)).toEqual(["clicked", "member-2"]);
+    expect(page.nextCursor).toEqual({ ts: 1_000, seq: 7 });
+    expect(hydratedPackets[0]?.id).toBe("flowpacket:1");
+  });
+
   it("can seed filtered history from an empty live head cursor", async () => {
     const requestedUrls: string[] = [];
     const page = await loadOptionsTapeHistoryPage({
@@ -211,13 +282,19 @@ describe("options tape helpers", () => {
   it("keeps broad filters out of packet and contract scopes", () => {
     const filters = { ...buildDefaultOptionsTapeFilters(), nbboSides: ["AA" as const] };
     const packetScope = {
+      packetId: "flowpacket:1",
       optionContractId: "SPY-2026-06-22-555-C",
       packetMemberTraceIds: ["member-1", "member-2"]
     };
     const contractScope = { optionContractId: "SPY-2026-06-22-555-C" };
     const prints = [
       makePrint({ trace_id: "member-1", nbbo_side: "B", signal_pass: false }),
-      makePrint({ trace_id: "member-2", nbbo_side: "BB", signal_pass: false }),
+      makePrint({
+        trace_id: "member-2",
+        nbbo_side: "BB",
+        option_contract_id: "SPY-2026-06-22-560-C",
+        signal_pass: false
+      }),
       makePrint({ trace_id: "other", nbbo_side: "AA" })
     ];
 
@@ -233,7 +310,7 @@ describe("options tape helpers", () => {
         contractScope,
         getOptionsTapeScopeFilters(contractScope, filters)
       )
-    ).toEqual(prints);
+    ).toEqual([prints[0], prints[2]]);
   });
 });
 
