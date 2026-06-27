@@ -76,3 +76,5 @@ Blocked: no
 2026-06-27: Implementation callback reported PR `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/97` ready on branch `lavender/islandflow-j06e-4-qa-diagnostics-settings`; worker filed follow-up `islandflow-j06e.6` for graceful options QA history/bootstrap fetch failure handling; orchestrator is launching thermo-nuclear review and CI ownership.
 
 2026-06-27: Review callback reported PR `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/97` repaired with Forgejo Validate task `#415` green at `5dce64d91d`; orchestrator merged PR #97, closed `islandflow-j06e.4`, and selected next ready issue `islandflow-j06e.5`.
+
+2026-06-27: Orchestrator claimed `islandflow-j06e.5`, prepared branch `lavender/islandflow-j06e-5-more-info-triage`, and assigned worktree `/home/delta/.codex/worktrees/options-smart-flow-support-05-more-info` for the implementation thread.
