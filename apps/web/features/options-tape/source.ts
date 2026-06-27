@@ -119,6 +119,39 @@ export const loadOptionsTapeHistoryPage = async ({
   };
 };
 
+export const createOptionsTapeFilteredSource = <TScope, TFilters>(
+  source: DurableTapeSource<OptionPrint, TScope, TFilters>,
+  predicate: (print: OptionPrint) => boolean
+): DurableTapeSource<OptionPrint, TScope, TFilters> => {
+  const filterRows = (rows: readonly OptionPrint[]): OptionPrint[] => rows.filter(predicate);
+
+  return {
+    subscribe: (input) => {
+      const subscription = source.subscribe(input);
+      return {
+        getSnapshot: subscription.getSnapshot
+          ? () => filterRows(subscription.getSnapshot?.() ?? [])
+          : undefined,
+        listen: subscription.listen
+          ? (listener) =>
+              subscription.listen?.((items) => listener(filterRows(items))) ?? (() => {})
+          : undefined,
+        unsubscribe: () => subscription.unsubscribe()
+      };
+    },
+    getInitialHistoryCursor: source.getInitialHistoryCursor
+      ? (input) => source.getInitialHistoryCursor?.(input)
+      : undefined,
+    loadOlder: async (cursor, input) => {
+      const page = await source.loadOlder(cursor, input);
+      return {
+        ...page,
+        items: filterRows(page.items)
+      };
+    }
+  };
+};
+
 export const useOptionsTapeArraySource = ({
   prints,
   options

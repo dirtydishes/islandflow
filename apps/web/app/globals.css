@@ -3327,6 +3327,13 @@ h3 {
   gap: 6px;
 }
 
+.options-tape-control-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+
 @media (max-width: 720px) {
   .options-tape-scope-band {
     align-items: stretch;
@@ -3350,6 +3357,7 @@ h3 {
 }
 
 .options-tape-scope-actions button,
+.options-tape-help-trigger,
 .options-tape-gear,
 .options-tape-settings-panel button {
   min-height: 30px;
@@ -3366,6 +3374,7 @@ h3 {
 }
 
 .options-tape-scope-actions button:hover,
+.options-tape-help-trigger:hover,
 .options-tape-gear:hover,
 .options-tape-settings-panel button:hover,
 .options-tape-settings-panel button.is-active {
@@ -3374,11 +3383,13 @@ h3 {
   color: var(--text);
 }
 
+.options-tape-help,
 .options-tape-settings {
   position: relative;
   flex: 0 0 auto;
 }
 
+.options-tape-help-panel,
 .options-tape-settings-panel {
   position: fixed;
   top: 124px;
@@ -3395,6 +3406,29 @@ h3 {
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.42);
 }
 
+.options-tape-help-panel {
+  right: 120px;
+  width: min(360px, calc(100vw - 36px));
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  line-height: 1.42;
+}
+
+.options-tape-help-panel strong {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text);
+  font-size: 0.86rem;
+}
+
+.options-tape-help-panel p {
+  margin: 0;
+}
+
+.options-tape-help-panel p + p {
+  margin-top: 8px;
+}
+
 .options-tape-settings-head {
   display: flex;
   align-items: center;
@@ -3407,6 +3441,25 @@ h3 {
 .options-tape-settings-head strong {
   color: var(--text);
   font-size: 0.86rem;
+}
+
+.options-tape-settings-head p {
+  margin: 3px 0 0;
+  color: var(--text-dim);
+  font-size: 0.74rem;
+}
+
+.options-tape-settings-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.options-tape-settings-panel button:disabled {
+  opacity: 0.46;
+  cursor: default;
 }
 
 .options-tape-settings section {
@@ -3440,6 +3493,81 @@ h3 {
   background: oklch(0.09 0.01 250);
   color: var(--text);
   font-family: var(--font-mono), monospace;
+}
+
+.options-tape-toggle,
+.options-tape-column-control label {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+.options-tape-toggle input,
+.options-tape-column-control input {
+  accent-color: var(--accent);
+}
+
+.options-tape-toggle strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.options-tape-column-controls {
+  display: grid;
+  gap: 6px;
+}
+
+.options-tape-column-control {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--border);
+  padding: 6px;
+  background: oklch(0.09 0.01 250 / 0.72);
+}
+
+.options-tape-column-control > div {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.options-tape-support-state {
+  display: inline-flex;
+  max-width: 100%;
+  min-height: 22px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 7px;
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.options-tape-support-state-matched {
+  border-color: oklch(0.74 0.13 151 / 0.34);
+  background: var(--green-soft);
+  color: #98f0c0;
+}
+
+.options-tape-support-state-warning {
+  border-color: var(--border-strong);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.options-tape-support-state-missing {
+  border-color: oklch(0.72 0.13 247 / 0.3);
+  background: var(--blue-soft);
+  color: #bddcff;
 }
 
 .options-tape {
@@ -4700,6 +4828,100 @@ h3 {
   overflow-wrap: anywhere;
 }
 
+.durable-tapes-support-diagnostics {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 9px 10px;
+  background: oklch(0.105 0.01 250 / 0.76);
+}
+
+.durable-tapes-support-diagnostics-head {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.durable-tapes-support-diagnostics-head div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.durable-tapes-support-diagnostics-head span,
+.durable-tapes-support-diagnostics-head em,
+.durable-tapes-support-counts,
+.durable-tapes-support-table {
+  color: var(--text-faint);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.66rem;
+  font-style: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.durable-tapes-support-diagnostics-head strong {
+  min-width: 0;
+  color: var(--text);
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+}
+
+.durable-tapes-support-empty {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+}
+
+.durable-tapes-support-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.durable-tapes-support-counts span {
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: var(--bg-soft);
+  overflow-wrap: anywhere;
+}
+
+.durable-tapes-support-table {
+  display: grid;
+  border-top: 1px solid var(--border);
+}
+
+.durable-tapes-support-table [role="row"] {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(180px, 1fr) minmax(120px, 0.8fr) minmax(
+      160px,
+      1fr
+    );
+  gap: 8px;
+  align-items: center;
+  border-bottom: 1px solid oklch(0.72 0.012 250 / 0.1);
+  padding: 6px 0;
+}
+
+.durable-tapes-support-table [role="columnheader"] {
+  color: var(--text-faint);
+}
+
+.durable-tapes-support-table [role="cell"] {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-dim);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .durable-tapes-template-matrix {
   min-width: 0;
   display: grid;
@@ -5057,6 +5279,38 @@ h3 {
 }
 
 @media (max-width: 720px) {
+  .options-tape-control-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .options-tape-control-actions {
+    justify-content: flex-end;
+  }
+
+  .options-tape-help-panel,
+  .options-tape-settings-panel {
+    top: 84px;
+    right: 10px;
+    left: 10px;
+    width: auto;
+    max-height: calc(100vh - 104px);
+  }
+
+  .options-tape-settings-head,
+  .durable-tapes-support-diagnostics-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .options-tape-settings-actions {
+    justify-content: flex-start;
+  }
+
+  .options-tape-column-control {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .durable-tapes-template-matrix {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -5092,6 +5346,19 @@ h3 {
 
   .durable-tapes-demo-module .alerts-module-detail {
     max-height: 180px;
+  }
+
+  .durable-tapes-support-table [role="row"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .durable-tapes-support-table [role="columnheader"] {
+    display: none;
+  }
+
+  .durable-tapes-support-table [role="cell"] {
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 }
 

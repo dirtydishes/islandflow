@@ -19,20 +19,8 @@ import {
   stableOptionSupportNbboKey,
   terminalHydrationScheduler
 } from "../terminal/hydration-scheduler";
-import {
-  OPTIONS_TAPE_COLUMNS,
-  OPTIONS_TAPE_TEMPLATES_BY_MODE,
-  renderOptionsTapeRow
-} from "./columns";
-import {
-  applyOptionsTapeSecurityPreset,
-  applyOptionsTapeSidePreset,
-  applyOptionsTapeTypePreset,
-  applyOptionsTapeView,
-  buildDefaultOptionsTapeFilters,
-  getOptionsTapeScopeFilters,
-  getOptionsTapeSidePreset
-} from "./filters";
+import { OPTIONS_TAPE_COLUMNS, renderOptionsTapeRow } from "./columns";
+import { buildDefaultOptionsTapeFilters, getOptionsTapeScopeFilters } from "./filters";
 import {
   formatOptionsTapeContractLabel,
   getOptionsTapePrintCursor,
@@ -40,7 +28,7 @@ import {
   getOptionsTapeUnderlying,
   normalizeOptionsTapeContractId
 } from "./format";
-import { useOptionsTapeArraySource } from "./source";
+import { createOptionsTapeFilteredSource, useOptionsTapeArraySource } from "./source";
 import {
   buildOptionsTapeSupportPacketMaps,
   buildOptionsTapeSupportRequest,
@@ -54,6 +42,15 @@ import {
   getOptionsTapeSmartFlowContextFromSupport,
   getOptionsTapeSmartFlowSummary
 } from "./tinting";
+import { OptionsTapeHelp, OptionsTapeSettings } from "./settings-controls";
+import {
+  buildDefaultOptionsTapeSettings,
+  buildOptionsTapeTemplatesForSettings,
+  normalizeOptionsTapeSettings,
+  readOptionsTapeSettings,
+  type OptionsTapeSettingsState,
+  writeOptionsTapeSettings
+} from "./settings";
 import type {
   FlowPacketFocusRequest,
   OptionsTapeMode,
@@ -76,6 +73,17 @@ const EMPTY_SMART_FLOW_SUPPORT_BY_TRACE_ID = new Map<
 >();
 
 const GLOBAL_SCOPE: OptionsTapeScope = { mode: "global" };
+
+const getOptionsTapeSettingsStorage = () => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+};
 
 const deriveMode = (scope: OptionsTapeScope): OptionsTapeMode =>
   scope.mode === "packet" ? "packet" : scope.mode === "contract" ? "contract" : "global";
@@ -150,207 +158,6 @@ const mergeMaps = <K, V>(
     return left;
   }
   return new Map([...left, ...right]);
-};
-
-const OptionsTapeSettings = ({
-  filters,
-  onChange
-}: {
-  filters: OptionFlowFilters;
-  onChange: Dispatch<SetStateAction<OptionFlowFilters>>;
-}) => {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement | null>(null);
-  const sidePreset = getOptionsTapeSidePreset(filters);
-  const premiumPresets = [
-    { label: "All", value: undefined },
-    { label: ">= 25K", value: 25_000 },
-    { label: ">= 50K", value: 50_000 },
-    { label: ">= 100K", value: 100_000 }
-  ];
-  const customPremium = typeof filters.minNotional === "number" ? filters.minNotional : "";
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    const onPointerDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
-
-  return (
-    <div className={`options-tape-settings ${open ? "is-open" : ""}`} ref={rootRef}>
-      <button
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        className="options-tape-gear"
-        type="button"
-        onClick={() => setOpen((current) => !current)}
-      >
-        Settings
-      </button>
-      {open ? (
-        <div
-          className="options-tape-settings-panel"
-          role="dialog"
-          aria-label="Options tape filters"
-        >
-          <div className="options-tape-settings-head">
-            <strong>Options Filters</strong>
-            <button
-              className="terminal-button"
-              type="button"
-              onClick={() => onChange(buildDefaultOptionsTapeFilters())}
-            >
-              Reset
-            </button>
-          </div>
-          <section>
-            <span>View</span>
-            <div className="options-tape-chip-row">
-              {[
-                { label: "Signal prints", value: "signal" as const },
-                { label: "All prints", value: "raw" as const }
-              ].map((preset) => (
-                <button
-                  className={filters.view === preset.value ? "is-active" : ""}
-                  key={preset.value}
-                  type="button"
-                  onClick={() => onChange((current) => applyOptionsTapeView(current, preset.value))}
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-          </section>
-          <section>
-            <span>Side</span>
-            <div className="options-tape-chip-row options-tape-chip-row-wide">
-              {[
-                ["Default", "default"],
-                ["AA only", "aa"],
-                ["Ask side", "ask"],
-                ["Mid", "mid"],
-                ["Bid side", "bid"],
-                ["BB only", "bb"],
-                ["Custom", "custom"]
-              ].map(([label, value]) => (
-                <button
-                  className={sidePreset === value ? "is-active" : ""}
-                  key={value}
-                  type="button"
-                  onClick={() =>
-                    onChange((current) => applyOptionsTapeSidePreset(current, value as never))
-                  }
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </section>
-          <section>
-            <span>Type</span>
-            <div className="options-tape-chip-row">
-              {[
-                ["Calls", "calls"],
-                ["Puts", "puts"],
-                ["Calls + Puts", "both"]
-              ].map(([label, value]) => (
-                <button
-                  className={
-                    (value === "calls" && filters.optionTypes?.join() === "call") ||
-                    (value === "puts" && filters.optionTypes?.join() === "put") ||
-                    (value === "both" && (filters.optionTypes?.length ?? 0) !== 1)
-                      ? "is-active"
-                      : ""
-                  }
-                  key={value}
-                  type="button"
-                  onClick={() =>
-                    onChange((current) => applyOptionsTapeTypePreset(current, value as never))
-                  }
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </section>
-          <section>
-            <span>Security</span>
-            <div className="options-tape-chip-row">
-              {[
-                ["Stocks", "stocks"],
-                ["ETFs", "etfs"],
-                ["All", "all"]
-              ].map(([label, value]) => (
-                <button
-                  className={
-                    (value === "stocks" && filters.securityTypes?.join() === "stock") ||
-                    (value === "etfs" && filters.securityTypes?.join() === "etf") ||
-                    (value === "all" && (filters.securityTypes?.length ?? 0) !== 1)
-                      ? "is-active"
-                      : ""
-                  }
-                  key={value}
-                  type="button"
-                  onClick={() =>
-                    onChange((current) => applyOptionsTapeSecurityPreset(current, value as never))
-                  }
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </section>
-          <section>
-            <span>Premium</span>
-            <div className="options-tape-chip-row">
-              {premiumPresets.map((preset) => (
-                <button
-                  className={filters.minNotional === preset.value ? "is-active" : ""}
-                  key={preset.label}
-                  type="button"
-                  onClick={() => onChange((current) => ({ ...current, minNotional: preset.value }))}
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-            <label className="options-tape-custom-premium">
-              <span>Custom</span>
-              <input
-                inputMode="numeric"
-                min={0}
-                type="number"
-                value={customPremium}
-                onChange={(event) => {
-                  const value = Number(event.target.value);
-                  onChange((current) => ({
-                    ...current,
-                    minNotional: Number.isFinite(value) && value > 0 ? value : undefined
-                  }));
-                }}
-              />
-            </label>
-          </section>
-        </div>
-      ) : null}
-    </div>
-  );
 };
 
 const renderScopeBand = ({
@@ -482,6 +289,21 @@ export const OptionsTape = ({
   );
   const activeFilters = filters ?? localFilters;
   const setFilters = onFiltersChange ?? setLocalFilters;
+  const settingsStorage = useMemo(() => getOptionsTapeSettingsStorage(), []);
+  const [moduleSettings, setModuleSettingsState] = useState<OptionsTapeSettingsState>(() =>
+    buildDefaultOptionsTapeSettings()
+  );
+  const [moduleSettingsHydrated, setModuleSettingsHydrated] = useState(false);
+  const setModuleSettings = useCallback<Dispatch<SetStateAction<OptionsTapeSettingsState>>>(
+    (nextSettings) => {
+      setModuleSettingsState((current) =>
+        normalizeOptionsTapeSettings(
+          typeof nextSettings === "function" ? nextSettings(current) : nextSettings
+        )
+      );
+    },
+    []
+  );
   const [scope, setScope] = useState<OptionsTapeScope>(GLOBAL_SCOPE);
   const mountedRef = useRef(true);
   const supportContextRef = useRef({
@@ -507,7 +329,10 @@ export const OptionsTape = ({
     () => getOptionsTapeScopeFilters(sourceScope, activeFilters),
     [activeFilters, sourceScope]
   );
-  const templates = OPTIONS_TAPE_TEMPLATES_BY_MODE[mode];
+  const templates = useMemo(
+    () => buildOptionsTapeTemplatesForSettings(mode, moduleSettings),
+    [mode, moduleSettings]
+  );
   const hydratedPacketMaps = useMemo(
     () => buildOptionsTapeSupportPacketMaps(hydratedPackets),
     [hydratedPackets]
@@ -556,6 +381,17 @@ export const OptionsTape = ({
   );
   const tapeSource = useOptionsTapeArraySource({ prints, options: resolvedSourceOptions });
   const activeSource = source ?? tapeSource;
+
+  useEffect(() => {
+    setModuleSettingsState(readOptionsTapeSettings(settingsStorage));
+    setModuleSettingsHydrated(true);
+  }, [settingsStorage]);
+
+  useEffect(() => {
+    if (moduleSettingsHydrated) {
+      writeOptionsTapeSettings(settingsStorage, moduleSettings);
+    }
+  }, [moduleSettings, moduleSettingsHydrated, settingsStorage]);
 
   useEffect(
     () => () => {
@@ -669,6 +505,15 @@ export const OptionsTape = ({
       mergedSmartFlowSupportByTraceId,
       nbboByContractId
     ]
+  );
+  const displaySource = useMemo(
+    () =>
+      moduleSettings.smartFlowOnly
+        ? createOptionsTapeFilteredSource(supportHydratedSource, (print) =>
+            Boolean(contextForPrint(print).smartFlow)
+          )
+        : supportHydratedSource,
+    [contextForPrint, moduleSettings.smartFlowOnly, supportHydratedSource]
   );
 
   const rowTintForPrint = useCallback(
@@ -788,9 +633,20 @@ export const OptionsTape = ({
       <div className="options-tape-control-row">
         <div>
           <span>View</span>
-          <strong>{activeFilters.view === "raw" ? "all prints" : "signal prints"}</strong>
+          <strong>
+            {activeFilters.view === "raw" ? "all prints" : "signal prints"}
+            {moduleSettings.smartFlowOnly ? " / smart-flow only" : ""}
+          </strong>
         </div>
-        <OptionsTapeSettings filters={activeFilters} onChange={updateFilters} />
+        <div className="options-tape-control-actions">
+          <OptionsTapeHelp />
+          <OptionsTapeSettings
+            filters={activeFilters}
+            settings={moduleSettings}
+            onApplyFilters={updateFilters}
+            onApplySettings={setModuleSettings}
+          />
+        </div>
       </div>
       {renderScopeBand({ scope, onShowAll: showAllForContract, onClear: clearScope })}
       <DurableTape
@@ -814,7 +670,7 @@ export const OptionsTape = ({
         rowHeight={rowHeight}
         overscan={overscan}
         scope={sourceScope}
-        source={supportHydratedSource}
+        source={displaySource}
         template={template}
         templates={templates}
         title={title}
