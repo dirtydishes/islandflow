@@ -53,29 +53,69 @@ Reviewer skill:
 
 `thermo-nuclear-code-quality-review`
 
-Not started by this worker. The orchestrator owns review-thread creation.
+Reviewer closeout status: repaired locally; Forgejo publication and final PR CI
+verification are owned by the reviewer thread before callback.
+
+Findings repaired:
+
+- Packet scope was still applying exact-contract client filtering whenever
+  `optionContractId` was present. That hid legitimate cross-contract packet
+  members returned by the authoritative packet API scope. Repair: packet scopes
+  now strip broad filters whenever `flow_packet_id` is active and skip
+  contract-only client filtering while `packetId` is present.
+- Non-smart-flow packet support was hydrated into the scheduler but dropped by
+  the options tape state because only matched smart-flow support was retained.
+  That made packet-backed non-smart-flow rows fall through to contract focus.
+  Repair: the tape now retains explicit unavailable support and merges packets
+  carried by support resolutions into the hydrated packet maps without changing
+  tint eligibility.
+- Internal packet/contract scope could be cleared or superseded by terminal
+  parent focus bookkeeping during the same activation. Repair: external clear
+  handling now only reacts to an actual focused-contract-to-null transition, and
+  row activation applies the in-place scope after parent focus callbacks.
+
+Findings remaining:
+
+None.
 
 ## CI And Gates
 
 CI owner: reviewer/verification agents
 
-Current CI state: `local-gates-passed`
+Current CI state: `local-gates-passed-after-review-repair`
 
 Evidence:
 
-- `bun test apps/web/features/options-tape` - passed, 20 tests.
-- `bun test services/api/tests` - passed, 72 tests.
-- `bun --cwd=apps/web run build` - passed.
-- `git diff --check` - passed.
-- Browser verification: `/options` desktop and mobile packet-scope interaction passed with a temporary Playwright spec against local Next dev on `http://127.0.0.1:3100`.
-- Browser screenshots captured under `/tmp/islandflow-j06e3-browser/`: `desktop-packet.png`, `desktop-contract.png`, `desktop-after-return.png`, `mobile-packet.png`, `mobile-contract.png`, `mobile-after-return.png`.
-- API-path verification note: starting a second full API service would reuse production-like JetStream durable names, so I used a temporary local REST proxy on `127.0.0.1:4103` for direct branch `/history/options` checks. The proxy verified the branch packet endpoint returned one deduped option-print row per packet member and the pinned clicked trace before the browser UI pass was rerun against the host API.
+- `bun test apps/web/features/options-tape` - passed after review repair,
+  20 tests, 76 assertions.
+- `bun test services/api/tests` - passed after review repair, 72 tests,
+  262 assertions.
+- `bun --cwd=apps/web run build` - passed after review repair.
+- `git diff --check` - passed after review repair.
+- Browser verification: `/options` desktop and mobile packet-scope interaction
+  passed against local Next dev on `http://127.0.0.1:3101` with intercepted
+  branch-shaped API responses. The probe verified:
+  - non-smart-flow packet-backed row opens `Packet prints`;
+  - packet history is requested with `flow_packet_id` and `pinned_trace_id`;
+  - cross-contract packet member rows remain visible from the server response;
+  - clicked print receives `options-tape-row-selected-print`;
+  - `Show contract` widens to exact `option_contract_id`;
+  - `Back to tape` returns to the prior global signal tape.
+- Forgejo PR status evidence before repair push:
+  - `fj pr status 96 --wait` is unavailable because Forgejo returns
+    `/dirtydishes/islandflow/actions/runs/403/jobs/0`, which this `fj` build
+    rejects as an invalid relative URL.
+  - `fj actions tasks -R forgejo --page 1` showed pull-request tasks `#402`
+    and `#403` failing on implementation commits `0331e79` and `9b2fe0c`.
+    Final repaired-head CI verification is performed after the reviewer push.
 
 ## PR And Commits
 
 - Forgejo PR: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/96`
 - Branch: `lavender/islandflow-j06e-3-packet-contract-scope`
 - Implementation commit: `0331e79` - `add packet-backed options scope`
+- Implementation doc commit: `9b2fe0c` - `document packet scope publication`
+- Reviewer repair commit: `a72199a` - `repair packet scope review findings`
 
 ## Beads Updates
 
@@ -95,4 +135,5 @@ None.
 
 ## Closeout
 
-Local implementation complete; publication and review are pending.
+Review repairs are complete locally. Reviewer publication, `bd dolt push`, and
+final Forgejo CI verification remain before callback.
