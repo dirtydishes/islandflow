@@ -1,12 +1,13 @@
 "use client";
 
 import type { FlowPacket, OptionFlowFilters, OptionNBBO, OptionPrint } from "@islandflow/types";
-import { parseOptionContractId } from "@islandflow/types";
+import { optionFlowFilterKey, parseOptionContractId } from "@islandflow/types";
 import {
   type Dispatch,
   type SetStateAction,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState
@@ -21,7 +22,6 @@ import {
 } from "../terminal/hydration-scheduler";
 import {
   OPTIONS_TAPE_COLUMNS,
-  OPTIONS_TAPE_TEMPLATES_BY_MODE,
   renderOptionsTapeRow
 } from "./columns";
 import {
@@ -40,7 +40,7 @@ import {
   getOptionsTapeUnderlying,
   normalizeOptionsTapeContractId
 } from "./format";
-import { useOptionsTapeArraySource } from "./source";
+import { createOptionsTapeFilteredSource, useOptionsTapeArraySource } from "./source";
 import {
   buildOptionsTapeSupportPacketMaps,
   buildOptionsTapeSupportRequest,
@@ -54,6 +54,16 @@ import {
   getOptionsTapeSmartFlowContextFromSupport,
   getOptionsTapeSmartFlowSummary
 } from "./tinting";
+import {
+  buildDefaultOptionsTapeSettings,
+  buildOptionsTapeTemplatesForSettings,
+  getVisibleOptionsTapeColumnOrder,
+  normalizeOptionsTapeSettings,
+  readOptionsTapeSettings,
+  reduceOptionsTapeSettings,
+  type OptionsTapeSettingsState,
+  writeOptionsTapeSettings
+} from "./settings";
 import type {
   FlowPacketFocusRequest,
   OptionsTapeMode,
@@ -76,6 +86,17 @@ const EMPTY_SMART_FLOW_SUPPORT_BY_TRACE_ID = new Map<
 >();
 
 const GLOBAL_SCOPE: OptionsTapeScope = { mode: "global" };
+
+const getOptionsTapeSettingsStorage = () => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+};
 
 const deriveMode = (scope: OptionsTapeScope): OptionsTapeMode =>
   scope.mode === "packet" ? "packet" : scope.mode === "contract" ? "contract" : "global";
@@ -152,23 +173,10 @@ const mergeMaps = <K, V>(
   return new Map([...left, ...right]);
 };
 
-const OptionsTapeSettings = ({
-  filters,
-  onChange
-}: {
-  filters: OptionFlowFilters;
-  onChange: Dispatch<SetStateAction<OptionFlowFilters>>;
-}) => {
+const OptionsTapeHelp = () => {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const sidePreset = getOptionsTapeSidePreset(filters);
-  const premiumPresets = [
-    { label: "All", value: undefined },
-    { label: ">= 25K", value: 25_000 },
-    { label: ">= 50K", value: 50_000 },
-    { label: ">= 100K", value: 100_000 }
-  ];
-  const customPremium = typeof filters.minNotional === "number" ? filters.minNotional : "";
+  const helpId = useId();
 
   useEffect(() => {
     if (!open) {
@@ -193,8 +201,122 @@ const OptionsTapeSettings = ({
   }, [open]);
 
   return (
+    <div className={`options-tape-help ${open ? "is-open" : ""}`} ref={rootRef}>
+      <button
+        aria-controls={open ? helpId : undefined}
+        aria-expanded={open}
+        aria-label="Options tape help"
+        className="options-tape-help-trigger"
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+      >
+        ?
+      </button>
+      {open ? (
+        <div className="options-tape-help-panel" id={helpId} role="dialog" aria-label="Options tape help">
+          <strong>Smart-flow row treatment</strong>
+          <p>
+            Tinting comes from canonical smart-flow support attached to a direct option print or a
+            packet member. Abstained and unclear hypotheses stay as context and do not tint rows.
+          </p>
+          <p>
+            Packet scope shows prints inside the matched packet. Contract scope shows the normalized
+            option contract. QA can expose unavailable support states; product modules keep those
+            diagnostics out of default columns.
+          </p>
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
+const OptionsTapeSettings = ({
+  filters,
+  settings,
+  onApplyFilters,
+  onApplySettings
+}: {
+  filters: OptionFlowFilters;
+  settings: OptionsTapeSettingsState;
+  onApplyFilters: Dispatch<SetStateAction<OptionFlowFilters>>;
+  onApplySettings: Dispatch<SetStateAction<OptionsTapeSettingsState>>;
+}) => {
+  const [open, setOpen] = useState(false);
+  const dialogId = useId();
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [draftFilters, setDraftFilters] = useState<OptionFlowFilters>(() => filters);
+  const [draftSettings, setDraftSettings] = useState<OptionsTapeSettingsState>(() =>
+    normalizeOptionsTapeSettings(settings)
+  );
+  const sidePreset = getOptionsTapeSidePreset(draftFilters);
+  const visibleColumnOrder = getVisibleOptionsTapeColumnOrder(draftSettings);
+  const premiumPresets = [
+    { label: "All", value: undefined },
+    { label: ">= 25K", value: 25_000 },
+    { label: ">= 50K", value: 50_000 },
+    { label: ">= 100K", value: 100_000 }
+  ];
+  const customPremium =
+    typeof draftFilters.minNotional === "number" ? draftFilters.minNotional : "";
+  const filtersChanged = optionFlowFilterKey(draftFilters) !== optionFlowFilterKey(filters);
+  const settingsChanged =
+    JSON.stringify(normalizeOptionsTapeSettings(draftSettings)) !==
+    JSON.stringify(normalizeOptionsTapeSettings(settings));
+  const applyDisabled = !filtersChanged && !settingsChanged;
+
+  useEffect(() => {
+    if (!open) {
+      setDraftFilters(filters);
+      setDraftSettings(normalizeOptionsTapeSettings(settings));
+      return;
+    }
+    const onPointerDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) {
+      setDraftFilters(filters);
+      setDraftSettings(normalizeOptionsTapeSettings(settings));
+    }
+  }, [filters, open, settings]);
+
+  const applyDrafts = () => {
+    if (filtersChanged) {
+      onApplyFilters(draftFilters);
+    }
+    if (settingsChanged) {
+      onApplySettings(normalizeOptionsTapeSettings(draftSettings));
+    }
+  };
+
+  const resetSettings = () => {
+    const nextFilters = buildDefaultOptionsTapeFilters();
+    const nextSettings = buildDefaultOptionsTapeSettings();
+    setDraftFilters(nextFilters);
+    setDraftSettings(nextSettings);
+    onApplyFilters(nextFilters);
+    onApplySettings(nextSettings);
+  };
+
+  return (
     <div className={`options-tape-settings ${open ? "is-open" : ""}`} ref={rootRef}>
       <button
+        aria-controls={open ? dialogId : undefined}
         aria-expanded={open}
         aria-haspopup="dialog"
         className="options-tape-gear"
@@ -206,19 +328,47 @@ const OptionsTapeSettings = ({
       {open ? (
         <div
           className="options-tape-settings-panel"
+          id={dialogId}
           role="dialog"
           aria-label="Options tape filters"
         >
           <div className="options-tape-settings-head">
-            <strong>Options Filters</strong>
-            <button
-              className="terminal-button"
-              type="button"
-              onClick={() => onChange(buildDefaultOptionsTapeFilters())}
-            >
-              Reset
-            </button>
+            <div>
+              <strong>Options Settings</strong>
+              <p>Filter changes reload the tape after apply.</p>
+            </div>
+            <div className="options-tape-settings-actions">
+              <button className="terminal-button" type="button" onClick={resetSettings}>
+                Reset
+              </button>
+              <button
+                className={`terminal-button ${filtersChanged ? "is-active" : ""}`.trim()}
+                disabled={applyDisabled}
+                type="button"
+                onClick={applyDrafts}
+              >
+                Apply refresh
+              </button>
+            </div>
           </div>
+          <section>
+            <span>Smart-flow</span>
+            <label className="options-tape-toggle">
+              <input
+                type="checkbox"
+                checked={draftSettings.smartFlowOnly}
+                onChange={(event) =>
+                  setDraftSettings((current) =>
+                    reduceOptionsTapeSettings(current, {
+                      type: "set-smart-flow-only",
+                      value: event.target.checked
+                    })
+                  )
+                }
+              />
+              <strong>Smart-flow rows only</strong>
+            </label>
+          </section>
           <section>
             <span>View</span>
             <div className="options-tape-chip-row">
@@ -227,10 +377,12 @@ const OptionsTapeSettings = ({
                 { label: "All prints", value: "raw" as const }
               ].map((preset) => (
                 <button
-                  className={filters.view === preset.value ? "is-active" : ""}
+                  className={draftFilters.view === preset.value ? "is-active" : ""}
                   key={preset.value}
                   type="button"
-                  onClick={() => onChange((current) => applyOptionsTapeView(current, preset.value))}
+                  onClick={() =>
+                    setDraftFilters((current) => applyOptionsTapeView(current, preset.value))
+                  }
                 >
                   {preset.label}
                 </button>
@@ -243,9 +395,11 @@ const OptionsTapeSettings = ({
               {[
                 ["Default", "default"],
                 ["AA only", "aa"],
+                ["A only", "a"],
                 ["Ask side", "ask"],
                 ["Mid", "mid"],
                 ["Bid side", "bid"],
+                ["B only", "b"],
                 ["BB only", "bb"],
                 ["Custom", "custom"]
               ].map(([label, value]) => (
@@ -254,7 +408,7 @@ const OptionsTapeSettings = ({
                   key={value}
                   type="button"
                   onClick={() =>
-                    onChange((current) => applyOptionsTapeSidePreset(current, value as never))
+                    setDraftFilters((current) => applyOptionsTapeSidePreset(current, value as never))
                   }
                 >
                   {label}
@@ -272,16 +426,16 @@ const OptionsTapeSettings = ({
               ].map(([label, value]) => (
                 <button
                   className={
-                    (value === "calls" && filters.optionTypes?.join() === "call") ||
-                    (value === "puts" && filters.optionTypes?.join() === "put") ||
-                    (value === "both" && (filters.optionTypes?.length ?? 0) !== 1)
+                    (value === "calls" && draftFilters.optionTypes?.join() === "call") ||
+                    (value === "puts" && draftFilters.optionTypes?.join() === "put") ||
+                    (value === "both" && (draftFilters.optionTypes?.length ?? 0) !== 1)
                       ? "is-active"
                       : ""
                   }
                   key={value}
                   type="button"
                   onClick={() =>
-                    onChange((current) => applyOptionsTapeTypePreset(current, value as never))
+                    setDraftFilters((current) => applyOptionsTapeTypePreset(current, value as never))
                   }
                 >
                   {label}
@@ -299,16 +453,18 @@ const OptionsTapeSettings = ({
               ].map(([label, value]) => (
                 <button
                   className={
-                    (value === "stocks" && filters.securityTypes?.join() === "stock") ||
-                    (value === "etfs" && filters.securityTypes?.join() === "etf") ||
-                    (value === "all" && (filters.securityTypes?.length ?? 0) !== 1)
+                    (value === "stocks" && draftFilters.securityTypes?.join() === "stock") ||
+                    (value === "etfs" && draftFilters.securityTypes?.join() === "etf") ||
+                    (value === "all" && (draftFilters.securityTypes?.length ?? 0) !== 1)
                       ? "is-active"
                       : ""
                   }
                   key={value}
                   type="button"
                   onClick={() =>
-                    onChange((current) => applyOptionsTapeSecurityPreset(current, value as never))
+                    setDraftFilters((current) =>
+                      applyOptionsTapeSecurityPreset(current, value as never)
+                    )
                   }
                 >
                   {label}
@@ -321,10 +477,12 @@ const OptionsTapeSettings = ({
             <div className="options-tape-chip-row">
               {premiumPresets.map((preset) => (
                 <button
-                  className={filters.minNotional === preset.value ? "is-active" : ""}
+                  className={draftFilters.minNotional === preset.value ? "is-active" : ""}
                   key={preset.label}
                   type="button"
-                  onClick={() => onChange((current) => ({ ...current, minNotional: preset.value }))}
+                  onClick={() =>
+                    setDraftFilters((current) => ({ ...current, minNotional: preset.value }))
+                  }
                 >
                   {preset.label}
                 </button>
@@ -339,13 +497,76 @@ const OptionsTapeSettings = ({
                 value={customPremium}
                 onChange={(event) => {
                   const value = Number(event.target.value);
-                  onChange((current) => ({
+                  setDraftFilters((current) => ({
                     ...current,
                     minNotional: Number.isFinite(value) && value > 0 ? value : undefined
                   }));
                 }}
               />
             </label>
+          </section>
+          <section>
+            <span>Columns</span>
+            <div className="options-tape-column-controls">
+              {draftSettings.columnOrder.map((columnId, index) => {
+                const visible = visibleColumnOrder.includes(columnId);
+                return (
+                  <div className="options-tape-column-control" key={columnId}>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={visible}
+                        disabled={visible && visibleColumnOrder.length === 1}
+                        onChange={(event) =>
+                          setDraftSettings((current) =>
+                            reduceOptionsTapeSettings(current, {
+                              type: "toggle-column",
+                              id: columnId,
+                              visible: event.target.checked
+                            })
+                          )
+                        }
+                      />
+                      <span>{columnId}</span>
+                    </label>
+                    <div>
+                      <button
+                        aria-label={`Move ${columnId} column earlier`}
+                        disabled={index === 0}
+                        type="button"
+                        onClick={() =>
+                          setDraftSettings((current) =>
+                            reduceOptionsTapeSettings(current, {
+                              type: "move-column",
+                              id: columnId,
+                              direction: "up"
+                            })
+                          )
+                        }
+                      >
+                        Up
+                      </button>
+                      <button
+                        aria-label={`Move ${columnId} column later`}
+                        disabled={index === draftSettings.columnOrder.length - 1}
+                        type="button"
+                        onClick={() =>
+                          setDraftSettings((current) =>
+                            reduceOptionsTapeSettings(current, {
+                              type: "move-column",
+                              id: columnId,
+                              direction: "down"
+                            })
+                          )
+                        }
+                      >
+                        Down
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </section>
         </div>
       ) : null}
@@ -482,6 +703,21 @@ export const OptionsTape = ({
   );
   const activeFilters = filters ?? localFilters;
   const setFilters = onFiltersChange ?? setLocalFilters;
+  const settingsStorage = useMemo(() => getOptionsTapeSettingsStorage(), []);
+  const [moduleSettings, setModuleSettingsState] = useState<OptionsTapeSettingsState>(() =>
+    buildDefaultOptionsTapeSettings()
+  );
+  const [moduleSettingsHydrated, setModuleSettingsHydrated] = useState(false);
+  const setModuleSettings = useCallback<Dispatch<SetStateAction<OptionsTapeSettingsState>>>(
+    (nextSettings) => {
+      setModuleSettingsState((current) =>
+        normalizeOptionsTapeSettings(
+          typeof nextSettings === "function" ? nextSettings(current) : nextSettings
+        )
+      );
+    },
+    []
+  );
   const [scope, setScope] = useState<OptionsTapeScope>(GLOBAL_SCOPE);
   const mountedRef = useRef(true);
   const supportContextRef = useRef({
@@ -507,7 +743,10 @@ export const OptionsTape = ({
     () => getOptionsTapeScopeFilters(sourceScope, activeFilters),
     [activeFilters, sourceScope]
   );
-  const templates = OPTIONS_TAPE_TEMPLATES_BY_MODE[mode];
+  const templates = useMemo(
+    () => buildOptionsTapeTemplatesForSettings(mode, moduleSettings),
+    [mode, moduleSettings]
+  );
   const hydratedPacketMaps = useMemo(
     () => buildOptionsTapeSupportPacketMaps(hydratedPackets),
     [hydratedPackets]
@@ -556,6 +795,17 @@ export const OptionsTape = ({
   );
   const tapeSource = useOptionsTapeArraySource({ prints, options: resolvedSourceOptions });
   const activeSource = source ?? tapeSource;
+
+  useEffect(() => {
+    setModuleSettingsState(readOptionsTapeSettings(settingsStorage));
+    setModuleSettingsHydrated(true);
+  }, [settingsStorage]);
+
+  useEffect(() => {
+    if (moduleSettingsHydrated) {
+      writeOptionsTapeSettings(settingsStorage, moduleSettings);
+    }
+  }, [moduleSettings, moduleSettingsHydrated, settingsStorage]);
 
   useEffect(
     () => () => {
@@ -669,6 +919,15 @@ export const OptionsTape = ({
       mergedSmartFlowSupportByTraceId,
       nbboByContractId
     ]
+  );
+  const displaySource = useMemo(
+    () =>
+      moduleSettings.smartFlowOnly
+        ? createOptionsTapeFilteredSource(supportHydratedSource, (print) =>
+            Boolean(contextForPrint(print).smartFlow)
+          )
+        : supportHydratedSource,
+    [contextForPrint, moduleSettings.smartFlowOnly, supportHydratedSource]
   );
 
   const rowTintForPrint = useCallback(
@@ -788,9 +1047,20 @@ export const OptionsTape = ({
       <div className="options-tape-control-row">
         <div>
           <span>View</span>
-          <strong>{activeFilters.view === "raw" ? "all prints" : "signal prints"}</strong>
+          <strong>
+            {activeFilters.view === "raw" ? "all prints" : "signal prints"}
+            {moduleSettings.smartFlowOnly ? " / smart-flow only" : ""}
+          </strong>
         </div>
-        <OptionsTapeSettings filters={activeFilters} onChange={updateFilters} />
+        <div className="options-tape-control-actions">
+          <OptionsTapeHelp />
+          <OptionsTapeSettings
+            filters={activeFilters}
+            settings={moduleSettings}
+            onApplyFilters={updateFilters}
+            onApplySettings={setModuleSettings}
+          />
+        </div>
       </div>
       {renderScopeBand({ scope, onShowAll: showAllForContract, onClear: clearScope })}
       <DurableTape
@@ -814,7 +1084,7 @@ export const OptionsTape = ({
         rowHeight={rowHeight}
         overscan={overscan}
         scope={sourceScope}
-        source={supportHydratedSource}
+        source={displaySource}
         template={template}
         templates={templates}
         title={title}

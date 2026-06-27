@@ -14,7 +14,16 @@ export const OPTIONS_TAPE_DEFAULT_SIDES: OptionNbboSide[] = ["AA", "A", "MID"];
 export const OPTIONS_TAPE_DEFAULT_OPTION_TYPES: OptionType[] = ["call", "put"];
 export const OPTIONS_TAPE_DEFAULT_SECURITY_TYPES: OptionSecurityType[] = ["stock"];
 
-export type OptionsTapeSidePreset = "default" | "aa" | "ask" | "mid" | "bid" | "bb" | "custom";
+export type OptionsTapeSidePreset =
+  | "default"
+  | "aa"
+  | "a"
+  | "ask"
+  | "mid"
+  | "bid"
+  | "b"
+  | "bb"
+  | "custom";
 
 export const buildDefaultOptionsTapeFilters = (): OptionFlowFilters => ({
   view: "signal",
@@ -44,6 +53,9 @@ export const getOptionsTapeSidePreset = (
   if (sameValues(filters.nbboSides, ["AA"])) {
     return "aa";
   }
+  if (sameValues(filters.nbboSides, ["A"])) {
+    return "a";
+  }
   if (sameValues(filters.nbboSides, ["AA", "A"])) {
     return "ask";
   }
@@ -52,6 +64,9 @@ export const getOptionsTapeSidePreset = (
   }
   if (sameValues(filters.nbboSides, ["B", "BB"])) {
     return "bid";
+  }
+  if (sameValues(filters.nbboSides, ["B"])) {
+    return "b";
   }
   if (sameValues(filters.nbboSides, ["BB"])) {
     return "bb";
@@ -86,9 +101,11 @@ export const applyOptionsTapeSidePreset = (
   const sidesByPreset: Record<Exclude<OptionsTapeSidePreset, "custom">, OptionNbboSide[]> = {
     default: OPTIONS_TAPE_DEFAULT_SIDES,
     aa: ["AA"],
+    a: ["A"],
     ask: ["AA", "A"],
     mid: ["MID"],
     bid: ["B", "BB"],
+    b: ["B"],
     bb: ["BB"]
   };
   if (preset === "custom") {

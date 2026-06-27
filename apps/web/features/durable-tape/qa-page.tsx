@@ -1,5 +1,6 @@
 "use client";
 
+import type { DurableTapeOptionRowViewModel } from "@islandflow/types";
 import { type CSSProperties, type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { AlertsModule } from "../alerts";
@@ -21,6 +22,10 @@ import {
 } from "../market-chart";
 import { NewsWire } from "../news-wire";
 import { OptionsTape } from "../options-tape";
+import {
+  getDurableOptionSupportStateLabel,
+  getDurableOptionSupportStateTone
+} from "./row-view-models";
 import { PageFrame } from "../terminal/components/primitives";
 import {
   selectDurableTapesAlertsPane,
@@ -59,6 +64,11 @@ type QaChartPreviewProps = {
   candles: MarketChartCandle[];
   lowerSeries: MarketChartLowerSeries;
   status: MarketChartStatus;
+};
+
+type QaOptionsSupportDiagnosticsProps = {
+  rows: readonly DurableTapeOptionRowViewModel[];
+  status: string;
 };
 
 const QA_INTERVAL_MS = 60_000;
@@ -223,6 +233,84 @@ const QAMarketChartPreview = ({ template, candles, lowerSeries, status }: QaChar
   );
 };
 
+const SUPPORT_STATE_LABELS: Record<
+  DurableTapeOptionRowViewModel["support"]["smart_flow_status"],
+  string
+> = {
+  matched: "Smart-flow attached",
+  no_matching_projection: "No matching projection",
+  packet_unavailable: "Packet unavailable",
+  smart_flow_unavailable: "Smart-flow unavailable"
+};
+
+const QaOptionsSupportDiagnostics = ({ rows, status }: QaOptionsSupportDiagnosticsProps) => {
+  const counts = useMemo(() => {
+    const next = new Map<DurableTapeOptionRowViewModel["support"]["smart_flow_status"], number>();
+    for (const row of rows) {
+      const key = row.support.smart_flow_status;
+      next.set(key, (next.get(key) ?? 0) + 1);
+    }
+    return next;
+  }, [rows]);
+  const sampleRows = rows.slice(0, 8);
+
+  return (
+    <div className="durable-tapes-support-diagnostics">
+      <div className="durable-tapes-support-diagnostics-head">
+        <div>
+          <span>Support State</span>
+          <strong>{rows.length.toLocaleString()} server rows</strong>
+        </div>
+        <em>Durable rows feed: {status}</em>
+      </div>
+      {rows.length === 0 ? (
+        <p className="durable-tapes-support-empty">
+          No server-composed option rows are available for diagnostics.
+        </p>
+      ) : (
+        <>
+          <div className="durable-tapes-support-counts" aria-label="Support state counts">
+            {Object.entries(SUPPORT_STATE_LABELS).map(([state, label]) => (
+              <span key={state}>
+                {label}: {(counts.get(state as DurableTapeOptionRowViewModel["support"]["smart_flow_status"]) ?? 0).toLocaleString()}
+              </span>
+            ))}
+          </div>
+          <div
+            className="durable-tapes-support-table"
+            role="table"
+            aria-label="Options support diagnostics"
+          >
+            <div role="row">
+              <span role="columnheader">Trace</span>
+              <span role="columnheader">Support State</span>
+              <span role="columnheader">Packet</span>
+              <span role="columnheader">Reason</span>
+            </div>
+            {sampleRows.map((row) => (
+              <div role="row" key={row.id}>
+                <span role="cell">{row.option.trace_id}</span>
+                <span
+                  className={`options-tape-support-state options-tape-support-state-${getDurableOptionSupportStateTone(row)}`}
+                  role="cell"
+                >
+                  {getDurableOptionSupportStateLabel(row)}
+                </span>
+                <span role="cell">{row.support.packet?.id ?? "--"}</span>
+                <span role="cell">
+                  {row.support.smart_flow_unavailable_reason ??
+                    row.evidence_summary?.label ??
+                    "--"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 export const DurableTapesQaRoute = () => {
   const state = useTerminal();
   const optionsPane = selectDurableTapesOptionsPane(state);
@@ -302,9 +390,19 @@ export const DurableTapesQaRoute = () => {
         <QaSection
           id="durable-tapes-options"
           title="Options Tape"
-          summary="OPRA print rows with smart-flow tinting, packet context, NBBO fields, hover detail, and filter controls."
-          options={["templates pinned", "row tinting", "hover detail", "filters", "history off"]}
+          summary="OPRA print rows with smart-flow tinting, packet context, NBBO fields, hover detail, filter controls, and real support diagnostics."
+          options={[
+            "templates pinned",
+            "row tinting",
+            "support diagnostics",
+            "filters",
+            "history off"
+          ]}
         >
+          <QaOptionsSupportDiagnostics
+            rows={optionsPane.rowViewModels}
+            status={optionsPane.rowViewModelStatus}
+          />
           <QaTemplateMatrix
             renderPreview={(template) => (
               <OptionsTape

@@ -8,7 +8,11 @@ import {
   type SmartFlowExplainabilityProjection
 } from "@islandflow/types";
 import { createDurableTapeInitialHistoryCursor } from "../durable-tape/history";
-import { getDurableOptionRowTint } from "../durable-tape/row-view-models";
+import {
+  DURABLE_OPTION_ROW_DIAGNOSTIC_TEMPLATES,
+  DURABLE_OPTION_ROW_TEMPLATES,
+  getDurableOptionRowTint
+} from "../durable-tape/row-view-models";
 import { selectDurableTapeTemplate } from "../durable-tape/templates";
 import {
   formatOptionsTapeContractLabel,
@@ -32,6 +36,17 @@ import {
   buildOptionsTapeSupportRequest,
   createOptionsTapeSupportHydratingSource
 } from "./support-hydration";
+import {
+  buildDefaultOptionsTapeSettings,
+  buildOptionsTapeTemplatesForSettings,
+  filterOptionsTapeSmartFlowRows,
+  getVisibleOptionsTapeColumnOrder,
+  OPTIONS_TAPE_SETTINGS_STORAGE_KEY,
+  OPTIONS_TAPE_SETTINGS_STORAGE_VERSION,
+  readOptionsTapeSettings,
+  reduceOptionsTapeSettings,
+  writeOptionsTapeSettings
+} from "./settings";
 import {
   getOptionsTapeRowTintClassName,
   getOptionsTapeRowTintFromContext,
@@ -73,6 +88,16 @@ const makeFlowPacket = (overrides: Partial<FlowPacket> = {}): FlowPacket =>
     join_quality: {},
     ...overrides
   }) as FlowPacket;
+
+const createStorage = (initial: Record<string, string> = {}) => {
+  const values = new Map(Object.entries(initial));
+  return {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      values.set(key, value);
+    }
+  };
+};
 
 describe("options tape helpers", () => {
   it("formats primary contract labels for 0DTE and dated expiries", () => {
@@ -153,8 +178,101 @@ describe("options tape helpers", () => {
     });
     expect(getOptionsTapeSidePreset(defaults)).toBe("default");
     expect(getOptionsTapeSidePreset(applyOptionsTapeSidePreset(defaults, "bb"))).toBe("bb");
+    expect(getOptionsTapeSidePreset(applyOptionsTapeSidePreset(defaults, "a"))).toBe("a");
+    expect(getOptionsTapeSidePreset(applyOptionsTapeSidePreset(defaults, "b"))).toBe("b");
     expect(applyOptionsTapeTypePreset(defaults, "calls").optionTypes).toEqual(["call"]);
     expect(applyOptionsTapeSecurityPreset(defaults, "all").securityTypes).toEqual(["stock", "etf"]);
+  });
+
+  it("serializes, reads, and resets options tape module settings", () => {
+    const storage = createStorage();
+    const settings = reduceOptionsTapeSettings(
+      reduceOptionsTapeSettings(buildDefaultOptionsTapeSettings(), {
+        type: "set-smart-flow-only",
+        value: true
+      }),
+      { type: "move-column", id: "premium", direction: "up" }
+    );
+
+    writeOptionsTapeSettings(storage, settings);
+
+    expect(JSON.parse(storage.getItem(OPTIONS_TAPE_SETTINGS_STORAGE_KEY) ?? "{}")).toMatchObject({
+      version: OPTIONS_TAPE_SETTINGS_STORAGE_VERSION,
+      settings: {
+        smartFlowOnly: true
+      }
+    });
+    expect(readOptionsTapeSettings(storage).smartFlowOnly).toBe(true);
+    expect(
+      reduceOptionsTapeSettings(readOptionsTapeSettings(storage), { type: "reset" })
+    ).toEqual(buildDefaultOptionsTapeSettings());
+
+    const malformedStorage = createStorage({ [OPTIONS_TAPE_SETTINGS_STORAGE_KEY]: "{" });
+    expect(readOptionsTapeSettings(malformedStorage)).toEqual(buildDefaultOptionsTapeSettings());
+  });
+
+  it("keeps at least one visible column and derives responsive templates from saved order", () => {
+    let settings = buildDefaultOptionsTapeSettings();
+    for (const columnId of settings.columnOrder.slice(1)) {
+      settings = reduceOptionsTapeSettings(settings, {
+        type: "toggle-column",
+        id: columnId,
+        visible: false
+      });
+    }
+    settings = reduceOptionsTapeSettings(settings, {
+      type: "toggle-column",
+      id: settings.columnOrder[0]!,
+      visible: false
+    });
+
+    expect(getVisibleOptionsTapeColumnOrder(settings)).toEqual(["time"]);
+
+    const reordered = reduceOptionsTapeSettings(
+      {
+        ...buildDefaultOptionsTapeSettings(),
+        columnOrder: ["premium", "contract", "side", "time", "price", "size", "dte", "iv", "spot", "nbbo", "exchange"]
+      },
+      { type: "toggle-column", id: "side", visible: false }
+    );
+    const templates = buildOptionsTapeTemplatesForSettings("global", reordered);
+
+    expect(templates.find((template) => template.id === "full")?.columns.slice(0, 2)).toEqual([
+      "premium",
+      "contract"
+    ]);
+    expect(templates.find((template) => template.id === "oneThird")?.columns).toEqual([
+      "premium",
+      "contract"
+    ]);
+    const selection = selectDurableTapeTemplate({
+      columns: OPTIONS_TAPE_COLUMNS,
+      templates,
+      containerWidth: 180,
+      requestedTemplate: "auto"
+    });
+    expect(selection.columns.map((column) => column.id)).not.toContain("side");
+  });
+
+  it("filters smart-flow-only rows from resolved support context without scanning projections", () => {
+    const rows = [
+      makePrint({ trace_id: "plain" }),
+      makePrint({ trace_id: "smart-flow-supported", seq: 2 })
+    ];
+
+    expect(
+      filterOptionsTapeSmartFlowRows(rows, true, (row) => row.trace_id === "smart-flow-supported")
+    ).toEqual([rows[1]]);
+    expect(filterOptionsTapeSmartFlowRows(rows, false, () => false)).toEqual(rows);
+  });
+
+  it("keeps server-row support diagnostics out of product option templates by default", () => {
+    for (const template of DURABLE_OPTION_ROW_TEMPLATES) {
+      expect(template.columns).not.toContain("support");
+    }
+    expect(DURABLE_OPTION_ROW_DIAGNOSTIC_TEMPLATES.some((template) =>
+      template.columns.includes("support")
+    )).toBe(true);
   });
 
   it("serializes filter and scope query params for option history", () => {

@@ -80,6 +80,45 @@ type OptionRowColumnId =
   | "nbbo"
   | "support";
 
+const humanizeSupportToken = (value: string): string =>
+  value
+    .split(/[_-]+/g)
+    .filter(Boolean)
+    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
+
+export const getDurableOptionSupportStateLabel = (
+  row: DurableTapeOptionRowViewModel
+): string => {
+  if (row.support.smart_flow_status === "matched") {
+    return row.support.smart_flow
+      ? `Smart-flow attached: ${humanizeSupportToken(row.support.smart_flow.hypothesis_type)}`
+      : "Smart-flow matched";
+  }
+  if (row.support.smart_flow_status === "no_matching_projection") {
+    return "No matching projection";
+  }
+  if (row.support.smart_flow_status === "packet_unavailable") {
+    return "Packet unavailable";
+  }
+  const reason = row.support.smart_flow_unavailable_reason;
+  return reason
+    ? `Smart-flow unavailable: ${humanizeSupportToken(reason)}`
+    : "Smart-flow unavailable";
+};
+
+export const getDurableOptionSupportStateTone = (
+  row: DurableTapeOptionRowViewModel
+): "matched" | "missing" | "warning" => {
+  if (row.support.smart_flow_status === "matched" && row.support.smart_flow) {
+    return "matched";
+  }
+  if (row.support.smart_flow_status === "no_matching_projection") {
+    return "missing";
+  }
+  return "warning";
+};
+
 const OPTION_ROW_COLUMNS: DurableTapeColumnDefinition<
   DurableTapeOptionRowViewModel,
   OptionRowColumnId
@@ -139,19 +178,33 @@ const OPTION_ROW_COLUMNS: DurableTapeColumnDefinition<
   },
   {
     id: "support",
-    label: "SUPPORT",
-    minWidth: 112,
-    className: "options-tape-cell-exchange",
-    render: (row) => row.cells.support ?? "--"
+    label: "SUPPORT STATE",
+    minWidth: 136,
+    className: "options-tape-cell-support-state",
+    render: (row) => (
+      <span
+        className={`options-tape-support-state options-tape-support-state-${getDurableOptionSupportStateTone(row)}`}
+      >
+        {getDurableOptionSupportStateLabel(row)}
+      </span>
+    )
   }
 ];
 
-const OPTION_ROW_TEMPLATES: DurableTapeTemplate<OptionRowColumnId>[] = [
-  { id: "full", columns: ["time", "contract", "price", "size", "premium", "side", "support"] },
-  { id: "twoThirds", columns: ["time", "contract", "premium", "side", "support"] },
+export const DURABLE_OPTION_ROW_TEMPLATES: DurableTapeTemplate<OptionRowColumnId>[] = [
+  { id: "full", columns: ["time", "contract", "price", "size", "premium", "side", "nbbo"] },
+  { id: "twoThirds", columns: ["time", "contract", "premium", "side"] },
   { id: "half", columns: ["time", "contract", "premium", "side"] },
   { id: "oneThird", columns: ["contract", "premium", "side"] },
   { id: "micro", columns: ["contract", "premium"] }
+];
+
+export const DURABLE_OPTION_ROW_DIAGNOSTIC_TEMPLATES: DurableTapeTemplate<OptionRowColumnId>[] = [
+  { id: "full", columns: ["time", "contract", "price", "size", "premium", "side", "support"] },
+  { id: "twoThirds", columns: ["time", "contract", "premium", "side", "support"] },
+  { id: "half", columns: ["time", "contract", "premium", "support"] },
+  { id: "oneThird", columns: ["contract", "support"] },
+  { id: "micro", columns: ["support"] }
 ];
 
 const renderOptionSideCell = (content: ReactNode): ReactNode => {
@@ -297,6 +350,7 @@ export const DurableTapeOptionRowsPane = ({
   title = "Options Tape",
   className,
   features,
+  showDiagnosticSupportColumn = false,
   rowHeight = 34,
   onContractFocus,
   onPacketFocus
@@ -305,6 +359,7 @@ export const DurableTapeOptionRowsPane = ({
   title?: string;
   className?: string;
   features?: readonly DurableTapeFeatureInput[];
+  showDiagnosticSupportColumn?: boolean;
   rowHeight?: number;
   onContractFocus?: (print: OptionPrint) => void;
   onPacketFocus?: (request: FlowPacketFocusRequest) => void;
@@ -341,7 +396,11 @@ export const DurableTapeOptionRowsPane = ({
         renderRow={({ item, columns }) => renderOptionRow({ row: item, columns })}
         rowHeight={rowHeight}
         source={source}
-        templates={OPTION_ROW_TEMPLATES}
+        templates={
+          showDiagnosticSupportColumn
+            ? DURABLE_OPTION_ROW_DIAGNOSTIC_TEMPLATES
+            : DURABLE_OPTION_ROW_TEMPLATES
+        }
         title={title}
       />
     </section>
