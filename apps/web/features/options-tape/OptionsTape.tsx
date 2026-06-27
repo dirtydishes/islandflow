@@ -570,10 +570,14 @@ export const OptionsTape = ({
         if (payload.smartFlowSupportByTraceId.size > 0) {
           setHydratedSmartFlowSupportByTraceId((current) => {
             const next = new Map(current);
+            let changed = false;
             for (const [traceId, support] of payload.smartFlowSupportByTraceId) {
-              next.set(traceId, support);
+              if (support.smart_flow_status === "matched" && support.smart_flow) {
+                next.set(traceId, support);
+                changed = true;
+              }
             }
-            return next;
+            return changed ? next : current;
           });
         }
         if (Object.keys(payload.nbboByTraceId).length > 0) {

@@ -1,10 +1,8 @@
 import type {
-  DurableTapeSmartFlowSupport,
-  DurableTapeSmartFlowSupportStatus,
+  DurableTapeSmartFlowSupportResolution,
   FlowPacket,
   OptionNBBO,
-  OptionPrint,
-  SmartFlowExplainabilityProjection
+  OptionPrint
 } from "@islandflow/types";
 
 import { buildApiUrl, readErrorDetail } from "./transport";
@@ -27,16 +25,10 @@ export type OptionSupportRequest = {
   nbboContext?: OptionSupportNbboContext[];
 };
 
-export type OptionSmartFlowSupportResolution = {
-  packet: FlowPacket | null;
-  smart_flow_status: DurableTapeSmartFlowSupportStatus;
-  smart_flow_unavailable_reason?: string;
-  smart_flow: DurableTapeSmartFlowSupport | null;
-};
+export type OptionSmartFlowSupportResolution = DurableTapeSmartFlowSupportResolution;
 
 export type OptionSupportResult = {
   packets: FlowPacket[];
-  smartFlowProjections: SmartFlowExplainabilityProjection[];
   smartFlowSupportByTraceId: Map<string, OptionSmartFlowSupportResolution>;
   nbboByTraceId: Record<string, OptionNBBO | null>;
 };
@@ -53,7 +45,6 @@ export type FlowPacketLookupResult = {
 
 type OptionSupportPayload = {
   packets?: FlowPacket[];
-  smart_flow?: SmartFlowExplainabilityProjection[];
   support_by_trace_id?: Record<string, OptionSmartFlowSupportResolution>;
   nbbo_by_trace_id?: Record<string, OptionNBBO | null>;
 };
@@ -84,18 +75,6 @@ const DEFAULT_BACKOFF_MAX_MS = 30_000;
 
 const supportTraceKey = (traceId: string): string => `trace:${traceId}`;
 const supportNbboKey = (traceId: string): string => `nbbo:${traceId}`;
-
-const getSmartFlowPacketRefs = (projection: SmartFlowExplainabilityProjection): string[] =>
-  Array.from(
-    new Set(
-      [
-        projection.refs.cluster_id,
-        ...(projection.refs.evidence_refs ?? []),
-        ...(projection.evidence.evidence_refs ?? []),
-        ...(projection.hypothesis.evidence_refs ?? [])
-      ].filter((ref): ref is string => Boolean(ref?.startsWith("flowpacket:")))
-    )
-  );
 
 export const normalizeHydrationIds = (ids: Iterable<string | null | undefined>): string[] =>
   Array.from(new Set(Array.from(ids, (id) => id?.trim() ?? "").filter(Boolean))).sort();
@@ -202,9 +181,9 @@ export class HydrationScheduler {
   private readonly flowPacketById: TtlCache<FlowPacket>;
   private readonly flowPacketMisses: TtlCache<true>;
   private readonly supportByTraceId: TtlCache<OptionSmartFlowSupportResolution>;
+  private readonly supportUnavailableByTraceId: TtlCache<OptionSmartFlowSupportResolution>;
   private readonly supportPacketByTraceId: TtlCache<FlowPacket>;
   private readonly supportTraceMisses: TtlCache<true>;
-  private readonly supportSmartFlowByPacketId: TtlCache<SmartFlowExplainabilityProjection[]>;
   private readonly supportNbboByTraceId: TtlCache<OptionNBBO>;
   private readonly supportNbboMisses: TtlCache<true>;
 
@@ -246,9 +225,9 @@ export class HydrationScheduler {
     this.flowPacketById = new TtlCache(maxEntries, positiveTtlMs, this.now);
     this.flowPacketMisses = new TtlCache(maxEntries, negativeTtlMs, this.now);
     this.supportByTraceId = new TtlCache(maxEntries, positiveTtlMs, this.now);
+    this.supportUnavailableByTraceId = new TtlCache(maxEntries, negativeTtlMs, this.now);
     this.supportPacketByTraceId = new TtlCache(maxEntries, positiveTtlMs, this.now);
     this.supportTraceMisses = new TtlCache(maxEntries, negativeTtlMs, this.now);
-    this.supportSmartFlowByPacketId = new TtlCache(maxEntries, positiveTtlMs, this.now);
     this.supportNbboByTraceId = new TtlCache(maxEntries, positiveTtlMs, this.now);
     this.supportNbboMisses = new TtlCache(maxEntries, negativeTtlMs, this.now);
   }
@@ -304,9 +283,9 @@ export class HydrationScheduler {
     this.flowPacketById.clear();
     this.flowPacketMisses.clear();
     this.supportByTraceId.clear();
+    this.supportUnavailableByTraceId.clear();
     this.supportPacketByTraceId.clear();
     this.supportTraceMisses.clear();
-    this.supportSmartFlowByPacketId.clear();
     this.supportNbboByTraceId.clear();
     this.supportNbboMisses.clear();
     this.backoff.clear();
@@ -518,7 +497,7 @@ export class HydrationScheduler {
   private queueSupportTrace(traceId: string): Promise<void> {
     if (
       this.supportByTraceId.has(traceId) ||
-      this.supportPacketByTraceId.has(traceId) ||
+      this.supportUnavailableByTraceId.has(traceId) ||
       this.supportTraceMisses.has(traceId) ||
       this.isBackedOff("optionSupport")
     ) {
@@ -646,26 +625,21 @@ export class HydrationScheduler {
     }
 
     for (const [traceId, support] of Object.entries(payload.support_by_trace_id ?? {})) {
-      this.supportByTraceId.set(traceId, {
+      const resolution = {
         packet: support.packet ?? null,
         smart_flow_status: support.smart_flow_status,
         ...(support.smart_flow_unavailable_reason
           ? { smart_flow_unavailable_reason: support.smart_flow_unavailable_reason }
           : {}),
         smart_flow: support.smart_flow ?? null
-      });
+      };
+      if (resolution.smart_flow_status === "matched" && resolution.smart_flow) {
+        this.supportByTraceId.set(traceId, resolution);
+      } else {
+        this.supportUnavailableByTraceId.set(traceId, resolution);
+      }
       if (support.packet) {
         this.cacheSupportPacket(support.packet, [traceId]);
-      }
-    }
-
-    for (const projection of payload.smart_flow ?? []) {
-      for (const packetId of getSmartFlowPacketRefs(projection)) {
-        const existing = this.supportSmartFlowByPacketId.getEntry(packetId)?.value ?? [];
-        if (existing.some((item) => item.trace_id === projection.trace_id)) {
-          continue;
-        }
-        this.supportSmartFlowByPacketId.set(packetId, [...existing, projection].slice(-24));
       }
     }
 
@@ -684,7 +658,19 @@ export class HydrationScheduler {
     }
 
     for (const traceId of requestedTraceIds) {
-      if (!this.supportByTraceId.has(traceId) && !this.supportPacketByTraceId.has(traceId)) {
+      if (this.supportByTraceId.has(traceId) || this.supportUnavailableByTraceId.has(traceId)) {
+        continue;
+      }
+      const packet = this.supportPacketByTraceId.getEntry(traceId)?.value ?? null;
+      if (packet) {
+        this.supportUnavailableByTraceId.set(traceId, {
+          packet,
+          smart_flow_status: "smart_flow_unavailable",
+          smart_flow_unavailable_reason:
+            "no compact smart-flow support was returned for this option print",
+          smart_flow: null
+        });
+      } else {
         this.supportTraceMisses.set(traceId, true);
       }
     }
@@ -716,10 +702,11 @@ export class HydrationScheduler {
     nbboContext: OptionSupportNbboContext[]
   ): OptionSupportResult {
     const packets = new Map<string, FlowPacket>();
-    const packetIds = new Set<string>();
     const smartFlowSupportByTraceId = new Map<string, OptionSmartFlowSupportResolution>();
     for (const traceId of traceIds) {
-      const support = this.supportByTraceId.getEntry(traceId)?.value;
+      const support =
+        this.supportByTraceId.getEntry(traceId)?.value ??
+        this.supportUnavailableByTraceId.getEntry(traceId)?.value;
       if (support) {
         smartFlowSupportByTraceId.set(traceId, support);
       }
@@ -728,14 +715,6 @@ export class HydrationScheduler {
         continue;
       }
       packets.set(packet.id, packet);
-      packetIds.add(packet.id);
-    }
-
-    const smartFlowProjections = new Map<string, SmartFlowExplainabilityProjection>();
-    for (const packetId of packetIds) {
-      for (const projection of this.supportSmartFlowByPacketId.getEntry(packetId)?.value ?? []) {
-        smartFlowProjections.set(projection.trace_id, projection);
-      }
     }
 
     const nbboByTraceId: Record<string, OptionNBBO | null> = {};
@@ -750,7 +729,6 @@ export class HydrationScheduler {
 
     return {
       packets: Array.from(packets.values()),
-      smartFlowProjections: Array.from(smartFlowProjections.values()),
       smartFlowSupportByTraceId,
       nbboByTraceId
     };

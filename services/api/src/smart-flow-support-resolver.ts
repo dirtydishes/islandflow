@@ -1,6 +1,7 @@
 import { type ClickHouseClient, fetchFlowPacketsByMemberTraceIds } from "@islandflow/storage";
 import type {
   DurableTapeSmartFlowSupport,
+  DurableTapeSmartFlowSupportResolution,
   DurableTapeSmartFlowSupportStatus,
   FlowPacket,
   SmartFlowExplainabilityProjection
@@ -59,12 +60,7 @@ class TtlCache<T> {
   }
 }
 
-export type SmartFlowOptionSupportResolution = {
-  packet: FlowPacket | null;
-  smart_flow_status: DurableTapeSmartFlowSupportStatus;
-  smart_flow_unavailable_reason?: string;
-  smart_flow: DurableTapeSmartFlowSupport | null;
-};
+export type SmartFlowOptionSupportResolution = DurableTapeSmartFlowSupportResolution;
 
 export type SmartFlowSupportResolverInput = {
   optionTraceIds: string[];

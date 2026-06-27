@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { SmartFlowDirectionSchema } from "./events";
+import { type FlowPacket, SmartFlowDirectionSchema } from "./events";
 import { OptionNbboSideSchema, OptionTypeSchema } from "./options-flow";
 import { FlowHypothesisTypeSchema } from "./smart-flow";
 
@@ -72,6 +72,13 @@ export const DurableTapeSmartFlowSupportSchema = z.object({
   })
 });
 export type DurableTapeSmartFlowSupport = z.infer<typeof DurableTapeSmartFlowSupportSchema>;
+
+export type DurableTapeSmartFlowSupportResolution = {
+  packet: FlowPacket | null;
+  smart_flow_status: DurableTapeSmartFlowSupportStatus;
+  smart_flow_unavailable_reason?: string;
+  smart_flow: DurableTapeSmartFlowSupport | null;
+};
 
 const DurableTapeRowBaseSchema = z.object({
   id: z.string().min(1),

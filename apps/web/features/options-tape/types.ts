@@ -1,6 +1,6 @@
 import type {
   DurableTapeSmartFlowSupport,
-  DurableTapeSmartFlowSupportStatus,
+  DurableTapeSmartFlowSupportResolution,
   FlowPacket,
   OptionFlowFilters,
   OptionNBBO,
@@ -112,12 +112,7 @@ export type OptionsTapeSmartFlowContext = {
   expandedPacketRefs: string[];
 };
 
-export type OptionsTapeSmartFlowSupportResolution = {
-  packet: FlowPacket | null;
-  smart_flow_status: DurableTapeSmartFlowSupportStatus;
-  smart_flow_unavailable_reason?: string;
-  smart_flow: DurableTapeSmartFlowSupport | null;
-};
+export type OptionsTapeSmartFlowSupportResolution = DurableTapeSmartFlowSupportResolution;
 
 export type OptionsTapePacketContext = {
   packet: FlowPacket;

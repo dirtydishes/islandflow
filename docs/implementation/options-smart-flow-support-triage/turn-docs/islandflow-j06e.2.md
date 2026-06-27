@@ -32,7 +32,8 @@ Implemented Phase 02 only:
 
 ## Subagent Swarms
 
-No helper subagents used; implementation was contained to the assigned branch/worktree.
+- Implementation used no helper subagents; implementation was contained to the assigned branch/worktree.
+- Review used a read-only thermo-nuclear code-quality scout and a read-only CI/gate verification scout.
 
 ## Review
 
@@ -40,18 +41,30 @@ Reviewer skill:
 
 `thermo-nuclear-code-quality-review`
 
-Not started. The orchestrator will create the review thread after implementation callback.
+Reviewer state: repaired.
+
+Review findings repaired in scope:
+
+- `HydrationScheduler` treated cached packet membership as enough to skip later compact support lookups for sibling packet members. Repaired so only compact support or unavailable negative-cache entries suppress support requests.
+- Non-matched compact support was cached like a long-lived final support result. Repaired by separating matched support into the positive cache, unavailable support into the negative cache, and storing only matched support in `OptionsTape` component state.
+- The options row support hydration path still retained the old `smart_flow` projection cache/result. Repaired by making `requestOptionSupport` expose compact `support_by_trace_id` only for row support.
+- The compact support resolution type was duplicated across API and frontend layers. Repaired by exporting `DurableTapeSmartFlowSupportResolution` from `@islandflow/types` and aliasing it in API/frontend modules.
+
+Remaining findings: none in Phase 02 scope.
 
 ## CI And Gates
 
 CI owner: reviewer/verification agents
 
-Current CI state: `local-gates-passed`
+Current CI state before push: `local-repair-gates-passed`.
+
+Expected review callback CI state after Forgejo post-push confirmation: `ci-repaired-and-green`.
 
 Evidence:
 
-- `bunx biome check apps/web/app/terminal.tsx apps/web/features/durable-tape/qa-page.tsx apps/web/features/durable-tape/row-view-models.tsx apps/web/features/options-tape/OptionsTape.tsx apps/web/features/options-tape/options-tape.test.ts apps/web/features/options-tape/support-hydration.ts apps/web/features/options-tape/tinting.ts apps/web/features/options-tape/types.ts apps/web/features/terminal/hydration-scheduler.test.ts apps/web/features/terminal/hydration-scheduler.ts` - passed.
-- `bun test apps/web/features/terminal/hydration-scheduler.test.ts apps/web/features/options-tape` - passed, 26 tests.
+- Forgejo Actions before reviewer repairs: `#396 (617183019a) success Validate 1m19s (pull_request)`.
+- `bunx biome check apps/web/features/terminal/hydration-scheduler.ts apps/web/features/terminal/hydration-scheduler.test.ts apps/web/features/options-tape/OptionsTape.tsx apps/web/features/options-tape/options-tape.test.ts apps/web/features/options-tape/support-hydration.ts apps/web/features/options-tape/tinting.ts apps/web/features/options-tape/types.ts apps/web/features/durable-tape/row-view-models.tsx apps/web/features/durable-tape/qa-page.tsx apps/web/app/terminal.tsx packages/types/src/durable-tapes.ts services/api/src/smart-flow-support-resolver.ts` - passed.
+- `bun test apps/web/features/terminal/hydration-scheduler.test.ts apps/web/features/options-tape` - passed, 28 tests.
 - `bun test apps/web/features/durable-tape apps/web/features/options-tape` - passed, 59 tests.
 - `bun --cwd=apps/web run build` - passed.
 - `bun test services/api/tests/options-support.test.ts services/api/tests/smart-flow-support-resolver.test.ts` - passed, 9 tests.
@@ -62,6 +75,7 @@ Evidence:
 - Forgejo PR: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/95`
 - Branch: `lavender/islandflow-j06e-2-row-support-tint`
 - Implementation commit: `c6c1f54` - `render options smart flow support from row payloads`
+- Review repair commit: included in the current branch head after this document update.
 
 ## Beads Updates
 
@@ -83,4 +97,4 @@ None.
 
 ## Closeout
 
-Forgejo PR opened. Pending final doc checkpoint push, `bd dolt push`, clean status verification, and implementation callback.
+Forgejo PR opened and repaired by review. Pending `bd dolt push`, `git push forgejo`, Forgejo post-push CI confirmation, clean status verification, and review callback.
