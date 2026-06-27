@@ -104,7 +104,11 @@ Evidence:
 
 ## PR And Commits
 
-Pending publication.
+- Forgejo PR: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/97`
+- Branch: `lavender/islandflow-j06e-4-qa-diagnostics-settings`
+- Implementation commit: `7d76c7f` - `add options tape diagnostics settings`
+- Publication doc commit: this update records the PR URL, Beads push, and
+  final publication evidence.
 
 ## Beads Updates
 
@@ -131,5 +135,6 @@ Pending publication.
 
 ## Closeout
 
-Implementation and local verification are complete. Publication, Forgejo PR
-creation, and the final callback remain.
+Implementation, local verification, `bd dolt push`, branch publication, and
+Forgejo PR creation are complete. The orchestrator owns reviewer-thread
+creation, Beads closeout, merge, and next-phase selection.
