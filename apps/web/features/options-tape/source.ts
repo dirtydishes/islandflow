@@ -42,8 +42,8 @@ type OptionsTapeArrayListener = {
 
 const parseHistoryResponse = async (response: Response): Promise<OptionsTapeHistoryResponse> => {
   const payload = (await response.json()) as OptionsTapeHistoryResponse;
-  const hasPacket = Object.prototype.hasOwnProperty.call(payload, "packet");
-  const hasPinned = Object.prototype.hasOwnProperty.call(payload, "pinned");
+  const hasPacket = Object.hasOwn(payload, "packet");
+  const hasPinned = Object.hasOwn(payload, "pinned");
   return {
     data: parseOptionPrints(payload.data ?? []),
     next_before: payload.next_before ?? null,
@@ -94,7 +94,7 @@ export const loadOptionsTapeHistoryPage = async ({
     }
 
     const payload = await parseHistoryResponse(response);
-    if (Object.prototype.hasOwnProperty.call(payload, "packet")) {
+    if (Object.hasOwn(payload, "packet")) {
       options?.onPacketHydrated?.(payload.packet ?? null);
     }
     const filtered = filterOptionsTapePrints(

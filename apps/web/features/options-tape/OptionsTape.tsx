@@ -108,7 +108,8 @@ const scopeToSourceScope = (scope: OptionsTapeScope): OptionsTapeSourceScope => 
     optionContractId: scope.optionContractId,
     underlyingIds: scope.underlyingId ? [scope.underlyingId] : undefined,
     packetId: scope.mode === "packet" ? scope.packetId : undefined,
-    packetMemberTraceIds: scope.mode === "packet" && !scope.packetId ? scope.memberTraceIds : undefined,
+    packetMemberTraceIds:
+      scope.mode === "packet" && !scope.packetId ? scope.memberTraceIds : undefined,
     selectedTraceId: scope.mode === "packet" ? scope.selectedTraceId : undefined
   };
 };

@@ -99,20 +99,21 @@ export const parseOptionPrintQuery = (url: URL): ParsedOptionPrintQuery => {
   };
   const isContractDrilldown = Boolean(scope.optionContractId);
   const isPacketScope = Boolean(scope.flowPacketId);
-  const storageFilters: OptionPrintQueryFilters = isContractDrilldown || isPacketScope
-    ? {
-        view: "raw",
-        optionContractId: scope.optionContractId
-      }
-    : {
-        view,
-        security,
-        minNotional: parsed.min_notional,
-        nbboSides: parsed.side,
-        optionTypes: parsed.type,
-        underlyingIds: scope.underlyingIds,
-        optionContractId: scope.optionContractId
-      };
+  const storageFilters: OptionPrintQueryFilters =
+    isContractDrilldown || isPacketScope
+      ? {
+          view: "raw",
+          optionContractId: scope.optionContractId
+        }
+      : {
+          view,
+          security,
+          minNotional: parsed.min_notional,
+          nbboSides: parsed.side,
+          optionTypes: parsed.type,
+          underlyingIds: scope.underlyingIds,
+          optionContractId: scope.optionContractId
+        };
 
   return {
     scope,
