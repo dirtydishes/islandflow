@@ -101,7 +101,7 @@ Findings remaining:
 CI owner: implementation worker for initial local gates, reviewer for repaired
 local gates and Forgejo CI.
 
-Current CI state: `reviewer-repaired-local-green`
+Current CI state: `forgejo-code-head-green`
 
 Evidence:
 
@@ -135,6 +135,8 @@ Evidence:
   - `/tmp/islandflow-j06e-4-browser-after-guard/options-mobile-settings.png`
   - `/tmp/islandflow-j06e-4-browser-after-guard/qa-desktop.png`
   - `/tmp/islandflow-j06e-4-browser-after-guard/qa-mobile.png`
+- Forgejo task `#414` on repair head `5ba84405a9` passed `Validate` in
+  1m19s.
 
 ## PR And Commits
 
@@ -142,7 +144,7 @@ Evidence:
 - Branch: `lavender/islandflow-j06e-4-qa-diagnostics-settings`
 - Implementation commit: `7d76c7f` - `add options tape diagnostics settings`
 - Publication doc commit: `3d71df4` - `document qa settings publication`
-- Reviewer repair commit: `repair options tape review findings`
+- Reviewer repair commit: `5ba8440` - `repair options tape review findings`
 
 ## Beads Updates
 
