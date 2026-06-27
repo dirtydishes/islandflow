@@ -10,9 +10,9 @@ Stream: `options-smart-flow-support-triage`
 
 Workflow: `orchestrator-callback`
 
-Current phase: 01 - Server-side smart-flow support resolver
+Current phase: none
 
-Current Beads issue: `islandflow-j06e.1`
+Current Beads issue: none
 
 Current PR: none
 
@@ -43,7 +43,7 @@ Blocked: no
 
 | Phase | Beads Issue | Status | PR | Turn Doc |
 |---|---|---|---|---|
-| 01 - Server-side smart-flow support resolver | `islandflow-j06e.1` | In progress | None | `docs/implementation/options-smart-flow-support-triage/turn-docs/islandflow-j06e.1.md` |
+| 01 - Server-side smart-flow support resolver | `islandflow-j06e.1` | Open | None | `docs/implementation/options-smart-flow-support-triage/turn-docs/islandflow-j06e.1.md` |
 | 02 - Row support rendering and tint parity | `islandflow-j06e.2` | Blocked on `islandflow-j06e.1` | None | `docs/implementation/options-smart-flow-support-triage/turn-docs/islandflow-j06e.2.md` |
 | 03 - Packet and contract scope interactions | `islandflow-j06e.3` | Blocked on `islandflow-j06e.2` | None | `docs/implementation/options-smart-flow-support-triage/turn-docs/islandflow-j06e.3.md` |
 | 04 - QA diagnostics and module settings | `islandflow-j06e.4` | Blocked on `islandflow-j06e.3` | None | `docs/implementation/options-smart-flow-support-triage/turn-docs/islandflow-j06e.4.md` |
@@ -51,4 +51,6 @@ Blocked: no
 
 ## Last Coordinator Update
 
-2026-06-27: Workflow corrected to `orchestrator-callback`, canonical Beads epic corrected to `islandflow-j06e`, and phase IDs mirrored from Beads. Beads currently reports `islandflow-j06e.1` as in progress with no PR recorded in this loop state.
+2026-06-27: Workflow corrected to `orchestrator-callback`, canonical Beads epic corrected to `islandflow-j06e`, and phase IDs mirrored from Beads.
+
+2026-06-27: All Beads child issues under `islandflow-j06e` were reset to `open`; no current phase or PR is recorded in this loop state.

@@ -8,7 +8,7 @@ This is the single Markdown turn doc for the phase.
 
 ## Phase Selection
 
-Beads currently reports `islandflow-j06e.1` as `in_progress` assigned to `dirtydishes`. No implementation PR is recorded in this turn doc yet.
+Beads currently reports `islandflow-j06e.1` as `open`. No implementation PR is recorded in this turn doc yet.
 
 ## Scope
 
@@ -49,6 +49,8 @@ Not started.
 Issue created under `islandflow-j06e`.
 
 2026-06-27 workflow correction: this turn doc was renamed to the canonical Beads issue id `islandflow-j06e.1`.
+
+2026-06-27 status correction: `islandflow-j06e.1` was reset to `open` along with the other child issues under `islandflow-j06e`.
 
 ## Follow-Ups Filed
 
