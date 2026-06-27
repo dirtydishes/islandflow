@@ -1,8 +1,8 @@
 # Options Smart-Flow Support And Triage Loop
 
-Workflow: `single-thread-subagent`
+Workflow: `orchestrator-callback`
 
-Canonical tracker: Beads epic `islandflow-miqb`
+Canonical tracker: Beads epic `islandflow-j06e`
 
 This stream is driven by Beads. These docs are execution context and resume aids. If Beads and these docs disagree, Beads wins.
 
@@ -12,11 +12,15 @@ Make options tape smart-flow support accurate, reusable, and cheap for the brows
 
 ## Sources Of Truth
 
-- Beads epic: `islandflow-miqb`
+- Beads epic: `islandflow-j06e`
 - Roadmap: `docs/implementation/options-smart-flow-support-triage/00-roadmap.md`
 - Loop state mirror: `docs/implementation/options-smart-flow-support-triage/loop-state.md`
+- Run prompt: `docs/implementation/options-smart-flow-support-triage/prompts/run-loop.md`
+- Implementation thread prompt: `docs/implementation/options-smart-flow-support-triage/prompts/implementation-thread.md`
+- Review thread prompt: `docs/implementation/options-smart-flow-support-triage/prompts/review-thread.md`
 - Phase docs linked from Beads child issues
 - Turn docs: `docs/implementation/options-smart-flow-support-triage/turn-docs/`
+- Callback schemas: `docs/implementation/options-smart-flow-support-triage/schemas/`
 - Predecessor stream: `docs/implementation/options-tape-smart-flow-row-tinting/IMPLEMENT.md`
 - Durable tapes module plan: `docs/implementation/durable-tapes/02-options-tape.md`
 - Performance predecessor: `docs/implementation/durable-tapes-performance/05-server-composed-view-models.md`
@@ -83,11 +87,11 @@ Install `@pierre/diffs` in the target repo if missing. Every storyboard diff mus
 
 | Beads Issue | Phase | Phase Doc | Depends On | Status |
 |---|---|---|---|---|
-| `islandflow-miqb.1` | 01 - Server-side smart-flow support resolver | `docs/implementation/options-smart-flow-support-triage/01-server-side-support-resolver.md` | None | Open |
-| `islandflow-miqb.2` | 02 - Row support rendering and tint parity | `docs/implementation/options-smart-flow-support-triage/02-row-support-rendering-tint-parity.md` | `islandflow-miqb.1` | Open, blocked |
-| `islandflow-miqb.3` | 03 - Packet and contract scope interactions | `docs/implementation/options-smart-flow-support-triage/03-packet-contract-scope-interactions.md` | `islandflow-miqb.2` | Open, blocked |
-| `islandflow-miqb.4` | 04 - QA diagnostics and module settings | `docs/implementation/options-smart-flow-support-triage/04-qa-diagnostics-module-settings.md` | `islandflow-miqb.3` | Open, blocked |
-| `islandflow-miqb.5` | 05 - More-info triage workspace | `docs/implementation/options-smart-flow-support-triage/05-more-info-triage-workspace.md` | `islandflow-miqb.4` | Open, blocked |
+| `islandflow-j06e.1` | 01 - Server-side smart-flow support resolver | `docs/implementation/options-smart-flow-support-triage/01-server-side-support-resolver.md` | None | In progress |
+| `islandflow-j06e.2` | 02 - Row support rendering and tint parity | `docs/implementation/options-smart-flow-support-triage/02-row-support-rendering-tint-parity.md` | `islandflow-j06e.1` | Open, blocked |
+| `islandflow-j06e.3` | 03 - Packet and contract scope interactions | `docs/implementation/options-smart-flow-support-triage/03-packet-contract-scope-interactions.md` | `islandflow-j06e.2` | Open, blocked |
+| `islandflow-j06e.4` | 04 - QA diagnostics and module settings | `docs/implementation/options-smart-flow-support-triage/04-qa-diagnostics-module-settings.md` | `islandflow-j06e.3` | Open, blocked |
+| `islandflow-j06e.5` | 05 - More-info triage workspace | `docs/implementation/options-smart-flow-support-triage/05-more-info-triage-workspace.md` | `islandflow-j06e.4` | Open, blocked |
 
 ## Quality Gates
 
@@ -110,18 +114,31 @@ UI phases also require browser verification for `/options` and `/qa` at desktop 
 - When a branch is assigned, push to `forgejo` and use Forgejo PR workflows.
 - Do not merge completed PRs unless the user explicitly asks.
 
-## Single-Thread Subagent Workflow
+## Orchestrator Callback Workflow
 
 Topology:
 
 ```text
-main coordinator thread
-  -> selector subagents
-  -> scout subagents
-  -> implementation in main thread unless explicitly assigned
-  -> reviewer subagents
-  -> CI verification subagents
-  -> coordinator closeout
+orchestrator thread
+  -> selector subagent chooses the next ready Beads child issue
+  -> orchestrator creates one visible implementation thread
+  -> implementation thread may use scout/helper subagents
+  -> implementation thread opens or updates one Forgejo PR
+  -> implementation thread calls back exactly once
+  -> orchestrator creates one visible review thread
+  -> review thread uses thermo-nuclear-code-quality-review
+  -> review thread owns CI, safe repairs, reruns, and evidence
+  -> review thread calls back exactly once
+  -> orchestrator updates Beads and loop state
+  -> orchestrator selects the next phase or stops with a concrete state
 ```
 
-The main coordinator owns branch state, implementation, PR state, Beads updates, and closeout. Subagents inspect, compare, critique, verify, and report. Subagents do not advance loop state.
+The orchestrator owns Beads state, phase selection, thread creation, callback routing, phase closeout, and stream closeout. It does not implement phase code.
+
+Implementation threads own exactly one selected Beads issue, the assigned branch/worktree, implementation, local gates before PR when feasible, Forgejo PR creation, the existing phase turn doc, and the implementation callback. Implementation threads do not create review threads.
+
+Review threads own the thermo-nuclear review, reviewer/CI verification swarms, CI diagnosis, safe in-scope repairs, reruns, evidence, the existing phase turn doc, and the review callback. Review threads do not create follow-up implementation threads or close Beads issues.
+
+Worker and reviewer threads should be visible project-scoped Islandflow threads using regular `xhigh` reasoning. Do not use projectless/local threads or fast-mode/model overrides.
+
+Callbacks are single-shot. Use the schemas in `docs/implementation/options-smart-flow-support-triage/schemas/`.

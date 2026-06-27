@@ -1,8 +1,8 @@
 # Phase 04: QA Diagnostics And Module Settings
 
-Canonical Beads issue: `islandflow-miqb.4`
+Canonical Beads issue: `islandflow-j06e.4`
 
-Epic: `islandflow-miqb`
+Epic: `islandflow-j06e`
 
 Status is tracked in Beads. This doc is implementation context.
 
@@ -52,9 +52,9 @@ Out of scope:
 
 ## Beads
 
-- Epic: `islandflow-miqb`
-- Issue: `islandflow-miqb.4`
-- Depends on: `islandflow-miqb.3`
+- Epic: `islandflow-j06e`
+- Issue: `islandflow-j06e.4`
+- Depends on: `islandflow-j06e.3`
 - Parallel-safe: No. This depends on stable row support and scope semantics.
 
 ## Expected Files Or Areas

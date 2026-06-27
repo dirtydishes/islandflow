@@ -1,14 +1,14 @@
-# Phase 01 Turn Doc: Server-Side Smart-Flow Support Resolver
+# Phase 02 Turn Doc: Row Support Rendering And Tint Parity
 
-Beads issue: `islandflow-miqb.1`
+Beads issue: `islandflow-j06e.2`
 
-Phase doc: `docs/implementation/options-smart-flow-support-triage/01-server-side-support-resolver.md`
+Phase doc: `docs/implementation/options-smart-flow-support-triage/02-row-support-rendering-tint-parity.md`
 
 This is the single Markdown turn doc for the phase.
 
 ## Phase Selection
 
-Not started.
+Blocked on `islandflow-j06e.1`.
 
 ## Scope
 
@@ -46,7 +46,7 @@ Not started.
 
 ## Beads Updates
 
-Issue created under `islandflow-miqb`.
+Issue created under `islandflow-j06e` and depends on `islandflow-j06e.1`.
 
 ## Follow-Ups Filed
 
@@ -54,9 +54,9 @@ None.
 
 ## Context To Keep
 
-- Server composes support; browser renders compact support.
-- Hot cache first, durable fallback second.
-- Highest-confidence non-abstained projection wins.
+- Use one canonical tint helper.
+- Only non-abstained support tints rows.
+- No browser-side packet or projection reconstruction.
 
 ## Closeout
 

@@ -1,14 +1,14 @@
-# Phase 02 Turn Doc: Row Support Rendering And Tint Parity
+# Phase 03 Turn Doc: Packet And Contract Scope Interactions
 
-Beads issue: `islandflow-miqb.2`
+Beads issue: `islandflow-j06e.3`
 
-Phase doc: `docs/implementation/options-smart-flow-support-triage/02-row-support-rendering-tint-parity.md`
+Phase doc: `docs/implementation/options-smart-flow-support-triage/03-packet-contract-scope-interactions.md`
 
 This is the single Markdown turn doc for the phase.
 
 ## Phase Selection
 
-Blocked on `islandflow-miqb.1`.
+Blocked on `islandflow-j06e.2`.
 
 ## Scope
 
@@ -46,7 +46,7 @@ Not started.
 
 ## Beads Updates
 
-Issue created under `islandflow-miqb` and depends on `islandflow-miqb.1`.
+Issue created under `islandflow-j06e` and depends on `islandflow-j06e.2`.
 
 ## Follow-Ups Filed
 
@@ -54,9 +54,9 @@ None.
 
 ## Context To Keep
 
-- Use one canonical tint helper.
-- Only non-abstained support tints rows.
-- No browser-side packet or projection reconstruction.
+- Packet scope is a tape view.
+- Exact contract scope means normalized OCC contract.
+- Clicked print should be pinned or highlighted.
 
 ## Closeout
 

@@ -1,6 +1,6 @@
 # Phase 04 Turn Doc: QA Diagnostics And Module Settings
 
-Beads issue: `islandflow-miqb.4`
+Beads issue: `islandflow-j06e.4`
 
 Phase doc: `docs/implementation/options-smart-flow-support-triage/04-qa-diagnostics-module-settings.md`
 
@@ -8,7 +8,7 @@ This is the single Markdown turn doc for the phase.
 
 ## Phase Selection
 
-Blocked on `islandflow-miqb.3`.
+Blocked on `islandflow-j06e.3`.
 
 ## Scope
 
@@ -46,7 +46,7 @@ Not started.
 
 ## Beads Updates
 
-Issue created under `islandflow-miqb` and depends on `islandflow-miqb.3`.
+Issue created under `islandflow-j06e` and depends on `islandflow-j06e.3`.
 
 ## Follow-Ups Filed
 
