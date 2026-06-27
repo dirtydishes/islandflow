@@ -10,13 +10,13 @@ Stream: `options-smart-flow-support-triage`
 
 Workflow: `orchestrator-callback`
 
-Current phase: 04 - QA diagnostics and module settings
+Current phase: 05 - More-info triage workspace
 
-Current Beads issue: `islandflow-j06e.4`
+Current Beads issue: `islandflow-j06e.5`
 
-Current PR: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/97`
+Current PR: none
 
-Last completed phase: 03 - Packet and contract scope interactions
+Last completed phase: 04 - QA diagnostics and module settings
 
 Blocked: no
 
@@ -46,8 +46,8 @@ Blocked: no
 | 01 - Server-side smart-flow support resolver | `islandflow-j06e.1` | Closed; merged via PR `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/94` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/94` | `docs/implementation/options-smart-flow-support-triage/turn-docs/islandflow-j06e.1.md` |
 | 02 - Row support rendering and tint parity | `islandflow-j06e.2` | Closed; merged via PR `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/95` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/95` | `docs/implementation/options-smart-flow-support-triage/turn-docs/islandflow-j06e.2.md` |
 | 03 - Packet and contract scope interactions | `islandflow-j06e.3` | Closed; merged via PR `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/96` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/96` | `docs/implementation/options-smart-flow-support-triage/turn-docs/islandflow-j06e.3.md` |
-| 04 - QA diagnostics and module settings | `islandflow-j06e.4` | In review | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/97` | `docs/implementation/options-smart-flow-support-triage/turn-docs/islandflow-j06e.4.md` |
-| 05 - More-info triage workspace | `islandflow-j06e.5` | Blocked on `islandflow-j06e.4` | None | `docs/implementation/options-smart-flow-support-triage/turn-docs/islandflow-j06e.5.md` |
+| 04 - QA diagnostics and module settings | `islandflow-j06e.4` | Closed; merged via PR `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/97` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/97` | `docs/implementation/options-smart-flow-support-triage/turn-docs/islandflow-j06e.4.md` |
+| 05 - More-info triage workspace | `islandflow-j06e.5` | In progress | None | `docs/implementation/options-smart-flow-support-triage/turn-docs/islandflow-j06e.5.md` |
 
 ## Last Coordinator Update
 
@@ -74,3 +74,5 @@ Blocked: no
 2026-06-27: Orchestrator claimed `islandflow-j06e.4`, prepared branch `lavender/islandflow-j06e-4-qa-diagnostics-settings`, and assigned worktree `/home/delta/.codex/worktrees/options-smart-flow-support-04-qa-settings` for the implementation thread.
 
 2026-06-27: Implementation callback reported PR `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/97` ready on branch `lavender/islandflow-j06e-4-qa-diagnostics-settings`; worker filed follow-up `islandflow-j06e.6` for graceful options QA history/bootstrap fetch failure handling; orchestrator is launching thermo-nuclear review and CI ownership.
+
+2026-06-27: Review callback reported PR `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/97` repaired with Forgejo Validate task `#415` green at `5dce64d91d`; orchestrator merged PR #97, closed `islandflow-j06e.4`, and selected next ready issue `islandflow-j06e.5`.
