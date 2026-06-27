@@ -10,13 +10,13 @@ Stream: `options-smart-flow-support-triage`
 
 Workflow: `orchestrator-callback`
 
-Current phase: 01 - Server-side smart-flow support resolver
+Current phase: 02 - Row support rendering and tint parity
 
-Current Beads issue: `islandflow-j06e.1`
+Current Beads issue: `islandflow-j06e.2`
 
-Current PR: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/94`
+Current PR: none
 
-Last completed phase: none
+Last completed phase: 01 - Server-side smart-flow support resolver
 
 Blocked: no
 
@@ -43,8 +43,8 @@ Blocked: no
 
 | Phase | Beads Issue | Status | PR | Turn Doc |
 |---|---|---|---|---|
-| 01 - Server-side smart-flow support resolver | `islandflow-j06e.1` | Reviewed and repaired; awaiting orchestrator merge permission | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/94` | `docs/implementation/options-smart-flow-support-triage/turn-docs/islandflow-j06e.1.md` |
-| 02 - Row support rendering and tint parity | `islandflow-j06e.2` | Blocked on `islandflow-j06e.1` | None | `docs/implementation/options-smart-flow-support-triage/turn-docs/islandflow-j06e.2.md` |
+| 01 - Server-side smart-flow support resolver | `islandflow-j06e.1` | Closed; merged via PR `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/94` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/94` | `docs/implementation/options-smart-flow-support-triage/turn-docs/islandflow-j06e.1.md` |
+| 02 - Row support rendering and tint parity | `islandflow-j06e.2` | Ready; selected for implementation | None | `docs/implementation/options-smart-flow-support-triage/turn-docs/islandflow-j06e.2.md` |
 | 03 - Packet and contract scope interactions | `islandflow-j06e.3` | Blocked on `islandflow-j06e.2` | None | `docs/implementation/options-smart-flow-support-triage/turn-docs/islandflow-j06e.3.md` |
 | 04 - QA diagnostics and module settings | `islandflow-j06e.4` | Blocked on `islandflow-j06e.3` | None | `docs/implementation/options-smart-flow-support-triage/turn-docs/islandflow-j06e.4.md` |
 | 05 - More-info triage workspace | `islandflow-j06e.5` | Blocked on `islandflow-j06e.4` | None | `docs/implementation/options-smart-flow-support-triage/turn-docs/islandflow-j06e.5.md` |
@@ -58,3 +58,5 @@ Blocked: no
 2026-06-27: Orchestrator selected and claimed `islandflow-j06e.1`, prepared branch `lavender/islandflow-j06e-1-support-resolver`, and assigned worktree `/home/delta/.codex/worktrees/options-smart-flow-support-01-resolver` for the implementation thread.
 
 2026-06-27: Implementation callback reported PR `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/94` ready on branch `lavender/islandflow-j06e-1-support-resolver`; review callback reported repaired state with CI fallback evidence green for repair commit `19f9d488ca`. Phase remains open pending explicit orchestrator merge permission.
+
+2026-06-27: Orchestrator merged PR `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/94`, closed `islandflow-j06e.1`, and selected next ready issue `islandflow-j06e.2`.
