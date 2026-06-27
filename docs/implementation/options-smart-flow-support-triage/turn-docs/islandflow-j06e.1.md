@@ -72,9 +72,13 @@ Evidence:
 
 ## PR And Commits
 
-PR: pending publication.
+PR: `#94`
 
-Commits: pending publication.
+URL: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/94`
+
+Commits:
+
+- `2f62329393b5d139fcbe57f2b53ff6fa627feaf9` - add options smart-flow support resolver
 
 ## Beads Updates
 
@@ -100,4 +104,4 @@ None.
 
 ## Closeout
 
-Implementation local gates passed. PR publication pending.
+Implementation local gates passed. Forgejo PR `#94` is open for review.
