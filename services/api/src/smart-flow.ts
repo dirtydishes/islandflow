@@ -3,6 +3,7 @@ import {
   fetchRecentSmartFlowProjections,
   fetchSmartFlowProjectionsAfter,
   fetchSmartFlowProjectionsBefore,
+  fetchSmartFlowProjectionsByEvidenceRefs,
   fetchSmartFlowProjectionsByPacketIds
 } from "@islandflow/storage";
 import { type Cursor, type SmartFlowExplainabilityProjection } from "@islandflow/types";
@@ -38,3 +39,9 @@ export const fetchSmartFlowExplainabilityByPacketIds = async (
   packetIds: string[]
 ): Promise<SmartFlowExplainabilityProjection[]> =>
   fetchSmartFlowProjectionsByPacketIds(client, packetIds);
+
+export const fetchSmartFlowExplainabilityByEvidenceRefs = async (
+  client: ClickHouseClient,
+  evidenceRefs: string[]
+): Promise<SmartFlowExplainabilityProjection[]> =>
+  fetchSmartFlowProjectionsByEvidenceRefs(client, evidenceRefs);

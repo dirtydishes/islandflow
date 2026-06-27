@@ -1918,18 +1918,18 @@ export const fetchFlowPacketsByMemberTraceIds = async (
   return FlowPacketSchema.array().parse(records.map(fromFlowPacketRecord));
 };
 
-export const fetchSmartFlowProjectionsByPacketIds = async (
+export const fetchSmartFlowProjectionsByEvidenceRefs = async (
   client: ClickHouseClient,
-  packetIds: string[]
+  evidenceRefs: string[]
 ): Promise<SmartFlowExplainabilityProjection[]> => {
-  const ids = Array.from(new Set(packetIds.map((id) => id.trim()).filter(Boolean)));
+  const ids = Array.from(new Set(evidenceRefs.map((id) => id.trim()).filter(Boolean)));
   if (ids.length === 0) {
     return [];
   }
 
-  const packetPredicates = ids.map((id) => `has(evidence_refs, ${quoteString(id)})`);
+  const evidencePredicates = ids.map((id) => `has(evidence_refs, ${quoteString(id)})`);
   const result = await client.query({
-    query: `SELECT * FROM ${SMART_FLOW_PROJECTIONS_TABLE} WHERE ${packetPredicates.join(" OR ")} ORDER BY source_ts DESC, seq DESC LIMIT ${clampLookupLimit(ids.length * 4)}`,
+    query: `SELECT * FROM ${SMART_FLOW_PROJECTIONS_TABLE} WHERE ${evidencePredicates.join(" OR ")} ORDER BY source_ts DESC, seq DESC LIMIT ${clampLookupLimit(ids.length * 4)}`,
     format: "JSONEachRow"
   });
 
@@ -1941,6 +1941,12 @@ export const fetchSmartFlowProjectionsByPacketIds = async (
     records.map(fromSmartFlowProjectionRecord)
   );
 };
+
+export const fetchSmartFlowProjectionsByPacketIds = async (
+  client: ClickHouseClient,
+  packetIds: string[]
+): Promise<SmartFlowExplainabilityProjection[]> =>
+  fetchSmartFlowProjectionsByEvidenceRefs(client, packetIds);
 
 export const fetchNearestOptionNBBOForPrints = async (
   client: ClickHouseClient,

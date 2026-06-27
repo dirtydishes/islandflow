@@ -1,10 +1,11 @@
-import {
-  type ClickHouseClient,
-  fetchFlowPacketsByMemberTraceIds,
-  fetchNearestOptionNBBOForPrints
-} from "@islandflow/storage";
+import { type ClickHouseClient, fetchNearestOptionNBBOForPrints } from "@islandflow/storage";
 import type { FlowPacket, OptionNBBO, SmartFlowExplainabilityProjection } from "@islandflow/types";
-import { fetchSmartFlowExplainabilityByPacketIds } from "./smart-flow";
+import {
+  defaultSmartFlowSupportResolver,
+  type SmartFlowOptionSupportResolution,
+  type SmartFlowSupportResolverInput,
+  type SmartFlowSupportResolverResult
+} from "./smart-flow-support-resolver";
 
 export type OptionsSupportNbboLookupInput = {
   trace_id: string;
@@ -20,18 +21,15 @@ export type OptionsSupportLookupInput = {
 export type OptionsSupportLookupPayload = {
   packets: FlowPacket[];
   smart_flow: SmartFlowExplainabilityProjection[];
+  support_by_trace_id: Record<string, SmartFlowOptionSupportResolution>;
   nbbo_by_trace_id: Record<string, OptionNBBO | null>;
 };
 
 export type OptionsSupportLookupDeps = {
-  fetchFlowPacketsByMemberTraceIds: (
+  resolveSmartFlowSupport: (
     client: ClickHouseClient,
-    traceIds: string[]
-  ) => Promise<FlowPacket[]>;
-  fetchSmartFlowExplainabilityByPacketIds: (
-    client: ClickHouseClient,
-    packetIds: string[]
-  ) => Promise<SmartFlowExplainabilityProjection[]>;
+    input: SmartFlowSupportResolverInput
+  ) => Promise<SmartFlowSupportResolverResult>;
   fetchNearestOptionNBBOForPrints: (
     client: ClickHouseClient,
     inputs: OptionsSupportNbboLookupInput[]
@@ -39,8 +37,8 @@ export type OptionsSupportLookupDeps = {
 };
 
 const defaultOptionsSupportLookupDeps: OptionsSupportLookupDeps = {
-  fetchFlowPacketsByMemberTraceIds,
-  fetchSmartFlowExplainabilityByPacketIds,
+  resolveSmartFlowSupport: (client, input) =>
+    defaultSmartFlowSupportResolver.resolve(client, input),
   fetchNearestOptionNBBOForPrints
 };
 
@@ -49,17 +47,18 @@ export const lookupOptionsSupport = async (
   input: OptionsSupportLookupInput,
   deps: OptionsSupportLookupDeps = defaultOptionsSupportLookupDeps
 ): Promise<OptionsSupportLookupPayload> => {
-  const packetsPromise = deps.fetchFlowPacketsByMemberTraceIds(client, input.trace_ids);
+  const smartFlowSupportPromise = deps.resolveSmartFlowSupport(client, {
+    optionTraceIds: input.trace_ids,
+    allowStorageFallback: true
+  });
   const nbboByTraceIdPromise = deps
     .fetchNearestOptionNBBOForPrints(client, input.nbbo_context)
     .then(
       (value) => ({ ok: true as const, value }),
       (error: unknown) => ({ ok: false as const, error })
     );
-  const packets = await packetsPromise;
-  const packetIds = packets.map((packet) => packet.id);
-  const [smartFlow, nbboByTraceIdResult] = await Promise.all([
-    deps.fetchSmartFlowExplainabilityByPacketIds(client, packetIds),
+  const [smartFlowSupport, nbboByTraceIdResult] = await Promise.all([
+    smartFlowSupportPromise,
     nbboByTraceIdPromise
   ]);
   if (!nbboByTraceIdResult.ok) {
@@ -67,8 +66,9 @@ export const lookupOptionsSupport = async (
   }
 
   return {
-    packets,
-    smart_flow: smartFlow,
+    packets: smartFlowSupport.packets,
+    smart_flow: smartFlowSupport.smartFlowProjections,
+    support_by_trace_id: Object.fromEntries(smartFlowSupport.supportByTraceId),
     nbbo_by_trace_id: nbboByTraceIdResult.value
   };
 };

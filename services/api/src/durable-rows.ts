@@ -1,10 +1,10 @@
 import {
   type Cursor,
-  DurableTapeAlertRowViewModelSchema,
   type DurableTapeAlertRowViewModel,
+  DurableTapeAlertRowViewModelSchema,
   type DurableTapeComposedLane,
-  DurableTapeOptionRowViewModelSchema,
   type DurableTapeOptionRowViewModel,
+  DurableTapeOptionRowViewModelSchema,
   type DurableTapeRowViewModel,
   type FeedSnapshot,
   type FlowPacket,
@@ -16,6 +16,10 @@ import {
   type SmartFlowAlertEvent,
   type SmartFlowExplainabilityProjection
 } from "@islandflow/types";
+import {
+  resolveSmartFlowSupportFromContext,
+  type SmartFlowOptionSupportResolution
+} from "./smart-flow-support-resolver";
 
 const DURABLE_ROW_DEFAULT_LANES: DurableTapeComposedLane[] = ["options", "alerts"];
 const DURABLE_ROW_MAX_REFS = 32;
@@ -30,6 +34,7 @@ export type DurableRowCompositionContext = {
   optionPrints: OptionPrint[];
   nbbo: OptionNBBO[];
   smartFlowProjections: SmartFlowExplainabilityProjection[];
+  smartFlowSupportByTraceId?: ReadonlyMap<string, SmartFlowOptionSupportResolution>;
 };
 
 type DurableRowLookups = {
@@ -37,7 +42,7 @@ type DurableRowLookups = {
   flowPacketById: Map<string, FlowPacket>;
   optionPrintByTraceId: Map<string, OptionPrint>;
   nbboByContractId: Map<string, OptionNBBO>;
-  smartFlowByPacketId: Map<string, SmartFlowExplainabilityProjection>;
+  smartFlowSupportByTraceId: ReadonlyMap<string, SmartFlowOptionSupportResolution>;
 };
 
 const compareCursors = (a: Cursor, b: Cursor): number => b.ts - a.ts || b.seq - a.seq;
@@ -155,33 +160,18 @@ const buildNbboByContractId = (items: OptionNBBO[]): Map<string, OptionNBBO> => 
   return map;
 };
 
-const buildSmartFlowByPacketId = (
-  projections: SmartFlowExplainabilityProjection[]
-): Map<string, SmartFlowExplainabilityProjection> => {
-  const map = new Map<string, SmartFlowExplainabilityProjection>();
-  for (const projection of projections) {
-    for (const packetId of projection.refs.evidence_refs.filter((ref) =>
-      ref.startsWith("flowpacket:")
-    )) {
-      const existing = map.get(packetId);
-      if (
-        !existing ||
-        projection.source_ts > existing.source_ts ||
-        (projection.source_ts === existing.source_ts && projection.seq > existing.seq)
-      ) {
-        map.set(packetId, projection);
-      }
-    }
-  }
-  return map;
-};
-
 const buildDurableRowLookups = (context: DurableRowCompositionContext): DurableRowLookups => ({
   flowPacketByMemberTraceId: buildFlowPacketByMemberTraceId(context.flowPackets),
   flowPacketById: buildFlowPacketById(context.flowPackets),
   optionPrintByTraceId: buildOptionPrintByTraceId(context.optionPrints),
   nbboByContractId: buildNbboByContractId(context.nbbo),
-  smartFlowByPacketId: buildSmartFlowByPacketId(context.smartFlowProjections)
+  smartFlowSupportByTraceId:
+    context.smartFlowSupportByTraceId ??
+    resolveSmartFlowSupportFromContext({
+      optionTraceIds: context.optionPrints.map((print) => print.trace_id),
+      packets: context.flowPackets,
+      projections: context.smartFlowProjections
+    })
 });
 
 const confidenceBandForAlert = (alert: SmartFlowAlertEvent): "high" | "medium" | "low" => {
@@ -312,15 +302,20 @@ const buildDurableOptionRow = (
   print: OptionPrint,
   lookups: DurableRowLookups
 ): DurableTapeOptionRowViewModel => {
-  const packet = lookups.flowPacketByMemberTraceId.get(print.trace_id) ?? null;
-  const smartFlow = packet ? (lookups.smartFlowByPacketId.get(packet.id) ?? null) : null;
+  const resolvedSupport = lookups.smartFlowSupportByTraceId.get(print.trace_id);
+  const packet =
+    resolvedSupport?.packet ?? lookups.flowPacketByMemberTraceId.get(print.trace_id) ?? null;
+  const smartFlow = resolvedSupport?.smart_flow ?? null;
+  const smartFlowStatus =
+    resolvedSupport?.smart_flow_status ??
+    (packet ? "smart_flow_unavailable" : "packet_unavailable");
   const premium = getOptionPremium(print);
   const side = print.execution_nbbo_side ?? print.nbbo_side ?? null;
   const nbbo = resolveOptionNbbo(print, lookups.nbboByContractId);
   const underlying =
     print.underlying_id ?? extractUnderlyingFromContract(print.option_contract_id) ?? undefined;
   const supportLabel = smartFlow
-    ? humanizeToken(smartFlow.hypothesis.hypothesis_type)
+    ? humanizeToken(smartFlow.hypothesis_type)
     : packet
       ? "smart-flow unavailable"
       : "packet unavailable";
@@ -339,10 +334,8 @@ const buildDurableOptionRow = (
     smartFlow
       ? {
           kind: "smart-flow",
-          label: humanizeToken(smartFlow.hypothesis.hypothesis_type),
-          tone: smartFlow.abstention.abstained
-            ? "neutral"
-            : normalizeDirection(smartFlow.hypothesis.direction)
+          label: humanizeToken(smartFlow.hypothesis_type),
+          tone: smartFlow.tint_eligible ? normalizeDirection(smartFlow.direction) : "neutral"
         }
       : packet
         ? {
@@ -402,6 +395,10 @@ const buildDurableOptionRow = (
     },
     support: {
       packet: packetSummary(packet),
+      smart_flow_status: smartFlowStatus,
+      ...(resolvedSupport?.smart_flow_unavailable_reason
+        ? { smart_flow_unavailable_reason: resolvedSupport.smart_flow_unavailable_reason }
+        : {}),
       smart_flow: smartFlow
     },
     badges,
@@ -626,6 +623,11 @@ export const composeDurableRowsForEvent = (
       }
     } else if (channel === "smart-flow") {
       const projection = item as SmartFlowExplainabilityProjection;
+      for (const traceId of projection.refs.evidence_refs
+        .filter((ref) => !ref.startsWith("flowpacket:"))
+        .slice(0, DURABLE_ROW_MAX_REFS)) {
+        pushOptionPrint(lookups.optionPrintByTraceId.get(traceId));
+      }
       for (const packetId of projection.refs.evidence_refs
         .filter((ref) => ref.startsWith("flowpacket:"))
         .slice(0, DURABLE_ROW_MAX_REFS)) {

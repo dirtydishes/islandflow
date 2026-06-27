@@ -1,6 +1,7 @@
 import { z } from "zod";
+import { SmartFlowDirectionSchema } from "./events";
 import { OptionNbboSideSchema, OptionTypeSchema } from "./options-flow";
-import { FlowHypothesisTypeSchema, SmartFlowExplainabilityProjectionSchema } from "./smart-flow";
+import { FlowAbstentionSchema, FlowHypothesisTypeSchema } from "./smart-flow";
 
 export const DurableTapeComposedLaneSchema = z.enum(["options", "alerts"]);
 export type DurableTapeComposedLane = z.infer<typeof DurableTapeComposedLaneSchema>;
@@ -27,6 +28,72 @@ export const DurableTapeEvidenceSummarySchema = z.object({
     .optional()
 });
 export type DurableTapeEvidenceSummary = z.infer<typeof DurableTapeEvidenceSummarySchema>;
+
+export const DurableTapeSmartFlowSupportStatusSchema = z.enum([
+  "matched",
+  "packet_unavailable",
+  "smart_flow_unavailable",
+  "no_matching_projection"
+]);
+export type DurableTapeSmartFlowSupportStatus = z.infer<
+  typeof DurableTapeSmartFlowSupportStatusSchema
+>;
+
+export const DurableTapeSmartFlowSupportMatchSourceSchema = z.enum([
+  "direct_print",
+  "packet_member"
+]);
+export type DurableTapeSmartFlowSupportMatchSource = z.infer<
+  typeof DurableTapeSmartFlowSupportMatchSourceSchema
+>;
+
+const DurableTapeSmartFlowConfidenceSchema = z.object({
+  policy_confidence: z.number().min(0).max(1),
+  evidence_quality: z.number().min(0).max(1),
+  hypothesis_margin: z.number().min(0).max(1),
+  conviction: z.number().min(0).max(1),
+  calibration_version: z.string().min(1).nullable()
+});
+
+export const DurableTapeSmartFlowSupportSchema = z.object({
+  status: z.literal("matched"),
+  source_channel: z.literal("smart-flow"),
+  projection_id: z.string().min(1),
+  projection_trace_id: z.string().min(1),
+  packet_id: z.string().min(1).nullable(),
+  match_source: DurableTapeSmartFlowSupportMatchSourceSchema,
+  tint_eligible: z.boolean(),
+  hypothesis_type: FlowHypothesisTypeSchema,
+  direction: SmartFlowDirectionSchema,
+  confidence: z.number().min(0).max(1),
+  evidence_quality: z.number().min(0).max(1),
+  abstained: z.boolean(),
+  refs: z.object({
+    evidence_refs: z.array(z.string().min(1)),
+    packet_refs: z.array(z.string().min(1)),
+    option_print_refs: z.array(z.string().min(1))
+  }),
+  counts: z.object({
+    evidence_refs: z.number().int().nonnegative(),
+    flow_packets: z.number().int().nonnegative(),
+    option_prints: z.number().int().nonnegative()
+  }),
+  evidence: z.object({
+    evidence_refs: z.array(z.string().min(1)),
+    evidence_quality: z.number().min(0).max(1)
+  }),
+  hypothesis: z.object({
+    hypothesis_id: z.string().min(1),
+    hypothesis_type: FlowHypothesisTypeSchema,
+    direction: SmartFlowDirectionSchema,
+    evidence_refs: z.array(z.string().min(1)),
+    scores: z.object({
+      confidence: DurableTapeSmartFlowConfidenceSchema
+    })
+  }),
+  abstention: FlowAbstentionSchema
+});
+export type DurableTapeSmartFlowSupport = z.infer<typeof DurableTapeSmartFlowSupportSchema>;
 
 const DurableTapeRowBaseSchema = z.object({
   id: z.string().min(1),
@@ -91,7 +158,9 @@ export const DurableTapeOptionRowViewModelSchema = DurableTapeRowBaseSchema.exte
         truncated: z.boolean().optional()
       })
       .nullable(),
-    smart_flow: SmartFlowExplainabilityProjectionSchema.nullable()
+    smart_flow_status: DurableTapeSmartFlowSupportStatusSchema,
+    smart_flow_unavailable_reason: z.string().min(1).optional(),
+    smart_flow: DurableTapeSmartFlowSupportSchema.nullable()
   })
 });
 export type DurableTapeOptionRowViewModel = z.infer<typeof DurableTapeOptionRowViewModelSchema>;

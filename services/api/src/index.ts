@@ -143,6 +143,7 @@ import {
   fetchSmartFlowAlertEventsBefore,
   smartFlowAlertCursor
 } from "./smart-flow-alerts";
+import { SMART_FLOW_SUPPORT_MAX_TRACE_IDS } from "./smart-flow-support-resolver";
 import {
   buildSyntheticDerivedStatus,
   createRollingSyntheticProfileHits,
@@ -372,7 +373,7 @@ const getBearerToken = (req: Request): string => {
 };
 
 const optionsSupportLookupSchema = z.object({
-  trace_ids: z.array(z.string().min(1)).default([]),
+  trace_ids: z.array(z.string().min(1)).max(SMART_FLOW_SUPPORT_MAX_TRACE_IDS).default([]),
   nbbo_context: z
     .array(
       z.object({
@@ -381,6 +382,7 @@ const optionsSupportLookupSchema = z.object({
         ts: z.number().int().nonnegative()
       })
     )
+    .max(SMART_FLOW_SUPPORT_MAX_TRACE_IDS)
     .optional()
     .default([])
 });

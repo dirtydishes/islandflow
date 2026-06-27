@@ -74,8 +74,33 @@ export type OnPacketFocus = (request: FlowPacketFocusRequest) => void;
 
 export type OptionsTapeSmartFlowRefSource = "direct-print" | "packet-member";
 
+export type OptionsTapeSmartFlowProjection = Pick<
+  SmartFlowExplainabilityProjection,
+  "abstention"
+> & {
+  source_ts?: number;
+  seq?: number;
+  trace_id?: string;
+  refs: Pick<SmartFlowExplainabilityProjection["refs"], "evidence_refs">;
+  evidence: Pick<
+    SmartFlowExplainabilityProjection["evidence"],
+    "evidence_refs" | "evidence_quality"
+  >;
+  hypothesis: Pick<
+    SmartFlowExplainabilityProjection["hypothesis"],
+    "evidence_refs" | "hypothesis_type" | "direction"
+  > & {
+    scores: {
+      confidence: Pick<
+        SmartFlowExplainabilityProjection["hypothesis"]["scores"]["confidence"],
+        "policy_confidence" | "evidence_quality"
+      >;
+    };
+  };
+};
+
 export type OptionsTapeSmartFlowContext = {
-  projection: SmartFlowExplainabilityProjection;
+  projection: OptionsTapeSmartFlowProjection;
   source: OptionsTapeSmartFlowRefSource;
   evidenceRefs: string[];
   directPrintRefs: string[];

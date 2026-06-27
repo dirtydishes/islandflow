@@ -1,4 +1,4 @@
-import type { FlowPacket, SmartFlowExplainabilityProjection } from "@islandflow/types";
+import type { FlowPacket } from "@islandflow/types";
 import type { CSSProperties } from "react";
 
 import {
@@ -18,6 +18,7 @@ import {
 import type {
   OptionsTapeRowContext,
   OptionsTapeSmartFlowContext,
+  OptionsTapeSmartFlowProjection,
   OptionsTapeSmartFlowRefSource
 } from "./types";
 
@@ -38,7 +39,7 @@ export type OptionsTapeRowTint = {
 export type OptionsTapeSmartFlowSummary = SmartFlowSummary;
 
 export type OptionsTapeSmartFlowContextMapInput = {
-  projections?: readonly SmartFlowExplainabilityProjection[];
+  projections?: readonly OptionsTapeSmartFlowProjection[];
   flowPacketById?: ReadonlyMap<string, FlowPacket>;
   flowPacketByTraceId?: ReadonlyMap<string, FlowPacket>;
 };
@@ -47,7 +48,7 @@ const uniqueNonEmpty = (items: readonly string[]): string[] =>
   Array.from(new Set(items.map((item) => item.trim()).filter(Boolean)));
 
 export const getOptionsTapeSmartFlowEvidenceRefs = (
-  projection: Pick<SmartFlowExplainabilityProjection, "refs" | "evidence" | "hypothesis">
+  projection: OptionsTapeSmartFlowProjection
 ): string[] =>
   uniqueNonEmpty([
     ...projection.refs.evidence_refs,
@@ -59,14 +60,14 @@ export const isOptionsTapeSmartFlowPacketRef = (ref: string): boolean =>
   ref.startsWith("flowpacket:");
 
 export const getOptionsTapeSmartFlowOptionPrintRefs = (
-  projection: Pick<SmartFlowExplainabilityProjection, "refs" | "evidence" | "hypothesis">
+  projection: OptionsTapeSmartFlowProjection
 ): string[] =>
   getOptionsTapeSmartFlowEvidenceRefs(projection).filter(
     (ref) => !isOptionsTapeSmartFlowPacketRef(ref)
   );
 
 export const getOptionsTapeSmartFlowPacketRefs = (
-  projection: Pick<SmartFlowExplainabilityProjection, "refs" | "evidence" | "hypothesis">
+  projection: OptionsTapeSmartFlowProjection
 ): string[] =>
   getOptionsTapeSmartFlowEvidenceRefs(projection).filter(isOptionsTapeSmartFlowPacketRef);
 
@@ -77,8 +78,8 @@ const resolveSmartFlowPacketRef = (
 ): FlowPacket | undefined => flowPacketById?.get(ref) ?? flowPacketByTraceId?.get(ref);
 
 const compareProjectionRecency = (
-  left: SmartFlowExplainabilityProjection,
-  right: SmartFlowExplainabilityProjection
+  left: OptionsTapeSmartFlowProjection,
+  right: OptionsTapeSmartFlowProjection
 ): number => {
   const sourceDelta = (left.source_ts ?? 0) - (right.source_ts ?? 0);
   if (sourceDelta !== 0) {
@@ -94,7 +95,7 @@ const SMART_FLOW_REF_SOURCE_RANK: Record<OptionsTapeSmartFlowRefSource, number> 
 
 const shouldReplaceSmartFlowContext = (
   current: OptionsTapeSmartFlowContext | undefined,
-  nextProjection: SmartFlowExplainabilityProjection,
+  nextProjection: OptionsTapeSmartFlowProjection,
   nextSource: OptionsTapeSmartFlowRefSource
 ): boolean => {
   if (!current) {

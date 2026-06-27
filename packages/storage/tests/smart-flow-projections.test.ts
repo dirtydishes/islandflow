@@ -5,6 +5,7 @@ import {
   SMART_FLOW_HYPOTHESIS_SCORE_POLICY_VERSION,
   smartFlowExplainabilityFromHypothesisEvent
 } from "@islandflow/types";
+import { createClickHouseClient, fetchSmartFlowProjectionsByEvidenceRefs } from "../src/clickhouse";
 import {
   fromSmartFlowProjectionRecord,
   SMART_FLOW_PROJECTIONS_TABLE,
@@ -69,5 +70,25 @@ describe("smart-flow projection storage helpers", () => {
     expect(record.evidence_refs).toEqual(["flowpacket:1", "print:1"]);
     expect(record.source_channel).toBe("smart-flow");
     expect(fromSmartFlowProjectionRecord(record)).toEqual(projection);
+  });
+
+  it("builds direct evidence-ref lookup queries", async () => {
+    const projection = makeProjection();
+    const queries: string[] = [];
+    const client = createClickHouseClient({ url: "http://127.0.0.1:8123" });
+    client.query = async ({ query }) => {
+      queries.push(query);
+      return {
+        async json<T>() {
+          return [toSmartFlowProjectionRecord(projection)] as T;
+        }
+      };
+    };
+
+    const [payload] = await fetchSmartFlowProjectionsByEvidenceRefs(client, ["print:1"]);
+
+    expect(queries[0]).toContain("has(evidence_refs, 'print:1')");
+    expect(queries[0]).toContain("ORDER BY source_ts DESC, seq DESC");
+    expect(payload?.refs.evidence_refs).toEqual(["flowpacket:1", "print:1"]);
   });
 });

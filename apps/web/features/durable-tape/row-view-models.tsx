@@ -6,11 +6,9 @@ import type {
   DurableTapeRowViewModel,
   OptionPrint
 } from "@islandflow/types";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import type { FlowPacketFocusRequest } from "../flow-packets";
-import { DurableTape } from "./components/DurableTape";
-import { createDurableTapeInitialHistoryCursor } from "./history";
 import {
   getOptionsTapeRowTintClassName,
   getOptionsTapeRowTintFromContext,
@@ -22,6 +20,8 @@ import {
   type OptionsTapeRowTint
 } from "../options-tape/tinting";
 import type { OptionsTapeSmartFlowContext } from "../options-tape/types";
+import { DurableTape } from "./components/DurableTape";
+import { createDurableTapeInitialHistoryCursor } from "./history";
 import {
   type DurableTapeColumnDefinition,
   type DurableTapeFeatureInput,
