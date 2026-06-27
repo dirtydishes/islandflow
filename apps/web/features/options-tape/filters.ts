@@ -140,6 +140,12 @@ export const getOptionsTapeQueryParams = (
   if (scope?.underlyingIds?.length) {
     params.set("underlying_ids", scope.underlyingIds.join(","));
   }
+  if (scope?.packetId) {
+    params.set("flow_packet_id", scope.packetId);
+  }
+  if (scope?.selectedTraceId) {
+    params.set("pinned_trace_id", scope.selectedTraceId);
+  }
   if (scope?.optionContractId) {
     params.set("option_contract_id", scope.optionContractId);
   }

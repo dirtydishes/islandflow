@@ -38,14 +38,25 @@ const optionFilterQuerySchema = z.object({
   min_notional: z.coerce.number().nonnegative().optional()
 });
 
+const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001F\u007F]/;
+const packetScopeIdSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(512)
+  .refine((value) => !CONTROL_CHARACTER_PATTERN.test(value), "id contains control characters");
+
 export type ParsedOptionPrintQuery = {
   scope: {
     underlyingIds?: string[];
     optionContractId?: string;
+    flowPacketId?: string;
+    pinnedTraceId?: string;
   };
   flowFilters: OptionFlowFilters;
   storageFilters: OptionPrintQueryFilters;
   isContractDrilldown: boolean;
+  isPacketScope: boolean;
 };
 
 const parseScopeList = (url: URL, ...keys: string[]): string[] | undefined => {
@@ -59,6 +70,8 @@ const parseScopeList = (url: URL, ...keys: string[]): string[] | undefined => {
 };
 
 export const parseOptionPrintQuery = (url: URL): ParsedOptionPrintQuery => {
+  const flowPacketIdParam = url.searchParams.get("flow_packet_id");
+  const pinnedTraceIdParam = url.searchParams.get("pinned_trace_id");
   const parsed = optionFilterQuerySchema.parse({
     view: url.searchParams.get("view") ?? undefined,
     security: url.searchParams.get("security") ?? undefined,
@@ -68,7 +81,9 @@ export const parseOptionPrintQuery = (url: URL): ParsedOptionPrintQuery => {
   });
   const scope = {
     underlyingIds: parseScopeList(url, "underlying_id", "underlying_ids"),
-    optionContractId: url.searchParams.get("option_contract_id") ?? undefined
+    optionContractId: url.searchParams.get("option_contract_id") ?? undefined,
+    flowPacketId: flowPacketIdParam ? packetScopeIdSchema.parse(flowPacketIdParam) : undefined,
+    pinnedTraceId: pinnedTraceIdParam ? packetScopeIdSchema.parse(pinnedTraceIdParam) : undefined
   };
   const view = parsed.view ?? "signal";
   const security = parsed.security ?? (view === "raw" ? "all" : "stock");
@@ -83,7 +98,8 @@ export const parseOptionPrintQuery = (url: URL): ParsedOptionPrintQuery => {
     minNotional: parsed.min_notional
   };
   const isContractDrilldown = Boolean(scope.optionContractId);
-  const storageFilters: OptionPrintQueryFilters = isContractDrilldown
+  const isPacketScope = Boolean(scope.flowPacketId);
+  const storageFilters: OptionPrintQueryFilters = isContractDrilldown || isPacketScope
     ? {
         view: "raw",
         optionContractId: scope.optionContractId
@@ -102,7 +118,8 @@ export const parseOptionPrintQuery = (url: URL): ParsedOptionPrintQuery => {
     scope,
     flowFilters,
     storageFilters,
-    isContractDrilldown
+    isContractDrilldown,
+    isPacketScope
   };
 };
 

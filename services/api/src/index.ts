@@ -67,6 +67,7 @@ import {
   fetchOptionNBBOBefore,
   fetchOptionPrintsAfter,
   fetchOptionPrintsBefore,
+  fetchOptionPrintsForFlowPacketBefore,
   fetchOptionPrintsByTraceIds,
   fetchRecentEquityPrintJoins,
   fetchRecentEquityPrints,
@@ -1587,7 +1588,22 @@ const run = async () => {
           try {
             const { beforeTs, beforeSeq, limit } = parseBeforeParams(url);
             const source = parseReplaySource(url) ?? undefined;
-            const { storageFilters } = parseOptionPrintQuery(url);
+            const { scope, storageFilters } = parseOptionPrintQuery(url);
+            if (scope.flowPacketId) {
+              const page = await fetchOptionPrintsForFlowPacketBefore(
+                clickhouse,
+                scope.flowPacketId,
+                beforeTs,
+                beforeSeq,
+                limit,
+                scope.pinnedTraceId
+              );
+              return jsonResponse({
+                ...buildHistoryResponse(page.data, (item) => ({ ts: item.ts, seq: item.seq })),
+                packet: page.packet,
+                pinned: page.pinned
+              });
+            }
             const data = await fetchOptionPrintsBefore(
               clickhouse,
               beforeTs,

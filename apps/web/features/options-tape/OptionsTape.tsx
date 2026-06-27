@@ -107,7 +107,9 @@ const scopeToSourceScope = (scope: OptionsTapeScope): OptionsTapeSourceScope => 
   return {
     optionContractId: scope.optionContractId,
     underlyingIds: scope.underlyingId ? [scope.underlyingId] : undefined,
-    packetMemberTraceIds: scope.mode === "packet" ? scope.memberTraceIds : undefined
+    packetId: scope.mode === "packet" ? scope.packetId : undefined,
+    packetMemberTraceIds: scope.mode === "packet" && !scope.packetId ? scope.memberTraceIds : undefined,
+    selectedTraceId: scope.mode === "packet" ? scope.selectedTraceId : undefined
   };
 };
 
@@ -131,6 +133,7 @@ const getPacketFocusScope = (
   memberTraceIds: packet.members,
   optionContractId:
     getPacketContractId(packet) ?? normalizeOptionsTapeContractId(print.option_contract_id),
+  selectedTraceId: print.trace_id,
   underlyingId: getOptionsTapeUnderlying(print),
   smartFlow: context?.smartFlow
 });
@@ -371,7 +374,11 @@ const renderScopeBand = ({
         <div className="options-tape-scope-focus">
           <span>{scope.mode === "packet" ? "Packet prints" : "Contract flow"}</span>
           <strong>{label}</strong>
-          {scope.mode === "packet" ? <em>{scope.packetId}</em> : null}
+          {scope.mode === "packet" ? (
+            <em>
+              {scope.packetId} / {scope.memberTraceIds.length.toLocaleString()} prints
+            </em>
+          ) : null}
         </div>
         {smartFlowSummary ? (
           <div className="options-tape-scope-smart-flow">
@@ -387,11 +394,11 @@ const renderScopeBand = ({
       <div className="options-tape-scope-actions">
         {scope.mode === "packet" ? (
           <button type="button" onClick={onShowAll}>
-            Show all
+            Show contract
           </button>
         ) : null}
         <button type="button" onClick={onClear}>
-          Clear
+          Back to tape
         </button>
       </div>
     </div>
@@ -475,8 +482,6 @@ export const OptionsTape = ({
   const activeFilters = filters ?? localFilters;
   const setFilters = onFiltersChange ?? setLocalFilters;
   const [scope, setScope] = useState<OptionsTapeScope>(GLOBAL_SCOPE);
-  const tapeSource = useOptionsTapeArraySource({ prints, options: sourceOptions });
-  const activeSource = source ?? tapeSource;
   const mountedRef = useRef(true);
   const supportContextRef = useRef({
     smartFlowSupportByTraceId: EMPTY_SMART_FLOW_SUPPORT_BY_TRACE_ID as ReadonlyMap<
@@ -530,6 +535,24 @@ export const OptionsTape = ({
       EMPTY_SMART_FLOW_SUPPORT_BY_TRACE_ID,
     [hydratedSmartFlowSupportByTraceId, smartFlowSupportByTraceId]
   );
+  const handlePacketHydrated = useCallback(
+    (packet: FlowPacket | null) => {
+      if (packet) {
+        setHydratedPackets((current) => mergeOptionsTapeSupportPackets(current, [packet]));
+      }
+      sourceOptions?.onPacketHydrated?.(packet);
+    },
+    [sourceOptions]
+  );
+  const resolvedSourceOptions = useMemo(
+    () => ({
+      ...sourceOptions,
+      onPacketHydrated: handlePacketHydrated
+    }),
+    [handlePacketHydrated, sourceOptions]
+  );
+  const tapeSource = useOptionsTapeArraySource({ prints, options: resolvedSourceOptions });
+  const activeSource = source ?? tapeSource;
 
   useEffect(
     () => () => {
@@ -638,6 +661,19 @@ export const OptionsTape = ({
   const rowTintForPrint = useCallback(
     (print: OptionPrint) => getOptionsTapeRowTintFromContext(contextForPrint(print)),
     [contextForPrint]
+  );
+  const selectedPacketTraceId = scope.mode === "packet" ? scope.selectedTraceId : undefined;
+  const rowClassNameForPrint = useCallback(
+    (print: OptionPrint) => {
+      const classNames = [
+        getOptionsTapeRowTintClassName(rowTintForPrint(print)),
+        selectedPacketTraceId && print.trace_id === selectedPacketTraceId
+          ? "options-tape-row-selected-print"
+          : undefined
+      ].filter(Boolean);
+      return classNames.length > 0 ? classNames.join(" ") : undefined;
+    },
+    [rowTintForPrint, selectedPacketTraceId]
   );
 
   const clearScope = useCallback(() => {
@@ -751,7 +787,7 @@ export const OptionsTape = ({
         features={features}
         filters={sourceFilters}
         getCursor={getOptionsTapePrintCursor}
-        getRowClassName={({ item }) => getOptionsTapeRowTintClassName(rowTintForPrint(item))}
+        getRowClassName={({ item }) => rowClassNameForPrint(item)}
         getRowKey={getOptionsTapePrintKey}
         getRowStyle={({ item }) => getOptionsTapeRowTintStyle(rowTintForPrint(item))}
         onActivate={activatePrint}
