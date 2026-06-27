@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ImplementationCallback",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "type",
+    "phase_issue_id",
+    "status",
+    "branch",
+    "pr",
+    "commits",
+    "turn_doc",
+    "local_gates",
+    "changed_files",
+    "blockers",
+    "context_to_keep"
+  ],
+  "properties": {
+    "type": {
+      "const": "implementation-callback"
+    },
+    "phase_issue_id": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "pr-ready",
+        "blocked"
+      ]
+    },
+    "branch": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "pr": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "commits": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "turn_doc": {
+      "type": "string"
+    },
+    "local_gates": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "changed_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "context_to_keep": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

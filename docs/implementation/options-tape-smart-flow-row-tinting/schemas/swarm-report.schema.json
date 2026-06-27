@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SwarmReport",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "scope_checked",
+    "findings",
+    "recommendations",
+    "context_to_keep"
+  ],
+  "properties": {
+    "status": {
+      "enum": [
+        "ready",
+        "blocked",
+        "risk-found",
+        "done"
+      ]
+    },
+    "scope_checked": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "severity",
+          "evidence",
+          "summary",
+          "recommendation"
+        ],
+        "properties": {
+          "severity": {
+            "enum": [
+              "high",
+              "medium",
+              "low",
+              "info"
+            ]
+          },
+          "evidence": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "recommendation": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "recommendations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "context_to_keep": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

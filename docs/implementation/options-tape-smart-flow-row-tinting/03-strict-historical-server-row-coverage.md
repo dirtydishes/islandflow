@@ -87,7 +87,7 @@ Helpers may propose specific edits or tests, but the worker owns the hydration/s
 ## Suggested Future Codex Implementation Prompt
 
 ```text
-Implement docs/implementation/options-tape-smart-flow-row-tinting/03-strict-historical-server-row-coverage.md for Beads issue islandflow-xcdn.3 after Phase 02 is merged. Expose smart_flow through hydration results/cache, tint loaded historical options rows after support hydration, add typed durable option row support.smart_flow coverage, and keep OptionsTape and DurableTapeOptionRowsPane on the same tint helper. Run full final gates including bun test and bun --cwd=apps/web run build.
+Run under docs/implementation/options-tape-smart-flow-row-tinting/IMPLEMENT.md using the orchestrator-callback workflow. Implement docs/implementation/options-tape-smart-flow-row-tinting/03-strict-historical-server-row-coverage.md for Beads issue islandflow-xcdn.3 after Phase 02 is merged. Expose smart_flow through hydration results/cache, tint loaded historical options rows after support hydration, add typed durable option row support.smart_flow coverage, and keep OptionsTape and DurableTapeOptionRowsPane on the same tint helper. Run full final gates including bun test and bun --cwd=apps/web run build. Open a Forgejo PR when ready and call back to the orchestrator exactly once using docs/implementation/options-tape-smart-flow-row-tinting/schemas/implementation-callback.schema.json. Do not create the reviewer thread.
 ```
 
 ## Matching Beads Issue
