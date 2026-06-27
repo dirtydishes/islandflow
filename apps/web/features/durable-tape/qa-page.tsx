@@ -272,7 +272,12 @@ const QaOptionsSupportDiagnostics = ({ rows, status }: QaOptionsSupportDiagnosti
           <div className="durable-tapes-support-counts" aria-label="Support state counts">
             {Object.entries(SUPPORT_STATE_LABELS).map(([state, label]) => (
               <span key={state}>
-                {label}: {(counts.get(state as DurableTapeOptionRowViewModel["support"]["smart_flow_status"]) ?? 0).toLocaleString()}
+                {label}:{" "}
+                {(
+                  counts.get(
+                    state as DurableTapeOptionRowViewModel["support"]["smart_flow_status"]
+                  ) ?? 0
+                ).toLocaleString()}
               </span>
             ))}
           </div>
@@ -298,9 +303,7 @@ const QaOptionsSupportDiagnostics = ({ rows, status }: QaOptionsSupportDiagnosti
                 </span>
                 <span role="cell">{row.support.packet?.id ?? "--"}</span>
                 <span role="cell">
-                  {row.support.smart_flow_unavailable_reason ??
-                    row.evidence_summary?.label ??
-                    "--"}
+                  {row.support.smart_flow_unavailable_reason ?? row.evidence_summary?.label ?? "--"}
                 </span>
               </div>
             ))}

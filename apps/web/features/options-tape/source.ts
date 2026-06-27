@@ -133,7 +133,8 @@ export const createOptionsTapeFilteredSource = <TScope, TFilters>(
           ? () => filterRows(subscription.getSnapshot?.() ?? [])
           : undefined,
         listen: subscription.listen
-          ? (listener) => subscription.listen?.((items) => listener(filterRows(items))) ?? (() => {})
+          ? (listener) =>
+              subscription.listen?.((items) => listener(filterRows(items))) ?? (() => {})
           : undefined,
         unsubscribe: () => subscription.unsubscribe()
       };

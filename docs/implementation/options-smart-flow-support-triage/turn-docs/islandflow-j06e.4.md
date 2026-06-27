@@ -71,15 +71,37 @@ Reviewer skill:
 
 `thermo-nuclear-code-quality-review`
 
-Not started by this worker. The orchestrator owns review-thread creation and
-Beads closeout after the implementation callback.
+Reviewer pass completed on the PR branch.
+
+Findings repaired:
+
+- The PR pushed `apps/web/features/options-tape/OptionsTape.tsx` from 824
+  lines to 1,094 lines by embedding the help and settings popovers directly in
+  the tape orchestration component. The review treated this as a structural
+  blocker under the thermo-nuclear 1k-line rule. Repair extracted the reusable
+  help/settings controls into `apps/web/features/options-tape/settings-controls.tsx`
+  and brought `OptionsTape.tsx` back down to 680 lines.
+- The settings preset controls used tuple mapping plus `as never` casts in the
+  UI layer. Repair replaced that with typed preset arrays in the extracted
+  settings controls module.
+- Browser verification exposed a Next dev overlay caused by unhandled
+  `source.loadOlder` rejections when the local API origin was unavailable.
+  Repair added a generation-aware catch in `DurableTape` history loading that
+  logs the failure, clears the cursor, and marks history exhausted so the live
+  or empty tape stays rendered without an unhandled rejection.
+
+Findings remaining:
+
+- None blocking. The API-down QA candle bootstrap still logs a handled warning
+  when the local API is unavailable; it does not surface a dev overlay after
+  the durable history repair.
 
 ## CI And Gates
 
-CI owner: implementation worker for local gates, reviewer/orchestrator for
-Forgejo CI.
+CI owner: implementation worker for initial local gates, reviewer for repaired
+local gates and Forgejo CI.
 
-Current CI state: `local-gates-passed`
+Current CI state: `reviewer-repaired-local-green`
 
 Evidence:
 
@@ -88,33 +110,46 @@ Evidence:
 - `bun test apps/web/features/options-tape` - passed, 24 tests.
 - `bun test apps/web/app/terminal.test.ts apps/web/app/routes.test.ts` -
   passed, 91 tests.
-- `bun --cwd=apps/web run build` - passed.
+- Reviewer reproduced Forgejo PR failures locally with `bun run fmt:check`;
+  Biome reported formatting failures in 7 files, matching the fast failing
+  Forgejo validation tasks.
+- `bun run fmt:check` - passed after reviewer repair.
+- `bun run lint` - passed after reviewer repair.
+- `bun run typecheck` - passed after reviewer repair.
+- `bun test apps/web/features/durable-tape apps/web/features/options-tape apps/web/app/terminal.test.ts apps/web/app/routes.test.ts` -
+  passed, 156 tests, after reviewer repair.
+- `bun test` - passed after reviewer repair, 513 tests.
+- `bun run check:public-api-routes` - failed as expected without
+  `DEPLOY_PUBLIC_APP_URL` and printed
+  `DEPLOY_PUBLIC_APP_URL=<production-app-origin>`.
+- `bun run check:docker-workspace` - passed.
+- `bun --cwd=apps/web run build` - passed after reviewer repair.
 - Browser verification used system Chromium at `/usr/bin/chromium` against
-  local Next dev on `http://127.0.0.1:3001`.
+  local Next dev on `http://127.0.0.1:3002`.
 - Browser desktop and mobile probes passed for `/options` default module
-  behavior and `/qa` diagnostics, with no sampled overflow:
-  - `/tmp/islandflow-j06e4-options-desktop.png`
-  - `/tmp/islandflow-j06e4-qa-desktop.png`
-  - `/tmp/islandflow-j06e4-options-mobile.png`
-  - `/tmp/islandflow-j06e4-qa-mobile.png`
-- Browser logs showed existing API-down history/bootstrap fetch warnings when
-  the local API at `http://127.0.0.1:4000` was unavailable. The UI still
-  rendered and the diagnostics/settings probes passed; a follow-up bug was
-  filed for graceful handling.
+  behavior and `/qa` diagnostics, with no sampled overflow, no default
+  `SUPPORT` column on `/options`, opened help/settings popovers, and no Next
+  dev overlay:
+  - `/tmp/islandflow-j06e-4-browser-after-guard/options-desktop.png`
+  - `/tmp/islandflow-j06e-4-browser-after-guard/options-mobile.png`
+  - `/tmp/islandflow-j06e-4-browser-after-guard/options-mobile-settings.png`
+  - `/tmp/islandflow-j06e-4-browser-after-guard/qa-desktop.png`
+  - `/tmp/islandflow-j06e-4-browser-after-guard/qa-mobile.png`
 
 ## PR And Commits
 
 - Forgejo PR: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/97`
 - Branch: `lavender/islandflow-j06e-4-qa-diagnostics-settings`
 - Implementation commit: `7d76c7f` - `add options tape diagnostics settings`
-- Publication doc commit: this update records the PR URL, Beads push, and
-  final publication evidence.
+- Publication doc commit: `3d71df4` - `document qa settings publication`
+- Reviewer repair commit: `repair options tape review findings`
 
 ## Beads Updates
 
 - `islandflow-j06e.4` remains open for orchestrator-owned closeout.
 - Filed follow-up `islandflow-j06e.6` for graceful handling of options QA
   history/bootstrap fetch failures when the local API is unavailable.
+- Reviewer did not close Beads; orchestrator owns closeout.
 
 ## Follow-Ups Filed
 
@@ -136,5 +171,6 @@ Evidence:
 ## Closeout
 
 Implementation, local verification, `bd dolt push`, branch publication, and
-Forgejo PR creation are complete. The orchestrator owns reviewer-thread
-creation, Beads closeout, merge, and next-phase selection.
+Forgejo PR creation are complete. Reviewer repairs and local verification are
+complete. The orchestrator owns Beads closeout, merge, and next-phase
+selection.

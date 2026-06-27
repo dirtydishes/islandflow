@@ -4900,7 +4900,10 @@ h3 {
 .durable-tapes-support-table [role="row"] {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(130px, 1fr) minmax(180px, 1fr) minmax(120px, 0.8fr) minmax(160px, 1fr);
+  grid-template-columns: minmax(130px, 1fr) minmax(180px, 1fr) minmax(120px, 0.8fr) minmax(
+      160px,
+      1fr
+    );
   gap: 8px;
   align-items: center;
   border-bottom: 1px solid oklch(0.72 0.012 250 / 0.1);

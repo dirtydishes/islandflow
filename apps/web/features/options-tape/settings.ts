@@ -81,8 +81,7 @@ export const normalizeOptionsTapeSettings = (value: unknown): OptionsTapeSetting
   return {
     smartFlowOnly: candidate.smartFlowOnly === true,
     columnOrder,
-    hiddenColumns:
-      hiddenColumns.length >= columnOrder.length ? [] : hiddenColumns
+    hiddenColumns: hiddenColumns.length >= columnOrder.length ? [] : hiddenColumns
   };
 };
 

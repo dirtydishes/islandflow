@@ -203,9 +203,9 @@ describe("options tape helpers", () => {
       }
     });
     expect(readOptionsTapeSettings(storage).smartFlowOnly).toBe(true);
-    expect(
-      reduceOptionsTapeSettings(readOptionsTapeSettings(storage), { type: "reset" })
-    ).toEqual(buildDefaultOptionsTapeSettings());
+    expect(reduceOptionsTapeSettings(readOptionsTapeSettings(storage), { type: "reset" })).toEqual(
+      buildDefaultOptionsTapeSettings()
+    );
 
     const malformedStorage = createStorage({ [OPTIONS_TAPE_SETTINGS_STORAGE_KEY]: "{" });
     expect(readOptionsTapeSettings(malformedStorage)).toEqual(buildDefaultOptionsTapeSettings());
@@ -231,7 +231,19 @@ describe("options tape helpers", () => {
     const reordered = reduceOptionsTapeSettings(
       {
         ...buildDefaultOptionsTapeSettings(),
-        columnOrder: ["premium", "contract", "side", "time", "price", "size", "dte", "iv", "spot", "nbbo", "exchange"]
+        columnOrder: [
+          "premium",
+          "contract",
+          "side",
+          "time",
+          "price",
+          "size",
+          "dte",
+          "iv",
+          "spot",
+          "nbbo",
+          "exchange"
+        ]
       },
       { type: "toggle-column", id: "side", visible: false }
     );
@@ -270,9 +282,11 @@ describe("options tape helpers", () => {
     for (const template of DURABLE_OPTION_ROW_TEMPLATES) {
       expect(template.columns).not.toContain("support");
     }
-    expect(DURABLE_OPTION_ROW_DIAGNOSTIC_TEMPLATES.some((template) =>
-      template.columns.includes("support")
-    )).toBe(true);
+    expect(
+      DURABLE_OPTION_ROW_DIAGNOSTIC_TEMPLATES.some((template) =>
+        template.columns.includes("support")
+      )
+    ).toBe(true);
   });
 
   it("serializes filter and scope query params for option history", () => {

@@ -87,9 +87,7 @@ const humanizeSupportToken = (value: string): string =>
     .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
     .join(" ");
 
-export const getDurableOptionSupportStateLabel = (
-  row: DurableTapeOptionRowViewModel
-): string => {
+export const getDurableOptionSupportStateLabel = (row: DurableTapeOptionRowViewModel): string => {
   if (row.support.smart_flow_status === "matched") {
     return row.support.smart_flow
       ? `Smart-flow attached: ${humanizeSupportToken(row.support.smart_flow.hypothesis_type)}`

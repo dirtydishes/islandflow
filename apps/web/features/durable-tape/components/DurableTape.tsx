@@ -246,6 +246,17 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
         );
         setHistoryCursor(cursorStalled ? undefined : (nextCursor ?? undefined));
         setHistoryExhausted(page.exhausted === true || nextCursor === null || cursorStalled);
+      } catch (error) {
+        if (
+          shouldApplyDurableTapeHistoryLoad({
+            loadGeneration,
+            currentGeneration: historyLoadGenerationRef.current
+          })
+        ) {
+          console.warn("Failed to load durable tape history", error);
+          setHistoryCursor(undefined);
+          setHistoryExhausted(true);
+        }
       } finally {
         if (
           shouldApplyDurableTapeHistoryLoad({
