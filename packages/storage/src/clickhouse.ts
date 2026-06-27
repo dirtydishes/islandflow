@@ -1918,18 +1918,17 @@ export const fetchFlowPacketsByMemberTraceIds = async (
   return FlowPacketSchema.array().parse(records.map(fromFlowPacketRecord));
 };
 
-export const fetchSmartFlowProjectionsByPacketIds = async (
+export const fetchSmartFlowProjectionsByEvidenceRefs = async (
   client: ClickHouseClient,
-  packetIds: string[]
+  evidenceRefs: string[]
 ): Promise<SmartFlowExplainabilityProjection[]> => {
-  const ids = Array.from(new Set(packetIds.map((id) => id.trim()).filter(Boolean)));
+  const ids = Array.from(new Set(evidenceRefs.map((id) => id.trim()).filter(Boolean)));
   if (ids.length === 0) {
     return [];
   }
 
-  const packetPredicates = ids.map((id) => `has(evidence_refs, ${quoteString(id)})`);
   const result = await client.query({
-    query: `SELECT * FROM ${SMART_FLOW_PROJECTIONS_TABLE} WHERE ${packetPredicates.join(" OR ")} ORDER BY source_ts DESC, seq DESC LIMIT ${clampLookupLimit(ids.length * 4)}`,
+    query: `SELECT * FROM (SELECT *, arrayJoin(evidence_refs) AS matched_ref FROM ${SMART_FLOW_PROJECTIONS_TABLE} WHERE hasAny(evidence_refs, [${buildStringList(ids)}])) WHERE matched_ref IN (${buildStringList(ids)}) ORDER BY matched_ref ASC, source_ts DESC, seq DESC LIMIT 4 BY matched_ref`,
     format: "JSONEachRow"
   });
 
@@ -1937,10 +1936,22 @@ export const fetchSmartFlowProjectionsByPacketIds = async (
   const records = rows
     .map(normalizeSmartFlowProjectionRow)
     .filter((record): record is SmartFlowProjectionRecord => record !== null);
-  return SmartFlowExplainabilityProjectionSchema.array().parse(
-    records.map(fromSmartFlowProjectionRecord)
-  );
+  const projections = records.map(fromSmartFlowProjectionRecord);
+  const byKey = new Map<string, SmartFlowExplainabilityProjection>();
+  for (const projection of projections) {
+    byKey.set(
+      projection.trace_id || projection.refs.event_id || projection.refs.hypothesis_id,
+      projection
+    );
+  }
+  return SmartFlowExplainabilityProjectionSchema.array().parse(Array.from(byKey.values()));
 };
+
+export const fetchSmartFlowProjectionsByPacketIds = async (
+  client: ClickHouseClient,
+  packetIds: string[]
+): Promise<SmartFlowExplainabilityProjection[]> =>
+  fetchSmartFlowProjectionsByEvidenceRefs(client, packetIds);
 
 export const fetchNearestOptionNBBOForPrints = async (
   client: ClickHouseClient,

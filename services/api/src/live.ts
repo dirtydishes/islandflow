@@ -45,10 +45,17 @@ import {
   composeDurableRowSnapshot,
   composeDurableRowsForEvent,
   type DurableRowCompositionContext,
-  type DurableRowsSubscription
+  type DurableRowsSubscription,
+  selectDurableOptionSnapshotPrints,
+  wantsDurableOptionRows
 } from "./durable-rows";
 import { fetchRecentSmartFlowExplainability, smartFlowCursor } from "./smart-flow";
 import { fetchRecentSmartFlowAlertEvents, smartFlowAlertCursor } from "./smart-flow-alerts";
+import {
+  createSmartFlowSupportResolver,
+  SMART_FLOW_SUPPORT_MAX_TRACE_IDS,
+  type SmartFlowSupportResolver
+} from "./smart-flow-support-resolver";
 
 const CURSOR_HASH_KEY = "live:cursors";
 export const LIVE_FEED_LOOKBACK_MS = 24 * 60 * 60 * 1000;
@@ -635,6 +642,7 @@ export class LiveStateManager {
   private readonly overlayCursors = new Map<string, Cursor | null>();
   private readonly overlayAccess = new Map<string, number>();
   private readonly pendingRedisWrites = new Map<string, BufferedRedisWrite>();
+  private readonly smartFlowSupportResolver: SmartFlowSupportResolver;
   private readonly redisFlushTimer: ReturnType<typeof setInterval> | null;
   private readonly stats = {
     genericHydrateFromRedis: 0,
@@ -664,6 +672,7 @@ export class LiveStateManager {
           redisFlushMaxItems: DEFAULT_REDIS_FLUSH_MAX_ITEMS
         };
     this.generic = getGenericConfig(this.config.limits);
+    this.smartFlowSupportResolver = createSmartFlowSupportResolver();
     this.redisFlushTimer =
       this.redis && this.redis.isOpen
         ? setInterval(() => {
@@ -735,10 +744,33 @@ export class LiveStateManager {
     return Math.max(this.config.limits.options, this.config.limits["smart-flow-alerts"]);
   }
 
-  private getDurableRowSnapshot(subscription: DurableRowsSubscription): FeedSnapshot<unknown> {
+  private async getDurableRowSnapshot(
+    subscription: DurableRowsSubscription
+  ): Promise<FeedSnapshot<unknown>> {
+    const context = this.getDurableRowCompositionContext();
+    if (!wantsDurableOptionRows(subscription)) {
+      return composeDurableRowSnapshot(subscription, context, this.durableRowsConfiguredLimit());
+    }
+
+    const optionPrints = selectDurableOptionSnapshotPrints(
+      subscription,
+      context,
+      this.durableRowsConfiguredLimit(),
+      SMART_FLOW_SUPPORT_MAX_TRACE_IDS
+    );
+    const smartFlowSupport = await this.smartFlowSupportResolver.resolve(this.clickhouse, {
+      optionTraceIds: optionPrints.map((print) => print.trace_id),
+      hotPackets: context.flowPackets,
+      hotSmartFlowProjections: context.smartFlowProjections,
+      allowStorageFallback: true
+    });
     return composeDurableRowSnapshot(
       subscription,
-      this.getDurableRowCompositionContext(),
+      {
+        ...context,
+        optionPrints,
+        smartFlowSupportByTraceId: smartFlowSupport.supportByTraceId
+      },
       this.durableRowsConfiguredLimit()
     );
   }
@@ -1032,7 +1064,7 @@ export class LiveStateManager {
         };
       }
       case "durable-rows": {
-        return this.getDurableRowSnapshot(subscription);
+        return await this.getDurableRowSnapshot(subscription);
       }
       default: {
         const config = this.generic[subscription.channel];

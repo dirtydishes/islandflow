@@ -1,14 +1,15 @@
 import { describe, expect, it } from "bun:test";
 import type { ClickHouseClient } from "@islandflow/storage";
 import {
+  type FlowPacket,
   SMART_FLOW_CONTRACT_VERSION,
   SMART_FLOW_HYPOTHESIS_SCORE_MODEL_VERSION,
   SMART_FLOW_HYPOTHESIS_SCORE_POLICY_VERSION,
-  type FlowPacket,
   type SmartFlowExplainabilityProjection,
   smartFlowExplainabilityFromHypothesisEvent
 } from "@islandflow/types";
 import { lookupOptionsSupport } from "../src/options-support";
+import { resolveSmartFlowSupportFromContext } from "../src/smart-flow-support-resolver";
 
 const clickhouse = {} as ClickHouseClient;
 
@@ -78,13 +79,21 @@ describe("options support lookup", () => {
         nbbo_context: [{ trace_id: "print:1", option_contract_id: "SPY-2025-01-17-450-C", ts: 1 }]
       },
       {
-        fetchFlowPacketsByMemberTraceIds: async (_client, traceIds) => {
-          expect(traceIds).toEqual(["print:1"]);
-          return [packet];
-        },
-        fetchSmartFlowExplainabilityByPacketIds: async (_client, packetIds) => {
-          expect(packetIds).toEqual(["flowpacket:1"]);
-          return [smartFlow];
+        resolveSmartFlowSupport: async (_client, input) => {
+          expect(input.optionTraceIds).toEqual(["print:1"]);
+          return {
+            supportByTraceId: resolveSmartFlowSupportFromContext({
+              optionTraceIds: input.optionTraceIds,
+              packets: [packet],
+              projections: [smartFlow]
+            }),
+            packets: [packet],
+            smartFlowProjections: [smartFlow],
+            storageLookups: {
+              packetTraceIds: ["print:1"],
+              evidenceRefs: ["print:1", "flowpacket:1"]
+            }
+          };
         },
         fetchNearestOptionNBBOForPrints: async (_client, inputs) => {
           expect(inputs.map((item) => item.trace_id)).toEqual(["print:1"]);
@@ -97,6 +106,8 @@ describe("options support lookup", () => {
     expect(payload.smart_flow).toHaveLength(1);
     expect(payload.smart_flow[0]?.source_channel).toBe("smart-flow");
     expect(payload.smart_flow[0]?.refs.evidence_refs).toEqual(["flowpacket:1", "print:1"]);
+    expect(payload.support_by_trace_id["print:1"]?.smart_flow_status).toBe("matched");
+    expect(payload.support_by_trace_id["print:1"]?.smart_flow?.tint_eligible).toBe(true);
     expect(payload.nbbo_by_trace_id).toEqual({ "print:1": null });
   });
 
@@ -116,11 +127,22 @@ describe("options support lookup", () => {
         nbbo_context: [{ trace_id: "print:1", option_contract_id: "SPY-2025-01-17-450-C", ts: 1 }]
       },
       {
-        fetchFlowPacketsByMemberTraceIds: async () => {
+        resolveSmartFlowSupport: async (_client, input) => {
           await packetLookupGate;
-          return [packet];
+          return {
+            supportByTraceId: resolveSmartFlowSupportFromContext({
+              optionTraceIds: input.optionTraceIds,
+              packets: [packet],
+              projections: [smartFlow]
+            }),
+            packets: [packet],
+            smartFlowProjections: [smartFlow],
+            storageLookups: {
+              packetTraceIds: input.optionTraceIds,
+              evidenceRefs: ["print:1", "flowpacket:1"]
+            }
+          };
         },
-        fetchSmartFlowExplainabilityByPacketIds: async () => [smartFlow],
         fetchNearestOptionNBBOForPrints: async () => {
           nbboStarted = true;
           return { "print:1": null };
@@ -137,6 +159,11 @@ describe("options support lookup", () => {
     await expect(lookup).resolves.toMatchObject({
       packets: [packet],
       smart_flow: [smartFlow],
+      support_by_trace_id: {
+        "print:1": {
+          smart_flow_status: "matched"
+        }
+      },
       nbbo_by_trace_id: { "print:1": null }
     });
   });
