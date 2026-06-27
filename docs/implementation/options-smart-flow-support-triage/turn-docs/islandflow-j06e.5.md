@@ -1,6 +1,6 @@
 # Phase 05 Turn Doc: More-Info Triage Workspace
 
-Beads issue: `islandflow-miqb.5`
+Beads issue: `islandflow-j06e.5`
 
 Phase doc: `docs/implementation/options-smart-flow-support-triage/05-more-info-triage-workspace.md`
 
@@ -8,7 +8,7 @@ This is the single Markdown turn doc for the phase.
 
 ## Phase Selection
 
-Blocked on `islandflow-miqb.4`.
+Blocked on `islandflow-j06e.4`.
 
 ## Scope
 
@@ -46,7 +46,7 @@ Not started.
 
 ## Beads Updates
 
-Issue created under `islandflow-miqb` and depends on `islandflow-miqb.4`.
+Issue created under `islandflow-j06e` and depends on `islandflow-j06e.4`.
 
 ## Follow-Ups Filed
 

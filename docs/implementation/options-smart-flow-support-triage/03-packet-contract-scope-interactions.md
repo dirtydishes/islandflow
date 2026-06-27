@@ -1,8 +1,8 @@
 # Phase 03: Packet And Contract Scope Interactions
 
-Canonical Beads issue: `islandflow-miqb.3`
+Canonical Beads issue: `islandflow-j06e.3`
 
-Epic: `islandflow-miqb`
+Epic: `islandflow-j06e`
 
 Status is tracked in Beads. This doc is implementation context.
 
@@ -49,9 +49,9 @@ Out of scope:
 
 ## Beads
 
-- Epic: `islandflow-miqb`
-- Issue: `islandflow-miqb.3`
-- Depends on: `islandflow-miqb.2`
+- Epic: `islandflow-j06e`
+- Issue: `islandflow-j06e.3`
+- Depends on: `islandflow-j06e.2`
 - Parallel-safe: No. This phase depends on support parity and row identifiers.
 
 ## Expected Files Or Areas

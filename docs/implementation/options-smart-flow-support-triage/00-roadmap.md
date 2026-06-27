@@ -1,6 +1,8 @@
 # Options Smart-Flow Support And Triage Roadmap
 
-Canonical tracker: Beads epic `islandflow-miqb`
+Canonical tracker: Beads epic `islandflow-j06e`
+
+Workflow: `orchestrator-callback`
 
 ## Plan Source
 
@@ -12,15 +14,17 @@ Options rows should carry real, compact smart-flow support whenever the canonica
 
 ## Phase Sequence
 
-1. `islandflow-miqb.1` - Server-side smart-flow support resolver.
-2. `islandflow-miqb.2` - Row support rendering and tint parity.
-3. `islandflow-miqb.3` - Packet and contract scope interactions.
-4. `islandflow-miqb.4` - QA diagnostics and module settings.
-5. `islandflow-miqb.5` - More-info triage workspace.
+1. `islandflow-j06e.1` - Server-side smart-flow support resolver.
+2. `islandflow-j06e.2` - Row support rendering and tint parity.
+3. `islandflow-j06e.3` - Packet and contract scope interactions.
+4. `islandflow-j06e.4` - QA diagnostics and module settings.
+5. `islandflow-j06e.5` - More-info triage workspace.
 
 ## Dependencies
 
 The phases are serial. Resolver semantics must land before frontend parity, frontend support parity must land before packet scope, packet scope must land before QA/settings polish, and the richer triage workspace should wait until packet and settings behavior is stable.
+
+The orchestrator selects one phase from Beads, creates a visible implementation thread for that phase, waits for the implementation callback, creates a visible review thread, waits for review and CI callback, then updates Beads and loop state before selecting the next phase.
 
 The closed row-tinting stream remains predecessor context:
 

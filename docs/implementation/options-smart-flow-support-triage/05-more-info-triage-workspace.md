@@ -1,8 +1,8 @@
 # Phase 05: More-Info Triage Workspace
 
-Canonical Beads issue: `islandflow-miqb.5`
+Canonical Beads issue: `islandflow-j06e.5`
 
-Epic: `islandflow-miqb`
+Epic: `islandflow-j06e`
 
 Status is tracked in Beads. This doc is implementation context.
 
@@ -50,9 +50,9 @@ Out of scope:
 
 ## Beads
 
-- Epic: `islandflow-miqb`
-- Issue: `islandflow-miqb.5`
-- Depends on: `islandflow-miqb.4`
+- Epic: `islandflow-j06e`
+- Issue: `islandflow-j06e.5`
+- Depends on: `islandflow-j06e.4`
 - Parallel-safe: No. This phase depends on stable packet scope and module controls.
 
 ## Expected Files Or Areas

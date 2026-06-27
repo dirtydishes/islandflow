@@ -1,6 +1,6 @@
 # Loop State
 
-Canonical tracker: Beads epic `islandflow-miqb`
+Canonical tracker: Beads epic `islandflow-j06e`
 
 This file is a compact resume aid only. If this file disagrees with Beads, Beads wins.
 
@@ -8,11 +8,11 @@ Status: active
 
 Stream: `options-smart-flow-support-triage`
 
-Workflow: `single-thread-subagent`
+Workflow: `orchestrator-callback`
 
-Current phase: none
+Current phase: 01 - Server-side smart-flow support resolver
 
-Current Beads issue: none
+Current Beads issue: `islandflow-j06e.1`
 
 Current PR: none
 
@@ -43,12 +43,12 @@ Blocked: no
 
 | Phase | Beads Issue | Status | PR | Turn Doc |
 |---|---|---|---|---|
-| 01 - Server-side smart-flow support resolver | `islandflow-miqb.1` | Open | None | `docs/implementation/options-smart-flow-support-triage/turn-docs/islandflow-miqb.1.md` |
-| 02 - Row support rendering and tint parity | `islandflow-miqb.2` | Blocked on `islandflow-miqb.1` | None | `docs/implementation/options-smart-flow-support-triage/turn-docs/islandflow-miqb.2.md` |
-| 03 - Packet and contract scope interactions | `islandflow-miqb.3` | Blocked on `islandflow-miqb.2` | None | `docs/implementation/options-smart-flow-support-triage/turn-docs/islandflow-miqb.3.md` |
-| 04 - QA diagnostics and module settings | `islandflow-miqb.4` | Blocked on `islandflow-miqb.3` | None | `docs/implementation/options-smart-flow-support-triage/turn-docs/islandflow-miqb.4.md` |
-| 05 - More-info triage workspace | `islandflow-miqb.5` | Blocked on `islandflow-miqb.4` | None | `docs/implementation/options-smart-flow-support-triage/turn-docs/islandflow-miqb.5.md` |
+| 01 - Server-side smart-flow support resolver | `islandflow-j06e.1` | In progress | None | `docs/implementation/options-smart-flow-support-triage/turn-docs/islandflow-j06e.1.md` |
+| 02 - Row support rendering and tint parity | `islandflow-j06e.2` | Blocked on `islandflow-j06e.1` | None | `docs/implementation/options-smart-flow-support-triage/turn-docs/islandflow-j06e.2.md` |
+| 03 - Packet and contract scope interactions | `islandflow-j06e.3` | Blocked on `islandflow-j06e.2` | None | `docs/implementation/options-smart-flow-support-triage/turn-docs/islandflow-j06e.3.md` |
+| 04 - QA diagnostics and module settings | `islandflow-j06e.4` | Blocked on `islandflow-j06e.3` | None | `docs/implementation/options-smart-flow-support-triage/turn-docs/islandflow-j06e.4.md` |
+| 05 - More-info triage workspace | `islandflow-j06e.5` | Blocked on `islandflow-j06e.4` | None | `docs/implementation/options-smart-flow-support-triage/turn-docs/islandflow-j06e.5.md` |
 
 ## Last Coordinator Update
 
-Loop created from the aligned 2026-06-27 plan. Implementation has not started.
+2026-06-27: Workflow corrected to `orchestrator-callback`, canonical Beads epic corrected to `islandflow-j06e`, and phase IDs mirrored from Beads. Beads currently reports `islandflow-j06e.1` as in progress with no PR recorded in this loop state.

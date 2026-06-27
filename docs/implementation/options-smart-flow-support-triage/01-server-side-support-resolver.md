@@ -1,8 +1,8 @@
 # Phase 01: Server-Side Smart-Flow Support Resolver
 
-Canonical Beads issue: `islandflow-miqb.1`
+Canonical Beads issue: `islandflow-j06e.1`
 
-Epic: `islandflow-miqb`
+Epic: `islandflow-j06e`
 
 Status is tracked in Beads. This doc is implementation context.
 
@@ -52,8 +52,8 @@ Out of scope:
 
 ## Beads
 
-- Epic: `islandflow-miqb`
-- Issue: `islandflow-miqb.1`
+- Epic: `islandflow-j06e`
+- Issue: `islandflow-j06e.1`
 - Depends on: None
 - Parallel-safe: No. This phase establishes the support contract used by later phases.
 
