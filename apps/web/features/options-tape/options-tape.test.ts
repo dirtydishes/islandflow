@@ -235,7 +235,11 @@ describe("options tape helpers", () => {
             packet,
             pinned: makePrint({ trace_id: "clicked", seq: 7 }),
             data: [
-              makePrint({ trace_id: "member-2", seq: 8 }),
+              makePrint({
+                trace_id: "member-2",
+                seq: 8,
+                option_contract_id: "SPY-2026-06-22-560-C"
+              }),
               makePrint({ trace_id: "clicked", seq: 7 })
             ],
             next_before: { ts: 1_000, seq: 7 }
@@ -278,13 +282,19 @@ describe("options tape helpers", () => {
   it("keeps broad filters out of packet and contract scopes", () => {
     const filters = { ...buildDefaultOptionsTapeFilters(), nbboSides: ["AA" as const] };
     const packetScope = {
+      packetId: "flowpacket:1",
       optionContractId: "SPY-2026-06-22-555-C",
       packetMemberTraceIds: ["member-1", "member-2"]
     };
     const contractScope = { optionContractId: "SPY-2026-06-22-555-C" };
     const prints = [
       makePrint({ trace_id: "member-1", nbbo_side: "B", signal_pass: false }),
-      makePrint({ trace_id: "member-2", nbbo_side: "BB", signal_pass: false }),
+      makePrint({
+        trace_id: "member-2",
+        nbbo_side: "BB",
+        option_contract_id: "SPY-2026-06-22-560-C",
+        signal_pass: false
+      }),
       makePrint({ trace_id: "other", nbbo_side: "AA" })
     ];
 
@@ -300,7 +310,7 @@ describe("options tape helpers", () => {
         contractScope,
         getOptionsTapeScopeFilters(contractScope, filters)
       )
-    ).toEqual(prints);
+    ).toEqual([prints[0], prints[2]]);
   });
 });
 

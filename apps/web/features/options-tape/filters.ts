@@ -156,7 +156,9 @@ export const getOptionsTapeScopeFilters = (
   scope: OptionsTapeSourceScope | undefined,
   filters: OptionFlowFilters | undefined
 ): OptionFlowFilters | undefined =>
-  scope?.packetMemberTraceIds?.length || scope?.optionContractId ? undefined : filters;
+  scope?.packetId || scope?.packetMemberTraceIds?.length || scope?.optionContractId
+    ? undefined
+    : filters;
 
 export const filterOptionsTapePrints = (
   prints: readonly OptionPrint[],
@@ -168,7 +170,11 @@ export const filterOptionsTapePrints = (
     if (memberTraceIds.size > 0 && !memberTraceIds.has(print.trace_id)) {
       return false;
     }
-    if (scope?.optionContractId && print.option_contract_id.trim() !== scope.optionContractId) {
+    if (
+      !scope?.packetId &&
+      scope?.optionContractId &&
+      print.option_contract_id.trim() !== scope.optionContractId
+    ) {
       return false;
     }
     return matchesOptionPrintFilters(print, filters);

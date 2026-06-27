@@ -491,6 +491,8 @@ export const OptionsTape = ({
     nbboByTraceId: EMPTY_NBBO_BY_TRACE_ID as ReadonlyMap<string, OptionNBBO | null>
   });
   const pendingSupportRequestKeysRef = useRef(new Set<string>());
+  const currentFocusedContractId = focusedContractId ?? null;
+  const previousFocusedContractIdRef = useRef<string | null>(currentFocusedContractId);
   const [hydratedPackets, setHydratedPackets] = useState<FlowPacket[]>([]);
   const [hydratedSmartFlowSupportByTraceId, setHydratedSmartFlowSupportByTraceId] = useState<
     Map<string, OptionsTapeSmartFlowSupportResolution>
@@ -587,15 +589,19 @@ export const OptionsTape = ({
         if (!mountedRef.current) {
           return;
         }
-        if (payload.packets.length > 0) {
-          setHydratedPackets((current) => mergeOptionsTapeSupportPackets(current, payload.packets));
+        const supportPackets = Array.from(payload.smartFlowSupportByTraceId.values())
+          .map((support) => support.packet)
+          .filter((packet): packet is FlowPacket => Boolean(packet));
+        const packets = [...payload.packets, ...supportPackets];
+        if (packets.length > 0) {
+          setHydratedPackets((current) => mergeOptionsTapeSupportPackets(current, packets));
         }
         if (payload.smartFlowSupportByTraceId.size > 0) {
           setHydratedSmartFlowSupportByTraceId((current) => {
             const next = new Map(current);
             let changed = false;
             for (const [traceId, support] of payload.smartFlowSupportByTraceId) {
-              if (support.smart_flow_status === "matched" && support.smart_flow) {
+              if (next.get(traceId) !== support) {
                 next.set(traceId, support);
                 changed = true;
               }
@@ -632,10 +638,16 @@ export const OptionsTape = ({
   );
 
   useEffect(() => {
-    if (focusedContractId === null && scope.mode !== "global") {
+    const previousFocusedContractId = previousFocusedContractIdRef.current;
+    previousFocusedContractIdRef.current = currentFocusedContractId;
+    if (
+      previousFocusedContractId !== null &&
+      currentFocusedContractId === null &&
+      scope.mode !== "global"
+    ) {
       setScope(GLOBAL_SCOPE);
     }
-  }, [focusedContractId, scope.mode]);
+  }, [currentFocusedContractId, scope.mode]);
 
   const contextForPrint = useCallback(
     (print: OptionPrint) =>
@@ -708,15 +720,15 @@ export const OptionsTape = ({
       const { print, packet } = context;
       if (packet?.packet) {
         const nextScope = getPacketFocusScope(print, packet.packet, context);
-        setScope(nextScope);
         onContractFocus?.(print);
         onPacketFocus?.(
           packetRequestFromPrint({ print, packet: packet.packet, source: "options-tape" })
         );
+        setScope(nextScope);
         return;
       }
-      setScope(getContractFocusScope(print, context));
       onContractFocus?.(print);
+      setScope(getContractFocusScope(print, context));
     },
     [contextForPrint, onContractFocus, onPacketFocus]
   );
