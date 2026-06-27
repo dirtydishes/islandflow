@@ -84,7 +84,7 @@ Helpers may propose specific edits or tests, but the worker owns the route-featu
 ## Suggested Future Codex Implementation Prompt
 
 ```text
-Implement docs/implementation/options-tape-smart-flow-row-tinting/02-live-smart-flow-coloring.md for Beads issue islandflow-xcdn.2 after Phase 01 is merged. Subscribe /options to smart-flow without enabling unrelated legacy smart-money UI, pass smart-flow projections into OptionsTape call sites, and tint live rows through direct print refs and FlowPacket.members expansion. Do not claim historical/server-row completeness; that belongs to Phase 03.
+Run under docs/implementation/options-tape-smart-flow-row-tinting/IMPLEMENT.md using the orchestrator-callback workflow. Implement docs/implementation/options-tape-smart-flow-row-tinting/02-live-smart-flow-coloring.md for Beads issue islandflow-xcdn.2 after Phase 01 is merged. Subscribe /options to smart-flow without enabling unrelated legacy smart-money UI, pass smart-flow projections into OptionsTape call sites, and tint live rows through direct print refs and FlowPacket.members expansion. Do not claim historical/server-row completeness; that belongs to Phase 03. Open a Forgejo PR when ready and call back to the orchestrator exactly once using docs/implementation/options-tape-smart-flow-row-tinting/schemas/implementation-callback.schema.json. Do not create the reviewer thread.
 ```
 
 ## Matching Beads Issue

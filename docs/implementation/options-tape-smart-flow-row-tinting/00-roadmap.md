@@ -4,6 +4,8 @@ Beads issue: `islandflow-n16t`
 
 Index: [`IMPLEMENT.md`](./IMPLEMENT.md)
 
+Workflow: `orchestrator-callback`
+
 ## Purpose
 
 Create the durable execution surface for adding smart-flow hypothesis tinting to options tape rows. This phase records the scope split, Beads graph, thread orchestration model, review requirements, and closeout rules before runtime code changes begin.
@@ -12,14 +14,14 @@ Create the durable execution surface for adding smart-flow hypothesis tinting to
 
 Options tape rows should make smart-flow hypothesis context scannable without turning the tape into a slow or noisy dashboard. Live prints, loaded historical prints, and server-composed durable option rows should eventually use the same subtle tint semantics for hypothesis type, direction, confidence, and abstention.
 
-## Current State
+## Initial State At Planning Time
 
-- `OptionsTape` already owns option-print row context and is reused on `/options`, dashboard options modules, and durable-tapes-adjacent surfaces.
-- `DurableTape` already has a `rowTinting` feature flag but no row class/style hook API.
-- Existing decor is mostly classifier or legacy smart-money driven and is keyed through `decorByTraceId`.
-- `/options` currently avoids the legacy smart-money UI by setting `smartMoney: false`, which also prevents subscribing to `smart-flow`.
-- `/lookup/options-support` already includes `smart_flow` in its response, but frontend support hydration does not expose it to options rows.
-- Durable option row view models are a separate path that must be brought into parity in the strict coverage phase.
+- `OptionsTape` already owned option-print row context and was reused on `/options`, dashboard options modules, and durable-tapes-adjacent surfaces.
+- `DurableTape` already had a `rowTinting` feature flag but no row class/style hook API.
+- Existing decor was mostly classifier or legacy smart-money driven and keyed through `decorByTraceId`.
+- `/options` avoided the legacy smart-money UI by setting `smartMoney: false`, which also prevented subscribing to `smart-flow`.
+- `/lookup/options-support` already included `smart_flow` in its response, but frontend support hydration did not expose it to options rows.
+- Durable option row view models were a separate path that needed parity in the strict coverage phase.
 
 ## Architecture Direction
 
@@ -70,8 +72,10 @@ Use `$impeccable` for UI/UX work.
 ## Acceptance Gates
 
 - `IMPLEMENT.md` exists and names the Beads graph.
+- `IMPLEMENT.md` names the workflow as `orchestrator-callback`.
 - Phase docs `00` through `03` exist.
-- Orchestrator thread creation guidance includes the orchestrator thread ID callback contract.
+- Orchestrator thread creation guidance includes the orchestrator thread ID callback contract and the single-shot implementation/review callback schemas.
+- `loop-state.md`, `prompts/run-loop.md`, and `schemas/` exist for dirtyloops resume, run, and callback validation.
 - Large-swarm scout/review topology and worker helper delegation rules are documented.
 - Review threads are required to use `thermo-nuclear-code-quality-review`.
 - Beads issues exist for every implementation phase and dependencies are wired.

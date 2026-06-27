@@ -82,7 +82,7 @@ Helpers may propose specific edits or tests, but the worker owns the hook contra
 ## Suggested Future Codex Implementation Prompt
 
 ```text
-Implement docs/implementation/options-tape-smart-flow-row-tinting/01-durable-tape-tint-foundation.md for Beads issue islandflow-xcdn.1. Add the shared DurableTape row hook foundation and pure options-tint helpers only. Do not change live subscriptions, API payloads, or historical hydration behavior. Use the required thermo-nuclear reviewer thread after the implementation worker is PR-ready.
+Run under docs/implementation/options-tape-smart-flow-row-tinting/IMPLEMENT.md using the orchestrator-callback workflow. Implement docs/implementation/options-tape-smart-flow-row-tinting/01-durable-tape-tint-foundation.md for Beads issue islandflow-xcdn.1. Add the shared DurableTape row hook foundation and pure options-tint helpers only. Do not change live subscriptions, API payloads, or historical hydration behavior. Open a Forgejo PR when ready and call back to the orchestrator exactly once using docs/implementation/options-tape-smart-flow-row-tinting/schemas/implementation-callback.schema.json. Do not create the reviewer thread.
 ```
 
 ## Matching Beads Issue
