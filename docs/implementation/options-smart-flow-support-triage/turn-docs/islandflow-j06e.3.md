@@ -8,19 +8,44 @@ This is the single Markdown turn doc for the phase.
 
 ## Phase Selection
 
-Blocked on `islandflow-j06e.2`.
+Selected after Phase 02 was completed and the orchestrator assigned implementation on branch:
+
+`lavender/islandflow-j06e-3-packet-contract-scope`
 
 ## Scope
 
-Not started.
+Implemented Phase 03 only:
+
+- Packet-backed option rows open an in-place packet scope.
+- Packet scope requests authoritative packet summary and member rows from `/history/options`.
+- The clicked print is pinned/highlighted in packet rows.
+- Packet scope exposes a visible `Show contract` control that widens to the exact normalized OCC contract.
+- `Back to tape` clears the scoped tape and returns to the global signal tape path.
+- Packet-backed rows without tint-eligible smart-flow support can still open packet scope; row tinting remains gated by support eligibility.
+- Packet and contract scope history requests bypass live-head rows and use bounded API history pages.
+
+Out of scope and not changed:
+
+- More-info triage workspace.
+- Settings popout.
+- QA diagnostic support columns.
+- Broad dashboard redesign.
+- Client-side packet membership reconstruction from visible rows.
 
 ## Implementation Log
 
-Not started.
+- Added packet-scope query parsing for `flow_packet_id` and `pinned_trace_id`, with broad option-flow filters stripped from packet and contract storage scopes.
+- Added storage support for packet member option rows through `fetchOptionPrintsForFlowPacketBefore`.
+- Kept packet membership server-composed by querying the latest stored packet row, deduping to one option print per member trace ID, then applying cursor/limit pagination outside the deduped set.
+- Added API response fields `packet` and `pinned` for packet scope history pages.
+- Updated options tape source requests to send packet and pinned trace params, parse packet metadata, prepend the pinned print once, and hydrate packet maps from API responses.
+- Changed packet and contract scopes to bypass live snapshots so scoped views start from API history rather than reconstructing from visible rows.
+- Added a packet scope band with packet/member count, selected-print highlight, `Show contract`, and `Back to tape`.
+- Added focused web and API tests for packet query params, packet API hydration, clicked-print pinning, and packet member SQL shape.
 
 ## Subagent Swarms
 
-Not started.
+None. Implementation stayed inside the assigned worktree/branch.
 
 ## Review
 
@@ -28,25 +53,92 @@ Reviewer skill:
 
 `thermo-nuclear-code-quality-review`
 
-Not started.
+Reviewer closeout status: repaired locally; Forgejo publication and final PR CI
+verification are owned by the reviewer thread before callback.
+
+Findings repaired:
+
+- Packet scope was still applying exact-contract client filtering whenever
+  `optionContractId` was present. That hid legitimate cross-contract packet
+  members returned by the authoritative packet API scope. Repair: packet scopes
+  now strip broad filters whenever `flow_packet_id` is active and skip
+  contract-only client filtering while `packetId` is present.
+- Non-smart-flow packet support was hydrated into the scheduler but dropped by
+  the options tape state because only matched smart-flow support was retained.
+  That made packet-backed non-smart-flow rows fall through to contract focus.
+  Repair: the tape now retains explicit unavailable support and merges packets
+  carried by support resolutions into the hydrated packet maps without changing
+  tint eligibility.
+- Internal packet/contract scope could be cleared or superseded by terminal
+  parent focus bookkeeping during the same activation. Repair: external clear
+  handling now only reacts to an actual focused-contract-to-null transition, and
+  row activation applies the in-place scope after parent focus callbacks.
+- Forgejo pull-request task `#405` failed in `Check formatting` on the repaired
+  head. Repair: applied Biome formatting to the affected packet-scope UI/API
+  files and replaced lint-warned `Object.prototype.hasOwnProperty.call(...)`
+  uses with `Object.hasOwn(...)` in the packet history source.
+
+Findings remaining:
+
+None.
 
 ## CI And Gates
 
 CI owner: reviewer/verification agents
 
-Current CI state: `not-started`
+Current CI state: `local-ci-gates-passed-after-review-and-formatting-repairs`
 
 Evidence:
 
-Not started.
+- `bun run fmt:check` - passed after formatting repair.
+- `bun run lint` - passed after formatting repair, no warnings.
+- `bun run typecheck` - passed after formatting repair.
+- `bun test` - passed after formatting repair, 508 tests, 7420 assertions.
+- `bun run check:public-api-routes` - produced the expected
+  `DEPLOY_PUBLIC_APP_URL=<production-app-origin>` guard failure.
+- `bun run check:docker-workspace` - passed after formatting repair.
+- `bun --cwd=apps/web run build` - passed after formatting repair.
+- Earlier scoped repair gates also passed:
+  `bun test apps/web/features/options-tape` (20 tests, 76 assertions),
+  `bun test services/api/tests` (72 tests, 262 assertions), and
+  `git diff --check`.
+- Browser verification: `/options` desktop and mobile packet-scope interaction
+  passed against local Next dev on `http://127.0.0.1:3101` with intercepted
+  branch-shaped API responses. The probe verified:
+  - non-smart-flow packet-backed row opens `Packet prints`;
+  - packet history is requested with `flow_packet_id` and `pinned_trace_id`;
+  - cross-contract packet member rows remain visible from the server response;
+  - clicked print receives `options-tape-row-selected-print`;
+  - `Show contract` widens to exact `option_contract_id`;
+  - `Back to tape` returns to the prior global signal tape.
+- Forgejo PR status evidence before repair push:
+  - `fj pr status 96 --wait` is unavailable because Forgejo returns
+    `/dirtydishes/islandflow/actions/runs/403/jobs/0`, which this `fj` build
+    rejects as an invalid relative URL.
+  - `fj actions tasks -R forgejo --page 1` showed pull-request tasks `#402`
+    and `#403` failing on implementation commits `0331e79` and `9b2fe0c`.
+- Forgejo CI repair evidence:
+  - Pull-request task `#405` on head `4e8c702` failed at `Check formatting`.
+    The run page identified job id `461`; the step log showed Biome formatting
+    failures in `apps/web/app/globals.css`,
+    `apps/web/features/options-tape/OptionsTape.tsx`, and
+    `services/api/src/option-queries.ts`.
+  - Final repaired-head CI verification is performed after the reviewer pushes
+    the formatting and doc-evidence repairs.
 
 ## PR And Commits
 
-Not started.
+- Forgejo PR: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/96`
+- Branch: `lavender/islandflow-j06e-3-packet-contract-scope`
+- Implementation commit: `0331e79` - `add packet-backed options scope`
+- Implementation doc commit: `9b2fe0c` - `document packet scope publication`
+- Reviewer repair commit: `a72199a` - `repair packet scope review findings`
+- Reviewer doc commit: `4e8c702` - `record packet scope review repairs`
+- Reviewer CI repair commit: `cabe300` - `repair ci formatting failures`
 
 ## Beads Updates
 
-Issue created under `islandflow-j06e` and depends on `islandflow-j06e.2`.
+No Beads state was mutated by this worker. The issue remains orchestrator-owned for closeout.
 
 ## Follow-Ups Filed
 
@@ -54,10 +146,13 @@ None.
 
 ## Context To Keep
 
-- Packet scope is a tape view.
-- Exact contract scope means normalized OCC contract.
-- Clicked print should be pinned or highlighted.
+- Packet scope is API-backed by `flow_packet_id`; do not reconstruct packet membership from visible rows.
+- `pinned_trace_id` is only a visual pin/highlight request; packet rows still come from server-composed membership.
+- Exact contract widening is `option_contract_id` without `flow_packet_id`.
+- Packet scope history is deduped to one latest option print per packet member trace ID before pagination.
+- Smart-flow tint is unchanged: packet support alone does not tint a row unless compact support is tint eligible.
 
 ## Closeout
 
-Not started.
+Review and CI repairs are complete locally. Reviewer publication, `bd dolt push`,
+and final Forgejo CI verification remain before callback.
