@@ -73,9 +73,9 @@ Evidence:
 
 ## PR And Commits
 
-- Forgejo PR: pending publication.
+- Forgejo PR: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/96`
 - Branch: `lavender/islandflow-j06e-3-packet-contract-scope`
-- Commits: pending publication.
+- Implementation commit: `0331e79` - `add packet-backed options scope`
 
 ## Beads Updates
 
