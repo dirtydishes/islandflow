@@ -1,4 +1,5 @@
 export * from "./columns";
+export * from "./detail";
 export * from "./filters";
 export * from "./format";
 export * from "./OptionsTape";

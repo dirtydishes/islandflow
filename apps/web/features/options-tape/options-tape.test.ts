@@ -15,6 +15,7 @@ import {
 } from "../durable-tape/row-view-models";
 import { selectDurableTapeTemplate } from "../durable-tape/templates";
 import {
+  buildOptionsTapeSmartFlowDetailUrl,
   formatOptionsTapeContractLabel,
   formatOptionsTapeDteLabel,
   getOptionsTapePrintCursor,
@@ -115,32 +116,32 @@ describe("options tape helpers", () => {
 
   it("keeps no-horizontal-scroll templates small by state", () => {
     expect(OPTIONS_TAPE_TEMPLATES_BY_MODE.global[0]?.columns).toEqual([
+      "info",
       "time",
       "contract",
       "price",
       "size",
       "premium",
-      "side",
-      "iv"
+      "side"
     ]);
     expect(OPTIONS_TAPE_TEMPLATES_BY_MODE.packet[0]?.columns).toEqual([
+      "info",
       "dte",
       "time",
       "price",
       "size",
       "premium",
-      "side",
-      "spot"
+      "side"
     ]);
     expect(OPTIONS_TAPE_TEMPLATES_BY_MODE.contract[0]?.columns).toEqual([
+      "info",
       "time",
       "price",
       "size",
       "premium",
       "nbbo",
       "side",
-      "exchange",
-      "iv"
+      "exchange"
     ]);
   });
 
@@ -153,9 +154,9 @@ describe("options tape helpers", () => {
     });
     expect(globalSelection.template.id).toBe("oneThird");
     expect(globalSelection.columns.map((column) => column.id)).toEqual([
+      "info",
       "contract",
-      "premium",
-      "side"
+      "premium"
     ]);
 
     const packetSelection = selectDurableTapeTemplate({
@@ -165,7 +166,7 @@ describe("options tape helpers", () => {
       requestedTemplate: "auto"
     });
     expect(packetSelection.template.id).toBe("micro");
-    expect(packetSelection.columns.map((column) => column.id)).toEqual(["premium", "side"]);
+    expect(packetSelection.columns.map((column) => column.id)).toEqual(["info", "premium"]);
   });
 
   it("applies settings presets without changing default signal semantics", () => {
@@ -226,12 +227,13 @@ describe("options tape helpers", () => {
       visible: false
     });
 
-    expect(getVisibleOptionsTapeColumnOrder(settings)).toEqual(["time"]);
+    expect(getVisibleOptionsTapeColumnOrder(settings)).toEqual(["info"]);
 
     const reordered = reduceOptionsTapeSettings(
       {
         ...buildDefaultOptionsTapeSettings(),
         columnOrder: [
+          "info",
           "premium",
           "contract",
           "side",
@@ -249,11 +251,13 @@ describe("options tape helpers", () => {
     );
     const templates = buildOptionsTapeTemplatesForSettings("global", reordered);
 
-    expect(templates.find((template) => template.id === "full")?.columns.slice(0, 2)).toEqual([
+    expect(templates.find((template) => template.id === "full")?.columns.slice(0, 3)).toEqual([
+      "info",
       "premium",
       "contract"
     ]);
     expect(templates.find((template) => template.id === "oneThird")?.columns).toEqual([
+      "info",
       "premium",
       "contract"
     ]);
@@ -264,6 +268,37 @@ describe("options tape helpers", () => {
       requestedTemplate: "auto"
     });
     expect(selection.columns.map((column) => column.id)).not.toContain("side");
+    expect(selection.columns.map((column) => column.id)).toContain("info");
+  });
+
+  it("builds smart-flow detail URLs without loading detail for every row", () => {
+    const url = buildOptionsTapeSmartFlowDetailUrl(
+      {
+        optionTraceId: "print:1",
+        projectionTraceId: "smart-flow:1",
+        packetId: "flowpacket:1",
+        optionContractId: "SPY-2026-06-22-555-C",
+        packetBefore: { ts: 500, seq: 5 },
+        contractBefore: { ts: 400, seq: 4 },
+        packetLimit: 8,
+        contractLimit: 10
+      },
+      "https://api.example.test"
+    );
+    const params = new URL(url).searchParams;
+
+    expect(new URL(url).origin).toBe("https://api.example.test");
+    expect(new URL(url).pathname).toBe("/options/smart-flow-detail");
+    expect(params.get("option_trace_id")).toBe("print:1");
+    expect(params.get("projection_trace_id")).toBe("smart-flow:1");
+    expect(params.get("packet_id")).toBe("flowpacket:1");
+    expect(params.get("option_contract_id")).toBe("SPY-2026-06-22-555-C");
+    expect(params.get("packet_before_ts")).toBe("500");
+    expect(params.get("packet_before_seq")).toBe("5");
+    expect(params.get("contract_before_ts")).toBe("400");
+    expect(params.get("contract_before_seq")).toBe("4");
+    expect(params.get("packet_limit")).toBe("8");
+    expect(params.get("contract_limit")).toBe("10");
   });
 
   it("filters smart-flow-only rows from resolved support context without scanning projections", () => {

@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { type FlowPacket, SmartFlowDirectionSchema } from "./events";
+import { type FlowPacket, FlowPacketSchema, SmartFlowDirectionSchema } from "./events";
 import { OptionNbboSideSchema, OptionTypeSchema } from "./options-flow";
-import { FlowHypothesisTypeSchema } from "./smart-flow";
+import { FlowHypothesisTypeSchema, SmartFlowExplainabilityProjectionSchema } from "./smart-flow";
 
 export const DurableTapeComposedLaneSchema = z.enum(["options", "alerts"]);
 export type DurableTapeComposedLane = z.infer<typeof DurableTapeComposedLaneSchema>;
@@ -73,12 +73,15 @@ export const DurableTapeSmartFlowSupportSchema = z.object({
 });
 export type DurableTapeSmartFlowSupport = z.infer<typeof DurableTapeSmartFlowSupportSchema>;
 
-export type DurableTapeSmartFlowSupportResolution = {
-  packet: FlowPacket | null;
-  smart_flow_status: DurableTapeSmartFlowSupportStatus;
-  smart_flow_unavailable_reason?: string;
-  smart_flow: DurableTapeSmartFlowSupport | null;
-};
+export const DurableTapeSmartFlowSupportResolutionSchema = z.object({
+  packet: FlowPacketSchema.nullable(),
+  smart_flow_status: DurableTapeSmartFlowSupportStatusSchema,
+  smart_flow_unavailable_reason: z.string().min(1).optional(),
+  smart_flow: DurableTapeSmartFlowSupportSchema.nullable()
+});
+export type DurableTapeSmartFlowSupportResolution = z.infer<
+  typeof DurableTapeSmartFlowSupportResolutionSchema
+>;
 
 const DurableTapeRowBaseSchema = z.object({
   id: z.string().min(1),
@@ -202,3 +205,36 @@ export const DurableTapeRowViewModelSchema = z.discriminatedUnion("lane", [
   DurableTapeAlertRowViewModelSchema
 ]);
 export type DurableTapeRowViewModel = z.infer<typeof DurableTapeRowViewModelSchema>;
+
+export const DurableTapeCursorSchema = z.object({
+  ts: z.number().int().nonnegative(),
+  seq: z.number().int().nonnegative()
+});
+export type DurableTapeCursor = z.infer<typeof DurableTapeCursorSchema>;
+
+export const OptionsSmartFlowTriageRowsSchema = z.object({
+  rows: z.array(DurableTapeOptionRowViewModelSchema),
+  next_before: DurableTapeCursorSchema.nullable(),
+  limit: z.number().int().positive(),
+  row_count: z.number().int().nonnegative()
+});
+export type OptionsSmartFlowTriageRows = z.infer<typeof OptionsSmartFlowTriageRowsSchema>;
+
+export const OptionsSmartFlowTriageDetailSchema = z.object({
+  option_trace_id: z.string().min(1),
+  projection_trace_id: z.string().min(1).nullable(),
+  option_contract_id: z.string().min(1).nullable(),
+  support: DurableTapeSmartFlowSupportResolutionSchema.nullable(),
+  packet: FlowPacketSchema.nullable(),
+  projection: SmartFlowExplainabilityProjectionSchema.nullable(),
+  selected_print: DurableTapeOptionRowViewModelSchema.nullable(),
+  packet_members: OptionsSmartFlowTriageRowsSchema,
+  exact_contract: OptionsSmartFlowTriageRowsSchema,
+  missing: z.object({
+    projection: z.boolean(),
+    packet: z.boolean(),
+    selected_print: z.boolean()
+  }),
+  detail_unavailable_reason: z.string().min(1).nullable()
+});
+export type OptionsSmartFlowTriageDetail = z.infer<typeof OptionsSmartFlowTriageDetailSchema>;

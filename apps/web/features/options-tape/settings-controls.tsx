@@ -380,7 +380,10 @@ export const OptionsTapeSettings = ({
                       <input
                         type="checkbox"
                         checked={visible}
-                        disabled={visible && visibleColumnOrder.length === 1}
+                        disabled={
+                          (columnId === "info" && visible) ||
+                          (visible && visibleColumnOrder.length === 1)
+                        }
                         onChange={(event) =>
                           setDraftSettings((current) =>
                             reduceOptionsTapeSettings(current, {

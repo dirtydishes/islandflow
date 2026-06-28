@@ -8,6 +8,7 @@ export const OPTIONS_TAPE_SETTINGS_STORAGE_KEY = "islandflow.options-tape.settin
 export const OPTIONS_TAPE_SETTINGS_STORAGE_VERSION = 1;
 
 export const OPTIONS_TAPE_DEFAULT_COLUMN_ORDER = [
+  "info",
   "time",
   "contract",
   "dte",
@@ -109,6 +110,9 @@ export const reduceOptionsTapeSettings = (
   }
 
   if (action.type === "toggle-column") {
+    if (action.id === "info" && !action.visible) {
+      return current;
+    }
     const hidden = new Set(current.hiddenColumns);
     const visibleCount = getVisibleOptionsTapeColumnOrder(current).length;
     if (action.visible) {
@@ -144,9 +148,11 @@ export const buildOptionsTapeTemplatesForSettings = (
   return OPTIONS_TAPE_TEMPLATES_BY_MODE[mode].map((template) => {
     const allowed = new Set(template.columns);
     const columns = visibleOrder.filter((id) => allowed.has(id));
+    const ensuredColumns =
+      allowed.has("info") && !columns.includes("info") ? (["info", ...columns] as const) : columns;
     return {
       ...template,
-      columns: columns.length > 0 ? columns : visibleOrder.slice(0, 1)
+      columns: ensuredColumns.length > 0 ? ensuredColumns : visibleOrder.slice(0, 1)
     };
   });
 };

@@ -55,6 +55,7 @@ type FixedWindowEntry = {
 const LOOKUP_EXACT_PATHS = new Set([
   "/option-prints/by-trace",
   "/lookup/options-support",
+  "/options/smart-flow-detail",
   "/equity-joins/by-id"
 ]);
 
