@@ -114,7 +114,7 @@ Remaining findings: none.
 CI owner: implementation worker for local gates; orchestrator/reviewer for
 Forgejo CI and closeout.
 
-Current CI state: `reviewer-local-gates-passed-awaiting-forgejo-rerun`
+Current CI state: `reviewer-local-gates-passed-forgejo-green`
 
 Pre-repair Forgejo CI evidence:
 
@@ -123,6 +123,12 @@ Pre-repair Forgejo CI evidence:
 - Forgejo action logs for those tasks failed in `bun run typecheck` with
   `TS4104` readonly-array assignment errors in
   `services/api/src/options-smart-flow-detail.ts`.
+
+Post-repair Forgejo CI evidence:
+
+- `fj actions tasks -R forgejo --page 1` showed task `#423`
+  (`d1453245bf`) passing `Validate` in `1m18s` after the reviewer repair and
+  closeout doc commits were pushed.
 
 Evidence:
 
