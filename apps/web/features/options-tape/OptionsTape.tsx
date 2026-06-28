@@ -1,6 +1,12 @@
 "use client";
 
-import type { FlowPacket, OptionFlowFilters, OptionNBBO, OptionPrint } from "@islandflow/types";
+import type {
+  FlowPacket,
+  OptionFlowFilters,
+  OptionNBBO,
+  OptionPrint,
+  OptionsSmartFlowTriageDetail
+} from "@islandflow/types";
 import { parseOptionContractId } from "@islandflow/types";
 import {
   type Dispatch,
@@ -20,6 +26,8 @@ import {
   terminalHydrationScheduler
 } from "../terminal/hydration-scheduler";
 import { OPTIONS_TAPE_COLUMNS, renderOptionsTapeRow } from "./columns";
+import { loadOptionsTapeSmartFlowDetail, type OptionsTapeSmartFlowDetailRequest } from "./detail";
+import { OptionsTapeSmartFlowDetailSurface } from "./detail-surface";
 import { buildDefaultOptionsTapeFilters, getOptionsTapeScopeFilters } from "./filters";
 import {
   formatOptionsTapeContractLabel,
@@ -73,6 +81,14 @@ const EMPTY_SMART_FLOW_SUPPORT_BY_TRACE_ID = new Map<
 >();
 
 const GLOBAL_SCOPE: OptionsTapeScope = { mode: "global" };
+
+type OptionsTapeSmartFlowDetailState = {
+  status: "loading" | "ready" | "error";
+  request: OptionsTapeSmartFlowDetailRequest;
+  context: OptionsTapeRowContext;
+  detail?: OptionsSmartFlowTriageDetail;
+  error?: string;
+};
 
 const getOptionsTapeSettingsStorage = () => {
   if (typeof window === "undefined") {
@@ -305,7 +321,12 @@ export const OptionsTape = ({
     []
   );
   const [scope, setScope] = useState<OptionsTapeScope>(GLOBAL_SCOPE);
+  const [smartFlowDetail, setSmartFlowDetail] = useState<OptionsTapeSmartFlowDetailState | null>(
+    null
+  );
   const mountedRef = useRef(true);
+  const smartFlowDetailRequestIdRef = useRef(0);
+  const smartFlowDetailTriggerRef = useRef<HTMLButtonElement | null>(null);
   const supportContextRef = useRef({
     smartFlowSupportByTraceId: EMPTY_SMART_FLOW_SUPPORT_BY_TRACE_ID as ReadonlyMap<
       string,
@@ -539,13 +560,83 @@ export const OptionsTape = ({
     onClearFocus?.();
   }, [onClearFocus]);
 
+  const clearSmartFlowDetail = useCallback(() => {
+    smartFlowDetailRequestIdRef.current += 1;
+    setSmartFlowDetail(null);
+  }, []);
+
+  const closeSmartFlowDetail = useCallback(() => {
+    clearSmartFlowDetail();
+    requestAnimationFrame(() => {
+      smartFlowDetailTriggerRef.current?.focus();
+    });
+  }, [clearSmartFlowDetail]);
+
+  const loadSmartFlowDetail = useCallback(
+    (request: OptionsTapeSmartFlowDetailRequest, context: OptionsTapeRowContext) => {
+      const requestId = smartFlowDetailRequestIdRef.current + 1;
+      smartFlowDetailRequestIdRef.current = requestId;
+      setSmartFlowDetail({ status: "loading", request, context });
+
+      void loadOptionsTapeSmartFlowDetail(request, {
+        apiBaseUrl: sourceOptions?.apiBaseUrl,
+        fetcher: sourceOptions?.fetcher
+      })
+        .then((detail) => {
+          if (!mountedRef.current || smartFlowDetailRequestIdRef.current !== requestId) {
+            return;
+          }
+          setSmartFlowDetail({ status: "ready", request, context, detail });
+        })
+        .catch((error) => {
+          if (!mountedRef.current || smartFlowDetailRequestIdRef.current !== requestId) {
+            return;
+          }
+          setSmartFlowDetail({
+            status: "error",
+            request,
+            context,
+            error: error instanceof Error ? error.message : String(error)
+          });
+        });
+    },
+    [sourceOptions?.apiBaseUrl, sourceOptions?.fetcher]
+  );
+
+  const openSmartFlowDetail = useCallback(
+    (context: OptionsTapeRowContext, trigger: HTMLButtonElement) => {
+      if (!context.smartFlow) {
+        return;
+      }
+      smartFlowDetailTriggerRef.current = trigger;
+      loadSmartFlowDetail(
+        {
+          optionTraceId: context.print.trace_id,
+          projectionTraceId: context.smartFlow.support.projection_trace_id,
+          packetId: context.packet?.packetId ?? context.smartFlow.support.packet_id ?? undefined,
+          optionContractId: normalizeOptionsTapeContractId(context.print.option_contract_id)
+        },
+        context
+      );
+    },
+    [loadSmartFlowDetail]
+  );
+
+  const retrySmartFlowDetail = useCallback(() => {
+    if (!smartFlowDetail) {
+      return;
+    }
+    loadSmartFlowDetail(smartFlowDetail.request, smartFlowDetail.context);
+  }, [loadSmartFlowDetail, smartFlowDetail]);
+
   const updateFilters = useCallback<Dispatch<SetStateAction<OptionFlowFilters>>>(
     (nextFilters) => {
+      clearSmartFlowDetail();
       setScope(GLOBAL_SCOPE);
       onClearFocus?.();
       setFilters(nextFilters);
     },
-    [onClearFocus, setFilters]
+    [clearSmartFlowDetail, onClearFocus, setFilters]
   );
 
   const showAllForContract = useCallback(() => {
@@ -560,10 +651,34 @@ export const OptionsTape = ({
     });
   }, [scope]);
 
+  const openDetailPacketScope = useCallback(() => {
+    const detail = smartFlowDetail?.detail;
+    const context = smartFlowDetail?.context;
+    const packet = detail?.packet ?? context?.packet?.packet;
+    if (!context || !packet) {
+      return;
+    }
+    onContractFocus?.(context.print);
+    onPacketFocus?.(
+      packetRequestFromPrint({ print: context.print, packet, source: "options-tape" })
+    );
+    setScope(getPacketFocusScope(context.print, packet, context));
+  }, [onContractFocus, onPacketFocus, smartFlowDetail]);
+
+  const openDetailContractScope = useCallback(() => {
+    const context = smartFlowDetail?.context;
+    if (!context) {
+      return;
+    }
+    onContractFocus?.(context.print);
+    setScope(getContractFocusScope(context.print, context));
+  }, [onContractFocus, smartFlowDetail]);
+
   const activatePrint = useCallback(
     (event: DurableTapeFocusEvent<OptionPrint>) => {
       const context = contextForPrint(event.item);
       const { print, packet } = context;
+      clearSmartFlowDetail();
       if (packet?.packet) {
         const nextScope = getPacketFocusScope(print, packet.packet, context);
         onContractFocus?.(print);
@@ -576,7 +691,7 @@ export const OptionsTape = ({
       onContractFocus?.(print);
       setScope(getContractFocusScope(print, context));
     },
-    [contextForPrint, onContractFocus, onPacketFocus]
+    [clearSmartFlowDetail, contextForPrint, onContractFocus, onPacketFocus]
   );
 
   const renderHover = useCallback(
@@ -664,7 +779,9 @@ export const OptionsTape = ({
         renderRow={({ item, columns }) =>
           renderOptionsTapeRow({
             context: contextForPrint(item),
-            columns
+            columns,
+            onMoreInfo: openSmartFlowDetail,
+            activeDetailTraceId: smartFlowDetail?.context.print.trace_id ?? null
           })
         }
         rowHeight={rowHeight}
@@ -675,6 +792,18 @@ export const OptionsTape = ({
         templates={templates}
         title={title}
       />
+      {smartFlowDetail ? (
+        <OptionsTapeSmartFlowDetailSurface
+          status={smartFlowDetail.status}
+          context={smartFlowDetail.context}
+          detail={smartFlowDetail.detail}
+          error={smartFlowDetail.error}
+          onClose={closeSmartFlowDetail}
+          onRetry={retrySmartFlowDetail}
+          onOpenPacketScope={openDetailPacketScope}
+          onOpenContractScope={openDetailContractScope}
+        />
+      ) : null}
     </section>
   );
 };

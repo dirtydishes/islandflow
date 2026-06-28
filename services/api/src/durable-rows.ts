@@ -436,6 +436,25 @@ const buildDurableOptionRow = (
   });
 };
 
+export const composeDurableOptionRows = (
+  prints: readonly OptionPrint[],
+  context: Omit<DurableRowCompositionContext, "alerts" | "optionPrints"> & {
+    optionPrints?: OptionPrint[];
+  }
+): DurableTapeOptionRowViewModel[] => {
+  const optionPrints = context.optionPrints ?? [...prints];
+  const lookups = buildDurableRowLookups({
+    alerts: [],
+    optionPrints,
+    flowPackets: context.flowPackets,
+    nbbo: context.nbbo,
+    smartFlowProjections: context.smartFlowProjections,
+    smartFlowSupportByTraceId: context.smartFlowSupportByTraceId
+  });
+
+  return prints.map((print) => buildDurableOptionRow(print, lookups));
+};
+
 const buildDurableAlertRow = (
   alert: SmartFlowAlertEvent,
   lookups: DurableRowLookups

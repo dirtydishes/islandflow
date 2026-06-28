@@ -2,12 +2,18 @@ import { describe, expect, it } from "bun:test";
 import type { ClickHouseClient } from "@islandflow/storage";
 import {
   type FlowPacket,
+  type OptionNBBO,
+  type OptionPrint,
   SMART_FLOW_CONTRACT_VERSION,
   SMART_FLOW_HYPOTHESIS_SCORE_MODEL_VERSION,
   SMART_FLOW_HYPOTHESIS_SCORE_POLICY_VERSION,
   type SmartFlowExplainabilityProjection,
   smartFlowExplainabilityFromHypothesisEvent
 } from "@islandflow/types";
+import {
+  lookupOptionsSmartFlowTriageDetail,
+  parseOptionsSmartFlowDetailParams
+} from "../src/options-smart-flow-detail";
 import { lookupOptionsSupport } from "../src/options-support";
 import { resolveSmartFlowSupportFromContext } from "../src/smart-flow-support-resolver";
 
@@ -67,6 +73,24 @@ const makeSmartFlowProjection = (packet: FlowPacket): SmartFlowExplainabilityPro
     generated_from: "flow_evidence_cluster"
   });
 };
+
+const makePrint = (overrides: Partial<OptionPrint> = {}): OptionPrint => ({
+  source_ts: 1_000,
+  ingest_ts: 1_001,
+  seq: 1,
+  trace_id: "print:1",
+  ts: 1_000,
+  option_contract_id: "SPY-2025-01-17-450-C",
+  price: 1.25,
+  size: 100,
+  exchange: "CBOE",
+  option_type: "call",
+  nbbo_side: "A",
+  notional: 12_500,
+  signal_pass: true,
+  signal_profile: "smart-flow",
+  ...overrides
+});
 
 describe("options support lookup", () => {
   it("projects canonical smart_flow beside packet and nbbo support", async () => {
@@ -166,5 +190,113 @@ describe("options support lookup", () => {
       },
       nbbo_by_trace_id: { "print:1": null }
     });
+  });
+});
+
+describe("options smart-flow triage detail", () => {
+  it("parses bounded detail params", () => {
+    const params = parseOptionsSmartFlowDetailParams(
+      new URL(
+        "http://localhost/options/smart-flow-detail?option_trace_id=print%3A1&projection_trace_id=smartflow%3A1&packet_id=flowpacket%3A1&option_contract_id=SPY-2025-01-17-450-C&packet_limit=8&contract_limit=9"
+      )
+    );
+
+    expect(params).toMatchObject({
+      optionTraceId: "print:1",
+      projectionTraceId: "smartflow:1",
+      packetId: "flowpacket:1",
+      optionContractId: "SPY-2025-01-17-450-C",
+      packetLimit: 8,
+      contractLimit: 9
+    });
+  });
+
+  it("returns projection detail plus bounded server-composed packet and contract rows", async () => {
+    const packet = makePacket();
+    const smartFlow = makeSmartFlowProjection(packet);
+    const selected = makePrint();
+    const packetPeer = makePrint({ trace_id: "print:2", seq: 2, ts: 990 });
+    const contractPeer = makePrint({ trace_id: "print:3", seq: 3, ts: 980 });
+    const supportInputs: string[][] = [];
+
+    const detail = await lookupOptionsSmartFlowTriageDetail(
+      clickhouse,
+      {
+        optionTraceId: "print:1",
+        projectionTraceId: smartFlow.trace_id,
+        packetId: packet.id,
+        optionContractId: selected.option_contract_id,
+        packetBefore: { ts: Number.MAX_SAFE_INTEGER, seq: Number.MAX_SAFE_INTEGER },
+        packetLimit: 12,
+        contractBefore: { ts: Number.MAX_SAFE_INTEGER, seq: Number.MAX_SAFE_INTEGER },
+        contractLimit: 12
+      },
+      {
+        resolveSmartFlowSupport: async (_client, input) => {
+          supportInputs.push(input.optionTraceIds);
+          return {
+            supportByTraceId: resolveSmartFlowSupportFromContext({
+              optionTraceIds: input.optionTraceIds,
+              packets: [packet],
+              projections: [smartFlow]
+            }),
+            packets: [packet],
+            smartFlowProjections: [smartFlow],
+            storageLookups: {
+              packetTraceIds: input.optionTraceIds,
+              evidenceRefs: [packet.id, ...input.optionTraceIds]
+            }
+          };
+        },
+        fetchFlowPacketById: async (_client, packetId) => (packetId === packet.id ? packet : null),
+        fetchOptionPrintsByTraceIds: async (_client, traceIds) =>
+          traceIds.includes(selected.trace_id) ? [selected] : [],
+        fetchOptionPrintsForFlowPacketBefore: async (
+          _client,
+          packetId,
+          _beforeTs,
+          _beforeSeq,
+          limit,
+          pinnedTraceId
+        ) => {
+          expect(packetId).toBe(packet.id);
+          expect(limit).toBe(12);
+          expect(pinnedTraceId).toBe(selected.trace_id);
+          return { packet, pinned: selected, data: [packetPeer] };
+        },
+        fetchOptionPrintsBefore: async (
+          _client,
+          _beforeTs,
+          _beforeSeq,
+          limit,
+          _source,
+          filters
+        ) => {
+          expect(limit).toBe(12);
+          expect(filters).toMatchObject({
+            view: "raw",
+            optionContractId: selected.option_contract_id
+          });
+          return [contractPeer];
+        },
+        fetchNearestOptionNBBOForPrints: async (_client, inputs) =>
+          Object.fromEntries(inputs.map((input) => [input.trace_id, null as OptionNBBO | null]))
+      }
+    );
+
+    expect(supportInputs[0]).toEqual(["print:1"]);
+    expect(detail.projection_trace_id).toBe(smartFlow.trace_id);
+    expect(detail.packet?.id).toBe(packet.id);
+    expect(detail.selected_print?.option.trace_id).toBe(selected.trace_id);
+    expect(detail.packet_members.rows.map((row) => row.option.trace_id)).toEqual([
+      selected.trace_id,
+      packetPeer.trace_id
+    ]);
+    expect(detail.exact_contract.rows.map((row) => row.option.trace_id)).toEqual([
+      selected.trace_id,
+      contractPeer.trace_id
+    ]);
+    expect(detail.packet_members.rows[0]?.support.smart_flow_status).toBe("matched");
+    expect(detail.detail_unavailable_reason).toBeNull();
   });
 });

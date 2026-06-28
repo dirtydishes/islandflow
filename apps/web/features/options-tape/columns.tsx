@@ -21,6 +21,13 @@ import type { OptionsTapeColumnId, OptionsTapeMode, OptionsTapeRowContext } from
 export const OPTIONS_TAPE_COLUMNS: DurableTapeColumnDefinition<OptionPrint, OptionsTapeColumnId>[] =
   [
     {
+      id: "info",
+      label: "",
+      minWidth: 42,
+      className: "options-tape-cell-info",
+      render: () => ""
+    },
+    {
       id: "time",
       label: "TIME",
       minWidth: 72,
@@ -110,25 +117,28 @@ export const OPTIONS_TAPE_TEMPLATES_BY_MODE: Record<
   DurableTapeTemplate<OptionsTapeColumnId>[]
 > = {
   global: [
-    { id: "full", columns: ["time", "contract", "price", "size", "premium", "side", "iv"] },
-    { id: "twoThirds", columns: ["time", "contract", "price", "size", "premium", "side"] },
-    { id: "half", columns: ["time", "contract", "premium", "side"] },
-    { id: "oneThird", columns: ["contract", "premium", "side"] },
-    { id: "micro", columns: ["contract", "premium"] }
+    { id: "full", columns: ["info", "time", "contract", "price", "size", "premium", "side"] },
+    { id: "twoThirds", columns: ["info", "time", "contract", "price", "premium", "side"] },
+    { id: "half", columns: ["info", "time", "contract", "premium", "side"] },
+    { id: "oneThird", columns: ["info", "contract", "premium"] },
+    { id: "micro", columns: ["info", "contract"] }
   ],
   packet: [
-    { id: "full", columns: ["dte", "time", "price", "size", "premium", "side", "spot"] },
-    { id: "twoThirds", columns: ["time", "price", "size", "premium", "side", "spot"] },
-    { id: "half", columns: ["time", "price", "premium", "side"] },
-    { id: "oneThird", columns: ["time", "premium", "side"] },
-    { id: "micro", columns: ["premium", "side"] }
+    { id: "full", columns: ["info", "dte", "time", "price", "size", "premium", "side"] },
+    { id: "twoThirds", columns: ["info", "time", "price", "size", "premium", "side"] },
+    { id: "half", columns: ["info", "time", "price", "premium", "side"] },
+    { id: "oneThird", columns: ["info", "time", "premium"] },
+    { id: "micro", columns: ["info", "premium"] }
   ],
   contract: [
-    { id: "full", columns: ["time", "price", "size", "premium", "nbbo", "side", "exchange", "iv"] },
-    { id: "twoThirds", columns: ["time", "price", "size", "premium", "nbbo", "side"] },
-    { id: "half", columns: ["time", "price", "premium", "side"] },
-    { id: "oneThird", columns: ["price", "premium", "side"] },
-    { id: "micro", columns: ["price", "premium"] }
+    {
+      id: "full",
+      columns: ["info", "time", "price", "size", "premium", "nbbo", "side", "exchange"]
+    },
+    { id: "twoThirds", columns: ["info", "time", "price", "premium", "nbbo", "side"] },
+    { id: "half", columns: ["info", "time", "price", "premium", "side"] },
+    { id: "oneThird", columns: ["info", "price", "premium"] },
+    { id: "micro", columns: ["info", "premium"] }
   ]
 };
 
@@ -139,12 +149,48 @@ const renderSideCell = (content: ReactNode): ReactNode => {
 
 export const renderOptionsTapeRow = ({
   context,
-  columns
+  columns,
+  onMoreInfo,
+  activeDetailTraceId
 }: {
   context: OptionsTapeRowContext;
   columns: DurableTapeColumnDefinition<OptionPrint>[];
+  onMoreInfo?: (context: OptionsTapeRowContext, trigger: HTMLButtonElement) => void;
+  activeDetailTraceId?: string | null;
 }): ReactNode =>
   columns.map((column) => {
+    if (column.id === "info") {
+      const hasSmartFlow = Boolean(context.smartFlow);
+      return (
+        <span
+          className={`durable-tape-cell ${column.className ?? ""}`.trim()}
+          data-align="center"
+          key={column.id}
+          role="cell"
+        >
+          {hasSmartFlow ? (
+            <button
+              aria-label={`Open smart-flow more info for ${formatOptionsTapeContractLabel(
+                context.print.option_contract_id
+              )}`}
+              className="options-tape-more-info"
+              data-active={activeDetailTraceId === context.print.trace_id}
+              onClick={(event) => {
+                event.stopPropagation();
+                onMoreInfo?.(context, event.currentTarget);
+              }}
+              onKeyDown={(event) => {
+                event.stopPropagation();
+              }}
+              title="Smart-flow more info"
+              type="button"
+            >
+              i
+            </button>
+          ) : null}
+        </span>
+      );
+    }
     const rawContent =
       column.id === "nbbo"
         ? formatOptionsTapeNbbo(context.print, context.nbbo)

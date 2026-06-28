@@ -16,6 +16,7 @@ import type {
 } from "../durable-tape/types";
 
 export type OptionsTapeColumnId =
+  | "info"
   | "time"
   | "contract"
   | "dte"

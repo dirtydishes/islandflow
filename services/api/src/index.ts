@@ -130,6 +130,10 @@ import {
   parseOptionPrintTraceLookupParams
 } from "./option-print-lookup";
 import { getOptionPrintQueryErrorStatus, parseOptionPrintQuery } from "./option-queries";
+import {
+  lookupOptionsSmartFlowTriageDetail,
+  parseOptionsSmartFlowDetailParams
+} from "./options-smart-flow-detail";
 import { lookupOptionsSupport } from "./options-support";
 import { ApiRateLimiter, buildRateLimitResponse, recordRateLimitRejection } from "./rate-limit";
 import {
@@ -1768,6 +1772,34 @@ const run = async () => {
                 detail: error instanceof Error ? error.message : String(error)
               },
               400
+            );
+          }
+        }
+
+        if (req.method === "GET" && url.pathname === "/options/smart-flow-detail") {
+          const startedAt = Date.now();
+          try {
+            const params = parseOptionsSmartFlowDetailParams(url);
+            const data = await lookupOptionsSmartFlowTriageDetail(clickhouse, params);
+            metrics.timing("api.options.smart_flow_detail_ms", Date.now() - startedAt, {
+              status: "ok",
+              packet_rows: String(data.packet_members.row_count),
+              contract_rows: String(data.exact_contract.row_count)
+            });
+            return jsonResponse({ data });
+          } catch (error) {
+            metrics.timing("api.options.smart_flow_detail_ms", Date.now() - startedAt, {
+              status: error instanceof z.ZodError ? "invalid" : "error"
+            });
+            return jsonResponse(
+              {
+                error:
+                  error instanceof z.ZodError
+                    ? "invalid options smart-flow detail query"
+                    : "options smart-flow detail failed",
+                detail: getErrorMessage(error)
+              },
+              error instanceof z.ZodError ? 400 : 503
             );
           }
         }
