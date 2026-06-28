@@ -66,12 +66,23 @@ type QaChartPreviewProps = {
   status: MarketChartStatus;
 };
 
+type QaChartCandleBootstrapStatus = "loading" | "ready" | "unavailable";
+
+type QaChartCandleBootstrapState = {
+  candles: MarketChartCandleInput[];
+  status: QaChartCandleBootstrapStatus;
+  failure?: string;
+  canRetry: boolean;
+  retry: () => void;
+};
+
 type QaOptionsSupportDiagnosticsProps = {
   rows: readonly DurableTapeOptionRowViewModel[];
   status: string;
 };
 
 const QA_INTERVAL_MS = 60_000;
+const QA_CANDLE_BOOTSTRAP_RETRY_LIMIT = 2;
 const QA_FEATURES: DurableTapeFeatureInput[] = [
   "default",
   { key: "clickhouseHistory", enabled: false },
@@ -137,42 +148,111 @@ const buildByIdMap = <T extends { id?: string; trace_id?: string }>(
   return map;
 };
 
-const useQaChartCandleBootstrap = (): MarketChartCandleInput[] => {
-  const [candles, setCandles] = useState<MarketChartCandleInput[]>([]);
+type QaChartCandleBootstrapFetchOptions = {
+  apiBaseUrl?: string;
+  fetcher?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+  signal?: AbortSignal;
+};
+
+const isAbortError = (error: unknown): boolean =>
+  error instanceof DOMException && error.name === "AbortError";
+
+const formatQaChartCandleBootstrapFailure = (error: unknown): string => {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+  return "The QA candle bootstrap API did not respond.";
+};
+
+export const buildQaChartCandleBootstrapUrl = (apiBaseUrl?: string): string => {
+  const url = new URL(buildBrowserApiUrl("/candles/equities", apiBaseUrl));
+  url.searchParams.set("underlying_id", "SPY");
+  url.searchParams.set("interval_ms", QA_INTERVAL_MS.toString());
+  url.searchParams.set("limit", "300");
+  url.searchParams.set("cache", "1");
+  return url.toString();
+};
+
+export const fetchQaChartCandleBootstrap = async ({
+  apiBaseUrl,
+  fetcher = fetch,
+  signal
+}: QaChartCandleBootstrapFetchOptions = {}): Promise<MarketChartCandleInput[]> => {
+  const response = await fetcher(buildQaChartCandleBootstrapUrl(apiBaseUrl), { signal });
+  if (!response.ok) {
+    throw new Error(`QA candle bootstrap failed with ${response.status}`);
+  }
+  const payload = (await response.json()) as { data?: MarketChartCandleInput[] };
+  return payload.data ?? [];
+};
+
+export const resolveQaChartStatus = ({
+  bootstrapStatus,
+  candleCount,
+  liveStatus
+}: {
+  bootstrapStatus: QaChartCandleBootstrapStatus;
+  candleCount: number;
+  liveStatus: string;
+}): MarketChartStatus => {
+  if (liveStatus === "connected") {
+    return candleCount > 0 ? "live" : bootstrapStatus === "unavailable" ? "error" : "loading";
+  }
+  if (liveStatus === "stale") {
+    return "stale";
+  }
+  if (liveStatus === "connecting") {
+    return bootstrapStatus === "unavailable" && candleCount === 0 ? "error" : "loading";
+  }
+  return "error";
+};
+
+const useQaChartCandleBootstrap = (): QaChartCandleBootstrapState => {
+  const [retryCount, setRetryCount] = useState(0);
+  const [state, setState] = useState<{
+    candles: MarketChartCandleInput[];
+    status: QaChartCandleBootstrapStatus;
+    failure?: string;
+  }>({
+    candles: [],
+    status: "loading"
+  });
 
   useEffect(() => {
     const abort = new AbortController();
-    const url = new URL(buildBrowserApiUrl("/candles/equities"));
-    url.searchParams.set("underlying_id", "SPY");
-    url.searchParams.set("interval_ms", QA_INTERVAL_MS.toString());
-    url.searchParams.set("limit", "300");
-    url.searchParams.set("cache", "1");
+    setState((current) => ({ ...current, status: "loading", failure: undefined }));
 
-    void fetch(url.toString(), { signal: abort.signal })
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error(`QA candle bootstrap failed with ${response.status}`);
-        }
-        return (await response.json()) as { data?: MarketChartCandleInput[] };
-      })
-      .then((payload) => {
+    void fetchQaChartCandleBootstrap({ signal: abort.signal })
+      .then((candles) => {
         if (!abort.signal.aborted) {
-          setCandles(payload.data ?? []);
+          setState({ candles, status: "ready" });
         }
       })
       .catch((error) => {
-        if (error instanceof DOMException && error.name === "AbortError") {
+        if (isAbortError(error)) {
           return;
         }
-        console.warn("Failed to load QA chart candles", error);
+        setState({
+          candles: [],
+          status: "unavailable",
+          failure: formatQaChartCandleBootstrapFailure(error)
+        });
       });
 
     return () => {
       abort.abort();
     };
-  }, []);
+  }, [retryCount]);
 
-  return candles;
+  return {
+    ...state,
+    canRetry: state.status === "unavailable" && retryCount < QA_CANDLE_BOOTSTRAP_RETRY_LIMIT,
+    retry: () => {
+      setRetryCount((current) =>
+        current < QA_CANDLE_BOOTSTRAP_RETRY_LIMIT ? current + 1 : current
+      );
+    }
+  };
 };
 
 const QaSection = ({ id, title, summary, options, children, style }: QaSectionProps) => (
@@ -230,6 +310,32 @@ const QAMarketChartPreview = ({ template, candles, lowerSeries, status }: QaChar
         />
       </div>
     </MarketChartSection>
+  );
+};
+
+const QaCandleBootstrapNotice = ({ bootstrap }: { bootstrap: QaChartCandleBootstrapState }) => {
+  if (bootstrap.status !== "unavailable") {
+    return null;
+  }
+
+  return (
+    <div className="durable-tapes-bootstrap-status" role="status" aria-live="polite">
+      <div>
+        <span>Candle Bootstrap</span>
+        <strong>Unavailable</strong>
+      </div>
+      <p>
+        {bootstrap.failure ?? "The QA candle API did not respond."} Chart shells stay mounted and
+        live candles can still fill in.
+      </p>
+      {bootstrap.canRetry ? (
+        <button type="button" onClick={bootstrap.retry}>
+          Retry candles
+        </button>
+      ) : (
+        <em>Retry limit reached</em>
+      )}
+    </div>
   );
 };
 
@@ -327,11 +433,11 @@ export const DurableTapesQaRoute = () => {
   const smartFlowProjections = optionsPane.smartFlowProjections;
   const alerts = alertsPane.alerts;
   const newsStories = newsPane.stories;
-  const fetchedChartCandles = useQaChartCandleBootstrap();
+  const fetchedChartBootstrap = useQaChartCandleBootstrap();
   const chartCandleInput =
     state.liveSession.chartCandles.length > 0
       ? state.liveSession.chartCandles
-      : fetchedChartCandles;
+      : fetchedChartBootstrap.candles;
   const chartCandles = useMemo(
     () => normalizeMarketChartCandles(chartCandleInput),
     [chartCandleInput]
@@ -344,16 +450,11 @@ export const DurableTapesQaRoute = () => {
       }),
     [chartCandles, smartFlowProjections]
   );
-  const chartStatus: MarketChartStatus =
-    state.liveSession.status === "connected"
-      ? chartCandles.length > 0
-        ? "live"
-        : "loading"
-      : state.liveSession.status === "stale"
-        ? "stale"
-        : state.liveSession.status === "connecting"
-          ? "loading"
-          : "error";
+  const chartStatus = resolveQaChartStatus({
+    bootstrapStatus: fetchedChartBootstrap.status,
+    candleCount: chartCandles.length,
+    liveStatus: state.liveSession.status
+  });
 
   const flowSource = useMemo(() => createStaticFlowPacketsTapeSource(flowPackets), [flowPackets]);
   const equitiesSource = useMemo(
@@ -378,6 +479,7 @@ export const DurableTapesQaRoute = () => {
             } as CSSProperties
           }
         >
+          <QaCandleBootstrapNotice bootstrap={fetchedChartBootstrap} />
           <QaTemplateMatrix
             renderPreview={(template) => (
               <QAMarketChartPreview
