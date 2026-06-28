@@ -59,8 +59,10 @@ Evidence:
 ## PR And Commits
 
 - Branch: `lavender/islandflow-j06e-6-qa-history-failures`
-- PR: pending publication
-- Commits: pending
+- PR: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/99`
+- Commits:
+  - `63de914027cb8e6ea422c11a6e1361fdcdd056ff` - handle options and qa history failures
+  - final turn-doc publication update
 
 ## Beads Updates
 
@@ -79,4 +81,4 @@ None.
 
 ## Closeout
 
-Implementation complete locally. PR publication pending.
+Implementation complete and PR published. Orchestrator owns review-thread creation, Beads closeout, merge, and epic closeout.
