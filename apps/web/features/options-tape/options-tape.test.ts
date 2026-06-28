@@ -278,15 +278,27 @@ describe("options tape helpers", () => {
         projectionTraceId: "smart-flow:1",
         packetId: "flowpacket:1",
         optionContractId: "SPY-2026-06-22-555-C",
+        packetBefore: { ts: 500, seq: 5 },
+        contractBefore: { ts: 400, seq: 4 },
         packetLimit: 8,
         contractLimit: 10
       },
       "https://api.example.test"
     );
+    const params = new URL(url).searchParams;
 
-    expect(url).toBe(
-      "https://api.example.test/options/smart-flow-detail?option_trace_id=print%3A1&projection_trace_id=smart-flow%3A1&packet_id=flowpacket%3A1&option_contract_id=SPY-2026-06-22-555-C&packet_limit=8&contract_limit=10"
-    );
+    expect(new URL(url).origin).toBe("https://api.example.test");
+    expect(new URL(url).pathname).toBe("/options/smart-flow-detail");
+    expect(params.get("option_trace_id")).toBe("print:1");
+    expect(params.get("projection_trace_id")).toBe("smart-flow:1");
+    expect(params.get("packet_id")).toBe("flowpacket:1");
+    expect(params.get("option_contract_id")).toBe("SPY-2026-06-22-555-C");
+    expect(params.get("packet_before_ts")).toBe("500");
+    expect(params.get("packet_before_seq")).toBe("5");
+    expect(params.get("contract_before_ts")).toBe("400");
+    expect(params.get("contract_before_seq")).toBe("4");
+    expect(params.get("packet_limit")).toBe("8");
+    expect(params.get("contract_limit")).toBe("10");
   });
 
   it("filters smart-flow-only rows from resolved support context without scanning projections", () => {

@@ -63,10 +63,10 @@ class TtlCache<T> {
 export type SmartFlowOptionSupportResolution = DurableTapeSmartFlowSupportResolution;
 
 export type SmartFlowSupportResolverInput = {
-  optionTraceIds: string[];
-  packetIds?: string[];
-  hotPackets?: FlowPacket[];
-  hotSmartFlowProjections?: SmartFlowExplainabilityProjection[];
+  optionTraceIds: readonly string[];
+  packetIds?: readonly string[];
+  hotPackets?: readonly FlowPacket[];
+  hotSmartFlowProjections?: readonly SmartFlowExplainabilityProjection[];
   allowStorageFallback?: boolean;
 };
 

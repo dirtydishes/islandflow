@@ -3825,6 +3825,12 @@ h3 {
   gap: 3px;
 }
 
+.options-tape-triage-section-head > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
 .options-tape-triage span,
 .options-tape-triage dt,
 .options-tape-triage-section-head em {
@@ -3867,7 +3873,8 @@ h3 {
 }
 
 .options-tape-triage-actions button,
-.options-tape-triage-unavailable button {
+.options-tape-triage-unavailable button,
+.options-tape-triage-section-head button {
   min-height: 30px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -3884,10 +3891,17 @@ h3 {
 .options-tape-triage-actions button:hover,
 .options-tape-triage-actions button:focus-visible,
 .options-tape-triage-unavailable button:hover,
-.options-tape-triage-unavailable button:focus-visible {
+.options-tape-triage-unavailable button:focus-visible,
+.options-tape-triage-section-head button:hover,
+.options-tape-triage-section-head button:focus-visible {
   border-color: var(--border-strong);
   background: var(--accent-soft);
   color: var(--text);
+}
+
+.options-tape-triage-section-head button:disabled {
+  cursor: wait;
+  opacity: 0.62;
 }
 
 .options-tape-triage-grid {
@@ -4077,6 +4091,11 @@ h3 {
 
   .options-tape-triage-actions button {
     flex: 1 1 120px;
+  }
+
+  .options-tape-triage-section-head {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .options-tape-triage dl div {

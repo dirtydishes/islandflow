@@ -88,6 +88,8 @@ type OptionsTapeSmartFlowDetailState = {
   context: OptionsTapeRowContext;
   detail?: OptionsSmartFlowTriageDetail;
   error?: string;
+  pageLoading?: "packet" | "contract" | null;
+  pageError?: string;
 };
 
 const getOptionsTapeSettingsStorage = () => {
@@ -122,6 +124,40 @@ const packetRequestFromPrint = ({
   memberTraceIds: packet.members,
   optionContractId: getPacketContractId(packet) ?? print.option_contract_id,
   source
+});
+
+type OptionsSmartFlowTriageRows = OptionsSmartFlowTriageDetail["packet_members"];
+
+const mergeTriageRows = (
+  current: OptionsSmartFlowTriageRows,
+  incoming: OptionsSmartFlowTriageRows
+): OptionsSmartFlowTriageRows => {
+  const rowsById = new Map<string, OptionsSmartFlowTriageRows["rows"][number]>();
+  for (const row of [...current.rows, ...incoming.rows]) {
+    rowsById.set(row.id, row);
+  }
+  const rows = Array.from(rowsById.values());
+  return {
+    ...incoming,
+    rows,
+    row_count: rows.length
+  };
+};
+
+const mergeSmartFlowDetailPage = (
+  current: OptionsSmartFlowTriageDetail,
+  incoming: OptionsSmartFlowTriageDetail,
+  page: "packet" | "contract"
+): OptionsSmartFlowTriageDetail => ({
+  ...current,
+  packet_members:
+    page === "packet"
+      ? mergeTriageRows(current.packet_members, incoming.packet_members)
+      : current.packet_members,
+  exact_contract:
+    page === "contract"
+      ? mergeTriageRows(current.exact_contract, incoming.exact_contract)
+      : current.exact_contract
 });
 
 const scopeToSourceScope = (scope: OptionsTapeScope): OptionsTapeSourceScope => {
@@ -629,6 +665,71 @@ export const OptionsTape = ({
     loadSmartFlowDetail(smartFlowDetail.request, smartFlowDetail.context);
   }, [loadSmartFlowDetail, smartFlowDetail]);
 
+  const loadSmartFlowDetailPage = useCallback(
+    (page: "packet" | "contract") => {
+      if (
+        !smartFlowDetail?.detail ||
+        smartFlowDetail.status !== "ready" ||
+        smartFlowDetail.pageLoading
+      ) {
+        return;
+      }
+      const cursor =
+        page === "packet"
+          ? smartFlowDetail.detail.packet_members.next_before
+          : smartFlowDetail.detail.exact_contract.next_before;
+      if (!cursor) {
+        return;
+      }
+
+      const request: OptionsTapeSmartFlowDetailRequest = {
+        ...smartFlowDetail.request,
+        ...(page === "packet" ? { packetBefore: cursor } : { contractBefore: cursor })
+      };
+      const requestId = smartFlowDetailRequestIdRef.current;
+      setSmartFlowDetail((current) =>
+        current ? { ...current, pageLoading: page, pageError: undefined } : current
+      );
+
+      void loadOptionsTapeSmartFlowDetail(request, {
+        apiBaseUrl: sourceOptions?.apiBaseUrl,
+        fetcher: sourceOptions?.fetcher
+      })
+        .then((detail) => {
+          if (!mountedRef.current || smartFlowDetailRequestIdRef.current !== requestId) {
+            return;
+          }
+          setSmartFlowDetail((current) => {
+            if (!current?.detail) {
+              return current;
+            }
+            return {
+              ...current,
+              status: "ready",
+              detail: mergeSmartFlowDetailPage(current.detail, detail, page),
+              pageLoading: null,
+              pageError: undefined
+            };
+          });
+        })
+        .catch((error) => {
+          if (!mountedRef.current || smartFlowDetailRequestIdRef.current !== requestId) {
+            return;
+          }
+          setSmartFlowDetail((current) =>
+            current
+              ? {
+                  ...current,
+                  pageLoading: null,
+                  pageError: error instanceof Error ? error.message : String(error)
+                }
+              : current
+          );
+        });
+    },
+    [smartFlowDetail, sourceOptions?.apiBaseUrl, sourceOptions?.fetcher]
+  );
+
   const updateFilters = useCallback<Dispatch<SetStateAction<OptionFlowFilters>>>(
     (nextFilters) => {
       clearSmartFlowDetail();
@@ -798,10 +899,15 @@ export const OptionsTape = ({
           context={smartFlowDetail.context}
           detail={smartFlowDetail.detail}
           error={smartFlowDetail.error}
+          pageError={smartFlowDetail.pageError}
+          packetPageLoading={smartFlowDetail.pageLoading === "packet"}
+          contractPageLoading={smartFlowDetail.pageLoading === "contract"}
           onClose={closeSmartFlowDetail}
           onRetry={retrySmartFlowDetail}
           onOpenPacketScope={openDetailPacketScope}
           onOpenContractScope={openDetailContractScope}
+          onLoadMorePacketRows={() => loadSmartFlowDetailPage("packet")}
+          onLoadMoreContractRows={() => loadSmartFlowDetailPage("contract")}
         />
       ) : null}
     </section>

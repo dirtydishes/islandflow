@@ -197,7 +197,7 @@ describe("options smart-flow triage detail", () => {
   it("parses bounded detail params", () => {
     const params = parseOptionsSmartFlowDetailParams(
       new URL(
-        "http://localhost/options/smart-flow-detail?option_trace_id=print%3A1&projection_trace_id=smartflow%3A1&packet_id=flowpacket%3A1&option_contract_id=SPY-2025-01-17-450-C&packet_limit=8&contract_limit=9"
+        "http://localhost/options/smart-flow-detail?option_trace_id=print%3A1&projection_trace_id=smartflow%3A1&packet_id=flowpacket%3A1&option_contract_id=SPY-2025-01-17-450-C&packet_before_ts=500&packet_before_seq=5&contract_before_ts=400&contract_before_seq=4&packet_limit=8&contract_limit=9"
       )
     );
 
@@ -206,6 +206,8 @@ describe("options smart-flow triage detail", () => {
       projectionTraceId: "smartflow:1",
       packetId: "flowpacket:1",
       optionContractId: "SPY-2025-01-17-450-C",
+      packetBefore: { ts: 500, seq: 5 },
+      contractBefore: { ts: 400, seq: 4 },
       packetLimit: 8,
       contractLimit: 9
     });

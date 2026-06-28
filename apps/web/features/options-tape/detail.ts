@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  type DurableTapeCursor,
   type OptionsSmartFlowTriageDetail,
   OptionsSmartFlowTriageDetailSchema
 } from "@islandflow/types";
@@ -15,6 +16,8 @@ export type OptionsTapeSmartFlowDetailRequest = {
   projectionTraceId?: string;
   packetId?: string;
   optionContractId?: string;
+  packetBefore?: DurableTapeCursor;
+  contractBefore?: DurableTapeCursor;
   packetLimit?: number;
   contractLimit?: number;
 };
@@ -31,6 +34,18 @@ const appendOptionalParam = (url: URL, key: string, value: string | undefined): 
   }
 };
 
+const appendCursorParams = (
+  url: URL,
+  prefix: "packet" | "contract",
+  cursor: DurableTapeCursor | undefined
+): void => {
+  if (!cursor) {
+    return;
+  }
+  url.searchParams.set(`${prefix}_before_ts`, String(cursor.ts));
+  url.searchParams.set(`${prefix}_before_seq`, String(cursor.seq));
+};
+
 export const buildOptionsTapeSmartFlowDetailUrl = (
   request: OptionsTapeSmartFlowDetailRequest,
   apiBaseUrl?: string
@@ -40,6 +55,8 @@ export const buildOptionsTapeSmartFlowDetailUrl = (
   appendOptionalParam(url, "projection_trace_id", request.projectionTraceId);
   appendOptionalParam(url, "packet_id", request.packetId);
   appendOptionalParam(url, "option_contract_id", request.optionContractId);
+  appendCursorParams(url, "packet", request.packetBefore);
+  appendCursorParams(url, "contract", request.contractBefore);
   if (request.packetLimit) {
     url.searchParams.set("packet_limit", String(request.packetLimit));
   }

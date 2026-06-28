@@ -17,10 +17,15 @@ export type OptionsTapeSmartFlowDetailSurfaceProps = {
   context: OptionsTapeRowContext;
   detail?: OptionsSmartFlowTriageDetail;
   error?: string;
+  pageError?: string;
+  packetPageLoading?: boolean;
+  contractPageLoading?: boolean;
   onClose: () => void;
   onRetry: () => void;
   onOpenPacketScope: () => void;
   onOpenContractScope: () => void;
+  onLoadMorePacketRows: () => void;
+  onLoadMoreContractRows: () => void;
 };
 
 const humanizeToken = (value: string | null | undefined): string =>
@@ -89,10 +94,15 @@ export const OptionsTapeSmartFlowDetailSurface = ({
   context,
   detail,
   error,
+  pageError,
+  packetPageLoading = false,
+  contractPageLoading = false,
   onClose,
   onRetry,
   onOpenPacketScope,
-  onOpenContractScope
+  onOpenContractScope,
+  onLoadMorePacketRows,
+  onLoadMoreContractRows
 }: OptionsTapeSmartFlowDetailSurfaceProps) => {
   const rootRef = useRef<HTMLElement | null>(null);
   const smartFlow = context.smartFlow;
@@ -265,8 +275,15 @@ export const OptionsTapeSmartFlowDetailSurface = ({
 
           <section className="options-tape-triage-section">
             <div className="options-tape-triage-section-head">
-              <span>Packet member prints</span>
-              <em>{detail.packet_members.row_count} server rows</em>
+              <div>
+                <span>Packet member prints</span>
+                <em>{detail.packet_members.row_count} loaded rows</em>
+              </div>
+              {detail.packet_members.next_before ? (
+                <button type="button" disabled={packetPageLoading} onClick={onLoadMorePacketRows}>
+                  {packetPageLoading ? "Loading" : "Older packet rows"}
+                </button>
+              ) : null}
             </div>
             {renderRowTable({
               rows: detail.packet_members.rows,
@@ -278,14 +295,32 @@ export const OptionsTapeSmartFlowDetailSurface = ({
 
           <section className="options-tape-triage-section">
             <div className="options-tape-triage-section-head">
-              <span>Exact contract context</span>
-              <em>{detail.exact_contract.row_count} server rows</em>
+              <div>
+                <span>Exact contract context</span>
+                <em>{detail.exact_contract.row_count} loaded rows</em>
+              </div>
+              {detail.exact_contract.next_before ? (
+                <button
+                  type="button"
+                  disabled={contractPageLoading}
+                  onClick={onLoadMoreContractRows}
+                >
+                  {contractPageLoading ? "Loading" : "Older contract rows"}
+                </button>
+              ) : null}
             </div>
             {renderRowTable({
               rows: detail.exact_contract.rows,
               emptyLabel: "No exact-contract rows were returned."
             })}
           </section>
+
+          {pageError ? (
+            <div className="options-tape-triage-unavailable" role="alert">
+              <strong>Older rows unavailable</strong>
+              <p>{pageError}</p>
+            </div>
+          ) : null}
         </>
       ) : null}
     </aside>
