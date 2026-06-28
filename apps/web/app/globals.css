@@ -2512,8 +2512,32 @@ h3 {
   min-width: 0;
 }
 
+.durable-tape-history-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--text-faint);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.durable-tape-history-state-unavailable {
+  color: var(--red);
+}
+
+.durable-tape-history-state > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .durable-tape-settings-trigger,
-.durable-tape-jump {
+.durable-tape-jump,
+.durable-tape-history-retry {
   min-height: 32px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -2529,6 +2553,7 @@ h3 {
 
 .durable-tape-settings-trigger:focus-visible,
 .durable-tape-jump:focus-visible,
+.durable-tape-history-retry:focus-visible,
 .durable-tape-row:focus-visible {
   outline: 2px solid oklch(0.83 0.08 74 / 0.82);
   outline-offset: 2px;
@@ -2541,6 +2566,17 @@ h3 {
 }
 
 .durable-tape-jump:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.durable-tape-history-retry {
+  min-height: 26px;
+  padding: 5px 7px;
+  color: var(--text);
+}
+
+.durable-tape-history-retry:disabled {
   opacity: 0.45;
   cursor: default;
 }
@@ -5188,6 +5224,71 @@ h3 {
   overflow-wrap: anywhere;
 }
 
+.durable-tapes-bootstrap-status {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(180px, 0.6fr) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  border-top: 1px solid oklch(0.65 0.16 28 / 0.42);
+  border-bottom: 1px solid oklch(0.65 0.16 28 / 0.42);
+  padding: 8px 10px;
+  background: oklch(0.18 0.045 28 / 0.32);
+}
+
+.durable-tapes-bootstrap-status div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.durable-tapes-bootstrap-status span,
+.durable-tapes-bootstrap-status em,
+.durable-tapes-bootstrap-status button {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.66rem;
+  font-style: normal;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.durable-tapes-bootstrap-status span {
+  color: var(--text-faint);
+}
+
+.durable-tapes-bootstrap-status strong {
+  color: var(--red);
+  font-size: 0.84rem;
+}
+
+.durable-tapes-bootstrap-status p {
+  min-width: 0;
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.durable-tapes-bootstrap-status button {
+  min-height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 9px;
+  background: var(--bg-soft);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.durable-tapes-bootstrap-status button:focus-visible {
+  outline: 2px solid oklch(0.83 0.08 74 / 0.82);
+  outline-offset: 2px;
+}
+
+.durable-tapes-bootstrap-status em {
+  color: var(--text-faint);
+}
+
 .durable-tapes-support-diagnostics {
   min-width: 0;
   display: grid;
@@ -5673,6 +5774,16 @@ h3 {
 
   .durable-tapes-template-matrix {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .durable-tapes-bootstrap-status {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .durable-tapes-bootstrap-status button,
+  .durable-tapes-bootstrap-status em {
+    justify-self: start;
   }
 
   .durable-tapes-template-frame-full,

@@ -23,6 +23,11 @@ export type DurableTapeHistoryPage<TItem> = {
   items: TItem[];
   nextCursor?: DurableTapeCursor | null;
   exhausted?: boolean;
+  historyUnavailable?: {
+    label: string;
+    detail?: string;
+    retryable?: boolean;
+  };
 };
 
 export type DurableTapeItemAccessors<TItem> = {

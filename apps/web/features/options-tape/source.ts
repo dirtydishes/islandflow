@@ -65,6 +65,27 @@ const prependPinnedPrint = (
 const shouldBypassLiveSnapshot = (scope: OptionsTapeSourceScope | undefined): boolean =>
   Boolean(scope?.packetId || scope?.optionContractId);
 
+const getOptionsHistoryFailureDetail = (error: unknown): string => {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+  return "The options history API did not respond.";
+};
+
+const createOptionsHistoryUnavailablePage = (
+  cursor: DurableTapeCursor,
+  error: unknown
+): DurableTapeHistoryPage<OptionPrint> => ({
+  items: [],
+  nextCursor: cursor,
+  exhausted: true,
+  historyUnavailable: {
+    label: "Options history unavailable",
+    detail: getOptionsHistoryFailureDetail(error),
+    retryable: true
+  }
+});
+
 export const loadOptionsTapeHistoryPage = async ({
   cursor,
   scope,
@@ -88,9 +109,17 @@ export const loadOptionsTapeHistoryPage = async ({
     params.set("before_seq", String(nextCursor.seq));
     url.search = params.toString();
 
-    const response = await fetcher(url.toString());
+    let response: Response;
+    try {
+      response = await fetcher(url.toString());
+    } catch (error) {
+      return createOptionsHistoryUnavailablePage(nextCursor, error);
+    }
     if (!response.ok) {
-      throw new Error(`Options history failed with HTTP ${response.status}`);
+      return createOptionsHistoryUnavailablePage(
+        nextCursor,
+        new Error(`Options history failed with HTTP ${response.status}`)
+      );
     }
 
     const payload = await parseHistoryResponse(response);

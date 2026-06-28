@@ -381,6 +381,42 @@ describe("options tape helpers", () => {
     expect(page.exhausted).toBe(true);
   });
 
+  it("returns a retryable unavailable page when option history fetch rejects", async () => {
+    const page = await loadOptionsTapeHistoryPage({
+      cursor: { ts: 2_000, seq: 2 },
+      options: {
+        fetcher: async () => {
+          throw new TypeError("fetch failed");
+        }
+      }
+    });
+
+    expect(page.items).toEqual([]);
+    expect(page.exhausted).toBe(true);
+    expect(page.nextCursor).toEqual({ ts: 2_000, seq: 2 });
+    expect(page.historyUnavailable).toEqual({
+      label: "Options history unavailable",
+      detail: "fetch failed",
+      retryable: true
+    });
+  });
+
+  it("returns a retryable unavailable page when option history responds with an error", async () => {
+    const page = await loadOptionsTapeHistoryPage({
+      cursor: { ts: 3_000, seq: 3 },
+      options: {
+        fetcher: async () => new Response(null, { status: 503 })
+      }
+    });
+
+    expect(page.items).toEqual([]);
+    expect(page.exhausted).toBe(true);
+    expect(page.nextCursor).toEqual({ ts: 3_000, seq: 3 });
+    expect(page.historyUnavailable?.label).toBe("Options history unavailable");
+    expect(page.historyUnavailable?.detail).toBe("Options history failed with HTTP 503");
+    expect(page.historyUnavailable?.retryable).toBe(true);
+  });
+
   it("loads packet scope rows from API and places the clicked print first", async () => {
     const packet = makeFlowPacket({ members: ["clicked", "member-2"] });
     const requestedUrls: string[] = [];

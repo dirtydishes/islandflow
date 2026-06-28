@@ -45,6 +45,20 @@ const DEFAULT_HOT_LIMIT = 500;
 const EMPTY_COLUMNS: DurableTapeColumnDefinition<unknown>[] = [];
 const EMPTY_TEMPLATES: DurableTapeTemplate[] = [{ id: "micro", columns: [] }];
 
+type DurableTapeHistoryFailure = {
+  label: string;
+  detail?: string;
+  retryable: boolean;
+  cursor: DurableTapeCursor;
+};
+
+const formatDurableTapeHistoryFailure = (error: unknown): string => {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+  return "Historical rows could not be loaded.";
+};
+
 const useMeasuredWidth = () => {
   const ref = useRef<HTMLDivElement | null>(null);
   const [width, setWidth] = useState(0);
@@ -103,6 +117,7 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyExhausted, setHistoryExhausted] = useState(false);
   const [historyCursor, setHistoryCursor] = useState<DurableTapeCursor | undefined>(undefined);
+  const [historyFailure, setHistoryFailure] = useState<DurableTapeHistoryFailure | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [hovered, setHovered] = useState<{
     item: TItem;
@@ -157,6 +172,7 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
     setHistoryLoading(false);
     setHistoryExhausted(false);
     setHistoryCursor(undefined);
+    setHistoryFailure(null);
     initialHistoryLoadKeysRef.current.clear();
     setHovered(null);
     setScrollHold(createEmptyDurableTapeScrollHold<TItem>());
@@ -210,8 +226,12 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
   });
 
   const loadOlder = useCallback(
-    async (cursorOverride?: DurableTapeCursor) => {
-      if (!resolvedFeatures.clickhouseHistory || historyLoading || historyExhausted) {
+    async (cursorOverride?: DurableTapeCursor, options: { force?: boolean } = {}) => {
+      if (
+        !resolvedFeatures.clickhouseHistory ||
+        historyLoading ||
+        (historyExhausted && !options.force)
+      ) {
         return;
       }
 
@@ -228,6 +248,7 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
       }
 
       setHistoryLoading(true);
+      setHistoryFailure(null);
       const loadGeneration = historyLoadGenerationRef.current;
       try {
         const page = await source.loadOlder(cursor, query);
@@ -239,6 +260,17 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
         ) {
           return;
         }
+        if (page.historyUnavailable) {
+          setHistoryFailure({
+            label: page.historyUnavailable.label,
+            detail: page.historyUnavailable.detail,
+            retryable: page.historyUnavailable.retryable !== false,
+            cursor
+          });
+          setHistoryCursor(cursor);
+          setHistoryExhausted(true);
+          return;
+        }
         const nextCursor = page.nextCursor ?? null;
         const cursorStalled = nextCursor ? isSameDurableTapeCursor(nextCursor, cursor) : false;
         setHistoryItems((current) =>
@@ -246,6 +278,7 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
         );
         setHistoryCursor(cursorStalled ? undefined : (nextCursor ?? undefined));
         setHistoryExhausted(page.exhausted === true || nextCursor === null || cursorStalled);
+        setHistoryFailure(null);
       } catch (error) {
         if (
           shouldApplyDurableTapeHistoryLoad({
@@ -254,6 +287,12 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
           })
         ) {
           console.warn("Failed to load durable tape history", error);
+          setHistoryFailure({
+            label: "History unavailable",
+            detail: formatDurableTapeHistoryFailure(error),
+            retryable: true,
+            cursor
+          });
           setHistoryCursor(undefined);
           setHistoryExhausted(true);
         }
@@ -282,6 +321,14 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
       source
     ]
   );
+
+  const retryHistoryLoad = useCallback(() => {
+    const cursor = historyFailure?.cursor ?? historyCursor ?? initialHistoryCursor;
+    if (!cursor || historyLoading) {
+      return;
+    }
+    void loadOlder(cursor, { force: true });
+  }, [historyCursor, historyFailure?.cursor, historyLoading, initialHistoryCursor, loadOlder]);
 
   const historyLoadSignal = historyCursor ? `${historyCursor.ts}:${historyCursor.seq}` : undefined;
   const initialHistoryLoadSignal = initialHistoryCursor
@@ -366,6 +413,25 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
   const canInspectRows =
     resolvedFeatures.keyboardInspect || Boolean(onFocus) || Boolean(onActivate);
   const canShowHover = resolvedFeatures.hoverDetails && Boolean(renderHover);
+  const historyStatus = historyFailure ? (
+    <span className="durable-tape-history-state durable-tape-history-state-unavailable">
+      <span role="status" title={historyFailure.detail}>
+        {historyFailure.label}
+      </span>
+      <button
+        className="durable-tape-history-retry"
+        type="button"
+        disabled={!historyFailure.retryable || historyLoading}
+        onClick={retryHistoryLoad}
+      >
+        Retry history
+      </button>
+    </span>
+  ) : historyLoading ? (
+    <span className="durable-tape-history-state" role="status">
+      History loading
+    </span>
+  ) : null;
 
   const showHoverDetail = useCallback(
     (item: TItem, rowKey: string, index: number) => {
@@ -396,6 +462,7 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
     >
       <DurableTapeHeader
         title={title}
+        status={historyStatus}
         actions={
           <>
             {resolvedFeatures.jumpToLive ? (
