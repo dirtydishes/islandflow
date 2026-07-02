@@ -35,6 +35,7 @@ import {
 } from "react";
 import type { AlertContractFocusRequest, AlertEquityFocusRequest } from "../alerts";
 import type { FlowPacketFocusRequest } from "../flow-packets";
+import { type BoardTickerFocusSource, createBoardTickerFocus } from "../market-command/focus-model";
 import { sortBySourceTime } from "./charts/markers";
 import { CANDLE_INTERVALS, LIVE_HOT_WINDOW_OPTIONS, LIVE_OPTIONS_HEAD_LIMIT } from "./config";
 import { bumpTapeDebugMetric, logTapeDebug } from "./debug";
@@ -979,6 +980,13 @@ export const useTerminalState = () => {
     }
   }, [equityFocusScopeKey, equityFocusSeed, liveEquities.historyItems, liveEquities.liveItems]);
 
+  const clearBoardDetailSelections = useCallback(() => {
+    setSelectedAlert(null);
+    setSelectedNewsStory(null);
+    setSelectedDarkEvent(null);
+    setSelectedSmartFlowProjection(null);
+  }, []);
+
   const focusOptionContract = useCallback(
     (print: OptionPrint) => {
       const contractId = normalizeContractId(print.option_contract_id);
@@ -1013,6 +1021,7 @@ export const useTerminalState = () => {
         contractId,
         underlyingId
       });
+      setFilterInput(underlyingId);
     },
     [filteredOptionsRef]
   );
@@ -1082,9 +1091,35 @@ export const useTerminalState = () => {
         contractId,
         underlyingId
       });
+      setFilterInput(underlyingId);
     },
     [filteredOptionsRef, resolvedOptionPrintMapRef]
   );
+
+  const focusTickerSymbol = useCallback(
+    (symbol: string, source: BoardTickerFocusSource = "manual") => {
+      const focus = createBoardTickerFocus(symbol, source);
+      if (!focus) {
+        return;
+      }
+      setFilterInput(focus.symbol);
+      setSelectedInstrument(null);
+      setOptionFocusSeed(null);
+      setEquityFocusSeed(null);
+      clearBoardDetailSelections();
+      logTapeDebug("board ticker focused", focus);
+    },
+    [clearBoardDetailSelections]
+  );
+
+  const clearBoardFocus = useCallback(() => {
+    setFilterInput("");
+    setSelectedInstrument(null);
+    setOptionFocusSeed(null);
+    setEquityFocusSeed(null);
+    clearBoardDetailSelections();
+    logTapeDebug("board focus cleared");
+  }, [clearBoardDetailSelections]);
 
   const focusAlertContract = useCallback(
     (request: AlertContractFocusRequest) => {
@@ -1626,6 +1661,8 @@ export const useTerminalState = () => {
     chartSmartFlowProjections,
     chartInferredDark,
     focusOptionContract,
+    focusTickerSymbol,
+    clearBoardFocus,
     focusEquityTicker,
     focusFlowPacketRequest,
     focusAlertContract,
