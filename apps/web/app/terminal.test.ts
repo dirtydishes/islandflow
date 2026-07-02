@@ -461,6 +461,46 @@ describe("live manifest", () => {
     ).toEqual(["news"]);
   });
 
+  it("subscribes the root dashboard to the locked Market Command feed set", () => {
+    const filters = buildDefaultFlowFilters();
+    const manifest = getLiveManifest("/", "NVDA", 900_000, filters);
+    const channels = manifest.map((subscription) => subscription.channel);
+
+    expect(channels).toEqual([
+      "options",
+      "durable-rows",
+      "nbbo",
+      "equities",
+      "flow",
+      "news",
+      "smart-flow-alerts",
+      "smart-flow",
+      "inferred-dark",
+      "equity-joins",
+      "equity-candles",
+      "equity-overlay"
+    ]);
+    expect(manifest.find((subscription) => subscription.channel === "options")).toMatchObject({
+      filters
+    });
+    expect(manifest.find((subscription) => subscription.channel === "durable-rows")).toMatchObject({
+      lanes: ["options", "alerts"],
+      filters
+    });
+    expect(manifest.find((subscription) => subscription.channel === "flow")?.filters).toBe(filters);
+    expect(
+      manifest.find((subscription) => subscription.channel === "equity-candles")
+    ).toMatchObject({
+      underlying_id: "NVDA",
+      interval_ms: 900_000
+    });
+    expect(
+      manifest.find((subscription) => subscription.channel === "equity-overlay")
+    ).toMatchObject({
+      underlying_id: "NVDA"
+    });
+  });
+
   it("subscribes /qa to the live feeds rendered by the QA page", () => {
     const filters = buildDefaultFlowFilters();
     const manifest = getLiveManifest("/qa", "SPY", 60000, filters);
@@ -496,16 +536,23 @@ describe("live manifest", () => {
     expect(getLiveManifest("/unknown", "SPY", 60000, buildDefaultFlowFilters())).toEqual(home);
   });
 
-  it("uses 15m chart interval selections for dashboard candle subscriptions", () => {
-    const manifest = getLiveManifest("/", "SPY", 900_000, buildDefaultFlowFilters());
+  it("uses focused ticker paths for dashboard candle and overlay subscriptions", () => {
+    const manifest = getLiveManifest("/", "NVDA", 900_000, buildDefaultFlowFilters());
     const candleSubscription = manifest.find(
       (subscription) => subscription.channel === "equity-candles"
+    );
+    const overlaySubscription = manifest.find(
+      (subscription) => subscription.channel === "equity-overlay"
     );
 
     expect(candleSubscription).toMatchObject({
       channel: "equity-candles",
-      underlying_id: "SPY",
+      underlying_id: "NVDA",
       interval_ms: 900_000
+    });
+    expect(overlaySubscription).toMatchObject({
+      channel: "equity-overlay",
+      underlying_id: "NVDA"
     });
   });
 
@@ -694,6 +741,32 @@ describe("contract-focused option helpers", () => {
 });
 
 describe("route feature map", () => {
+  it("maps / to the locked Market Command dashboard feature surface", () => {
+    const features = getRouteFeatures("/");
+
+    expect(features).toMatchObject({
+      options: true,
+      nbbo: true,
+      equities: true,
+      flow: true,
+      news: true,
+      alerts: true,
+      durableRows: true,
+      smartFlow: true,
+      inferredDark: true,
+      equityJoins: true,
+      equityCandles: true,
+      equityOverlay: true,
+      showOptionsPane: true,
+      showEquitiesPane: true,
+      showFlowPane: true,
+      showNewsPane: true,
+      showAlertsPane: true,
+      showDarkPane: true,
+      showChartPane: true
+    });
+  });
+
   it("maps /options to the options and packets panes", () => {
     const features = getRouteFeatures("/options");
     expect(features.showOptionsPane).toBe(true);
