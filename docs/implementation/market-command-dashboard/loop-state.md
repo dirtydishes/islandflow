@@ -10,13 +10,13 @@ Stream: `market-command-dashboard`
 
 Workflow: `orchestrator-callback`
 
-Current phase: 03 - Root route feature upgrade
+Current phase: pending selector
 
-Current Beads issue: `islandflow-mcmd.3`
+Current Beads issue: none
 
-Current PR: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/104`
+Current PR: none
 
-Last completed phase: 02 - Ticker rail and board focus model (`islandflow-mcmd.2`)
+Last completed phase: 03 - Root route feature upgrade (`islandflow-mcmd.3`)
 
 Blocked: no
 
@@ -44,7 +44,7 @@ Blocked: no
 |---|---|---|---|---|
 | 01 - Server ranking contract | `islandflow-mcmd.1` | Closed, merged via PR #102 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/102` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.1.md` |
 | 02 - Ticker rail and board focus model | `islandflow-mcmd.2` | Closed, merged via PR #103 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/103` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.2.md` |
-| 03 - Root route feature upgrade | `islandflow-mcmd.3` | In progress | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/104` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.3.md` |
+| 03 - Root route feature upgrade | `islandflow-mcmd.3` | Closed, merged via PR #104 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/104` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.3.md` |
 | 04 - Dashboard layout replacement | `islandflow-mcmd.4` | Open, blocked by `islandflow-mcmd.3` | None | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.4.md` |
 | 05 - Hybrid detail drawer model | `islandflow-mcmd.5` | Open, blocked by `islandflow-mcmd.4` | None | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.5.md` |
 | 06 - News relevance ordering | `islandflow-mcmd.6` | Open, blocked by `islandflow-mcmd.5` | None | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.6.md` |
@@ -52,4 +52,4 @@ Blocked: no
 
 ## Last Coordinator Update
 
-2026-07-02: Implementation callback for Phase `islandflow-mcmd.3` reported PR #104 ready from branch `lavender/islandflow-mcmd-3-route-feature-upgrade` into `dashboard-v2`. Review handoff is in progress.
+2026-07-02: Phase `islandflow-mcmd.3` merged via Forgejo PR #104 into `dashboard-v2` after implementation and thermo-nuclear review approval. Forgejo Actions task #447 passed for final review head `9bdff54`; merge commit `a375372` is now on `dashboard-v2`. Orchestrator closed the Beads phase issue. Next phase selection has not been assigned yet.

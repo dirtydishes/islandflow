@@ -59,7 +59,7 @@ Evidence:
 
 CI owner: reviewer/verification agents
 
-Current CI state: `ci-green` for implementation head `e76bc526dd` before reviewer doc-closeout; final reviewer doc-closeout CI is recorded below after push.
+Current CI state: `ci-green`
 
 Evidence:
 
@@ -75,19 +75,24 @@ Evidence:
 - Chromium mobile `/`, 390x844: document `clientWidth` 390 and `scrollWidth` 390, body `clientWidth` 390 and `scrollWidth` 390, no document/body horizontal overflow, no visible dialog/backdrop candidates, `Local fallback` rail label visible, ticker rail not looping at this width, screenshot `/tmp/islandflow-mcmd3-review-mobile.png`.
 - Chromium reduced-motion `/`, 1440x1100 with `prefers-reduced-motion: reduce`: document `clientWidth` 1440 and `scrollWidth` 1440, body `clientWidth` 1440 and `scrollWidth` 1440, no document/body horizontal overflow, no visible dialog/backdrop candidates, `Local fallback` rail label visible, ticker rail `is-looping` false, screenshot `/tmp/islandflow-mcmd3-review-reduced-motion.png`.
 - Forgejo CI before reviewer doc-closeout: task #445 for head `e76bc526dd` passed (`Validate`, pull_request, 1m24s).
-- Forgejo CI after reviewer doc-closeout is verified after this committed doc update and recorded in the review callback; writing the final task id here would create another doc-only head requiring another CI run.
+- Forgejo CI after reviewer doc-closeout: task #447 for final review head `9bdff54853` passed (`Validate`, pull_request, 1m24s).
 
 ## PR And Commits
 
 - Forgejo PR: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/104`
 - Implementation commit: `d829d5de0b149e72d0bd9de54c9b4d991347617b` (`upgrade root route feed subscriptions`)
-- A final doc-closeout commit records the PR URL before callback.
+- Implementation doc commit: `e76bc526dd787f5000b4c6152df1ccfd6c4176db` (`record market command phase 3 pr`)
+- Review evidence commit: `29414d037f`
+- Final review closeout commit: `9bdff5485361f2ea977cfbbd9449cd853302f79a`
+- Merge commit on `dashboard-v2`: `a375372` (`merge market command root feed upgrade`)
 
 ## Beads Updates
 
 - Created phase issue `islandflow-mcmd.3`.
 - Blocked by `islandflow-mcmd.2`.
 - Implementation thread did not close the Beads phase issue; closeout remains orchestrator-owned.
+- Orchestrator closed `islandflow-mcmd.3` after PR #104 merged into
+  `dashboard-v2` with Forgejo Actions task #447 green.
 
 ## Follow-Ups Filed
 
@@ -100,4 +105,5 @@ None.
 
 ## Closeout
 
-Implementation PR is open and ready for orchestrator-owned review handoff after final doc-closeout push.
+Review approved with `ci-green`; no repairs or remaining findings. PR #104 was
+merged into `dashboard-v2`, and the Beads issue was closed by the orchestrator.
