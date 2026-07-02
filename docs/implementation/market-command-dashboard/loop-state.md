@@ -14,7 +14,7 @@ Current phase: 08 - Deterministic drawer browser fixture
 
 Current Beads issue: `islandflow-mcmd.8`
 
-Current PR: none
+Current PR: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/109`
 
 Last completed phase: 07 - Polish, performance, and visual QA (`islandflow-mcmd.7`)
 
@@ -49,8 +49,8 @@ Blocked: no
 | 05 - Hybrid detail drawer model | `islandflow-mcmd.5` | Closed, merged via PR #106 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/106` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.5.md` |
 | 06 - News relevance ordering | `islandflow-mcmd.6` | Closed, merged via PR #107 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/107` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.6.md` |
 | 07 - Polish, performance, and visual QA | `islandflow-mcmd.7` | Closed, merged via PR #108 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/108` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.7.md` |
-| 08 - Deterministic drawer browser fixture | `islandflow-mcmd.8` | In progress | None | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.8.md` |
+| 08 - Deterministic drawer browser fixture | `islandflow-mcmd.8` | In review | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/109` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.8.md` |
 
 ## Last Coordinator Update
 
-2026-07-02: Closeout/selector subagent verified Phase `islandflow-mcmd.7` is closed and PR #108 is merged. Beads still has ready child `islandflow-mcmd.8`, a Phase 05 follow-up for deterministic drawer browser fixtures. Orchestrator claimed it and assigned branch `lavender/islandflow-mcmd-8-deterministic-drawer-fixture` from base branch `dashboard-v2`.
+2026-07-02: Implementation callback for Phase `islandflow-mcmd.8` reported PR #109 ready from branch `lavender/islandflow-mcmd-8-deterministic-drawer-fixture` into `dashboard-v2`. Orchestrator recorded the PR and is handing the phase to thermo-nuclear review.
