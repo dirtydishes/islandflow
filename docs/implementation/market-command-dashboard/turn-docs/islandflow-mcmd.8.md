@@ -71,7 +71,7 @@ creation after the implementation callback.
 
 CI owner: reviewer/verification agents
 
-Current CI state: `local-gates-passed`
+Current CI state: `ci-green`
 
 Evidence:
 
@@ -88,6 +88,14 @@ Evidence:
 - `git diff --check` - passed.
 - The web build rewrote `apps/web/next-env.d.ts` from `.next-dev` to `.next`;
   the generated drift was restored to the pre-build dev metadata path.
+- Initial Forgejo Validate task `#461` failed at `Check Docker workspace
+  snapshot` because adding the root package script left
+  `deployment/docker/workspace-root/package.json` out of sync.
+- `bun run sync:docker-workspace` - passed, updating only
+  `deployment/docker/workspace-root/package.json`.
+- `bun run check:docker-workspace` - passed after the snapshot repair.
+- Forgejo Validate task `#462` passed on commit
+  `3e4de0f395825cb85835fdcda6a747079cdfe6c4`.
 
 Browser evidence:
 
@@ -109,6 +117,10 @@ Browser evidence:
 - PR: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/109`
 - Implementation commit:
   `79d6ed35d9a281d528199db19f0bcdfe457c00c0`
+- PR evidence commit:
+  `56974c0fb0aa903d338a9456d7a6293918dda00a`
+- Docker workspace snapshot repair:
+  `3e4de0f395825cb85835fdcda6a747079cdfe6c4`
 
 ## Beads Updates
 
@@ -129,5 +141,5 @@ None.
 
 ## Closeout
 
-Implementation complete locally; PR #109 is open against `dashboard-v2`, and
-the final implementation callback is pending.
+Implementation complete; PR #109 is open against `dashboard-v2`, local gates and
+Forgejo Validate are green, and the final implementation callback is pending.
