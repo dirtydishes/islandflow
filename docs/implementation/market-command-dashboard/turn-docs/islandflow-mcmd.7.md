@@ -62,15 +62,35 @@ Reviewer skill:
 
 `thermo-nuclear-code-quality-review`
 
-Not started by this implementation thread. The orchestrator owns review-thread
-creation after the implementation callback.
+2026-07-02 review:
+
+- Verified this review worktree was detached at
+  `565ca9af44ba858a401cf8e89002b642923dff16`, then attached it to the
+  existing assigned branch
+  `lavender/islandflow-mcmd-7-polish-performance-visual-qa`. No branch was
+  created or renamed.
+- Reviewed the PR diff against `forgejo/dashboard-v2` and Phase 07 scope. The
+  runtime diff is tightly bounded to ticker rail probe state, rail/source-label
+  accessibility, and scoped dashboard sizing CSS. No ranking-policy,
+  persistence, websocket-channel, hidden-route, nav-label, or product-surface
+  drift was found.
+- Applied the strict thermo-nuclear maintainability bar. No structural blocker
+  remains: no new large abstraction, no scattered cross-module conditionals, no
+  cast-heavy contract churn, and no file crossed the 1k-line threshold because
+  of this PR. `apps/web/app/globals.css` is already large, but this phase adds a
+  small market-command-scoped sizing patch rather than materially worsening the
+  file boundary.
+- Sampled the committed Chromium artifacts in
+  `docs/implementation/market-command-dashboard/turn-docs/artifacts/`; desktop,
+  mobile, reduced-motion, fallback, and interaction screenshots match the
+  recorded implementation evidence.
+- No reviewer repair commits were needed.
 
 ## CI And Gates
 
 CI owner: reviewer/verification agents
 
-Current CI state: `local-gates-passed`; Forgejo CI not started until the PR is
-opened.
+Current CI state: `ci-green`.
 
 Evidence:
 
@@ -89,6 +109,33 @@ Evidence:
 - `git diff --check` - passed.
 - Build-generated `apps/web/next-env.d.ts` drift from `.next-dev` to `.next`
   was restored to the pre-build dev metadata path.
+- Reviewer local gates:
+  - Initial `bun test` failed before product assertions because this review
+    worktree had no installed workspace dependencies (`@islandflow/types`,
+    `react/jsx-dev-runtime`, `zod`, and related packages could not resolve).
+  - `bun install --frozen-lockfile` - passed, installing 1100 packages with no
+    lockfile changes.
+  - Rerun `bun test` - passed, 547 tests, 7444 assertions.
+  - `bun --cwd=apps/web run build` - passed.
+  - `bunx biome check apps/web/features/market-command/MarketCommandTickerRail.tsx apps/web/features/market-command/MarketCommandTickerRail.test.tsx apps/web/app/globals.css`
+    - passed.
+  - `git diff --check` - passed.
+  - The web build again rewrote `apps/web/next-env.d.ts` from `.next-dev` to
+    `.next`; the generated drift was restored and the worktree returned to the
+    intended PR diff.
+- Forgejo PR state:
+  - `fj pr view 108` shows PR #108 open from
+    `lavender/islandflow-mcmd-7-polish-performance-visual-qa` into
+    `dashboard-v2`.
+  - `fj actions tasks -R forgejo --page 1` shows current head
+    `565ca9af44ba858a401cf8e89002b642923dff16` task `#458` `success`
+    (`Validate`, pull_request, 1m17s).
+  - `fj pr status 108` is still unreliable on this host; it failed with
+    `invalid value: string "/dirtydishes/islandflow/actions/runs/458/jobs/0", expected relative URL without a base`.
+    CI truth was taken from `fj actions tasks` instead.
+  - Local mergeability check
+    `git merge-tree --write-tree forgejo/dashboard-v2 HEAD` succeeded and
+    produced tree `51608461e5dd1b0118349298d9a2ffc8cea47fcd`.
 
 Browser evidence:
 
@@ -151,11 +198,51 @@ Browser evidence:
   Verified server-ranked rail, `data-reduced-motion="true"`,
   `data-auto-loop="false"`, row counts `1/1/1/2`, overlays `0`, and horizontal
   overflow `0`.
+- Reviewer live Chromium/CDP verification:
+  - Chromium path: `/usr/bin/chromium` (`Chromium 149.0.7827.196`).
+  - Playwright was not installed in this worktree, so reviewer browser probes
+    used Chromium remote debugging protocol directly.
+  - Observed existing `islandflow-api.service` bound to `172.18.0.1:4000`; it
+    was not restarted or touched. The temporary reviewer fixture bound only to
+    `127.0.0.1:4107`, and the web dev server ran on `127.0.0.1:3108` with
+    `NEXT_PUBLIC_API_URL=http://127.0.0.1:4107`.
+  - Final CDP probe passed with no failures. Desktop `1440x1100` rendered chart,
+    alerts, flow packets, options tape, and news; chart canvases `12`, module
+    row counts alerts/flow/options `1/1/1`, `data-source="server"`,
+    `data-overflows="true"`, `data-auto-loop="true"`, overlays `0`, nested-card
+    selector match `false`, and horizontal overflow `0`.
+  - Clicking `NVDA` in the rail set the board focus input to `NVDA`; alerts,
+    flow, and options rows remained visible, and news showed both `Focused NVDA`
+    and `Market wire`.
+  - Alert row selection opened the shared detail drawer and kept the alerts pane
+    dimensions stable: header `454x30` and row `454x36` before and after drawer
+    opening.
+  - Flow packet activation focused the related contract; the focus ribbon showed
+    `Contract: NVDA 07-17-26 150C`, and the related options row remained
+    visible.
+  - Rail hover and keyboard focus both paused the loop; computed animation play
+    state was `paused` in both cases.
+  - Live-update sizing stayed stable across fixture websocket events: alerts
+    `454x30`/`454x36`, flow `454x30`/`454x40`, options `915x30`/`915x36`, and
+    news `1377x30`/`1377x52`.
+  - Mobile `390x844` rendered all modules, kept alerts/flow/options rows
+    visible, set `data-mobile-viewport="true"`, set `data-auto-loop="false"`,
+    overlays `0`, nested-card selector match `false`, and horizontal overflow
+    `0`.
+  - Reduced-motion desktop set `data-reduced-motion="true"`,
+    `data-auto-loop="false"`, and horizontal overflow `0`.
+  - Simulated ticker endpoint failure produced `data-source="local-fallback"`,
+    visible local fallback rail, all module labels still present, and horizontal
+    overflow `0`.
+  - Temporary fixture, web dev server, and Chromium processes were stopped after
+    verification; no local listener remained on `4107`, `3108`, or `9223`.
 
 ## PR And Commits
 
 - PR: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/108`
 - Implementation commit: `a3923098ea213c7c9df68ed4298dfd724b3e9a75`
+- PR head at review: `565ca9af44ba858a401cf8e89002b642923dff16`
+- Reviewer repair commits: none.
 
 ## Beads Updates
 
@@ -180,5 +267,7 @@ None.
 
 ## Closeout
 
-Implementation local gates and browser QA are complete. PR #108 is open against
-`dashboard-v2`. Implementation callback is still pending in this thread.
+Implementation and reviewer local gates, browser QA, Forgejo CI, and local
+mergeability checks are complete. PR #108 is open against `dashboard-v2` and
+ready for orchestrator closeout. The review thread leaves `islandflow-mcmd.7`
+open as instructed.
