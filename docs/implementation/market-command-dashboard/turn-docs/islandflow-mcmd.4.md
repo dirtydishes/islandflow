@@ -61,13 +61,20 @@ Reviewer skill:
 
 `thermo-nuclear-code-quality-review`
 
-Not started. Per implementation-thread scope, reviewer thread creation remains orchestrator-owned after callback.
+Reviewer status: approved.
+
+Reviewer findings:
+
+- No structural blockers found. The root `OverviewRoute` is now a small delegation point, and the new Market Command route keeps the phase-owned layout composition in `apps/web/features/market-command/`.
+- No in-scope repairs were needed. The implementation preserves the locked root replacement, keeps `NAV_ITEMS` labeled `Dashboard`, avoids a hidden v2 route, and does not widen into the Phase 05 shared drawer or Phase 06 news-ranking work.
+- The durable alert and option panes are preferred when filtered durable rows are present, with raw module fallbacks retained for unavailable/empty durable rows as reported in the implementation callback.
+- `TerminalMarketChartSection` still owns smart-flow and inferred-dark marker click dispatch, preserving existing drawer behavior for Phase 05.
 
 ## CI And Gates
 
 CI owner: reviewer/verification agents
 
-Current CI state: `not-started`
+Current CI state: `ci-green`
 
 Evidence:
 
@@ -80,6 +87,13 @@ Evidence:
 - Whitespace gate: `git diff --check` passed.
 - Browser verification server: `PORT=3104 HOSTNAME=127.0.0.1 bun --cwd=apps/web run start` from the production build.
 - Chromium executable: `/usr/bin/chromium`.
+- Reviewer rerun: `bun install --frozen-lockfile` passed.
+- Reviewer rerun: `bun test apps/web/features/market-command` passed, 7 tests.
+- Reviewer rerun: `bun test apps/web` passed, 279 tests.
+- Reviewer rerun: `bun --cwd=apps/web run build` passed.
+- Reviewer rerun: `bunx biome check apps/web/app/terminal.tsx apps/web/app/globals.css apps/web/features/market-command/MarketCommandChrome.tsx apps/web/features/market-command/MarketCommandRoute.tsx apps/web/features/market-command/MarketCommandRoute.test.tsx` passed.
+- Reviewer rerun: `git diff --check` passed.
+- Forgejo Actions: task `#449` passed for implementation head `50cbb22754` before the docs-only review evidence update; reviewer callback records final pushed-head CI after this update.
 - Desktop `/`, 1440x1100:
   - no horizontal page overflow: `clientWidth=1440`, `scrollWidth=1440`, overflow `0`
   - chart/alerts ratio `2.017`
@@ -105,6 +119,28 @@ Evidence:
   - top-level layout overlap candidates: none
   - ticker animation computed as `none`
   - screenshot: `docs/implementation/market-command-dashboard/turn-docs/artifacts/mcmd4-reduced-motion-1440x1100.png`
+- Reviewer Chromium probe, desktop `/`, 1440x1100:
+  - no horizontal page overflow: `clientWidth=1425`, `scrollWidth=1425`, overflow `0`
+  - chart/alerts ratio `2.018`
+  - options/flow ratio `2.018`
+  - full-width news-to-layout delta `0.02px`
+  - independent module scroll regions found for alerts, flow, options, and news with `overflow-y: auto`
+  - top-level layout overlap candidates: none
+  - degraded ranking label visible as `Local fallback` with `Failed to fetch`
+- Reviewer Chromium probe, mobile `/`, 390x844:
+  - no horizontal page overflow: `clientWidth=390`, `scrollWidth=390`, overflow `0`
+  - stack order by top position: chrome, rail, chart, alerts, options, flow, news
+  - independent module scroll regions found for alerts, flow, options, and news with `overflow-y: auto`
+  - top-level layout overlap candidates: none
+  - degraded ranking label visible as `Local fallback` with `Failed to fetch`
+  - ticker animation computed as `none`
+- Reviewer Chromium probe, reduced-motion `/`, 1440x1100:
+  - no horizontal page overflow: `clientWidth=1425`, `scrollWidth=1425`, overflow `0`
+  - chart/alerts ratio `2.018`
+  - options/flow ratio `2.018`
+  - full-width news-to-layout delta `0.02px`
+  - top-level layout overlap candidates: none
+  - ticker animation computed as `none`
 
 ## PR And Commits
 
@@ -132,4 +168,4 @@ None.
 
 ## Closeout
 
-Implementation complete. PR #105 is open against `dashboard-v2`; callback is pending.
+Implementation and review complete. PR #105 is open against `dashboard-v2`; orchestrator callback is pending.
