@@ -1,23 +1,11 @@
 "use client";
 
-import { type ReactNode, useMemo } from "react";
+import type { ReactNode } from "react";
 
 import { DurableTapesQaRoute } from "../features/durable-tape/qa-page";
-import { createStaticEquitiesTapeSource, EquitiesTape } from "../features/equities-tape";
-import { createStaticFlowPacketsTapeSource, FlowPacketsTape } from "../features/flow-packets";
-import { MarketCommandTickerRail } from "../features/market-command/MarketCommandTickerRail";
+import { MarketCommandRoute } from "../features/market-command/MarketCommandRoute";
 import { NewsWire } from "../features/news-wire";
 import { OptionsTape } from "../features/options-tape";
-import { TerminalMarketChartSection } from "../features/terminal/chart-adapter";
-import {
-  CommandDecisionLevels,
-  CommandDeckHeader,
-  CommandMetricsStrip,
-  CommandPriorityBoard,
-  EventContextPane,
-  FeedHealthPane,
-  HomeReplayRail
-} from "../features/terminal/components/charts";
 import { renderTerminalDrawers } from "../features/terminal/components/drawers";
 import { OpraIntakeRail } from "../features/terminal/components/opra";
 import { FlowFilterPopover, PageFrame } from "../features/terminal/components/primitives";
@@ -126,85 +114,7 @@ export function TerminalAppShell({ children }: { children: ReactNode }) {
 
 export function OverviewRoute() {
   const state = useTerminal();
-  const flowSource = useMemo(
-    () => createStaticFlowPacketsTapeSource(state.filteredFlow),
-    [state.filteredFlow]
-  );
-  const equitiesSource = useMemo(
-    () => createStaticEquitiesTapeSource(state.filteredEquities),
-    [state.filteredEquities]
-  );
-  const compactTapeFeatures = useMemo(
-    () =>
-      [
-        "default",
-        { key: "clickhouseHistory", enabled: false },
-        { key: "settingsGear", enabled: false }
-      ] as const,
-    []
-  );
-
-  return (
-    <PageFrame title="Market Command" eyebrow="Dashboard" variant="dashboard">
-      <div className="market-command-shell">
-        <CommandDeckHeader state={state} />
-        <CommandMetricsStrip state={state} />
-        <MarketCommandTickerRail state={state} />
-        <div className="market-command-grid">
-          <CommandPriorityBoard state={state} />
-          <TerminalMarketChartSection
-            state={state}
-            title="Chart Context"
-            className="market-command-chart"
-          />
-          <CommandDecisionLevels state={state} />
-          <OptionsTape
-            className="command-contracts-tape"
-            features={compactTapeFeatures}
-            filters={state.flowFilters}
-            flowPacketById={state.flowPacketMap}
-            focusedContractId={
-              state.selectedInstrument?.kind === "option-contract"
-                ? state.selectedInstrument.contractId
-                : null
-            }
-            nbboByContractId={state.nbboMap}
-            onClearFocus={() => state.setSelectedInstrument(null)}
-            onContractFocus={state.focusOptionContract}
-            onFiltersChange={state.setFlowFilters}
-            onPacketFocus={state.focusFlowPacketRequest}
-            packetIdByOptionTraceId={state.packetIdByOptionTraceId}
-            prints={state.filteredOptions.slice(0, 36)}
-            rowHeight={34}
-            template="half"
-            title="Recent Contracts"
-          />
-          <FlowPacketsTape
-            className="command-flow-tape"
-            features={compactTapeFeatures}
-            filters={state.flowFilters}
-            onPacketFocus={state.focusFlowPacketRequest}
-            rowHeight={40}
-            source={flowSource}
-            template="oneThird"
-            title="Flow Packets"
-          />
-          <EquitiesTape
-            className="command-equities-tape"
-            features={compactTapeFeatures}
-            onTickerFocus={(event) => state.focusEquityTicker(event.print)}
-            rowHeight={34}
-            source={equitiesSource}
-            template="oneThird"
-            title="Equities Tape"
-          />
-          <FeedHealthPane state={state} />
-          <EventContextPane state={state} />
-          <HomeReplayRail state={state} />
-        </div>
-      </div>
-    </PageFrame>
-  );
+  return <MarketCommandRoute state={state} />;
 }
 
 export function QaRoute() {

@@ -1406,71 +1406,235 @@ h3 {
   }
 }
 
-.market-command-grid {
+.market-command-chrome {
+  position: sticky;
+  top: var(--topbar-height);
+  z-index: 12;
+  min-width: 0;
   display: grid;
-  grid-template-columns: minmax(360px, 0.88fr) minmax(460px, 1.15fr) minmax(300px, 0.78fr);
-  grid-template-areas:
-    "priority chart levels"
-    "contracts chart health"
-    "flow chart health"
-    "equities context replay";
-  gap: 8px;
-  align-items: stretch;
+  gap: 0;
+  border-top: 1px solid var(--route-line);
+  border-bottom: 1px solid var(--border);
+  background: oklch(0.105 0.01 250 / 0.97);
 }
 
-.market-command-grid > .terminal-pane,
-.market-command-grid > .options-tape-module,
-.market-command-grid > .durable-tape {
+.market-command-chrome-primary,
+.market-command-focus-row,
+.market-command-health-grid {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  align-items: center;
+}
+
+.market-command-chrome-primary {
+  grid-template-columns: minmax(180px, 0.7fr) minmax(260px, 1.2fr) auto;
+  min-height: 48px;
+  padding: 8px 10px;
+}
+
+.market-command-chrome-title,
+.market-command-chrome-status,
+.market-command-chrome-actions,
+.market-command-focus-ribbon {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.market-command-chrome-title {
+  display: grid;
+  gap: 1px;
+}
+
+.market-command-chrome-title span,
+.market-command-focus-input span,
+.market-command-focus-ribbon em,
+.market-command-health-row,
+.market-command-pane-source {
+  color: var(--text-faint);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+.market-command-chrome-title strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.08rem;
+  line-height: 1.05;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.market-command-chrome-status,
+.market-command-chrome-actions {
+  flex-wrap: wrap;
+}
+
+.market-command-chrome-actions {
+  justify-content: flex-end;
+}
+
+.market-command-focus-row {
+  grid-template-columns: minmax(220px, 0.35fr) minmax(0, 1fr);
+  padding: 8px 10px;
+  border-top: 1px solid oklch(0.72 0.012 250 / 0.1);
+}
+
+.market-command-focus-input {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.market-command-focus-input .terminal-input {
+  min-height: 30px;
+  padding: 0 0 5px;
+}
+
+.market-command-focus-ribbon {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.market-command-focus-ribbon span,
+.market-command-focus-ribbon strong {
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--font-mono), monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.market-command-focus-ribbon span {
+  max-width: min(420px, 38vw);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.market-command-focus-ribbon strong {
+  color: var(--text-dim);
+  font-size: 0.76rem;
+}
+
+.market-command-health-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  border-top: 1px solid oklch(0.72 0.012 250 / 0.1);
+}
+
+.market-command-health-row {
+  min-width: 0;
+  min-height: 38px;
+  display: grid;
+  grid-template-columns: minmax(62px, 0.72fr) auto;
+  gap: 2px 8px;
+  align-items: center;
+  padding: 6px 10px;
+  border-right: 1px solid var(--border);
+}
+
+.market-command-health-row:last-child {
+  border-right: 0;
+}
+
+.market-command-health-row > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.market-command-health-row > span:nth-child(3),
+.market-command-health-row > span:nth-child(4) {
+  color: var(--text-faint);
+  font-size: 0.62rem;
+}
+
+.market-command-layout {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-areas:
+    "chart chart alerts"
+    "flow options options"
+    "news news news";
+  gap: 8px;
+  align-items: stretch;
+  overflow-x: clip;
+}
+
+.market-command-layout > * {
+  min-width: 0;
   min-height: 0;
 }
 
-.command-priority-pane {
-  grid-area: priority;
-  min-height: 330px;
+.market-command-chart-pane {
+  grid-area: chart;
+  min-height: 560px;
 }
 
-.market-command-chart {
-  grid-area: chart;
+.market-command-alerts-pane {
+  grid-area: alerts;
+  min-height: 560px;
+}
+
+.market-command-flow-pane {
+  grid-area: flow;
+  min-height: 360px;
+}
+
+.market-command-options-pane {
+  grid-area: options;
+  min-height: 360px;
+}
+
+.market-command-news-pane {
+  grid-area: news;
   min-height: 520px;
 }
 
-.command-levels-pane {
-  grid-area: levels;
-  min-height: 236px;
+.market-command-layout .market-chart-surface {
+  height: 470px;
 }
 
-.command-contracts-tape {
-  grid-area: contracts;
-  min-height: 314px;
+.market-command-alerts-pane.alerts-module,
+.market-command-options-pane.options-tape-module,
+.market-command-flow-pane.flow-packets-tape,
+.market-command-news-pane.news-wire-module {
+  height: 100%;
 }
 
-.command-flow-tape {
-  grid-area: flow;
-  min-height: 252px;
+.market-command-alerts-pane.alerts-module {
+  min-height: 560px;
+  grid-template-rows: minmax(0, 1fr) auto;
 }
 
-.command-equities-tape {
-  grid-area: equities;
-  min-height: 230px;
+.market-command-options-pane.options-tape-module,
+.market-command-flow-pane.flow-packets-tape {
+  min-height: 360px;
 }
 
-.command-feed-pane {
-  grid-area: health;
-  min-height: 420px;
+.market-command-news-pane.news-wire-module {
+  min-height: 520px;
+  grid-template-rows: auto auto minmax(0, 1fr);
 }
 
-.command-context-pane {
-  grid-area: context;
-  min-height: 230px;
+.market-command-news-pane .news-wire-history-warning {
+  max-height: 72px;
+  overflow: auto;
+  overflow-wrap: anywhere;
 }
 
-.command-replay-pane {
-  grid-area: replay;
-  min-height: 140px;
-}
-
-.market-command-grid .market-chart-surface {
-  height: 430px;
+.market-command-alerts-pane .durable-tape,
+.market-command-options-pane .durable-tape,
+.market-command-flow-pane.flow-packets-tape,
+.market-command-news-pane .news-wire-tape {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .command-priority-table {
@@ -6080,15 +6244,30 @@ h3 {
       "replay replay";
   }
 
-  .market-command-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(340px, 0.8fr);
+  .market-command-chrome {
+    position: static;
+  }
+
+  .market-command-chrome-primary {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .market-command-chrome-title {
+    grid-column: 1 / -1;
+  }
+
+  .market-command-health-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .market-command-layout {
+    grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
-      "priority levels"
-      "chart chart"
-      "contracts health"
-      "flow health"
-      "equities context"
-      "replay replay";
+      "chart"
+      "alerts"
+      "options"
+      "flow"
+      "news";
   }
 
   .wire-control-rails {
@@ -6151,18 +6330,26 @@ h3 {
       "dark";
   }
 
-  .market-command-grid {
+  .market-command-chrome-primary,
+  .market-command-focus-row,
+  .market-command-health-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .market-command-chrome-status,
+  .market-command-chrome-actions,
+  .market-command-focus-ribbon {
+    justify-content: flex-start;
+  }
+
+  .market-command-layout {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
-      "priority"
       "chart"
-      "levels"
-      "contracts"
+      "alerts"
+      "options"
       "flow"
-      "equities"
-      "health"
-      "context"
-      "replay";
+      "news";
   }
 
   .command-deck-grid > .terminal-pane {
@@ -6179,10 +6366,7 @@ h3 {
     min-height: 0;
   }
 
-  .market-command-grid > .terminal-pane,
-  .market-command-grid > .options-tape-module,
-  .market-command-grid > .durable-tape,
-  .market-command-chart,
+  .market-command-layout > *,
   .news-pane-full {
     min-height: 0;
   }
@@ -6527,8 +6711,19 @@ h3 {
     height: 320px;
   }
 
-  .market-command-grid .market-chart-surface {
+  .market-command-layout .market-chart-surface {
     height: 320px;
+  }
+
+  .market-command-chart-pane,
+  .market-command-alerts-pane.alerts-module,
+  .market-command-options-pane.options-tape-module,
+  .market-command-flow-pane.flow-packets-tape {
+    min-height: min(520px, 72vh);
+  }
+
+  .market-command-news-pane.news-wire-module {
+    min-height: min(520px, 78vh);
   }
 
   .market-chart-tooltip {
