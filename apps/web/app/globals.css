@@ -3350,6 +3350,11 @@ h3 {
   background: oklch(0.78 0.12 74 / 0.05);
 }
 
+.alerts-tape .durable-tape-row.alerts-row-selected {
+  border-color: rgba(245, 166, 35, 0.38);
+  background: oklch(0.78 0.12 74 / 0.08);
+}
+
 .alerts-tape .durable-tape-row.alerts-row-tinted {
   border-color: rgba(
     var(--smart-flow-rgb, 192, 200, 210),
@@ -4783,6 +4788,15 @@ h3 {
   background: oklch(0.16 0.012 250 / 0.98);
   box-shadow: 0 22px 56px rgba(0, 0, 0, 0.38);
   z-index: 40;
+}
+
+.market-command-detail-drawer {
+  width: min(520px, calc(100vw - 32px));
+}
+
+.market-command-detail-drawer .alerts-detail {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
 }
 
 .synthetic-control-gear {

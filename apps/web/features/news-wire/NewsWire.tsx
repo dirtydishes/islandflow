@@ -52,6 +52,7 @@ export type NewsWireProps = {
   showControlRails?: boolean;
   template?: DurableTapeTemplateId | "auto";
   historyEnabled?: boolean;
+  detailMode?: "inline" | "external";
   fetcher?: NewsWireHistoryFetcher;
   buildApiUrl?: NewsWireApiUrlBuilder;
   onStorySelect?: (story: NewsStory) => void;
@@ -440,6 +441,7 @@ export const NewsWire = ({
   showControlRails = false,
   template = "auto",
   historyEnabled = true,
+  detailMode = "inline",
   fetcher,
   buildApiUrl,
   onStorySelect
@@ -469,10 +471,12 @@ export const NewsWire = ({
 
   const selectStory = useCallback(
     (story: NewsStory) => {
-      setSelectedStory(story);
+      if (detailMode === "inline") {
+        setSelectedStory(story);
+      }
       onStorySelect?.(story);
     },
-    [onStorySelect]
+    [detailMode, onStorySelect]
   );
 
   const renderRow = useCallback<DurableTapeRowRenderer<NewsStory>>(({ item: story, columns }) => {
@@ -509,7 +513,7 @@ export const NewsWire = ({
       : "Waiting for live news stories.";
 
   useEffect(() => {
-    if (!selectedStory) {
+    if (detailMode !== "inline" || !selectedStory) {
       return;
     }
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -519,7 +523,7 @@ export const NewsWire = ({
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [selectedStory]);
+  }, [detailMode, selectedStory]);
 
   return (
     <section className={`news-wire-module ${className}`.trim()}>
@@ -593,7 +597,7 @@ export const NewsWire = ({
         </div>
       )}
 
-      {selectedStory ? (
+      {detailMode === "inline" && selectedStory ? (
         <NewsWireDetail story={selectedStory} onClose={() => setSelectedStory(null)} />
       ) : null}
     </section>

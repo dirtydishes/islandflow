@@ -1,7 +1,10 @@
 import { describe, expect, it, mock } from "bun:test";
+import type { DurableTapeAlertRowViewModel } from "@islandflow/types";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import { DurableTapeAlertRowsPane } from "../durable-tape";
 import { buildDefaultFlowFilters } from "../terminal/filters";
+import { MarketCommandDetailDrawer } from "./MarketCommandDetailDrawer";
 import { MarketCommandRoute } from "./MarketCommandRoute";
 
 const noop = mock(() => {});
@@ -129,6 +132,79 @@ const makeState = (overrides: Record<string, unknown> = {}) => {
   };
 };
 
+const makeDurableAlertRow = (
+  overrides: Partial<DurableTapeAlertRowViewModel> = {}
+): DurableTapeAlertRowViewModel => ({
+  id: "alert-row-1",
+  lane: "alerts",
+  ts: 1_000,
+  seq: 1,
+  source_ts: 1_000,
+  ingest_ts: 1_001,
+  source: "server",
+  symbol: "SPY",
+  cells: {
+    time: "09:30:00",
+    symbol: "SPY",
+    kind: "Directional accumulation",
+    confidence: "76%",
+    state: "high / bullish",
+    evidence: "3 refs"
+  },
+  badges: [{ kind: "band", label: "High", tone: "green" }],
+  evidence_summary: {
+    label: "3 refs",
+    refs: ["flowpacket:1", "print:1", "print:2"],
+    counts: {
+      total: 3,
+      flow_packets: 1,
+      option_prints: 2,
+      unresolved: 0
+    }
+  },
+  drilldown_refs: ["flowpacket:1", "print:1", "print:2"],
+  alert: {
+    trace_id: "alert:1",
+    alert_id: "alert-1",
+    hypothesis_id: "hypothesis-1",
+    insight_id: "insight-1",
+    primary_label: "Directional accumulation",
+    hypothesis_type: "directional_accumulation",
+    direction: "bullish",
+    policy_confidence: 0.76,
+    evidence_quality: 0.82,
+    confidence_band: "high",
+    evidence_quality_band: "strong",
+    trigger_kind: "policy",
+    projection_trace_id: "projection-1"
+  },
+  evidence: {
+    total_refs: 3,
+    flow_packet_refs: ["flowpacket:1"],
+    option_print_refs: ["print:1", "print:2"],
+    unresolved_refs: [],
+    underlying_id: "SPY",
+    primary_packet: {
+      id: "flowpacket:1",
+      option_contract_id: "SPY-2026-06-19-500-C",
+      member_trace_ids: ["print:1", "print:2"],
+      member_count: 2
+    },
+    preview_prints: [
+      {
+        trace_id: "print:1",
+        option_contract_id: "SPY-2026-06-19-500-C",
+        ts: 1_000,
+        price: 1.25,
+        size: 10,
+        premium: 1_250,
+        exchange: "CBOE"
+      }
+    ]
+  },
+  ...overrides
+});
+
 describe("MarketCommandRoute", () => {
   it("composes the replacement dashboard without old standalone panes", () => {
     const html = renderToStaticMarkup(<MarketCommandRoute state={makeState() as never} />);
@@ -164,5 +240,37 @@ describe("MarketCommandRoute", () => {
 
     expect(durableHtml.match(/data-row-source="server"/g)?.length).toBe(2);
     expect(fallbackHtml).not.toContain('data-row-source="server"');
+  });
+
+  it("keeps external durable alert selection out of the inline pane detail", () => {
+    const row = makeDurableAlertRow();
+    const html = renderToStaticMarkup(
+      <DurableTapeAlertRowsPane
+        detailMode="external"
+        onSelectRow={noop}
+        rows={[row]}
+        selectedRowId={row.id}
+      />
+    );
+
+    expect(html).toContain('data-row-source="server"');
+    expect(html).not.toContain("alerts-module-detail");
+    expect(html).not.toContain("Close detail");
+  });
+
+  it("renders durable alert rows in the shared Market Command drawer", () => {
+    const row = makeDurableAlertRow();
+    const html = renderToStaticMarkup(
+      <MarketCommandDetailDrawer
+        detail={{ kind: "durable-alert-row", row }}
+        state={makeState() as never}
+        onClose={noop}
+      />
+    );
+
+    expect(html).toContain('data-testid="market-command-detail-drawer"');
+    expect(html).toContain("Durable alert row");
+    expect(html).toContain("Directional accumulation");
+    expect(html).toContain("Server-composed alert detail");
   });
 });

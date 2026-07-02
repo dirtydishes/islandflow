@@ -481,10 +481,16 @@ type TerminalMarketChartSectionProps = {
   state: TerminalState;
   title?: string;
   className?: string;
+  onMarkerSelect?: (payload: TerminalMarketChartMarkerPayload) => void;
 };
 
 export const TerminalMarketChartSection = memo(
-  ({ state, title = "Chart Context", className }: TerminalMarketChartSectionProps) => {
+  ({
+    state,
+    title = "Chart Context",
+    className,
+    onMarkerSelect
+  }: TerminalMarketChartSectionProps) => {
     const settingsStorage = useMemo(() => getChartSettingsStorage(), []);
     const settingsCapabilities = useMemo(
       () => ({
@@ -828,13 +834,17 @@ export const TerminalMarketChartSection = memo(
         if (!payload) {
           return;
         }
+        if (onMarkerSelect) {
+          onMarkerSelect(payload);
+          return;
+        }
         if (payload.kind === "smart-flow") {
           state.handleSmartFlowMarkerClick(payload.projection);
         } else {
           state.handleDarkMarkerClick(payload.event);
         }
       },
-      [state]
+      [onMarkerSelect, state]
     );
 
     return (
