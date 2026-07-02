@@ -1,7 +1,11 @@
 import { describe, expect, it } from "bun:test";
 
 import { selectDurableTapeTemplate } from "../durable-tape/templates";
-import { filterNewsStories } from "./filters";
+import {
+  filterNewsStories,
+  orderNewsStoriesByScopeRelevance,
+  summarizeNewsWireRelevance
+} from "./filters";
 import {
   formatNewsBodyText,
   formatNewsSymbolsLabel,
@@ -101,6 +105,43 @@ describe("news wire helpers", () => {
         (story) => story.trace_id
       )
     ).toEqual(["b"]);
+  });
+
+  it("promotes focused ticker stories without hiding the market wire", () => {
+    const stories = [
+      makeStory({ trace_id: "market-open", resolved_symbols: [], symbol_resolution: "derived" }),
+      makeStory({ trace_id: "spy-first", resolved_symbols: ["SPY"] }),
+      makeStory({ trace_id: "msft", resolved_symbols: ["MSFT"] }),
+      makeStory({ trace_id: "spy-second", resolved_symbols: ["AAPL", "SPY"] })
+    ];
+
+    const ordered = orderNewsStoriesByScopeRelevance(stories, ["SPY"]);
+
+    expect(ordered.map((story) => story.trace_id)).toEqual([
+      "spy-first",
+      "spy-second",
+      "market-open",
+      "msft"
+    ]);
+    expect(summarizeNewsWireRelevance(stories, ["SPY"])).toEqual({
+      focused: 2,
+      market: 2
+    });
+  });
+
+  it("preserves the market wire when the focused ticker has no mapped stories", () => {
+    const stories = [
+      makeStory({ trace_id: "market-open", resolved_symbols: [], symbol_resolution: "derived" }),
+      makeStory({ trace_id: "msft", resolved_symbols: ["MSFT"] })
+    ];
+
+    const ordered = orderNewsStoriesByScopeRelevance(stories, ["NVDA"]);
+
+    expect(ordered.map((story) => story.trace_id)).toEqual(["market-open", "msft"]);
+    expect(summarizeNewsWireRelevance(stories, ["NVDA"])).toEqual({
+      focused: 0,
+      market: 2
+    });
   });
 
   it("uses published timestamp and seq for /history/news cursor requests", () => {

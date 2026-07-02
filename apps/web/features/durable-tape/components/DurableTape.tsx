@@ -95,6 +95,7 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
   columnOverrides,
   getRowKey,
   getCursor,
+  getSortCursor,
   source,
   renderRow,
   renderHover,
@@ -128,12 +129,12 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
     createEmptyDurableTapeScrollHold<TItem>()
   );
 
-  const itemAccessors = useMemo(
+  const sortAccessors = useMemo(
     () => ({
       getKey: getRowKey,
-      getCursor
+      getCursor: getSortCursor ?? getCursor
     }),
-    [getCursor, getRowKey]
+    [getCursor, getRowKey, getSortCursor]
   );
 
   const resolvedFeatures = useMemo(() => {
@@ -193,7 +194,7 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
           resolvedFeatures.scrollHold && !wasAtTopRef.current,
           DEFAULT_HOT_LIMIT,
           undefined,
-          itemAccessors
+          sortAccessors
         )
       );
     };
@@ -208,11 +209,11 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
       unsubscribe?.();
       subscription.unsubscribe();
     };
-  }, [itemAccessors, query, resolvedFeatures.scrollHold, source]);
+  }, [query, resolvedFeatures.scrollHold, sortAccessors, source]);
 
   const items = useMemo(() => {
-    return composeTapeItems([], scrollHold.visible, historyItems, itemAccessors);
-  }, [historyItems, itemAccessors, scrollHold.visible]);
+    return composeTapeItems([], scrollHold.visible, historyItems, sortAccessors);
+  }, [historyItems, scrollHold.visible, sortAccessors]);
 
   const initialHistoryCursor = useMemo(() => {
     return source.getInitialHistoryCursor?.(query) ?? null;
@@ -274,7 +275,7 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
         const nextCursor = page.nextCursor ?? null;
         const cursorStalled = nextCursor ? isSameDurableTapeCursor(nextCursor, cursor) : false;
         setHistoryItems((current) =>
-          appendHistoryTail(current, page.items, scrollHold.visible, 0, itemAccessors)
+          appendHistoryTail(current, page.items, scrollHold.visible, 0, sortAccessors)
         );
         setHistoryCursor(cursorStalled ? undefined : (nextCursor ?? undefined));
         setHistoryExhausted(page.exhausted === true || nextCursor === null || cursorStalled);
@@ -313,11 +314,11 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
       historyExhausted,
       historyLoading,
       initialHistoryCursor,
-      itemAccessors,
       items,
       query,
       resolvedFeatures.clickhouseHistory,
       scrollHold.visible,
+      sortAccessors,
       source
     ]
   );
@@ -376,7 +377,7 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
     setScrollHold((current) => {
       const result = flushDurableTapeJumpToLive(current, DEFAULT_HOT_LIMIT, {
         reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-        accessors: itemAccessors
+        accessors: sortAccessors
       });
       return result.state;
     });
@@ -385,7 +386,7 @@ export const DurableTape = <TItem, TScope = unknown, TFilters = unknown>({
     }
     wasAtTopRef.current = true;
     setIsAtTop(true);
-  }, [itemAccessors]);
+  }, [sortAccessors]);
 
   const closeSettings = useCallback(() => {
     setSettingsOpen(false);

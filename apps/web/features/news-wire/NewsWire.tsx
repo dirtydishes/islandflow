@@ -20,7 +20,9 @@ import {
   hasActiveNewsWireFilters,
   matchesNewsWireScope,
   type NewsWireFilters,
-  type NewsWireMappedFilter
+  type NewsWireMappedFilter,
+  orderNewsStoriesByScopeRelevance,
+  summarizeNewsWireRelevance
 } from "./filters";
 import {
   decodeNewsText,
@@ -40,6 +42,7 @@ import {
 import { NEWS_WIRE_COLUMNS, NEWS_WIRE_TEMPLATES } from "./templates";
 
 export type NewsWireConnectionStatus = "connecting" | "connected" | "disconnected" | "stale";
+export type NewsWireScopeMode = "filter" | "promote";
 
 export type NewsWireProps = {
   stories: readonly NewsStory[];
@@ -49,6 +52,7 @@ export type NewsWireProps = {
   status?: NewsWireConnectionStatus;
   lastUpdate?: number | null;
   scopeSymbols?: readonly string[];
+  scopeMode?: NewsWireScopeMode;
   showControlRails?: boolean;
   template?: DurableTapeTemplateId | "auto";
   historyEnabled?: boolean;
@@ -102,6 +106,9 @@ const formatCompactCount = (value: number): string => {
   return `${(value / 1_000_000).toFixed(1)}M`;
 };
 
+const formatScopeLabel = (scopeSymbols: readonly string[] | undefined): string =>
+  scopeSymbols && scopeSymbols.length > 0 ? scopeSymbols.join(", ") : "all symbols";
+
 const toggleValue = (values: readonly string[], value: string): string[] => {
   return values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
 };
@@ -123,6 +130,7 @@ const useArrayNewsWireSource = ({
   historyEnabled,
   fetcher,
   buildApiUrl,
+  orderStories,
   onHistoryState
 }: {
   stories: readonly NewsStory[];
@@ -130,6 +138,7 @@ const useArrayNewsWireSource = ({
   historyEnabled: boolean;
   fetcher?: NewsWireHistoryFetcher;
   buildApiUrl?: NewsWireApiUrlBuilder;
+  orderStories?: (stories: readonly NewsStory[]) => NewsStory[];
   onHistoryState: (state: NewsWireHistoryState) => void;
 }): DurableTapeSource<NewsStory, undefined, string> => {
   const storiesRef = useRef<readonly NewsStory[]>(stories);
@@ -138,6 +147,7 @@ const useArrayNewsWireSource = ({
   const historyEnabledRef = useRef(historyEnabled);
   const fetcherRef = useRef(fetcher);
   const buildApiUrlRef = useRef(buildApiUrl);
+  const orderStoriesRef = useRef(orderStories);
   const historyStateRef = useRef(onHistoryState);
 
   useEffect(() => {
@@ -158,8 +168,9 @@ const useArrayNewsWireSource = ({
   useEffect(() => {
     fetcherRef.current = fetcher;
     buildApiUrlRef.current = buildApiUrl;
+    orderStoriesRef.current = orderStories;
     historyStateRef.current = onHistoryState;
-  }, [buildApiUrl, fetcher, onHistoryState]);
+  }, [buildApiUrl, fetcher, orderStories, onHistoryState]);
 
   return useMemo(
     () => ({
@@ -186,8 +197,12 @@ const useArrayNewsWireSource = ({
             fetcher: fetcherRef.current,
             buildApiUrl: buildApiUrlRef.current
           });
+          const orderPageStories = orderStoriesRef.current;
           historyStateRef.current({ loading: false, error: null });
-          return page;
+          return {
+            ...page,
+            items: orderPageStories ? orderPageStories(page.items) : page.items
+          };
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           historyStateRef.current({ loading: false, error: message });
@@ -206,6 +221,7 @@ const NewsWireControls = ({
   lastUpdate,
   historyState,
   scopeSymbols,
+  scopeMode,
   onToggleSource,
   onToggleSymbol,
   onMappedChange,
@@ -218,20 +234,24 @@ const NewsWireControls = ({
   lastUpdate?: number | null;
   historyState: NewsWireHistoryState;
   scopeSymbols?: readonly string[];
+  scopeMode: NewsWireScopeMode;
   onToggleSource: (source: string) => void;
   onToggleSymbol: (symbol: string) => void;
   onMappedChange: (mapped: NewsWireMappedFilter) => void;
   onToggleUpdatedOnly: () => void;
   onReset: () => void;
 }) => {
+  const controlScopeSymbols = scopeMode === "filter" ? scopeSymbols : undefined;
   const scopedStories = useMemo(
-    () => stories.filter((story) => matchesNewsWireScope(story, scopeSymbols)),
-    [scopeSymbols, stories]
+    () => stories.filter((story) => matchesNewsWireScope(story, controlScopeSymbols)),
+    [controlScopeSymbols, stories]
   );
   const facets = useMemo(() => getNewsWireFacets(scopedStories), [scopedStories]);
-  const active = hasActiveNewsWireFilters(toWireFilters(filters, scopeSymbols));
+  const active = hasActiveNewsWireFilters(toWireFilters(filters, controlScopeSymbols));
   const scopeLabel =
-    scopeSymbols && scopeSymbols.length > 0 ? scopeSymbols.join(", ") : "all symbols";
+    scopeMode === "promote" && scopeSymbols && scopeSymbols.length > 0
+      ? `focus ${formatScopeLabel(scopeSymbols)} + market`
+      : formatScopeLabel(controlScopeSymbols);
 
   return (
     <section className="news-wire-control-rails" aria-label="News wire controls">
@@ -438,6 +458,7 @@ export const NewsWire = ({
   status,
   lastUpdate,
   scopeSymbols,
+  scopeMode = "filter",
   showControlRails = false,
   template = "auto",
   historyEnabled = true,
@@ -453,19 +474,76 @@ export const NewsWire = ({
     error: null
   });
 
-  const wireFilters = useMemo(() => toWireFilters(filters, scopeSymbols), [filters, scopeSymbols]);
+  const promotedScopeActive = scopeMode === "promote" && (scopeSymbols?.length ?? 0) > 0;
+  const wireScopeSymbols = scopeMode === "filter" ? scopeSymbols : undefined;
+  const wireFilters = useMemo(
+    () => toWireFilters(filters, wireScopeSymbols),
+    [filters, wireScopeSymbols]
+  );
   const filteredStories = useMemo(
     () => filterNewsStories(stories, wireFilters),
     [stories, wireFilters]
   );
-  const filterKey = useMemo(() => getNewsWireFilterKey(wireFilters), [wireFilters]);
+  const orderedStories = useMemo(
+    () =>
+      scopeMode === "promote"
+        ? orderNewsStoriesByScopeRelevance(filteredStories, scopeSymbols)
+        : filteredStories,
+    [filteredStories, scopeMode, scopeSymbols]
+  );
+  const filterKey = useMemo(
+    () =>
+      JSON.stringify({
+        filters: getNewsWireFilterKey(wireFilters),
+        promotedScope: scopeMode === "promote" ? formatScopeLabel(scopeSymbols) : "",
+        scopeMode
+      }),
+    [scopeMode, scopeSymbols, wireFilters]
+  );
   const activeFilters = hasActiveNewsWireFilters(wireFilters);
+  const relevanceSummary = useMemo(
+    () => summarizeNewsWireRelevance(filteredStories, scopeSymbols),
+    [filteredStories, scopeSymbols]
+  );
+  const focusedStoryKeys = useMemo(() => {
+    if (!promotedScopeActive) {
+      return new Set<string>();
+    }
+    return new Set(
+      orderedStories
+        .filter((story) => matchesNewsWireScope(story, scopeSymbols))
+        .map((story) => getNewsStoryKey(story))
+    );
+  }, [orderedStories, promotedScopeActive, scopeSymbols]);
+  const storySortRanks = useMemo(() => {
+    if (!promotedScopeActive) {
+      return new Map<string, number>();
+    }
+    return new Map(orderedStories.map((story, index) => [getNewsStoryKey(story), index]));
+  }, [orderedStories, promotedScopeActive]);
+  const getRelevanceSortCursor = useCallback(
+    (story: NewsStory) => {
+      const rank = storySortRanks.get(getNewsStoryKey(story));
+      if (rank === undefined) {
+        return getNewsStoryCursor(story);
+      }
+      const sortValue = Number.MAX_SAFE_INTEGER - rank;
+      return { ts: sortValue, seq: sortValue };
+    },
+    [storySortRanks]
+  );
+  const focusLabel = promotedScopeActive ? `Focused ${formatScopeLabel(scopeSymbols)}` : "Focused";
+  const orderHistoryStories = useCallback(
+    (items: readonly NewsStory[]) => orderNewsStoriesByScopeRelevance(items, scopeSymbols),
+    [scopeSymbols]
+  );
   const source = useArrayNewsWireSource({
-    stories: filteredStories,
+    stories: orderedStories,
     filters: wireFilters,
     historyEnabled: liveEnabled && historyEnabled,
     fetcher,
     buildApiUrl,
+    orderStories: scopeMode === "promote" ? orderHistoryStories : undefined,
     onHistoryState: setHistoryState
   });
 
@@ -479,38 +557,71 @@ export const NewsWire = ({
     [detailMode, onStorySelect]
   );
 
-  const renderRow = useCallback<DurableTapeRowRenderer<NewsStory>>(({ item: story, columns }) => {
-    const headline = decodeNewsText(story.headline);
-    return columns.map((column) => {
-      let content: ReactNode;
-      if (column.id === "time") {
-        content = formatNewsTimestamp(story.published_ts);
-      } else if (column.id === "source") {
-        content = story.source;
-      } else if (column.id === "symbols") {
-        content = formatNewsSymbolsLabel(story);
-      } else {
-        content = <span className="news-wire-headline-text">{headline}</span>;
-      }
+  const renderRow = useCallback<DurableTapeRowRenderer<NewsStory>>(
+    ({ item: story, columns }) => {
+      const headline = decodeNewsText(story.headline);
+      const sectionLabel = promotedScopeActive
+        ? focusedStoryKeys.has(getNewsStoryKey(story))
+          ? focusLabel
+          : "Market wire"
+        : null;
+      const sectionClass = sectionLabel === focusLabel ? "focused" : "market";
 
-      return (
-        <span
-          className={`durable-tape-cell ${column.className ?? ""}`.trim()}
-          key={column.id}
-          role="cell"
-          title={typeof content === "string" ? content : headline}
-        >
-          {content}
-        </span>
-      );
-    });
-  }, []);
+      return columns.map((column) => {
+        let content: ReactNode;
+        if (column.id === "time") {
+          content = formatNewsTimestamp(story.published_ts);
+        } else if (column.id === "source") {
+          content = story.source;
+        } else if (column.id === "symbols") {
+          content = formatNewsSymbolsLabel(story);
+        } else {
+          content = (
+            <span className="news-wire-headline-stack">
+              {sectionLabel ? (
+                <span className={`news-wire-relevance-badge news-wire-relevance-${sectionClass}`}>
+                  {sectionLabel}
+                </span>
+              ) : null}
+              <span className="news-wire-headline-text">{headline}</span>
+            </span>
+          );
+        }
+
+        return (
+          <span
+            className={`durable-tape-cell ${column.className ?? ""}`.trim()}
+            key={column.id}
+            role="cell"
+            title={typeof content === "string" ? content : headline}
+          >
+            {content}
+          </span>
+        );
+      });
+    },
+    [focusLabel, focusedStoryKeys, promotedScopeActive]
+  );
+
+  const getRowClassName = useCallback(
+    ({ item: story }: { item: NewsStory }) => {
+      if (!promotedScopeActive) {
+        return undefined;
+      }
+      return focusedStoryKeys.has(getNewsStoryKey(story))
+        ? "news-wire-row-focused"
+        : "news-wire-row-market";
+    },
+    [focusedStoryKeys, promotedScopeActive]
+  );
 
   const emptyMessage = !liveEnabled
     ? "News is live only in v1."
-    : activeFilters || (scopeSymbols && scopeSymbols.length > 0)
+    : activeFilters || (scopeMode === "filter" && scopeSymbols && scopeSymbols.length > 0)
       ? "No news stories match the current filter."
       : "Waiting for live news stories.";
+  const showRelevanceStrip = liveEnabled && promotedScopeActive;
+  const hasPrelude = showRelevanceStrip || Boolean(historyState.error);
 
   useEffect(() => {
     if (detailMode !== "inline" || !selectedStory) {
@@ -535,6 +646,7 @@ export const NewsWire = ({
           lastUpdate={lastUpdate}
           historyState={historyState}
           scopeSymbols={scopeSymbols}
+          scopeMode={scopeMode}
           onToggleSource={(sourceValue) =>
             setFilters((current) => ({
               ...current,
@@ -555,9 +667,32 @@ export const NewsWire = ({
         />
       ) : null}
 
-      {historyState.error ? (
-        <div className="news-wire-history-warning" role="status">
-          Older news history failed to load: {historyState.error}
+      {hasPrelude ? (
+        <div className="news-wire-prelude">
+          {showRelevanceStrip ? (
+            <section className="news-wire-relevance-strip" aria-label="News relevance sections">
+              <span
+                className={
+                  relevanceSummary.focused > 0
+                    ? "news-wire-relevance-chip news-wire-relevance-focused"
+                    : "news-wire-relevance-chip news-wire-relevance-empty"
+                }
+              >
+                <strong>{focusLabel}</strong>
+                <em>{formatCompactCount(relevanceSummary.focused)} stories</em>
+              </span>
+              <span className="news-wire-relevance-chip news-wire-relevance-market">
+                <strong>Market wire</strong>
+                <em>{formatCompactCount(relevanceSummary.market)} stories</em>
+              </span>
+            </section>
+          ) : null}
+
+          {historyState.error ? (
+            <div className="news-wire-history-warning" role="status">
+              Older news history failed to load: {historyState.error}
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -579,6 +714,8 @@ export const NewsWire = ({
             filters={filterKey}
             getCursor={getNewsStoryCursor}
             getRowKey={getNewsStoryKey}
+            getSortCursor={promotedScopeActive ? getRelevanceSortCursor : undefined}
+            getRowClassName={getRowClassName}
             onActivate={({ item }) => selectStory(item)}
             renderHover={({ item }) => <NewsWireHover story={item} />}
             renderRow={renderRow}
@@ -589,7 +726,7 @@ export const NewsWire = ({
             templates={NEWS_WIRE_TEMPLATES}
             title={title}
           />
-          {filteredStories.length === 0 ? (
+          {orderedStories.length === 0 ? (
             <div className="news-wire-empty" role="status">
               {emptyMessage}
             </div>

@@ -242,9 +242,10 @@ export const MarketCommandRoute = ({ state }: { state: TerminalState }) => {
             liveEnabled={state.mode === "live"}
             onStorySelect={openNewsDetail}
             scopeSymbols={state.activeTickers}
+            scopeMode="promote"
             showControlRails
             status={state.liveSession.status}
-            stories={state.filteredNews}
+            stories={state.news.items}
             title="News Wire"
           />
         </div>

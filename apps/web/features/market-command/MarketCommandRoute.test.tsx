@@ -1,5 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
-import type { DurableTapeAlertRowViewModel } from "@islandflow/types";
+import type { DurableTapeAlertRowViewModel, NewsStory } from "@islandflow/types";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { DurableTapeAlertRowsPane } from "../durable-tape";
@@ -205,6 +205,26 @@ const makeDurableAlertRow = (
   ...overrides
 });
 
+const makeNewsStory = (overrides: Partial<NewsStory> = {}): NewsStory => ({
+  trace_id: "news-1",
+  seq: 1,
+  source_ts: 1_000,
+  ingest_ts: 1_001,
+  story_id: 77,
+  provider: "alpaca",
+  source: "Reuters",
+  headline: "SPY leadership broadens",
+  summary: "summary",
+  content_html: "<p>body</p>",
+  url: "https://example.com/story",
+  published_ts: 1_000,
+  updated_ts: 1_000,
+  provider_symbols: ["SPY"],
+  resolved_symbols: ["SPY"],
+  symbol_resolution: "provider",
+  ...overrides
+});
+
 describe("MarketCommandRoute", () => {
   it("composes the replacement dashboard without old standalone panes", () => {
     const html = renderToStaticMarkup(<MarketCommandRoute state={makeState() as never} />);
@@ -272,5 +292,39 @@ describe("MarketCommandRoute", () => {
     expect(html).toContain("Durable alert row");
     expect(html).toContain("Directional accumulation");
     expect(html).toContain("Server-composed alert detail");
+  });
+
+  it("labels focused and market news sections without hiding the global wire", () => {
+    const html = renderToStaticMarkup(
+      <MarketCommandRoute
+        state={
+          makeState({
+            activeTickers: ["SPY"],
+            news: makeFeed({
+              items: [
+                makeNewsStory({ trace_id: "market", resolved_symbols: [] }),
+                makeNewsStory({ trace_id: "focused", resolved_symbols: ["SPY"] })
+              ]
+            })
+          }) as never
+        }
+      />
+    );
+
+    expect(html).toContain("Focused SPY");
+    expect(html).toContain("Market wire");
+  });
+
+  it("renders news stories in the shared Market Command drawer", () => {
+    const html = renderToStaticMarkup(
+      <MarketCommandDetailDrawer
+        detail={{ kind: "news", story: makeNewsStory({ headline: "NVDA story opens" }) }}
+        state={makeState() as never}
+        onClose={noop}
+      />
+    );
+
+    expect(html).toContain("News wire");
+    expect(html).toContain("NVDA story opens");
   });
 });

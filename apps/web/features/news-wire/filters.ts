@@ -12,6 +12,11 @@ export type NewsWireFilters = {
   updatedOnly?: boolean;
 };
 
+export type NewsWireRelevanceSummary = {
+  focused: number;
+  market: number;
+};
+
 export type NewsWireFacet = {
   value: string;
   count: number;
@@ -50,6 +55,48 @@ export const matchesNewsWireScope = (
     return true;
   }
   return story.resolved_symbols.some((symbol) => scope.has(normalize(symbol)));
+};
+
+export const summarizeNewsWireRelevance = (
+  stories: readonly NewsStory[],
+  scopeSymbols: readonly string[] | undefined
+): NewsWireRelevanceSummary => {
+  if (!hasActiveSet(scopeSymbols)) {
+    return { focused: 0, market: stories.length };
+  }
+
+  let focused = 0;
+  for (const story of stories) {
+    if (matchesNewsWireScope(story, scopeSymbols)) {
+      focused += 1;
+    }
+  }
+
+  return {
+    focused,
+    market: stories.length - focused
+  };
+};
+
+export const orderNewsStoriesByScopeRelevance = (
+  stories: readonly NewsStory[],
+  scopeSymbols: readonly string[] | undefined
+): NewsStory[] => {
+  if (!hasActiveSet(scopeSymbols)) {
+    return [...stories];
+  }
+
+  const focused: NewsStory[] = [];
+  const market: NewsStory[] = [];
+  for (const story of stories) {
+    if (matchesNewsWireScope(story, scopeSymbols)) {
+      focused.push(story);
+    } else {
+      market.push(story);
+    }
+  }
+
+  return [...focused, ...market];
 };
 
 export const filterNewsStories = (
