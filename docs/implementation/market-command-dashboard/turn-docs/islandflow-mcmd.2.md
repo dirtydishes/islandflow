@@ -99,8 +99,9 @@ Browser evidence:
 
 ## PR And Commits
 
-- PR: pending Forgejo create after commit/push.
-- Commits: pending.
+- PR: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/103`
+- Commits:
+  - `7806c19` - `add market command ticker rail focus model`
 
 ## Beads Updates
 
@@ -122,5 +123,4 @@ None.
 
 ## Closeout
 
-Implementation complete locally. Forgejo push, PR creation, and implementation
-callback pending.
+Implementation PR opened. Callback pending.
