@@ -71,7 +71,7 @@ creation after the implementation callback.
 
 CI owner: reviewer/verification agents
 
-Current CI state: `not-started`
+Current CI state: `local-gates-passed`
 
 Evidence:
 
@@ -106,8 +106,9 @@ Browser evidence:
 
 ## PR And Commits
 
-- PR: pending.
-- Implementation commits: pending.
+- PR: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/109`
+- Implementation commit:
+  `79d6ed35d9a281d528199db19f0bcdfe457c00c0`
 
 ## Beads Updates
 
@@ -128,4 +129,5 @@ None.
 
 ## Closeout
 
-Implementation complete locally; PR creation and final callback are pending.
+Implementation complete locally; PR #109 is open against `dashboard-v2`, and
+the final implementation callback is pending.
