@@ -56,7 +56,8 @@ Evidence:
 
 ## PR And Commits
 
-Pending.
+- PR: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/102`
+- Commits: pushed on `lavender/islandflow-mcmd-1-server-ranking-contract`; callback carries the exact commit list.
 
 ## Beads Updates
 
@@ -77,4 +78,4 @@ None.
 
 ## Closeout
 
-Implementation complete locally. PR creation and callback pending.
+Implementation PR opened. Callback pending.
