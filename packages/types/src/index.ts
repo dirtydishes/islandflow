@@ -1,6 +1,7 @@
 export * from "./durable-tapes";
 export * from "./events";
 export * from "./live";
+export * from "./market-command";
 export * from "./options-flow";
 export * from "./smart-flow";
 export * from "./smart-flow-alerts";

@@ -69,6 +69,11 @@ describe("api rate limit route categories", () => {
       bucket: "rest",
       routeCategory: "rest_read"
     });
+    expect(classifyApiRouteForRateLimit("GET", "/market-command/tickers")).toMatchObject({
+      exempt: false,
+      bucket: "rest",
+      routeCategory: "rest_read"
+    });
   });
 });
 
