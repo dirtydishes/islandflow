@@ -91,6 +91,8 @@ Use `impeccable` when present. If missing, continue without it and note that it 
 
 Install `@pierre/diffs` in the target repo if missing. Every storyboard diff must use `@pierre/diffs/ssr`.
 
+Status: generated and Chromium-verified on 2026-07-02 after Phase 08 closeout.
+
 ## Phase Ledger
 
 | Beads Issue | Phase | Phase Doc | Depends On | Status |

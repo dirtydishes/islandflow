@@ -4,7 +4,7 @@ Canonical tracker: Beads epic `islandflow-mcmd`
 
 This file is a compact resume aid only. If this file disagrees with Beads, Beads wins.
 
-Status: active
+Status: complete
 
 Stream: `market-command-dashboard`
 
@@ -17,6 +17,8 @@ Current Beads issue: none
 Current PR: none
 
 Last completed phase: 08 - Deterministic drawer browser fixture (`islandflow-mcmd.8`)
+
+Final storyboard: `docs/implementation/market-command-dashboard/storyboard-post-run-07-02-2026.html`
 
 Blocked: no
 
@@ -54,3 +56,5 @@ Blocked: no
 ## Last Coordinator Update
 
 2026-07-02: Review callback approved Phase `islandflow-mcmd.8` with `ci-green`. Orchestrator merged PR #109 into `dashboard-v2` at merge commit `ead46aa`, closed Beads issue `islandflow-mcmd.8`, and recorded Forgejo Actions task `#464` as green for final reviewer head `fd6c197988`.
+
+2026-07-02: Final selector found no remaining ready or open `islandflow-mcmd.*` children. Orchestrator generated and Chromium-verified `docs/implementation/market-command-dashboard/storyboard-post-run-07-02-2026.html`; the storyboard uses `@pierre/diffs/ssr` for all rendered diff blocks and notes that `impeccable` was unavailable in this session. Epic `islandflow-mcmd` was closed in Beads after storyboard verification.
