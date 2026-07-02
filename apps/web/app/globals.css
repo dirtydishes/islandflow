@@ -1600,6 +1600,33 @@ h3 {
   min-height: 560px;
 }
 
+.market-command-fixture-probes {
+  grid-area: chart;
+  align-self: end;
+  justify-self: end;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+}
+
+.market-command-fixture-probes button {
+  border: 1px solid var(--border-strong);
+  background: rgba(9, 13, 17, 0.92);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.68rem;
+  line-height: 1;
+  padding: 7px 9px;
+  cursor: pointer;
+}
+
+.market-command-fixture-probes button:disabled {
+  cursor: not-allowed;
+  color: var(--text-faint);
+}
+
 .market-command-alerts-pane {
   grid-area: alerts;
   min-height: 560px;

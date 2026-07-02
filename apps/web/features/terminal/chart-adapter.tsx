@@ -578,6 +578,19 @@ export const TerminalMarketChartSection = memo(
     );
 
     useEffect(() => {
+      if (state.marketCommandDrawerFixtureEnabled) {
+        const candles = sortByTsSeq(state.liveSession.chartCandles);
+        const last = candles.at(-1);
+        setOverlayRangePrints([]);
+        setFetchStateIfChanged({
+          candles,
+          status: "connected",
+          lastUpdate: last ? (last.ingest_ts ?? last.ts) : state.liveSession.lastUpdate,
+          error: null
+        });
+        return;
+      }
+
       let active = true;
       const abort = new AbortController();
       setFetchStateIfChanged({
@@ -637,6 +650,9 @@ export const TerminalMarketChartSection = memo(
         abort.abort();
       };
     }, [
+      state.marketCommandDrawerFixtureEnabled,
+      state.liveSession.chartCandles,
+      state.liveSession.lastUpdate,
       state.chartTicker,
       state.mode,
       normalizedChartIntervalMs,
@@ -669,6 +685,10 @@ export const TerminalMarketChartSection = memo(
 
     useEffect(() => {
       overlayAbortRef.current?.abort();
+      if (state.marketCommandDrawerFixtureEnabled) {
+        setOverlayRangePrints([]);
+        return;
+      }
       if (!visibleRangeMs || !settings.display.showOverlays) {
         setOverlayRangePrints([]);
         return;
@@ -710,7 +730,12 @@ export const TerminalMarketChartSection = memo(
         window.clearTimeout(timer);
         abort.abort();
       };
-    }, [settings.display.showOverlays, state.chartTicker, visibleRangeMs]);
+    }, [
+      settings.display.showOverlays,
+      state.chartTicker,
+      state.marketCommandDrawerFixtureEnabled,
+      visibleRangeMs
+    ]);
 
     const normalizedCandles = useMemo(
       () => normalizeTerminalChartCandles(fetchState.candles),
