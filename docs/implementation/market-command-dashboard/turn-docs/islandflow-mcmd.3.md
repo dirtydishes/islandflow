@@ -60,7 +60,9 @@ Evidence:
 
 ## PR And Commits
 
-Pending commit and Forgejo PR.
+- Forgejo PR: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/104`
+- Implementation commit: `d829d5de0b149e72d0bd9de54c9b4d991347617b` (`upgrade root route feed subscriptions`)
+- A final doc-closeout commit records the PR URL before callback.
 
 ## Beads Updates
 
@@ -79,4 +81,4 @@ None.
 
 ## Closeout
 
-Implementation is locally ready for commit, push, Forgejo PR, and one schema-valid callback.
+Implementation PR is open and ready for orchestrator-owned review handoff after final doc-closeout push.
