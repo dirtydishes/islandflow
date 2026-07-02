@@ -494,7 +494,7 @@ const renderAlertRow = ({
     );
   });
 
-const renderAlertDetail = (row: DurableTapeAlertRowViewModel) => (
+export const renderDurableTapeAlertRowDetail = (row: DurableTapeAlertRowViewModel) => (
   <div className="alerts-detail" aria-label="Server-composed alert detail">
     <div className="alerts-detail-head">
       <div>
@@ -572,23 +572,35 @@ export const DurableTapeAlertRowsPane = ({
   title = "Alerts",
   className,
   features,
-  rowHeight = 36
+  rowHeight = 36,
+  detailMode = "inline",
+  selectedRowId,
+  onSelectRow
 }: {
   rows: readonly DurableTapeAlertRowViewModel[];
   title?: string;
   className?: string;
   features?: readonly DurableTapeFeatureInput[];
   rowHeight?: number;
+  detailMode?: "inline" | "external";
+  selectedRowId?: string | null;
+  onSelectRow?: (row: DurableTapeAlertRowViewModel) => void;
 }) => {
   const source = useStaticRowSource(rows);
-  const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
-  const selectedRow = rows.find((row) => row.id === selectedRowId) ?? null;
+  const [internalSelectedRowId, setInternalSelectedRowId] = useState<string | null>(null);
+  const activeSelectedRowId =
+    detailMode === "external" ? (selectedRowId ?? null) : internalSelectedRowId;
+  const selectedRow = rows.find((row) => row.id === activeSelectedRowId) ?? null;
 
   useEffect(() => {
-    if (selectedRowId && !rows.some((row) => row.id === selectedRowId)) {
-      setSelectedRowId(null);
+    if (
+      detailMode === "inline" &&
+      internalSelectedRowId &&
+      !rows.some((row) => row.id === internalSelectedRowId)
+    ) {
+      setInternalSelectedRowId(null);
     }
-  }, [rows, selectedRowId]);
+  }, [detailMode, rows, internalSelectedRowId]);
 
   return (
     <section className={`alerts-module ${className ?? ""}`.trim()} data-row-source="server">
@@ -598,25 +610,34 @@ export const DurableTapeAlertRowsPane = ({
         columns={ALERT_ROW_COLUMNS}
         features={features}
         getCursor={getRowCursor}
+        getRowClassName={({ item }) =>
+          activeSelectedRowId === item.id ? "alerts-row-selected" : undefined
+        }
         getRowKey={getRowKey}
-        onActivate={({ item }) => setSelectedRowId(item.id)}
-        renderHover={({ item }) => renderAlertDetail(item)}
+        onActivate={({ item }) => {
+          if (detailMode === "external") {
+            onSelectRow?.(item);
+            return;
+          }
+          setInternalSelectedRowId(item.id);
+        }}
+        renderHover={({ item }) => renderDurableTapeAlertRowDetail(item)}
         renderRow={({ item, columns }) => renderAlertRow({ row: item, columns })}
         rowHeight={rowHeight}
         source={source}
         templates={ALERT_ROW_TEMPLATES}
         title={title}
       />
-      {selectedRow ? (
+      {detailMode === "inline" && selectedRow ? (
         <div className="alerts-module-detail">
           <button
             className="alerts-module-detail-close"
             type="button"
-            onClick={() => setSelectedRowId(null)}
+            onClick={() => setInternalSelectedRowId(null)}
           >
             Close detail
           </button>
-          {renderAlertDetail(selectedRow)}
+          {renderDurableTapeAlertRowDetail(selectedRow)}
         </div>
       ) : null}
     </section>

@@ -160,7 +160,7 @@ export const renderOptionsTapeRow = ({
 }): ReactNode =>
   columns.map((column) => {
     if (column.id === "info") {
-      const hasSmartFlow = Boolean(context.smartFlow);
+      const hasSmartFlow = Boolean(context.smartFlow && onMoreInfo);
       return (
         <span
           className={`durable-tape-cell ${column.className ?? ""}`.trim()}

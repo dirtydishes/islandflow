@@ -36,6 +36,15 @@ import {
   getOptionsTapeUnderlying,
   normalizeOptionsTapeContractId
 } from "./format";
+import {
+  buildDefaultOptionsTapeSettings,
+  buildOptionsTapeTemplatesForSettings,
+  normalizeOptionsTapeSettings,
+  type OptionsTapeSettingsState,
+  readOptionsTapeSettings,
+  writeOptionsTapeSettings
+} from "./settings";
+import { OptionsTapeHelp, OptionsTapeSettings } from "./settings-controls";
 import { createOptionsTapeFilteredSource, useOptionsTapeArraySource } from "./source";
 import {
   buildOptionsTapeSupportPacketMaps,
@@ -50,15 +59,6 @@ import {
   getOptionsTapeSmartFlowContextFromSupport,
   getOptionsTapeSmartFlowSummary
 } from "./tinting";
-import { OptionsTapeHelp, OptionsTapeSettings } from "./settings-controls";
-import {
-  buildDefaultOptionsTapeSettings,
-  buildOptionsTapeTemplatesForSettings,
-  normalizeOptionsTapeSettings,
-  readOptionsTapeSettings,
-  type OptionsTapeSettingsState,
-  writeOptionsTapeSettings
-} from "./settings";
 import type {
   FlowPacketFocusRequest,
   OptionsTapeMode,
@@ -328,6 +328,7 @@ export const OptionsTape = ({
   nbboByContractId,
   nbboByTraceId,
   supportHydrationEnabled = true,
+  smartFlowDetailMode = "inline",
   focusedContractId,
   onContractFocus,
   onPacketFocus,
@@ -881,7 +882,7 @@ export const OptionsTape = ({
           renderOptionsTapeRow({
             context: contextForPrint(item),
             columns,
-            onMoreInfo: openSmartFlowDetail,
+            onMoreInfo: smartFlowDetailMode === "inline" ? openSmartFlowDetail : undefined,
             activeDetailTraceId: smartFlowDetail?.context.print.trace_id ?? null
           })
         }
@@ -893,7 +894,7 @@ export const OptionsTape = ({
         templates={templates}
         title={title}
       />
-      {smartFlowDetail ? (
+      {smartFlowDetailMode === "inline" && smartFlowDetail ? (
         <OptionsTapeSmartFlowDetailSurface
           status={smartFlowDetail.status}
           context={smartFlowDetail.context}
