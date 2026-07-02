@@ -14,7 +14,7 @@ Current phase: 06 - News relevance ordering
 
 Current Beads issue: `islandflow-mcmd.6`
 
-Current PR: none
+Current PR: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/107`
 
 Last completed phase: 05 - Hybrid detail drawer model (`islandflow-mcmd.5`)
 
@@ -47,9 +47,9 @@ Blocked: no
 | 03 - Root route feature upgrade | `islandflow-mcmd.3` | Closed, merged via PR #104 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/104` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.3.md` |
 | 04 - Dashboard layout replacement | `islandflow-mcmd.4` | Closed, merged via PR #105 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/105` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.4.md` |
 | 05 - Hybrid detail drawer model | `islandflow-mcmd.5` | Closed, merged via PR #106 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/106` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.5.md` |
-| 06 - News relevance ordering | `islandflow-mcmd.6` | In progress | None | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.6.md` |
+| 06 - News relevance ordering | `islandflow-mcmd.6` | In review | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/107` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.6.md` |
 | 07 - Polish, performance, and visual QA | `islandflow-mcmd.7` | Open, blocked by `islandflow-mcmd.6` | None | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.7.md` |
 
 ## Last Coordinator Update
 
-2026-07-02: Closeout/selector subagent verified Phase `islandflow-mcmd.5` is closed and PR #106 is merged. It selected Beads-ready phase `islandflow-mcmd.6`. Orchestrator claimed it and assigned branch `lavender/islandflow-mcmd-6-news-relevance-ordering` from base branch `dashboard-v2`.
+2026-07-02: Implementation callback for Phase `islandflow-mcmd.6` reported PR #107 ready from branch `lavender/islandflow-mcmd-6-news-relevance-ordering` into `dashboard-v2`. Orchestrator recorded the PR and is handing the phase to thermo-nuclear review.
