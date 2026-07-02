@@ -3,6 +3,8 @@ import { describe, expect, it } from "bun:test";
 import { selectDurableTapeTemplate } from "../durable-tape/templates";
 import {
   filterNewsStories,
+  getNewsWireRelevanceSortCursor,
+  isNewsStoryFocusedForScope,
   orderNewsStoriesByScopeRelevance,
   summarizeNewsWireRelevance
 } from "./filters";
@@ -127,6 +129,28 @@ describe("news wire helpers", () => {
       focused: 2,
       market: 2
     });
+  });
+
+  it("keeps focused relevance stable for history rows outside the live rank set", () => {
+    const focusedOlder = makeStory({
+      trace_id: "spy-old-history",
+      published_ts: 1_000,
+      resolved_symbols: ["SPY"]
+    });
+    const marketNewer = makeStory({
+      trace_id: "market-newer",
+      published_ts: 5_000,
+      resolved_symbols: ["QQQ"]
+    });
+
+    const focusedCursor = getNewsWireRelevanceSortCursor(focusedOlder, ["SPY"], getNewsStoryCursor);
+    const marketCursor = getNewsWireRelevanceSortCursor(marketNewer, ["SPY"], getNewsStoryCursor);
+
+    expect(isNewsStoryFocusedForScope(focusedOlder, ["SPY"])).toBe(true);
+    expect(isNewsStoryFocusedForScope(marketNewer, ["SPY"])).toBe(false);
+    expect(focusedCursor.ts).toBeGreaterThan(marketCursor.ts);
+    expect(focusedCursor.seq).toBe(getNewsStoryCursor(focusedOlder).seq);
+    expect(marketCursor).toEqual(getNewsStoryCursor(marketNewer));
   });
 
   it("preserves the market wire when the focused ticker has no mapped stories", () => {

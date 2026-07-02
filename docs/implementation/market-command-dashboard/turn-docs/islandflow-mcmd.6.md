@@ -52,17 +52,38 @@ Reviewer skill:
 
 `thermo-nuclear-code-quality-review`
 
-Not started.
+Completed by the review thread.
+
+Finding repaired:
+
+- The initial promotion cursor was rank-based from the current live `orderedStories`
+  array. That kept the visible hot rows ordered, but older/history rows outside
+  that live rank map fell back to timestamp ordering and could be labeled as
+  `Market wire` even when they matched the focused ticker. The repair moved
+  focused-scope membership and relevance cursor construction into
+  `news-wire/filters.ts`, then made row labels, row classes, and visual sort
+  cursors use that predicate for every story. Paging still uses the real
+  `getNewsStoryCursor`.
+
+Findings remaining:
+
+- None in Phase 06 scope.
 
 ## CI And Gates
 
 CI owner: reviewer/verification agents
 
-Current CI state: `not-started`
+Current CI state: `reviewer-local-green`; Forgejo CI is inspected after the
+reviewer repair commit is pushed.
 
 Evidence:
 
-- `bun test apps/web` - passed, 285 tests.
+- `bun install --frozen-lockfile` - completed after the prepared worktree was
+  missing installed workspace dependencies.
+- Initial reviewer `bun test apps/web` before dependency bootstrap failed before
+  exercising product code because modules such as `react/jsx-dev-runtime`,
+  `@islandflow/types`, and `@tanstack/react-virtual` were unavailable.
+- `bun test apps/web` - passed, 286 tests after the reviewer repair.
 - `bun --cwd=apps/web run build` - passed, Next.js production build completed.
 - Scoped Biome:
   `./node_modules/.bin/biome check apps/web/features/durable-tape/components/DurableTape.tsx apps/web/features/durable-tape/types.ts apps/web/features/news-wire/NewsWire.tsx apps/web/features/news-wire/filters.ts apps/web/features/news-wire/news-wire.test.ts apps/web/features/market-command/MarketCommandRoute.tsx apps/web/features/market-command/MarketCommandRoute.test.tsx apps/web/app/globals.css`
@@ -86,10 +107,24 @@ Browser evidence:
   drawer closed cleanly, and no page-level horizontal overflow was detected.
 - Temporary dev server, fake API, and Chromium processes were stopped after
   verification.
+- Reviewer repair pass used system Chromium at `/usr/bin/chromium`, a local
+  fake API/WebSocket on `127.0.0.1:4000`, and the worktree web server on
+  `127.0.0.1:3001`.
+- Reviewer desktop `1440x1100` with `prefers-reduced-motion: reduce`: clicked
+  SPY in the ticker rail, verified `Focused SPY`, `Market wire`, local fallback
+  ranking, SPY row promoted above a newer market story, shared drawer opened for
+  the SPY story, drawer closed, NVDA focus showed `Focused NVDA` with `0
+  stories`, and the market wire stayed visible. Horizontal overflow was `0`.
+- Reviewer mobile `390x900`: repeated the SPY and NVDA focused-news checks,
+  verified market wire preservation and shared drawer behavior, and measured
+  horizontal overflow `0`.
 
 ## PR And Commits
 
-Pending commit and PR.
+- PR: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/107`
+- Implementation commit: `4771d7be03eaf8226f1ad6bfd0182052f80794bd`
+- Reviewer repair commit: this review-thread commit on
+  `lavender/islandflow-mcmd-6-news-relevance-ordering`.
 
 ## Beads Updates
 

@@ -17,7 +17,9 @@ import {
   filterNewsStories,
   getNewsWireFacets,
   getNewsWireFilterKey,
+  getNewsWireRelevanceSortCursor,
   hasActiveNewsWireFilters,
+  isNewsStoryFocusedForScope,
   matchesNewsWireScope,
   type NewsWireFilters,
   type NewsWireMappedFilter,
@@ -505,32 +507,9 @@ export const NewsWire = ({
     () => summarizeNewsWireRelevance(filteredStories, scopeSymbols),
     [filteredStories, scopeSymbols]
   );
-  const focusedStoryKeys = useMemo(() => {
-    if (!promotedScopeActive) {
-      return new Set<string>();
-    }
-    return new Set(
-      orderedStories
-        .filter((story) => matchesNewsWireScope(story, scopeSymbols))
-        .map((story) => getNewsStoryKey(story))
-    );
-  }, [orderedStories, promotedScopeActive, scopeSymbols]);
-  const storySortRanks = useMemo(() => {
-    if (!promotedScopeActive) {
-      return new Map<string, number>();
-    }
-    return new Map(orderedStories.map((story, index) => [getNewsStoryKey(story), index]));
-  }, [orderedStories, promotedScopeActive]);
   const getRelevanceSortCursor = useCallback(
-    (story: NewsStory) => {
-      const rank = storySortRanks.get(getNewsStoryKey(story));
-      if (rank === undefined) {
-        return getNewsStoryCursor(story);
-      }
-      const sortValue = Number.MAX_SAFE_INTEGER - rank;
-      return { ts: sortValue, seq: sortValue };
-    },
-    [storySortRanks]
+    (story: NewsStory) => getNewsWireRelevanceSortCursor(story, scopeSymbols, getNewsStoryCursor),
+    [scopeSymbols]
   );
   const focusLabel = promotedScopeActive ? `Focused ${formatScopeLabel(scopeSymbols)}` : "Focused";
   const orderHistoryStories = useCallback(
@@ -561,7 +540,7 @@ export const NewsWire = ({
     ({ item: story, columns }) => {
       const headline = decodeNewsText(story.headline);
       const sectionLabel = promotedScopeActive
-        ? focusedStoryKeys.has(getNewsStoryKey(story))
+        ? isNewsStoryFocusedForScope(story, scopeSymbols)
           ? focusLabel
           : "Market wire"
         : null;
@@ -600,7 +579,7 @@ export const NewsWire = ({
         );
       });
     },
-    [focusLabel, focusedStoryKeys, promotedScopeActive]
+    [focusLabel, promotedScopeActive, scopeSymbols]
   );
 
   const getRowClassName = useCallback(
@@ -608,11 +587,11 @@ export const NewsWire = ({
       if (!promotedScopeActive) {
         return undefined;
       }
-      return focusedStoryKeys.has(getNewsStoryKey(story))
+      return isNewsStoryFocusedForScope(story, scopeSymbols)
         ? "news-wire-row-focused"
         : "news-wire-row-market";
     },
-    [focusedStoryKeys, promotedScopeActive]
+    [promotedScopeActive, scopeSymbols]
   );
 
   const emptyMessage = !liveEnabled
