@@ -85,6 +85,7 @@ Use a selector subagent with regular xhigh reasoning to choose the next ready is
 If no islandflow-xcdn.* child issue is ready because the epic is complete, report the completed state and do not launch worker or reviewer threads.
 
 For a ready phase, the orchestrator creates one visible project-scoped Islandflow implementation thread. Pass the worker:
+- Reasoning: regular `xhigh`; do not use fast mode or a model override.
 - Orchestrator thread ID: <current-orchestrator-thread-id>
 - Callback target: message only that thread exactly once when PR-ready or genuinely blocked.
 - docs/implementation/options-tape-smart-flow-row-tinting/IMPLEMENT.md
@@ -98,6 +99,7 @@ For a ready phase, the orchestrator creates one visible project-scoped Islandflo
 The worker opens a Forgejo PR against main when ready and sends exactly one implementation callback matching the schema.
 
 After a PR-ready callback, the orchestrator creates one visible project-scoped Islandflow review thread. Pass the reviewer:
+- Reasoning: regular `xhigh`; do not use fast mode or a model override.
 - Orchestrator thread ID: <current-orchestrator-thread-id>
 - Callback target: message only that thread exactly once when review and CI are resolved or concretely blocked.
 - PR URL and branch
