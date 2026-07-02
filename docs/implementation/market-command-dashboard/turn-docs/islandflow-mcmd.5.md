@@ -70,7 +70,8 @@ Browser evidence:
 
 ## PR And Commits
 
-Pending.
+- PR: https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/106
+- `a6bb311` — add market command shared detail drawer
 
 ## Beads Updates
 
@@ -91,4 +92,4 @@ Pending.
 
 ## Closeout
 
-Implementation ready for PR after commit/push. Beads phase `islandflow-mcmd.5` intentionally left open for orchestrator/reviewer closeout.
+Implementation PR #106 is open against `dashboard-v2` and branch `lavender/islandflow-mcmd-5-hybrid-detail-model` is pushed to Forgejo. Beads phase `islandflow-mcmd.5` intentionally left open for orchestrator/reviewer closeout.
