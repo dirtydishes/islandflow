@@ -42,36 +42,52 @@ Reviewer skill:
 
 `thermo-nuclear-code-quality-review`
 
-Not started. The orchestrator owns review-thread creation after the implementation callback.
+2026-07-02 reviewer pass:
+
+- Reviewed the Phase 05 diff against `docs/implementation/market-command-dashboard/05-hybrid-detail-model.md` and PR #106 scope.
+- No structural maintainability blockers found. The shared drawer is isolated in `MarketCommandDetailDrawer`, the route-level state remains bounded, inline durable alert behavior stays the default, and no touched file crosses the 1k-line threshold.
+- No code repairs were required. `OptionsTape` smart-flow detail suppression is scoped to Market Command fallback usage; row activation still focuses packet/contract context instead of opening a competing panel.
+- Residual risk is limited to durable automation: the reviewer used a temporary local fixture for Chromium interaction proof. Follow-up `islandflow-mcmd.8` remains the right place to add a committed fixture that also covers chart marker clicks in browser automation.
 
 ## CI And Gates
 
 CI owner: reviewer/verification agents
 
-Current CI state: `not-started`
+Current CI state: `ci-green`
 
 Evidence:
 
 - `bun install --frozen-lockfile` passed after the prepared worktree initially lacked installed dependencies.
-- `bun test apps/web/features/durable-tape` passed: 41 tests.
-- `bun test apps/web/features/market-command` passed: 9 tests.
-- `bun test apps/web/features/options-tape` passed: 27 tests, run because the raw options detail surface was touched.
-- `bun test apps/web/features/news-wire` passed: 8 tests, run because news detail mode was touched.
-- `bun test apps/web/features/terminal/live-session-state.test.ts apps/web/features/api-transport.test.ts` passed: 11 tests.
-- `bunx biome check` passed for touched files.
-- `git diff --check` passed.
-- `bun --cwd=apps/web run build` passed.
+- Reviewer reran `bun test apps/web/features/durable-tape`: passed, 41 tests.
+- Reviewer reran `bun test apps/web/features/market-command`: passed, 9 tests.
+- Reviewer reran `bun test apps/web/features/options-tape`: passed, 27 tests.
+- Reviewer reran `bun test apps/web/features/news-wire`: passed, 8 tests.
+- Reviewer reran `bun test apps/web/features/terminal/live-session-state.test.ts apps/web/features/api-transport.test.ts`: passed, 11 tests.
+- Reviewer reran `bunx biome check` for touched code files: passed.
+- Reviewer reran `bun --cwd=apps/web run build`: passed. Build-generated `apps/web/next-env.d.ts` drift was restored to the pre-build dev metadata path.
+- Reviewer reran `git diff --check`: passed.
+- Forgejo Actions task #452 passed `Validate` for PR head `e577245439416625e64d9e08c2651db5a340f480`.
+- `git merge-tree --write-tree HEAD forgejo/dashboard-v2` succeeded, producing tree `e0124a7ae3aa78a71eb34a9d3ebff957a92690d4`; PR #106 is merge-clean against current `dashboard-v2`.
 
 Browser evidence:
 
 - Started the worktree web app on `http://localhost:3105` first; confirmed desktop `/` renders the replacement dashboard with no drawer open, local fallback ranking visible, desktop overflow `-15`, and mobile 390px overflow `0` with reduced motion emulation active.
 - Restarted the worktree web app on `http://localhost:3100` with `NEXT_PUBLIC_API_URL=http://172.18.0.1:4000`. A populated Chromium snapshot of `/` showed 261 alert rows, 203 news rows, 100 option rows, 430 flow rows, desktop overflow `-15`, and mobile 390px overflow `0`.
 - Follow-up interaction probes could not be completed reliably because the deployment-host API at `172.18.0.1:4000` later timed out even on `/health`, and fresh Chromium pages remained in `Connecting` with no live rows. The code paths are covered by the focused component tests above; a deterministic browser fixture follow-up was filed as `islandflow-mcmd.8`.
+- Reviewer confirmed the deployment-host API was still unhealthy during review: `curl --max-time 3 http://172.18.0.1:4000/health` timed out while the API port was listening.
+- Reviewer started a temporary local API/WebSocket fixture on `127.0.0.1:4106` and the worktree web app on `http://localhost:3106` for deterministic Chromium interaction evidence without restarting production-like services.
+- Chromium desktop 1440x1000 with reduced motion rendered `/` with local fallback ranking, 1 alert row, 1 news row, 1 option row, no overlays, and horizontal overflow `0`.
+- Desktop alert-row click opened the shared drawer with durable alert text, selected exactly one alert row, kept `alerts-module-detail` absent, kept the alerts pane at 454x560 and the alerts tape at 454x552 before and after selection, and left horizontal overflow `0`.
+- Desktop Escape closed the drawer and cleared selected alert styling. A separate outside `mousedown` probe also closed the drawer and cleared selected alert styling.
+- Chromium mobile 390x844 with reduced motion rendered `/` with local fallback ranking, 1 alert row, 1 news row, 1 option row, no overlays, and horizontal overflow `0`.
+- Mobile alert-row click opened the shared drawer within the viewport at 370px wide, selected exactly one alert row, kept `alerts-module-detail` absent, kept the alerts pane at 374x520 and the alerts tape at 374x512 before and after selection, and left horizontal overflow `0`.
+- News-row click opened the shared drawer with news detail text, left inline `.news-wire-detail` absent, and kept horizontal overflow `0`.
 
 ## PR And Commits
 
 - PR: https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/106
 - `a6bb311` — add market command shared detail drawer
+- `e577245` — record market command phase 5 pr state
 
 ## Beads Updates
 
@@ -89,7 +105,9 @@ Browser evidence:
 - `detailMode="external"` must not consume alert pane height.
 - Hover previews remain inline.
 - Shared drawer handles alerts, smart-flow markers, inferred-dark markers, and news stories.
+- Reviewer found no code-quality blockers and made no code repairs.
+- Final callback should include the reviewer documentation commit's pushed CI evidence to avoid self-referential CI churn in this turn doc.
 
 ## Closeout
 
-Implementation PR #106 is open against `dashboard-v2` and branch `lavender/islandflow-mcmd-5-hybrid-detail-model` is pushed to Forgejo. Beads phase `islandflow-mcmd.5` intentionally left open for orchestrator/reviewer closeout.
+Reviewer approved Phase 05 with no code repairs. PR #106 is open against `dashboard-v2`, branch `lavender/islandflow-mcmd-5-hybrid-detail-model` is pushed to Forgejo, CI is green for implementation head `e577245`, and merge-tree is clean against current `dashboard-v2`. Beads phase `islandflow-mcmd.5` intentionally remains open for orchestrator closeout.
