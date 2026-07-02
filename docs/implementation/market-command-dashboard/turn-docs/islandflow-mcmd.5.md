@@ -88,6 +88,8 @@ Browser evidence:
 - PR: https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/106
 - `a6bb311` — add market command shared detail drawer
 - `e577245` — record market command phase 5 pr state
+- `c36f89c` — record market command phase 5 review evidence
+- `48b50b0` — merge commit into `dashboard-v2`
 
 ## Beads Updates
 
@@ -95,6 +97,7 @@ Browser evidence:
 - Blocked by `islandflow-mcmd.4`.
 - Orchestrator claimed `islandflow-mcmd.5` after Phase 04 closeout and assigned branch `lavender/islandflow-mcmd-5-hybrid-detail-model`.
 - Implementation filed follow-up `islandflow-mcmd.8` for deterministic browser fixtures because live API/socket availability blocked repeatable drawer interaction probes.
+- Orchestrator closed `islandflow-mcmd.5` after PR #106 merged into `dashboard-v2` with Forgejo Actions task `#453` green.
 
 ## Follow-Ups Filed
 
@@ -110,4 +113,4 @@ Browser evidence:
 
 ## Closeout
 
-Reviewer approved Phase 05 with no code repairs. PR #106 is open against `dashboard-v2`, branch `lavender/islandflow-mcmd-5-hybrid-detail-model` is pushed to Forgejo, CI is green for implementation head `e577245`, and merge-tree is clean against current `dashboard-v2`. Beads phase `islandflow-mcmd.5` intentionally remains open for orchestrator closeout.
+Implementation and thermo-nuclear review are complete. PR #106 merged into `dashboard-v2` with merge commit `48b50b0` after Forgejo Actions task `#453` passed for reviewer head `c36f89cd97`. Beads issue `islandflow-mcmd.5` is closed by the orchestrator.

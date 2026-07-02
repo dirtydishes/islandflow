@@ -10,13 +10,13 @@ Stream: `market-command-dashboard`
 
 Workflow: `orchestrator-callback`
 
-Current phase: 05 - Hybrid detail drawer model
+Current phase: none
 
-Current Beads issue: `islandflow-mcmd.5`
+Current Beads issue: none
 
-Current PR: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/106`
+Current PR: none
 
-Last completed phase: 04 - Dashboard layout replacement (`islandflow-mcmd.4`)
+Last completed phase: 05 - Hybrid detail drawer model (`islandflow-mcmd.5`)
 
 Blocked: no
 
@@ -46,10 +46,10 @@ Blocked: no
 | 02 - Ticker rail and board focus model | `islandflow-mcmd.2` | Closed, merged via PR #103 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/103` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.2.md` |
 | 03 - Root route feature upgrade | `islandflow-mcmd.3` | Closed, merged via PR #104 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/104` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.3.md` |
 | 04 - Dashboard layout replacement | `islandflow-mcmd.4` | Closed, merged via PR #105 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/105` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.4.md` |
-| 05 - Hybrid detail drawer model | `islandflow-mcmd.5` | In review | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/106` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.5.md` |
+| 05 - Hybrid detail drawer model | `islandflow-mcmd.5` | Closed, merged via PR #106 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/106` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.5.md` |
 | 06 - News relevance ordering | `islandflow-mcmd.6` | Open, blocked by `islandflow-mcmd.5` | None | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.6.md` |
 | 07 - Polish, performance, and visual QA | `islandflow-mcmd.7` | Open, blocked by `islandflow-mcmd.6` | None | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.7.md` |
 
 ## Last Coordinator Update
 
-2026-07-02: Implementation callback for Phase `islandflow-mcmd.5` reported PR #106 ready from branch `lavender/islandflow-mcmd-5-hybrid-detail-model` into `dashboard-v2`. Orchestrator recorded the PR and is handing the phase to thermo-nuclear review.
+2026-07-02: Review callback approved Phase `islandflow-mcmd.5` with `ci-green`. Orchestrator merged PR #106 into `dashboard-v2` at merge commit `48b50b0`, closed Beads issue `islandflow-mcmd.5`, and recorded Forgejo Actions task `#453` as green for final reviewer head `c36f89cd97`.
