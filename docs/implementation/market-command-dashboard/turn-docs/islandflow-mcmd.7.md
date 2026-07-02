@@ -154,7 +154,8 @@ Browser evidence:
 
 ## PR And Commits
 
-Pending implementation commit and Forgejo PR.
+- PR: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/108`
+- Implementation commit: `a3923096595cb80080267d1280c0785bb2e2fb2d8`
 
 ## Beads Updates
 
@@ -179,5 +180,5 @@ None.
 
 ## Closeout
 
-Implementation local gates and browser QA are complete. Commit, Forgejo push,
-PR creation, and implementation callback are still pending in this thread.
+Implementation local gates and browser QA are complete. PR #108 is open against
+`dashboard-v2`. Implementation callback is still pending in this thread.
