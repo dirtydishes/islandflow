@@ -14,7 +14,7 @@ Current phase: 02 - Ticker rail and board focus model
 
 Current Beads issue: `islandflow-mcmd.2`
 
-Current PR: none
+Current PR: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/103`
 
 Last completed phase: 01 - Server ranking contract (`islandflow-mcmd.1`)
 
