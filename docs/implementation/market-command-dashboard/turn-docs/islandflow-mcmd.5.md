@@ -8,7 +8,14 @@ This is the single Markdown turn doc for the phase.
 
 ## Phase Selection
 
-Not started.
+Selected by the closeout/selector subagent after Phase `islandflow-mcmd.4` closed and PR #105 merged into `dashboard-v2`.
+
+Preflight:
+
+- Assigned branch: `lavender/islandflow-mcmd-5-hybrid-detail-model`
+- Base branch: `dashboard-v2`
+- Callback target: `019f2079-1443-7e53-95a3-ee0eb7bf5ba0`
+- Beads issue claimed by the orchestrator before implementation thread launch.
 
 ## Scope
 
@@ -42,12 +49,13 @@ Evidence:
 
 ## PR And Commits
 
-None.
+None yet.
 
 ## Beads Updates
 
 - Created phase issue `islandflow-mcmd.5`.
 - Blocked by `islandflow-mcmd.4`.
+- Orchestrator claimed `islandflow-mcmd.5` after Phase 04 closeout and assigned branch `lavender/islandflow-mcmd-5-hybrid-detail-model`.
 
 ## Follow-Ups Filed
 

@@ -85,7 +85,7 @@ Implementation, review, CI, repairs, PR state, Beads updates, follow-ups, and cl
 
 When the epic is complete, generate:
 
-`docs/implementation/market-command-dashboard/storyboard-post-run-07-01-2026.html`
+`docs/implementation/market-command-dashboard/storyboard-post-run-07-02-2026.html`
 
 Use `impeccable` when present. If missing, continue without it and note that it was skipped.
 
@@ -95,11 +95,11 @@ Install `@pierre/diffs` in the target repo if missing. Every storyboard diff mus
 
 | Beads Issue | Phase | Phase Doc | Depends On | Status |
 |---|---|---|---|---|
-| `islandflow-mcmd.1` | 01 - Server ranking contract | `docs/implementation/market-command-dashboard/01-server-ranking-contract.md` | None | Open |
-| `islandflow-mcmd.2` | 02 - Ticker rail and board focus model | `docs/implementation/market-command-dashboard/02-ticker-rail-focus-model.md` | `islandflow-mcmd.1` | Open, blocked |
-| `islandflow-mcmd.3` | 03 - Root route feature upgrade | `docs/implementation/market-command-dashboard/03-route-feature-upgrade.md` | `islandflow-mcmd.2` | Open, blocked |
-| `islandflow-mcmd.4` | 04 - Dashboard layout replacement | `docs/implementation/market-command-dashboard/04-dashboard-layout-replacement.md` | `islandflow-mcmd.3` | Open, blocked |
-| `islandflow-mcmd.5` | 05 - Hybrid detail drawer model | `docs/implementation/market-command-dashboard/05-hybrid-detail-model.md` | `islandflow-mcmd.4` | Open, blocked |
+| `islandflow-mcmd.1` | 01 - Server ranking contract | `docs/implementation/market-command-dashboard/01-server-ranking-contract.md` | None | Closed, merged via PR #102 |
+| `islandflow-mcmd.2` | 02 - Ticker rail and board focus model | `docs/implementation/market-command-dashboard/02-ticker-rail-focus-model.md` | `islandflow-mcmd.1` | Closed, merged via PR #103 |
+| `islandflow-mcmd.3` | 03 - Root route feature upgrade | `docs/implementation/market-command-dashboard/03-route-feature-upgrade.md` | `islandflow-mcmd.2` | Closed, merged via PR #104 |
+| `islandflow-mcmd.4` | 04 - Dashboard layout replacement | `docs/implementation/market-command-dashboard/04-dashboard-layout-replacement.md` | `islandflow-mcmd.3` | Closed, merged via PR #105 |
+| `islandflow-mcmd.5` | 05 - Hybrid detail drawer model | `docs/implementation/market-command-dashboard/05-hybrid-detail-model.md` | `islandflow-mcmd.4` | In progress |
 | `islandflow-mcmd.6` | 06 - News relevance ordering | `docs/implementation/market-command-dashboard/06-news-relevance-ordering.md` | `islandflow-mcmd.5` | Open, blocked |
 | `islandflow-mcmd.7` | 07 - Polish, performance, and visual QA | `docs/implementation/market-command-dashboard/07-polish-performance-visual-qa.md` | `islandflow-mcmd.6` | Open, blocked |
 

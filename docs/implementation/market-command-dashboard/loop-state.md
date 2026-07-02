@@ -10,9 +10,9 @@ Stream: `market-command-dashboard`
 
 Workflow: `orchestrator-callback`
 
-Current phase: none
+Current phase: 05 - Hybrid detail drawer model
 
-Current Beads issue: none
+Current Beads issue: `islandflow-mcmd.5`
 
 Current PR: none
 
@@ -46,10 +46,10 @@ Blocked: no
 | 02 - Ticker rail and board focus model | `islandflow-mcmd.2` | Closed, merged via PR #103 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/103` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.2.md` |
 | 03 - Root route feature upgrade | `islandflow-mcmd.3` | Closed, merged via PR #104 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/104` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.3.md` |
 | 04 - Dashboard layout replacement | `islandflow-mcmd.4` | Closed, merged via PR #105 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/105` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.4.md` |
-| 05 - Hybrid detail drawer model | `islandflow-mcmd.5` | Open, blocked by `islandflow-mcmd.4` | None | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.5.md` |
+| 05 - Hybrid detail drawer model | `islandflow-mcmd.5` | In progress | None | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.5.md` |
 | 06 - News relevance ordering | `islandflow-mcmd.6` | Open, blocked by `islandflow-mcmd.5` | None | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.6.md` |
 | 07 - Polish, performance, and visual QA | `islandflow-mcmd.7` | Open, blocked by `islandflow-mcmd.6` | None | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.7.md` |
 
 ## Last Coordinator Update
 
-2026-07-02: Review callback approved Phase `islandflow-mcmd.4` with `ci-green`. Orchestrator merged PR #105 into `dashboard-v2` at merge commit `fe08df5`, closed Beads issue `islandflow-mcmd.4`, and recorded Forgejo Actions task `#450` as green for final reviewer head `7e8b8fae30`.
+2026-07-02: Closeout/selector subagent verified Phase `islandflow-mcmd.4` is closed and PR #105 is merged. It selected Beads-ready phase `islandflow-mcmd.5`. Orchestrator claimed it and assigned branch `lavender/islandflow-mcmd-5-hybrid-detail-model` from base branch `dashboard-v2`.
