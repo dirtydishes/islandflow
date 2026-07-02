@@ -49,6 +49,9 @@ describe("MarketCommandTickerRail", () => {
     );
 
     expect(html).toContain('data-local-fallback="true"');
+    expect(html).toContain('data-source="local-fallback"');
+    expect(html).toContain('data-auto-loop="false"');
+    expect(html).toContain('data-reduced-motion="false"');
     expect(html).toContain("Local fallback");
     expect(html).toContain("Pinned");
     expect(html).toContain("Important now");
