@@ -132,6 +132,8 @@ Browser evidence:
 - Commits:
   - `7806c19` - `add market command ticker rail focus model`
   - `7ecdfb9` - `record market command ticker rail pr`
+  - `22eae8e` - reviewer turn-doc closeout commit
+- Merge commit on `dashboard-v2`: `0e88364` - `merge market command ticker rail focus model`
 
 ## Beads Updates
 
@@ -140,6 +142,8 @@ Browser evidence:
 - Implementation thread verified the issue is in progress and claimed it with
   `bd update islandflow-mcmd.2 --claim`. The phase issue was not closed;
   orchestrator owns closeout.
+- Orchestrator closed `islandflow-mcmd.2` after PR #103 merged into
+  `dashboard-v2` with Forgejo Actions task #443 green.
 
 ## Follow-Ups Filed
 
@@ -153,4 +157,5 @@ None.
 
 ## Closeout
 
-Review approved. Callback pending.
+Review approved with `ci-green`; no repairs or remaining findings. PR #103 was
+merged into `dashboard-v2`, and the Beads issue was closed by the orchestrator.

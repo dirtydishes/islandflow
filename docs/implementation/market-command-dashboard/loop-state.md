@@ -10,13 +10,13 @@ Stream: `market-command-dashboard`
 
 Workflow: `orchestrator-callback`
 
-Current phase: 02 - Ticker rail and board focus model
+Current phase: pending selector
 
-Current Beads issue: `islandflow-mcmd.2`
+Current Beads issue: none
 
-Current PR: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/103`
+Current PR: none
 
-Last completed phase: 01 - Server ranking contract (`islandflow-mcmd.1`)
+Last completed phase: 02 - Ticker rail and board focus model (`islandflow-mcmd.2`)
 
 Blocked: no
 
@@ -43,7 +43,7 @@ Blocked: no
 | Phase | Beads Issue | Status | PR | Turn Doc |
 |---|---|---|---|---|
 | 01 - Server ranking contract | `islandflow-mcmd.1` | Closed, merged via PR #102 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/102` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.1.md` |
-| 02 - Ticker rail and board focus model | `islandflow-mcmd.2` | In progress | None | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.2.md` |
+| 02 - Ticker rail and board focus model | `islandflow-mcmd.2` | Closed, merged via PR #103 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/103` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.2.md` |
 | 03 - Root route feature upgrade | `islandflow-mcmd.3` | Open, blocked by `islandflow-mcmd.2` | None | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.3.md` |
 | 04 - Dashboard layout replacement | `islandflow-mcmd.4` | Open, blocked by `islandflow-mcmd.3` | None | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.4.md` |
 | 05 - Hybrid detail drawer model | `islandflow-mcmd.5` | Open, blocked by `islandflow-mcmd.4` | None | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.5.md` |
@@ -52,4 +52,4 @@ Blocked: no
 
 ## Last Coordinator Update
 
-2026-07-02: Selector subagent confirmed Beads-ready phase `islandflow-mcmd.2`. Orchestrator claimed it and assigned branch `lavender/islandflow-mcmd-2-ticker-rail-focus-model` from base branch `dashboard-v2`.
+2026-07-02: Phase `islandflow-mcmd.2` merged via Forgejo PR #103 into `dashboard-v2` after implementation and thermo-nuclear review approval. Forgejo Actions task #443 passed for reviewer closeout head `22eae8e`; merge commit `0e88364` is now on `dashboard-v2`. Orchestrator closed the Beads phase issue. Next phase selection has not been assigned yet.
