@@ -108,8 +108,9 @@ Evidence:
 
 ## PR And Commits
 
-- Forgejo PR: pending.
-- Implementation commit: pending.
+- Forgejo PR: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/105`
+- Implementation commit: `242f54d` (`replace market command dashboard layout`)
+- Implementation PR metadata commit: `record market command dashboard pr`
 
 ## Beads Updates
 
@@ -131,4 +132,4 @@ None.
 
 ## Closeout
 
-Implementation complete locally. PR publication and callback are pending.
+Implementation complete. PR #105 is open against `dashboard-v2`; callback is pending.
