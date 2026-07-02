@@ -185,7 +185,12 @@ export const MarketCommandTickerRail = ({
     <section
       aria-label="Ticker focus rail"
       className={`command-ticker-rail${autoLoop ? " is-looping" : ""}`}
+      data-auto-loop={autoLoop ? "true" : "false"}
       data-local-fallback={rail.isLocalFallback ? "true" : undefined}
+      data-mobile-viewport={mobileViewport ? "true" : "false"}
+      data-overflows={overflows ? "true" : "false"}
+      data-reduced-motion={reducedMotion ? "true" : "false"}
+      data-source={rail.source}
     >
       <div className="command-ticker-rail-head">
         <div className="command-ticker-rail-title">
@@ -195,7 +200,9 @@ export const MarketCommandTickerRail = ({
           </strong>
         </div>
         <div className="command-ticker-rail-actions">
-          <span className={`command-ticker-source is-${rail.source}`}>{railStateLabel}</span>
+          <span aria-live="polite" className={`command-ticker-source is-${rail.source}`}>
+            {railStateLabel}
+          </span>
           {rail.error ? <span className="command-ticker-error">{rail.error}</span> : null}
           {state.activeTickers.length > 0 || state.selectedInstrument ? (
             <button className="terminal-button" type="button" onClick={state.clearBoardFocus}>
