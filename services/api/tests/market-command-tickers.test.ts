@@ -286,4 +286,38 @@ describe("market-command ticker ranking", () => {
 
     expect(response.important.map((item) => item.symbol)).toEqual(["TSLA"]);
   });
+
+  it("ignores malformed symbols and scores only signal option prints", () => {
+    const nowTs = ts("2026-06-30T14:15:00.000Z");
+    const session = resolveMarketCommandRegularSession(nowTs);
+    const rawOptionPrint = {
+      ...makeOptionPrint("TSLA", ts("2026-06-30T14:08:00.000Z"), 5_000_000, 1),
+      signal_pass: false
+    };
+    const malformedOptionPrint = {
+      ...makeOptionPrint("BAD", ts("2026-06-30T14:09:00.000Z"), 6_000_000, 2),
+      underlying_id: "bad symbol",
+      option_contract_id: "bad symbol-2026-07-17-500-C"
+    };
+    const malformedEquityPrint = {
+      ...makeEquityPrint("BAD", ts("2026-06-30T14:10:00.000Z"), 100, 3),
+      underlying_id: "bad symbol"
+    };
+
+    const response = buildMarketCommandTickerRail({
+      params: { watchlist: ["SPY"], limit: 16 },
+      session,
+      nowTs,
+      data: {
+        optionPrints: [
+          rawOptionPrint,
+          malformedOptionPrint,
+          makeOptionPrint("NVDA", ts("2026-06-30T14:11:00.000Z"), 500_000, 4)
+        ],
+        equityPrints: [malformedEquityPrint]
+      }
+    });
+
+    expect(response.important.map((item) => item.symbol)).toEqual(["NVDA"]);
+  });
 });

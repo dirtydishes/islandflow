@@ -27,7 +27,6 @@ const HALF_LIFE_MS = 45 * 60 * 1000;
 const CURRENT_SESSION_DECAY_FLOOR = 0.2;
 const REGULAR_SESSION_OPEN_MINUTES = 9 * 60 + 30;
 const REGULAR_SESSION_CLOSE_MINUTES = 16 * 60;
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const MARKET_COMMAND_RANKING_WEIGHTS = {
   smartFlowAlert: 50,
@@ -109,6 +108,18 @@ export const normalizeMarketCommandTickerSymbol = (value: string): string => {
     throw new MarketCommandTickerValidationError(`invalid ticker symbol: ${value}`);
   }
   return parsed.data;
+};
+
+const safeTickerSymbol = (value: string | null | undefined): string | null => {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return normalizeMarketCommandTickerSymbol(value);
+  } catch {
+    return null;
+  }
 };
 
 export const parseMarketCommandTickerRailParams = (url: URL): MarketCommandTickerRailParams => {
@@ -372,14 +383,14 @@ const symbolFromOptionContract = (contractId: string | null | undefined): string
   if (!contractId) {
     return null;
   }
-  return parseOptionContractId(contractId)?.root?.toUpperCase() ?? null;
+  return safeTickerSymbol(parseOptionContractId(contractId)?.root);
 };
 
 const symbolFromOptionPrint = (print: OptionPrint): string | null =>
-  print.underlying_id?.toUpperCase() ?? symbolFromOptionContract(print.option_contract_id);
+  safeTickerSymbol(print.underlying_id) ?? symbolFromOptionContract(print.option_contract_id);
 
 const symbolFromFlowPacket = (packet: FlowPacket): string | null =>
-  featureString(packet, "underlying_id")?.toUpperCase() ??
+  safeTickerSymbol(featureString(packet, "underlying_id")) ??
   symbolFromOptionContract(featureString(packet, "option_contract_id"));
 
 const symbolsFromNews = (story: NewsStory): string[] => {
@@ -388,15 +399,12 @@ const symbolsFromNews = (story: NewsStory): string[] => {
   const symbols: string[] = [];
   const seen = new Set<string>();
   for (const candidate of candidates) {
-    try {
-      const symbol = normalizeMarketCommandTickerSymbol(candidate);
-      if (!seen.has(symbol)) {
-        seen.add(symbol);
-        symbols.push(symbol);
-      }
-    } catch {
+    const symbol = safeTickerSymbol(candidate);
+    if (!symbol || seen.has(symbol)) {
       continue;
     }
+    seen.add(symbol);
+    symbols.push(symbol);
   }
   return symbols;
 };
@@ -533,17 +541,19 @@ const scoreOptionPrints = (
   >();
 
   for (const print of dedupeByIdentity(prints, (item) => item.trace_id)) {
+    if (print.signal_pass !== true) {
+      continue;
+    }
     const symbol = symbolFromOptionPrint(print);
     if (!symbol) {
       continue;
     }
-    const normalized = normalizeMarketCommandTickerSymbol(symbol);
-    const bucket = bySymbol.get(normalized) ?? { count: 0, premium: 0, latestTs: 0, ids: [] };
+    const bucket = bySymbol.get(symbol) ?? { count: 0, premium: 0, latestTs: 0, ids: [] };
     bucket.count += 1;
     bucket.premium += optionNotional(print);
     bucket.latestTs = Math.max(bucket.latestTs, print.ts);
     bucket.ids.push(print.trace_id);
-    bySymbol.set(normalized, bucket);
+    bySymbol.set(symbol, bucket);
   }
 
   for (const [symbol, bucket] of bySymbol) {
@@ -583,7 +593,10 @@ const scoreEquityMoves = (
 ): void => {
   const bySymbol = new Map<string, EquityPrint[]>();
   for (const print of dedupeByIdentity(prints, (item) => item.trace_id)) {
-    const symbol = normalizeMarketCommandTickerSymbol(print.underlying_id);
+    const symbol = safeTickerSymbol(print.underlying_id);
+    if (!symbol) {
+      continue;
+    }
     bySymbol.set(symbol, [...(bySymbol.get(symbol) ?? []), print]);
   }
 

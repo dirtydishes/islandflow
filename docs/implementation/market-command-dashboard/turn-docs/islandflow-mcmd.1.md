@@ -37,27 +37,50 @@ Reviewer skill:
 
 `thermo-nuclear-code-quality-review`
 
-Not started. The implementation thread does not create review threads.
+Reviewer pass completed in the assigned worktree on
+`lavender/islandflow-mcmd-1-server-ranking-contract`.
+
+Findings repaired in scope:
+
+- The live-cache option evidence path could rank raw/non-signal option prints even though the
+  storage path intentionally queried the signal view. Repaired the ranker so option-print evidence
+  only scores prints with `signal_pass === true`.
+- The option/equity symbol extraction paths normalized stored symbols directly. A malformed stored
+  symbol could turn otherwise useful degraded rail output into a hard ranking failure. Repaired the
+  ranker to ignore malformed stored symbols the same way alert/flow/news extraction already did.
+
+Findings remaining:
+
+- None for Phase 01 scope. The added server API code is phase-bounded; no UI files, route
+  subscriptions, hidden routes, or dashboard layout files were touched.
 
 ## CI And Gates
 
 CI owner: reviewer/verification agents
 
-Current CI state: `not-started`
+Current CI state: `review-repair-local-gates-green`
 
 Evidence:
 
 - `bun test packages/types` - passed, 24 tests.
-- `bun test services/api/tests` - passed, 80 tests.
-- `bun test` - passed, 530 tests.
+- `bun test services/api/tests` - passed, 81 tests after reviewer regression coverage.
+- `bun test` - passed, 531 tests after reviewer regression coverage.
 - `bunx tsc -p services/api/tsconfig.json --noEmit` - passed.
 - `bunx biome check <phase touched files>` - passed.
+- `git diff --check` - passed.
+- Forgejo Actions before reviewer repair: task `#438` for `d084df629d` passed (`Validate`,
+  pull_request). Task `#437` for the superseded initial PR head was cancelled.
 - `bun run check` - blocked by unrelated pre-existing import-order diagnostics outside this phase scope, including `apps/desktop/src/main.ts`, `apps/web/app/layout.tsx`, and multiple existing app/service files. Touched files pass targeted Biome.
+
+Post-repair Forgejo CI is pending reviewer repair commit/push.
 
 ## PR And Commits
 
 - PR: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/102`
 - Commits: pushed on `lavender/islandflow-mcmd-1-server-ranking-contract`; callback carries the exact commit list.
+- `fj pr view 102` on 2026-07-01 showed the PR open against `dashboard-v2`. The orchestrator
+  stated that PR base/closeout correction is being handled separately, so the reviewer did not
+  change PR base or merge state.
 
 ## Beads Updates
 
