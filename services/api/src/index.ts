@@ -32,7 +32,7 @@ import {
 } from "@islandflow/bus";
 import { readEnv } from "@islandflow/config";
 import { createLogger, createMetrics } from "@islandflow/observability";
-import type { EquityPrintQueryFilters } from "@islandflow/storage";
+import type { ClickHouseClient, EquityPrintQueryFilters } from "@islandflow/storage";
 import {
   createClickHouseClient,
   ensureEquityCandlesTable,
@@ -67,8 +67,8 @@ import {
   fetchOptionNBBOBefore,
   fetchOptionPrintsAfter,
   fetchOptionPrintsBefore,
-  fetchOptionPrintsForFlowPacketBefore,
   fetchOptionPrintsByTraceIds,
+  fetchOptionPrintsForFlowPacketBefore,
   fetchRecentEquityPrintJoins,
   fetchRecentEquityPrints,
   fetchRecentEquityQuotes,
@@ -87,10 +87,12 @@ import {
 import {
   Cursor,
   EquityCandleSchema,
+  type EquityPrint,
   EquityPrintJoinSchema,
   EquityPrintSchema,
   EquityQuoteSchema,
   FeedSnapshot,
+  type FlowPacket,
   FlowPacketSchema,
   getSubscriptionKey,
   InferredDarkEventSchema,
@@ -101,12 +103,15 @@ import {
   LiveSubscriptionSchema,
   matchesFlowPacketFilters,
   matchesOptionPrintFilters,
+  type NewsStory,
   NewsStorySchema,
   normalizeSyntheticControlState,
   OptionNBBOSchema,
   type OptionPrint,
   OptionPrintSchema,
+  type SmartFlowAlertEvent,
   SmartFlowAlertEventSchema,
+  type SmartFlowExplainabilityProjection,
   SmartFlowExplainabilityProjectionSchema,
   type SyntheticControlState,
   SyntheticControlStateSchema
@@ -125,6 +130,13 @@ import {
   resolveLiveStateConfig,
   shouldFanoutLiveEvent
 } from "./live";
+import {
+  buildMarketCommandTickerRail,
+  type MarketCommandTickerRailData,
+  MarketCommandTickerValidationError,
+  parseMarketCommandTickerRailParams,
+  resolveMarketCommandRegularSession
+} from "./market-command-tickers";
 import {
   getOptionPrintTraceLookupErrorStatus,
   parseOptionPrintTraceLookupParams
@@ -398,6 +410,150 @@ const parseLimit = (value: string | null): number => {
   }
 
   return limitSchema.parse(value);
+};
+
+const MARKET_COMMAND_LIVE_LIMIT = 1000;
+const MARKET_COMMAND_STORAGE_LIMIT = 1000;
+
+const marketCommandStorageErrorReason = (label: string, error: unknown): string =>
+  `${label} unavailable: ${getErrorMessage(error)}`;
+
+const getMarketCommandLiveData = (liveState: LiveStateManager): MarketCommandTickerRailData => ({
+  alerts: liveState.getCachedGenericItems(
+    "smart-flow-alerts",
+    MARKET_COMMAND_LIVE_LIMIT
+  ) as SmartFlowAlertEvent[],
+  smartFlowProjections: liveState.getCachedGenericItems(
+    "smart-flow",
+    MARKET_COMMAND_LIVE_LIMIT
+  ) as SmartFlowExplainabilityProjection[],
+  flowPackets: liveState.getCachedGenericItems("flow", MARKET_COMMAND_LIVE_LIMIT) as FlowPacket[],
+  optionPrints: liveState.getCachedGenericItems(
+    "options",
+    MARKET_COMMAND_LIVE_LIMIT
+  ) as OptionPrint[],
+  equityPrints: liveState.getCachedGenericItems(
+    "equities",
+    MARKET_COMMAND_LIVE_LIMIT
+  ) as EquityPrint[],
+  news: liveState.getCachedGenericItems("news", MARKET_COMMAND_LIVE_LIMIT) as NewsStory[]
+});
+
+const loadMarketCommandStorageData = async (
+  clickhouse: ClickHouseClient,
+  session: { start_ts: number; end_ts: number }
+): Promise<{ data: MarketCommandTickerRailData; degradedReasons: string[] }> => {
+  const beforeTs = Math.min(Number.MAX_SAFE_INTEGER, session.end_ts + 1);
+  const beforeSeq = Number.MAX_SAFE_INTEGER;
+  const reads = {
+    alerts: fetchSmartFlowAlertEventsBefore(
+      clickhouse,
+      beforeTs,
+      beforeSeq,
+      MARKET_COMMAND_STORAGE_LIMIT
+    ),
+    smartFlowProjections: fetchSmartFlowExplainabilityBefore(
+      clickhouse,
+      beforeTs,
+      beforeSeq,
+      MARKET_COMMAND_STORAGE_LIMIT
+    ),
+    flowPackets: fetchFlowPacketsBefore(
+      clickhouse,
+      beforeTs,
+      beforeSeq,
+      MARKET_COMMAND_STORAGE_LIMIT
+    ),
+    optionPrints: fetchOptionPrintsBefore(
+      clickhouse,
+      beforeTs,
+      beforeSeq,
+      MARKET_COMMAND_STORAGE_LIMIT,
+      undefined,
+      {
+        view: "signal",
+        sinceTs: session.start_ts
+      }
+    ),
+    equityPrints: fetchEquityPrintsBefore(
+      clickhouse,
+      beforeTs,
+      beforeSeq,
+      MARKET_COMMAND_STORAGE_LIMIT,
+      {
+        sinceTs: session.start_ts
+      }
+    ),
+    news: fetchNewsBefore(clickhouse, beforeTs, beforeSeq, MARKET_COMMAND_STORAGE_LIMIT)
+  } as const;
+
+  const [alerts, smartFlowProjections, flowPackets, optionPrints, equityPrints, news] =
+    await Promise.allSettled([
+      reads.alerts,
+      reads.smartFlowProjections,
+      reads.flowPackets,
+      reads.optionPrints,
+      reads.equityPrints,
+      reads.news
+    ]);
+
+  const data: MarketCommandTickerRailData = {};
+  const degradedReasons: string[] = [];
+  const collect = <K extends keyof MarketCommandTickerRailData>(
+    result: PromiseSettledResult<NonNullable<MarketCommandTickerRailData[K]>>,
+    key: K,
+    label: string
+  ) => {
+    if (result.status === "fulfilled") {
+      data[key] = result.value;
+    } else {
+      degradedReasons.push(marketCommandStorageErrorReason(label, result.reason));
+    }
+  };
+
+  collect(alerts, "alerts", "smart-flow alerts");
+  collect(smartFlowProjections, "smartFlowProjections", "smart-flow projections");
+  collect(flowPackets, "flowPackets", "flow packets");
+  collect(optionPrints, "optionPrints", "option prints");
+  collect(equityPrints, "equityPrints", "equity prints");
+  collect(news, "news", "news");
+
+  return { data, degradedReasons };
+};
+
+const mergeMarketCommandData = (
+  liveData: MarketCommandTickerRailData,
+  storageData: MarketCommandTickerRailData
+): MarketCommandTickerRailData => ({
+  alerts: [...(liveData.alerts ?? []), ...(storageData.alerts ?? [])],
+  smartFlowProjections: [
+    ...(liveData.smartFlowProjections ?? []),
+    ...(storageData.smartFlowProjections ?? [])
+  ],
+  flowPackets: [...(liveData.flowPackets ?? []), ...(storageData.flowPackets ?? [])],
+  optionPrints: [...(liveData.optionPrints ?? []), ...(storageData.optionPrints ?? [])],
+  equityPrints: [...(liveData.equityPrints ?? []), ...(storageData.equityPrints ?? [])],
+  news: [...(liveData.news ?? []), ...(storageData.news ?? [])]
+});
+
+const buildMarketCommandTickerRailForRequest = async (
+  url: URL,
+  liveState: LiveStateManager,
+  clickhouse: ClickHouseClient,
+  nowTs = Date.now()
+) => {
+  const params = parseMarketCommandTickerRailParams(url);
+  const session = resolveMarketCommandRegularSession(nowTs);
+  const liveData = getMarketCommandLiveData(liveState);
+  const storage = await loadMarketCommandStorageData(clickhouse, session);
+
+  return buildMarketCommandTickerRail({
+    params,
+    session,
+    nowTs,
+    data: mergeMarketCommandData(liveData, storage.data),
+    degradedReasons: storage.degradedReasons
+  });
 };
 
 const applyDeliverPolicy = (
@@ -1451,6 +1607,38 @@ const run = async () => {
                 detail: getErrorMessage(error)
               },
               400
+            );
+          }
+        }
+
+        if (req.method === "GET" && url.pathname === "/market-command/tickers") {
+          const startedAt = Date.now();
+          try {
+            const payload = await buildMarketCommandTickerRailForRequest(
+              url,
+              liveState,
+              clickhouse
+            );
+            metrics.timing("api.market_command.tickers_ms", Date.now() - startedAt, {
+              status: payload.degraded ? "degraded" : "ok",
+              pinned_count: String(payload.pinned.length),
+              important_count: String(payload.important.length)
+            });
+            return jsonResponse(payload);
+          } catch (error) {
+            const status = error instanceof MarketCommandTickerValidationError ? 400 : 503;
+            metrics.timing("api.market_command.tickers_ms", Date.now() - startedAt, {
+              status: status === 400 ? "invalid" : "error"
+            });
+            return jsonResponse(
+              {
+                error:
+                  status === 400
+                    ? "invalid market-command ticker query"
+                    : "market-command ticker ranking failed",
+                detail: getErrorMessage(error)
+              },
+              status
             );
           }
         }

@@ -726,6 +726,14 @@ export class LiveStateManager {
     };
   }
 
+  getCachedGenericItems(
+    channel: LiveGenericChannel,
+    limit = this.config.limits[channel]
+  ): unknown[] {
+    const safeLimit = Math.max(1, Math.min(Math.floor(limit), this.config.limits[channel]));
+    return (this.genericItems.get(channel) ?? []).slice(0, safeLimit);
+  }
+
   private getDurableRowCompositionContext(): DurableRowCompositionContext {
     return {
       alerts: (this.genericItems.get("smart-flow-alerts") ??

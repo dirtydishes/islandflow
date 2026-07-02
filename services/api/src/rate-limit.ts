@@ -147,6 +147,7 @@ export const classifyApiRouteForRateLimit = (
     "/joins/",
     "/dark/",
     "/flow/",
+    "/market-command/",
     "/news",
     "/history/",
     "/replay/"
