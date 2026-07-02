@@ -75,7 +75,7 @@ Evidence:
 - Chromium mobile `/`, 390x844: document `clientWidth` 390 and `scrollWidth` 390, body `clientWidth` 390 and `scrollWidth` 390, no document/body horizontal overflow, no visible dialog/backdrop candidates, `Local fallback` rail label visible, ticker rail not looping at this width, screenshot `/tmp/islandflow-mcmd3-review-mobile.png`.
 - Chromium reduced-motion `/`, 1440x1100 with `prefers-reduced-motion: reduce`: document `clientWidth` 1440 and `scrollWidth` 1440, body `clientWidth` 1440 and `scrollWidth` 1440, no document/body horizontal overflow, no visible dialog/backdrop candidates, `Local fallback` rail label visible, ticker rail `is-looping` false, screenshot `/tmp/islandflow-mcmd3-review-reduced-motion.png`.
 - Forgejo CI before reviewer doc-closeout: task #445 for head `e76bc526dd` passed (`Validate`, pull_request, 1m24s).
-- Forgejo CI after reviewer doc-closeout: pending final push evidence.
+- Forgejo CI after reviewer doc-closeout is verified after this committed doc update and recorded in the review callback; writing the final task id here would create another doc-only head requiring another CI run.
 
 ## PR And Commits
 
