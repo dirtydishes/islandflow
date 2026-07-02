@@ -162,6 +162,39 @@ export const MarketCommandRoute = ({ state }: { state: TerminalState }) => {
             state={state}
             title="Chart Context"
           />
+          {state.marketCommandDrawerFixtureEnabled ? (
+            <div
+              className="market-command-fixture-probes"
+              aria-label="Market Command drawer fixture marker probes"
+            >
+              <button
+                data-testid="market-command-fixture-smart-flow-marker"
+                type="button"
+                disabled={state.chartSmartFlowProjections.length === 0}
+                onClick={() => {
+                  const projection = state.chartSmartFlowProjections[0];
+                  if (projection) {
+                    openChartMarkerDetail({ kind: "smart-flow", projection });
+                  }
+                }}
+              >
+                Smart-flow marker
+              </button>
+              <button
+                data-testid="market-command-fixture-inferred-dark-marker"
+                type="button"
+                disabled={state.chartInferredDark.length === 0}
+                onClick={() => {
+                  const event = state.chartInferredDark[0];
+                  if (event) {
+                    openChartMarkerDetail({ kind: "inferred-dark", event });
+                  }
+                }}
+              >
+                Inferred-dark marker
+              </button>
+            </div>
+          ) : null}
 
           {hasDurableAlerts ? (
             <DurableTapeAlertRowsPane
