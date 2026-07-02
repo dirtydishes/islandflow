@@ -10,13 +10,13 @@ Stream: `market-command-dashboard`
 
 Workflow: `orchestrator-callback`
 
-Current phase: 08 - Deterministic drawer browser fixture
+Current phase: none
 
-Current Beads issue: `islandflow-mcmd.8`
+Current Beads issue: none
 
-Current PR: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/109`
+Current PR: none
 
-Last completed phase: 07 - Polish, performance, and visual QA (`islandflow-mcmd.7`)
+Last completed phase: 08 - Deterministic drawer browser fixture (`islandflow-mcmd.8`)
 
 Blocked: no
 
@@ -49,8 +49,8 @@ Blocked: no
 | 05 - Hybrid detail drawer model | `islandflow-mcmd.5` | Closed, merged via PR #106 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/106` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.5.md` |
 | 06 - News relevance ordering | `islandflow-mcmd.6` | Closed, merged via PR #107 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/107` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.6.md` |
 | 07 - Polish, performance, and visual QA | `islandflow-mcmd.7` | Closed, merged via PR #108 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/108` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.7.md` |
-| 08 - Deterministic drawer browser fixture | `islandflow-mcmd.8` | In review | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/109` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.8.md` |
+| 08 - Deterministic drawer browser fixture | `islandflow-mcmd.8` | Closed, merged via PR #109 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/109` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.8.md` |
 
 ## Last Coordinator Update
 
-2026-07-02: Implementation callback for Phase `islandflow-mcmd.8` reported PR #109 ready from branch `lavender/islandflow-mcmd-8-deterministic-drawer-fixture` into `dashboard-v2`. Orchestrator recorded the PR and is handing the phase to thermo-nuclear review.
+2026-07-02: Review callback approved Phase `islandflow-mcmd.8` with `ci-green`. Orchestrator merged PR #109 into `dashboard-v2` at merge commit `ead46aa`, closed Beads issue `islandflow-mcmd.8`, and recorded Forgejo Actions task `#464` as green for final reviewer head `fd6c197988`.

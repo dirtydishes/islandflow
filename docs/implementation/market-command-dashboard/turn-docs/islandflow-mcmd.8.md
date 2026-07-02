@@ -153,6 +153,9 @@ Browser evidence:
   `3e4de0f395bc7228fc59367ab657a28c6af4ea21`
 - CI repair evidence:
   `b0c5c9b04bb82013a712922444b6e84951dd7f0b`
+- Reviewer evidence commit:
+  `fd6c197988e8198df284cb82645f5029a24f7b56`
+- Merge commit into `dashboard-v2`: `ead46aa`
 
 ## Beads Updates
 
@@ -160,6 +163,7 @@ Browser evidence:
 - Discovered from `islandflow-mcmd.5`.
 - Orchestrator selected `islandflow-mcmd.8` after Phase 07 closeout and assigned branch `lavender/islandflow-mcmd-8-deterministic-drawer-fixture`.
 - Implementation thread left `islandflow-mcmd.8` open as instructed.
+- Orchestrator closed `islandflow-mcmd.8` after PR #109 merged into `dashboard-v2` with Forgejo Actions task `#464` green.
 
 ## Follow-Ups Filed
 
@@ -173,6 +177,7 @@ None.
 
 ## Closeout
 
-Review complete; PR #109 is open against `dashboard-v2`, local gates and
-Forgejo Validate are green, merge-tree against `dashboard-v2` succeeds, and the
-final review callback is pending.
+Implementation and thermo-nuclear review are complete. PR #109 merged into
+`dashboard-v2` with merge commit `ead46aa` after Forgejo Actions task `#464`
+passed for reviewer evidence head `fd6c197988`. Beads issue `islandflow-mcmd.8`
+is closed by the orchestrator.
