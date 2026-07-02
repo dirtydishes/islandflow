@@ -34,7 +34,8 @@ const routeChecks: RouteCheck[] = [
     }
   },
   { path: "/option-prints/by-trace?trace_id=public-route-check", expectJson: true },
-  { path: "/equity-joins/by-id?id=public-route-check", expectJson: true }
+  { path: "/equity-joins/by-id?id=public-route-check", expectJson: true },
+  { path: "/market-command/tickers?watchlist=SPY,NVDA,AAPL&limit=1", expectJson: true }
 ];
 
 const appUrl = process.env.DEPLOY_PUBLIC_APP_URL?.trim() || process.argv[2]?.trim();

@@ -124,6 +124,7 @@ import {
   parseCorsAllowedOrigins,
   withCorsHeaders
 } from "./cors";
+import { booleanEnvSchema } from "./env";
 import {
   HOT_LIVE_REDIS_KEYS,
   LiveStateManager,
@@ -186,40 +187,14 @@ const envSchema = z.object({
   EQUITIES_INGEST_ADAPTER: z.string().min(1).default("synthetic"),
   REST_DEFAULT_LIMIT: z.coerce.number().int().positive().default(200),
   API_DELIVER_POLICY: DeliverPolicySchema.default("new"),
-  API_CONSUMER_RESET: z.coerce.boolean().default(false),
+  API_CONSUMER_RESET: booleanEnvSchema.default(false),
   LIVE_LAG_WARN_MS: z.coerce.number().int().positive().default(120_000),
-  API_RATE_LIMIT_ENABLED: z
-    .preprocess((value) => {
-      if (typeof value === "string") {
-        const normalized = value.trim().toLowerCase();
-        if (["1", "true", "yes", "on"].includes(normalized)) {
-          return true;
-        }
-        if (["0", "false", "no", "off"].includes(normalized)) {
-          return false;
-        }
-      }
-      return value;
-    }, z.boolean())
-    .default(false),
+  API_RATE_LIMIT_ENABLED: booleanEnvSchema.default(false),
   API_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
   API_RATE_LIMIT_REST_MAX: z.coerce.number().int().positive().default(1200),
   API_RATE_LIMIT_LOOKUP_MAX: z.coerce.number().int().positive().default(120),
   API_RATE_LIMIT_WS_MAX: z.coerce.number().int().positive().default(120),
-  SYNTHETIC_CONTROL_ENABLED: z
-    .preprocess((value) => {
-      if (typeof value === "string") {
-        const normalized = value.trim().toLowerCase();
-        if (["1", "true", "yes", "on"].includes(normalized)) {
-          return true;
-        }
-        if (["0", "false", "no", "off"].includes(normalized)) {
-          return false;
-        }
-      }
-      return value;
-    }, z.boolean())
-    .default(false),
+  SYNTHETIC_CONTROL_ENABLED: booleanEnvSchema.default(false),
   SYNTHETIC_ADMIN_TOKEN: z.string().default(""),
   API_CORS_ORIGINS: z.string().default(DEFAULT_API_CORS_ORIGINS)
 });
@@ -731,6 +706,12 @@ const sendLiveMessage = (socket: LiveSocket, payload: LiveServerMessage): void =
   }
 };
 
+const yieldToEventLoop = (): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+const LIVE_SEND_YIELD_INTERVAL = 25;
+
 const subscribeSocket = (socket: LiveSocket, subscription: LiveSubscription): void => {
   const key = getSubscriptionKey(subscription);
   const keys = liveSocketSubscriptions.get(socket) ?? new Set<string>();
@@ -1196,6 +1177,7 @@ const run = async () => {
         continue;
       }
       matchedDurableRowSubscriptions += 1;
+      let durableSendsSinceYield = 0;
       for (const row of rows) {
         for (const socket of sockets) {
           sendLiveMessage(socket, {
@@ -1204,6 +1186,11 @@ const run = async () => {
             item: row,
             watermark: { ts: row.ts, seq: row.seq }
           });
+          durableSendsSinceYield += 1;
+          if (durableSendsSinceYield >= LIVE_SEND_YIELD_INTERVAL) {
+            durableSendsSinceYield = 0;
+            await yieldToEventLoop();
+          }
         }
       }
     }
@@ -1267,6 +1254,7 @@ const run = async () => {
 
       matchedSubscriptions += 1;
 
+      let sendsSinceYield = 0;
       for (const socket of sockets) {
         sendLiveMessage(socket, {
           op: "event",
@@ -1274,6 +1262,11 @@ const run = async () => {
           item,
           watermark
         });
+        sendsSinceYield += 1;
+        if (sendsSinceYield >= LIVE_SEND_YIELD_INTERVAL) {
+          sendsSinceYield = 0;
+          await yieldToEventLoop();
+        }
       }
     }
 
@@ -1285,6 +1278,9 @@ const run = async () => {
         "api.live.durable_row_subscription_match_count",
         matchedDurableRowSubscriptions
       );
+    }
+    if (matchedSubscriptions > 0 || matchedDurableRowSubscriptions > 0) {
+      await yieldToEventLoop();
     }
   };
 
@@ -2275,7 +2271,11 @@ const run = async () => {
             return;
           }
 
-          for (const subscription of parsed.subscriptions) {
+          for (let index = 0; index < parsed.subscriptions.length; index += 1) {
+            const subscription = parsed.subscriptions[index];
+            if (!subscription) {
+              continue;
+            }
             LiveSubscriptionSchema.parse(subscription);
             if (parsed.op === "unsubscribe") {
               unsubscribeSocket(socket, subscription);
@@ -2285,6 +2285,9 @@ const run = async () => {
             subscribeSocket(socket, subscription);
             const snapshot = await liveState.getSnapshot(subscription);
             sendLiveMessage(socket, { op: "snapshot", snapshot });
+            if (index < parsed.subscriptions.length - 1) {
+              await yieldToEventLoop();
+            }
           }
         } catch (error) {
           sendLiveMessage(socket, {

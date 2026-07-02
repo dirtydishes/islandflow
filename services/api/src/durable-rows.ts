@@ -160,7 +160,10 @@ const buildNbboByContractId = (items: OptionNBBO[]): Map<string, OptionNBBO> => 
   return map;
 };
 
-const buildDurableRowLookups = (context: DurableRowCompositionContext): DurableRowLookups => ({
+const buildDurableRowLookups = (
+  context: DurableRowCompositionContext,
+  supportTraceIds?: readonly string[]
+): DurableRowLookups => ({
   flowPacketByMemberTraceId: buildFlowPacketByMemberTraceId(context.flowPackets),
   flowPacketById: buildFlowPacketById(context.flowPackets),
   optionPrintByTraceId: buildOptionPrintByTraceId(context.optionPrints),
@@ -168,7 +171,9 @@ const buildDurableRowLookups = (context: DurableRowCompositionContext): DurableR
   smartFlowSupportByTraceId:
     context.smartFlowSupportByTraceId ??
     resolveSmartFlowSupportFromContext({
-      optionTraceIds: context.optionPrints.map((print) => print.trace_id),
+      optionTraceIds: supportTraceIds
+        ? [...supportTraceIds]
+        : context.optionPrints.map((print) => print.trace_id),
       packets: context.flowPackets,
       projections: context.smartFlowProjections
     })
@@ -622,11 +627,13 @@ export const composeDurableRowsForEvent = (
   context: DurableRowCompositionContext,
   configuredLimit: number
 ): DurableTapeRowViewModel[] => {
-  const lookups = buildDurableRowLookups(context);
+  const baseLookups = buildDurableRowLookups(context, []);
   const lanes = durableRowLanesFor(subscription);
   const limit = snapshotLimitForDurableRows(subscription, configuredLimit);
   const rows: DurableTapeRowViewModel[] = [];
   const seen = new Set<string>();
+  const candidateOptionPrints: OptionPrint[] = [];
+  const seenOptionTraceIds = new Set<string>();
   const push = (row: DurableTapeRowViewModel) => {
     if (seen.has(row.id)) {
       return;
@@ -634,17 +641,21 @@ export const composeDurableRowsForEvent = (
     seen.add(row.id);
     rows.push(row);
   };
-  const pushOptionPrint = (print: OptionPrint | null | undefined) => {
+  const collectOptionPrint = (print: OptionPrint | null | undefined) => {
     if (!print || !matchesDurableOptionSubscription(print, subscription)) {
       return;
     }
-    push(buildDurableOptionRow(print, lookups));
+    if (seenOptionTraceIds.has(print.trace_id)) {
+      return;
+    }
+    seenOptionTraceIds.add(print.trace_id);
+    candidateOptionPrints.push(print);
   };
   const pushAlert = (alert: SmartFlowAlertEvent | null | undefined) => {
     if (!alert) {
       return;
     }
-    const row = buildDurableAlertRow(alert, lookups);
+    const row = buildDurableAlertRow(alert, baseLookups);
     if (matchesDurableAlertSubscription(row, subscription)) {
       push(row);
     }
@@ -652,25 +663,25 @@ export const composeDurableRowsForEvent = (
 
   if (lanes.has("options")) {
     if (channel === "options") {
-      pushOptionPrint(item as OptionPrint);
+      collectOptionPrint(item as OptionPrint);
     } else if (channel === "flow") {
       const packet = item as FlowPacket;
       for (const traceId of packet.members.slice(0, DURABLE_ROW_MAX_PACKET_MEMBERS)) {
-        pushOptionPrint(lookups.optionPrintByTraceId.get(traceId));
+        collectOptionPrint(baseLookups.optionPrintByTraceId.get(traceId));
       }
     } else if (channel === "smart-flow") {
       const projection = item as SmartFlowExplainabilityProjection;
       for (const traceId of projection.refs.evidence_refs
         .filter((ref) => !ref.startsWith("flowpacket:"))
         .slice(0, DURABLE_ROW_MAX_REFS)) {
-        pushOptionPrint(lookups.optionPrintByTraceId.get(traceId));
+        collectOptionPrint(baseLookups.optionPrintByTraceId.get(traceId));
       }
       for (const packetId of projection.refs.evidence_refs
         .filter((ref) => ref.startsWith("flowpacket:"))
         .slice(0, DURABLE_ROW_MAX_REFS)) {
-        const packet = lookups.flowPacketById.get(packetId);
+        const packet = baseLookups.flowPacketById.get(packetId);
         for (const traceId of packet?.members.slice(0, DURABLE_ROW_MAX_PACKET_MEMBERS) ?? []) {
-          pushOptionPrint(lookups.optionPrintByTraceId.get(traceId));
+          collectOptionPrint(baseLookups.optionPrintByTraceId.get(traceId));
         }
       }
     } else if (channel === "nbbo") {
@@ -678,7 +689,7 @@ export const composeDurableRowsForEvent = (
       for (const print of context.optionPrints
         .filter((candidate) => candidate.option_contract_id === quote.option_contract_id)
         .slice(0, DURABLE_ROW_MAX_PACKET_MEMBERS)) {
-        pushOptionPrint(print);
+        collectOptionPrint(print);
       }
     }
   }
@@ -700,6 +711,19 @@ export const composeDurableRowsForEvent = (
           pushAlert(alert);
         }
       }
+    }
+  }
+
+  if (candidateOptionPrints.length > 0) {
+    const targetedLookups = buildDurableRowLookups(
+      {
+        ...context,
+        optionPrints: candidateOptionPrints
+      },
+      candidateOptionPrints.map((print) => print.trace_id)
+    );
+    for (const print of candidateOptionPrints) {
+      push(buildDurableOptionRow(print, targetedLookups));
     }
   }
 

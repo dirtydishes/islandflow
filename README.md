@@ -329,7 +329,7 @@ export ISLANDFLOW_API_DOMAIN=<raw-api-origin-host>
 That switch keeps `<raw-api-origin>` closed and installs the same-origin matcher on the app host for:
 
 ```text
-/(ws|replay|prints|joins|nbbo|quotes|dark|flow|candles|history|news|lookup|option-prints|equity-joins)(/|$)
+/(ws|replay|prints|joins|nbbo|quotes|dark|flow|candles|history|news|lookup|option-prints|equity-joins|market-command)(/|$)
 ```
 
 Then deploy native web/API changes with the edge guardrail acknowledged:

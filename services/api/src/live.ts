@@ -396,6 +396,9 @@ const parseJsonList = <T>(payloads: string[], parse: (value: unknown) => T): T[]
   return items;
 };
 
+const isRedisClientClosedError = (error: unknown): boolean =>
+  error instanceof Error && /client is closed/i.test(error.message);
+
 const compareCursors = (a: Cursor, b: Cursor): number => b.ts - a.ts || b.seq - a.seq;
 
 const sortGenericItems = <T>(items: T[], cursorOf: (item: T) => Cursor): T[] =>
@@ -642,6 +645,8 @@ export class LiveStateManager {
   private readonly overlayCursors = new Map<string, Cursor | null>();
   private readonly overlayAccess = new Map<string, number>();
   private readonly pendingRedisWrites = new Map<string, BufferedRedisWrite>();
+  private redisFlushAgain = false;
+  private redisFlushPromise: Promise<void> | null = null;
   private readonly smartFlowSupportResolver: SmartFlowSupportResolver;
   private readonly redisFlushTimer: ReturnType<typeof setInterval> | null;
   private readonly stats = {
@@ -801,23 +806,39 @@ export class LiveStateManager {
     if (!this.redis?.isOpen) {
       return;
     }
-
-    const writes = Array.from(this.pendingRedisWrites.values());
-    this.pendingRedisWrites.clear();
-
-    for (const write of writes) {
-      await this.persistList(
-        write.listKey,
-        write.cursorField,
-        write.items,
-        write.limit,
-        write.cursor
-      );
-      this.stats.redisFlushCount += 1;
-      this.stats.redisFlushItems += write.items.length;
-      metrics.count("api.live.redis_flush_count", 1);
-      metrics.count("api.live.redis_flush_items", write.items.length);
+    if (this.redisFlushPromise) {
+      this.redisFlushAgain = true;
+      return this.redisFlushPromise;
     }
+
+    this.redisFlushPromise = this.drainRedisWrites();
+    try {
+      return await this.redisFlushPromise;
+    } finally {
+      this.redisFlushPromise = null;
+    }
+  }
+
+  private async drainRedisWrites(): Promise<void> {
+    do {
+      this.redisFlushAgain = false;
+      const writes = Array.from(this.pendingRedisWrites.values());
+      this.pendingRedisWrites.clear();
+
+      for (const write of writes) {
+        await this.persistList(
+          write.listKey,
+          write.cursorField,
+          write.items,
+          write.limit,
+          write.cursor
+        );
+        this.stats.redisFlushCount += 1;
+        this.stats.redisFlushItems += write.items.length;
+        metrics.count("api.live.redis_flush_count", 1);
+        metrics.count("api.live.redis_flush_items", write.items.length);
+      }
+    } while (this.redisFlushAgain || this.pendingRedisWrites.size > 0);
   }
 
   private getChannelHealth(channel: LiveHotChannel): LiveChannelHealth {
@@ -1302,20 +1323,35 @@ export class LiveStateManager {
       return;
     }
 
-    const payloads = items.map((entry) => JSON.stringify(entry));
-    await this.redis.lTrim(listKey, 1, 0);
-    this.stats.trimOperations += 1;
-    if (payloads.length > 0) {
-      for (let idx = payloads.length - 1; idx >= 0; idx -= 1) {
-        const payload = payloads[idx];
-        if (payload) {
-          await this.redis.lPush(listKey, payload);
-        }
-      }
-      await this.redis.lTrim(listKey, 0, limit - 1);
+    try {
+      const payloads = items.map((entry) => JSON.stringify(entry));
+      await this.redis.lTrim(listKey, 1, 0);
       this.stats.trimOperations += 1;
+      if (payloads.length > 0) {
+        for (let idx = payloads.length - 1; idx >= 0; idx -= 1) {
+          const payload = payloads[idx];
+          if (payload) {
+            if (!this.redis.isOpen) {
+              return;
+            }
+            await this.redis.lPush(listKey, payload);
+          }
+        }
+        if (!this.redis.isOpen) {
+          return;
+        }
+        await this.redis.lTrim(listKey, 0, limit - 1);
+        this.stats.trimOperations += 1;
+      }
+      this.stats.cacheDepthByKey.set(listKey, Math.min(items.length, limit));
+      if (this.redis.isOpen) {
+        await this.redis.hSet(CURSOR_HASH_KEY, cursorField, JSON.stringify(cursor));
+      }
+    } catch (error) {
+      if (!this.redis?.isOpen || isRedisClientClosedError(error)) {
+        return;
+      }
+      throw error;
     }
-    this.stats.cacheDepthByKey.set(listKey, Math.min(items.length, limit));
-    await this.redis.hSet(CURSOR_HASH_KEY, cursorField, JSON.stringify(cursor));
   }
 }

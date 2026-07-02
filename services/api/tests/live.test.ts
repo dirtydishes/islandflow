@@ -64,6 +64,57 @@ const makeRedis = () => {
   };
 };
 
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+const makeSlowRedis = (delayMs = 5) => {
+  const base = makeRedis();
+  let activeWrites = 0;
+  let maxActiveWrites = 0;
+  const track = async <T>(operation: () => Promise<T>): Promise<T> => {
+    activeWrites += 1;
+    maxActiveWrites = Math.max(maxActiveWrites, activeWrites);
+    try {
+      await sleep(delayMs);
+      return await operation();
+    } finally {
+      activeWrites -= 1;
+    }
+  };
+
+  return {
+    redis: {
+      ...base,
+      lPush: (key: string, value: string) => track(() => base.lPush(key, value)),
+      lTrim: (key: string, start: number, stop: number) =>
+        track(() => base.lTrim(key, start, stop)),
+      hSet: (key: string, field: string, value: string) =>
+        track(() => base.hSet(key, field, value))
+    },
+    getMaxActiveWrites: () => maxActiveWrites
+  };
+};
+
+const makeOptionPrint = (
+  traceId: string,
+  ts: number,
+  seq: number,
+  overrides: Record<string, unknown> = {}
+) => ({
+  source_ts: ts,
+  ingest_ts: ts + 1,
+  seq,
+  trace_id: traceId,
+  ts,
+  option_contract_id: "SPY-2025-01-17-450-C",
+  underlying_id: "SPY",
+  option_type: "call",
+  price: 1,
+  size: 1,
+  exchange: "X",
+  notional: 100,
+  ...overrides
+});
+
 const makeSmartFlowProjection = (
   now = Date.now(),
   overrides: {
@@ -167,6 +218,36 @@ describe("LiveStateManager", () => {
     expect(snapshot.items).toHaveLength(1);
     expect(snapshot.watermark).toEqual({ ts: now, seq: 1 });
     expect(snapshot.next_before).toEqual({ ts: now, seq: 1 });
+  });
+
+  it("coalesces overlapping redis live-cache flush requests", async () => {
+    const now = Date.now();
+    const slowRedis = makeSlowRedis();
+    const manager = new LiveStateManager(makeClickHouse(), slowRedis.redis as never, {
+      limits: {
+        options: 5,
+        nbbo: 5,
+        equities: 5,
+        "equity-quotes": 5,
+        "equity-joins": 5,
+        flow: 5,
+        "smart-flow": 5,
+        "smart-flow-alerts": 5,
+        "inferred-dark": 5,
+        news: 5
+      },
+      scopedCacheMaxKeys: 32,
+      redisFlushIntervalMs: 60_000,
+      redisFlushMaxItems: 1
+    });
+
+    await manager.ingest("options", makeOptionPrint("print:flush:1", now, 1));
+    await manager.ingest("options", makeOptionPrint("print:flush:2", now + 1, 2));
+    await manager.flushRedisWrites();
+    await manager.close();
+
+    expect(slowRedis.getMaxActiveWrites()).toBe(1);
+    expect(manager.getStatsSnapshot().redisFlushCount).toBeGreaterThan(0);
   });
 
   it("persists parameterized candle and overlay caches on ingest", async () => {
@@ -519,6 +600,91 @@ describe("LiveStateManager", () => {
     expect(row?.option.trace_id).toBe("print:target");
     expect(row?.support.smart_flow_status).toBe("matched");
     expect(row?.support.smart_flow.projection_trace_id).toBe(smartFlow.trace_id);
+  });
+
+  it("resolves durable delta support only for event-matched option rows", async () => {
+    const now = Date.now();
+    const targetContract = "TARGET-2025-01-17-450-C";
+    const manager = new LiveStateManager(makeClickHouse(), null, {
+      options: 300,
+      nbbo: 1000,
+      equities: 1000,
+      "equity-quotes": 500,
+      "equity-joins": 500,
+      flow: 300,
+      "smart-flow": 300,
+      "smart-flow-alerts": 300,
+      "inferred-dark": 300,
+      news: 100
+    });
+
+    await manager.ingest("options", {
+      source_ts: now,
+      ingest_ts: now + 1,
+      seq: 1,
+      trace_id: "print:target-delta",
+      ts: now,
+      option_contract_id: targetContract,
+      underlying_id: "TARGET",
+      option_type: "call",
+      price: 1.25,
+      size: 10,
+      exchange: "X",
+      notional: 12_500
+    });
+    for (let index = 0; index < 260; index += 1) {
+      await manager.ingest("options", {
+        source_ts: now + 1_000 + index,
+        ingest_ts: now + 1_001 + index,
+        seq: 10 + index,
+        trace_id: `print:delta-decoy:${index}`,
+        ts: now + 1_000 + index,
+        option_contract_id: "SPY-2025-01-17-450-C",
+        underlying_id: "SPY",
+        option_type: "call",
+        price: 1,
+        size: 1,
+        exchange: "X",
+        notional: 100
+      });
+    }
+
+    const packet = {
+      source_ts: now + 2,
+      ingest_ts: now + 3,
+      seq: 2,
+      trace_id: "flowpacket:target-delta",
+      id: "flowpacket:target-delta",
+      members: ["print:target-delta"],
+      features: {
+        option_contract_id: targetContract
+      },
+      join_quality: {}
+    };
+    const smartFlow = makeSmartFlowProjection(now + 4, {
+      packetIds: ["flowpacket:target-delta"],
+      printIds: ["print:target-delta"],
+      underlyingId: "TARGET"
+    });
+
+    await manager.ingest("flow", packet);
+    await manager.ingest("smart-flow", smartFlow);
+
+    const rows = manager.composeDurableRowsForEvent(
+      {
+        channel: "durable-rows",
+        lanes: ["options"],
+        option_contract_id: targetContract,
+        snapshot_limit: 10
+      },
+      "smart-flow",
+      smartFlow
+    ) as Array<Record<string, any>>;
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.option.trace_id).toBe("print:target-delta");
+    expect(rows[0]?.support.smart_flow_status).toBe("matched");
+    expect(rows[0]?.support.smart_flow.projection_trace_id).toBe(smartFlow.trace_id);
   });
 
   it("reorders out-of-order live events without dropping newest-first semantics", async () => {
