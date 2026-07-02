@@ -146,13 +146,16 @@ Evidence:
 
 - Forgejo PR: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/105`
 - Implementation commit: `242f54d` (`replace market command dashboard layout`)
-- Implementation PR metadata commit: `record market command dashboard pr`
+- Implementation PR metadata commit: `50cbb22` (`record market command dashboard pr`)
+- Reviewer evidence commit: `7e8b8fa` (`record market command review closeout`)
+- Merge commit into `dashboard-v2`: `fe08df5`
 
 ## Beads Updates
 
 - Created phase issue `islandflow-mcmd.4`.
 - Blocked by `islandflow-mcmd.3`.
 - Implementation thread did not close the Beads phase issue; closeout remains orchestrator-owned.
+- Orchestrator closed `islandflow-mcmd.4` after PR #105 merged into `dashboard-v2` with Forgejo Actions task `#450` green.
 
 ## Follow-Ups Filed
 
@@ -168,4 +171,4 @@ None.
 
 ## Closeout
 
-Implementation and review complete. PR #105 is open against `dashboard-v2`; orchestrator callback is pending.
+Implementation and thermo-nuclear review are complete. PR #105 merged into `dashboard-v2` with merge commit `fe08df5` after Forgejo Actions task `#450` passed for reviewer head `7e8b8fae30`. Beads issue `islandflow-mcmd.4` is closed by the orchestrator.
