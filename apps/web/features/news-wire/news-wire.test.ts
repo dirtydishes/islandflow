@@ -1,7 +1,13 @@
 import { describe, expect, it } from "bun:test";
 
 import { selectDurableTapeTemplate } from "../durable-tape/templates";
-import { filterNewsStories } from "./filters";
+import {
+  filterNewsStories,
+  getNewsWireRelevanceSortCursor,
+  isNewsStoryFocusedForScope,
+  orderNewsStoriesByScopeRelevance,
+  summarizeNewsWireRelevance
+} from "./filters";
 import {
   formatNewsBodyText,
   formatNewsSymbolsLabel,
@@ -101,6 +107,65 @@ describe("news wire helpers", () => {
         (story) => story.trace_id
       )
     ).toEqual(["b"]);
+  });
+
+  it("promotes focused ticker stories without hiding the market wire", () => {
+    const stories = [
+      makeStory({ trace_id: "market-open", resolved_symbols: [], symbol_resolution: "derived" }),
+      makeStory({ trace_id: "spy-first", resolved_symbols: ["SPY"] }),
+      makeStory({ trace_id: "msft", resolved_symbols: ["MSFT"] }),
+      makeStory({ trace_id: "spy-second", resolved_symbols: ["AAPL", "SPY"] })
+    ];
+
+    const ordered = orderNewsStoriesByScopeRelevance(stories, ["SPY"]);
+
+    expect(ordered.map((story) => story.trace_id)).toEqual([
+      "spy-first",
+      "spy-second",
+      "market-open",
+      "msft"
+    ]);
+    expect(summarizeNewsWireRelevance(stories, ["SPY"])).toEqual({
+      focused: 2,
+      market: 2
+    });
+  });
+
+  it("keeps focused relevance stable for history rows outside the live rank set", () => {
+    const focusedOlder = makeStory({
+      trace_id: "spy-old-history",
+      published_ts: 1_000,
+      resolved_symbols: ["SPY"]
+    });
+    const marketNewer = makeStory({
+      trace_id: "market-newer",
+      published_ts: 5_000,
+      resolved_symbols: ["QQQ"]
+    });
+
+    const focusedCursor = getNewsWireRelevanceSortCursor(focusedOlder, ["SPY"], getNewsStoryCursor);
+    const marketCursor = getNewsWireRelevanceSortCursor(marketNewer, ["SPY"], getNewsStoryCursor);
+
+    expect(isNewsStoryFocusedForScope(focusedOlder, ["SPY"])).toBe(true);
+    expect(isNewsStoryFocusedForScope(marketNewer, ["SPY"])).toBe(false);
+    expect(focusedCursor.ts).toBeGreaterThan(marketCursor.ts);
+    expect(focusedCursor.seq).toBe(getNewsStoryCursor(focusedOlder).seq);
+    expect(marketCursor).toEqual(getNewsStoryCursor(marketNewer));
+  });
+
+  it("preserves the market wire when the focused ticker has no mapped stories", () => {
+    const stories = [
+      makeStory({ trace_id: "market-open", resolved_symbols: [], symbol_resolution: "derived" }),
+      makeStory({ trace_id: "msft", resolved_symbols: ["MSFT"] })
+    ];
+
+    const ordered = orderNewsStoriesByScopeRelevance(stories, ["NVDA"]);
+
+    expect(ordered.map((story) => story.trace_id)).toEqual(["market-open", "msft"]);
+    expect(summarizeNewsWireRelevance(stories, ["NVDA"])).toEqual({
+      focused: 0,
+      market: 2
+    });
   });
 
   it("uses published timestamp and seq for /history/news cursor requests", () => {
