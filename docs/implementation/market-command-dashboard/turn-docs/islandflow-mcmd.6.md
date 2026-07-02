@@ -73,8 +73,7 @@ Findings remaining:
 
 CI owner: reviewer/verification agents
 
-Current CI state: `reviewer-local-green`; Forgejo CI is inspected after the
-reviewer repair commit is pushed.
+Current CI state: `ci-repaired-and-green`.
 
 Evidence:
 
@@ -89,6 +88,8 @@ Evidence:
   `./node_modules/.bin/biome check apps/web/features/durable-tape/components/DurableTape.tsx apps/web/features/durable-tape/types.ts apps/web/features/news-wire/NewsWire.tsx apps/web/features/news-wire/filters.ts apps/web/features/news-wire/news-wire.test.ts apps/web/features/market-command/MarketCommandRoute.tsx apps/web/features/market-command/MarketCommandRoute.test.tsx apps/web/app/globals.css`
   - passed.
 - `git diff --check` - passed.
+- Forgejo Actions task `#455` passed `Validate` for reviewer repair head
+  `61e15a96c7b59d169b0f88bc9c52c05781814dd9`.
 
 Browser evidence:
 
@@ -123,14 +124,15 @@ Browser evidence:
 
 - PR: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/107`
 - Implementation commit: `4771d7be03eaf8226f1ad6bfd0182052f80794bd`
-- Reviewer repair commit: this review-thread commit on
-  `lavender/islandflow-mcmd-6-news-relevance-ordering`.
+- Reviewer repair commit: `61e15a96c7b59d169b0f88bc9c52c05781814dd9`
+- Merge commit into `dashboard-v2`: `2827b53`
 
 ## Beads Updates
 
 - Created phase issue `islandflow-mcmd.6`.
 - Blocked by `islandflow-mcmd.5`.
 - Orchestrator claimed `islandflow-mcmd.6` after Phase 05 closeout and assigned branch `lavender/islandflow-mcmd-6-news-relevance-ordering`.
+- Orchestrator closed `islandflow-mcmd.6` after PR #107 merged into `dashboard-v2` with Forgejo Actions task `#455` green.
 
 ## Follow-Ups Filed
 
@@ -143,5 +145,7 @@ None.
 
 ## Closeout
 
-Implementation local verification complete. Beads issue remains open for the
-orchestrator/reviewer workflow as instructed.
+Implementation and thermo-nuclear review are complete. PR #107 merged into
+`dashboard-v2` with merge commit `2827b53` after Forgejo Actions task `#455`
+passed for reviewer repair head `61e15a96c7`. Beads issue `islandflow-mcmd.6`
+is closed by the orchestrator.
