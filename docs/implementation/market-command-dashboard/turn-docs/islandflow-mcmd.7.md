@@ -242,6 +242,8 @@ Browser evidence:
 - PR: `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/108`
 - Implementation commit: `a3923098ea213c7c9df68ed4298dfd724b3e9a75`
 - PR head at review: `565ca9af44ba858a401cf8e89002b642923dff16`
+- Reviewer evidence commit: `43532d7a674f5e3519d063de01c674bbfaa1da6e`
+- Merge commit into `dashboard-v2`: `7904a33`
 - Reviewer repair commits: none.
 
 ## Beads Updates
@@ -250,6 +252,7 @@ Browser evidence:
 - Blocked by `islandflow-mcmd.6`.
 - Orchestrator claimed `islandflow-mcmd.7` after Phase 06 closeout and assigned branch `lavender/islandflow-mcmd-7-polish-performance-visual-qa`.
 - Implementation thread left `islandflow-mcmd.7` open as instructed.
+- Orchestrator closed `islandflow-mcmd.7` after PR #108 merged into `dashboard-v2` with Forgejo Actions task `#459` green.
 
 ## Follow-Ups Filed
 
@@ -267,7 +270,7 @@ None.
 
 ## Closeout
 
-Implementation and reviewer local gates, browser QA, Forgejo CI, and local
-mergeability checks are complete. PR #108 is open against `dashboard-v2` and
-ready for orchestrator closeout. The review thread leaves `islandflow-mcmd.7`
-open as instructed.
+Implementation and thermo-nuclear review are complete. PR #108 merged into
+`dashboard-v2` with merge commit `7904a33` after Forgejo Actions task `#459`
+passed for reviewer evidence head `43532d7a67`. Beads issue `islandflow-mcmd.7`
+is closed by the orchestrator.
