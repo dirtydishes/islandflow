@@ -64,8 +64,27 @@ Reviewer skill:
 
 `thermo-nuclear-code-quality-review`
 
-Not started in this implementation thread. The orchestrator owns review thread
-creation after the implementation callback.
+2026-07-02 review:
+
+- Verified the review worktree was initially detached at the assigned branch
+  tip, then attached it to the existing assigned branch
+  `lavender/islandflow-mcmd-8-deterministic-drawer-fixture`. No branch was
+  created or renamed.
+- Reviewed the diff against Phase 08 scope. The fixture is isolated behind
+  `NODE_ENV !== "production"`, root pathname `/`, and the explicit
+  `?marketCommandFixture=drawer` query parameter.
+- Normal `/` remains on the existing live API/WebSocket path because fixture
+  feed replacement and fixture marker probes are only enabled by that gate.
+- The seeded data covers durable alert rows, news stories, option rows, flow
+  packets, smart-flow projections/alerts, inferred-dark markers, equity joins,
+  chart candles, and chart overlay prints.
+- The browser probe uses real Chromium/CDP and verifies durable alert, news,
+  smart-flow, inferred-dark, option, and flow packet paths, drawer close
+  behavior, and page-level horizontal overflow.
+- The Docker workspace package snapshot matches the root package script change.
+- No structural blockers or in-scope code repairs were found. `state.tsx` was
+  already over 1k lines before this phase; `chart-adapter.tsx` remained below
+  1k lines after the patch.
 
 ## CI And Gates
 
@@ -76,13 +95,17 @@ Current CI state: `ci-green`
 Evidence:
 
 - `bun install --frozen-lockfile` - passed, with no lockfile changes.
+- First reviewer test attempt failed before running tests because this fresh
+  prepared worktree did not have installed workspace dependencies; the
+  follow-up `bun install --frozen-lockfile` bootstrap passed with no lockfile
+  changes, then all gates below were rerun.
 - Focused fixture/route tests:
   `bun test apps/web/features/market-command/MarketCommandRoute.test.tsx apps/web/features/market-command/browser-fixture.test.ts`
   - passed, 8 tests, 38 assertions.
 - Full web test suite: `bun test apps/web` - passed, 288 tests, 818
   assertions.
 - Scoped Biome:
-  `./node_modules/.bin/biome check apps/web/features/market-command/MarketCommandRoute.tsx apps/web/features/market-command/browser-fixture.ts apps/web/features/market-command/browser-fixture.test.ts apps/web/features/terminal/state.tsx apps/web/features/terminal/chart-adapter.tsx apps/web/app/globals.css scripts/probes/market-command-drawer-fixture.ts package.json`
+  `bunx biome check apps/web/features/market-command/MarketCommandRoute.tsx apps/web/features/market-command/browser-fixture.ts apps/web/features/market-command/browser-fixture.test.ts apps/web/features/terminal/state.tsx apps/web/features/terminal/chart-adapter.tsx apps/web/app/globals.css scripts/probes/market-command-drawer-fixture.ts package.json deployment/docker/workspace-root/package.json`
   - passed.
 - Web production build: `bun --cwd=apps/web run build` - passed.
 - `git diff --check` - passed.
@@ -95,7 +118,14 @@ Evidence:
   `deployment/docker/workspace-root/package.json`.
 - `bun run check:docker-workspace` - passed after the snapshot repair.
 - Forgejo Validate task `#462` passed on commit
-  `3e4de0f395825cb85835fdcda6a747079cdfe6c4`.
+  `3e4de0f395bc7228fc59367ab657a28c6af4ea21`.
+- Forgejo Validate task `#463` passed on commit
+  `b0c5c9b04bb82013a712922444b6e84951dd7f0b`.
+- `fj pr status 109 --wait` failed with the known Forgejo CLI response
+  parsing issue, so reviewer CI evidence used `fj actions tasks`, `fj pr view
+  109`, and final-head task evidence.
+- Mergeability check: `git merge-tree --write-tree forgejo/dashboard-v2 HEAD`
+  passed and produced tree `d4d3330fab51a2dcad583d0ce5411d3c95f80269`.
 
 Browser evidence:
 
@@ -120,7 +150,9 @@ Browser evidence:
 - PR evidence commit:
   `56974c0fb0aa903d338a9456d7a6293918dda00a`
 - Docker workspace snapshot repair:
-  `3e4de0f395825cb85835fdcda6a747079cdfe6c4`
+  `3e4de0f395bc7228fc59367ab657a28c6af4ea21`
+- CI repair evidence:
+  `b0c5c9b04bb82013a712922444b6e84951dd7f0b`
 
 ## Beads Updates
 
@@ -141,5 +173,6 @@ None.
 
 ## Closeout
 
-Implementation complete; PR #109 is open against `dashboard-v2`, local gates and
-Forgejo Validate are green, and the final implementation callback is pending.
+Review complete; PR #109 is open against `dashboard-v2`, local gates and
+Forgejo Validate are green, merge-tree against `dashboard-v2` succeeds, and the
+final review callback is pending.
