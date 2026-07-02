@@ -5,6 +5,7 @@ import { type ReactNode, useMemo } from "react";
 import { DurableTapesQaRoute } from "../features/durable-tape/qa-page";
 import { createStaticEquitiesTapeSource, EquitiesTape } from "../features/equities-tape";
 import { createStaticFlowPacketsTapeSource, FlowPacketsTape } from "../features/flow-packets";
+import { MarketCommandTickerRail } from "../features/market-command/MarketCommandTickerRail";
 import { NewsWire } from "../features/news-wire";
 import { OptionsTape } from "../features/options-tape";
 import { TerminalMarketChartSection } from "../features/terminal/chart-adapter";
@@ -13,7 +14,6 @@ import {
   CommandDeckHeader,
   CommandMetricsStrip,
   CommandPriorityBoard,
-  CommandSymbolRail,
   EventContextPane,
   FeedHealthPane,
   HomeReplayRail
@@ -149,7 +149,7 @@ export function OverviewRoute() {
       <div className="market-command-shell">
         <CommandDeckHeader state={state} />
         <CommandMetricsStrip state={state} />
-        <CommandSymbolRail state={state} />
+        <MarketCommandTickerRail state={state} />
         <div className="market-command-grid">
           <CommandPriorityBoard state={state} />
           <TerminalMarketChartSection
