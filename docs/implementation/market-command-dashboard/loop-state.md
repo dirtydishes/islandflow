@@ -10,9 +10,9 @@ Stream: `market-command-dashboard`
 
 Workflow: `orchestrator-callback`
 
-Current phase: none
+Current phase: 08 - Deterministic drawer browser fixture
 
-Current Beads issue: none
+Current Beads issue: `islandflow-mcmd.8`
 
 Current PR: none
 
@@ -49,7 +49,8 @@ Blocked: no
 | 05 - Hybrid detail drawer model | `islandflow-mcmd.5` | Closed, merged via PR #106 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/106` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.5.md` |
 | 06 - News relevance ordering | `islandflow-mcmd.6` | Closed, merged via PR #107 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/107` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.6.md` |
 | 07 - Polish, performance, and visual QA | `islandflow-mcmd.7` | Closed, merged via PR #108 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/108` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.7.md` |
+| 08 - Deterministic drawer browser fixture | `islandflow-mcmd.8` | In progress | None | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.8.md` |
 
 ## Last Coordinator Update
 
-2026-07-02: Review callback approved Phase `islandflow-mcmd.7` with `ci-green`. Orchestrator merged PR #108 into `dashboard-v2` at merge commit `7904a33`, closed Beads issue `islandflow-mcmd.7`, and recorded Forgejo Actions task `#459` as green for final reviewer head `43532d7a67`.
+2026-07-02: Closeout/selector subagent verified Phase `islandflow-mcmd.7` is closed and PR #108 is merged. Beads still has ready child `islandflow-mcmd.8`, a Phase 05 follow-up for deterministic drawer browser fixtures. Orchestrator claimed it and assigned branch `lavender/islandflow-mcmd-8-deterministic-drawer-fixture` from base branch `dashboard-v2`.

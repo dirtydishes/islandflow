@@ -102,6 +102,7 @@ Install `@pierre/diffs` in the target repo if missing. Every storyboard diff mus
 | `islandflow-mcmd.5` | 05 - Hybrid detail drawer model | `docs/implementation/market-command-dashboard/05-hybrid-detail-model.md` | `islandflow-mcmd.4` | Closed, merged via PR #106 |
 | `islandflow-mcmd.6` | 06 - News relevance ordering | `docs/implementation/market-command-dashboard/06-news-relevance-ordering.md` | `islandflow-mcmd.5` | Closed, merged via PR #107 |
 | `islandflow-mcmd.7` | 07 - Polish, performance, and visual QA | `docs/implementation/market-command-dashboard/07-polish-performance-visual-qa.md` | `islandflow-mcmd.6` | Closed, merged via PR #108 |
+| `islandflow-mcmd.8` | 08 - Deterministic drawer browser fixture | `docs/implementation/market-command-dashboard/08-deterministic-drawer-browser-fixture.md` | `islandflow-mcmd.5` (discovered from) | In progress |
 
 ## Quality Gates
 
