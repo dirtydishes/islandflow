@@ -58,7 +58,7 @@ Findings remaining:
 
 CI owner: reviewer/verification agents
 
-Current CI state: `review-repair-local-gates-green`
+Current CI state: `ci-repaired-and-green`
 
 Evidence:
 
@@ -70,9 +70,9 @@ Evidence:
 - `git diff --check` - passed.
 - Forgejo Actions before reviewer repair: task `#438` for `d084df629d` passed (`Validate`,
   pull_request). Task `#437` for the superseded initial PR head was cancelled.
+- Forgejo Actions after reviewer repair: task `#439` for `bb6733a11a` passed (`Validate`,
+  pull_request) in 1m24s.
 - `bun run check` - blocked by unrelated pre-existing import-order diagnostics outside this phase scope, including `apps/desktop/src/main.ts`, `apps/web/app/layout.tsx`, and multiple existing app/service files. Touched files pass targeted Biome.
-
-Post-repair Forgejo CI is pending reviewer repair commit/push.
 
 ## PR And Commits
 
