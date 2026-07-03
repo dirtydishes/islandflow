@@ -178,6 +178,62 @@ describe("smart-flow alert API projections", () => {
     expect(smartFlowAlertCursor(payload!)).toEqual({ ts: 1_000, seq: 12 });
   });
 
+  it("hides synthetic alert history when hosted adapters are live", async () => {
+    const originalOptionsAdapter = process.env.OPTIONS_INGEST_ADAPTER;
+    const originalEquitiesAdapter = process.env.EQUITIES_INGEST_ADAPTER;
+    process.env.OPTIONS_INGEST_ADAPTER = "alpaca";
+    process.env.EQUITIES_INGEST_ADAPTER = "alpaca";
+
+    try {
+      const projection = makeSmartFlowProjection();
+      const alert = smartFlowAlertFromProjection(projection);
+      if (!alert) {
+        throw new Error("expected non-abstained projection to derive an alert");
+      }
+      const syntheticEvidenceRefs = ["flowpacket:12", "synthetic-options-1"];
+      const syntheticAlert = {
+        ...alert,
+        alert_id: "smartflow:alert:synthetic",
+        trace_id: "smartflow:alert:synthetic",
+        evidence_refs: syntheticEvidenceRefs,
+        projection: {
+          ...alert.projection,
+          refs: { ...alert.projection.refs, evidence_refs: syntheticEvidenceRefs },
+          evidence: { ...alert.projection.evidence, evidence_refs: syntheticEvidenceRefs },
+          hypothesis: { ...alert.projection.hypothesis, evidence_refs: syntheticEvidenceRefs },
+          insight: { ...alert.projection.insight, evidence_refs: syntheticEvidenceRefs }
+        }
+      };
+      const realAlert = {
+        ...alert,
+        alert_id: "smartflow:alert:real",
+        trace_id: "smartflow:alert:real"
+      };
+      const queries: string[] = [];
+      const payload = await fetchRecentSmartFlowAlertEvents(
+        makeClickHouse(
+          [toSmartFlowAlertRecord(syntheticAlert), toSmartFlowAlertRecord(realAlert)],
+          queries
+        ),
+        1
+      );
+
+      expect(payload.map((item) => item.alert_id)).toEqual(["smartflow:alert:real"]);
+      expect(queries[0]).toContain("LIMIT 5");
+    } finally {
+      if (originalOptionsAdapter === undefined) {
+        delete process.env.OPTIONS_INGEST_ADAPTER;
+      } else {
+        process.env.OPTIONS_INGEST_ADAPTER = originalOptionsAdapter;
+      }
+      if (originalEquitiesAdapter === undefined) {
+        delete process.env.EQUITIES_INGEST_ADAPTER;
+      } else {
+        process.env.EQUITIES_INGEST_ADAPTER = originalEquitiesAdapter;
+      }
+    }
+  });
+
   it("queries smart-flow alerts after and before cursors", async () => {
     const projection = makeSmartFlowProjection();
     const alert = smartFlowAlertFromProjection(projection);

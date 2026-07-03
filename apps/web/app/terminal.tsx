@@ -20,6 +20,7 @@ export {
   buildTerminalMarketChartMarkers,
   getTerminalChartReplayEndTs,
   mapTerminalChartStatus,
+  mergeTerminalChartCandles,
   normalizeTerminalChartCandles
 } from "../features/terminal/chart-adapter";
 export type { ChartFlowMarkerItem } from "../features/terminal/charts/markers";

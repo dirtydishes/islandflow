@@ -33,6 +33,7 @@ export type NormalizedAlertsModuleFilters = {
 export type AlertEvidenceItem =
   | { kind: "flow"; id: string; packet: FlowPacket }
   | { kind: "print"; id: string; print: OptionPrint }
+  | { kind: "context"; id: string; label: string }
   | { kind: "unknown"; id: string };
 
 export type AlertContextBundle = {

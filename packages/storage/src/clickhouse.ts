@@ -1995,7 +1995,7 @@ export const fetchOptionPrintsByTraceIds = async (
   }
 
   const result = await client.query({
-    query: `SELECT * FROM ${OPTION_PRINTS_TABLE} WHERE trace_id IN (${buildStringList(ids)}) ORDER BY ts DESC, seq DESC LIMIT ${clampLookupLimit(ids.length)}`,
+    query: `SELECT * FROM ${OPTION_PRINTS_TABLE} WHERE trace_id IN (${buildStringList(ids)}) ORDER BY trace_id ASC, ts DESC, seq DESC LIMIT 1 BY trace_id`,
     format: "JSONEachRow",
     ...OPTION_PRINT_QUERY_BOUNDS
   });

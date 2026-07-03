@@ -159,6 +159,7 @@ import {
   fetchRecentSmartFlowAlertEvents,
   fetchSmartFlowAlertEventsAfter,
   fetchSmartFlowAlertEventsBefore,
+  shouldSurfaceSmartFlowAlert,
   smartFlowAlertCursor
 } from "./smart-flow-alerts";
 import { SMART_FLOW_SUPPORT_MAX_TRACE_IDS } from "./smart-flow-support-resolver";
@@ -1158,6 +1159,10 @@ const run = async () => {
   ) => {
     const watermark = await liveState.ingest(ingestChannel, item);
 
+    if (!watermark) {
+      return;
+    }
+
     if (!shouldFanoutLiveEvent(ingestChannel, item)) {
       return;
     }
@@ -1448,6 +1453,10 @@ const run = async () => {
     for await (const msg of smartFlowAlertSubscription.messages) {
       try {
         const payload = SmartFlowAlertEventSchema.parse(smartFlowAlertSubscription.decode(msg));
+        if (!shouldSurfaceSmartFlowAlert(payload)) {
+          msg.ack();
+          continue;
+        }
         broadcast(smartFlowAlertSockets, { type: "smart-flow-alert", payload });
         await fanoutLive({ channel: "smart-flow-alerts" }, payload, "smart-flow-alerts");
         msg.ack();

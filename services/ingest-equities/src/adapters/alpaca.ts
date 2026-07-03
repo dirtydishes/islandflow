@@ -1,6 +1,5 @@
 import {
   buildAlpacaAuthHeaders,
-  buildAlpacaWebSocketAuthMessage,
   type AlpacaCredentials
 } from "@islandflow/config";
 import { createLogger } from "@islandflow/observability";
@@ -227,10 +226,6 @@ export const createAlpacaEquitiesAdapter = (
       let seq = 0;
       let stopped = false;
       let authenticated = false;
-
-      ws.on("open", () => {
-        ws.send(JSON.stringify(buildAlpacaWebSocketAuthMessage(config.credentials)));
-      });
 
       const subscribe = () => {
         const message: Record<string, unknown> = {

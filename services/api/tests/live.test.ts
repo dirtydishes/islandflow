@@ -411,6 +411,109 @@ describe("LiveStateManager", () => {
     );
   });
 
+  it("filters synthetic smart-flow alerts from native-mode redis hydration", async () => {
+    const previousOptionsAdapter = process.env.OPTIONS_INGEST_ADAPTER;
+    const previousEquitiesAdapter = process.env.EQUITIES_INGEST_ADAPTER;
+    process.env.OPTIONS_INGEST_ADAPTER = "alpaca";
+    process.env.EQUITIES_INGEST_ADAPTER = "alpaca";
+    try {
+      const redis = makeRedis();
+      const now = Date.now();
+      const syntheticAlert = smartFlowAlertFromProjection(
+        makeSmartFlowProjection(now, {
+          packetIds: ["flowpacket:synthetic"],
+          printIds: ["synthetic-options-1"],
+          underlyingId: "SYN"
+        }),
+        {
+          alert_id: "smartflow:alert:SYN",
+          trace_id: "smartflow:alert:SYN"
+        }
+      );
+      const nativeAlert = smartFlowAlertFromProjection(
+        makeSmartFlowProjection(now + 1, {
+          packetIds: ["flowpacket:native"],
+          printIds: ["alpaca-options-1"],
+          underlyingId: "SPY"
+        }),
+        {
+          alert_id: "smartflow:alert:SPY",
+          trace_id: "smartflow:alert:SPY"
+        }
+      );
+      if (!syntheticAlert || !nativeAlert) {
+        throw new Error("expected non-abstained projections to derive alerts");
+      }
+      await redis.lPush("live:smart-flow-alerts", JSON.stringify(syntheticAlert));
+      await redis.lPush("live:smart-flow-alerts", JSON.stringify(nativeAlert));
+
+      const manager = new LiveStateManager(makeClickHouse(), redis as never);
+      await manager.hydrate();
+      const snapshot = await manager.getSnapshot({ channel: "smart-flow-alerts" });
+      await manager.close();
+
+      expect((snapshot.items as SmartFlowAlertEvent[]).map((item) => item.alert_id)).toEqual([
+        nativeAlert.alert_id
+      ]);
+      const persisted = await redis.lRange("live:smart-flow-alerts", 0, 10);
+      expect(persisted).toHaveLength(1);
+      expect(persisted[0]).toContain(nativeAlert.alert_id);
+      expect(persisted[0]).not.toContain(syntheticAlert.alert_id);
+    } finally {
+      if (previousOptionsAdapter === undefined) {
+        delete process.env.OPTIONS_INGEST_ADAPTER;
+      } else {
+        process.env.OPTIONS_INGEST_ADAPTER = previousOptionsAdapter;
+      }
+      if (previousEquitiesAdapter === undefined) {
+        delete process.env.EQUITIES_INGEST_ADAPTER;
+      } else {
+        process.env.EQUITIES_INGEST_ADAPTER = previousEquitiesAdapter;
+      }
+    }
+  });
+
+  it("rejects synthetic smart-flow alerts from native-mode live ingest", async () => {
+    const previousOptionsAdapter = process.env.OPTIONS_INGEST_ADAPTER;
+    const previousEquitiesAdapter = process.env.EQUITIES_INGEST_ADAPTER;
+    process.env.OPTIONS_INGEST_ADAPTER = "alpaca";
+    process.env.EQUITIES_INGEST_ADAPTER = "alpaca";
+    try {
+      const now = Date.now();
+      const syntheticAlert = smartFlowAlertFromProjection(
+        makeSmartFlowProjection(now, {
+          packetIds: ["flowpacket:synthetic"],
+          printIds: ["synthetic-options-1"]
+        }),
+        {
+          alert_id: "smartflow:alert:SYN",
+          trace_id: "smartflow:alert:SYN"
+        }
+      );
+      if (!syntheticAlert) {
+        throw new Error("expected non-abstained projection to derive an alert");
+      }
+      const manager = new LiveStateManager(makeClickHouse(), null);
+
+      const cursor = await manager.ingest("smart-flow-alerts", syntheticAlert);
+      const snapshot = await manager.getSnapshot({ channel: "smart-flow-alerts" });
+
+      expect(cursor).toBeNull();
+      expect(snapshot.items).toHaveLength(0);
+    } finally {
+      if (previousOptionsAdapter === undefined) {
+        delete process.env.OPTIONS_INGEST_ADAPTER;
+      } else {
+        process.env.OPTIONS_INGEST_ADAPTER = previousOptionsAdapter;
+      }
+      if (previousEquitiesAdapter === undefined) {
+        delete process.env.EQUITIES_INGEST_ADAPTER;
+      } else {
+        process.env.EQUITIES_INGEST_ADAPTER = previousEquitiesAdapter;
+      }
+    }
+  });
+
   it("keeps same-cursor smart-flow alerts with distinct alert identities", async () => {
     const now = Date.now();
     const first = smartFlowAlertFromProjection(makeSmartFlowProjection(now), {

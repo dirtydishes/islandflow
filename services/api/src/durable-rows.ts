@@ -465,7 +465,10 @@ const buildDurableAlertRow = (
   lookups: DurableRowLookups
 ): DurableTapeAlertRowViewModel => {
   const flowPacketRefs = alert.evidence_refs.filter((ref) => ref.startsWith("flowpacket:"));
-  const optionPrintRefs = alert.evidence_refs.filter((ref) => !ref.startsWith("flowpacket:"));
+  const optionContextRefs = alert.evidence_refs.filter((ref) => ref.startsWith("option-nbbo:"));
+  const optionPrintRefs = alert.evidence_refs.filter(
+    (ref) => !ref.startsWith("flowpacket:") && !ref.startsWith("option-nbbo:")
+  );
   const primaryPacket =
     flowPacketRefs.map((ref) => lookups.flowPacketById.get(ref)).find(Boolean) ?? null;
   const previewPrints = optionPrintRefs
@@ -476,7 +479,9 @@ const buildDurableAlertRow = (
     ...flowPacketRefs.filter((ref) => lookups.flowPacketById.has(ref)),
     ...optionPrintRefs.filter((ref) => lookups.optionPrintByTraceId.has(ref))
   ];
-  const missingRefs = alert.evidence_refs.filter((ref) => !availableRefs.includes(ref));
+  const missingRefs = alert.evidence_refs.filter(
+    (ref) => !availableRefs.includes(ref) && !optionContextRefs.includes(ref)
+  );
   const packetContract = getPacketContractId(primaryPacket);
   const firstPreviewPrint = previewPrints[0];
   const underlying =

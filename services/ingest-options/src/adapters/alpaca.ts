@@ -1,7 +1,6 @@
 import { decode, encode } from "@msgpack/msgpack";
 import {
   buildAlpacaAuthHeaders,
-  buildAlpacaWebSocketAuthMessage,
   type AlpacaCredentials
 } from "@islandflow/config";
 import { createLogger } from "@islandflow/observability";
@@ -507,10 +506,6 @@ export const createAlpacaOptionsAdapter = (
 
         ws.send(encode(subscribe));
       };
-
-      ws.on("open", () => {
-        ws.send(encode(buildAlpacaWebSocketAuthMessage(config.credentials)));
-      });
 
       ws.on("message", (data) => {
         if (stopped) {

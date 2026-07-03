@@ -3,7 +3,7 @@ import type {
   ChartOptions,
   DeepPartial
 } from "lightweight-charts";
-import { formatChartTickTime } from "./transforms/time";
+import { formatChartLabelTime, formatChartTickTime } from "./transforms/time";
 import {
   DEFAULT_MARKET_CHART_INTERVALS,
   DEFAULT_TIMEFRAME_FAVORITE_IDS
@@ -234,6 +234,9 @@ export const createMarketChartOptions = (
     crosshair: {
       vertLine: { color: tokens.crosshair },
       horzLine: { color: tokens.crosshair }
+    },
+    localization: {
+      timeFormatter: formatChartLabelTime
     },
     timeScale: {
       borderColor: tokens.border,

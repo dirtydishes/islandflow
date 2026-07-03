@@ -156,6 +156,9 @@ export const getAlertPrimaryPacketRef = (
   alert: Pick<SmartFlowAlertEvent, "evidence_refs">
 ): string | null => alert.evidence_refs.find((ref) => ref.startsWith("flowpacket:")) ?? null;
 
+const isAlertPrimaryOptionPrintRef = (ref: string): boolean =>
+  !ref.startsWith("flowpacket:") && !ref.startsWith("option-nbbo:");
+
 export const getAlertPrimaryOptionRef = (
   alert: Pick<SmartFlowAlertEvent, "evidence_refs">
-): string | null => alert.evidence_refs.find((ref) => !ref.startsWith("flowpacket:")) ?? null;
+): string | null => alert.evidence_refs.find(isAlertPrimaryOptionPrintRef) ?? null;

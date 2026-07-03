@@ -61,6 +61,9 @@ const uniqueNonEmpty = (items: readonly string[]): string[] =>
   Array.from(new Set(items.map((item) => item.trim()).filter(Boolean)));
 
 export const isAlertFlowPacketRef = (ref: string): boolean => ref.startsWith("flowpacket:");
+export const isAlertOptionNbboRef = (ref: string): boolean => ref.startsWith("option-nbbo:");
+export const isAlertOptionPrintRef = (ref: string): boolean =>
+  !isAlertFlowPacketRef(ref) && !isAlertOptionNbboRef(ref);
 
 export const getAlertFlowPacketRefs = (
   alert: Pick<SmartFlowAlertEvent, "evidence_refs">
@@ -68,7 +71,7 @@ export const getAlertFlowPacketRefs = (
 
 export const getAlertOptionPrintRefs = (
   alert: Pick<SmartFlowAlertEvent, "evidence_refs">
-): string[] => uniqueNonEmpty(alert.evidence_refs).filter((ref) => !isAlertFlowPacketRef(ref));
+): string[] => uniqueNonEmpty(alert.evidence_refs).filter(isAlertOptionPrintRef);
 
 export const resolveAlertFlowPacket = (
   alert: Pick<SmartFlowAlertEvent, "evidence_refs">,
@@ -101,6 +104,9 @@ export const resolveAlertEvidence = ({
     const print = prints.get(id);
     if (print) {
       return { kind: "print", id, print };
+    }
+    if (isAlertOptionNbboRef(id)) {
+      return { kind: "context", id, label: "Option NBBO" };
     }
     return { kind: "unknown", id };
   });

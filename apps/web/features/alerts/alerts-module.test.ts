@@ -206,7 +206,14 @@ describe("alerts module helpers", () => {
   });
 
   it("renders row columns without legacy score or severity presentation", () => {
-    const alert = makeAlert();
+    const alert = {
+      ...makeAlert(),
+      evidence_refs: [
+        "flowpacket:SPY-2026-06-22-555-C:1",
+        "option-nbbo:SPY-2026-06-22-555-C:1",
+        "print:1"
+      ]
+    };
     const markup = renderNode(renderAlertsRow({ alert, columns: ALERTS_COLUMNS }));
 
     expect(markup).toContain("SPY");
@@ -233,7 +240,13 @@ describe("alerts module helpers", () => {
   });
 
   it("owns canonical alert evidence paths and evidence resolution", () => {
-    const alert = makeAlert();
+    const alert = makeAlert({
+      evidence_refs: [
+        "flowpacket:SPY-2026-06-22-555-C:1",
+        "option-nbbo:SPY-2026-06-22-555-C:1",
+        "print:1"
+      ]
+    });
     const packet = makePacket();
     const print = makePrint();
     const evidence = collectAlertContextEvidence({
@@ -257,6 +270,7 @@ describe("alerts module helpers", () => {
       resolveAlertEvidence({ alert, packets: evidence.packets, prints: evidence.prints })
     ).toEqual([
       { kind: "flow", id: packet.id, packet },
+      { kind: "context", id: "option-nbbo:SPY-2026-06-22-555-C:1", label: "Option NBBO" },
       { kind: "print", id: print.trace_id, print }
     ]);
     expect(inferAlertUnderlying(alert, packet, [print])).toBe("SPY");

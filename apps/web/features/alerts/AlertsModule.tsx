@@ -130,6 +130,7 @@ export const AlertDetail = ({
   );
   const hiddenEvidencePrintCount = Math.max(0, evidencePrints.length - 6);
   const unresolved = hydration.evidence.filter((item) => item.kind === "unknown");
+  const contextRefs = hydration.evidence.filter((item) => item.kind === "context");
   const packetRefs = getAlertFlowPacketRefs(alert);
   const optionRefs = getAlertOptionPrintRefs(alert);
   const primaryPacketRef = getAlertPrimaryPacketRef(alert);
@@ -269,6 +270,9 @@ export const AlertDetail = ({
         )}
         {hiddenEvidencePrintCount > 0 ? (
           <p className="drawer-empty">+{hiddenEvidencePrintCount} more evidence prints.</p>
+        ) : null}
+        {contextRefs.length > 0 ? (
+          <p className="drawer-empty">Quote context refs: {contextRefs.length}</p>
         ) : null}
         {unresolved.length > 0 ? (
           <p className="drawer-empty">

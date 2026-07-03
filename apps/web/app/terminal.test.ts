@@ -74,6 +74,7 @@ const {
   mergeHeldTapeHistory,
   mergeNewestWithOverflow,
   mapTerminalChartStatus,
+  mergeTerminalChartCandles,
   normalizeTickerFilterInput,
   normalizeTerminalChartCandles,
   nextFlowFilterPopoverState,
@@ -327,7 +328,7 @@ describe("alert context hydration helpers", () => {
 
   it("keeps packet refs out of alert option-print evidence refs", () => {
     const alert = makeAlert({
-      evidence_refs: ["flowpacket:1", "print:1", "print:2"]
+      evidence_refs: ["flowpacket:1", "option-nbbo:SPY-2026-06-22-555-C:1", "print:1", "print:2"]
     });
 
     expect(getAlertOptionPrintRefs(alert)).toEqual(["print:1", "print:2"]);
@@ -1524,6 +1525,32 @@ describe("smart-flow explainability helpers", () => {
     expect(overlays).toHaveLength(1);
     expect(overlays[0].points).toHaveLength(1);
     expect(overlays[0].points[0]).toMatchObject({ timestampMs: 1_000, price: 101, value: 100 });
+  });
+
+  it("merges live chart candles into fetched chart history without dropping older buckets", () => {
+    const candle = (ts: number, seq: number, close = 101) =>
+      ({
+        trace_id: `candle:${ts}:${seq}`,
+        source_ts: ts,
+        ingest_ts: ts + 1,
+        seq,
+        ts,
+        interval_ms: 60_000,
+        underlying_id: "SPY",
+        open: 100,
+        high: 104,
+        low: 99,
+        close,
+        volume: 10,
+        trade_count: 2
+      }) as any;
+    const fetched = [candle(60_000, 1), candle(120_000, 2), candle(180_000, 3)];
+    const live = [candle(180_000, 4, 105), candle(240_000, 5)];
+
+    const merged = mergeTerminalChartCandles(fetched, live, 4);
+
+    expect(merged.map((item) => item.ts)).toEqual([60_000, 120_000, 180_000, 240_000]);
+    expect(merged.find((item) => item.ts === 180_000)?.seq).toBe(4);
   });
 
   it("scopes lower-pane all-flow inputs to the active chart ticker", () => {

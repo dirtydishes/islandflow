@@ -50,7 +50,11 @@ import {
   wantsDurableOptionRows
 } from "./durable-rows";
 import { fetchRecentSmartFlowExplainability, smartFlowCursor } from "./smart-flow";
-import { fetchRecentSmartFlowAlertEvents, smartFlowAlertCursor } from "./smart-flow-alerts";
+import {
+  fetchRecentSmartFlowAlertEvents,
+  shouldSurfaceSmartFlowAlert,
+  smartFlowAlertCursor
+} from "./smart-flow-alerts";
 import {
   createSmartFlowSupportResolver,
   SMART_FLOW_SUPPORT_MAX_TRACE_IDS,
@@ -105,6 +109,7 @@ type GenericFeedConfig = {
   cursorField: string;
   limit: number;
   parse: (value: unknown) => any;
+  include?: (item: any) => boolean;
   cursor: (item: any) => Cursor;
   identity?: (item: any) => string;
   fetchRecent: (clickhouse: ClickHouseClient, limit: number) => Promise<any[]>;
@@ -362,6 +367,7 @@ const getGenericConfig = (
     cursorField: "smart-flow-alerts",
     limit: limits["smart-flow-alerts"],
     parse: (value) => SmartFlowAlertEventSchema.parse(value),
+    include: shouldSurfaceSmartFlowAlert,
     cursor: smartFlowAlertCursor,
     identity: (item) => item.alert_id,
     fetchRecent: fetchRecentSmartFlowAlertEvents
@@ -936,7 +942,11 @@ export class LiveStateManager {
     const config = this.generic[channel];
     if (this.redis?.isOpen) {
       const payloads = await this.redis.lRange(config.redisKey, 0, config.limit - 1);
-      const cached = normalizeGenericItems(channel, parseJsonList(payloads, config.parse), config);
+      const cached = normalizeGenericItems(
+        channel,
+        parseJsonList(payloads, config.parse).filter((item) => config.include?.(item) ?? true),
+        config
+      );
       if (cached.length > 0) {
         this.genericItems.set(channel, cached);
         this.stats.genericHydrateFromRedis += 1;
@@ -959,7 +969,9 @@ export class LiveStateManager {
 
     const fresh = normalizeGenericItems(
       channel,
-      await config.fetchRecent(this.clickhouse, config.limit),
+      (await config.fetchRecent(this.clickhouse, config.limit)).filter(
+        (item) => config.include?.(item) ?? true
+      ),
       config
     );
     this.stats.genericHydrateFromClickHouse += 1;
@@ -1177,6 +1189,9 @@ export class LiveStateManager {
       default: {
         const config = this.generic[channel];
         const parsed = config.parse(item);
+        if (!(config.include?.(parsed) ?? true)) {
+          return null;
+        }
         if (!isWithinLiveFeedLookback(channel, parsed)) {
           return null;
         }

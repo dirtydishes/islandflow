@@ -5,6 +5,20 @@ const DEFAULT_LOCALE = "en-US";
 
 const formatterCache = new Map<string, Intl.DateTimeFormat>();
 
+const resolveBrowserTimeZone = (): string | null => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  try {
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone?.trim();
+    return timeZone || null;
+  } catch {
+    return null;
+  }
+};
+
+export const getUserTimeZone = (): string => resolveBrowserTimeZone() ?? EASTERN_TIME_ZONE;
+
 const formatterKey = (locale: string, options: Intl.DateTimeFormatOptions): string =>
   JSON.stringify([
     locale,
@@ -17,7 +31,7 @@ const getFormatter = (
   options: Intl.DateTimeFormatOptions,
   locale = DEFAULT_LOCALE
 ): Intl.DateTimeFormat => {
-  const normalizedOptions = { ...options, timeZone: EASTERN_TIME_ZONE };
+  const normalizedOptions = { ...options, timeZone: getUserTimeZone() };
   const key = formatterKey(locale, normalizedOptions);
   const cached = formatterCache.get(key);
   if (cached) {
@@ -99,6 +113,23 @@ export const formatEasternTimestampWithMs = (
   }
   const ms = String(new Date(ts).getMilliseconds()).padStart(3, "0");
   return `${formatEasternDate(ts, dateOptions)} ${formatEasternTime(ts, timeOptions)}.${ms}`;
+};
+
+export const formatTimeZoneLabel = (ts: number, locale = DEFAULT_LOCALE): string => {
+  if (!isFiniteTimestamp(ts)) {
+    return EASTERN_TIME_LABEL;
+  }
+  const parts = getFormatter(
+    {
+      hour: "numeric",
+      timeZoneName: "short"
+    },
+    locale
+  ).formatToParts(new Date(ts));
+  return (
+    parts.find((part) => part.type === "timeZoneName")?.value.trim() ||
+    (getUserTimeZone() === EASTERN_TIME_ZONE ? EASTERN_TIME_LABEL : getUserTimeZone())
+  );
 };
 
 const easternDateKeyFormatter = getFormatter({

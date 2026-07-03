@@ -18,6 +18,7 @@ import {
   type OptionsTapeRowTint
 } from "../options-tape/tinting";
 import type { OptionsTapeSmartFlowContext } from "../options-tape/types";
+import { formatEasternTime } from "../time-format";
 import { DurableTape } from "./components/DurableTape";
 import { createDurableTapeInitialHistoryCursor } from "./history";
 import {
@@ -69,6 +70,16 @@ const useStaticRowSource = <T extends DurableTapeRowViewModel>(
 
 const getRowKey = (row: DurableTapeRowViewModel): string => row.id;
 const getRowCursor = (row: DurableTapeRowViewModel) => ({ ts: row.ts, seq: row.seq });
+export const formatDurableRowTime = (
+  row: Pick<DurableTapeRowViewModel, "ts" | "cells">
+): string =>
+  Number.isFinite(row.ts)
+    ? formatEasternTime(row.ts, { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    : String(row.cells.time ?? "--");
+const formatDurableTimestamp = (ts: number, fallback = "--"): string =>
+  Number.isFinite(ts)
+    ? formatEasternTime(ts, { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    : fallback;
 
 type OptionRowColumnId =
   | "time"
@@ -126,7 +137,7 @@ const OPTION_ROW_COLUMNS: DurableTapeColumnDefinition<
     label: "TIME",
     minWidth: 72,
     className: "options-tape-cell-time durable-tape-cell-number",
-    render: (row) => row.cells.time ?? "--"
+    render: formatDurableRowTime
   },
   {
     id: "contract",
@@ -416,7 +427,7 @@ const ALERT_ROW_COLUMNS: DurableTapeColumnDefinition<
     label: "TIME",
     minWidth: 76,
     className: "alerts-cell-time durable-tape-cell-number",
-    render: (row) => row.cells.time ?? "--"
+    render: formatDurableRowTime
   },
   {
     id: "symbol",
@@ -500,7 +511,7 @@ export const renderDurableTapeAlertRowDetail = (row: DurableTapeAlertRowViewMode
       <div>
         <span>Alert detail</span>
         <h3>{row.alert.primary_label}</h3>
-        <p>{row.cells.time}</p>
+        <p>{formatDurableRowTime(row)}</p>
       </div>
       <div className="alerts-detail-score">
         <span>Confidence</span>
@@ -545,7 +556,7 @@ export const renderDurableTapeAlertRowDetail = (row: DurableTapeAlertRowViewMode
             <div className="alerts-detail-row" key={print.trace_id}>
               <div>
                 <strong>{print.option_contract_id}</strong>
-                <span>{row.cells.time}</span>
+                <span>{formatDurableTimestamp(print.ts, String(row.cells.time ?? "--"))}</span>
               </div>
               <p>
                 ${print.price.toFixed(2)} / {print.size}x /{" "}
