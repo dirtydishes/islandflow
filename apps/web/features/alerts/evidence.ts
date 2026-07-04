@@ -1,14 +1,16 @@
 "use client";
 
-import type { FlowPacket, OptionPrint, SmartFlowAlertEvent } from "@islandflow/types";
+import {
+  SMART_FLOW_ALERT_EVIDENCE_LOOKUP_PATH,
+  SmartFlowAlertEvidenceBundleSchema,
+  type FlowPacket,
+  type OptionPrint,
+  type SmartFlowAlertEvent
+} from "@islandflow/types";
 import { useEffect, useMemo, useState } from "react";
 
 import { buildAlertsApiUrl } from "./source";
-import {
-  getAlertContextRefLabel,
-  isAlertFlowPacketRef,
-  isAlertOptionPrintRef
-} from "./refs";
+import { isAlertFlowPacketRef, isAlertOptionPrintRef } from "./refs";
 import type {
   AlertContextBundle,
   AlertContextStatus,
@@ -35,6 +37,8 @@ export const buildAlertOptionPrintsPath = (traceIds: readonly string[]): string 
   const query = params.toString();
   return query ? `/option-prints/by-trace?${query}` : "/option-prints/by-trace";
 };
+
+export const buildAlertEvidenceLookupPath = (): string => SMART_FLOW_ALERT_EVIDENCE_LOOKUP_PATH;
 
 export const collectAlertContextEvidence = (
   bundle: AlertContextBundle
@@ -99,64 +103,18 @@ export const resolveAlertEvidence = ({
   alert.evidence_refs.map((id) => {
     const packet = packets.get(id);
     if (packet) {
-      return { kind: "flow", id, packet };
+      return { kind: "flow_packet", ref: id, packet };
     }
     const print = prints.get(id);
     if (print) {
-      return { kind: "print", id, print };
+      return { kind: "option_print", ref: id, print };
     }
-    const contextLabel = getAlertContextRefLabel(id);
-    if (contextLabel) {
-      return { kind: "context", id, label: contextLabel };
-    }
-    return { kind: "unknown", id };
+    return { kind: "unresolved", ref: id, inferred_kind: "unknown", reason: "not_found" };
   });
 
 const readErrorDetail = async (response: Response): Promise<string> => {
   const text = await response.text();
   return text || `HTTP ${response.status}`;
-};
-
-const fetchFlowPacketsById = async ({
-  packetIds,
-  fetcher,
-  apiBaseUrl,
-  signal
-}: {
-  packetIds: readonly string[];
-  fetcher: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
-  apiBaseUrl?: string;
-  signal: AbortSignal;
-}): Promise<{ packets: Map<string, FlowPacket>; missing: string[] }> => {
-  const packets = new Map<string, FlowPacket>();
-  const missing: string[] = [];
-
-  await Promise.all(
-    packetIds.map(async (packetId) => {
-      const response = await fetcher(
-        buildAlertsApiUrl(buildAlertFlowPacketPath(packetId), apiBaseUrl),
-        { signal }
-      );
-      if (response.status === 404) {
-        missing.push(packetId);
-        return;
-      }
-      if (!response.ok) {
-        throw new Error(await readErrorDetail(response));
-      }
-      const payload = (await response.json()) as { data?: FlowPacket | null };
-      if (payload.data) {
-        packets.set(payload.data.id, payload.data);
-        if (payload.data.trace_id) {
-          packets.set(payload.data.trace_id, payload.data);
-        }
-      } else {
-        missing.push(packetId);
-      }
-    })
-  );
-
-  return { packets, missing };
 };
 
 export const fetchOptionPrintsByTraceId = async ({
@@ -199,10 +157,36 @@ export const fetchOptionPrintsByTraceId = async ({
   };
 };
 
+export const fetchAlertEvidenceBundle = async ({
+  alertId,
+  refs,
+  fetcher,
+  apiBaseUrl,
+  signal
+}: {
+  alertId?: string;
+  refs: readonly string[];
+  fetcher: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+  apiBaseUrl?: string;
+  signal: AbortSignal;
+}) => {
+  const response = await fetcher(buildAlertsApiUrl(buildAlertEvidenceLookupPath(), apiBaseUrl), {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({ alert_id: alertId, refs }),
+    signal
+  });
+  if (!response.ok) {
+    throw new Error(await readErrorDetail(response));
+  }
+  return SmartFlowAlertEvidenceBundleSchema.parse(await response.json());
+};
+
 export const useAlertEvidenceHydration = ({
   alert,
-  flowPacketById,
-  optionPrintByTraceId,
   sourceOptions
 }: {
   alert: SmartFlowAlertEvent | null | undefined;
@@ -210,30 +194,13 @@ export const useAlertEvidenceHydration = ({
   optionPrintByTraceId?: ReadonlyMap<string, OptionPrint>;
   sourceOptions?: AlertsModuleSourceOptions;
 }): AlertEvidenceHydration => {
-  const [hydratedPackets, setHydratedPackets] = useState<Map<string, FlowPacket>>(() => new Map());
-  const [hydratedPrints, setHydratedPrints] = useState<Map<string, OptionPrint>>(() => new Map());
+  const [bundle, setBundle] = useState<AlertEvidenceHydration["bundle"]>(null);
   const [status, setStatus] = useState<AlertContextStatus>(EMPTY_STATUS);
 
   useEffect(() => {
     if (!alert) {
-      setHydratedPackets(new Map());
-      setHydratedPrints(new Map());
+      setBundle(null);
       setStatus(EMPTY_STATUS);
-      return;
-    }
-
-    const packetRefs = getAlertFlowPacketRefs(alert).filter((id) => !flowPacketById?.has(id));
-    const printRefs = getAlertOptionPrintRefs(alert).filter((id) => !optionPrintByTraceId?.has(id));
-
-    if (packetRefs.length === 0 && printRefs.length === 0) {
-      setHydratedPackets(new Map());
-      setHydratedPrints(new Map());
-      setStatus({
-        traceId: alert.trace_id,
-        loading: false,
-        missingRefs: [],
-        error: null
-      });
       return;
     }
 
@@ -246,30 +213,24 @@ export const useAlertEvidenceHydration = ({
       error: null
     });
 
-    void Promise.all([
-      fetchFlowPacketsById({
-        packetIds: packetRefs,
-        fetcher,
-        apiBaseUrl: sourceOptions?.apiBaseUrl,
-        signal: abort.signal
-      }),
-      fetchOptionPrintsByTraceId({
-        traceIds: printRefs,
-        fetcher,
-        apiBaseUrl: sourceOptions?.apiBaseUrl,
-        signal: abort.signal
-      })
-    ])
-      .then(([packetResult, printResult]) => {
+    void fetchAlertEvidenceBundle({
+      alertId: alert.alert_id,
+      refs: alert.evidence_refs,
+      fetcher,
+      apiBaseUrl: sourceOptions?.apiBaseUrl,
+      signal: abort.signal
+    })
+      .then((nextBundle) => {
         if (abort.signal.aborted) {
           return;
         }
-        setHydratedPackets(packetResult.packets);
-        setHydratedPrints(printResult.prints);
+        setBundle(nextBundle);
         setStatus({
           traceId: alert.trace_id,
           loading: false,
-          missingRefs: [...packetResult.missing, ...printResult.missing],
+          missingRefs: nextBundle.items
+            .filter((item) => item.kind === "unresolved")
+            .map((item) => item.ref),
           error: null
         });
       })
@@ -277,8 +238,7 @@ export const useAlertEvidenceHydration = ({
         if (abort.signal.aborted) {
           return;
         }
-        setHydratedPackets(new Map());
-        setHydratedPrints(new Map());
+        setBundle(null);
         setStatus({
           traceId: alert.trace_id,
           loading: false,
@@ -288,43 +248,25 @@ export const useAlertEvidenceHydration = ({
       });
 
     return () => abort.abort();
-  }, [alert, flowPacketById, optionPrintByTraceId, sourceOptions]);
-
-  const packets = useMemo(() => {
-    const next = new Map<string, FlowPacket>();
-    for (const [key, value] of flowPacketById ?? []) {
-      next.set(key, value);
-    }
-    for (const [key, value] of hydratedPackets) {
-      next.set(key, value);
-    }
-    return next;
-  }, [flowPacketById, hydratedPackets]);
-
-  const prints = useMemo(() => {
-    const next = new Map<string, OptionPrint>();
-    for (const [key, value] of optionPrintByTraceId ?? []) {
-      next.set(key, value);
-    }
-    for (const [key, value] of hydratedPrints) {
-      next.set(key, value);
-    }
-    return next;
-  }, [hydratedPrints, optionPrintByTraceId]);
+  }, [alert, sourceOptions]);
 
   return useMemo(() => {
     if (!alert) {
       return {
         evidence: [],
+        bundle: null,
         flowPacket: null,
         status
       };
     }
 
+    const evidence = bundle?.items ?? [];
+    const flowPacket = evidence.find((item) => item.kind === "flow_packet")?.packet ?? null;
     return {
-      evidence: resolveAlertEvidence({ alert, packets, prints }),
-      flowPacket: resolveAlertFlowPacket(alert, packets),
+      evidence,
+      bundle,
+      flowPacket,
       status
     };
-  }, [alert, packets, prints, status]);
+  }, [alert, bundle, status]);
 };

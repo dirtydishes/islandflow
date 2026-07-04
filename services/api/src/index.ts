@@ -109,6 +109,7 @@ import {
   OptionNBBOSchema,
   type OptionPrint,
   OptionPrintSchema,
+  SmartFlowAlertEvidenceLookupRequestSchema,
   type SmartFlowAlertEvent,
   SmartFlowAlertEventSchema,
   type SmartFlowExplainabilityProjection,
@@ -149,6 +150,7 @@ import {
 } from "./options-smart-flow-detail";
 import { lookupOptionsSupport } from "./options-support";
 import { ApiRateLimiter, buildRateLimitResponse, recordRateLimitRejection } from "./rate-limit";
+import { resolveSmartFlowAlertEvidenceBundle } from "./smart-flow-alert-evidence";
 import {
   fetchRecentSmartFlowExplainability,
   fetchSmartFlowExplainabilityAfter,
@@ -1965,6 +1967,33 @@ const run = async () => {
                 detail: error instanceof Error ? error.message : String(error)
               },
               400
+            );
+          }
+        }
+
+        if (req.method === "POST" && url.pathname === "/lookup/smart-flow-alert-evidence") {
+          const startedAt = Date.now();
+          try {
+            const body = SmartFlowAlertEvidenceLookupRequestSchema.parse(await readJsonBody(req));
+            const payload = await resolveSmartFlowAlertEvidenceBundle(clickhouse, body);
+            metrics.timing("api.lookup.smart_flow_alert_evidence_ms", Date.now() - startedAt, {
+              status: "ok",
+              ref_count: String(body.refs.length)
+            });
+            return jsonResponse(payload);
+          } catch (error) {
+            metrics.timing("api.lookup.smart_flow_alert_evidence_ms", Date.now() - startedAt, {
+              status: error instanceof z.ZodError ? "invalid" : "error"
+            });
+            return jsonResponse(
+              {
+                error:
+                  error instanceof z.ZodError
+                    ? "invalid smart-flow alert evidence lookup"
+                    : "smart-flow alert evidence lookup failed",
+                detail: getErrorMessage(error)
+              },
+              error instanceof z.ZodError ? 400 : 503
             );
           }
         }

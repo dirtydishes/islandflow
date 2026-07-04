@@ -18,4 +18,6 @@ export const getAlertContextRefLabel = (ref: string): string | null =>
 export const isAlertContextRef = (ref: string): boolean => getAlertContextRefLabel(ref) !== null;
 
 export const isAlertOptionPrintRef = (ref: string): boolean =>
-  !isAlertFlowPacketRef(ref) && !isAlertContextRef(ref);
+  !isAlertFlowPacketRef(ref) &&
+  !isAlertContextRef(ref) &&
+  (!ref.includes(":") || ref.startsWith("print:"));

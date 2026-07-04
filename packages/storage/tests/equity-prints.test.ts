@@ -3,6 +3,7 @@ import {
   createClickHouseClient,
   fetchEquityPrintsAfter,
   fetchEquityPrintsBefore,
+  fetchEquityPrintsByTraceIds,
   fetchRecentEquityPrints
 } from "../src/clickhouse";
 import { equityPrintsTableDDL, EQUITY_PRINTS_TABLE } from "../src/equity-prints";
@@ -64,5 +65,31 @@ describe("equity-prints storage helpers", () => {
     expect(queries[2]).toContain("((ts, seq) > (100, 5))");
     expect(queries[2]).toContain("underlying_id IN ('NVDA')");
     expect(queries[2]).toContain("ts >= 50");
+  });
+
+  it("builds bounded equity print trace lookup queries", async () => {
+    let queryText = "";
+    const client = createClickHouseClient({ url: "http://127.0.0.1:8123" });
+    client.query = async ({ query }) => {
+      queryText = query;
+      return {
+        async json<T>() {
+          return [{ ...basePrint, trace_id: "equity:hit" }] as T;
+        }
+      };
+    };
+
+    const rows = await fetchEquityPrintsByTraceIds(client, [
+      "equity:hit",
+      "equity:hit",
+      "equity:other",
+      " "
+    ]);
+
+    expect(rows[0]?.trace_id).toBe("equity:hit");
+    expect(queryText).toContain(EQUITY_PRINTS_TABLE);
+    expect(queryText).toContain("trace_id IN ('equity:hit', 'equity:other')");
+    expect(queryText).toContain("ORDER BY trace_id ASC, ts DESC, seq DESC");
+    expect(queryText).toContain("LIMIT 1 BY trace_id LIMIT 2");
   });
 });

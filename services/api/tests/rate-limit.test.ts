@@ -39,6 +39,13 @@ describe("api rate limit route categories", () => {
       bucket: "lookup",
       routeCategory: "lookup"
     });
+    expect(classifyApiRouteForRateLimit("POST", "/lookup/smart-flow-alert-evidence")).toMatchObject(
+      {
+        exempt: false,
+        bucket: "lookup",
+        routeCategory: "lookup"
+      }
+    );
     expect(classifyApiRouteForRateLimit("GET", "/option-prints/by-trace")).toMatchObject({
       exempt: false,
       bucket: "lookup",

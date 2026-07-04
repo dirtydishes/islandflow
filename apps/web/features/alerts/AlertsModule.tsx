@@ -58,27 +58,43 @@ const getPrintNotional = (print: OptionPrint): number =>
 
 const getActionPrint = (evidence: AlertEvidenceItem[]): OptionPrint | null => {
   for (const item of evidence) {
-    if (item.kind === "print") {
+    if (item.kind === "option_print") {
       return item.print;
     }
   }
   return null;
 };
 
+const getActionUnderlying = (evidence: AlertEvidenceItem[]): string | null => {
+  for (const item of evidence) {
+    if (item.kind === "equity_quote") {
+      return item.quote.underlying_id.toUpperCase();
+    }
+    if (item.kind === "equity_print") {
+      return item.print.underlying_id.toUpperCase();
+    }
+  }
+  return null;
+};
+
+const formatEvidenceKind = (value: string): string => humanizeSmartFlowToken(value);
+
 export const getAlertDetailFocusTargets = (
   alert: SmartFlowAlertEvent,
   hydration: AlertEvidenceHydration
 ) => {
   const evidencePrints = hydration.evidence.filter(
-    (item): item is Extract<AlertEvidenceItem, { kind: "print" }> => item.kind === "print"
+    (item): item is Extract<AlertEvidenceItem, { kind: "option_print" }> =>
+      item.kind === "option_print"
   );
   const print = getActionPrint(hydration.evidence);
   const packet = hydration.flowPacket;
-  const underlying = inferAlertUnderlying(
-    alert,
-    packet,
-    evidencePrints.map((item) => item.print)
-  );
+  const underlying =
+    inferAlertUnderlying(
+      alert,
+      packet,
+      evidencePrints.map((item) => item.print)
+    ) ?? getActionUnderlying(hydration.evidence);
 
   return { packet, print, underlying };
 };
@@ -126,11 +142,33 @@ export const AlertDetail = ({
   const confidence = projection.hypothesis.scores.confidence;
   const direction = normalizeAlertDirection(alert.direction);
   const evidencePrints = hydration.evidence.filter(
-    (item): item is Extract<AlertEvidenceItem, { kind: "print" }> => item.kind === "print"
+    (item): item is Extract<AlertEvidenceItem, { kind: "option_print" }> =>
+      item.kind === "option_print"
+  );
+  const optionNbboItems = hydration.evidence.filter(
+    (item): item is Extract<AlertEvidenceItem, { kind: "option_nbbo" }> =>
+      item.kind === "option_nbbo"
+  );
+  const equityQuoteItems = hydration.evidence.filter(
+    (item): item is Extract<AlertEvidenceItem, { kind: "equity_quote" }> =>
+      item.kind === "equity_quote"
+  );
+  const equityPrintItems = hydration.evidence.filter(
+    (item): item is Extract<AlertEvidenceItem, { kind: "equity_print" }> =>
+      item.kind === "equity_print"
+  );
+  const syntheticLabelItems = hydration.evidence.filter(
+    (item): item is Extract<AlertEvidenceItem, { kind: "synthetic_label" }> =>
+      item.kind === "synthetic_label"
+  );
+  const externalContextItems = hydration.evidence.filter(
+    (item): item is Extract<AlertEvidenceItem, { kind: "external_context" }> =>
+      item.kind === "external_context"
   );
   const hiddenEvidencePrintCount = Math.max(0, evidencePrints.length - 6);
-  const unresolved = hydration.evidence.filter((item) => item.kind === "unknown");
-  const contextRefs = hydration.evidence.filter((item) => item.kind === "context");
+  const unresolved = hydration.evidence.filter(
+    (item): item is Extract<AlertEvidenceItem, { kind: "unresolved" }> => item.kind === "unresolved"
+  );
   const packetRefs = getAlertFlowPacketRefs(alert);
   const optionRefs = getAlertOptionPrintRefs(alert);
   const primaryPacketRef = getAlertPrimaryPacketRef(alert);
@@ -254,8 +292,8 @@ export const AlertDetail = ({
           </p>
         ) : (
           <div className="alerts-detail-list">
-            {evidencePrints.slice(0, 6).map(({ id, print }) => (
-              <div className="alerts-detail-row" key={id}>
+            {evidencePrints.slice(0, 6).map(({ ref, print }) => (
+              <div className="alerts-detail-row" key={ref}>
                 <div>
                   <strong>{print.option_contract_id}</strong>
                   <span>{formatAlertTime(print.ts)}</span>
@@ -271,17 +309,92 @@ export const AlertDetail = ({
         {hiddenEvidencePrintCount > 0 ? (
           <p className="drawer-empty">+{hiddenEvidencePrintCount} more evidence prints.</p>
         ) : null}
-        {contextRefs.length > 0 ? (
-          <p className="drawer-empty">Quote context refs: {contextRefs.length}</p>
+        {optionNbboItems.length > 0 ? (
+          <div className="alerts-detail-list">
+            {optionNbboItems.map(({ ref, nbbo }) => (
+              <div className="alerts-detail-row" key={ref}>
+                <div>
+                  <strong>{nbbo.option_contract_id}</strong>
+                  <span>{formatAlertTime(nbbo.ts)}</span>
+                </div>
+                <p>
+                  NBBO ${formatAlertPrice(nbbo.bid)} / ${formatAlertPrice(nbbo.ask)}, size{" "}
+                  {formatAlertSize(nbbo.bidSize)} x {formatAlertSize(nbbo.askSize)}
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        {equityQuoteItems.length > 0 ? (
+          <div className="alerts-detail-list">
+            {equityQuoteItems.map(({ ref, quote }) => (
+              <div className="alerts-detail-row" key={ref}>
+                <div>
+                  <strong>{quote.underlying_id}</strong>
+                  <span>{formatAlertTime(quote.ts)}</span>
+                </div>
+                <p>
+                  Equity quote ${formatAlertPrice(quote.bid)} / ${formatAlertPrice(quote.ask)}
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        {equityPrintItems.length > 0 ? (
+          <div className="alerts-detail-list">
+            {equityPrintItems.map(({ ref, print }) => (
+              <div className="alerts-detail-row" key={ref}>
+                <div>
+                  <strong>{print.underlying_id}</strong>
+                  <span>{formatAlertTime(print.ts)}</span>
+                </div>
+                <p>
+                  Equity print ${formatAlertPrice(print.price)} / {formatAlertSize(print.size)}x /{" "}
+                  {print.exchange}
+                  {print.offExchangeFlag ? " / off-exchange" : ""}
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        {syntheticLabelItems.length > 0 ? (
+          <div className="alerts-detail-list">
+            {syntheticLabelItems.map(({ ref, label }) => (
+              <div className="alerts-detail-row" key={ref}>
+                <div>
+                  <strong>{humanizeSmartFlowToken(label.label_type)}</strong>
+                  <span>{label.label_id}</span>
+                </div>
+                <p>Synthetic label context: {label.context.join(" / ")}</p>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        {externalContextItems.length > 0 ? (
+          <div className="alerts-detail-list">
+            {externalContextItems.map(({ ref, context }) => (
+              <div className="alerts-detail-row" key={ref}>
+                <div>
+                  <strong>{formatEvidenceKind(context.source)}</strong>
+                  <span>{context.id}</span>
+                </div>
+                <p>{ref}</p>
+              </div>
+            ))}
+          </div>
         ) : null}
         {unresolved.length > 0 ? (
-          <p className="drawer-empty">
-            Unresolved refs:{" "}
-            {unresolved
-              .slice(0, 4)
-              .map((item) => item.id)
-              .join(", ")}
-          </p>
+          <div className="alerts-detail-list">
+            {unresolved.slice(0, 6).map((item) => (
+              <div className="alerts-detail-row" key={item.ref}>
+                <div>
+                  <strong>{formatEvidenceKind(item.inferred_kind)}</strong>
+                  <span>{formatEvidenceKind(item.reason)}</span>
+                </div>
+                <p>{item.ref}</p>
+              </div>
+            ))}
+          </div>
         ) : null}
         {hydration.status.traceId === alert.trace_id && hydration.status.missingRefs.length > 0 ? (
           <p className="drawer-empty">
