@@ -20,6 +20,7 @@ import {
   buildAlertFlowPacketPath,
   buildAlertOptionPrintsPath,
   collectAlertContextEvidence,
+  fetchOptionPrintsByTraceId,
   getAlertFlowPacketRefs,
   getAlertOptionPrintRefs,
   resolveAlertEvidence,
@@ -274,6 +275,20 @@ describe("alerts module helpers", () => {
       { kind: "print", id: print.trace_id, print }
     ]);
     expect(inferAlertUnderlying(alert, packet, [print])).toBe("SPY");
+  });
+
+  it("treats missing persisted option-print context as missing refs instead of a drawer error", async () => {
+    const abort = new AbortController();
+    const result = await fetchOptionPrintsByTraceId({
+      traceIds: ["print:missing"],
+      fetcher: async () => Response.json({ error: "not found" }, { status: 404 }),
+      signal: abort.signal
+    });
+
+    expect(result).toEqual({
+      prints: new Map(),
+      missing: ["print:missing"]
+    });
   });
 
   it("normalizes canonical alert scope and filters array/history results", async () => {

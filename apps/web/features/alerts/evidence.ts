@@ -158,7 +158,7 @@ const fetchFlowPacketsById = async ({
   return { packets, missing };
 };
 
-const fetchOptionPrintsByTraceId = async ({
+export const fetchOptionPrintsByTraceId = async ({
   traceIds,
   fetcher,
   apiBaseUrl,
@@ -178,6 +178,9 @@ const fetchOptionPrintsByTraceId = async ({
     buildAlertsApiUrl(buildAlertOptionPrintsPath(traceIds), apiBaseUrl),
     { signal }
   );
+  if (response.status === 404) {
+    return { prints, missing: [...traceIds] };
+  }
   if (!response.ok) {
     throw new Error(await readErrorDetail(response));
   }

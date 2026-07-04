@@ -380,6 +380,9 @@ export class HydrationScheduler {
       url.searchParams.append("trace_id", traceId);
     }
     const response = await this.fetcher(url.toString());
+    if (response.status === 404) {
+      return [];
+    }
     if (!response.ok) {
       throw new Error(await readErrorDetail(response));
     }
