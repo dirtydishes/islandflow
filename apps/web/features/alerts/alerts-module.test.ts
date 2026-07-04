@@ -42,6 +42,7 @@ import {
   normalizeAlertsFilters,
   normalizeAlertsScope
 } from "./source";
+import { getAlertContextRefLabel, isAlertOptionPrintRef } from "./refs";
 import {
   getSmartFlowAlertRowTint,
   getSmartFlowAlertRowTintClassName,
@@ -275,6 +276,33 @@ describe("alerts module helpers", () => {
       { kind: "print", id: print.trace_id, print }
     ]);
     expect(inferAlertUnderlying(alert, packet, [print])).toBe("SPY");
+  });
+
+  it("classifies mixed alert evidence refs before option-print hydration", () => {
+    const alert = makeAlert({
+      evidence_refs: [
+        "flowpacket:SPY-2026-06-22-555-C:1",
+        "option-nbbo:SPY-2026-06-22-555-C:1",
+        "equity-quote:SPY:1000",
+        "synthetic-label:scenario:1",
+        "print:1",
+        "synthetic-options-1",
+        "alpaca-2",
+        "databento-3",
+        "ibkr-4"
+      ]
+    });
+
+    expect(getAlertOptionPrintRefs(alert)).toEqual([
+      "print:1",
+      "synthetic-options-1",
+      "alpaca-2",
+      "databento-3",
+      "ibkr-4"
+    ]);
+    expect(getAlertContextRefLabel("equity-quote:SPY:1000")).toBe("Equity quote");
+    expect(isAlertOptionPrintRef("equity-quote:SPY:1000")).toBe(false);
+    expect(getAlertPrimaryOptionRef(alert)).toBe("print:1");
   });
 
   it("treats missing persisted option-print context as missing refs instead of a drawer error", async () => {

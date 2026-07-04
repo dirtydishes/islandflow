@@ -4,6 +4,11 @@ import type { FlowPacket, OptionPrint, SmartFlowAlertEvent } from "@islandflow/t
 import { useEffect, useMemo, useState } from "react";
 
 import { buildAlertsApiUrl } from "./source";
+import {
+  getAlertContextRefLabel,
+  isAlertFlowPacketRef,
+  isAlertOptionPrintRef
+} from "./refs";
 import type {
   AlertContextBundle,
   AlertContextStatus,
@@ -60,11 +65,6 @@ export const collectAlertContextEvidence = (
 const uniqueNonEmpty = (items: readonly string[]): string[] =>
   Array.from(new Set(items.map((item) => item.trim()).filter(Boolean)));
 
-export const isAlertFlowPacketRef = (ref: string): boolean => ref.startsWith("flowpacket:");
-export const isAlertOptionNbboRef = (ref: string): boolean => ref.startsWith("option-nbbo:");
-export const isAlertOptionPrintRef = (ref: string): boolean =>
-  !isAlertFlowPacketRef(ref) && !isAlertOptionNbboRef(ref);
-
 export const getAlertFlowPacketRefs = (
   alert: Pick<SmartFlowAlertEvent, "evidence_refs">
 ): string[] => uniqueNonEmpty(alert.evidence_refs).filter(isAlertFlowPacketRef);
@@ -105,8 +105,9 @@ export const resolveAlertEvidence = ({
     if (print) {
       return { kind: "print", id, print };
     }
-    if (isAlertOptionNbboRef(id)) {
-      return { kind: "context", id, label: "Option NBBO" };
+    const contextLabel = getAlertContextRefLabel(id);
+    if (contextLabel) {
+      return { kind: "context", id, label: contextLabel };
     }
     return { kind: "unknown", id };
   });

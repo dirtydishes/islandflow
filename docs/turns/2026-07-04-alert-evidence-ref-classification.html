@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Alert Evidence Ref Classification</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #0d141b;
+        --panel-2: #111820;
+        --line: rgba(230, 237, 244, 0.14);
+        --line-strong: rgba(245, 166, 35, 0.36);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --green: #25c17a;
+        --red: #ff6b5f;
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.55 var(--sans);
+      }
+
+      main {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+
+      header {
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 920px;
+        font-size: 2rem;
+        line-height: 1.08;
+        letter-spacing: 0;
+      }
+
+      h2,
+      .label,
+      code,
+      pre {
+        font-family: var(--mono);
+      }
+
+      h2 {
+        margin-bottom: 10px;
+        color: var(--accent);
+        font-size: 0.9rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      section {
+        padding: 20px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      p {
+        max-width: 88ch;
+        color: var(--muted);
+      }
+
+      p + p {
+        margin-top: 10px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 7px;
+      }
+
+      code {
+        padding: 0.08rem 0.28rem;
+        border: 1px solid rgba(245, 166, 35, 0.18);
+        border-radius: 5px;
+        background: rgba(245, 166, 35, 0.1);
+        color: #ffe0a3;
+        font-size: 0.9em;
+      }
+
+      .subtitle {
+        margin-top: 12px;
+      }
+
+      .meta-grid,
+      .evidence-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1px;
+        margin-top: 18px;
+        border: 1px solid var(--line);
+        background: var(--line);
+      }
+
+      .meta-cell,
+      .evidence-cell {
+        min-width: 0;
+        padding: 10px 12px;
+        background: var(--panel-2);
+      }
+
+      .label {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--faint);
+        font-size: 0.66rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .ok {
+        color: var(--green);
+      }
+
+      .risk {
+        color: var(--red);
+      }
+
+      .diff-panel {
+        border: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      .diff-panel[data-rich-ready="true"] .diff-fallback {
+        display: none;
+      }
+
+      .diff-rich {
+        display: none;
+      }
+
+      .diff-panel[data-rich-ready="true"] .diff-rich {
+        display: block;
+      }
+
+      .diff-fallback {
+        max-height: 760px;
+        margin: 0;
+        overflow: auto;
+        padding: 14px;
+        color: var(--text);
+        font-size: 0.76rem;
+        line-height: 1.45;
+        white-space: pre-wrap;
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "@pierre/diffs/react": "../../node_modules/@pierre/diffs/dist/react/index.js",
+          "react": "../../node_modules/react/index.js",
+          "react-dom/client": "../../node_modules/react-dom/client.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Alert Evidence Ref Classification</h1>
+        <p class="subtitle">
+          Stopped the alerts drawer and terminal evidence helpers from treating contextual evidence
+          refs as option-print trace ids. This removes the false persisted-context miss path for
+          refs such as <code>equity-quote:*</code>.
+        </p>
+        <div class="meta-grid" aria-label="Turn metadata">
+          <div class="meta-cell"><span class="label">Branch</span>dashboard-v2</div>
+          <div class="meta-cell"><span class="label">Beads</span>islandflow-umft</div>
+          <div class="meta-cell"><span class="label">Follow-up</span>islandflow-3q0e</div>
+          <div class="meta-cell"><span class="label">Surface</span>Alerts detail drawer, terminal evidence</div>
+        </div>
+      </header>
+
+      <section>
+        <h2>Root Cause</h2>
+        <p>
+          Smart-flow alert evidence refs are mixed observation references. A single
+          <code>evidence_refs</code> list can include flow packets, option prints, option NBBO,
+          equity quotes, labels, and other external context.
+        </p>
+        <p>
+          The drawer had only a narrow split: <code>flowpacket:*</code>,
+          <code>option-nbbo:*</code>, and everything else. That made refs like
+          <code>equity-quote:SPY:1000</code> look like option-print trace ids, so the client sent
+          them to <code>/option-prints/by-trace</code>. Those refs were not option-print rows, so
+          the lookup correctly had no persisted option-print context, but the UI interpreted the
+          miss as drawer context instability.
+        </p>
+      </section>
+
+      <section>
+        <h2>Implementation</h2>
+        <ul>
+          <li>Added a shared alert ref classifier for flow packets, known context refs, and option-print refs.</li>
+          <li>Classified <code>option-nbbo:</code>, <code>equity-quote:</code>, <code>equity-print:</code>, <code>news-story:</code>, <code>event-calendar:</code>, <code>synthetic-label:</code>, and <code>external-context:</code> as context refs.</li>
+          <li>Updated alert primary-option selection and terminal smart-flow print grouping to use the same classifier.</li>
+          <li>Kept unresolved, non-context refs eligible for option-print hydration so existing provider trace ids still work.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Durable Contract Fix</h2>
+        <p>
+          The stronger fix is server-side typed evidence: either a typed alert evidence contract or
+          an alert evidence resolver endpoint that returns resolved items by kind. I filed
+          <code>islandflow-3q0e</code> for that work. This patch removes the immediate broken
+          routing path while keeping the deeper contract cleanup tracked.
+        </p>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <div class="evidence-grid">
+          <div class="evidence-cell">
+            <span class="label">Focused tests</span>
+            <span class="ok">Passed</span>
+            <code>bun test apps/web/features/alerts/alerts-module.test.ts apps/web/app/terminal.test.ts</code>
+          </div>
+          <div class="evidence-cell">
+            <span class="label">Web tests</span>
+            <span class="ok">Passed</span>
+            <code>bun test apps/web</code>
+          </div>
+          <div class="evidence-cell">
+            <span class="label">Production build</span>
+            <span class="ok">Passed</span>
+            <code>bun --cwd=apps/web run build</code>
+          </div>
+          <div class="evidence-cell">
+            <span class="label">Generated drift</span>
+            <span class="ok">Cleaned</span>
+            <code>apps/web/next-env.d.ts</code>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p>
+          This section includes a readable unified diff fallback. If browser module loading works,
+          it is replaced by <code>PatchDiff</code> from browser-side <code>@pierre/diffs/react</code>.
+        </p>
+        <div class="diff-panel" id="diff-panel">
+          <div class="diff-rich" id="diff-rich" aria-label="Rich rendered diff"></div>
+          <pre class="diff-fallback" id="diff-fallback">diff --git a/apps/web/features/alerts/refs.ts b/apps/web/features/alerts/refs.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/web/features/alerts/refs.ts
+@@
++const ALERT_CONTEXT_REF_LABELS: Array&lt;[prefix: string, label: string]&gt; = [
++  ["option-nbbo:", "Option NBBO"],
++  ["equity-quote:", "Equity quote"],
++  ["equity-print:", "Equity print"],
++  ["news-story:", "News story"],
++  ["event-calendar:", "Event context"],
++  ["synthetic-label:", "Synthetic label"],
++  ["external-context:", "External context"]
++];
++
++export const isAlertFlowPacketRef = (ref: string): boolean => ref.startsWith("flowpacket:");
++export const isAlertOptionNbboRef = (ref: string): boolean => ref.startsWith("option-nbbo:");
++export const getAlertContextRefLabel = (ref: string): string | null =>
++  ALERT_CONTEXT_REF_LABELS.find(([prefix]) => ref.startsWith(prefix))?.[1] ?? null;
++export const isAlertContextRef = (ref: string): boolean => getAlertContextRefLabel(ref) !== null;
++export const isAlertOptionPrintRef = (ref: string): boolean =>
++  !isAlertFlowPacketRef(ref) && !isAlertContextRef(ref);
+
+diff --git a/apps/web/features/alerts/evidence.ts b/apps/web/features/alerts/evidence.ts
+@@
++import {
++  getAlertContextRefLabel,
++  isAlertFlowPacketRef,
++  isAlertOptionPrintRef
++} from "./refs";
+@@
+-export const isAlertFlowPacketRef = (ref: string): boolean => ref.startsWith("flowpacket:");
+-export const isAlertOptionNbboRef = (ref: string): boolean => ref.startsWith("option-nbbo:");
+-export const isAlertOptionPrintRef = (ref: string): boolean =>
+-  !isAlertFlowPacketRef(ref) && !isAlertOptionNbboRef(ref);
+@@
+-    if (isAlertOptionNbboRef(id)) {
+-      return { kind: "context", id, label: "Option NBBO" };
++    const contextLabel = getAlertContextRefLabel(id);
++    if (contextLabel) {
++      return { kind: "context", id, label: contextLabel };
+     }
+
+diff --git a/apps/web/features/alerts/format.ts b/apps/web/features/alerts/format.ts
+@@
++import { isAlertOptionPrintRef } from "./refs";
+@@
+-const isAlertPrimaryOptionPrintRef = (ref: string): boolean =>
+-  !ref.startsWith("flowpacket:") && !ref.startsWith("option-nbbo:");
+-
+ export const getAlertPrimaryOptionRef = (
+   alert: Pick&lt;SmartFlowAlertEvent, "evidence_refs"&gt;
+-): string | null => alert.evidence_refs.find(isAlertPrimaryOptionPrintRef) ?? null;
++): string | null => alert.evidence_refs.find(isAlertOptionPrintRef) ?? null;
+
+diff --git a/apps/web/features/terminal/evidence.ts b/apps/web/features/terminal/evidence.ts
+@@
++import { isAlertOptionPrintRef } from "../alerts";
+@@
+ export const getSmartFlowOptionPrintRefs = (
+   projection: Pick&lt;SmartFlowExplainabilityProjection, "refs" | "evidence" | "hypothesis"&gt;
+-): string[] => getSmartFlowEvidenceRefs(projection).filter((ref) => !isSmartFlowPacketRef(ref));
++): string[] => getSmartFlowEvidenceRefs(projection).filter(isAlertOptionPrintRef);
+
+diff --git a/apps/web/features/alerts/alerts-module.test.ts b/apps/web/features/alerts/alerts-module.test.ts
+@@
++  it("classifies mixed alert evidence refs before option-print hydration", () => {
++    const alert = makeAlert({
++      evidence_refs: [
++        "flowpacket:SPY-2026-06-22-555-C:1",
++        "option-nbbo:SPY-2026-06-22-555-C:1",
++        "equity-quote:SPY:1000",
++        "synthetic-label:scenario:1",
++        "print:1"
++      ]
++    });
++
++    expect(getAlertOptionPrintRefs(alert)).toEqual(["print:1"]);
++    expect(getAlertContextRefLabel("equity-quote:SPY:1000")).toBe("Equity quote");
++    expect(isAlertOptionPrintRef("equity-quote:SPY:1000")).toBe(false);
++    expect(getAlertPrimaryOptionRef(alert)).toBe("print:1");
++  });
+</pre>
+        </div>
+      </section>
+    </main>
+
+    <script type="module">
+      const fallback = document.getElementById("diff-fallback");
+      const target = document.getElementById("diff-rich");
+      const panel = document.getElementById("diff-panel");
+
+      try {
+        const [{ createElement }, { createRoot }, { PatchDiff }] = await Promise.all([
+          import("react"),
+          import("react-dom/client"),
+          import("@pierre/diffs/react")
+        ]);
+        createRoot(target).render(createElement(PatchDiff, { patch: fallback.textContent || "" }));
+        panel.dataset.richReady = "true";
+      } catch (error) {
+        console.warn("Diffs rich renderer failed; keeping HTML fallback.", error);
+      }
+    </script>
+  </body>
+</html>

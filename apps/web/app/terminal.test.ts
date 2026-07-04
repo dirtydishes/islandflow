@@ -326,9 +326,15 @@ describe("alert context hydration helpers", () => {
     expect(getAlertFlowPacketRefs(alert)).toEqual(["flowpacket:1"]);
   });
 
-  it("keeps packet refs out of alert option-print evidence refs", () => {
+  it("keeps packet and context refs out of alert option-print evidence refs", () => {
     const alert = makeAlert({
-      evidence_refs: ["flowpacket:1", "option-nbbo:SPY-2026-06-22-555-C:1", "print:1", "print:2"]
+      evidence_refs: [
+        "flowpacket:1",
+        "option-nbbo:SPY-2026-06-22-555-C:1",
+        "equity-quote:SPY:1000",
+        "print:1",
+        "print:2"
+      ]
     });
 
     expect(getAlertOptionPrintRefs(alert)).toEqual(["print:1", "print:2"]);
@@ -1355,9 +1361,26 @@ describe("smart-flow explainability helpers", () => {
   });
 
   it("merges smart-flow evidence refs into inspectable packet and print groups", () => {
-    const projection = makeProjection();
+    const projection = makeProjection({
+      refs: {
+        evidence_refs: ["flowpacket:1", "equity-quote:SPY:1000", "print:1"]
+      },
+      evidence: {
+        evidence_refs: ["print:1", "option-nbbo:SPY-2026-06-22-555-C:1", "print:2"]
+      },
+      hypothesis: {
+        evidence_refs: ["flowpacket:1", "external-context:calendar:1", "print:2"]
+      }
+    });
 
-    expect(getSmartFlowEvidenceRefs(projection)).toEqual(["flowpacket:1", "print:1", "print:2"]);
+    expect(getSmartFlowEvidenceRefs(projection)).toEqual([
+      "flowpacket:1",
+      "equity-quote:SPY:1000",
+      "print:1",
+      "option-nbbo:SPY-2026-06-22-555-C:1",
+      "print:2",
+      "external-context:calendar:1"
+    ]);
     expect(getSmartFlowPacketRefs(projection)).toEqual(["flowpacket:1"]);
     expect(getSmartFlowOptionPrintRefs(projection)).toEqual(["print:1", "print:2"]);
     expect(getSmartFlowPinnedFlowKeys(projection)).toEqual(["flowpacket:1"]);
