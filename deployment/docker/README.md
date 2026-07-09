@@ -132,7 +132,7 @@ Enable websocket support on whichever host serves `/ws/*`.
 For the current live Nginx Proxy Manager setup behind `<production-app-origin>`, keep the API location regex durable in the proxy host advanced config or API, not by hand-editing generated files under `/data/nginx/proxy_host/`. The route matcher should include history:
 
 ```nginx
-^/(ws|replay|prints|joins|nbbo|quotes|dark|flow|candles|history|news|lookup|option-prints|equity-joins)(/|$)
+^/(ws|replay|prints|joins|nbbo|quotes|dark|flow|candles|history|news|lookup|option-prints|equity-joins|market-command)(/|$)
 ```
 
 ## Replay service

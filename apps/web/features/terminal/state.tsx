@@ -35,6 +35,11 @@ import {
 } from "react";
 import type { AlertContractFocusRequest, AlertEquityFocusRequest } from "../alerts";
 import type { FlowPacketFocusRequest } from "../flow-packets";
+import {
+  createMarketCommandDrawerBrowserFixture,
+  isMarketCommandDrawerBrowserFixtureEnabled
+} from "../market-command/browser-fixture";
+import { type BoardTickerFocusSource, createBoardTickerFocus } from "../market-command/focus-model";
 import { sortBySourceTime } from "./charts/markers";
 import { CANDLE_INTERVALS, LIVE_HOT_WINDOW_OPTIONS, LIVE_OPTIONS_HEAD_LIMIT } from "./config";
 import { bumpTapeDebugMetric, logTapeDebug } from "./debug";
@@ -112,6 +117,11 @@ const useLatestRef = <T,>(value: T) => {
 export const useTerminalState = () => {
   const pathname = nextNavigation.usePathname();
   const routeFeatures = useMemo(() => getRouteFeatures(pathname), [pathname]);
+  const [marketCommandDrawerFixtureEnabled, setMarketCommandDrawerFixtureEnabled] = useState(false);
+  const marketCommandDrawerFixture = useMemo(
+    () => (marketCommandDrawerFixtureEnabled ? createMarketCommandDrawerBrowserFixture() : null),
+    [marketCommandDrawerFixtureEnabled]
+  );
   const [mode, setMode] = useState<TapeMode>("live");
   const [replaySource, setReplaySource] = useState<string | null>(null);
   const [selectedAlert, setSelectedAlert] = useState<SmartFlowAlertEvent | null>(null);
@@ -288,6 +298,16 @@ export const useTerminalState = () => {
     () => buildOptionTapeQueryParams(effectiveOptionPrintFilters, optionScope),
     [effectiveOptionPrintFilters, optionScope]
   );
+
+  useEffect(() => {
+    setMarketCommandDrawerFixtureEnabled(
+      isMarketCommandDrawerBrowserFixtureEnabled({
+        pathname,
+        searchParams:
+          typeof window === "undefined" ? null : new URLSearchParams(window.location.search)
+      })
+    );
+  }, [pathname]);
 
   const options = useTape<OptionPrint>({
     mode,
@@ -509,8 +529,9 @@ export const useTerminalState = () => {
     [liveSession.inferredDark, liveSession.inferredDarkHistory]
   );
 
-  const optionsFeed = mode === "live" ? { ...liveOptions, items: seededLiveOptionsItems } : options;
-  const nbboFeed =
+  const baseOptionsFeed =
+    mode === "live" ? { ...liveOptions, items: seededLiveOptionsItems } : options;
+  const baseNbboFeed =
     mode === "live"
       ? toStaticTapeState(
           getHotChannelFeedStatus(liveSession.status, liveSession.channelHealth.nbbo),
@@ -518,30 +539,145 @@ export const useTerminalState = () => {
           nbboLastUpdate
         )
       : nbbo;
-  const equitiesFeed =
+  const baseEquitiesFeed =
     mode === "live" ? { ...liveEquities, items: seededLiveEquitiesItems } : equities;
-  const equityJoinsFeed =
+  const baseEquityJoinsFeed =
     mode === "live"
       ? toStaticTapeState(liveSession.status, liveEquityJoinItems, equityJoinsLastUpdate)
       : equityJoins;
-  const flowFeed = mode === "live" ? liveFlow : flow;
-  const newsFeed = mode === "live" ? liveNews : toStaticTapeState("disconnected", [], null);
-  const alertsFeed =
+  const baseFlowFeed = mode === "live" ? liveFlow : flow;
+  const baseNewsFeed =
+    mode === "live" ? liveNews : toStaticTapeState<NewsStory>("disconnected", [], null);
+  const baseAlertsFeed =
     mode === "live"
       ? toStaticTapeState(liveSession.status, liveAlertItems, alertsLastUpdate)
       : alerts;
-  const durableRowsFeed =
+  const baseDurableRowsFeed =
     mode === "live"
       ? toStaticTapeState(liveSession.status, liveDurableRowItems, durableRowsLastUpdate)
       : toStaticTapeState<DurableTapeRowViewModel>("disconnected", [], null);
-  const smartFlowFeed =
+  const baseSmartFlowFeed =
     mode === "live"
       ? toStaticTapeState(liveSession.status, liveSmartFlowItems, smartFlowLastUpdate)
       : smartFlow;
-  const inferredDarkFeed =
+  const baseInferredDarkFeed =
     mode === "live"
       ? toStaticTapeState(liveSession.status, liveInferredDarkItems, inferredDarkLastUpdate)
       : inferredDark;
+  const optionsFeed = marketCommandDrawerFixture
+    ? toStaticTapeState(
+        "connected",
+        marketCommandDrawerFixture.options,
+        marketCommandDrawerFixture.lastUpdate
+      )
+    : baseOptionsFeed;
+  const nbboFeed = marketCommandDrawerFixture
+    ? toStaticTapeState(
+        "connected",
+        marketCommandDrawerFixture.nbbo,
+        marketCommandDrawerFixture.lastUpdate
+      )
+    : baseNbboFeed;
+  const equitiesFeed = marketCommandDrawerFixture
+    ? toStaticTapeState(
+        "connected",
+        marketCommandDrawerFixture.equities,
+        marketCommandDrawerFixture.lastUpdate
+      )
+    : baseEquitiesFeed;
+  const equityJoinsFeed = marketCommandDrawerFixture
+    ? toStaticTapeState(
+        "connected",
+        marketCommandDrawerFixture.equityJoins,
+        marketCommandDrawerFixture.lastUpdate
+      )
+    : baseEquityJoinsFeed;
+  const flowFeed = marketCommandDrawerFixture
+    ? toStaticTapeState(
+        "connected",
+        marketCommandDrawerFixture.flow,
+        marketCommandDrawerFixture.lastUpdate
+      )
+    : baseFlowFeed;
+  const newsFeed = marketCommandDrawerFixture
+    ? toStaticTapeState(
+        "connected",
+        marketCommandDrawerFixture.news,
+        marketCommandDrawerFixture.lastUpdate
+      )
+    : baseNewsFeed;
+  const alertsFeed = marketCommandDrawerFixture
+    ? toStaticTapeState(
+        "connected",
+        marketCommandDrawerFixture.alerts,
+        marketCommandDrawerFixture.lastUpdate
+      )
+    : baseAlertsFeed;
+  const durableRowsFeed = marketCommandDrawerFixture
+    ? toStaticTapeState(
+        "connected",
+        marketCommandDrawerFixture.durableRows,
+        marketCommandDrawerFixture.lastUpdate
+      )
+    : baseDurableRowsFeed;
+  const smartFlowFeed = marketCommandDrawerFixture
+    ? toStaticTapeState(
+        "connected",
+        marketCommandDrawerFixture.smartFlow,
+        marketCommandDrawerFixture.lastUpdate
+      )
+    : baseSmartFlowFeed;
+  const inferredDarkFeed = marketCommandDrawerFixture
+    ? toStaticTapeState(
+        "connected",
+        marketCommandDrawerFixture.inferredDark,
+        marketCommandDrawerFixture.lastUpdate
+      )
+    : baseInferredDarkFeed;
+  const resolvedLiveSession = useMemo(() => {
+    if (!marketCommandDrawerFixture) {
+      return liveSession;
+    }
+
+    const lastUpdate = marketCommandDrawerFixture.lastUpdate;
+    return {
+      ...liveSession,
+      status: "connected" as const,
+      connectedAt: liveSession.connectedAt ?? lastUpdate,
+      lastUpdate,
+      channelHealth: {
+        options: { freshness_age_ms: 0, healthy: true },
+        nbbo: { freshness_age_ms: 0, healthy: true },
+        equities: { freshness_age_ms: 0, healthy: true },
+        flow: { freshness_age_ms: 0, healthy: true }
+      },
+      lastEventByChannel: {
+        ...liveSession.lastEventByChannel,
+        options: lastUpdate,
+        nbbo: lastUpdate,
+        equities: lastUpdate,
+        "equity-joins": lastUpdate,
+        flow: lastUpdate,
+        "smart-flow": lastUpdate,
+        "smart-flow-alerts": lastUpdate,
+        "durable-rows": lastUpdate,
+        news: lastUpdate,
+        "inferred-dark": lastUpdate
+      },
+      options: marketCommandDrawerFixture.options,
+      nbbo: marketCommandDrawerFixture.nbbo,
+      equities: marketCommandDrawerFixture.equities,
+      equityJoins: marketCommandDrawerFixture.equityJoins,
+      flow: marketCommandDrawerFixture.flow,
+      smartFlow: marketCommandDrawerFixture.smartFlow,
+      smartFlowAlerts: marketCommandDrawerFixture.alerts,
+      durableRows: marketCommandDrawerFixture.durableRows,
+      news: marketCommandDrawerFixture.news,
+      inferredDark: marketCommandDrawerFixture.inferredDark,
+      chartCandles: marketCommandDrawerFixture.chartCandles,
+      chartOverlay: marketCommandDrawerFixture.chartOverlay
+    };
+  }, [liveSession, marketCommandDrawerFixture]);
 
   useLayoutEffect(() => {
     optionsAnchor.apply();
@@ -979,6 +1115,13 @@ export const useTerminalState = () => {
     }
   }, [equityFocusScopeKey, equityFocusSeed, liveEquities.historyItems, liveEquities.liveItems]);
 
+  const clearBoardDetailSelections = useCallback(() => {
+    setSelectedAlert(null);
+    setSelectedNewsStory(null);
+    setSelectedDarkEvent(null);
+    setSelectedSmartFlowProjection(null);
+  }, []);
+
   const focusOptionContract = useCallback(
     (print: OptionPrint) => {
       const contractId = normalizeContractId(print.option_contract_id);
@@ -1013,6 +1156,7 @@ export const useTerminalState = () => {
         contractId,
         underlyingId
       });
+      setFilterInput(underlyingId);
     },
     [filteredOptionsRef]
   );
@@ -1082,9 +1226,35 @@ export const useTerminalState = () => {
         contractId,
         underlyingId
       });
+      setFilterInput(underlyingId);
     },
     [filteredOptionsRef, resolvedOptionPrintMapRef]
   );
+
+  const focusTickerSymbol = useCallback(
+    (symbol: string, source: BoardTickerFocusSource = "manual") => {
+      const focus = createBoardTickerFocus(symbol, source);
+      if (!focus) {
+        return;
+      }
+      setFilterInput(focus.symbol);
+      setSelectedInstrument(null);
+      setOptionFocusSeed(null);
+      setEquityFocusSeed(null);
+      clearBoardDetailSelections();
+      logTapeDebug("board ticker focused", focus);
+    },
+    [clearBoardDetailSelections]
+  );
+
+  const clearBoardFocus = useCallback(() => {
+    setFilterInput("");
+    setSelectedInstrument(null);
+    setOptionFocusSeed(null);
+    setEquityFocusSeed(null);
+    clearBoardDetailSelections();
+    logTapeDebug("board focus cleared");
+  }, [clearBoardDetailSelections]);
 
   const focusAlertContract = useCallback(
     (request: AlertContractFocusRequest) => {
@@ -1124,10 +1294,10 @@ export const useTerminalState = () => {
   }, []);
 
   const equitiesSilentWarning = shouldShowEquitiesSilentFeedWarning({
-    wsStatus: liveSession.status,
+    wsStatus: resolvedLiveSession.status,
     equitiesSubscribed: mode === "live" && equitiesLiveSubscriptionActive,
-    connectedAt: liveSession.connectedAt,
-    lastEquitiesEventAt: liveSession.lastEventByChannel.equities ?? null
+    connectedAt: resolvedLiveSession.connectedAt,
+    lastEquitiesEventAt: resolvedLiveSession.lastEventByChannel.equities ?? null
   });
   const optionsScopeActive = Boolean(
     optionScope.option_contract_id || optionScope.underlying_ids?.length
@@ -1598,7 +1768,8 @@ export const useTerminalState = () => {
     alerts: alertsFeed,
     durableRows: durableRowsFeed,
     smartFlow: smartFlowFeed,
-    liveSession,
+    liveSession: resolvedLiveSession,
+    marketCommandDrawerFixtureEnabled,
     routeFeatures,
     activeTickers,
     tickerSet,
@@ -1626,6 +1797,8 @@ export const useTerminalState = () => {
     chartSmartFlowProjections,
     chartInferredDark,
     focusOptionContract,
+    focusTickerSymbol,
+    clearBoardFocus,
     focusEquityTicker,
     focusFlowPacketRequest,
     focusAlertContract,

@@ -98,6 +98,7 @@ const terminalChartFetchStatesEqual = (
   next: TerminalChartFetchState
 ): boolean => terminalChartFetchStateSignature(current) === terminalChartFetchStateSignature(next);
 
+const TERMINAL_CHART_CANDLE_LIMIT = 300;
 const MAX_DARK_MARKERS = 120;
 const MAX_TOTAL_MARKERS = 320;
 const OFF_EXCHANGE_OVERLAY_COLOR = "rgba(77, 163, 255, 0.58)";
@@ -123,6 +124,19 @@ const sortByTsSeq = <T extends { ts?: number; source_ts?: number; seq: number }>
     }
     return a.seq - b.seq;
   });
+
+export const mergeTerminalChartCandles = (
+  baseCandles: readonly EquityCandle[],
+  liveCandles: readonly EquityCandle[],
+  limit = TERMINAL_CHART_CANDLE_LIMIT
+): EquityCandle[] => {
+  const byBucket = new Map<string, EquityCandle>();
+  for (const candle of sortByTsSeq([...baseCandles, ...liveCandles])) {
+    byBucket.set(`${candle.underlying_id}:${candle.interval_ms}:${candle.ts}`, candle);
+  }
+  const merged = sortByTsSeq([...byBucket.values()]);
+  return limit > 0 && merged.length > limit ? merged.slice(merged.length - limit) : merged;
+};
 
 const matchesChartTicker = (value: string | null | undefined, chartTicker: string): boolean =>
   value ? value.toUpperCase() === chartTicker.toUpperCase() : false;
@@ -481,10 +495,16 @@ type TerminalMarketChartSectionProps = {
   state: TerminalState;
   title?: string;
   className?: string;
+  onMarkerSelect?: (payload: TerminalMarketChartMarkerPayload) => void;
 };
 
 export const TerminalMarketChartSection = memo(
-  ({ state, title = "Chart Context", className }: TerminalMarketChartSectionProps) => {
+  ({
+    state,
+    title = "Chart Context",
+    className,
+    onMarkerSelect
+  }: TerminalMarketChartSectionProps) => {
     const settingsStorage = useMemo(() => getChartSettingsStorage(), []);
     const settingsCapabilities = useMemo(
       () => ({
@@ -572,6 +592,36 @@ export const TerminalMarketChartSection = memo(
     );
 
     useEffect(() => {
+      if (!state.marketCommandDrawerFixtureEnabled) {
+        return;
+      }
+      const candles = sortByTsSeq(state.liveSession.chartCandles).filter(
+        (candle) =>
+          matchesChartTicker(candle.underlying_id, state.chartTicker) &&
+          candle.interval_ms === normalizedChartIntervalMs
+      );
+      const last = candles.at(-1);
+      setOverlayRangePrints([]);
+      setFetchStateIfChanged({
+        candles,
+        status: "connected",
+        lastUpdate: last ? (last.ingest_ts ?? last.ts) : state.liveSession.lastUpdate,
+        error: null
+      });
+    }, [
+      state.marketCommandDrawerFixtureEnabled,
+      state.liveSession.chartCandles,
+      state.liveSession.lastUpdate,
+      state.chartTicker,
+      normalizedChartIntervalMs,
+      setFetchStateIfChanged
+    ]);
+
+    useEffect(() => {
+      if (state.marketCommandDrawerFixtureEnabled) {
+        return;
+      }
+
       let active = true;
       const abort = new AbortController();
       setFetchStateIfChanged({
@@ -587,7 +637,7 @@ export const TerminalMarketChartSection = memo(
           const url = new URL(buildApiUrl("/candles/equities"));
           url.searchParams.set("underlying_id", state.chartTicker);
           url.searchParams.set("interval_ms", normalizedChartIntervalMs.toString());
-          url.searchParams.set("limit", "300");
+          url.searchParams.set("limit", String(TERMINAL_CHART_CANDLE_LIMIT));
           url.searchParams.set("cache", "1");
           if (state.mode === "replay" && replayEndTs !== null) {
             url.searchParams.set("end_ts", replayEndTs.toString());
@@ -631,6 +681,7 @@ export const TerminalMarketChartSection = memo(
         abort.abort();
       };
     }, [
+      state.marketCommandDrawerFixtureEnabled,
       state.chartTicker,
       state.mode,
       normalizedChartIntervalMs,
@@ -639,30 +690,44 @@ export const TerminalMarketChartSection = memo(
     ]);
 
     useEffect(() => {
-      if (state.mode !== "live") {
+      if (state.mode !== "live" || state.marketCommandDrawerFixtureEnabled) {
         return;
       }
-      const candles = sortByTsSeq(state.liveSession.chartCandles);
-      if (candles.length === 0) {
+      const liveCandles = sortByTsSeq(state.liveSession.chartCandles).filter(
+        (candle) =>
+          matchesChartTicker(candle.underlying_id, state.chartTicker) &&
+          candle.interval_ms === normalizedChartIntervalMs
+      );
+      if (liveCandles.length === 0) {
         return;
       }
-      const last = candles.at(-1);
-      setFetchStateIfChanged({
-        candles,
-        status: state.liveSession.status,
-        lastUpdate: last ? (last.ingest_ts ?? last.ts) : state.liveSession.lastUpdate,
-        error: null
+      const last = liveCandles.at(-1);
+      setFetchState((current) => {
+        const candles = mergeTerminalChartCandles(current.candles, liveCandles);
+        const next = {
+          candles,
+          status: state.liveSession.status,
+          lastUpdate: last ? (last.ingest_ts ?? last.ts) : state.liveSession.lastUpdate,
+          error: null
+        };
+        return terminalChartFetchStatesEqual(current, next) ? current : next;
       });
     }, [
+      state.marketCommandDrawerFixtureEnabled,
       state.liveSession.chartCandles,
       state.liveSession.lastUpdate,
       state.liveSession.status,
+      state.chartTicker,
       state.mode,
-      setFetchStateIfChanged
+      normalizedChartIntervalMs
     ]);
 
     useEffect(() => {
       overlayAbortRef.current?.abort();
+      if (state.marketCommandDrawerFixtureEnabled) {
+        setOverlayRangePrints([]);
+        return;
+      }
       if (!visibleRangeMs || !settings.display.showOverlays) {
         setOverlayRangePrints([]);
         return;
@@ -704,7 +769,12 @@ export const TerminalMarketChartSection = memo(
         window.clearTimeout(timer);
         abort.abort();
       };
-    }, [settings.display.showOverlays, state.chartTicker, visibleRangeMs]);
+    }, [
+      settings.display.showOverlays,
+      state.chartTicker,
+      state.marketCommandDrawerFixtureEnabled,
+      visibleRangeMs
+    ]);
 
     const normalizedCandles = useMemo(
       () => normalizeTerminalChartCandles(fetchState.candles),
@@ -828,13 +898,17 @@ export const TerminalMarketChartSection = memo(
         if (!payload) {
           return;
         }
+        if (onMarkerSelect) {
+          onMarkerSelect(payload);
+          return;
+        }
         if (payload.kind === "smart-flow") {
           state.handleSmartFlowMarkerClick(payload.projection);
         } else {
           state.handleDarkMarkerClick(payload.event);
         }
       },
-      [state]
+      [onMarkerSelect, state]
     );
 
     return (

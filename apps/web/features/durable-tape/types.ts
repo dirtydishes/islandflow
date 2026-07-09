@@ -166,6 +166,7 @@ export type DurableTapeProps<TItem, TScope = unknown, TFilters = unknown> = {
   columnOverrides?: DurableTapeColumnOverride<TItem>[];
   getRowKey: (item: TItem) => string;
   getCursor: (item: TItem) => DurableTapeCursor;
+  getSortCursor?: (item: TItem) => DurableTapeCursor;
   source: DurableTapeSource<TItem, TScope, TFilters>;
   renderRow: DurableTapeRowRenderer<TItem>;
   renderHover?: DurableTapeHoverRenderer<TItem>;

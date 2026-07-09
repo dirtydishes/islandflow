@@ -12,6 +12,16 @@ export type NewsWireFilters = {
   updatedOnly?: boolean;
 };
 
+export type NewsWireRelevanceSummary = {
+  focused: number;
+  market: number;
+};
+
+export type NewsWireRelevanceCursor = {
+  ts: number;
+  seq: number;
+};
+
 export type NewsWireFacet = {
   value: string;
   count: number;
@@ -26,6 +36,8 @@ export type NewsWireFacets = {
 };
 
 const normalize = (value: string): string => value.trim().toUpperCase();
+
+const NEWS_WIRE_FOCUS_SORT_BOOST_MS = 1_000_000_000_000_000;
 
 const toSet = (values: readonly string[] | undefined): Set<string> =>
   new Set((values ?? []).map(normalize).filter(Boolean));
@@ -50,6 +62,69 @@ export const matchesNewsWireScope = (
     return true;
   }
   return story.resolved_symbols.some((symbol) => scope.has(normalize(symbol)));
+};
+
+export const isNewsStoryFocusedForScope = (
+  story: NewsStory,
+  scopeSymbols: readonly string[] | undefined
+): boolean => hasActiveSet(scopeSymbols) && matchesNewsWireScope(story, scopeSymbols);
+
+export const summarizeNewsWireRelevance = (
+  stories: readonly NewsStory[],
+  scopeSymbols: readonly string[] | undefined
+): NewsWireRelevanceSummary => {
+  if (!hasActiveSet(scopeSymbols)) {
+    return { focused: 0, market: stories.length };
+  }
+
+  let focused = 0;
+  for (const story of stories) {
+    if (isNewsStoryFocusedForScope(story, scopeSymbols)) {
+      focused += 1;
+    }
+  }
+
+  return {
+    focused,
+    market: stories.length - focused
+  };
+};
+
+export const orderNewsStoriesByScopeRelevance = (
+  stories: readonly NewsStory[],
+  scopeSymbols: readonly string[] | undefined
+): NewsStory[] => {
+  if (!hasActiveSet(scopeSymbols)) {
+    return [...stories];
+  }
+
+  const focused: NewsStory[] = [];
+  const market: NewsStory[] = [];
+  for (const story of stories) {
+    if (isNewsStoryFocusedForScope(story, scopeSymbols)) {
+      focused.push(story);
+    } else {
+      market.push(story);
+    }
+  }
+
+  return [...focused, ...market];
+};
+
+export const getNewsWireRelevanceSortCursor = <TStory extends NewsStory>(
+  story: TStory,
+  scopeSymbols: readonly string[] | undefined,
+  getCursor: (story: TStory) => NewsWireRelevanceCursor
+): NewsWireRelevanceCursor => {
+  const cursor = getCursor(story);
+  if (!isNewsStoryFocusedForScope(story, scopeSymbols)) {
+    return cursor;
+  }
+
+  return {
+    ts: Math.min(Number.MAX_SAFE_INTEGER, cursor.ts + NEWS_WIRE_FOCUS_SORT_BOOST_MS),
+    seq: cursor.seq
+  };
 };
 
 export const filterNewsStories = (

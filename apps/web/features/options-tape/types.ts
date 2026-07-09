@@ -152,6 +152,7 @@ export type OptionsTapeProps = {
   nbboByContractId?: ReadonlyMap<string, OptionNBBO>;
   nbboByTraceId?: ReadonlyMap<string, OptionNBBO | null>;
   supportHydrationEnabled?: boolean;
+  smartFlowDetailMode?: "inline" | "disabled";
   focusedContractId?: string | null;
   onContractFocus?: (print: OptionPrint) => void;
   onPacketFocus?: OnPacketFocus;

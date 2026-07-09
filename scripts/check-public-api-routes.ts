@@ -33,8 +33,18 @@ const routeChecks: RouteCheck[] = [
       body: JSON.stringify({ trace_ids: [], nbbo_context: [] })
     }
   },
+  {
+    path: "/lookup/smart-flow-alert-evidence",
+    expectJson: true,
+    init: {
+      method: "POST",
+      headers: { accept: "application/json", "content-type": "application/json" },
+      body: JSON.stringify({ refs: [] })
+    }
+  },
   { path: "/option-prints/by-trace?trace_id=public-route-check", expectJson: true },
-  { path: "/equity-joins/by-id?id=public-route-check", expectJson: true }
+  { path: "/equity-joins/by-id?id=public-route-check", expectJson: true },
+  { path: "/market-command/tickers?watchlist=SPY,NVDA,AAPL&limit=1", expectJson: true }
 ];
 
 const appUrl = process.env.DEPLOY_PUBLIC_APP_URL?.trim() || process.argv[2]?.trim();

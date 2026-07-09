@@ -340,12 +340,14 @@ export const useMarketChartController = ({
   }, [markers, settings.display.showMarkers]);
 
   useEffect(() => {
+    const chartOptions = createMarketChartOptions(theme, settings.display.showGrid);
+    const timeScaleOptions = chartOptions.timeScale ?? {};
     chartRef.current?.applyOptions({
-      ...createMarketChartOptions(theme, settings.display.showGrid),
+      ...chartOptions,
       timeScale: {
-        borderColor: theme.tokens.border,
-        timeVisible: true,
-        secondsVisible: intervalMs < 60_000
+        ...timeScaleOptions,
+        secondsVisible: intervalMs < 60_000,
+        tickMarkFormatter: timeScaleOptions.tickMarkFormatter
       }
     });
     priceSeriesRef.current?.applyOptions(

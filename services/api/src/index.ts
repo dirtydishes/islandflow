@@ -32,7 +32,7 @@ import {
 } from "@islandflow/bus";
 import { readEnv } from "@islandflow/config";
 import { createLogger, createMetrics } from "@islandflow/observability";
-import type { EquityPrintQueryFilters } from "@islandflow/storage";
+import type { ClickHouseClient, EquityPrintQueryFilters } from "@islandflow/storage";
 import {
   createClickHouseClient,
   ensureEquityCandlesTable,
@@ -67,8 +67,8 @@ import {
   fetchOptionNBBOBefore,
   fetchOptionPrintsAfter,
   fetchOptionPrintsBefore,
-  fetchOptionPrintsForFlowPacketBefore,
   fetchOptionPrintsByTraceIds,
+  fetchOptionPrintsForFlowPacketBefore,
   fetchRecentEquityPrintJoins,
   fetchRecentEquityPrints,
   fetchRecentEquityQuotes,
@@ -87,10 +87,12 @@ import {
 import {
   Cursor,
   EquityCandleSchema,
+  type EquityPrint,
   EquityPrintJoinSchema,
   EquityPrintSchema,
   EquityQuoteSchema,
   FeedSnapshot,
+  type FlowPacket,
   FlowPacketSchema,
   getSubscriptionKey,
   InferredDarkEventSchema,
@@ -101,12 +103,16 @@ import {
   LiveSubscriptionSchema,
   matchesFlowPacketFilters,
   matchesOptionPrintFilters,
+  type NewsStory,
   NewsStorySchema,
   normalizeSyntheticControlState,
   OptionNBBOSchema,
   type OptionPrint,
   OptionPrintSchema,
+  SmartFlowAlertEvidenceLookupRequestSchema,
+  type SmartFlowAlertEvent,
   SmartFlowAlertEventSchema,
+  type SmartFlowExplainabilityProjection,
   SmartFlowExplainabilityProjectionSchema,
   type SyntheticControlState,
   SyntheticControlStateSchema
@@ -119,12 +125,20 @@ import {
   parseCorsAllowedOrigins,
   withCorsHeaders
 } from "./cors";
+import { booleanEnvSchema } from "./env";
 import {
   HOT_LIVE_REDIS_KEYS,
   LiveStateManager,
   resolveLiveStateConfig,
   shouldFanoutLiveEvent
 } from "./live";
+import {
+  buildMarketCommandTickerRail,
+  type MarketCommandTickerRailData,
+  MarketCommandTickerValidationError,
+  parseMarketCommandTickerRailParams,
+  resolveMarketCommandRegularSession
+} from "./market-command-tickers";
 import {
   getOptionPrintTraceLookupErrorStatus,
   parseOptionPrintTraceLookupParams
@@ -136,6 +150,7 @@ import {
 } from "./options-smart-flow-detail";
 import { lookupOptionsSupport } from "./options-support";
 import { ApiRateLimiter, buildRateLimitResponse, recordRateLimitRejection } from "./rate-limit";
+import { resolveSmartFlowAlertEvidenceBundle } from "./smart-flow-alert-evidence";
 import {
   fetchRecentSmartFlowExplainability,
   fetchSmartFlowExplainabilityAfter,
@@ -146,6 +161,7 @@ import {
   fetchRecentSmartFlowAlertEvents,
   fetchSmartFlowAlertEventsAfter,
   fetchSmartFlowAlertEventsBefore,
+  shouldSurfaceSmartFlowAlert,
   smartFlowAlertCursor
 } from "./smart-flow-alerts";
 import { SMART_FLOW_SUPPORT_MAX_TRACE_IDS } from "./smart-flow-support-resolver";
@@ -174,40 +190,14 @@ const envSchema = z.object({
   EQUITIES_INGEST_ADAPTER: z.string().min(1).default("synthetic"),
   REST_DEFAULT_LIMIT: z.coerce.number().int().positive().default(200),
   API_DELIVER_POLICY: DeliverPolicySchema.default("new"),
-  API_CONSUMER_RESET: z.coerce.boolean().default(false),
+  API_CONSUMER_RESET: booleanEnvSchema.default(false),
   LIVE_LAG_WARN_MS: z.coerce.number().int().positive().default(120_000),
-  API_RATE_LIMIT_ENABLED: z
-    .preprocess((value) => {
-      if (typeof value === "string") {
-        const normalized = value.trim().toLowerCase();
-        if (["1", "true", "yes", "on"].includes(normalized)) {
-          return true;
-        }
-        if (["0", "false", "no", "off"].includes(normalized)) {
-          return false;
-        }
-      }
-      return value;
-    }, z.boolean())
-    .default(false),
+  API_RATE_LIMIT_ENABLED: booleanEnvSchema.default(false),
   API_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
   API_RATE_LIMIT_REST_MAX: z.coerce.number().int().positive().default(1200),
   API_RATE_LIMIT_LOOKUP_MAX: z.coerce.number().int().positive().default(120),
   API_RATE_LIMIT_WS_MAX: z.coerce.number().int().positive().default(120),
-  SYNTHETIC_CONTROL_ENABLED: z
-    .preprocess((value) => {
-      if (typeof value === "string") {
-        const normalized = value.trim().toLowerCase();
-        if (["1", "true", "yes", "on"].includes(normalized)) {
-          return true;
-        }
-        if (["0", "false", "no", "off"].includes(normalized)) {
-          return false;
-        }
-      }
-      return value;
-    }, z.boolean())
-    .default(false),
+  SYNTHETIC_CONTROL_ENABLED: booleanEnvSchema.default(false),
   SYNTHETIC_ADMIN_TOKEN: z.string().default(""),
   API_CORS_ORIGINS: z.string().default(DEFAULT_API_CORS_ORIGINS)
 });
@@ -400,6 +390,150 @@ const parseLimit = (value: string | null): number => {
   return limitSchema.parse(value);
 };
 
+const MARKET_COMMAND_LIVE_LIMIT = 1000;
+const MARKET_COMMAND_STORAGE_LIMIT = 1000;
+
+const marketCommandStorageErrorReason = (label: string, error: unknown): string =>
+  `${label} unavailable: ${getErrorMessage(error)}`;
+
+const getMarketCommandLiveData = (liveState: LiveStateManager): MarketCommandTickerRailData => ({
+  alerts: liveState.getCachedGenericItems(
+    "smart-flow-alerts",
+    MARKET_COMMAND_LIVE_LIMIT
+  ) as SmartFlowAlertEvent[],
+  smartFlowProjections: liveState.getCachedGenericItems(
+    "smart-flow",
+    MARKET_COMMAND_LIVE_LIMIT
+  ) as SmartFlowExplainabilityProjection[],
+  flowPackets: liveState.getCachedGenericItems("flow", MARKET_COMMAND_LIVE_LIMIT) as FlowPacket[],
+  optionPrints: liveState.getCachedGenericItems(
+    "options",
+    MARKET_COMMAND_LIVE_LIMIT
+  ) as OptionPrint[],
+  equityPrints: liveState.getCachedGenericItems(
+    "equities",
+    MARKET_COMMAND_LIVE_LIMIT
+  ) as EquityPrint[],
+  news: liveState.getCachedGenericItems("news", MARKET_COMMAND_LIVE_LIMIT) as NewsStory[]
+});
+
+const loadMarketCommandStorageData = async (
+  clickhouse: ClickHouseClient,
+  session: { start_ts: number; end_ts: number }
+): Promise<{ data: MarketCommandTickerRailData; degradedReasons: string[] }> => {
+  const beforeTs = Math.min(Number.MAX_SAFE_INTEGER, session.end_ts + 1);
+  const beforeSeq = Number.MAX_SAFE_INTEGER;
+  const reads = {
+    alerts: fetchSmartFlowAlertEventsBefore(
+      clickhouse,
+      beforeTs,
+      beforeSeq,
+      MARKET_COMMAND_STORAGE_LIMIT
+    ),
+    smartFlowProjections: fetchSmartFlowExplainabilityBefore(
+      clickhouse,
+      beforeTs,
+      beforeSeq,
+      MARKET_COMMAND_STORAGE_LIMIT
+    ),
+    flowPackets: fetchFlowPacketsBefore(
+      clickhouse,
+      beforeTs,
+      beforeSeq,
+      MARKET_COMMAND_STORAGE_LIMIT
+    ),
+    optionPrints: fetchOptionPrintsBefore(
+      clickhouse,
+      beforeTs,
+      beforeSeq,
+      MARKET_COMMAND_STORAGE_LIMIT,
+      undefined,
+      {
+        view: "signal",
+        sinceTs: session.start_ts
+      }
+    ),
+    equityPrints: fetchEquityPrintsBefore(
+      clickhouse,
+      beforeTs,
+      beforeSeq,
+      MARKET_COMMAND_STORAGE_LIMIT,
+      {
+        sinceTs: session.start_ts
+      }
+    ),
+    news: fetchNewsBefore(clickhouse, beforeTs, beforeSeq, MARKET_COMMAND_STORAGE_LIMIT)
+  } as const;
+
+  const [alerts, smartFlowProjections, flowPackets, optionPrints, equityPrints, news] =
+    await Promise.allSettled([
+      reads.alerts,
+      reads.smartFlowProjections,
+      reads.flowPackets,
+      reads.optionPrints,
+      reads.equityPrints,
+      reads.news
+    ]);
+
+  const data: MarketCommandTickerRailData = {};
+  const degradedReasons: string[] = [];
+  const collect = <K extends keyof MarketCommandTickerRailData>(
+    result: PromiseSettledResult<NonNullable<MarketCommandTickerRailData[K]>>,
+    key: K,
+    label: string
+  ) => {
+    if (result.status === "fulfilled") {
+      data[key] = result.value;
+    } else {
+      degradedReasons.push(marketCommandStorageErrorReason(label, result.reason));
+    }
+  };
+
+  collect(alerts, "alerts", "smart-flow alerts");
+  collect(smartFlowProjections, "smartFlowProjections", "smart-flow projections");
+  collect(flowPackets, "flowPackets", "flow packets");
+  collect(optionPrints, "optionPrints", "option prints");
+  collect(equityPrints, "equityPrints", "equity prints");
+  collect(news, "news", "news");
+
+  return { data, degradedReasons };
+};
+
+const mergeMarketCommandData = (
+  liveData: MarketCommandTickerRailData,
+  storageData: MarketCommandTickerRailData
+): MarketCommandTickerRailData => ({
+  alerts: [...(liveData.alerts ?? []), ...(storageData.alerts ?? [])],
+  smartFlowProjections: [
+    ...(liveData.smartFlowProjections ?? []),
+    ...(storageData.smartFlowProjections ?? [])
+  ],
+  flowPackets: [...(liveData.flowPackets ?? []), ...(storageData.flowPackets ?? [])],
+  optionPrints: [...(liveData.optionPrints ?? []), ...(storageData.optionPrints ?? [])],
+  equityPrints: [...(liveData.equityPrints ?? []), ...(storageData.equityPrints ?? [])],
+  news: [...(liveData.news ?? []), ...(storageData.news ?? [])]
+});
+
+const buildMarketCommandTickerRailForRequest = async (
+  url: URL,
+  liveState: LiveStateManager,
+  clickhouse: ClickHouseClient,
+  nowTs = Date.now()
+) => {
+  const params = parseMarketCommandTickerRailParams(url);
+  const session = resolveMarketCommandRegularSession(nowTs);
+  const liveData = getMarketCommandLiveData(liveState);
+  const storage = await loadMarketCommandStorageData(clickhouse, session);
+
+  return buildMarketCommandTickerRail({
+    params,
+    session,
+    nowTs,
+    data: mergeMarketCommandData(liveData, storage.data),
+    degradedReasons: storage.degradedReasons
+  });
+};
+
 const applyDeliverPolicy = (
   opts: ReturnType<typeof buildDurableConsumer>,
   policy: z.infer<typeof DeliverPolicySchema>
@@ -574,6 +708,12 @@ const sendLiveMessage = (socket: LiveSocket, payload: LiveServerMessage): void =
     });
   }
 };
+
+const yieldToEventLoop = (): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+const LIVE_SEND_YIELD_INTERVAL = 25;
 
 const subscribeSocket = (socket: LiveSocket, subscription: LiveSubscription): void => {
   const key = getSubscriptionKey(subscription);
@@ -1021,6 +1161,10 @@ const run = async () => {
   ) => {
     const watermark = await liveState.ingest(ingestChannel, item);
 
+    if (!watermark) {
+      return;
+    }
+
     if (!shouldFanoutLiveEvent(ingestChannel, item)) {
       return;
     }
@@ -1040,6 +1184,7 @@ const run = async () => {
         continue;
       }
       matchedDurableRowSubscriptions += 1;
+      let durableSendsSinceYield = 0;
       for (const row of rows) {
         for (const socket of sockets) {
           sendLiveMessage(socket, {
@@ -1048,6 +1193,11 @@ const run = async () => {
             item: row,
             watermark: { ts: row.ts, seq: row.seq }
           });
+          durableSendsSinceYield += 1;
+          if (durableSendsSinceYield >= LIVE_SEND_YIELD_INTERVAL) {
+            durableSendsSinceYield = 0;
+            await yieldToEventLoop();
+          }
         }
       }
     }
@@ -1111,6 +1261,7 @@ const run = async () => {
 
       matchedSubscriptions += 1;
 
+      let sendsSinceYield = 0;
       for (const socket of sockets) {
         sendLiveMessage(socket, {
           op: "event",
@@ -1118,6 +1269,11 @@ const run = async () => {
           item,
           watermark
         });
+        sendsSinceYield += 1;
+        if (sendsSinceYield >= LIVE_SEND_YIELD_INTERVAL) {
+          sendsSinceYield = 0;
+          await yieldToEventLoop();
+        }
       }
     }
 
@@ -1129,6 +1285,9 @@ const run = async () => {
         "api.live.durable_row_subscription_match_count",
         matchedDurableRowSubscriptions
       );
+    }
+    if (matchedSubscriptions > 0 || matchedDurableRowSubscriptions > 0) {
+      await yieldToEventLoop();
     }
   };
 
@@ -1296,6 +1455,10 @@ const run = async () => {
     for await (const msg of smartFlowAlertSubscription.messages) {
       try {
         const payload = SmartFlowAlertEventSchema.parse(smartFlowAlertSubscription.decode(msg));
+        if (!shouldSurfaceSmartFlowAlert(payload)) {
+          msg.ack();
+          continue;
+        }
         broadcast(smartFlowAlertSockets, { type: "smart-flow-alert", payload });
         await fanoutLive({ channel: "smart-flow-alerts" }, payload, "smart-flow-alerts");
         msg.ack();
@@ -1451,6 +1614,38 @@ const run = async () => {
                 detail: getErrorMessage(error)
               },
               400
+            );
+          }
+        }
+
+        if (req.method === "GET" && url.pathname === "/market-command/tickers") {
+          const startedAt = Date.now();
+          try {
+            const payload = await buildMarketCommandTickerRailForRequest(
+              url,
+              liveState,
+              clickhouse
+            );
+            metrics.timing("api.market_command.tickers_ms", Date.now() - startedAt, {
+              status: payload.degraded ? "degraded" : "ok",
+              pinned_count: String(payload.pinned.length),
+              important_count: String(payload.important.length)
+            });
+            return jsonResponse(payload);
+          } catch (error) {
+            const status = error instanceof MarketCommandTickerValidationError ? 400 : 503;
+            metrics.timing("api.market_command.tickers_ms", Date.now() - startedAt, {
+              status: status === 400 ? "invalid" : "error"
+            });
+            return jsonResponse(
+              {
+                error:
+                  status === 400
+                    ? "invalid market-command ticker query"
+                    : "market-command ticker ranking failed",
+                detail: getErrorMessage(error)
+              },
+              status
             );
           }
         }
@@ -1776,6 +1971,33 @@ const run = async () => {
           }
         }
 
+        if (req.method === "POST" && url.pathname === "/lookup/smart-flow-alert-evidence") {
+          const startedAt = Date.now();
+          try {
+            const body = SmartFlowAlertEvidenceLookupRequestSchema.parse(await readJsonBody(req));
+            const payload = await resolveSmartFlowAlertEvidenceBundle(clickhouse, body);
+            metrics.timing("api.lookup.smart_flow_alert_evidence_ms", Date.now() - startedAt, {
+              status: "ok",
+              ref_count: String(body.refs.length)
+            });
+            return jsonResponse(payload);
+          } catch (error) {
+            metrics.timing("api.lookup.smart_flow_alert_evidence_ms", Date.now() - startedAt, {
+              status: error instanceof z.ZodError ? "invalid" : "error"
+            });
+            return jsonResponse(
+              {
+                error:
+                  error instanceof z.ZodError
+                    ? "invalid smart-flow alert evidence lookup"
+                    : "smart-flow alert evidence lookup failed",
+                detail: getErrorMessage(error)
+              },
+              error instanceof z.ZodError ? 400 : 503
+            );
+          }
+        }
+
         if (req.method === "GET" && url.pathname === "/options/smart-flow-detail") {
           const startedAt = Date.now();
           try {
@@ -2087,7 +2309,11 @@ const run = async () => {
             return;
           }
 
-          for (const subscription of parsed.subscriptions) {
+          for (let index = 0; index < parsed.subscriptions.length; index += 1) {
+            const subscription = parsed.subscriptions[index];
+            if (!subscription) {
+              continue;
+            }
             LiveSubscriptionSchema.parse(subscription);
             if (parsed.op === "unsubscribe") {
               unsubscribeSocket(socket, subscription);
@@ -2097,6 +2323,9 @@ const run = async () => {
             subscribeSocket(socket, subscription);
             const snapshot = await liveState.getSnapshot(subscription);
             sendLiveMessage(socket, { op: "snapshot", snapshot });
+            if (index < parsed.subscriptions.length - 1) {
+              await yieldToEventLoop();
+            }
           }
         } catch (error) {
           sendLiveMessage(socket, {

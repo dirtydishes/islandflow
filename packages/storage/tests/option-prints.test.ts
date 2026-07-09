@@ -117,6 +117,8 @@ describe("option-prints storage helpers", () => {
     expect(queries[1]?.query).not.toContain("signal_pass = 1");
     expect(queries[1]?.query).toContain("ORDER BY ts DESC, seq DESC LIMIT 20");
     expect(queries[2]?.query).toContain("trace_id IN ('trace-1', 'trace-2')");
+    expect(queries[2]?.query).toContain("ORDER BY trace_id ASC, ts DESC, seq DESC");
+    expect(queries[2]?.query).toContain("LIMIT 1 BY trace_id");
     expect(queries[2]?.settings?.max_execution_time).toBe(2);
     expect(queries[2]?.timeoutMs).toBe(OPTION_PRINT_QUERY_TIMEOUT_MS);
     expect(rows[0].execution_nbbo_side).toBe("A");
@@ -176,7 +178,7 @@ describe("option-prints storage helpers", () => {
     expect(queries).toHaveLength(1);
     expect(queries[0]?.query).toContain("trace_id IN ('trace-hit', 'trace-0'");
     expect(queries[0]?.query).not.toContain(`trace-${OPTION_PRINT_TRACE_LOOKUP_MAX_IDS}`);
-    expect(queries[0]?.query).toContain(`LIMIT ${OPTION_PRINT_TRACE_LOOKUP_MAX_IDS}`);
+    expect(queries[0]?.query).toContain("LIMIT 1 BY trace_id");
     expect(queries[0]?.settings?.max_execution_time).toBe(2);
     expect(queries[0]?.timeoutMs).toBe(OPTION_PRINT_QUERY_TIMEOUT_MS);
   });

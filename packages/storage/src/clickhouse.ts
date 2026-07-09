@@ -1896,6 +1896,102 @@ export const fetchFlowPacketsByIds = async (
   return FlowPacketSchema.array().parse(records.map(fromFlowPacketRecord));
 };
 
+export type OptionNbboExactLookup = {
+  option_contract_id: string;
+  ts: number;
+};
+
+export type EquityQuoteExactLookup = {
+  underlying_id: string;
+  ts: number;
+};
+
+const exactLookupKey = (left: string, ts: number): string => `${left}\u0000${ts}`;
+
+const normalizeExactOptionNbboLookups = (
+  inputs: OptionNbboExactLookup[]
+): OptionNbboExactLookup[] => {
+  const seen = new Set<string>();
+  const normalized: OptionNbboExactLookup[] = [];
+  for (const input of inputs) {
+    const optionContractId = input.option_contract_id.trim();
+    const ts = clampCursor(input.ts);
+    const key = exactLookupKey(optionContractId, ts);
+    if (!optionContractId || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    normalized.push({ option_contract_id: optionContractId, ts });
+    if (normalized.length >= OPTION_PRINT_TRACE_LOOKUP_MAX_IDS) {
+      break;
+    }
+  }
+  return normalized;
+};
+
+const normalizeExactEquityQuoteLookups = (
+  inputs: EquityQuoteExactLookup[]
+): EquityQuoteExactLookup[] => {
+  const seen = new Set<string>();
+  const normalized: EquityQuoteExactLookup[] = [];
+  for (const input of inputs) {
+    const underlyingId = input.underlying_id.trim().toUpperCase();
+    const ts = clampCursor(input.ts);
+    const key = exactLookupKey(underlyingId, ts);
+    if (!underlyingId || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    normalized.push({ underlying_id: underlyingId, ts });
+    if (normalized.length >= OPTION_PRINT_TRACE_LOOKUP_MAX_IDS) {
+      break;
+    }
+  }
+  return normalized;
+};
+
+export const fetchOptionNBBOByContractAndTs = async (
+  client: ClickHouseClient,
+  inputs: OptionNbboExactLookup[]
+): Promise<OptionNBBO[]> => {
+  const lookups = normalizeExactOptionNbboLookups(inputs);
+  if (lookups.length === 0) {
+    return [];
+  }
+
+  const tuples = lookups
+    .map((lookup) => `(${quoteString(lookup.option_contract_id)}, ${lookup.ts})`)
+    .join(", ");
+  const result = await client.query({
+    query: `SELECT * FROM ${OPTION_NBBO_TABLE} WHERE (option_contract_id, ts) IN (${tuples}) ORDER BY option_contract_id ASC, ts ASC, source_ts DESC, seq DESC LIMIT 1 BY option_contract_id, ts LIMIT ${clampLookupLimit(lookups.length)}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  return OptionNBBOSchema.array().parse(rows.map(normalizeOptionNbboRow));
+};
+
+export const fetchEquityQuotesByUnderlyingAndTs = async (
+  client: ClickHouseClient,
+  inputs: EquityQuoteExactLookup[]
+): Promise<EquityQuote[]> => {
+  const lookups = normalizeExactEquityQuoteLookups(inputs);
+  if (lookups.length === 0) {
+    return [];
+  }
+
+  const tuples = lookups
+    .map((lookup) => `(${quoteString(lookup.underlying_id)}, ${lookup.ts})`)
+    .join(", ");
+  const result = await client.query({
+    query: `SELECT * FROM ${EQUITY_QUOTES_TABLE} WHERE (underlying_id, ts) IN (${tuples}) ORDER BY underlying_id ASC, ts ASC, source_ts DESC, seq DESC LIMIT 1 BY underlying_id, ts LIMIT ${clampLookupLimit(lookups.length)}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  return EquityQuoteSchema.array().parse(rows.map(normalizeEquityQuoteRow));
+};
+
 export const fetchFlowPacketsByMemberTraceIds = async (
   client: ClickHouseClient,
   traceIds: string[]
@@ -1995,13 +2091,31 @@ export const fetchOptionPrintsByTraceIds = async (
   }
 
   const result = await client.query({
-    query: `SELECT * FROM ${OPTION_PRINTS_TABLE} WHERE trace_id IN (${buildStringList(ids)}) ORDER BY ts DESC, seq DESC LIMIT ${clampLookupLimit(ids.length)}`,
+    query: `SELECT * FROM ${OPTION_PRINTS_TABLE} WHERE trace_id IN (${buildStringList(ids)}) ORDER BY trace_id ASC, ts DESC, seq DESC LIMIT 1 BY trace_id`,
     format: "JSONEachRow",
     ...OPTION_PRINT_QUERY_BOUNDS
   });
 
   const rows = await result.json<unknown[]>();
   return OptionPrintSchema.array().parse(rows.map(normalizeOptionRow));
+};
+
+export const fetchEquityPrintsByTraceIds = async (
+  client: ClickHouseClient,
+  traceIds: string[]
+): Promise<EquityPrint[]> => {
+  const ids = normalizeOptionPrintTraceLookupIds(traceIds);
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const result = await client.query({
+    query: `SELECT * FROM ${EQUITY_PRINTS_TABLE} WHERE trace_id IN (${buildStringList(ids)}) ORDER BY trace_id ASC, ts DESC, seq DESC LIMIT 1 BY trace_id LIMIT ${clampLookupLimit(ids.length)}`,
+    format: "JSONEachRow"
+  });
+
+  const rows = await result.json<unknown[]>();
+  return EquityPrintSchema.array().parse(rows.map(normalizeEquityRow));
 };
 
 export type FlowPacketOptionPrintsPage = {

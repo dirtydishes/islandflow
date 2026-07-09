@@ -4,7 +4,11 @@ import {
   EQUITY_QUOTES_TABLE,
   normalizeEquityQuote
 } from "../src/equity-quotes";
-import { fetchEquityQuotesBefore, type ClickHouseClient } from "../src/clickhouse";
+import {
+  fetchEquityQuotesBefore,
+  fetchEquityQuotesByUnderlyingAndTs,
+  type ClickHouseClient
+} from "../src/clickhouse";
 
 const baseQuote = {
   source_ts: 100,
@@ -58,5 +62,31 @@ describe("equity-quotes storage helpers", () => {
     expect(queryText).toContain(EQUITY_QUOTES_TABLE);
     expect(queryText).toContain("WHERE (ts, seq) < (100, 3)");
     expect(queryText).toContain("ORDER BY ts DESC, seq DESC LIMIT 25");
+  });
+
+  it("builds bounded exact underlying/timestamp lookup queries", async () => {
+    let queryText = "";
+    const client = {
+      query: async ({ query }: { query: string }) => {
+        queryText = query;
+        return {
+          async json<T>() {
+            return [baseQuote] as T;
+          }
+        };
+      }
+    } as unknown as ClickHouseClient;
+
+    const rows = await fetchEquityQuotesByUnderlyingAndTs(client, [
+      { underlying_id: "spy", ts: 100 },
+      { underlying_id: "SPY", ts: 100 },
+      { underlying_id: "QQQ", ts: 200 },
+      { underlying_id: " ", ts: 300 }
+    ]);
+
+    expect(rows[0]?.underlying_id).toBe("SPY");
+    expect(queryText).toContain(EQUITY_QUOTES_TABLE);
+    expect(queryText).toContain("(underlying_id, ts) IN (('SPY', 100), ('QQQ', 200))");
+    expect(queryText).toContain("LIMIT 1 BY underlying_id, ts LIMIT 2");
   });
 });

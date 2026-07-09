@@ -6,6 +6,7 @@ import type {
 } from "@islandflow/types";
 import { useEffect, useRef } from "react";
 
+import { formatEasternTime } from "../time-format";
 import { formatOptionsTapeContractLabel } from "./format";
 import { getOptionsTapeSmartFlowSummary } from "./tinting";
 import type { OptionsTapeRowContext, OptionsTapeSmartFlowContext } from "./types";
@@ -39,6 +40,11 @@ const humanizeToken = (value: string | null | undefined): string =>
 
 const formatPercent = (value: number | null | undefined): string =>
   typeof value === "number" && Number.isFinite(value) ? `${Math.round(value * 100)}%` : "--";
+
+const formatRowTime = (row: DurableTapeOptionRowViewModel): string =>
+  Number.isFinite(row.ts)
+    ? formatEasternTime(row.ts, { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    : String(row.cells.time ?? "--");
 
 const metricRows = (detail: OptionsSmartFlowTriageDetail | undefined) => {
   const confidence = detail?.projection?.hypothesis.scores.confidence;
@@ -78,7 +84,7 @@ const renderRowTable = ({
       </div>
       {rows.map((row) => (
         <div className="options-tape-triage-row" key={row.id} role="row">
-          <span role="cell">{row.cells.time ?? "--"}</span>
+          <span role="cell">{formatRowTime(row)}</span>
           <span role="cell">{formatOptionsTapeContractLabel(row.option.option_contract_id)}</span>
           <span role="cell">{row.cells.premium ?? "--"}</span>
           <span role="cell">{row.cells.side ?? "--"}</span>

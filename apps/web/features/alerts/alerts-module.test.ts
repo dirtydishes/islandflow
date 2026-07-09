@@ -17,9 +17,11 @@ import { selectDurableTapeTemplate } from "../durable-tape";
 import { AlertDetail } from "./AlertsModule";
 import { ALERTS_COLUMNS, ALERTS_TEMPLATES, renderAlertsRow } from "./columns";
 import {
+  buildAlertEvidenceLookupPath,
   buildAlertFlowPacketPath,
   buildAlertOptionPrintsPath,
   collectAlertContextEvidence,
+  fetchAlertEvidenceBundle,
   getAlertFlowPacketRefs,
   getAlertOptionPrintRefs,
   resolveAlertEvidence,
@@ -41,6 +43,7 @@ import {
   normalizeAlertsFilters,
   normalizeAlertsScope
 } from "./source";
+import { getAlertContextRefLabel, isAlertOptionPrintRef } from "./refs";
 import {
   getSmartFlowAlertRowTint,
   getSmartFlowAlertRowTintClassName,
@@ -206,7 +209,14 @@ describe("alerts module helpers", () => {
   });
 
   it("renders row columns without legacy score or severity presentation", () => {
-    const alert = makeAlert();
+    const alert = {
+      ...makeAlert(),
+      evidence_refs: [
+        "flowpacket:SPY-2026-06-22-555-C:1",
+        "option-nbbo:SPY-2026-06-22-555-C:1",
+        "print:1"
+      ]
+    };
     const markup = renderNode(renderAlertsRow({ alert, columns: ALERTS_COLUMNS }));
 
     expect(markup).toContain("SPY");
@@ -233,7 +243,13 @@ describe("alerts module helpers", () => {
   });
 
   it("owns canonical alert evidence paths and evidence resolution", () => {
-    const alert = makeAlert();
+    const alert = makeAlert({
+      evidence_refs: [
+        "flowpacket:SPY-2026-06-22-555-C:1",
+        "option-nbbo:SPY-2026-06-22-555-C:1",
+        "print:1"
+      ]
+    });
     const packet = makePacket();
     const print = makePrint();
     const evidence = collectAlertContextEvidence({
@@ -248,6 +264,7 @@ describe("alerts module helpers", () => {
     expect(buildAlertOptionPrintsPath(["print:1", "print:2"])).toBe(
       "/option-prints/by-trace?trace_id=print%3A1&trace_id=print%3A2"
     );
+    expect(buildAlertEvidenceLookupPath()).toBe("/lookup/smart-flow-alert-evidence");
     expect(getAlertFlowPacketRefs(alert)).toEqual(["flowpacket:SPY-2026-06-22-555-C:1"]);
     expect(getAlertOptionPrintRefs(alert)).toEqual(["print:1"]);
     expect(getAlertPrimaryPacketRef(alert)).toBe("flowpacket:SPY-2026-06-22-555-C:1");
@@ -256,10 +273,85 @@ describe("alerts module helpers", () => {
     expect(
       resolveAlertEvidence({ alert, packets: evidence.packets, prints: evidence.prints })
     ).toEqual([
-      { kind: "flow", id: packet.id, packet },
-      { kind: "print", id: print.trace_id, print }
+      { kind: "flow_packet", ref: packet.id, packet },
+      {
+        kind: "unresolved",
+        ref: "option-nbbo:SPY-2026-06-22-555-C:1",
+        inferred_kind: "unknown",
+        reason: "not_found"
+      },
+      { kind: "option_print", ref: print.trace_id, print }
     ]);
     expect(inferAlertUnderlying(alert, packet, [print])).toBe("SPY");
+  });
+
+  it("classifies mixed alert evidence refs before option-print hydration", () => {
+    const alert = makeAlert({
+      evidence_refs: [
+        "flowpacket:SPY-2026-06-22-555-C:1",
+        "option-nbbo:SPY-2026-06-22-555-C:1",
+        "equity-quote:SPY:1000",
+        "synthetic-label:scenario:1",
+        "print:1",
+        "synthetic-options-1",
+        "alpaca-2",
+        "databento-3",
+        "ibkr-4"
+      ]
+    });
+
+    expect(getAlertOptionPrintRefs(alert)).toEqual([
+      "print:1",
+      "synthetic-options-1",
+      "alpaca-2",
+      "databento-3",
+      "ibkr-4"
+    ]);
+    expect(getAlertContextRefLabel("equity-quote:SPY:1000")).toBe("Equity quote");
+    expect(isAlertOptionPrintRef("equity-quote:SPY:1000")).toBe(false);
+    expect(getAlertPrimaryOptionRef(alert)).toBe("print:1");
+  });
+
+  it("fetches typed alert evidence bundle without direct option-print hydration", async () => {
+    const abort = new AbortController();
+    const requested: Array<{ url: string; init?: RequestInit }> = [];
+    const result = await fetchAlertEvidenceBundle({
+      alertId: "alert:1",
+      refs: ["print:missing"],
+      fetcher: async (input, init) => {
+        requested.push({ url: String(input), init });
+        return Response.json({
+          alert_id: "alert:1",
+          items: [
+            {
+              kind: "unresolved",
+              ref: "print:missing",
+              inferred_kind: "option_print",
+              reason: "not_found"
+            }
+          ]
+        });
+      },
+      signal: abort.signal
+    });
+
+    expect(new URL(requested[0]?.url ?? "http://missing").pathname).toBe(
+      "/lookup/smart-flow-alert-evidence"
+    );
+    expect(requested[0]?.init?.method).toBe("POST");
+    expect(requested[0]?.url).not.toContain("/option-prints/by-trace");
+    expect(JSON.parse(String(requested[0]?.init?.body))).toEqual({
+      alert_id: "alert:1",
+      refs: ["print:missing"]
+    });
+    expect(result.items).toEqual([
+      {
+        kind: "unresolved",
+        ref: "print:missing",
+        inferred_kind: "option_print",
+        reason: "not_found"
+      }
+    ]);
   });
 
   it("normalizes canonical alert scope and filters array/history results", async () => {
@@ -338,6 +430,7 @@ describe("alerts module helpers", () => {
     );
     const hydration: AlertEvidenceHydration = {
       evidence: [],
+      bundle: null,
       flowPacket: null,
       status: { traceId: alert.trace_id, loading: false, missingRefs: [], error: null }
     };
@@ -360,9 +453,10 @@ describe("alerts module helpers", () => {
     const print = makePrint();
     const hydration: AlertEvidenceHydration = {
       evidence: [
-        { kind: "flow", id: packet.id, packet },
-        { kind: "print", id: print.trace_id, print }
+        { kind: "flow_packet", ref: packet.id, packet },
+        { kind: "option_print", ref: print.trace_id, print }
       ],
+      bundle: null,
       flowPacket: packet,
       status: { traceId: alert.trace_id, loading: false, missingRefs: [], error: null }
     };
@@ -389,6 +483,107 @@ describe("alerts module helpers", () => {
     });
     expect(onContractFocus).toHaveBeenCalledWith({ print, source: "alerts" });
     expect(onEquityFocus).toHaveBeenCalledWith({ underlyingId: "SPY", source: "alerts" });
+  });
+
+  it("renders resolved typed evidence rows explicitly", () => {
+    const alert = makeAlert({
+      evidence_refs: [
+        "option-nbbo:SPY-2026-06-22-555-C:1000",
+        "equity-quote:SPY:1000",
+        "equity-print:eq:1",
+        "synthetic-label:scenario:large-call",
+        "news-story:42",
+        "legacy-alert:1"
+      ]
+    });
+    const hydration: AlertEvidenceHydration = {
+      evidence: [
+        {
+          kind: "option_nbbo",
+          ref: "option-nbbo:SPY-2026-06-22-555-C:1000",
+          nbbo: {
+            source_ts: 1_000,
+            ingest_ts: 1_001,
+            seq: 1,
+            trace_id: "nbbo:1",
+            ts: 1_000,
+            option_contract_id: "SPY-2026-06-22-555-C",
+            bid: 1.2,
+            ask: 1.3,
+            bidSize: 10,
+            askSize: 12
+          }
+        },
+        {
+          kind: "equity_quote",
+          ref: "equity-quote:SPY:1000",
+          quote: {
+            source_ts: 1_000,
+            ingest_ts: 1_001,
+            seq: 2,
+            trace_id: "quote:1",
+            ts: 1_000,
+            underlying_id: "SPY",
+            bid: 450.1,
+            ask: 450.2
+          }
+        },
+        {
+          kind: "equity_print",
+          ref: "equity-print:eq:1",
+          print: {
+            source_ts: 1_000,
+            ingest_ts: 1_001,
+            seq: 3,
+            trace_id: "eq:1",
+            ts: 1_000,
+            underlying_id: "SPY",
+            price: 450.15,
+            size: 100,
+            exchange: "DARK",
+            offExchangeFlag: true
+          }
+        },
+        {
+          kind: "synthetic_label",
+          ref: "synthetic-label:scenario:large-call",
+          label: {
+            label_type: "scenario",
+            label_id: "large-call",
+            context: ["large-call"]
+          }
+        },
+        {
+          kind: "external_context",
+          ref: "news-story:42",
+          context: { source: "news-story", id: "42" }
+        },
+        {
+          kind: "unresolved",
+          ref: "legacy-alert:1",
+          inferred_kind: "unknown",
+          reason: "unsupported_ref"
+        }
+      ],
+      bundle: null,
+      flowPacket: null,
+      status: {
+        traceId: alert.trace_id,
+        loading: false,
+        missingRefs: ["legacy-alert:1"],
+        error: null
+      }
+    };
+    const markup = renderNode(AlertDetail({ alert, hydration }));
+
+    expect(markup).toContain("NBBO $1.20 / $1.30");
+    expect(markup).toContain("Equity quote $450.10 / $450.20");
+    expect(markup).toContain("Equity print $450.15");
+    expect(markup).toContain("off-exchange");
+    expect(markup).toContain("Synthetic label context: large-call");
+    expect(markup).toContain("News Story");
+    expect(markup).toContain("Unsupported Ref");
+    expect(markup).not.toContain("Quote context refs:");
   });
 
   it("anchors strip window to latest visible canonical alert timestamp", () => {

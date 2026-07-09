@@ -74,6 +74,7 @@ const {
   mergeHeldTapeHistory,
   mergeNewestWithOverflow,
   mapTerminalChartStatus,
+  mergeTerminalChartCandles,
   normalizeTickerFilterInput,
   normalizeTerminalChartCandles,
   nextFlowFilterPopoverState,
@@ -325,9 +326,15 @@ describe("alert context hydration helpers", () => {
     expect(getAlertFlowPacketRefs(alert)).toEqual(["flowpacket:1"]);
   });
 
-  it("keeps packet refs out of alert option-print evidence refs", () => {
+  it("keeps packet and context refs out of alert option-print evidence refs", () => {
     const alert = makeAlert({
-      evidence_refs: ["flowpacket:1", "print:1", "print:2"]
+      evidence_refs: [
+        "flowpacket:1",
+        "option-nbbo:SPY-2026-06-22-555-C:1",
+        "equity-quote:SPY:1000",
+        "print:1",
+        "print:2"
+      ]
     });
 
     expect(getAlertOptionPrintRefs(alert)).toEqual(["print:1", "print:2"]);
@@ -461,6 +468,46 @@ describe("live manifest", () => {
     ).toEqual(["news"]);
   });
 
+  it("subscribes the root dashboard to the locked Market Command feed set", () => {
+    const filters = buildDefaultFlowFilters();
+    const manifest = getLiveManifest("/", "NVDA", 900_000, filters);
+    const channels = manifest.map((subscription) => subscription.channel);
+
+    expect(channels).toEqual([
+      "options",
+      "durable-rows",
+      "nbbo",
+      "equities",
+      "flow",
+      "news",
+      "smart-flow-alerts",
+      "smart-flow",
+      "inferred-dark",
+      "equity-joins",
+      "equity-candles",
+      "equity-overlay"
+    ]);
+    expect(manifest.find((subscription) => subscription.channel === "options")).toMatchObject({
+      filters
+    });
+    expect(manifest.find((subscription) => subscription.channel === "durable-rows")).toMatchObject({
+      lanes: ["options", "alerts"],
+      filters
+    });
+    expect(manifest.find((subscription) => subscription.channel === "flow")?.filters).toBe(filters);
+    expect(
+      manifest.find((subscription) => subscription.channel === "equity-candles")
+    ).toMatchObject({
+      underlying_id: "NVDA",
+      interval_ms: 900_000
+    });
+    expect(
+      manifest.find((subscription) => subscription.channel === "equity-overlay")
+    ).toMatchObject({
+      underlying_id: "NVDA"
+    });
+  });
+
   it("subscribes /qa to the live feeds rendered by the QA page", () => {
     const filters = buildDefaultFlowFilters();
     const manifest = getLiveManifest("/qa", "SPY", 60000, filters);
@@ -496,16 +543,23 @@ describe("live manifest", () => {
     expect(getLiveManifest("/unknown", "SPY", 60000, buildDefaultFlowFilters())).toEqual(home);
   });
 
-  it("uses 15m chart interval selections for dashboard candle subscriptions", () => {
-    const manifest = getLiveManifest("/", "SPY", 900_000, buildDefaultFlowFilters());
+  it("uses focused ticker paths for dashboard candle and overlay subscriptions", () => {
+    const manifest = getLiveManifest("/", "NVDA", 900_000, buildDefaultFlowFilters());
     const candleSubscription = manifest.find(
       (subscription) => subscription.channel === "equity-candles"
+    );
+    const overlaySubscription = manifest.find(
+      (subscription) => subscription.channel === "equity-overlay"
     );
 
     expect(candleSubscription).toMatchObject({
       channel: "equity-candles",
-      underlying_id: "SPY",
+      underlying_id: "NVDA",
       interval_ms: 900_000
+    });
+    expect(overlaySubscription).toMatchObject({
+      channel: "equity-overlay",
+      underlying_id: "NVDA"
     });
   });
 
@@ -694,6 +748,32 @@ describe("contract-focused option helpers", () => {
 });
 
 describe("route feature map", () => {
+  it("maps / to the locked Market Command dashboard feature surface", () => {
+    const features = getRouteFeatures("/");
+
+    expect(features).toMatchObject({
+      options: true,
+      nbbo: true,
+      equities: true,
+      flow: true,
+      news: true,
+      alerts: true,
+      durableRows: true,
+      smartFlow: true,
+      inferredDark: true,
+      equityJoins: true,
+      equityCandles: true,
+      equityOverlay: true,
+      showOptionsPane: true,
+      showEquitiesPane: true,
+      showFlowPane: true,
+      showNewsPane: true,
+      showAlertsPane: true,
+      showDarkPane: true,
+      showChartPane: true
+    });
+  });
+
   it("maps /options to the options and packets panes", () => {
     const features = getRouteFeatures("/options");
     expect(features.showOptionsPane).toBe(true);
@@ -1281,9 +1361,26 @@ describe("smart-flow explainability helpers", () => {
   });
 
   it("merges smart-flow evidence refs into inspectable packet and print groups", () => {
-    const projection = makeProjection();
+    const projection = makeProjection({
+      refs: {
+        evidence_refs: ["flowpacket:1", "equity-quote:SPY:1000", "print:1"]
+      },
+      evidence: {
+        evidence_refs: ["print:1", "option-nbbo:SPY-2026-06-22-555-C:1", "print:2"]
+      },
+      hypothesis: {
+        evidence_refs: ["flowpacket:1", "external-context:calendar:1", "print:2"]
+      }
+    });
 
-    expect(getSmartFlowEvidenceRefs(projection)).toEqual(["flowpacket:1", "print:1", "print:2"]);
+    expect(getSmartFlowEvidenceRefs(projection)).toEqual([
+      "flowpacket:1",
+      "equity-quote:SPY:1000",
+      "print:1",
+      "option-nbbo:SPY-2026-06-22-555-C:1",
+      "print:2",
+      "external-context:calendar:1"
+    ]);
     expect(getSmartFlowPacketRefs(projection)).toEqual(["flowpacket:1"]);
     expect(getSmartFlowOptionPrintRefs(projection)).toEqual(["print:1", "print:2"]);
     expect(getSmartFlowPinnedFlowKeys(projection)).toEqual(["flowpacket:1"]);
@@ -1451,6 +1548,32 @@ describe("smart-flow explainability helpers", () => {
     expect(overlays).toHaveLength(1);
     expect(overlays[0].points).toHaveLength(1);
     expect(overlays[0].points[0]).toMatchObject({ timestampMs: 1_000, price: 101, value: 100 });
+  });
+
+  it("merges live chart candles into fetched chart history without dropping older buckets", () => {
+    const candle = (ts: number, seq: number, close = 101) =>
+      ({
+        trace_id: `candle:${ts}:${seq}`,
+        source_ts: ts,
+        ingest_ts: ts + 1,
+        seq,
+        ts,
+        interval_ms: 60_000,
+        underlying_id: "SPY",
+        open: 100,
+        high: 104,
+        low: 99,
+        close,
+        volume: 10,
+        trade_count: 2
+      }) as any;
+    const fetched = [candle(60_000, 1), candle(120_000, 2), candle(180_000, 3)];
+    const live = [candle(180_000, 4, 105), candle(240_000, 5)];
+
+    const merged = mergeTerminalChartCandles(fetched, live, 4);
+
+    expect(merged.map((item) => item.ts)).toEqual([60_000, 120_000, 180_000, 240_000]);
+    expect(merged.find((item) => item.ts === 180_000)?.seq).toBe(4);
   });
 
   it("scopes lower-pane all-flow inputs to the active chart ticker", () => {

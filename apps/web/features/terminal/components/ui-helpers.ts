@@ -11,7 +11,7 @@ import {
   toChartCandle,
   toChartTime
 } from "../../market-chart";
-import { EASTERN_TIME_LABEL, formatEasternDateTime, formatEasternTime } from "../../time-format";
+import { formatEasternDateTime, formatEasternTime, formatTimeZoneLabel } from "../../time-format";
 import { decodeNewsText, formatOptionContractLabel } from "../format";
 import { normalizeContractId } from "../state-helpers";
 
@@ -77,7 +77,8 @@ export const formatTime = (ts: number): string =>
     second: "2-digit"
   });
 
-export const formatTimeWithZone = (ts: number): string => `${formatTime(ts)} ${EASTERN_TIME_LABEL}`;
+export const formatTimeWithZone = (ts: number): string =>
+  `${formatTime(ts)} ${formatTimeZoneLabel(ts)}`;
 
 export const formatConfidence = (value: number): string => `${Math.round(value * 100)}%`;
 

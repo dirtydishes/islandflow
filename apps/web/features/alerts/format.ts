@@ -8,6 +8,7 @@ import {
   normalizeSmartFlowDirection
 } from "../smart-flow";
 import { formatEasternTime, formatEasternTimestampWithMs } from "../time-format";
+import { isAlertOptionPrintRef } from "./refs";
 
 export const normalizeAlertDirection = (
   value: string | null | undefined
@@ -158,4 +159,4 @@ export const getAlertPrimaryPacketRef = (
 
 export const getAlertPrimaryOptionRef = (
   alert: Pick<SmartFlowAlertEvent, "evidence_refs">
-): string | null => alert.evidence_refs.find((ref) => !ref.startsWith("flowpacket:")) ?? null;
+): string | null => alert.evidence_refs.find(isAlertOptionPrintRef) ?? null;

@@ -137,7 +137,7 @@ describe("switch-npm-edge raw API host posture", () => {
     expect(app.forward_port).toBe(3000);
     expect(app.enabled).toBe(1);
     expect(app.allow_websocket_upgrade).toBe(1);
-    expect(app.advanced_config).toContain("^/(ws|replay|prints|joins|nbbo|quotes|dark|flow|candles|history|news|lookup|option-prints|equity-joins)(/|$)");
+    expect(app.advanced_config).toContain("^/(ws|replay|prints|joins|nbbo|quotes|dark|flow|candles|history|news|lookup|option-prints|equity-joins|market-command)(/|$)");
     expect(app.advanced_config).toContain('set $server         "api";');
 
     const api = readProxyHost(fixture.dbPath, 2);
@@ -148,7 +148,7 @@ describe("switch-npm-edge raw API host posture", () => {
     expect(api.advanced_config).toBe("");
     expect(existsSync(fixture.apiConf)).toBe(false);
     expect(readFileSync(fixture.appConf, "utf8")).toContain(
-      "^/(ws|replay|prints|joins|nbbo|quotes|dark|flow|candles|history|news|lookup|option-prints|equity-joins)(/|$)"
+      "^/(ws|replay|prints|joins|nbbo|quotes|dark|flow|candles|history|news|lookup|option-prints|equity-joins|market-command)(/|$)"
     );
     expect(output).toContain("public raw API forwarding is disabled");
   });

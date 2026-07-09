@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Alerts Drawer Context Miss Repair</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #0d141b;
+        --panel-2: #111820;
+        --line: rgba(230, 237, 244, 0.14);
+        --line-strong: rgba(245, 166, 35, 0.36);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --green: #25c17a;
+        --red: #ff6b5f;
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.55 var(--sans);
+      }
+
+      main {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+
+      header {
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 900px;
+        font-size: 2rem;
+        line-height: 1.08;
+        letter-spacing: 0;
+      }
+
+      h2,
+      .label,
+      code,
+      pre {
+        font-family: var(--mono);
+      }
+
+      h2 {
+        margin-bottom: 10px;
+        color: var(--accent);
+        font-size: 0.9rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      section {
+        padding: 20px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      p {
+        max-width: 84ch;
+        color: var(--muted);
+      }
+
+      p + p {
+        margin-top: 10px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 7px;
+      }
+
+      code {
+        padding: 0.08rem 0.28rem;
+        border: 1px solid rgba(245, 166, 35, 0.18);
+        border-radius: 5px;
+        background: rgba(245, 166, 35, 0.1);
+        color: #ffe0a3;
+        font-size: 0.9em;
+      }
+
+      .subtitle {
+        margin-top: 12px;
+      }
+
+      .meta-grid,
+      .evidence-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1px;
+        margin-top: 18px;
+        border: 1px solid var(--line);
+        background: var(--line);
+      }
+
+      .meta-cell,
+      .evidence-cell {
+        min-width: 0;
+        padding: 10px 12px;
+        background: var(--panel-2);
+      }
+
+      .label {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--faint);
+        font-size: 0.66rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .ok {
+        color: var(--green);
+      }
+
+      .risk {
+        color: var(--red);
+      }
+
+      .diff-panel {
+        border: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      .diff-panel[data-rich-ready="true"] .diff-fallback {
+        display: none;
+      }
+
+      .diff-rich {
+        display: none;
+      }
+
+      .diff-panel[data-rich-ready="true"] .diff-rich {
+        display: block;
+      }
+
+      .diff-fallback {
+        max-height: 760px;
+        margin: 0;
+        overflow: auto;
+        padding: 14px;
+        color: var(--text);
+        font-size: 0.76rem;
+        line-height: 1.45;
+        white-space: pre-wrap;
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "@pierre/diffs/react": "../../node_modules/@pierre/diffs/dist/react/index.js",
+          "react": "../../node_modules/react/index.js",
+          "react-dom/client": "../../node_modules/react-dom/client.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Alerts Drawer Context Miss Repair</h1>
+        <p class="subtitle">
+          Fixed the alert detail hydrator path that rendered a raw
+          <code>{"error":"not found"}</code> response as a flashing persisted-context drawer
+          error when option-print evidence was unavailable.
+        </p>
+        <div class="meta-grid" aria-label="Turn metadata">
+          <div class="meta-cell"><span class="label">Branch</span>dashboard-v2</div>
+          <div class="meta-cell"><span class="label">Beads</span>islandflow-g8wg</div>
+          <div class="meta-cell"><span class="label">Surface</span>Alerts detail drawer</div>
+          <div class="meta-cell"><span class="label">Scope</span>404 context misses, negative cache parity</div>
+        </div>
+      </header>
+
+      <section>
+        <h2>What Failed</h2>
+        <p>
+          Flow-packet hydration already treated a <code>404</code> as missing evidence. The
+          option-print batch lookup did not, so a missing persisted option-print response could
+          throw the raw body into <code>hydration.status.error</code>.
+        </p>
+        <p>
+          The drawer rendered that state as
+          <code>Persisted context could not be loaded: {"error":"not found"}</code>. In live
+          dashboard state, repeated map or selection updates could retrigger hydration and make the
+          message flash on and off above Primary evidence.
+        </p>
+      </section>
+
+      <section>
+        <h2>Implementation</h2>
+        <ul>
+          <li>Exported the alerts option-print fetch helper so the regression can exercise the real hydrator boundary.</li>
+          <li>Changed alert option-print hydration to convert <code>404</code> into missing refs instead of a fatal status error.</li>
+          <li>Changed the terminal hydration scheduler to treat the same <code>404</code> response as an empty lookup, preserving its negative-cache behavior.</li>
+          <li>Left non-404 failures as real errors so service outages and invalid responses still surface through the existing error/backoff paths.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Feedback Loop</h2>
+        <div class="evidence-grid">
+          <div class="evidence-cell">
+            <span class="label">Red-capable command</span>
+            <code>bun test apps/web/features/alerts/alerts-module.test.ts apps/web/features/terminal/hydration-scheduler.test.ts</code>
+          </div>
+          <div class="evidence-cell">
+            <span class="label">Before fix</span>
+            <span class="risk">2 failing tests</span>: alert hydrator threw
+            <code>{"error":"not found"}</code> and scheduler rejected the 404 lookup.
+          </div>
+          <div class="evidence-cell">
+            <span class="label">After fix</span>
+            <span class="ok">20 passing tests</span>, including the new alert and scheduler 404
+            missing-context cases.
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li><span class="ok">Passed</span> <code>bun test apps/web/features/alerts/alerts-module.test.ts apps/web/features/terminal/hydration-scheduler.test.ts</code> with 20 passing tests.</li>
+          <li><span class="ok">Passed</span> <code>bun test apps/web</code> with 291 passing tests.</li>
+          <li><span class="ok">Passed</span> <code>bun --cwd=apps/web run build</code>.</li>
+          <li><span class="ok">Cleaned</span> generated <code>apps/web/next-env.d.ts</code> build drift before commit.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p>
+          This section includes a readable unified diff fallback. If browser module loading works,
+          it is replaced by <code>PatchDiff</code> from browser-side <code>@pierre/diffs/react</code>.
+        </p>
+        <div class="diff-panel" id="diff-panel">
+          <div class="diff-rich" id="diff-rich" aria-label="Rich rendered diff"></div>
+          <pre class="diff-fallback" id="diff-fallback">diff --git a/apps/web/features/alerts/alerts-module.test.ts b/apps/web/features/alerts/alerts-module.test.ts
+@@
+   buildAlertFlowPacketPath,
+   buildAlertOptionPrintsPath,
+   collectAlertContextEvidence,
++  fetchOptionPrintsByTraceId,
+   getAlertFlowPacketRefs,
+@@
++  it("treats missing persisted option-print context as missing refs instead of a drawer error", async () => {
++    const abort = new AbortController();
++    const result = await fetchOptionPrintsByTraceId({
++      traceIds: ["print:missing"],
++      fetcher: async () => Response.json({ error: "not found" }, { status: 404 }),
++      signal: abort.signal
++    });
++
++    expect(result).toEqual({
++      prints: new Map(),
++      missing: ["print:missing"]
++    });
++  });
++
+
+diff --git a/apps/web/features/alerts/evidence.ts b/apps/web/features/alerts/evidence.ts
+@@
+-const fetchOptionPrintsByTraceId = async ({
++export const fetchOptionPrintsByTraceId = async ({
+@@
+   const response = await fetcher(
+     buildAlertsApiUrl(buildAlertOptionPrintsPath(traceIds), apiBaseUrl),
+     { signal }
+   );
++  if (response.status === 404) {
++    return { prints, missing: [...traceIds] };
++  }
+   if (!response.ok) {
+     throw new Error(await readErrorDetail(response));
+   }
+
+diff --git a/apps/web/features/terminal/hydration-scheduler.test.ts b/apps/web/features/terminal/hydration-scheduler.test.ts
+@@
++  it("negative-caches 404 option print lookups as missing evidence", async () => {
++    let requestCount = 0;
++    const scheduler = new HydrationScheduler({
++      batchDelayMs: 0,
++      negativeTtlMs: 50,
++      fetcher: async () => {
++        requestCount += 1;
++        return jsonResponse({ error: "not found" }, 404);
++      }
++    });
++
++    await expect(scheduler.requestOptionPrints(["missing"])).resolves.toEqual({
++      prints: [],
++      missingTraceIds: ["missing"]
++    });
++    await scheduler.requestOptionPrints(["missing"]);
++    expect(requestCount).toBe(1);
++  });
++
+
+diff --git a/apps/web/features/terminal/hydration-scheduler.ts b/apps/web/features/terminal/hydration-scheduler.ts
+@@
+     for (const traceId of traceIds) {
+       url.searchParams.append("trace_id", traceId);
+     }
+     const response = await this.fetcher(url.toString());
++    if (response.status === 404) {
++      return [];
++    }
+     if (!response.ok) {
+       throw new Error(await readErrorDetail(response));
+     }
+</pre>
+        </div>
+      </section>
+    </main>
+
+    <script type="module">
+      const fallback = document.getElementById("diff-fallback");
+      const target = document.getElementById("diff-rich");
+      const panel = document.getElementById("diff-panel");
+
+      try {
+        const [{ createElement }, { createRoot }, { PatchDiff }] = await Promise.all([
+          import("react"),
+          import("react-dom/client"),
+          import("@pierre/diffs/react")
+        ]);
+        createRoot(target).render(createElement(PatchDiff, { patch: fallback.textContent || "" }));
+        panel.dataset.richReady = "true";
+      } catch (error) {
+        console.warn("Diffs rich renderer failed; keeping HTML fallback.", error);
+      }
+    </script>
+  </body>
+</html>

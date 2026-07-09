@@ -39,6 +39,13 @@ describe("api rate limit route categories", () => {
       bucket: "lookup",
       routeCategory: "lookup"
     });
+    expect(classifyApiRouteForRateLimit("POST", "/lookup/smart-flow-alert-evidence")).toMatchObject(
+      {
+        exempt: false,
+        bucket: "lookup",
+        routeCategory: "lookup"
+      }
+    );
     expect(classifyApiRouteForRateLimit("GET", "/option-prints/by-trace")).toMatchObject({
       exempt: false,
       bucket: "lookup",
@@ -65,6 +72,11 @@ describe("api rate limit route categories", () => {
       routeCategory: "admin"
     });
     expect(classifyApiRouteForRateLimit("GET", "/prints/options")).toMatchObject({
+      exempt: false,
+      bucket: "rest",
+      routeCategory: "rest_read"
+    });
+    expect(classifyApiRouteForRateLimit("GET", "/market-command/tickers")).toMatchObject({
       exempt: false,
       bucket: "rest",
       routeCategory: "rest_read"

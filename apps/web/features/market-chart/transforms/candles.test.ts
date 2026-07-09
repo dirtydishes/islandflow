@@ -6,7 +6,13 @@ import {
   toChartCandle,
   toHeikinAshiCandles
 } from "./candles";
-import { chartTimeToMs, formatChartTickTime, formatIntervalLabel, toChartTime } from "./time";
+import {
+  chartTimeToMs,
+  formatChartLabelTime,
+  formatChartTickTime,
+  formatIntervalLabel,
+  toChartTime
+} from "./time";
 
 const normalizeSpaces = (value: string): string => value.replace(/\s+/g, " ");
 
@@ -196,5 +202,6 @@ describe("market chart candle transforms", () => {
     expect(normalizeSpaces(formatChartTickTime(ts))).toBe("10:30 AM");
     expect(normalizeSpaces(formatChartTickTime(ts, 4))).toBe("10:30:15 AM");
     expect(formatChartTickTime(ts, 2)).toBe("Jun 26");
+    expect(normalizeSpaces(formatChartLabelTime(ts))).toBe("Jun 26, 2026, 10:30 AM EDT");
   });
 });

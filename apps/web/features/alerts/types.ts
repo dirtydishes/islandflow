@@ -1,4 +1,10 @@
-import type { FlowPacket, OptionPrint, SmartFlowAlertEvent } from "@islandflow/types";
+import type {
+  FlowPacket,
+  OptionPrint,
+  SmartFlowAlertEvent,
+  SmartFlowAlertEvidenceBundle,
+  SmartFlowAlertEvidenceItem
+} from "@islandflow/types";
 
 import type {
   DurableTapeFeatureInput,
@@ -30,10 +36,7 @@ export type NormalizedAlertsModuleFilters = {
   directions?: string[];
 };
 
-export type AlertEvidenceItem =
-  | { kind: "flow"; id: string; packet: FlowPacket }
-  | { kind: "print"; id: string; print: OptionPrint }
-  | { kind: "unknown"; id: string };
+export type AlertEvidenceItem = SmartFlowAlertEvidenceItem;
 
 export type AlertContextBundle = {
   alert?: unknown;
@@ -51,6 +54,7 @@ export type AlertContextStatus = {
 
 export type AlertEvidenceHydration = {
   evidence: AlertEvidenceItem[];
+  bundle: SmartFlowAlertEvidenceBundle | null;
   flowPacket: FlowPacket | null;
   status: AlertContextStatus;
 };

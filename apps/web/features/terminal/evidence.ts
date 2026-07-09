@@ -1,4 +1,5 @@
 import type { SmartFlowExplainabilityProjection } from "@islandflow/types";
+import { isAlertOptionPrintRef } from "../alerts";
 import { PINNED_EVIDENCE_MAX_ITEMS, PINNED_EVIDENCE_TTL_MS } from "./config";
 import type { PinnedEntry } from "./types";
 
@@ -8,6 +9,7 @@ export {
   collectAlertContextEvidence,
   getAlertFlowPacketRefs,
   getAlertOptionPrintRefs,
+  isAlertOptionPrintRef,
   resolveAlertFlowPacket
 } from "../alerts";
 
@@ -32,7 +34,7 @@ export const getSmartFlowPacketRefs = (
 
 export const getSmartFlowOptionPrintRefs = (
   projection: Pick<SmartFlowExplainabilityProjection, "refs" | "evidence" | "hypothesis">
-): string[] => getSmartFlowEvidenceRefs(projection).filter((ref) => !isSmartFlowPacketRef(ref));
+): string[] => getSmartFlowEvidenceRefs(projection).filter(isAlertOptionPrintRef);
 
 export const getSmartFlowPinnedFlowKeys = (
   projection: Pick<SmartFlowExplainabilityProjection, "refs" | "evidence" | "hypothesis"> | null

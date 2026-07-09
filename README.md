@@ -112,7 +112,7 @@ The API is intentionally not stable yet, but the current gateway exposes these f
 - Current/live cache reads: `/prints/options`, `/prints/equities`, `/prints/equities/range`, `/candles/equities`, `/flow/packets`, `/flow/smart-flow`, `/flow/smart-flow-alerts`, `/news`
 - Cursor history: `/history/options`, `/history/nbbo`, `/history/equities`, `/history/equity-quotes`, `/history/equity-joins`, `/history/flow`, `/history/smart-flow`, `/history/smart-flow-alerts`, `/history/inferred-dark`, `/history/news`
 - Replay reads: `/replay/options`, `/replay/nbbo`, `/replay/equities`, `/replay/equity-quotes`, `/replay/equity-candles`, `/replay/equity-joins`, `/replay/inferred-dark`, `/replay/flow`, `/replay/smart-flow`, `/replay/smart-flow-alerts`
-- Detail hydration: `/flow/packets/:id`, `/option-prints/by-trace`, `/lookup/options-support`
+- Detail hydration: `/flow/packets/:id`, `/option-prints/by-trace`, `/lookup/options-support`, `/lookup/smart-flow-alert-evidence`
 - WebSockets: `/ws/live` plus channel-specific sockets for options, NBBO, equities, candles, quotes, joins, inferred-dark, flow, smart-flow, and smart-flow-alerts
 
 Option print reads support signal/raw views and filter parameters used by the terminal UI. These contracts are evolving with the durable-tapes and performance work.
@@ -329,7 +329,7 @@ export ISLANDFLOW_API_DOMAIN=<raw-api-origin-host>
 That switch keeps `<raw-api-origin>` closed and installs the same-origin matcher on the app host for:
 
 ```text
-/(ws|replay|prints|joins|nbbo|quotes|dark|flow|candles|history|news|lookup|option-prints|equity-joins)(/|$)
+/(ws|replay|prints|joins|nbbo|quotes|dark|flow|candles|history|news|lookup|option-prints|equity-joins|market-command)(/|$)
 ```
 
 Then deploy native web/API changes with the edge guardrail acknowledged:

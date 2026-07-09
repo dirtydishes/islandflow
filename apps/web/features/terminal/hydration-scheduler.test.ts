@@ -157,6 +157,25 @@ describe("HydrationScheduler", () => {
     expect(requestCount).toBe(2);
   });
 
+  it("negative-caches 404 option print lookups as missing evidence", async () => {
+    let requestCount = 0;
+    const scheduler = new HydrationScheduler({
+      batchDelayMs: 0,
+      negativeTtlMs: 50,
+      fetcher: async () => {
+        requestCount += 1;
+        return jsonResponse({ error: "not found" }, 404);
+      }
+    });
+
+    await expect(scheduler.requestOptionPrints(["missing"])).resolves.toEqual({
+      prints: [],
+      missingTraceIds: ["missing"]
+    });
+    await scheduler.requestOptionPrints(["missing"]);
+    expect(requestCount).toBe(1);
+  });
+
   it("backs off failed option print endpoints instead of spinning", async () => {
     let now = 0;
     let requestCount = 0;

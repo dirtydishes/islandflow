@@ -97,12 +97,12 @@ export const getRouteFeatures = (pathname: string): RouteFeatures => {
     default:
       return {
         options: true,
-        nbbo: false,
+        nbbo: true,
         equities: true,
         flow: true,
         news: true,
         alerts: true,
-        durableRows: false,
+        durableRows: true,
         smartFlow: true,
         inferredDark: true,
         equityJoins: true,

@@ -18,6 +18,7 @@ import {
   type OptionsTapeRowTint
 } from "../options-tape/tinting";
 import type { OptionsTapeSmartFlowContext } from "../options-tape/types";
+import { formatEasternTime } from "../time-format";
 import { DurableTape } from "./components/DurableTape";
 import { createDurableTapeInitialHistoryCursor } from "./history";
 import {
@@ -69,6 +70,14 @@ const useStaticRowSource = <T extends DurableTapeRowViewModel>(
 
 const getRowKey = (row: DurableTapeRowViewModel): string => row.id;
 const getRowCursor = (row: DurableTapeRowViewModel) => ({ ts: row.ts, seq: row.seq });
+export const formatDurableRowTime = (row: Pick<DurableTapeRowViewModel, "ts" | "cells">): string =>
+  Number.isFinite(row.ts)
+    ? formatEasternTime(row.ts, { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    : String(row.cells.time ?? "--");
+const formatDurableTimestamp = (ts: number, fallback = "--"): string =>
+  Number.isFinite(ts)
+    ? formatEasternTime(ts, { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    : fallback;
 
 type OptionRowColumnId =
   | "time"
@@ -126,7 +135,7 @@ const OPTION_ROW_COLUMNS: DurableTapeColumnDefinition<
     label: "TIME",
     minWidth: 72,
     className: "options-tape-cell-time durable-tape-cell-number",
-    render: (row) => row.cells.time ?? "--"
+    render: formatDurableRowTime
   },
   {
     id: "contract",
@@ -416,7 +425,7 @@ const ALERT_ROW_COLUMNS: DurableTapeColumnDefinition<
     label: "TIME",
     minWidth: 76,
     className: "alerts-cell-time durable-tape-cell-number",
-    render: (row) => row.cells.time ?? "--"
+    render: formatDurableRowTime
   },
   {
     id: "symbol",
@@ -494,13 +503,13 @@ const renderAlertRow = ({
     );
   });
 
-const renderAlertDetail = (row: DurableTapeAlertRowViewModel) => (
+export const renderDurableTapeAlertRowDetail = (row: DurableTapeAlertRowViewModel) => (
   <div className="alerts-detail" aria-label="Server-composed alert detail">
     <div className="alerts-detail-head">
       <div>
         <span>Alert detail</span>
         <h3>{row.alert.primary_label}</h3>
-        <p>{row.cells.time}</p>
+        <p>{formatDurableRowTime(row)}</p>
       </div>
       <div className="alerts-detail-score">
         <span>Confidence</span>
@@ -545,7 +554,7 @@ const renderAlertDetail = (row: DurableTapeAlertRowViewModel) => (
             <div className="alerts-detail-row" key={print.trace_id}>
               <div>
                 <strong>{print.option_contract_id}</strong>
-                <span>{row.cells.time}</span>
+                <span>{formatDurableTimestamp(print.ts, String(row.cells.time ?? "--"))}</span>
               </div>
               <p>
                 ${print.price.toFixed(2)} / {print.size}x /{" "}
@@ -572,23 +581,35 @@ export const DurableTapeAlertRowsPane = ({
   title = "Alerts",
   className,
   features,
-  rowHeight = 36
+  rowHeight = 36,
+  detailMode = "inline",
+  selectedRowId,
+  onSelectRow
 }: {
   rows: readonly DurableTapeAlertRowViewModel[];
   title?: string;
   className?: string;
   features?: readonly DurableTapeFeatureInput[];
   rowHeight?: number;
+  detailMode?: "inline" | "external";
+  selectedRowId?: string | null;
+  onSelectRow?: (row: DurableTapeAlertRowViewModel) => void;
 }) => {
   const source = useStaticRowSource(rows);
-  const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
-  const selectedRow = rows.find((row) => row.id === selectedRowId) ?? null;
+  const [internalSelectedRowId, setInternalSelectedRowId] = useState<string | null>(null);
+  const activeSelectedRowId =
+    detailMode === "external" ? (selectedRowId ?? null) : internalSelectedRowId;
+  const selectedRow = rows.find((row) => row.id === activeSelectedRowId) ?? null;
 
   useEffect(() => {
-    if (selectedRowId && !rows.some((row) => row.id === selectedRowId)) {
-      setSelectedRowId(null);
+    if (
+      detailMode === "inline" &&
+      internalSelectedRowId &&
+      !rows.some((row) => row.id === internalSelectedRowId)
+    ) {
+      setInternalSelectedRowId(null);
     }
-  }, [rows, selectedRowId]);
+  }, [detailMode, rows, internalSelectedRowId]);
 
   return (
     <section className={`alerts-module ${className ?? ""}`.trim()} data-row-source="server">
@@ -598,25 +619,34 @@ export const DurableTapeAlertRowsPane = ({
         columns={ALERT_ROW_COLUMNS}
         features={features}
         getCursor={getRowCursor}
+        getRowClassName={({ item }) =>
+          activeSelectedRowId === item.id ? "alerts-row-selected" : undefined
+        }
         getRowKey={getRowKey}
-        onActivate={({ item }) => setSelectedRowId(item.id)}
-        renderHover={({ item }) => renderAlertDetail(item)}
+        onActivate={({ item }) => {
+          if (detailMode === "external") {
+            onSelectRow?.(item);
+            return;
+          }
+          setInternalSelectedRowId(item.id);
+        }}
+        renderHover={({ item }) => renderDurableTapeAlertRowDetail(item)}
         renderRow={({ item, columns }) => renderAlertRow({ row: item, columns })}
         rowHeight={rowHeight}
         source={source}
         templates={ALERT_ROW_TEMPLATES}
         title={title}
       />
-      {selectedRow ? (
+      {detailMode === "inline" && selectedRow ? (
         <div className="alerts-module-detail">
           <button
             className="alerts-module-detail-close"
             type="button"
-            onClick={() => setSelectedRowId(null)}
+            onClick={() => setInternalSelectedRowId(null)}
           >
             Close detail
           </button>
-          {renderAlertDetail(selectedRow)}
+          {renderDurableTapeAlertRowDetail(selectedRow)}
         </div>
       ) : null}
     </section>

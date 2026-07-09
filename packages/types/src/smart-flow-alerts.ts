@@ -1,5 +1,13 @@
 import { z } from "zod";
-import { EventMetaSchema, SmartFlowDirectionSchema } from "./events";
+import {
+  EquityPrintSchema,
+  EquityQuoteSchema,
+  EventMetaSchema,
+  FlowPacketSchema,
+  OptionNBBOSchema,
+  OptionPrintSchema,
+  SmartFlowDirectionSchema
+} from "./events";
 import {
   FlowHypothesisTypeSchema,
   SmartFlowContractVersionSchema,
@@ -8,6 +16,7 @@ import {
 } from "./smart-flow";
 
 export const SMART_FLOW_ALERT_TRIGGER_KIND = "non_abstained_hypothesis";
+export const SMART_FLOW_ALERT_EVIDENCE_LOOKUP_PATH = "/lookup/smart-flow-alert-evidence";
 
 export const SmartFlowAlertTriggerSchema = z
   .object({
@@ -19,6 +28,132 @@ export const SmartFlowAlertTriggerSchema = z
   .strict();
 
 export type SmartFlowAlertTrigger = z.infer<typeof SmartFlowAlertTriggerSchema>;
+
+export const SmartFlowAlertEvidenceInferredKindSchema = z.enum([
+  "flow_packet",
+  "option_print",
+  "option_nbbo",
+  "equity_quote",
+  "equity_print",
+  "synthetic_label",
+  "external_context",
+  "unknown"
+]);
+
+export type SmartFlowAlertEvidenceInferredKind = z.infer<
+  typeof SmartFlowAlertEvidenceInferredKindSchema
+>;
+
+export const SmartFlowAlertEvidenceUnresolvedReasonSchema = z.enum([
+  "malformed_ref",
+  "not_found",
+  "unsupported_ref"
+]);
+
+export type SmartFlowAlertEvidenceUnresolvedReason = z.infer<
+  typeof SmartFlowAlertEvidenceUnresolvedReasonSchema
+>;
+
+export const SmartFlowSyntheticLabelPayloadSchema = z
+  .object({
+    label_type: z.string().min(1),
+    label_id: z.string().min(1),
+    context: z.array(z.string().min(1))
+  })
+  .strict();
+
+export type SmartFlowSyntheticLabelPayload = z.infer<typeof SmartFlowSyntheticLabelPayloadSchema>;
+
+export const SmartFlowExternalContextPayloadSchema = z
+  .object({
+    source: z.enum(["external-context", "news-story", "event-calendar"]),
+    id: z.string().min(1)
+  })
+  .strict();
+
+export type SmartFlowExternalContextPayload = z.infer<typeof SmartFlowExternalContextPayloadSchema>;
+
+export const SmartFlowAlertEvidenceItemSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("flow_packet"),
+      ref: z.string().min(1),
+      packet: FlowPacketSchema
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("option_print"),
+      ref: z.string().min(1),
+      print: OptionPrintSchema
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("option_nbbo"),
+      ref: z.string().min(1),
+      nbbo: OptionNBBOSchema
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("equity_quote"),
+      ref: z.string().min(1),
+      quote: EquityQuoteSchema
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("equity_print"),
+      ref: z.string().min(1),
+      print: EquityPrintSchema
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("synthetic_label"),
+      ref: z.string().min(1),
+      label: SmartFlowSyntheticLabelPayloadSchema
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("external_context"),
+      ref: z.string().min(1),
+      context: SmartFlowExternalContextPayloadSchema
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("unresolved"),
+      ref: z.string().min(1),
+      inferred_kind: SmartFlowAlertEvidenceInferredKindSchema,
+      reason: SmartFlowAlertEvidenceUnresolvedReasonSchema
+    })
+    .strict()
+]);
+
+export type SmartFlowAlertEvidenceItem = z.infer<typeof SmartFlowAlertEvidenceItemSchema>;
+
+export const SmartFlowAlertEvidenceLookupRequestSchema = z
+  .object({
+    alert_id: z.string().trim().min(1).optional(),
+    refs: z.array(z.string().trim().min(1)).max(100)
+  })
+  .strict();
+
+export type SmartFlowAlertEvidenceLookupRequest = z.infer<
+  typeof SmartFlowAlertEvidenceLookupRequestSchema
+>;
+
+export const SmartFlowAlertEvidenceBundleSchema = z
+  .object({
+    alert_id: z.string().min(1).optional(),
+    items: z.array(SmartFlowAlertEvidenceItemSchema)
+  })
+  .strict();
+
+export type SmartFlowAlertEvidenceBundle = z.infer<typeof SmartFlowAlertEvidenceBundleSchema>;
 
 export const isNativeNonAbstainedSmartFlowProjection = (
   projection: SmartFlowExplainabilityProjection

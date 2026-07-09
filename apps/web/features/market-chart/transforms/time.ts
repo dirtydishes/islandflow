@@ -95,6 +95,21 @@ export const formatChartTickTime = (value: ChartTimeLike, tickMarkType?: unknown
   }
 };
 
+export const formatChartLabelTime = (value: ChartTimeLike): string => {
+  const timestampMs = chartTimeToMs(value);
+  if (timestampMs === null) {
+    return "";
+  }
+  return formatEasternTime(timestampMs, {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZoneName: "short"
+  });
+};
+
 export const formatIntervalLabel = (
   intervalMs: number,
   intervals: readonly { label: string; ms: number }[] = MARKET_CHART_TIMEFRAME_REGISTRY

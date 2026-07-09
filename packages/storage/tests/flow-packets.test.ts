@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   createClickHouseClient,
   fetchFlowPacketById,
+  fetchFlowPacketsByIds,
   fetchFlowPacketsBefore
 } from "../src/clickhouse";
 import {
@@ -56,9 +57,12 @@ describe("flow-packets storage helpers", () => {
 
     await fetchFlowPacketsBefore(client, 200, 3, 15);
     await fetchFlowPacketById(client, "fp-1");
+    await fetchFlowPacketsByIds(client, ["fp-1", "fp-2", "fp-1", " "]);
 
     expect(queries[0]).toContain("(source_ts, seq) < (200, 3)");
     expect(queries[0]).toContain("ORDER BY source_ts DESC, seq DESC LIMIT 15");
     expect(queries[1]).toContain("WHERE id = 'fp-1'");
+    expect(queries[2]).toContain("WHERE id IN ('fp-1', 'fp-2')");
+    expect(queries[2]).toContain("ORDER BY source_ts DESC, seq DESC LIMIT 2");
   });
 });

@@ -55,6 +55,7 @@ type FixedWindowEntry = {
 const LOOKUP_EXACT_PATHS = new Set([
   "/option-prints/by-trace",
   "/lookup/options-support",
+  "/lookup/smart-flow-alert-evidence",
   "/options/smart-flow-detail",
   "/equity-joins/by-id"
 ]);
@@ -147,6 +148,7 @@ export const classifyApiRouteForRateLimit = (
     "/joins/",
     "/dark/",
     "/flow/",
+    "/market-command/",
     "/news",
     "/history/",
     "/replay/"
