@@ -1,7 +1,4 @@
-import {
-  buildAlpacaAuthHeaders,
-  type AlpacaCredentials
-} from "@islandflow/config";
+import { buildAlpacaAuthHeaders, type AlpacaCredentials } from "@islandflow/config";
 import { createLogger } from "@islandflow/observability";
 import type { EquityPrint, EquityQuote } from "@islandflow/types";
 import type { EquityIngestAdapter, EquityIngestHandlers } from "./types";

@@ -46,7 +46,9 @@ export const fetchSmartFlowAlertEventsAfter = async (
   afterSeq: number,
   limit: number
 ): Promise<SmartFlowAlertEvent[]> =>
-  filterSmartFlowAlertsForRuntime(await fetchSmartFlowAlertsAfter(client, afterTs, afterSeq, limit));
+  filterSmartFlowAlertsForRuntime(
+    await fetchSmartFlowAlertsAfter(client, afterTs, afterSeq, limit)
+  );
 
 export const fetchSmartFlowAlertEventsBefore = async (
   client: ClickHouseClient,

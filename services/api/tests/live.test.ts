@@ -87,8 +87,7 @@ const makeSlowRedis = (delayMs = 5) => {
       lPush: (key: string, value: string) => track(() => base.lPush(key, value)),
       lTrim: (key: string, start: number, stop: number) =>
         track(() => base.lTrim(key, start, stop)),
-      hSet: (key: string, field: string, value: string) =>
-        track(() => base.hSet(key, field, value))
+      hSet: (key: string, field: string, value: string) => track(() => base.hSet(key, field, value))
     },
     getMaxActiveWrites: () => maxActiveWrites
   };

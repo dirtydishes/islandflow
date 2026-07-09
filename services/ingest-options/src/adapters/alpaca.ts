@@ -1,8 +1,5 @@
 import { decode, encode } from "@msgpack/msgpack";
-import {
-  buildAlpacaAuthHeaders,
-  type AlpacaCredentials
-} from "@islandflow/config";
+import { buildAlpacaAuthHeaders, type AlpacaCredentials } from "@islandflow/config";
 import { createLogger } from "@islandflow/observability";
 import type { OptionIngestAdapter, OptionIngestHandlers } from "./types";
 import WebSocket from "ws";

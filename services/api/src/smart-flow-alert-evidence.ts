@@ -327,6 +327,8 @@ export const resolveSmartFlowAlertEvidenceBundle = async (
       case "unresolved":
         return unresolved(parsed.ref, parsed.inferredKind, parsed.reason);
     }
+    const exhaustive: never = parsed;
+    return exhaustive;
   });
 
   return SmartFlowAlertEvidenceBundleSchema.parse({

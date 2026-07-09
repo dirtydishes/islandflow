@@ -70,9 +70,7 @@ const useStaticRowSource = <T extends DurableTapeRowViewModel>(
 
 const getRowKey = (row: DurableTapeRowViewModel): string => row.id;
 const getRowCursor = (row: DurableTapeRowViewModel) => ({ ts: row.ts, seq: row.seq });
-export const formatDurableRowTime = (
-  row: Pick<DurableTapeRowViewModel, "ts" | "cells">
-): string =>
+export const formatDurableRowTime = (row: Pick<DurableTapeRowViewModel, "ts" | "cells">): string =>
   Number.isFinite(row.ts)
     ? formatEasternTime(row.ts, { hour: "2-digit", minute: "2-digit", second: "2-digit" })
     : String(row.cells.time ?? "--");
