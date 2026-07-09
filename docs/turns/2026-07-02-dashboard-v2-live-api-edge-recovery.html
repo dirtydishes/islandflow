@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dashboard V2 Live API Edge Recovery</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #0d141b;
+        --panel-2: #111820;
+        --line: rgba(230, 237, 244, 0.14);
+        --line-strong: rgba(245, 166, 35, 0.36);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --green: #25c17a;
+        --red: #ff6b5f;
+        --blue: #4da3ff;
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.55 var(--sans);
+      }
+
+      main {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+
+      header {
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 920px;
+        font-size: 2rem;
+        line-height: 1.08;
+        letter-spacing: 0;
+      }
+
+      h2,
+      .label,
+      code,
+      pre {
+        font-family: var(--mono);
+      }
+
+      h2 {
+        margin-bottom: 10px;
+        color: var(--accent);
+        font-size: 0.9rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      section {
+        padding: 20px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      p {
+        max-width: 82ch;
+        color: var(--muted);
+      }
+
+      p + p {
+        margin-top: 10px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 7px;
+      }
+
+      code {
+        padding: 0.08rem 0.28rem;
+        border: 1px solid rgba(245, 166, 35, 0.18);
+        border-radius: 5px;
+        background: rgba(245, 166, 35, 0.1);
+        color: #ffe0a3;
+        font-size: 0.9em;
+      }
+
+      .subtitle {
+        margin-top: 12px;
+      }
+
+      .meta-grid,
+      .evidence-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1px;
+        margin-top: 18px;
+        border: 1px solid var(--line);
+        background: var(--line);
+      }
+
+      .meta-cell,
+      .evidence-cell {
+        min-width: 0;
+        padding: 10px 12px;
+        background: var(--panel-2);
+      }
+
+      .label {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--faint);
+        font-size: 0.66rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .ok {
+        color: var(--green);
+      }
+
+      .warn {
+        color: var(--accent);
+      }
+
+      .risk {
+        color: var(--red);
+      }
+
+      .diff-panel {
+        border: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      .diff-panel[data-rich-ready="true"] .diff-fallback {
+        display: none;
+      }
+
+      .diff-rich {
+        display: none;
+      }
+
+      .diff-panel[data-rich-ready="true"] .diff-rich {
+        display: block;
+      }
+
+      .diff-fallback {
+        max-height: 720px;
+        margin: 0;
+        overflow: auto;
+        padding: 14px;
+        color: var(--text);
+        font-size: 0.76rem;
+        line-height: 1.45;
+        white-space: pre-wrap;
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "@pierre/diffs/react": "../../node_modules/@pierre/diffs/dist/react/index.js",
+          "react": "../../node_modules/react/index.js",
+          "react-dom/client": "../../node_modules/react-dom/client.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Dashboard V2 Live API Edge Recovery</h1>
+        <p class="subtitle">
+          Fixed the native dashboard failure where <code>/market-command/tickers</code> reached
+          the web app and returned an HTML 404, while dashboard-shaped live subscriptions could
+          starve the API event loop and make the backend look unavailable.
+        </p>
+        <div class="meta-grid" aria-label="Turn metadata">
+          <div class="meta-cell"><span class="label">Branch</span>dashboard-v2</div>
+          <div class="meta-cell"><span class="label">Beads</span>islandflow-hzlf</div>
+          <div class="meta-cell"><span class="label">Runtime</span>native user service + NPM</div>
+          <div class="meta-cell"><span class="label">Scope</span>API live state, edge matcher, probes</div>
+        </div>
+      </header>
+
+      <section>
+        <h2>What Failed</h2>
+        <p>
+          The screenshot had two independent symptoms. The <code>HTTP 404: received HTML response
+          instead of JSON</code> warning came from NPM not forwarding <code>/market-command/*</code>
+          to the API. Separately, dashboard reconnects pushed <code>islandflow-api</code> into
+          high CPU and health latency because live durable-row composition and websocket send
+          bursts were too synchronous under the root dashboard subscription set.
+        </p>
+      </section>
+
+      <section>
+        <h2>Implementation</h2>
+        <ul>
+          <li>Added <code>market-command</code> to the native/docker same-origin API matcher and to the public route probe.</li>
+          <li>Replaced boolean env coercion with explicit string parsing so <code>API_CONSUMER_RESET=false</code> stays false.</li>
+          <li>Changed durable-row live event composition to resolve smart-flow support only for event-matched option rows.</li>
+          <li>Made Redis live-cache flushing single-flight and tolerant of a Redis client closing during shutdown.</li>
+          <li>Yielded during large subscribe snapshots and live fanout bursts so health/REST requests get event-loop time.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Live Recovery</h2>
+        <div class="evidence-grid">
+          <div class="evidence-cell">
+            <span class="label">NPM Edge</span>
+            <span class="ok">Reloaded</span> <code>nginx-proxy-manager</code> with the
+            <code>market-command</code> matcher in generated <code>proxy_host/6.conf</code>.
+          </div>
+          <div class="evidence-cell">
+            <span class="label">API Restart</span>
+            <span class="ok">Clean restart</span> of <code>islandflow-api.service</code>; no
+            post-fix <code>reset jetstream consumer</code> warnings.
+          </div>
+          <div class="evidence-cell">
+            <span class="label">Public Route Probe</span>
+            <span class="ok">Passed</span> <code>DEPLOY_PUBLIC_APP_URL=https://flow.deltaisland.io bun run check:public-api-routes</code>.
+          </div>
+          <div class="evidence-cell">
+            <span class="label">Dashboard Socket Smoke</span>
+            <span class="ok">Passed</span> 1000 messages / 16.9 MB with health samples between
+            128 ms and 749 ms under a 2s timeout.
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li><span class="ok">Passed</span> <code>bun test services/api/tests/env.test.ts services/api/tests/live.test.ts deployment/native/switch-npm-edge.test.ts</code></li>
+          <li><span class="ok">Passed</span> <code>bun run typecheck</code></li>
+          <li><span class="ok">Passed</span> <code>DEPLOY_PUBLIC_APP_URL=https://flow.deltaisland.io bun run check:public-api-routes</code></li>
+          <li><span class="warn">Known repo baseline</span> <code>bun run check</code> fails on pre-existing import-order diagnostics in unrelated files.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p>
+          This section includes a readable unified diff fallback. If browser module loading works,
+          it is replaced by <code>PatchDiff</code> from browser-side <code>@pierre/diffs/react</code>.
+        </p>
+        <div class="diff-panel" id="diff-panel">
+          <div class="diff-rich" id="diff-rich" aria-label="Rich rendered diff"></div>
+          <pre class="diff-fallback" id="diff-fallback">diff --git a/deployment/native/switch-npm-edge.sh b/deployment/native/switch-npm-edge.sh
+@@
+-advanced_config = f"""location ~ ^/(ws|replay|prints|joins|nbbo|quotes|dark|flow|candles|history|news|lookup|option-prints|equity-joins)(/|$) {{
++advanced_config = f"""location ~ ^/(ws|replay|prints|joins|nbbo|quotes|dark|flow|candles|history|news|lookup|option-prints|equity-joins|market-command)(/|$) {{
+
+diff --git a/services/api/src/env.ts b/services/api/src/env.ts
+new file mode 100644
+@@
++export const booleanEnvSchema = z.preprocess((value) =&gt; {
++  if (typeof value === "string") {
++    const normalized = value.trim().toLowerCase();
++    if (["1", "true", "yes", "on"].includes(normalized)) return true;
++    if (["0", "false", "no", "off"].includes(normalized)) return false;
++  }
++  return value;
++}, z.boolean());
+
+diff --git a/services/api/src/durable-rows.ts b/services/api/src/durable-rows.ts
+@@
+-  const lookups = buildDurableRowLookups(context);
++  const baseLookups = buildDurableRowLookups(context, []);
++  const candidateOptionPrints: OptionPrint[] = [];
+@@
+-    push(buildDurableOptionRow(print, lookups));
++    candidateOptionPrints.push(print);
+@@
++  if (candidateOptionPrints.length &gt; 0) {
++    const targetedLookups = buildDurableRowLookups(
++      { ...context, optionPrints: candidateOptionPrints },
++      candidateOptionPrints.map((print) =&gt; print.trace_id)
++    );
++    for (const print of candidateOptionPrints) {
++      push(buildDurableOptionRow(print, targetedLookups));
++    }
++  }
+
+diff --git a/services/api/src/live.ts b/services/api/src/live.ts
+@@
++  private redisFlushAgain = false;
++  private redisFlushPromise: Promise&lt;void&gt; | null = null;
+@@
++    if (this.redisFlushPromise) {
++      this.redisFlushAgain = true;
++      return this.redisFlushPromise;
++    }
++    this.redisFlushPromise = this.drainRedisWrites();
+
+diff --git a/services/api/src/index.ts b/services/api/src/index.ts
+@@
++const yieldToEventLoop = (): Promise&lt;void&gt; =&gt;
++  new Promise((resolve) =&gt; {
++    setTimeout(resolve, 0);
++  });
++const LIVE_SEND_YIELD_INTERVAL = 25;
+@@
++            if (index &lt; parsed.subscriptions.length - 1) {
++              await yieldToEventLoop();
++            }
+@@
++    if (matchedSubscriptions &gt; 0 || matchedDurableRowSubscriptions &gt; 0) {
++      await yieldToEventLoop();
++    }
+</pre>
+        </div>
+      </section>
+    </main>
+
+    <script type="module">
+      const fallback = document.getElementById("diff-fallback");
+      const target = document.getElementById("diff-rich");
+      const panel = document.getElementById("diff-panel");
+
+      try {
+        const [{ createElement }, { createRoot }, { PatchDiff }] = await Promise.all([
+          import("react"),
+          import("react-dom/client"),
+          import("@pierre/diffs/react")
+        ]);
+        createRoot(target).render(createElement(PatchDiff, { patch: fallback.textContent || "" }));
+        panel.dataset.richReady = "true";
+      } catch (error) {
+        console.warn("Diffs rich renderer failed; keeping HTML fallback.", error);
+      }
+    </script>
+  </body>
+</html>

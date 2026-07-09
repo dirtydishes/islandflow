@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Typed Smart-Flow Alert Evidence Resolver</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #0d141b;
+        --panel-2: #111820;
+        --line: rgba(230, 237, 244, 0.14);
+        --line-strong: rgba(245, 166, 35, 0.36);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --green: #25c17a;
+        --warn: #f5a623;
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.55 var(--sans);
+      }
+
+      main {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+
+      header {
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 940px;
+        font-size: 2rem;
+        line-height: 1.08;
+        letter-spacing: 0;
+      }
+
+      h2,
+      .label,
+      code,
+      pre {
+        font-family: var(--mono);
+      }
+
+      h2 {
+        margin-bottom: 10px;
+        color: var(--accent);
+        font-size: 0.9rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      section {
+        padding: 20px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      p {
+        max-width: 86ch;
+        color: var(--muted);
+      }
+
+      p + p {
+        margin-top: 10px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 7px;
+      }
+
+      code {
+        padding: 0.08rem 0.28rem;
+        border: 1px solid rgba(245, 166, 35, 0.18);
+        border-radius: 5px;
+        background: rgba(245, 166, 35, 0.1);
+        color: #ffe0a3;
+        font-size: 0.9em;
+      }
+
+      .subtitle {
+        margin-top: 12px;
+      }
+
+      .meta-grid,
+      .evidence-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1px;
+        margin-top: 18px;
+        border: 1px solid var(--line);
+        background: var(--line);
+      }
+
+      .meta-cell,
+      .evidence-cell {
+        min-width: 0;
+        padding: 10px 12px;
+        background: var(--panel-2);
+      }
+
+      .label {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--faint);
+        font-size: 0.66rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .ok {
+        color: var(--green);
+      }
+
+      .warn {
+        color: var(--warn);
+      }
+
+      .diff-panel {
+        border: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      .diff-panel[data-rich-ready="true"] .diff-fallback {
+        display: none;
+      }
+
+      .diff-rich {
+        display: none;
+      }
+
+      .diff-panel[data-rich-ready="true"] .diff-rich {
+        display: block;
+      }
+
+      .diff-fallback {
+        max-height: 760px;
+        margin: 0;
+        overflow: auto;
+        padding: 14px;
+        color: var(--text);
+        font-size: 0.76rem;
+        line-height: 1.45;
+        white-space: pre-wrap;
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "@pierre/diffs/react": "../../node_modules/@pierre/diffs/dist/react/index.js",
+          "react": "../../node_modules/react/index.js",
+          "react-dom/client": "../../node_modules/react-dom/client.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Typed Smart-Flow Alert Evidence Resolver</h1>
+        <p class="subtitle">
+          Added a typed server-side resolver for smart-flow alert evidence refs and moved the alert
+          drawer from prefix inference to resolved evidence items.
+        </p>
+        <div class="meta-grid" aria-label="Turn metadata">
+          <div class="meta-cell"><span class="label">Branch</span>dashboard-v2</div>
+          <div class="meta-cell"><span class="label">Beads</span>islandflow-3q0e</div>
+          <div class="meta-cell"><span class="label">Surface</span>API lookup, storage, alerts drawer</div>
+          <div class="meta-cell"><span class="label">Contract</span><code>SmartFlowAlertEvent</code> unchanged</div>
+        </div>
+      </header>
+
+      <section>
+        <h2>Implementation</h2>
+        <ul>
+          <li>Added <code>SmartFlowAlertEvidenceBundle</code>, item variants, request schema, and the <code>/lookup/smart-flow-alert-evidence</code> path constant in <code>@islandflow/types</code>.</li>
+          <li>Implemented batched API resolution for flow packets, option prints, exact option NBBO, exact equity quotes, equity prints, synthetic labels, external context, and explicit unresolved refs.</li>
+          <li>Added bounded storage helpers for exact <code>(option_contract_id, ts)</code>, exact <code>(underlying_id, ts)</code>, and equity print trace lookups.</li>
+          <li>Wired the lookup route into API routing, lookup rate-limit classification, public route checks, and README route documentation.</li>
+          <li>Changed alert drawer hydration to use one typed bundle POST and render resolved NBBO, equity quote/print, synthetic label, external context, and unresolved rows explicitly.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Behavior Notes</h2>
+        <p>
+          The resolver preserves one output item per input ref in input order, while de-duping only
+          the storage calls. <code>option-nbbo:&lt;contract&gt;:&lt;ts&gt;</code> and
+          <code>equity-quote:&lt;underlying&gt;:&lt;ts&gt;</code> parse by the last colon so identifiers
+          can contain colons.
+        </p>
+        <p>
+          Bare refs and <code>print:*</code> refs remain option-print trace ids for current provider
+          traces. Semantic refs that cannot be parsed or found become typed <code>unresolved</code>
+          rows with <code>malformed_ref</code>, <code>not_found</code>, or <code>unsupported_ref</code>.
+        </p>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <div class="evidence-grid">
+          <div class="evidence-cell">
+            <span class="label">Requested tests</span>
+            <span class="ok">Passed</span>
+            <code>bun test packages/types packages/storage/tests services/api/tests apps/web/features/alerts/alerts-module.test.ts apps/web/app/terminal.test.ts</code>
+          </div>
+          <div class="evidence-cell">
+            <span class="label">Web build</span>
+            <span class="ok">Passed</span>
+            <code>bun --cwd=apps/web run build</code>
+          </div>
+          <div class="evidence-cell">
+            <span class="label">Public route check</span>
+            <span class="warn">Not run</span>
+            <code>check-public-api-routes</code> needs a deployed app origin.
+          </div>
+          <div class="evidence-cell">
+            <span class="label">Generated drift</span>
+            <span class="ok">Cleaned</span>
+            <code>apps/web/next-env.d.ts</code> build churn was reverted.
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p>
+          This section includes a readable unified diff fallback. If browser module loading works,
+          it is replaced by <code>PatchDiff</code> from browser-side <code>@pierre/diffs/react</code>.
+        </p>
+        <div class="diff-panel" id="diff-panel">
+          <div class="diff-rich" id="diff-rich" aria-label="Rich rendered diff"></div>
+          <pre class="diff-fallback" id="diff-fallback">diff --git a/packages/types/src/smart-flow-alerts.ts b/packages/types/src/smart-flow-alerts.ts
+@@
++export const SMART_FLOW_ALERT_EVIDENCE_LOOKUP_PATH = "/lookup/smart-flow-alert-evidence";
++
++export const SmartFlowAlertEvidenceItemSchema = z.discriminatedUnion("kind", [
++  z.object({ kind: z.literal("flow_packet"), ref: z.string().min(1), packet: FlowPacketSchema }).strict(),
++  z.object({ kind: z.literal("option_print"), ref: z.string().min(1), print: OptionPrintSchema }).strict(),
++  z.object({ kind: z.literal("option_nbbo"), ref: z.string().min(1), nbbo: OptionNBBOSchema }).strict(),
++  z.object({ kind: z.literal("equity_quote"), ref: z.string().min(1), quote: EquityQuoteSchema }).strict(),
++  z.object({ kind: z.literal("equity_print"), ref: z.string().min(1), print: EquityPrintSchema }).strict(),
++  z.object({ kind: z.literal("synthetic_label"), ref: z.string().min(1), label: SmartFlowSyntheticLabelPayloadSchema }).strict(),
++  z.object({ kind: z.literal("external_context"), ref: z.string().min(1), context: SmartFlowExternalContextPayloadSchema }).strict(),
++  z.object({ kind: z.literal("unresolved"), ref: z.string().min(1), inferred_kind: SmartFlowAlertEvidenceInferredKindSchema, reason: SmartFlowAlertEvidenceUnresolvedReasonSchema }).strict()
++]);
++
++export const SmartFlowAlertEvidenceLookupRequestSchema = z
++  .object({ alert_id: z.string().trim().min(1).optional(), refs: z.array(z.string().trim().min(1)).max(100) })
++  .strict();
++export const SmartFlowAlertEvidenceBundleSchema = z
++  .object({ alert_id: z.string().min(1).optional(), items: z.array(SmartFlowAlertEvidenceItemSchema) })
++  .strict();
+
+diff --git a/services/api/src/smart-flow-alert-evidence.ts b/services/api/src/smart-flow-alert-evidence.ts
+new file mode 100644
+@@
++export const parseSmartFlowAlertEvidenceRef = (rawRef: string): ParsedEvidenceRef =&gt; {
++  const ref = rawRef.trim();
++  if (ref.startsWith("option-nbbo:")) {
++    const parsed = parseLastColonLookup(ref, "option-nbbo:");
++    return parsed
++      ? { kind: "option_nbbo", ref, lookup: { option_contract_id: parsed.left, ts: parsed.ts } }
++      : { kind: "unresolved", ref, inferredKind: "option_nbbo", reason: "malformed_ref" };
++  }
++  if (ref.startsWith("equity-quote:")) {
++    const parsed = parseLastColonLookup(ref, "equity-quote:");
++    return parsed
++      ? { kind: "equity_quote", ref, lookup: { underlying_id: parsed.left, ts: parsed.ts } }
++      : { kind: "unresolved", ref, inferredKind: "equity_quote", reason: "malformed_ref" };
++  }
++  if (ref.includes(":") &amp;&amp; !ref.startsWith("print:")) {
++    return { kind: "unresolved", ref, inferredKind: "unknown", reason: "unsupported_ref" };
++  }
++  return { kind: "option_print", ref, traceId: ref };
++};
++
++export const resolveSmartFlowAlertEvidenceBundle = async (
++  client: ClickHouseClient,
++  request: SmartFlowAlertEvidenceLookupRequest,
++  deps: SmartFlowAlertEvidenceResolverDeps = DEFAULT_DEPS
++): Promise&lt;SmartFlowAlertEvidenceBundle&gt; =&gt; {
++  const parsedRefs = request.refs.map(parseSmartFlowAlertEvidenceRef);
++  const [flowPackets, optionPrints, optionNbbos, equityQuotes, equityPrints] = await Promise.all([...]);
++  return SmartFlowAlertEvidenceBundleSchema.parse({ alert_id: request.alert_id, items });
++};
+
+diff --git a/apps/web/features/alerts/evidence.ts b/apps/web/features/alerts/evidence.ts
+@@
+-    void Promise.all([
+-      fetchFlowPacketsById({ packetIds: packetRefs, fetcher, apiBaseUrl: sourceOptions?.apiBaseUrl, signal: abort.signal }),
+-      fetchOptionPrintsByTraceId({ traceIds: printRefs, fetcher, apiBaseUrl: sourceOptions?.apiBaseUrl, signal: abort.signal })
+-    ])
++    void fetchAlertEvidenceBundle({
++      alertId: alert.alert_id,
++      refs: alert.evidence_refs,
++      fetcher,
++      apiBaseUrl: sourceOptions?.apiBaseUrl,
++      signal: abort.signal
++    })
++      .then((nextBundle) =&gt; {
++        setBundle(nextBundle);
++        setStatus({
++          traceId: alert.trace_id,
++          loading: false,
++          missingRefs: nextBundle.items.filter((item) =&gt; item.kind === "unresolved").map((item) =&gt; item.ref),
++          error: null
++        });
++      });
+
+diff --git a/apps/web/features/alerts/AlertsModule.tsx b/apps/web/features/alerts/AlertsModule.tsx
+@@
+-  const unresolved = hydration.evidence.filter((item) =&gt; item.kind === "unknown");
+-  const contextRefs = hydration.evidence.filter((item) =&gt; item.kind === "context");
++  const optionNbboItems = hydration.evidence.filter((item) =&gt; item.kind === "option_nbbo");
++  const equityQuoteItems = hydration.evidence.filter((item) =&gt; item.kind === "equity_quote");
++  const equityPrintItems = hydration.evidence.filter((item) =&gt; item.kind === "equity_print");
++  const syntheticLabelItems = hydration.evidence.filter((item) =&gt; item.kind === "synthetic_label");
++  const externalContextItems = hydration.evidence.filter((item) =&gt; item.kind === "external_context");
++  const unresolved = hydration.evidence.filter((item) =&gt; item.kind === "unresolved");
+@@
+-        {contextRefs.length &gt; 0 ? &lt;p className="drawer-empty"&gt;Quote context refs: {contextRefs.length}&lt;/p&gt; : null}
++        {optionNbboItems.map(({ ref, nbbo }) =&gt; &lt;div className="alerts-detail-row" key={ref}&gt;...&lt;/div&gt;)}
++        {equityQuoteItems.map(({ ref, quote }) =&gt; &lt;div className="alerts-detail-row" key={ref}&gt;...&lt;/div&gt;)}
++        {equityPrintItems.map(({ ref, print }) =&gt; &lt;div className="alerts-detail-row" key={ref}&gt;...&lt;/div&gt;)}
++        {syntheticLabelItems.map(({ ref, label }) =&gt; &lt;div className="alerts-detail-row" key={ref}&gt;...&lt;/div&gt;)}
++        {externalContextItems.map(({ ref, context }) =&gt; &lt;div className="alerts-detail-row" key={ref}&gt;...&lt;/div&gt;)}
+</pre>
+        </div>
+      </section>
+    </main>
+
+    <script type="module">
+      const fallback = document.getElementById("diff-fallback");
+      const target = document.getElementById("diff-rich");
+      const panel = document.getElementById("diff-panel");
+
+      try {
+        const [{ createElement }, { createRoot }, { PatchDiff }] = await Promise.all([
+          import("react"),
+          import("react-dom/client"),
+          import("@pierre/diffs/react")
+        ]);
+        createRoot(target).render(createElement(PatchDiff, { patch: fallback.textContent || "" }));
+        panel.dataset.richReady = "true";
+      } catch (error) {
+        console.warn("Diffs rich renderer failed; keeping HTML fallback.", error);
+      }
+    </script>
+  </body>
+</html>

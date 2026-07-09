@@ -4,7 +4,7 @@ Canonical tracker: Beads epic `islandflow-mcmd`
 
 This file is a compact resume aid only. If this file disagrees with Beads, Beads wins.
 
-Status: active
+Status: complete
 
 Stream: `market-command-dashboard`
 
@@ -16,7 +16,9 @@ Current Beads issue: none
 
 Current PR: none
 
-Last completed phase: none
+Last completed phase: 08 - Deterministic drawer browser fixture (`islandflow-mcmd.8`)
+
+Final storyboard: `docs/implementation/market-command-dashboard/storyboard-post-run-07-02-2026.html`
 
 Blocked: no
 
@@ -42,14 +44,17 @@ Blocked: no
 
 | Phase | Beads Issue | Status | PR | Turn Doc |
 |---|---|---|---|---|
-| 01 - Server ranking contract | `islandflow-mcmd.1` | Open | None | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.1.md` |
-| 02 - Ticker rail and board focus model | `islandflow-mcmd.2` | Open, blocked by `islandflow-mcmd.1` | None | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.2.md` |
-| 03 - Root route feature upgrade | `islandflow-mcmd.3` | Open, blocked by `islandflow-mcmd.2` | None | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.3.md` |
-| 04 - Dashboard layout replacement | `islandflow-mcmd.4` | Open, blocked by `islandflow-mcmd.3` | None | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.4.md` |
-| 05 - Hybrid detail drawer model | `islandflow-mcmd.5` | Open, blocked by `islandflow-mcmd.4` | None | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.5.md` |
-| 06 - News relevance ordering | `islandflow-mcmd.6` | Open, blocked by `islandflow-mcmd.5` | None | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.6.md` |
-| 07 - Polish, performance, and visual QA | `islandflow-mcmd.7` | Open, blocked by `islandflow-mcmd.6` | None | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.7.md` |
+| 01 - Server ranking contract | `islandflow-mcmd.1` | Closed, merged via PR #102 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/102` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.1.md` |
+| 02 - Ticker rail and board focus model | `islandflow-mcmd.2` | Closed, merged via PR #103 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/103` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.2.md` |
+| 03 - Root route feature upgrade | `islandflow-mcmd.3` | Closed, merged via PR #104 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/104` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.3.md` |
+| 04 - Dashboard layout replacement | `islandflow-mcmd.4` | Closed, merged via PR #105 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/105` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.4.md` |
+| 05 - Hybrid detail drawer model | `islandflow-mcmd.5` | Closed, merged via PR #106 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/106` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.5.md` |
+| 06 - News relevance ordering | `islandflow-mcmd.6` | Closed, merged via PR #107 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/107` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.6.md` |
+| 07 - Polish, performance, and visual QA | `islandflow-mcmd.7` | Closed, merged via PR #108 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/108` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.7.md` |
+| 08 - Deterministic drawer browser fixture | `islandflow-mcmd.8` | Closed, merged via PR #109 into `dashboard-v2` | `https://git.dirtydishes.dev/dirtydishes/islandflow/pulls/109` | `docs/implementation/market-command-dashboard/turn-docs/islandflow-mcmd.8.md` |
 
 ## Last Coordinator Update
 
-2026-07-01: Created dirtyloops orchestrator-callback stream docs and Beads epic `islandflow-mcmd` with serial phase children `islandflow-mcmd.1` through `islandflow-mcmd.7`.
+2026-07-02: Review callback approved Phase `islandflow-mcmd.8` with `ci-green`. Orchestrator merged PR #109 into `dashboard-v2` at merge commit `ead46aa`, closed Beads issue `islandflow-mcmd.8`, and recorded Forgejo Actions task `#464` as green for final reviewer head `fd6c197988`.
+
+2026-07-02: Final selector found no remaining ready or open `islandflow-mcmd.*` children. Orchestrator generated and Chromium-verified `docs/implementation/market-command-dashboard/storyboard-post-run-07-02-2026.html`; the storyboard uses `@pierre/diffs/ssr` for all rendered diff blocks and notes that `impeccable` was unavailable in this session. Epic `islandflow-mcmd` was closed in Beads after storyboard verification.

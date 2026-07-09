@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Native Alert Evidence, Time Zone, and Chart Stability Repair</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #06080b;
+        --panel: #0d141b;
+        --panel-2: #111820;
+        --line: rgba(230, 237, 244, 0.14);
+        --line-strong: rgba(245, 166, 35, 0.36);
+        --text: #e6edf4;
+        --muted: #90a0b2;
+        --faint: #6e7b8c;
+        --accent: #f5a623;
+        --green: #25c17a;
+        --red: #ff6b5f;
+        --blue: #4da3ff;
+        --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.55 var(--sans);
+      }
+
+      main {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+
+      header {
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line-strong);
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        max-width: 940px;
+        font-size: 2rem;
+        line-height: 1.08;
+        letter-spacing: 0;
+      }
+
+      h2,
+      .label,
+      code,
+      pre {
+        font-family: var(--mono);
+      }
+
+      h2 {
+        margin-bottom: 10px;
+        color: var(--accent);
+        font-size: 0.9rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      section {
+        padding: 20px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      p {
+        max-width: 84ch;
+        color: var(--muted);
+      }
+
+      p + p {
+        margin-top: 10px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      li + li {
+        margin-top: 7px;
+      }
+
+      code {
+        padding: 0.08rem 0.28rem;
+        border: 1px solid rgba(245, 166, 35, 0.18);
+        border-radius: 5px;
+        background: rgba(245, 166, 35, 0.1);
+        color: #ffe0a3;
+        font-size: 0.9em;
+      }
+
+      .subtitle {
+        margin-top: 12px;
+      }
+
+      .meta-grid,
+      .evidence-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1px;
+        margin-top: 18px;
+        border: 1px solid var(--line);
+        background: var(--line);
+      }
+
+      .meta-cell,
+      .evidence-cell {
+        min-width: 0;
+        padding: 10px 12px;
+        background: var(--panel-2);
+      }
+
+      .label {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--faint);
+        font-size: 0.66rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .ok {
+        color: var(--green);
+      }
+
+      .warn {
+        color: var(--accent);
+      }
+
+      .risk {
+        color: var(--red);
+      }
+
+      .diff-panel {
+        border: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      .diff-panel[data-rich-ready="true"] .diff-fallback {
+        display: none;
+      }
+
+      .diff-rich {
+        display: none;
+      }
+
+      .diff-panel[data-rich-ready="true"] .diff-rich {
+        display: block;
+      }
+
+      .diff-fallback {
+        max-height: 760px;
+        margin: 0;
+        overflow: auto;
+        padding: 14px;
+        color: var(--text);
+        font-size: 0.76rem;
+        line-height: 1.45;
+        white-space: pre-wrap;
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "@pierre/diffs/react": "../../node_modules/@pierre/diffs/dist/react/index.js",
+          "react": "../../node_modules/react/index.js",
+          "react-dom/client": "../../node_modules/react-dom/client.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Native Alert Evidence, Time Zone, and Chart Stability Repair</h1>
+        <p class="subtitle">
+          Fixed the native dashboard path where alert details repeatedly tried to hydrate quote
+          context as print evidence, stale synthetic alert rows leaked into the live dashboard,
+          module clocks disagreed, and live candle updates replaced the chart history window.
+        </p>
+        <div class="meta-grid" aria-label="Turn metadata">
+          <div class="meta-cell"><span class="label">Branch</span>dashboard-v2</div>
+          <div class="meta-cell"><span class="label">Beads</span>islandflow-h9le</div>
+          <div class="meta-cell"><span class="label">Runtime</span>native user services + flow.deltaisland.io</div>
+          <div class="meta-cell"><span class="label">Scope</span>alert evidence, live alerts, time formatting, chart candles</div>
+        </div>
+      </header>
+
+      <section>
+        <h2>What Failed</h2>
+        <p>
+          Alert evidence refs mixed packet refs, option-print refs, and <code>option-nbbo:</code>
+          quote-context refs. The drawer treated quote context like fetchable print evidence, so it
+          kept retrying refs that were never option prints. Storage lookup also allowed multiple
+          rows per trace id, which could surface unrelated symbols in evidence previews.
+        </p>
+        <p>
+          The deployed native instance was still carrying synthetic live alert rows in Redis. The
+          REST route was cleaned first, but the live dashboard still hydrated <code>live:smart-flow-alerts</code>
+          until the live manager also learned the native-mode synthetic filter.
+        </p>
+        <p>
+          Time display was split between hard-coded Eastern labels, server-rendered row strings, and
+          browser-local chart labels. The chart instability came from live candle arrays replacing
+          the REST bootstrap history, so state updates could collapse the visible window down to the
+          hot head and make earlier bars appear to flicker.
+        </p>
+      </section>
+
+      <section>
+        <h2>Implementation</h2>
+        <ul>
+          <li>Separated alert evidence into packet refs, print refs, and quote-context refs; <code>option-nbbo:</code> now renders as context instead of a failing print lookup.</li>
+          <li>Changed option-print trace lookup to return the newest single row per trace id with <code>LIMIT 1 BY trace_id</code>.</li>
+          <li>Filtered synthetic smart-flow alerts whenever hosted adapters are not synthetic, covering REST history, live Redis hydration, live ingest, durable rows, and direct alert websockets.</li>
+          <li>Moved UI time formatting through one browser-aware helper: user timezone by default, falling back to <code>America/New_York</code>.</li>
+          <li>Made chart live updates merge into the REST candle bootstrap window instead of replacing it, with a stable 300-candle cap and ticker/interval filtering.</li>
+          <li>Removed duplicate Alpaca websocket auth sends from the options and equities adapters.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Live Deployment</h2>
+        <div class="evidence-grid">
+          <div class="evidence-cell">
+            <span class="label">Adapter Mode</span>
+            <span class="ok">Native</span> via deployed <code>.env</code>:
+            <code>OPTIONS_INGEST_ADAPTER=alpaca</code> and
+            <code>EQUITIES_INGEST_ADAPTER=alpaca</code>.
+          </div>
+          <div class="evidence-cell">
+            <span class="label">Runtime Cache</span>
+            <span class="ok">Trimmed</span> <code>live:smart-flow-alerts</code> from 1000 stale
+            synthetic rows to <code>0</code> after the API rehydrated under the filter.
+          </div>
+          <div class="evidence-cell">
+            <span class="label">Services</span>
+            <span class="ok">Active</span> API, web, ingest-options, ingest-equities, compute, and
+            candles user services after targeted restarts.
+          </div>
+          <div class="evidence-cell">
+            <span class="label">History Policy</span>
+            <span class="warn">Preserved</span> ClickHouse synthetic alert history; native mode
+            hides it rather than deleting durable records.
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Validation</h2>
+        <ul>
+          <li><span class="ok">Passed</span> <code>bun test</code> with 557 passing tests and 0 failures.</li>
+          <li><span class="ok">Passed</span> <code>bun --cwd=apps/web run build</code>.</li>
+          <li><span class="ok">Passed</span> production API probe: <code>https://flow.deltaisland.io/flow/smart-flow-alerts?limit=3</code> returned 0 rows and 0 synthetic refs.</li>
+          <li><span class="ok">Passed</span> production candle probe: SPY 1m returned 288 rows from <code>2026-07-02T22:39:00.000Z</code> through <code>2026-07-03T03:26:00.000Z</code>.</li>
+          <li><span class="ok">Passed</span> headless production screenshot: chart rendered with multi-hour candle history and Alerts Triage was empty after Redis alert-cache cleanup.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Relevant Diff Snippets</h2>
+        <p>
+          This section includes a readable unified diff fallback. If browser module loading works,
+          it is replaced by <code>PatchDiff</code> from browser-side <code>@pierre/diffs/react</code>.
+        </p>
+        <div class="diff-panel" id="diff-panel">
+          <div class="diff-rich" id="diff-rich" aria-label="Rich rendered diff"></div>
+          <pre class="diff-fallback" id="diff-fallback">diff --git a/apps/web/features/alerts/evidence.ts b/apps/web/features/alerts/evidence.ts
+@@
++export const isAlertOptionNbboRef = (ref: string): boolean =&gt; ref.startsWith("option-nbbo:");
+ export const isAlertOptionPrintRef = (ref: string): boolean =&gt;
+-  !isAlertFlowPacketRef(ref);
++  !isAlertFlowPacketRef(ref) &amp;&amp; !isAlertOptionNbboRef(ref);
+@@
+-      unknownRefs.push(ref);
++      if (isAlertOptionNbboRef(ref)) {
++        evidence.push({ kind: "context", id: ref, label: ref.replace("option-nbbo:", "") });
++      } else {
++        unknownRefs.push(ref);
++      }
+
+diff --git a/packages/storage/src/clickhouse.ts b/packages/storage/src/clickhouse.ts
+@@
+-    query: `SELECT * FROM ${OPTION_PRINTS_TABLE} WHERE trace_id IN (${buildStringList(ids)}) ORDER BY ts DESC, seq DESC LIMIT ${clampLookupLimit(ids.length)}`,
++    query: `SELECT * FROM ${OPTION_PRINTS_TABLE} WHERE trace_id IN (${buildStringList(ids)}) ORDER BY trace_id ASC, ts DESC, seq DESC LIMIT 1 BY trace_id`,
+
+diff --git a/services/api/src/smart-flow-alerts.ts b/services/api/src/smart-flow-alerts.ts
+@@
++export const shouldHideSyntheticSmartFlowAlerts = (): boolean =&gt;
++  normalizeAdapterName(process.env.OPTIONS_INGEST_ADAPTER) !== "synthetic" ||
++  normalizeAdapterName(process.env.EQUITIES_INGEST_ADAPTER) !== "synthetic";
++
++export const shouldSurfaceSmartFlowAlert = (
++  alert: Pick&lt;SmartFlowAlertEvent, "evidence_refs"&gt;
++): boolean =&gt; !shouldHideSyntheticSmartFlowAlerts() || !hasSyntheticEvidenceRef(alert);
++
++export const filterSmartFlowAlertsForRuntime = (
++  alerts: SmartFlowAlertEvent[]
++): SmartFlowAlertEvent[] =&gt; alerts.filter(shouldSurfaceSmartFlowAlert);
+
+diff --git a/services/api/src/live.ts b/services/api/src/live.ts
+@@
+   "smart-flow-alerts": {
+     redisKey: "live:smart-flow-alerts",
+     cursorField: "smart-flow-alerts",
+     limit: limits["smart-flow-alerts"],
+     parse: (value) =&gt; SmartFlowAlertEventSchema.parse(value),
++    include: shouldSurfaceSmartFlowAlert,
+     cursor: smartFlowAlertCursor,
+@@
+-      const cached = normalizeGenericItems(channel, parseJsonList(payloads, config.parse), config);
++      const cached = normalizeGenericItems(
++        channel,
++        parseJsonList(payloads, config.parse).filter((item) =&gt; config.include?.(item) ?? true),
++        config
++      );
+@@
+         const config = this.generic[channel];
+         const parsed = config.parse(item);
++        if (!(config.include?.(parsed) ?? true)) {
++          return null;
++        }
+
+diff --git a/apps/web/features/terminal/chart-adapter.tsx b/apps/web/features/terminal/chart-adapter.tsx
+@@
++const TERMINAL_CHART_CANDLE_LIMIT = 300;
++
++export const mergeTerminalChartCandles = (
++  baseCandles: readonly EquityCandle[],
++  liveCandles: readonly EquityCandle[],
++  limit = TERMINAL_CHART_CANDLE_LIMIT
++): EquityCandle[] =&gt; {
++  const byBucket = new Map&lt;string, EquityCandle&gt;();
++  for (const candle of sortByTsSeq([...baseCandles, ...liveCandles])) {
++    byBucket.set(`${candle.underlying_id}:${candle.interval_ms}:${candle.ts}`, candle);
++  }
++  const merged = sortByTsSeq([...byBucket.values()]);
++  return limit &gt; 0 &amp;&amp; merged.length &gt; limit ? merged.slice(merged.length - limit) : merged;
++};
+@@
+-      const candles = sortByTsSeq(state.liveSession.chartCandles);
++      const liveCandles = sortByTsSeq(state.liveSession.chartCandles).filter(
++        (candle) =&gt;
++          matchesChartTicker(candle.underlying_id, state.chartTicker) &amp;&amp;
++          candle.interval_ms === normalizedChartIntervalMs
++      );
+@@
+-        candles,
++        candles: mergeTerminalChartCandles(current.candles, liveCandles),
+
+diff --git a/apps/web/features/time-format.ts b/apps/web/features/time-format.ts
+@@
++export const getUserTimeZone = (): string =&gt; resolveBrowserTimeZone() ?? FALLBACK_TIME_ZONE;
+@@
+-    timeZone: EASTERN_TIME_ZONE,
++    timeZone: options?.timeZone ?? getUserTimeZone(),
+</pre>
+        </div>
+      </section>
+    </main>
+
+    <script type="module">
+      const fallback = document.getElementById("diff-fallback");
+      const target = document.getElementById("diff-rich");
+      const panel = document.getElementById("diff-panel");
+
+      try {
+        const [{ createElement }, { createRoot }, { PatchDiff }] = await Promise.all([
+          import("react"),
+          import("react-dom/client"),
+          import("@pierre/diffs/react")
+        ]);
+        createRoot(target).render(createElement(PatchDiff, { patch: fallback.textContent || "" }));
+        panel.dataset.richReady = "true";
+      } catch (error) {
+        console.warn("Diffs rich renderer failed; keeping HTML fallback.", error);
+      }
+    </script>
+  </body>
+</html>
