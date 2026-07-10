@@ -1,0 +1,1361 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Islandflow Deep Security Audit — 2026-07-09</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: oklch(0.105 0.012 250);
+        --surface: oklch(0.145 0.013 250);
+        --surface-2: oklch(0.175 0.014 250);
+        --surface-3: oklch(0.125 0.012 250);
+        --line: oklch(0.74 0.012 250 / 0.2);
+        --line-strong: oklch(0.78 0.08 74 / 0.38);
+        --text: oklch(0.94 0.014 250);
+        --muted: oklch(0.76 0.018 250);
+        --faint: oklch(0.66 0.016 250);
+        --amber: oklch(0.81 0.13 74);
+        --amber-soft: oklch(0.81 0.13 74 / 0.12);
+        --red: oklch(0.72 0.17 28);
+        --red-soft: oklch(0.72 0.17 28 / 0.12);
+        --green: oklch(0.78 0.13 151);
+        --green-soft: oklch(0.78 0.13 151 / 0.1);
+        --blue: oklch(0.76 0.13 247);
+        --blue-soft: oklch(0.76 0.13 247 / 0.11);
+        --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        --sans: "IBM Plex Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.58 var(--sans);
+      }
+
+      a {
+        color: var(--blue);
+        text-decoration-thickness: 1px;
+        text-underline-offset: 3px;
+      }
+
+      a:focus-visible,
+      button:focus-visible,
+      summary:focus-visible {
+        outline: 2px solid var(--amber);
+        outline-offset: 3px;
+      }
+
+      code,
+      pre,
+      .mono {
+        font-family: var(--mono);
+      }
+
+      code {
+        color: oklch(0.9 0.04 247);
+        overflow-wrap: anywhere;
+      }
+
+      .skip-link {
+        position: fixed;
+        z-index: 20;
+        top: 12px;
+        left: 12px;
+        padding: 8px 10px;
+        transform: translateY(-150%);
+        border: 1px solid var(--amber);
+        border-radius: 8px;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      .skip-link:focus {
+        transform: translateY(0);
+      }
+
+      .wrap {
+        width: min(1220px, calc(100vw - 40px));
+        margin-inline: auto;
+      }
+
+      header {
+        border-bottom: 1px solid var(--line);
+        background: var(--surface-3);
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(280px, 370px);
+        gap: 44px;
+        padding: 46px 0 38px;
+      }
+
+      .report-id {
+        color: var(--amber);
+        font: 700 0.78rem/1.2 var(--mono);
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        line-height: 1.16;
+        text-wrap: balance;
+      }
+
+      h1 {
+        max-width: 900px;
+        margin-top: 13px;
+        font-size: clamp(2.2rem, 5vw, 4.8rem);
+        letter-spacing: -0.035em;
+      }
+
+      h2 {
+        font-size: 1.55rem;
+      }
+
+      h3 {
+        font-size: 1.08rem;
+      }
+
+      p {
+        margin: 0;
+      }
+
+      p + p {
+        margin-top: 10px;
+      }
+
+      .lede {
+        max-width: 72ch;
+        margin-top: 18px;
+        color: var(--muted);
+        font-size: 1.06rem;
+        text-wrap: pretty;
+      }
+
+      .verdict {
+        align-self: end;
+        border-top: 3px solid var(--red);
+        padding-top: 18px;
+      }
+
+      .verdict strong {
+        display: block;
+        margin-bottom: 8px;
+        font: 700 1.06rem/1.3 var(--mono);
+        color: var(--red);
+      }
+
+      .verdict p {
+        color: var(--muted);
+      }
+
+      .meta-strip {
+        border-top: 1px solid var(--line);
+      }
+
+      .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .meta-item {
+        min-width: 0;
+        padding: 15px 18px 17px 0;
+        border-right: 1px solid var(--line);
+      }
+
+      .meta-item + .meta-item {
+        padding-left: 18px;
+      }
+
+      .meta-item:last-child {
+        border-right: 0;
+      }
+
+      .meta-label {
+        display: block;
+        margin-bottom: 5px;
+        color: var(--faint);
+        font: 700 0.7rem/1.2 var(--mono);
+      }
+
+      .meta-value {
+        color: var(--text);
+        font-weight: 650;
+      }
+
+      nav {
+        position: sticky;
+        z-index: 10;
+        top: 0;
+        border-bottom: 1px solid var(--line);
+        background: oklch(0.115 0.012 250 / 0.97);
+      }
+
+      nav .wrap {
+        display: flex;
+        gap: 22px;
+        overflow-x: auto;
+        padding-block: 11px;
+        scrollbar-width: thin;
+      }
+
+      nav a {
+        flex: none;
+        color: var(--muted);
+        font: 700 0.72rem/1.2 var(--mono);
+        text-decoration: none;
+      }
+
+      nav a:hover {
+        color: var(--text);
+      }
+
+      main {
+        padding: 18px 0 64px;
+      }
+
+      section {
+        scroll-margin-top: 60px;
+        padding: 32px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .section-head {
+        display: grid;
+        grid-template-columns: minmax(180px, 0.32fr) minmax(0, 0.68fr);
+        gap: 30px;
+        margin-bottom: 20px;
+      }
+
+      .section-head p {
+        max-width: 74ch;
+        color: var(--muted);
+        text-wrap: pretty;
+      }
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
+        gap: 16px;
+      }
+
+      .summary-pane {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--surface);
+        padding: 20px;
+      }
+
+      .summary-pane h3 {
+        margin-bottom: 11px;
+      }
+
+      .summary-pane p,
+      .summary-pane li {
+        color: var(--muted);
+      }
+
+      .risk-counts {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 17px;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        min-height: 29px;
+        padding: 4px 9px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        font: 700 0.72rem/1.2 var(--mono);
+      }
+
+      .badge.high {
+        border-color: oklch(0.72 0.17 28 / 0.5);
+        background: var(--red-soft);
+        color: oklch(0.86 0.12 28);
+      }
+
+      .badge.medium {
+        border-color: oklch(0.81 0.13 74 / 0.46);
+        background: var(--amber-soft);
+        color: oklch(0.9 0.1 74);
+      }
+
+      .badge.low {
+        border-color: oklch(0.76 0.13 247 / 0.42);
+        background: var(--blue-soft);
+        color: oklch(0.88 0.08 247);
+      }
+
+      .badge.good {
+        border-color: oklch(0.78 0.13 151 / 0.4);
+        background: var(--green-soft);
+        color: oklch(0.88 0.09 151);
+      }
+
+      .threat-table,
+      .finding-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--surface);
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+      }
+
+      th,
+      td {
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      th {
+        background: var(--surface-2);
+        color: var(--muted);
+        font: 700 0.7rem/1.25 var(--mono);
+      }
+
+      td {
+        color: var(--muted);
+      }
+
+      td strong {
+        color: var(--text);
+      }
+
+      .finding-table th:first-child,
+      .finding-table td:first-child {
+        width: 72px;
+        color: var(--text);
+        font-family: var(--mono);
+      }
+
+      .finding-table th:nth-child(2),
+      .finding-table td:nth-child(2) {
+        width: 100px;
+      }
+
+      .finding-table th:nth-child(3),
+      .finding-table td:nth-child(3) {
+        width: 170px;
+      }
+
+      .flow {
+        display: flex;
+        align-items: stretch;
+        gap: 8px;
+        overflow-x: auto;
+        padding-bottom: 6px;
+      }
+
+      .flow-step {
+        flex: 1 0 165px;
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--surface);
+        padding: 13px;
+      }
+
+      .flow-step strong {
+        display: block;
+        margin-bottom: 5px;
+        color: var(--text);
+      }
+
+      .flow-step span {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .flow-arrow {
+        display: grid;
+        flex: 0 0 24px;
+        place-items: center;
+        color: var(--red);
+        font: 800 1.2rem/1 var(--mono);
+      }
+
+      .finding-list {
+        display: grid;
+        gap: 12px;
+      }
+
+      details.finding {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--surface);
+      }
+
+      details.finding.high {
+        border-color: oklch(0.72 0.17 28 / 0.45);
+      }
+
+      details.finding[open] {
+        background: var(--surface-2);
+      }
+
+      summary {
+        display: grid;
+        grid-template-columns: 76px 112px minmax(0, 1fr);
+        gap: 12px;
+        align-items: center;
+        min-height: 58px;
+        padding: 12px 15px;
+        cursor: pointer;
+        list-style: none;
+      }
+
+      summary::-webkit-details-marker {
+        display: none;
+      }
+
+      summary::after {
+        content: "+";
+        grid-column: 4;
+        color: var(--faint);
+        font: 700 1.1rem/1 var(--mono);
+      }
+
+      details[open] summary::after {
+        content: "−";
+      }
+
+      .finding-id {
+        color: var(--faint);
+        font: 700 0.74rem/1.2 var(--mono);
+      }
+
+      .severity {
+        width: fit-content;
+        border-radius: 999px;
+        padding: 4px 8px;
+        font: 700 0.7rem/1.2 var(--mono);
+      }
+
+      .severity.high {
+        background: var(--red-soft);
+        color: oklch(0.86 0.12 28);
+      }
+
+      .severity.medium {
+        background: var(--amber-soft);
+        color: oklch(0.9 0.1 74);
+      }
+
+      .severity.low {
+        background: var(--blue-soft);
+        color: oklch(0.88 0.08 247);
+      }
+
+      .finding-title {
+        color: var(--text);
+        font-weight: 700;
+      }
+
+      .finding-body {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+        padding: 2px 15px 18px 215px;
+      }
+
+      .finding-body > div {
+        min-width: 0;
+      }
+
+      .finding-body h4 {
+        margin: 0 0 7px;
+        color: var(--faint);
+        font: 700 0.7rem/1.2 var(--mono);
+      }
+
+      .finding-body p,
+      .finding-body li {
+        color: var(--muted);
+      }
+
+      .finding-body ul {
+        margin: 0;
+        padding-left: 1.15rem;
+      }
+
+      .finding-body li + li {
+        margin-top: 5px;
+      }
+
+      .evidence,
+      .recommendation {
+        grid-column: 1 / -1;
+      }
+
+      .evidence-list {
+        display: grid;
+        gap: 6px;
+      }
+
+      .evidence-line {
+        padding: 8px 10px;
+        border-radius: 7px;
+        background: var(--surface-3);
+        color: oklch(0.86 0.028 250);
+        font: 0.78rem/1.45 var(--mono);
+        overflow-wrap: anywhere;
+      }
+
+      .recommendation {
+        border-top: 1px solid var(--line);
+        padding-top: 13px;
+      }
+
+      .roadmap {
+        display: grid;
+        gap: 12px;
+      }
+
+      .phase {
+        display: grid;
+        grid-template-columns: 120px minmax(0, 1fr) minmax(230px, 0.38fr);
+        gap: 18px;
+        align-items: start;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--surface);
+        padding: 18px;
+      }
+
+      .phase-name {
+        color: var(--amber);
+        font: 700 0.78rem/1.35 var(--mono);
+      }
+
+      .phase ul {
+        margin: 0;
+        padding-left: 1.15rem;
+        color: var(--muted);
+      }
+
+      .phase li + li {
+        margin-top: 6px;
+      }
+
+      .phase-gate {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .phase-gate strong {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--text);
+      }
+
+      .positive-grid {
+        columns: 2 340px;
+        column-gap: 34px;
+        margin: 0;
+        padding-left: 1.15rem;
+      }
+
+      .positive-grid li {
+        break-inside: avoid;
+        margin-bottom: 9px;
+        color: var(--muted);
+      }
+
+      .method-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .method {
+        border-top: 1px solid var(--line-strong);
+        padding-top: 12px;
+      }
+
+      .method h3 {
+        margin-bottom: 7px;
+      }
+
+      .method p {
+        color: var(--muted);
+      }
+
+      .footnote {
+        margin-top: 18px;
+        color: var(--faint);
+        font-size: 0.88rem;
+      }
+
+      footer {
+        padding: 24px 0 40px;
+        color: var(--faint);
+        font: 0.78rem/1.5 var(--mono);
+      }
+
+      @media (max-width: 900px) {
+        .hero,
+        .summary-grid,
+        .section-head {
+          grid-template-columns: 1fr;
+        }
+
+        .hero {
+          gap: 28px;
+        }
+
+        .meta-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .meta-item:nth-child(2) {
+          border-right: 0;
+        }
+
+        .meta-item:nth-child(n + 3) {
+          border-top: 1px solid var(--line);
+        }
+
+        .finding-body {
+          padding-left: 15px;
+        }
+
+        .phase {
+          grid-template-columns: 105px minmax(0, 1fr);
+        }
+
+        .phase-gate {
+          grid-column: 2;
+        }
+
+        .method-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 620px) {
+        .wrap {
+          width: min(100% - 24px, 1220px);
+        }
+
+        .hero {
+          padding-top: 30px;
+        }
+
+        h1 {
+          font-size: 2.2rem;
+        }
+
+        .meta-grid,
+        .finding-body,
+        .phase {
+          grid-template-columns: 1fr;
+        }
+
+        .meta-item,
+        .meta-item + .meta-item {
+          padding: 12px 0;
+          border-top: 1px solid var(--line);
+          border-right: 0;
+        }
+
+        summary {
+          grid-template-columns: 62px 86px minmax(0, 1fr);
+          gap: 8px;
+        }
+
+        summary::after {
+          display: none;
+        }
+
+        .finding-title {
+          font-size: 0.94rem;
+        }
+
+        .phase-gate {
+          grid-column: 1;
+        }
+
+        .positive-grid {
+          columns: 1;
+        }
+      }
+
+      @media print {
+        :root {
+          color-scheme: light;
+          --bg: white;
+          --surface: #f7f8fa;
+          --surface-2: #eef1f4;
+          --surface-3: white;
+          --line: #c7cdd5;
+          --line-strong: #9aa6b2;
+          --text: #111827;
+          --muted: #374151;
+          --faint: #4b5563;
+        }
+
+        body {
+          background: white;
+        }
+
+        nav,
+        .skip-link {
+          display: none;
+        }
+
+        details.finding {
+          break-inside: avoid;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#content">Skip to report</a>
+
+    <header>
+      <div class="wrap hero">
+        <div>
+          <span class="report-id">SECURITY REVIEW / ISLANDFLOW / 2026-07-09</span>
+          <h1>Deep security audit</h1>
+          <p class="lede">
+            Evidence-backed review of the web client, desktop shell, API, market-data services,
+            internal data plane, deployment host, CI/CD, dependencies, and secret handling. The
+            assessment uses the actual single-owner deployment as today’s threat model, then adds a
+            stricter readiness gate for inviting other users.
+          </p>
+        </div>
+        <aside class="verdict" aria-label="Audit verdict">
+          <strong>Not ready for additional users yet</strong>
+          <p>
+            The system has five high-priority current risks: SQL injection, stored browser script
+            execution, plaintext/direct-origin exposure, unbounded public WebSocket work, and an
+            unsupported Electron runtime. The rest is a tractable hardening backlog, not evidence
+            that your private tool is already compromised.
+          </p>
+        </aside>
+      </div>
+
+      <div class="meta-strip">
+        <div class="wrap meta-grid">
+          <div class="meta-item">
+            <span class="meta-label">REVIEWED REVISION</span>
+            <span class="meta-value mono">a2259c6 / main</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">DEPLOYMENT</span>
+            <span class="meta-value">Live Debian host + repo</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">THREAT MODEL</span>
+            <span class="meta-value">Single owner now; future users</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">TRACKING</span>
+            <span class="meta-value mono">islandflow-yet8</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <nav aria-label="Report sections">
+      <div class="wrap">
+        <a href="#summary">Summary</a>
+        <a href="#threat-model">Threat model</a>
+        <a href="#attack-paths">Attack paths</a>
+        <a href="#findings">Findings</a>
+        <a href="#roadmap">Roadmap</a>
+        <a href="#positives">Positive controls</a>
+        <a href="#method">Method</a>
+      </div>
+    </nav>
+
+    <main id="content" class="wrap">
+      <section id="summary">
+        <div class="section-head">
+          <h2>Executive summary</h2>
+          <p>
+            No secret leak or dependency advisory was found, the raw API is private, and the desktop
+            shell already uses strong renderer isolation. The dominant risk is instead a chain of
+            trust-boundary mistakes: provider HTML reaches a regex sanitizer, the public edge permits
+            plaintext and origin bypass, and several internal services assume every network peer is
+            trusted.
+          </p>
+        </div>
+
+        <div class="summary-grid">
+          <div class="summary-pane">
+            <h3>What is unsafe today</h3>
+            <p>
+              Public identifiers reach ClickHouse through a broken string-escaping helper, and a
+              harmless live probe confirmed that input can change the query shape. A compromised or
+              malicious news payload can also execute script when you open a story. The production
+              site answers over HTTP, the Next server listens on every interface, and public
+              WebSockets accept unbounded subscription work. Electron 39 is end-of-support while
+              loading this same remote content.
+            </p>
+            <div class="risk-counts" aria-label="Finding counts">
+              <span class="badge high">5 high / P1</span>
+              <span class="badge medium">11 medium / P2</span>
+              <span class="badge low">3 low / P3</span>
+              <span class="badge good">0 critical / P0</span>
+            </div>
+          </div>
+
+          <div class="summary-pane">
+            <h3>What changes before other users</h3>
+            <p>
+              Add a real identity/session boundary, make every privileged route authenticate the
+              caller, enforce request/resource bounds, isolate service credentials, and run untrusted
+              CI away from the privileged deployment runner. These are publication gates; they are
+              not current cross-account failures because there are no other accounts.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="threat-model">
+        <div class="section-head">
+          <h2>Threat model</h2>
+          <p>
+            Severity is based on reachable preconditions, not generic checklists. Public attackers,
+            upstream market-data/news providers, compromised containers, and supply-chain changes are
+            in scope. Cross-user privilege escalation is conditional because Islandflow currently has
+            one owner and no user-account model.
+          </p>
+        </div>
+
+        <div class="table-wrap">
+          <table class="threat-table">
+            <thead>
+              <tr>
+                <th>Actor / condition</th>
+                <th>Current relevance</th>
+                <th>Primary concern</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Unauthenticated internet client</strong></td>
+                <td>Current</td>
+                <td>Direct-origin access, plaintext downgrade, rate-limit bypass, resource exhaustion.</td>
+              </tr>
+              <tr>
+                <td><strong>Malicious or compromised provider</strong></td>
+                <td>Current</td>
+                <td>Stored news XSS, malformed high-volume payloads, unbounded cardinality.</td>
+              </tr>
+              <tr>
+                <td><strong>Compromised app service/container</strong></td>
+                <td>Current post-exploitation</td>
+                <td>Shared credentials, unauthenticated NATS/Redis/ClickHouse, weak process isolation.</td>
+              </tr>
+              <tr>
+                <td><strong>Untrusted pull-request author</strong></td>
+                <td>Conditional today</td>
+                <td>Privileged persistent CI runner and mutable installer trust chain.</td>
+              </tr>
+              <tr>
+                <td><strong>Additional Islandflow user</strong></td>
+                <td>Future-publication gate</td>
+                <td>No identity/session boundary; conditional admin proxy becomes a confused deputy.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="attack-paths">
+        <div class="section-head">
+          <h2>Confirmed attack paths</h2>
+          <p>
+            The most important relationships are chains, not isolated lint findings. These paths were
+            reproduced or verified against the running deployment and current source.
+          </p>
+        </div>
+
+        <h3>Provider content to same-origin script execution</h3>
+        <div class="flow" aria-label="Stored XSS flow">
+          <div class="flow-step"><strong>Provider / bus</strong><span>News <code>content_html</code> is accepted as an unrestricted string.</span></div>
+          <div class="flow-arrow" aria-hidden="true">→</div>
+          <div class="flow-step"><strong>Persistence</strong><span>The provider body is published and stored verbatim.</span></div>
+          <div class="flow-arrow" aria-hidden="true">→</div>
+          <div class="flow-step"><strong>Regex filter</strong><span>Unquoted schemes and spaced event attributes survive.</span></div>
+          <div class="flow-arrow" aria-hidden="true">→</div>
+          <div class="flow-step"><strong>Browser sink</strong><span><code>dangerouslySetInnerHTML</code> renders the result without CSP containment.</span></div>
+        </div>
+
+        <h3 style="margin-top: 22px">Public identifier to injected ClickHouse query</h3>
+        <div class="flow" aria-label="SQL injection flow">
+          <div class="flow-step"><strong>Public route</strong><span>Contract, underlying, packet, trace, and join identifiers accept quotes and backslashes.</span></div>
+          <div class="flow-arrow" aria-hidden="true">→</div>
+          <div class="flow-step"><strong>Broken quoting</strong><span><code>quoteString()</code> doubles quotes but leaves ClickHouse backslash escapes active.</span></div>
+          <div class="flow-arrow" aria-hidden="true">→</div>
+          <div class="flow-step"><strong>Query interpolation</strong><span>The escaped value is concatenated into SQL literals and <code>IN</code> lists.</span></div>
+          <div class="flow-arrow" aria-hidden="true">→</div>
+          <div class="flow-step"><strong>Database</strong><span>A read-only live probe added a second selected column and returned its marker.</span></div>
+        </div>
+
+        <h3 style="margin-top: 22px">Internet client to resource-limit bypass</h3>
+        <div class="flow" aria-label="Origin and rate-limit bypass flow">
+          <div class="flow-step"><strong>Direct origin</strong><span>Public address and HTTP route reach NPM/Next outside the intended HTTPS-only posture.</span></div>
+          <div class="flow-arrow" aria-hidden="true">→</div>
+          <div class="flow-step"><strong>Forwarded header</strong><span>NPM appends to caller-controlled <code>X-Forwarded-For</code>.</span></div>
+          <div class="flow-arrow" aria-hidden="true">→</div>
+          <div class="flow-step"><strong>API limiter</strong><span>The first syntactically valid address is trusted without verifying the proxy peer.</span></div>
+          <div class="flow-arrow" aria-hidden="true">→</div>
+          <div class="flow-step"><strong>Expensive routes</strong><span>Rotating spoofed addresses weakens REST, lookup, and WebSocket quotas.</span></div>
+        </div>
+      </section>
+
+      <section id="findings">
+        <div class="section-head">
+          <h2>Finding index</h2>
+          <p>
+            Priority maps to the audit convention: P0 critical, P1 high, P2 medium, P3 low. “Current”
+            means the prerequisite exists today; “conditional” means a future feature, deployment
+            mode, or second user creates the risk.
+          </p>
+        </div>
+
+        <div class="table-wrap">
+          <table class="finding-table">
+            <thead>
+              <tr><th>ID</th><th>Severity</th><th>Exposure</th><th>Finding</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>F-00</td><td><span class="severity high">High / P1</span></td><td>Current</td><td><strong>Public identifiers can inject ClickHouse SQL</strong></td></tr>
+              <tr><td>F-01</td><td><span class="severity high">High / P1</span></td><td>Current</td><td><strong>Stored XSS through provider-supplied news HTML</strong></td></tr>
+              <tr><td>F-02</td><td><span class="severity high">High / P1</span></td><td>Current</td><td><strong>Plaintext and direct-origin paths bypass the intended edge</strong></td></tr>
+              <tr><td>F-03</td><td><span class="severity high">High / P1</span></td><td>Current if desktop used</td><td><strong>Electron 39 is end-of-support while loading remote content</strong></td></tr>
+              <tr><td>F-18</td><td><span class="severity high">High / P1</span></td><td>Current</td><td><strong>Public WebSockets allow unbounded subscription work</strong></td></tr>
+              <tr><td>F-04</td><td><span class="severity medium">Medium / P2</span></td><td>Current</td><td><strong>Rate limiting trusts unverified forwarded addresses</strong></td></tr>
+              <tr><td>F-05</td><td><span class="severity medium">Medium / P2</span></td><td>Post-exploitation</td><td><strong>Shared credentials and Unix identity magnify one service compromise</strong></td></tr>
+              <tr><td>F-06</td><td><span class="severity medium">Medium / P2</span></td><td>Internal foothold</td><td><strong>Unauthenticated data plane plus unbounded message cardinality</strong></td></tr>
+              <tr><td>F-07</td><td><span class="severity medium">Medium / P2</span></td><td>Post-exploitation</td><td><strong>Native units and containers lack practical sandboxing</strong></td></tr>
+              <tr><td>F-08</td><td><span class="severity medium">Medium / P2</span></td><td>Conditional PR access</td><td><strong>Privileged CI executes mutable tooling and PR-controlled code</strong></td></tr>
+              <tr><td>F-09</td><td><span class="severity medium">Medium / P2</span></td><td>Conditional feature flag</td><td><strong>Synthetic admin proxy authenticates itself, not its caller</strong></td></tr>
+              <tr><td>F-10</td><td><span class="severity medium">Medium / P2</span></td><td>Current</td><td><strong>Browser security header baseline is absent</strong></td></tr>
+              <tr><td>F-11</td><td><span class="severity medium">Medium / P2</span></td><td>Post-exploitation/local</td><td><strong>Credential-bearing backups are over-retained and broadly readable</strong></td></tr>
+              <tr><td>F-12</td><td><span class="severity medium">Medium / P2</span></td><td>Provider failure</td><td><strong>Provider adapters lack backpressure, size limits, and deadlines</strong></td></tr>
+              <tr><td>F-13</td><td><span class="severity medium">Medium / P2</span></td><td>Rebuild/deploy</td><td><strong>Unsupported and mutable runtime dependencies remain in deploy paths</strong></td></tr>
+              <tr><td>F-14</td><td><span class="severity medium">Medium / P2</span></td><td>Operational</td><td><strong>State has no tested encrypted backup/restore control</strong></td></tr>
+              <tr><td>F-15</td><td><span class="severity low">Low / P3</span></td><td>Local operator input</td><td><strong>Synthetic fixture paths can escape their fixture directory</strong></td></tr>
+              <tr><td>F-16</td><td><span class="severity low">Low / P3</span></td><td>Current hardening</td><td><strong>Public error details and unbounded body reads expose avoidable surface</strong></td></tr>
+              <tr><td>F-17</td><td><span class="severity low">Low / P3</span></td><td>Regression risk</td><td><strong>Logging has no central secret-redaction safety net</strong></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="finding-list" style="margin-top: 22px">
+          <details class="finding high" open>
+            <summary><span class="finding-id">F-00</span><span class="severity high">High / P1</span><span class="finding-title">Public identifiers can inject ClickHouse SQL</span></summary>
+            <div class="finding-body">
+              <div><h4>IMPACT</h4><p>A public caller can alter ClickHouse query structure through identifier parameters, bypass intended filters and potentially read or infer data accessible to the API’s broad default database user.</p></div>
+              <div><h4>PRECONDITION</h4><p>Access to an ordinary public lookup/history route. No account is required. Multi-statement DDL was not attempted; the confirmed issue is query-shape control inside a SELECT.</p></div>
+              <div class="evidence"><h4>EVIDENCE</h4><div class="evidence-list">
+                <div class="evidence-line">packages/storage/src/clickhouse.ts:686-693 — quoteString() doubles ' but does not escape \\</div>
+                <div class="evidence-line">packages/storage/src/clickhouse.ts:868,1450,1869,2126 — helper feeds public identifier queries</div>
+                <div class="evidence-line">services/api/src/option-queries.ts:62-86; services/api/src/index.ts:298-304,1720-1723 — public strings reach those queries without a safe character policy</div>
+                <div class="evidence-line">Harmless live proof: generated SELECT added “7 AS marker”; ClickHouse returned the injected marker with HTTP 200</div>
+              </div></div>
+              <div class="recommendation"><h4>REMEDIATION</h4><p>Stop interpolating string literals. Use ClickHouse typed query parameters such as <code>{id:String}</code> with <code>param_id</code>, add restrictive identifier schemas and quote/backslash regression tests, and replace the broad default database user with least-privilege read/write roles. See <a href="https://clickhouse.com/docs/sql-reference/syntax#string">ClickHouse string syntax and query parameters</a>. CWE-89 / OWASP A03.</p></div>
+            </div>
+          </details>
+
+          <details class="finding high" open>
+            <summary><span class="finding-id">F-01</span><span class="severity high">High / P1</span><span class="finding-title">Stored XSS through provider-supplied news HTML</span></summary>
+            <div class="finding-body">
+              <div><h4>IMPACT</h4><p>A crafted story body can execute script in the Islandflow origin when the news drawer opens, allowing same-origin API actions and access to browser-visible data.</p></div>
+              <div><h4>PRECONDITION</h4><p>Malicious or compromised provider content, an operator-configured compatible endpoint, or an internal publisher able to inject a news event.</p></div>
+              <div class="evidence"><h4>EVIDENCE</h4><div class="evidence-list">
+                <div class="evidence-line">services/ingest-news/src/index.ts:76-94 — provider content is persisted and published verbatim</div>
+                <div class="evidence-line">packages/types/src/events.ts:243-258 — content_html is only z.string()</div>
+                <div class="evidence-line">apps/web/features/terminal/components/ui-helpers.ts:137-159 — regex sanitizer</div>
+                <div class="evidence-line">apps/web/features/terminal/components/drawers.tsx:80-86 — dangerouslySetInnerHTML sink</div>
+                <div class="evidence-line">Reproduced: href=javascript:... and onclick = ... survived with sanitized:true</div>
+              </div></div>
+              <div class="recommendation"><h4>REMEDIATION</h4><p>Replace the regex with a maintained parser-based allowlist; remove all attributes by default; parse and allow only required <code>https:</code>/<code>http:</code> links; sanitize before persistence and again at render; add regression payload tests and a restrictive CSP. CWE-79 / OWASP A03.</p></div>
+            </div>
+          </details>
+
+          <details class="finding high" open>
+            <summary><span class="finding-id">F-02</span><span class="severity high">High / P1</span><span class="finding-title">Plaintext and direct-origin paths bypass the intended edge</span></summary>
+            <div class="finding-body">
+              <div><h4>IMPACT</h4><p>Traffic can avoid an HTTPS-only/Cloudflare posture, exposing the app to network content injection, direct scanning, and edge-control bypass.</p></div>
+              <div><h4>PRECONDITION</h4><p>Ordinary network reachability. The domain’s HTTP endpoint returned 200, and the live Next listener is bound to all host interfaces.</p></div>
+              <div class="evidence"><h4>EVIDENCE</h4><div class="evidence-list">
+                <div class="evidence-line">deployment/native/systemd/user/islandflow-web.service:9-12 — WEB_HOST=0.0.0.0</div>
+                <div class="evidence-line">Live ss: 0.0.0.0:3000; direct public-address request returned 200</div>
+                <div class="evidence-line">Live http://flow.deltaisland.io/ returned 200 instead of a redirect</div>
+                <div class="evidence-line">NPM proxy_host/6.conf listens on 80 and 443 without forced SSL</div>
+              </div></div>
+              <div class="recommendation"><h4>REMEDIATION</h4><p>Bind Next to the Docker bridge or loopback, firewall 3000 from public interfaces, restrict origin ingress where practical, and issue a permanent HTTP→HTTPS redirect before enabling HSTS. CWE-319/CWE-346 / OWASP A02/A05.</p></div>
+            </div>
+          </details>
+
+          <details class="finding high" open>
+            <summary><span class="finding-id">F-03</span><span class="severity high">High / P1</span><span class="finding-title">Electron 39 is end-of-support while loading remote content</span></summary>
+            <div class="finding-body">
+              <div><h4>IMPACT</h4><p>The desktop shell embeds an unsupported Chromium/Electron line. A renderer compromise—especially through F-01—lands in a runtime no longer receiving normal security support.</p></div>
+              <div><h4>PRECONDITION</h4><p>The desktop package is used and hostile content reaches its trusted remote origin. Existing sandbox, context isolation, and navigation guards reduce impact but do not replace supported browser patches.</p></div>
+              <div class="evidence"><h4>EVIDENCE</h4><div class="evidence-list">
+                <div class="evidence-line">apps/desktop/package.json:15-21; bun.lock:688 — electron@39.8.10</div>
+                <div class="evidence-line">apps/desktop/README.md:3-10 — shell loads the hosted web app</div>
+                <div class="evidence-line">Electron’s official 39.8.10 page warns that 39.x is end-of-support</div>
+              </div></div>
+              <div class="recommendation"><h4>REMEDIATION</h4><p>Upgrade through supported majors with security tests at each step, then add an EOL policy gate. See <a href="https://releases.electronjs.org/release/v39.8.10">Electron 39.8.10</a>, the <a href="https://releases.electronjs.org/schedule">release schedule</a>, and <a href="https://www.electronjs.org/docs/latest/tutorial/security">Electron security guidance</a>.</p></div>
+            </div>
+          </details>
+
+          <details class="finding high" open>
+            <summary><span class="finding-id">F-18</span><span class="severity high">High / P1</span><span class="finding-title">Public WebSockets allow unbounded subscription work</span></summary>
+            <div class="finding-body">
+              <div><h4>IMPACT</h4><p>One anonymous connection can submit oversized subscription sets and identifiers that create snapshot/database work and persistent fanout keys. Handshake rate limits do not limit subsequent messages.</p></div>
+              <div><h4>PRECONDITION</h4><p>Public WebSocket access. Cross-origin browser sites can also connect because upgrades do not validate <code>Origin</code>; the data is public, so the primary risk is availability rather than confidentiality.</p></div>
+              <div class="evidence"><h4>EVIDENCE</h4><div class="evidence-list">
+                <div class="evidence-line">services/api/src/index.ts:1938-2023 — anonymous upgrades with no Origin validation</div>
+                <div class="evidence-line">packages/types/src/live.ts:75-125,159-183 — subscription arrays/IDs lack practical maxima</div>
+                <div class="evidence-line">services/api/src/index.ts:2068-2105; services/api/src/live.ts:947-1018 — each item can register work and trigger snapshots</div>
+                <div class="evidence-line">Bun.serve sets no application-sized max WebSocket payload or per-socket work quota</div>
+              </div></div>
+              <div class="recommendation"><h4>REMEDIATION</h4><p>Allowlist browser origins, set a small payload ceiling, cap subscriptions and identifier lengths per message/socket, enforce per-socket message/work quotas, close abusive connections, and apply backpressure. Origin checks are a browser-abuse control, not authentication. CWE-770.</p></div>
+            </div>
+          </details>
+
+          <details class="finding" open>
+            <summary><span class="finding-id">F-04</span><span class="severity medium">Medium / P2</span><span class="finding-title">Rate limiting trusts unverified forwarded addresses</span></summary>
+            <div class="finding-body">
+              <div><h4>IMPACT</h4><p>A caller that reaches the origin can rotate a spoofed first forwarded address, weakening quotas for REST, lookup, and WebSocket routes.</p></div>
+              <div><h4>PRECONDITION</h4><p>Direct-origin access or any proxy path that preserves a caller-supplied first <code>X-Forwarded-For</code> value.</p></div>
+              <div class="evidence"><h4>EVIDENCE</h4><div class="evidence-list">
+                <div class="evidence-line">services/api/src/rate-limit.ts:85-113 — first valid forwarded IP wins; socket peer is not checked</div>
+                <div class="evidence-line">Live NPM proxy.conf — X-Forwarded-For $proxy_add_x_forwarded_for</div>
+              </div></div>
+              <div class="recommendation"><h4>REMEDIATION</h4><p>Close direct origin access, overwrite forwarding headers at the first trusted edge, and resolve client identity only through an explicit trusted-proxy CIDR/hop policy. CWE-345/CWE-770.</p></div>
+            </div>
+          </details>
+
+          <details class="finding">
+            <summary><span class="finding-id">F-05</span><span class="severity medium">Medium / P2</span><span class="finding-title">Shared credentials and Unix identity magnify one service compromise</span></summary>
+            <div class="finding-body">
+              <div><h4>IMPACT</h4><p>Code execution in the web/API or any worker can expose provider credentials and state belonging to every other role.</p></div>
+              <div><h4>PRECONDITION</h4><p>Post-exploitation or local execution as <code>delta</code>; this is blast-radius reduction, not an initial access claim.</p></div>
+              <div class="evidence"><h4>EVIDENCE</h4><div class="evidence-list">
+                <div class="evidence-line">deployment/native/systemd/user/*.service — all units load /home/delta/islandflow/.env</div>
+                <div class="evidence-line">Live process review — web, API, compute, candles, and ingesters share provider-key environment</div>
+                <div class="evidence-line">deployment/docker/docker-compose.yml:15,39 — common/web env_file repeats the pattern</div>
+              </div></div>
+              <div class="recommendation"><h4>REMEDIATION</h4><p>Create service-specific identities and env/credential files; use <code>LoadCredential=</code> or Docker secrets; inject each key only into its consumer. CWE-250/CWE-522/CWE-732.</p></div>
+            </div>
+          </details>
+
+          <details class="finding">
+            <summary><span class="finding-id">F-06</span><span class="severity medium">Medium / P2</span><span class="finding-title">Unauthenticated data plane plus unbounded message cardinality</span></summary>
+            <div class="finding-body">
+              <div><h4>IMPACT</h4><p>A compromised local service/container can publish valid-looking events that cause monotonic maps, packet members, candle keys, and Redis sets to grow until services or the host degrade.</p></div>
+              <div><h4>PRECONDITION</h4><p>Local execution or access to the Docker network. Native listeners are loopback-only and Docker infra is not host-published, which keeps this out of direct internet scope.</p></div>
+              <div class="evidence"><h4>EVIDENCE</h4><div class="evidence-list">
+                <div class="evidence-line">NATS/Redis/ClickHouse native and Docker configs — no service authentication</div>
+                <div class="evidence-line">packages/types/src/events.ts:4-20,193-199 — unbounded identifiers/arrays</div>
+                <div class="evidence-line">services/compute/src/index.ts:236-245,597-615,1182-1197 — unbounded keys/members tied to event time</div>
+                <div class="evidence-line">services/candles/src/aggregator.ts:187-264; candles/src/index.ts:133-155 — persistent state keys without TTL</div>
+              </div></div>
+              <div class="recommendation"><h4>REMEDIATION</h4><p>Add NATS accounts and subject permissions, Redis ACLs, least-privilege ClickHouse users, bounded shared schemas, global cardinality ceilings, wall-clock TTLs, overflow metrics, and Redis expiration/trimming. CWE-306/CWE-770.</p></div>
+            </div>
+          </details>
+
+          <details class="finding">
+            <summary><span class="finding-id">F-07</span><span class="severity medium">Medium / P2</span><span class="finding-title">Native units and containers lack practical sandboxing</span></summary>
+            <div class="finding-body">
+              <div><h4>IMPACT</h4><p>An application compromise gets broad filesystem/home access in native mode or root inside a mutable container with host-gateway reachability.</p></div>
+              <div><h4>PRECONDITION</h4><p>Post-exploitation. This finding measures containment, not likelihood of initial compromise.</p></div>
+              <div class="evidence"><h4>EVIDENCE</h4><div class="evidence-list">
+                <div class="evidence-line">Native units omit NoNewPrivileges, ProtectSystem, ProtectHome, PrivateTmp, UMask, and capability/syscall bounds</div>
+                <div class="evidence-line">Live systemd-analyze security: web/API 9.8 UNSAFE; infra services 9.2 UNSAFE</div>
+                <div class="evidence-line">Dockerfiles set no USER; Compose sets no cap_drop, no-new-privileges, read_only, pids, or resource limits</div>
+              </div></div>
+              <div class="recommendation"><h4>REMEDIATION</h4><p>Harden one unit/image at a time with tested write paths, non-root identities, <code>NoNewPrivileges</code>, capability drops, read-only roots, tmpfs, PID/memory limits, and narrower networks.</p></div>
+            </div>
+          </details>
+
+          <details class="finding">
+            <summary><span class="finding-id">F-08</span><span class="severity medium">Medium / P2</span><span class="finding-title">Privileged CI executes mutable tooling and PR-controlled code</span></summary>
+            <div class="finding-body">
+              <div><h4>IMPACT</h4><p>If outside contributors can trigger PR CI, repository code runs beside a privileged DinD daemon. A mutable <code>curl | bash</code> installer also makes upstream compromise an execution path.</p></div>
+              <div><h4>PRECONDITION</h4><p>Untrusted PR access or supply-chain compromise. With only your own commits, current likelihood is materially lower.</p></div>
+              <div class="evidence"><h4>EVIDENCE</h4><div class="evidence-list">
+                <div class="evidence-line">.forgejo/workflows/ci.yml:3-8,23-49 — all PRs; mutable checkout tag; remote Bun installer; PR tests</div>
+                <div class="evidence-line">/home/delta/forgejo-runner/docker-compose.yml:3-6 — privileged DinD and plaintext Docker API</div>
+              </div></div>
+              <div class="recommendation"><h4>REMEDIATION</h4><p>Keep outside PRs off this runner; use disposable isolated workers; remove privileged/plaintext DinD; pin actions by SHA and Bun by version plus checksum. Retain the existing least-privilege <code>contents: read</code> token.</p></div>
+            </div>
+          </details>
+
+          <details class="finding">
+            <summary><span class="finding-id">F-09</span><span class="severity medium">Medium / P2</span><span class="finding-title">Synthetic admin proxy authenticates itself, not its caller</span></summary>
+            <div class="finding-body">
+              <div><h4>IMPACT</h4><p>When enabled, any browser caller that can reach the Next routes can invoke control operations; the server adds the backend bearer token for them.</p></div>
+              <div><h4>PRECONDITION</h4><p><code>NEXT_PUBLIC_SYNTHETIC_ADMIN=1</code>. The live deployment was verified at 0, so this is a dormant activation hazard and future-user release blocker.</p></div>
+              <div class="evidence"><h4>EVIDENCE</h4><div class="evidence-list">
+                <div class="evidence-line">apps/web/app/api/admin/synthetic/shared.ts:10-55 — feature flag, server token injection, no caller identity</div>
+                <div class="evidence-line">apps/web/app/api/admin/synthetic/control/route.ts:5-15 — unauthenticated GET/PUT proxy</div>
+              </div></div>
+              <div class="recommendation"><h4>REMEDIATION</h4><p>Require a real authenticated owner/admin session, same-origin/CSRF protection for mutations, audit logging, and server-side authorization independent of UI visibility. Keep the feature off until then. CWE-306/CWE-862.</p></div>
+            </div>
+          </details>
+
+          <details class="finding">
+            <summary><span class="finding-id">F-10</span><span class="severity medium">Medium / P2</span><span class="finding-title">Browser security header baseline is absent</span></summary>
+            <div class="finding-body">
+              <div><h4>IMPACT</h4><p>No CSP limits F-01, no HSTS prevents downgrade, and missing nosniff/referrer/permissions policies leave avoidable browser attack surface. Responses also disclose Next.js.</p></div>
+              <div><h4>PRECONDITION</h4><p>Current live responses. Headers are defense-in-depth except HSTS/redirect, but they materially constrain the confirmed XSS path.</p></div>
+              <div class="evidence"><h4>EVIDENCE</h4><div class="evidence-list">
+                <div class="evidence-line">Live HTTP/HTTPS headers lacked CSP, HSTS, X-Content-Type-Options, Referrer-Policy, and Permissions-Policy</div>
+                <div class="evidence-line">apps/web/next.config.mjs:31-37 — no production header policy; poweredByHeader remains enabled</div>
+              </div></div>
+              <div class="recommendation"><h4>REMEDIATION</h4><p>Deploy CSP in report-only mode, eliminate inline dependencies, then enforce it. Add HSTS after redirect reliability, nosniff, strict referrer policy, minimal permissions policy, frame-ancestors, and <code>poweredByHeader: false</code>. CWE-693.</p></div>
+            </div>
+          </details>
+
+          <details class="finding">
+            <summary><span class="finding-id">F-11</span><span class="severity medium">Medium / P2</span><span class="finding-title">Credential-bearing backups are over-retained and broadly readable</span></summary>
+            <div class="finding-body">
+              <div><h4>IMPACT</h4><p>A service compromise under the shared <code>delta</code> identity can recover current or historical provider, NPM, and runner credentials from backup copies.</p></div>
+              <div><h4>PRECONDITION</h4><p>Local execution as <code>delta</code>; <code>/home/delta</code> is mode 0700, so this is not a cross-Unix-user exposure today.</p></div>
+              <div class="evidence"><h4>EVIDENCE</h4><div class="evidence-list">
+                <div class="evidence-line">Several env/runner backups are 0664/0644; live NPM DB and nine backups are 0644</div>
+                <div class="evidence-line">deployment/native/switch-npm-edge.sh:92 — DB copy has no explicit restrictive mode/retention</div>
+                <div class="evidence-line">Tracked files and reachable Git history contained no matching live credential fingerprints</div>
+              </div></div>
+              <div class="recommendation"><h4>REMEDIATION</h4><p>Rotate historical credentials, remove obsolete copies, set <code>umask 077</code>/0600 for backups, encrypt and age retained copies, and pair this with service identity separation.</p></div>
+            </div>
+          </details>
+
+          <details class="finding">
+            <summary><span class="finding-id">F-12</span><span class="severity medium">Medium / P2</span><span class="finding-title">Provider adapters lack backpressure, size limits, and deadlines</span></summary>
+            <div class="finding-body">
+              <div><h4>IMPACT</h4><p>A malformed, stalled, or overproducing upstream can create detached concurrent writes, unhandled rejections, oversized WebSocket frames, endless pagination, and startup hangs.</p></div>
+              <div><h4>PRECONDITION</h4><p>Provider failure, compromise, or operator-configured compatible endpoint; this is not directly internet-facing.</p></div>
+              <div class="evidence"><h4>EVIDENCE</h4><div class="evidence-list">
+                <div class="evidence-line">ingest-equities Alpaca adapter:248-336 and ingest-options Alpaca adapter:515-589 — async handlers invoked with void</div>
+                <div class="evidence-line">Provider WebSockets set no maxPayload; REST fetches have no abort deadline</div>
+                <div class="evidence-line">Options snapshot pagination has no page ceiling or repeated-token detection</div>
+              </div></div>
+              <div class="recommendation"><h4>REMEDIATION</h4><p>Use bounded async queues, catch and meter handler rejection, <code>safeParse</code> inside the caught callback, set frame/array ceilings, use <code>AbortSignal.timeout</code>, and cap pagination.</p></div>
+            </div>
+          </details>
+
+          <details class="finding">
+            <summary><span class="finding-id">F-13</span><span class="severity medium">Medium / P2</span><span class="finding-title">Unsupported and mutable runtime dependencies remain in deploy paths</span></summary>
+            <div class="finding-body">
+              <div><h4>IMPACT</h4><p>Rebuilds can pull materially different Python graphs and mutable container contents; the Docker fallback pins ClickHouse 23.8, outside the current support window.</p></div>
+              <div><h4>PRECONDITION</h4><p>Image rebuild, Docker fallback use, registry/package compromise, or a vulnerable internal parser path.</p></div>
+              <div class="evidence"><h4>EVIDENCE</h4><div class="evidence-list">
+                <div class="evidence-line">deployment/docker/docker-compose.yml:134-176 — tag-only ClickHouse 23.8, Redis 7.2, NATS 2.10</div>
+                <div class="evidence-line">services/ingest-options/py/requirements.txt:1-3 — floating, unhashed requirements; archived ib_insync upstream</div>
+                <div class="evidence-line">Dockerfiles install full monorepo graph and keep build tooling in runtime images</div>
+              </div></div>
+              <div class="recommendation"><h4>REMEDIATION</h4><p>Plan a tested ClickHouse upgrade, digest-pin refreshed images, create a hashed Python lock/wheelhouse, replace or own a pinned <code>ib_insync</code> fork, and slim runtime stages. See the <a href="https://clickhouse.com/legal/support-services-policy">ClickHouse support policy</a>.</p></div>
+            </div>
+          </details>
+
+          <details class="finding">
+            <summary><span class="finding-id">F-14</span><span class="severity medium">Medium / P2</span><span class="finding-title">State has no tested encrypted backup/restore control</span></summary>
+            <div class="finding-body">
+              <div><h4>IMPACT</h4><p>Destructive compromise, operator error, or storage failure can become permanent data loss; a backup instruction without a restore drill is not a recovery control.</p></div>
+              <div><h4>PRECONDITION</h4><p>Operational failure or destructive access. This is security resilience, not confidentiality exposure.</p></div>
+              <div class="evidence"><h4>EVIDENCE</h4><div class="evidence-list">
+                <div class="evidence-line">docs/clickhouse-reset-runbook.md:9 — says “Take a backup” without command, destination, retention, RPO/RTO, or restore test</div>
+                <div class="evidence-line">No automated ClickHouse, Redis, or JetStream backup/restore control found</div>
+              </div></div>
+              <div class="recommendation"><h4>REMEDIATION</h4><p>Create encrypted off-host immutable backups, document RPO/RTO, run scheduled restore drills, tighten state permissions, and verify ownership before native/Docker cutovers.</p></div>
+            </div>
+          </details>
+
+          <details class="finding">
+            <summary><span class="finding-id">F-15</span><span class="severity low">Low / P3</span><span class="finding-title">Synthetic fixture paths can escape their fixture directory</span></summary>
+            <div class="finding-body">
+              <div><h4>IMPACT</h4><p>A manifest controller can make replay read arbitrary JSON-readable files available to the service user.</p></div>
+              <div><h4>PRECONDITION</h4><p>Control of a local/operator-selected fixture manifest. Severity becomes medium if fixture uploads are ever exposed to users.</p></div>
+              <div class="evidence"><h4>EVIDENCE</h4><div class="evidence-list"><div class="evidence-line">packages/synthetic-market/src/manifest.ts:182-224 and fixtures.ts:111-125 — artifact paths are joined without containment validation</div></div></div>
+              <div class="recommendation"><h4>REMEDIATION</h4><p>Resolve paths, reject absolute paths, reject <code>path.relative</code> escapes, and enforce file byte/event ceilings.</p></div>
+            </div>
+          </details>
+
+          <details class="finding">
+            <summary><span class="finding-id">F-16</span><span class="severity low">Low / P3</span><span class="finding-title">Public error details and unbounded body reads expose avoidable surface</span></summary>
+            <div class="finding-body">
+              <div><h4>IMPACT</h4><p>Raw internal messages may reveal storage/schema detail, while <code>req.text()</code> buffers request bodies before schema validation and can amplify memory pressure.</p></div>
+              <div><h4>PRECONDITION</h4><p>Malformed/oversized API request. Existing rate limits reduce frequency but are weakened by F-04.</p></div>
+              <div class="evidence"><h4>EVIDENCE</h4><div class="evidence-list">
+                <div class="evidence-line">services/api/src/index.ts:364-370 — unbounded req.text()</div>
+                <div class="evidence-line">services/api/src/index.ts:1465-1473,1622-1631,1765-1775,1829-1838 — raw error.message returned</div>
+              </div></div>
+              <div class="recommendation"><h4>REMEDIATION</h4><p>Enforce route-specific byte limits before buffering, return stable public error codes/messages, and keep detailed diagnostics in structured server logs with correlation IDs.</p></div>
+            </div>
+          </details>
+
+          <details class="finding">
+            <summary><span class="finding-id">F-17</span><span class="severity low">Low / P3</span><span class="finding-title">Logging has no central secret-redaction safety net</span></summary>
+            <div class="finding-body">
+              <div><h4>IMPACT</h4><p>A future logging change can accidentally serialize credentials or authorization headers without a framework-level backstop.</p></div>
+              <div><h4>PRECONDITION</h4><p>A developer adds secret-bearing context. No current direct credential logging was found.</p></div>
+              <div class="evidence"><h4>EVIDENCE</h4><div class="evidence-list"><div class="evidence-line">packages/observability/src/logger.ts:28-29,59-71 — arbitrary context serialization without recursive redaction</div></div></div>
+              <div class="recommendation"><h4>REMEDIATION</h4><p>Add recursive redaction for token/key/secret/password/authorization/cookie fields and tests that verify nested objects and headers.</p></div>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section id="roadmap">
+        <div class="section-head">
+          <h2>Recommended remediation sequence</h2>
+          <p>
+            Fix the exploit chains before broad hardening. Each phase has an explicit gate so “safe
+            enough for me” and “safe to invite someone” do not blur together.
+          </p>
+        </div>
+
+        <div class="roadmap">
+          <div class="phase">
+            <div class="phase-name">PHASE 0<br />NOW</div>
+            <ul>
+              <li>Replace interpolated ClickHouse strings with typed query parameters and add injection regression tests.</li>
+              <li>Replace the news HTML sanitizer and add hostile-content regression tests.</li>
+              <li>Bind web privately, close public 3000, and force HTTP→HTTPS.</li>
+              <li>Deploy CSP/report-only then enforce it; add baseline response headers.</li>
+              <li>Bound WebSocket payloads, subscriptions, identifiers, and per-socket work.</li>
+              <li>Upgrade Electron to a supported line before using/distributing the desktop shell.</li>
+            </ul>
+            <div class="phase-gate"><strong>Gate</strong>No confirmed browser-code-execution path; one HTTPS-only public entry; supported browser runtime.</div>
+          </div>
+
+          <div class="phase">
+            <div class="phase-name">PHASE 1<br />BEFORE USERS</div>
+            <ul>
+              <li>Add owner/user identity and server-side authorization for every privileged action.</li>
+              <li>Fix trusted-proxy IP resolution and apply body/query/cardinality limits.</li>
+              <li>Split service identities/credentials; authenticate the internal data plane.</li>
+              <li>Backpressure provider ingestion and add timeouts, payload caps, and overflow telemetry.</li>
+            </ul>
+            <div class="phase-gate"><strong>Gate</strong>A second user cannot invoke owner controls or exhaust shared resources through ordinary inputs.</div>
+          </div>
+
+          <div class="phase">
+            <div class="phase-name">PHASE 2<br />HARDEN</div>
+            <ul>
+              <li>Sandbox systemd units and run containers non-root with read-only roots and limits.</li>
+              <li>Move untrusted PR CI to disposable isolation; pin actions, tools, and images immutably.</li>
+              <li>Lock/hash Python dependencies; upgrade supported datastore/container lines.</li>
+              <li>Build encrypted backups and prove restore; add SCA, image, secret, and SBOM gates.</li>
+            </ul>
+            <div class="phase-gate"><strong>Gate</strong>One component compromise does not automatically become full-host, all-credential, or unrecoverable-state compromise.</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="positives">
+        <div class="section-head">
+          <h2>Positive controls</h2>
+          <p>
+            These controls are real and should be preserved. The audit did not treat absence of a
+            finding as proof, but it did verify the following defensive properties.
+          </p>
+        </div>
+
+        <ul class="positive-grid">
+          <li><code>bun audit --json</code> returned no advisory matches for the locked JS graph.</li>
+          <li><code>bun pm untrusted</code> found zero untrusted lifecycle-script dependencies.</li>
+          <li>No high-confidence secret, private key, or live credential fingerprint appeared in tracked files or reachable Git history.</li>
+          <li>Real env files are ignored from Git and Docker’s primary contexts; the current root env is mode 0600.</li>
+          <li>The raw API binds the Docker bridge and the public raw API host is disabled.</li>
+          <li>Native NATS, Redis, and ClickHouse listeners bind loopback only.</li>
+          <li>Production API rate limiting is enabled; synthetic admin is disabled.</li>
+          <li>CORS reflects an explicit allowlist and rejects unknown origins in focused tests.</li>
+          <li>Admin backend routes require a bearer token; the defect is in the optional web proxy caller boundary.</li>
+          <li>Desktop uses <code>nodeIntegration:false</code>, <code>contextIsolation:true</code>, <code>sandbox:true</code>, permission denial, and navigation guards.</li>
+          <li>JetStream retention is byte/time bounded and malformed bus payloads are schema-validated and terminally acknowledged.</li>
+          <li>Subprocesses use argv arrays rather than shell strings; provider keys are not passed in argv.</li>
+          <li>Docker and CI use <code>bun install --frozen-lockfile</code>; Docker workspace lock snapshots match.</li>
+          <li>Forgejo CI grants only <code>contents: read</code> and has timeout/concurrency cancellation.</li>
+          <li>No <code>eval</code>, <code>new Function</code>, command-injection path, or unsafe code-execution deserializer was found in assigned runtime surfaces.</li>
+          <li>Focused security controls passed 29/29 tests; public same-origin route probes passed.</li>
+        </ul>
+      </section>
+
+      <section id="method">
+        <div class="section-head">
+          <h2>Method and limits</h2>
+          <p>
+            This was a source-assisted, read-only security audit with safe live verification. It was
+            not a destructive penetration test, did not fuzz production, and did not rotate secrets,
+            restart services, alter firewall state, or exploit the confirmed XSS in a browser.
+          </p>
+        </div>
+
+        <div class="method-grid">
+          <div class="method">
+            <h3>Swarm review</h3>
+            <p>Root synthesis plus scoped scouts for web/desktop, infrastructure/secrets, services/message boundaries, dependencies/CI, API controls, and storage/query construction, run in waves under a four-agent concurrency ceiling.</p>
+          </div>
+          <div class="method">
+            <h3>Static and dependency checks</h3>
+            <p>Trust-boundary tracing, dangerous-sink search, tracked/history secret scan, lock/dependency audit, install-script trust review, CI/container/systemd review, and targeted code inspection.</p>
+          </div>
+          <div class="method">
+            <h3>Live verification</h3>
+            <p>Listener inventory, service state, edge headers, HTTP/HTTPS behavior, raw API closure, proxy configuration, local data-plane authentication posture, systemd exposure scoring, and public route probes.</p>
+          </div>
+        </div>
+
+        <p class="footnote">
+          Current-version claims were checked against primary sources, including
+          <a href="https://releases.electronjs.org/schedule">Electron’s release schedule</a> and the
+          <a href="https://clickhouse.com/legal/support-services-policy">ClickHouse support policy</a>.
+          CWE/OWASP labels are categorical aids, not CVSS scores. Severity reflects this deployment’s
+          actual preconditions and the owner’s single-user clarification.
+        </p>
+      </section>
+    </main>
+
+    <footer class="wrap">
+      Generated for Islandflow on 2026-07-09 America/New_York · audit-only task · no application or
+      deployment remediation performed.
+    </footer>
+  </body>
+</html>
