@@ -1,0 +1,2263 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="A beginner-first, code-connected explanation of Islandflow's event-sourced TypeScript architecture."
+    />
+    <title>Islandflow, Unboxed — a beginner architecture field guide</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --night: oklch(13% 0.022 303);
+        --night-deep: oklch(9% 0.018 303);
+        --surface: oklch(18% 0.03 303);
+        --surface-raised: oklch(22% 0.04 303);
+        --surface-soft: oklch(25% 0.032 303);
+        --ink: oklch(94% 0.018 292);
+        --ink-soft: oklch(78% 0.028 292);
+        --ink-faint: oklch(66% 0.026 292);
+        --line: oklch(38% 0.04 303 / 0.72);
+        --line-strong: oklch(53% 0.09 303 / 0.76);
+        --violet: oklch(73% 0.17 292);
+        --violet-soft: oklch(28% 0.08 292);
+        --coral: oklch(75% 0.16 25);
+        --coral-soft: oklch(27% 0.07 25);
+        --mint: oklch(78% 0.12 168);
+        --mint-soft: oklch(27% 0.052 168);
+        --yellow: oklch(84% 0.13 92);
+        --yellow-soft: oklch(28% 0.055 92);
+        --blue: oklch(76% 0.12 235);
+        --blue-soft: oklch(27% 0.06 235);
+        --red: oklch(70% 0.18 22);
+        --radius-sm: 6px;
+        --radius-md: 12px;
+        --nav-width: 17rem;
+        --content: 74rem;
+        --reading: 72ch;
+        --z-sticky: 20;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+        scroll-padding-top: 2rem;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at 12% 0%, oklch(30% 0.11 303 / 0.34), transparent 30rem),
+          radial-gradient(circle at 92% 18%, oklch(27% 0.09 25 / 0.18), transparent 25rem),
+          var(--night);
+        color: var(--ink);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 16px;
+        line-height: 1.68;
+      }
+
+      body::before {
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        background: linear-gradient(120deg, transparent 0 68%, oklch(50% 0.08 303 / 0.04));
+        content: "";
+        pointer-events: none;
+      }
+
+      a {
+        color: var(--blue);
+        text-underline-offset: 0.2em;
+      }
+
+      a:hover {
+        color: var(--ink);
+      }
+
+      button,
+      a {
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      :focus-visible {
+        outline: 3px solid var(--yellow);
+        outline-offset: 3px;
+      }
+
+      .skip-link {
+        position: fixed;
+        top: 0.75rem;
+        left: 0.75rem;
+        z-index: 100;
+        padding: 0.6rem 0.8rem;
+        background: var(--yellow);
+        color: var(--night-deep);
+        font-weight: 800;
+        transform: translateY(-180%);
+      }
+
+      .skip-link:focus {
+        transform: translateY(0);
+      }
+
+      .page-shell {
+        display: grid;
+        grid-template-columns: var(--nav-width) minmax(0, 1fr);
+        width: min(calc(var(--nav-width) + var(--content) + 4rem), 100%);
+        margin: 0 auto;
+      }
+
+      .side-nav {
+        position: sticky;
+        top: 0;
+        align-self: start;
+        height: 100vh;
+        padding: 1.5rem 1.25rem 2rem;
+        border-inline-end: 1px solid var(--line);
+        background: oklch(12% 0.025 303 / 0.9);
+        overflow-y: auto;
+      }
+
+      .nav-mark {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-block-end: 1.5rem;
+      }
+
+      .nav-glyph {
+        display: grid;
+        width: 2.2rem;
+        height: 2.2rem;
+        place-items: center;
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius-sm);
+        background: var(--violet-soft);
+        color: var(--violet);
+        font: 800 1rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .nav-mark strong,
+      .nav-mark span {
+        display: block;
+      }
+
+      .nav-mark strong {
+        font-size: 0.9rem;
+        letter-spacing: -0.015em;
+      }
+
+      .nav-mark span {
+        color: var(--ink-faint);
+        font-size: 0.72rem;
+      }
+
+      .progress-track {
+        height: 3px;
+        margin-block-end: 1.25rem;
+        background: var(--surface-soft);
+      }
+
+      .progress-bar {
+        width: 0;
+        height: 100%;
+        background: var(--coral);
+        transition: width 180ms ease-out;
+      }
+
+      .nav-label {
+        margin: 0 0 0.5rem;
+        color: var(--ink-faint);
+        font: 700 0.68rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .side-nav ol {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .side-nav a {
+        display: flex;
+        gap: 0.65rem;
+        padding: 0.48rem 0.5rem;
+        border-radius: var(--radius-sm);
+        color: var(--ink-soft);
+        font-size: 0.79rem;
+        line-height: 1.25;
+        text-decoration: none;
+      }
+
+      .side-nav a span {
+        width: 1.35rem;
+        flex: 0 0 auto;
+        color: var(--ink-faint);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .side-nav a:hover,
+      .side-nav a[aria-current="true"] {
+        background: var(--surface-raised);
+        color: var(--ink);
+      }
+
+      .side-nav a[aria-current="true"] span {
+        color: var(--coral);
+      }
+
+      .nav-note {
+        margin-block-start: 1.5rem;
+        padding-block-start: 1rem;
+        border-block-start: 1px solid var(--line);
+        color: var(--ink-faint);
+        font-size: 0.73rem;
+        line-height: 1.45;
+      }
+
+      main {
+        min-width: 0;
+        padding: 2.5rem clamp(1.25rem, 4vw, 4rem) 8rem;
+      }
+
+      .hero {
+        position: relative;
+        min-height: 34rem;
+        padding: clamp(2rem, 5vw, 4.5rem) 0 3rem;
+        border-block-end: 1px solid var(--line);
+      }
+
+      .hero::after {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        width: min(28rem, 48%);
+        height: 1px;
+        background: var(--coral);
+        content: "";
+      }
+
+      .hero-stamp {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+        margin-block-end: 1.5rem;
+        color: var(--mint);
+        font: 700 0.76rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .hero-stamp::before {
+        width: 0.55rem;
+        height: 0.55rem;
+        border-radius: 50%;
+        background: var(--mint);
+        content: "";
+      }
+
+      h1,
+      h2,
+      h3,
+      h4 {
+        margin-block-start: 0;
+        color: var(--ink);
+        text-wrap: balance;
+      }
+
+      h1 {
+        max-width: 12ch;
+        margin-block-end: 1.35rem;
+        font-size: clamp(3rem, 8vw, 5.8rem);
+        line-height: 0.94;
+        letter-spacing: -0.035em;
+      }
+
+      h1 em {
+        color: var(--coral);
+        font-style: normal;
+      }
+
+      h2 {
+        max-width: 18ch;
+        margin-block-end: 1.2rem;
+        font-size: clamp(2rem, 5vw, 3.4rem);
+        line-height: 1.03;
+        letter-spacing: -0.032em;
+      }
+
+      h3 {
+        margin-block-end: 0.65rem;
+        font-size: 1.28rem;
+        line-height: 1.24;
+        letter-spacing: -0.018em;
+      }
+
+      h4 {
+        margin-block-end: 0.4rem;
+        font-size: 1rem;
+      }
+
+      p,
+      li {
+        text-wrap: pretty;
+      }
+
+      p {
+        max-width: var(--reading);
+        color: var(--ink-soft);
+      }
+
+      .hero-lede {
+        max-width: 62ch;
+        margin-block-end: 2rem;
+        color: var(--ink);
+        font-size: clamp(1.15rem, 2.1vw, 1.45rem);
+        line-height: 1.55;
+      }
+
+      .hero-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.65rem;
+      }
+
+      .hero-meta span {
+        padding: 0.45rem 0.68rem;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--ink-soft);
+        font-size: 0.76rem;
+      }
+
+      .chapter {
+        padding: clamp(4rem, 8vw, 7rem) 0;
+        border-block-end: 1px solid var(--line);
+      }
+
+      .chapter-heading {
+        display: grid;
+        grid-template-columns: 4.5rem minmax(0, 1fr);
+        gap: 1rem;
+        align-items: start;
+        margin-block-end: 2.5rem;
+      }
+
+      .chapter-number {
+        padding-block-start: 0.4rem;
+        color: var(--violet);
+        font: 800 0.86rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .chapter-intro {
+        max-width: 66ch;
+        margin: 0;
+        color: var(--ink-soft);
+        font-size: 1.08rem;
+      }
+
+      .reading-block {
+        max-width: var(--reading);
+        margin-inline-start: 5.5rem;
+      }
+
+      .reading-block > * + * {
+        margin-block-start: 1.2rem;
+      }
+
+      .promise {
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(16rem, 0.85fr);
+        gap: 2rem;
+        align-items: start;
+        margin-block-start: 2.5rem;
+        padding: 1.5rem;
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius-md);
+        background: var(--violet-soft);
+      }
+
+      .promise p {
+        margin: 0;
+      }
+
+      .promise strong {
+        color: var(--ink);
+      }
+
+      .promise ul {
+        margin: 0;
+        padding-inline-start: 1.2rem;
+        color: var(--ink-soft);
+      }
+
+      .mental-model {
+        display: flex;
+        gap: 0;
+        margin-block-start: 2.5rem;
+        overflow-x: auto;
+        padding-block-end: 0.5rem;
+      }
+
+      .mental-node {
+        position: relative;
+        min-width: 10.5rem;
+        flex: 1 0 10.5rem;
+        padding: 1rem;
+        border-block: 1px solid var(--line);
+        border-inline-start: 1px solid var(--line);
+        background: var(--surface);
+      }
+
+      .mental-node:last-child {
+        border-inline-end: 1px solid var(--line);
+      }
+
+      .mental-node:not(:last-child)::after {
+        position: absolute;
+        top: 50%;
+        right: -0.45rem;
+        z-index: 2;
+        width: 0.75rem;
+        height: 0.75rem;
+        border-block-start: 2px solid var(--coral);
+        border-inline-end: 2px solid var(--coral);
+        background: var(--surface);
+        content: "";
+        transform: translateY(-50%) rotate(45deg);
+      }
+
+      .mental-node b,
+      .mental-node small {
+        display: block;
+      }
+
+      .mental-node b {
+        margin-block-end: 0.35rem;
+        color: var(--ink);
+      }
+
+      .mental-node small {
+        color: var(--ink-faint);
+        line-height: 1.4;
+      }
+
+      .analogy {
+        display: grid;
+        grid-template-columns: 8.5rem minmax(0, 1fr);
+        gap: 1.25rem;
+        margin: 2rem 0;
+        padding: 1.25rem 1.35rem;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: var(--surface);
+      }
+
+      .analogy-label {
+        color: var(--yellow);
+        font: 800 0.76rem/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .analogy p {
+        margin: 0;
+      }
+
+      .code-window {
+        margin: 1.5rem 0;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: var(--night-deep);
+        overflow: hidden;
+      }
+
+      .code-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        min-height: 2.6rem;
+        padding: 0.65rem 0.85rem;
+        border-block-end: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--ink-faint);
+        font: 650 0.73rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .copy-button {
+        min-height: 2rem;
+        padding: 0.35rem 0.6rem;
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius-sm);
+        background: transparent;
+        color: var(--ink-soft);
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .copy-button:hover {
+        background: var(--surface-raised);
+        color: var(--ink);
+      }
+
+      pre {
+        margin: 0;
+        overflow: auto;
+        tab-size: 2;
+      }
+
+      code,
+      kbd {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      }
+
+      p code,
+      li code,
+      td code {
+        padding: 0.12rem 0.32rem;
+        border-radius: 4px;
+        background: var(--surface-raised);
+        color: var(--ink);
+        font-size: 0.88em;
+      }
+
+      pre code {
+        display: block;
+        min-width: max-content;
+        padding: 1rem 1.1rem;
+        color: oklch(88% 0.03 292);
+        font-size: 0.82rem;
+        line-height: 1.68;
+      }
+
+      .tok-key { color: var(--violet); }
+      .tok-type { color: var(--mint); }
+      .tok-str { color: var(--yellow); }
+      .tok-fn { color: var(--blue); }
+      .tok-comment { color: var(--ink-faint); font-style: italic; }
+      .tok-prop { color: var(--coral); }
+
+      .annotation-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        counter-reset: notes;
+      }
+
+      .annotation-list li {
+        display: grid;
+        grid-template-columns: 2rem minmax(0, 1fr);
+        gap: 0.8rem;
+        margin-block-end: 0.75rem;
+        color: var(--ink-soft);
+        counter-increment: notes;
+      }
+
+      .annotation-list li::before {
+        display: grid;
+        width: 1.65rem;
+        height: 1.65rem;
+        place-items: center;
+        border-radius: 50%;
+        background: var(--coral-soft);
+        color: var(--coral);
+        content: counter(notes);
+        font: 800 0.72rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .folder-tree {
+        margin: 2rem 0;
+        padding: 1.25rem;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: var(--night-deep);
+        color: var(--ink-soft);
+        font: 0.85rem/1.75 ui-monospace, SFMono-Regular, Menlo, monospace;
+        overflow-x: auto;
+      }
+
+      .folder-tree b { color: var(--violet); }
+      .folder-tree em { color: var(--ink-faint); font-style: normal; }
+
+      .service-ledger {
+        margin: 2rem 0;
+        border-block: 1px solid var(--line);
+      }
+
+      .service-row {
+        display: grid;
+        grid-template-columns: minmax(11rem, 0.65fr) minmax(12rem, 1fr) minmax(12rem, 1fr);
+        gap: 1rem;
+        padding: 1.1rem 0;
+        border-block-end: 1px solid var(--line);
+      }
+
+      .service-row:last-child {
+        border-block-end: 0;
+      }
+
+      .service-row h3,
+      .service-row p {
+        margin: 0;
+      }
+
+      .service-row h3 code {
+        color: var(--violet);
+        font-size: 0.85rem;
+      }
+
+      .service-row p {
+        font-size: 0.9rem;
+      }
+
+      .service-row .plain {
+        color: var(--ink);
+      }
+
+      .infra-stage {
+        margin: 2rem 0;
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius-md);
+        overflow: hidden;
+      }
+
+      .infra-tabs {
+        display: flex;
+        overflow-x: auto;
+        border-block-end: 1px solid var(--line);
+        background: var(--night-deep);
+      }
+
+      .infra-tab {
+        flex: 1 0 auto;
+        padding: 0.85rem 1rem;
+        border: 0;
+        border-inline-end: 1px solid var(--line);
+        background: transparent;
+        color: var(--ink-soft);
+        font-weight: 750;
+        cursor: pointer;
+      }
+
+      .infra-tab[aria-selected="true"] {
+        background: var(--surface-raised);
+        color: var(--ink);
+        box-shadow: inset 0 -3px var(--coral);
+      }
+
+      .infra-panel {
+        display: none;
+        grid-template-columns: minmax(0, 1.2fr) minmax(15rem, 0.8fr);
+        gap: 2rem;
+        padding: 1.5rem;
+        background: var(--surface);
+      }
+
+      .infra-panel[data-open="true"] {
+        display: grid;
+      }
+
+      .infra-panel p:first-of-type {
+        color: var(--ink);
+        font-size: 1.03rem;
+      }
+
+      .infra-facts {
+        margin: 0;
+        padding: 1rem;
+        border-radius: var(--radius-sm);
+        background: var(--night-deep);
+      }
+
+      .infra-facts dt {
+        color: var(--ink-faint);
+        font: 700 0.7rem/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .infra-facts dd {
+        margin: 0.25rem 0 0.85rem;
+        color: var(--ink);
+        font-size: 0.86rem;
+      }
+
+      .comparison-wrap {
+        margin: 2rem 0;
+        overflow-x: auto;
+      }
+
+      table {
+        width: 100%;
+        min-width: 48rem;
+        border-collapse: collapse;
+        font-size: 0.88rem;
+      }
+
+      th,
+      td {
+        padding: 0.8rem 0.75rem;
+        border-block-end: 1px solid var(--line);
+        text-align: start;
+        vertical-align: top;
+      }
+
+      th {
+        background: var(--surface);
+        color: var(--ink);
+        font-size: 0.74rem;
+      }
+
+      td {
+        color: var(--ink-soft);
+      }
+
+      tbody tr:hover {
+        background: oklch(25% 0.04 303 / 0.48);
+      }
+
+      .flow-lab {
+        display: grid;
+        grid-template-columns: minmax(12rem, 0.65fr) minmax(0, 1.35fr);
+        gap: 1.2rem;
+        margin: 2.5rem 0;
+      }
+
+      .flow-controls {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+
+      .flow-step {
+        display: grid;
+        grid-template-columns: 2rem minmax(0, 1fr);
+        gap: 0.75rem;
+        align-items: center;
+        min-height: 3.3rem;
+        padding: 0.65rem 0.75rem;
+        border: 1px solid transparent;
+        border-radius: var(--radius-sm);
+        background: transparent;
+        color: var(--ink-soft);
+        text-align: start;
+        cursor: pointer;
+      }
+
+      .flow-step span:first-child {
+        display: grid;
+        width: 1.7rem;
+        height: 1.7rem;
+        place-items: center;
+        border: 1px solid var(--line);
+        border-radius: 50%;
+        font: 750 0.7rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .flow-step:hover,
+      .flow-step[aria-selected="true"] {
+        border-color: var(--line-strong);
+        background: var(--surface-raised);
+        color: var(--ink);
+      }
+
+      .flow-step[aria-selected="true"] span:first-child {
+        border-color: var(--coral);
+        background: var(--coral-soft);
+        color: var(--coral);
+      }
+
+      .flow-display {
+        min-height: 24rem;
+        padding: clamp(1.25rem, 3vw, 2rem);
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius-md);
+        background: var(--surface);
+      }
+
+      .flow-display h3 {
+        color: var(--coral);
+      }
+
+      .flow-path {
+        margin-block-start: 1.5rem;
+        padding: 0.75rem 1rem;
+        border-radius: var(--radius-sm);
+        background: var(--night-deep);
+        color: var(--mint);
+        font: 0.78rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+        overflow-wrap: anywhere;
+      }
+
+      .flow-question {
+        margin-block-start: 1.2rem;
+        padding-block-start: 1rem;
+        border-block-start: 1px solid var(--line);
+        color: var(--yellow);
+        font-size: 0.9rem;
+      }
+
+      .concept-pair {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem;
+        margin: 2rem 0;
+      }
+
+      .concept-pair > div {
+        padding: 1.2rem;
+        border-block: 1px solid var(--line);
+        background: var(--surface);
+      }
+
+      .concept-pair h3 {
+        color: var(--mint);
+      }
+
+      .concept-pair p:last-child {
+        margin-block-end: 0;
+      }
+
+      .type-anatomy {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 15rem;
+        gap: 1rem;
+        margin: 2rem 0;
+      }
+
+      .type-notes {
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+      }
+
+      .type-notes div {
+        padding: 0.75rem;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        background: var(--surface);
+        color: var(--ink-soft);
+        font-size: 0.82rem;
+      }
+
+      .type-notes b {
+        color: var(--coral);
+      }
+
+      .request-flow {
+        display: flex;
+        gap: 0;
+        margin: 2rem 0;
+        overflow-x: auto;
+      }
+
+      .request-flow div {
+        min-width: 9.5rem;
+        flex: 1 0 9.5rem;
+        padding: 1rem;
+        border-block: 1px solid var(--line);
+        border-inline-start: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--ink-soft);
+        font-size: 0.82rem;
+      }
+
+      .request-flow div:last-child {
+        border-inline-end: 1px solid var(--line);
+      }
+
+      .request-flow strong {
+        display: block;
+        margin-block-end: 0.35rem;
+        color: var(--violet);
+      }
+
+      .callout {
+        margin: 2rem 0;
+        padding: 1.25rem;
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius-md);
+        background: var(--surface);
+      }
+
+      .callout[data-tone="mint"] { background: var(--mint-soft); }
+      .callout[data-tone="coral"] { background: var(--coral-soft); }
+      .callout[data-tone="yellow"] { background: var(--yellow-soft); }
+
+      .callout h3,
+      .callout p:last-child {
+        margin-block-end: 0;
+      }
+
+      .failure-table td:first-child {
+        color: var(--coral);
+        font-weight: 700;
+      }
+
+      .learning-path {
+        display: grid;
+        grid-template-columns: 0.7fr 1.3fr;
+        gap: 1.25rem;
+        margin: 2rem 0;
+      }
+
+      .learning-path ol {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        counter-reset: path;
+      }
+
+      .learning-path li {
+        display: grid;
+        grid-template-columns: 2rem minmax(0, 1fr);
+        gap: 0.7rem;
+        margin-block-end: 0.75rem;
+        color: var(--ink-soft);
+        counter-increment: path;
+      }
+
+      .learning-path li::before {
+        color: var(--violet);
+        content: counter(path, decimal-leading-zero);
+        font: 800 0.75rem/1.7 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .portable-list {
+        margin: 0;
+        padding: 1.25rem;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: var(--surface);
+      }
+
+      .portable-list li {
+        margin-block-end: 0.65rem;
+        color: var(--ink-soft);
+      }
+
+      .portable-list strong {
+        color: var(--ink);
+      }
+
+      .diff-panel {
+        margin: 1.5rem 0;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: var(--night-deep);
+        overflow: hidden;
+      }
+
+      .diff-panel[data-rich-ready="true"] .diff-fallback {
+        display: none;
+      }
+
+      .diff-rich {
+        display: none;
+      }
+
+      .diff-panel[data-rich-ready="true"] .diff-rich {
+        display: block;
+      }
+
+      .diff-fallback {
+        max-height: 36rem;
+        padding: 1rem;
+        color: var(--ink-soft);
+        font-size: 0.76rem;
+        line-height: 1.5;
+        white-space: pre;
+      }
+
+      .glossary {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+        gap: 0;
+        margin: 2rem 0;
+        border-block-start: 1px solid var(--line);
+        border-inline-start: 1px solid var(--line);
+      }
+
+      .glossary div {
+        padding: 1rem;
+        border-inline-end: 1px solid var(--line);
+        border-block-end: 1px solid var(--line);
+        background: var(--surface);
+      }
+
+      .glossary dt {
+        margin-block-end: 0.35rem;
+        color: var(--mint);
+        font-weight: 800;
+      }
+
+      .glossary dd {
+        margin: 0;
+        color: var(--ink-soft);
+        font-size: 0.86rem;
+      }
+
+      .source-map {
+        columns: 2 18rem;
+        column-gap: 2.5rem;
+        margin: 2rem 0 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .source-map li {
+        break-inside: avoid;
+        margin-block-end: 0.65rem;
+        color: var(--ink-soft);
+        font-size: 0.84rem;
+      }
+
+      .source-map code {
+        color: var(--violet);
+      }
+
+      .closing {
+        padding: 5rem 0 1rem;
+      }
+
+      .closing blockquote {
+        max-width: 24ch;
+        margin: 0;
+        color: var(--ink);
+        font-size: clamp(2rem, 5vw, 3.2rem);
+        font-weight: 800;
+        line-height: 1.08;
+        letter-spacing: -0.03em;
+      }
+
+      .closing p {
+        margin-block-start: 1.5rem;
+      }
+
+      @media (max-width: 980px) {
+        .page-shell {
+          display: block;
+        }
+
+        .side-nav {
+          position: sticky;
+          top: 0;
+          z-index: var(--z-sticky);
+          display: flex;
+          height: auto;
+          gap: 0.75rem;
+          align-items: center;
+          padding: 0.65rem 1rem;
+          border-inline-end: 0;
+          border-block-end: 1px solid var(--line);
+          backdrop-filter: blur(16px);
+        }
+
+        .nav-mark {
+          margin: 0;
+        }
+
+        .nav-mark div:last-child,
+        .nav-label,
+        .nav-note,
+        .progress-track {
+          display: none;
+        }
+
+        .side-nav nav {
+          min-width: 0;
+          flex: 1;
+          overflow-x: auto;
+        }
+
+        .side-nav ol {
+          display: flex;
+          width: max-content;
+        }
+
+        .side-nav a {
+          white-space: nowrap;
+        }
+
+        main {
+          padding-block-start: 1rem;
+        }
+      }
+
+      @media (max-width: 720px) {
+        body {
+          font-size: 15px;
+        }
+
+        main {
+          padding-inline: 1rem;
+        }
+
+        .hero {
+          min-height: 0;
+          padding-block: 3.5rem;
+        }
+
+        h1 {
+          max-width: 9ch;
+          font-size: clamp(3rem, 17vw, 4.5rem);
+        }
+
+        .chapter-heading {
+          display: block;
+        }
+
+        .chapter-number {
+          margin-block-end: 0.75rem;
+        }
+
+        .reading-block {
+          margin-inline-start: 0;
+        }
+
+        .promise,
+        .infra-panel,
+        .flow-lab,
+        .type-anatomy,
+        .learning-path,
+        .concept-pair {
+          grid-template-columns: 1fr;
+        }
+
+        .analogy {
+          grid-template-columns: 1fr;
+          gap: 0.55rem;
+        }
+
+        .service-row {
+          grid-template-columns: 1fr;
+          gap: 0.45rem;
+        }
+
+        .flow-controls {
+          flex-direction: row;
+          overflow-x: auto;
+          padding-block-end: 0.35rem;
+        }
+
+        .flow-step {
+          min-width: 10rem;
+          flex: 0 0 10rem;
+        }
+
+        .flow-display {
+          min-height: 28rem;
+        }
+
+        .source-map {
+          columns: 1;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          transition-duration: 0.01ms !important;
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+        }
+      }
+
+      @media print {
+        :root {
+          color-scheme: light;
+        }
+
+        body {
+          background: white;
+          color: #17151b;
+        }
+
+        .side-nav,
+        .copy-button {
+          display: none;
+        }
+
+        .page-shell {
+          display: block;
+        }
+
+        main {
+          padding: 0;
+        }
+
+        p,
+        li,
+        td,
+        .chapter-intro {
+          color: #3d3945;
+        }
+
+        .chapter,
+        .hero,
+        .code-window,
+        .callout,
+        .promise,
+        .infra-stage,
+        .flow-display {
+          break-inside: avoid;
+          border-color: #c9c3d1;
+          background: white;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to the guide</a>
+    <div class="page-shell">
+      <aside class="side-nav" aria-label="Guide navigation">
+        <div class="nav-mark">
+          <span class="nav-glyph">iƒ</span>
+          <div>
+            <strong>Islandflow, unboxed</strong>
+            <span>a beginner field guide</span>
+          </div>
+        </div>
+        <div class="progress-track" aria-hidden="true"><div class="progress-bar"></div></div>
+        <nav>
+          <p class="nav-label">CHAPTERS</p>
+          <ol>
+            <li><a href="#welcome"><span>00</span> Start here</a></li>
+            <li><a href="#shape"><span>01</span> Shape of the repo</a></li>
+            <li><a href="#events"><span>02</span> Events are the spine</a></li>
+            <li><a href="#journey"><span>03</span> Follow one event</a></li>
+            <li><a href="#services"><span>04</span> The worker services</a></li>
+            <li><a href="#infrastructure"><span>05</span> NATS, ClickHouse, Redis</a></li>
+            <li><a href="#typescript"><span>06</span> Read the TypeScript</a></li>
+            <li><a href="#web"><span>07</span> API to React</a></li>
+            <li><a href="#time"><span>08</span> Live, history, replay</a></li>
+            <li><a href="#failure"><span>09</span> Think like a systems dev</a></li>
+            <li><a href="#practice"><span>10</span> A learning route</a></li>
+            <li><a href="#glossary"><span>11</span> Words and code map</a></li>
+          </ol>
+        </nav>
+        <p class="nav-note">Current checkout guide. Islandflow is pre-pre-alpha, so treat names as a map of today—not an eternal promise.</p>
+      </aside>
+
+      <main id="main">
+        <header class="hero" id="welcome" data-section>
+          <div class="hero-stamp">WORKSHOP EDITION · JULY 2026</div>
+          <h1>Islandflow, <em>unboxed.</em></h1>
+          <p class="hero-lede">
+            A patient tour of what this system does, why it has so many moving pieces, and how to
+            read the TypeScript without feeling like you wandered into the middle of somebody
+            else's conversation.
+          </p>
+          <div class="hero-meta" aria-label="Guide scope">
+            <span>Beginner-first</span>
+            <span>Connected to real files</span>
+            <span>TypeScript + React + backend</span>
+            <span>Dark-mode field notes</span>
+          </div>
+        </header>
+
+        <section class="chapter" aria-labelledby="welcome-title">
+          <div class="chapter-heading">
+            <div class="chapter-number">00</div>
+            <div>
+              <h2 id="welcome-title">You do not need to understand everything at once.</h2>
+              <p class="chapter-intro">
+                A real system is not one clever file. It is a collection of small agreements:
+                what data means, who owns it, how it moves, where it waits, and what happens when
+                something fails.
+              </p>
+            </div>
+          </div>
+          <div class="reading-block">
+            <p>
+              Islandflow watches market activity. Raw trades, quotes, options prints, and news
+              arrive from provider adapters. The system turns those observations into typed
+              events, moves them through a message bus, stores them, derives higher-level facts,
+              and sends useful views to a browser. The browser is the last stop, not the whole
+              product.
+            </p>
+            <div class="promise">
+              <p>
+                <strong>The goal of this guide is transfer.</strong> You should leave able to look
+                at another TypeScript system and ask better questions: Where does data enter? What
+                validates it? Is this storage durable or temporary? Which process owns this
+                decision? How does the UI receive changes?
+              </p>
+              <ul>
+                <li>No assumption that you already speak distributed-systems jargon.</li>
+                <li>Real Islandflow names, paired with plain-language explanations.</li>
+                <li>Small code examples before larger architectural ideas.</li>
+              </ul>
+            </div>
+            <div class="mental-model" aria-label="The five-part mental model">
+              <div class="mental-node"><b>Observe</b><small>Adapters receive market facts.</small></div>
+              <div class="mental-node"><b>Validate</b><small>Types and schemas check their shape.</small></div>
+              <div class="mental-node"><b>Move</b><small>NATS lets independent workers react.</small></div>
+              <div class="mental-node"><b>Remember</b><small>ClickHouse and Redis serve different time horizons.</small></div>
+              <div class="mental-node"><b>Present</b><small>The API and React turn data into an interface.</small></div>
+            </div>
+            <div class="analogy">
+              <div class="analogy-label">FIRST ANALOGY</div>
+              <p>
+                Picture a busy restaurant. Adapters are delivery doors, NATS is the ticket rail,
+                services are specialized stations, ClickHouse is the permanent order archive,
+                Redis is the whiteboard of what is hot right now, the API is the expediter, and
+                React is the board the customer actually sees. The analogy is imperfect—but it
+                gives every moving part a job.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section class="chapter" id="shape" data-section aria-labelledby="shape-title">
+          <div class="chapter-heading">
+            <div class="chapter-number">01</div>
+            <div>
+              <h2 id="shape-title">The repository is a neighborhood, not a single house.</h2>
+              <p class="chapter-intro">
+                Islandflow is a monorepo: several applications, background services, and shared
+                libraries live in one Git repository and use one Bun workspace.
+              </p>
+            </div>
+          </div>
+          <div class="reading-block">
+            <h3>What “Bun + TypeScript monorepo” actually means</h3>
+            <p>
+              <strong>Bun</strong> runs JavaScript/TypeScript, installs dependencies, and runs
+              tests and scripts. <strong>TypeScript</strong> is JavaScript with a type system that
+              lets the code describe expected data shapes. A <strong>monorepo</strong> keeps
+              related projects together so they can share types and tools without publishing a
+              package to the internet after every edit.
+            </p>
+            <div class="folder-tree" role="img" aria-label="Simplified Islandflow folder tree">
+<b>islandflow/</b>
+├── <b>apps/</b>
+│   ├── web/                 <em>Next.js + React interface</em>
+│   └── desktop/             <em>thin Electron wrapper</em>
+├── <b>services/</b>
+│   ├── ingest-options/      <em>options trades and quotes enter here</em>
+│   ├── ingest-equities/     <em>stock trades and quotes enter here</em>
+│   ├── ingest-news/         <em>news enters here</em>
+│   ├── compute/             <em>turns raw events into derived evidence</em>
+│   ├── candles/             <em>builds OHLCV candles</em>
+│   ├── api/                 <em>HTTP + WebSocket boundary for clients</em>
+│   └── replay/              <em>re-publishes old events in order</em>
+├── <b>packages/</b>
+│   ├── types/               <em>shared event vocabulary</em>
+│   ├── bus/                 <em>NATS subjects and helpers</em>
+│   ├── storage/             <em>ClickHouse queries and tables</em>
+│   ├── config/              <em>environment parsing</em>
+│   └── observability/       <em>logs and metrics</em>
+└── <b>deployment/</b>        <em>how the pieces run together</em>
+            </div>
+            <h3>Why split code this way?</h3>
+            <p>
+              A folder boundary should answer an ownership question. A service owns a running
+              job. A package owns reusable knowledge. An app owns a user-facing program. This is a
+              broadly useful distinction: if code performs a continuous task, it may belong in a
+              service; if it defines a shared contract, it likely belongs in a package.
+            </p>
+            <div class="concept-pair">
+              <div>
+                <h3>Service</h3>
+                <p>A program with a lifecycle: start, connect, work, handle errors, shut down. Example: <code>services/candles</code>.</p>
+              </div>
+              <div>
+                <h3>Package</h3>
+                <p>Code imported by other code. It normally does not run by itself. Example: <code>packages/types</code>.</p>
+              </div>
+            </div>
+            <div class="callout" data-tone="yellow">
+              <h3>A useful reading trick</h3>
+              <p>
+                When a large file feels opaque, do not read top-to-bottom. First scan its imports,
+                environment schema, startup function, subscriptions, and shutdown function. Those
+                five landmarks usually reveal what the program depends on, what it owns, and how
+                it spends its time.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section class="chapter" id="events" data-section aria-labelledby="events-title">
+          <div class="chapter-heading">
+            <div class="chapter-number">02</div>
+            <div>
+              <h2 id="events-title">Events are the spine of the system.</h2>
+              <p class="chapter-intro">
+                Instead of one giant function calling everything else, Islandflow records small,
+                explicit statements about what happened. Other parts of the system react to them.
+              </p>
+            </div>
+          </div>
+          <div class="reading-block">
+            <p>
+              An <strong>event</strong> is data describing a fact at a point in time: “a stock
+              traded,” “an options quote changed,” or “a one-minute candle closed.” It is usually
+              plain JSON, which makes it portable between processes and easy to store.
+            </p>
+            <div class="analogy">
+              <div class="analogy-label">SEALED POSTCARD</div>
+              <p>
+                Think of an event as a postcard. The sender writes a fact, stamps it with identity
+                and time, and drops it into the system. Receivers should not secretly edit that
+                postcard. If they learn something new, they create a new postcard that points back
+                to the evidence.
+              </p>
+            </div>
+            <div class="type-anatomy">
+              <div class="code-window">
+                <div class="code-head"><span>packages/types/src/events.ts · simplified</span><button class="copy-button" type="button">Copy</button></div>
+                <pre><code><span class="tok-key">const</span> EquityPrintSchema = EventMetaSchema.merge(
+  z.object({
+    <span class="tok-prop">ts</span>: z.number().int().nonnegative(),
+    <span class="tok-prop">underlying_id</span>: z.string().min(<span class="tok-str">1</span>),
+    <span class="tok-prop">price</span>: z.number().nonnegative(),
+    <span class="tok-prop">size</span>: z.number().int().positive(),
+    <span class="tok-prop">exchange</span>: z.string().min(<span class="tok-str">1</span>),
+    <span class="tok-prop">offExchangeFlag</span>: z.boolean()
+  })
+);
+
+<span class="tok-key">type</span> <span class="tok-type">EquityPrint</span> = z.infer&lt;<span class="tok-key">typeof</span> EquityPrintSchema&gt;;</code></pre>
+              </div>
+              <div class="type-notes" aria-label="TypeScript schema notes">
+                <div><b>Schema</b><br />A runtime guard. It checks real incoming values.</div>
+                <div><b>Type</b><br />A compile-time guide. Your editor and compiler use it while you code.</div>
+                <div><b>z.infer</b><br />Build the TypeScript type from the Zod schema, avoiding two copies of the contract.</div>
+              </div>
+            </div>
+            <h3>The metadata answers “can I trust and trace this?”</h3>
+            <div class="comparison-wrap">
+              <table>
+                <thead><tr><th>Field</th><th>Plain meaning</th><th>Why it matters elsewhere</th></tr></thead>
+                <tbody>
+                  <tr><td><code>source_ts</code></td><td>When the provider says the event happened.</td><td>Reconstructing market order and measuring delay.</td></tr>
+                  <tr><td><code>ingest_ts</code></td><td>When Islandflow received it.</td><td>Detecting slow feeds and pipeline lag.</td></tr>
+                  <tr><td><code>seq</code></td><td>A sequence number.</td><td>Stable ordering when timestamps tie.</td></tr>
+                  <tr><td><code>trace_id</code></td><td>A unique breadcrumb.</td><td>Following a fact through storage, derived events, API responses, and UI evidence.</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="callout" data-tone="mint">
+              <h3>Portable idea: a type is a promise, validation is evidence</h3>
+              <p>
+                TypeScript types disappear when code runs. External data can still be malformed.
+                That is why Islandflow uses Zod schemas such as <code>EquityPrintSchema.parse(candidate)</code>
+                at boundaries. Static types help developers; runtime schemas protect the running system.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section class="chapter" id="journey" data-section aria-labelledby="journey-title">
+          <div class="chapter-heading">
+            <div class="chapter-number">03</div>
+            <div>
+              <h2 id="journey-title">Follow one equity trade from wire to screen.</h2>
+              <p class="chapter-intro">
+                Click each step. The point is not to memorize file names; it is to see the same
+                few responsibilities repeat in a predictable order.
+              </p>
+            </div>
+          </div>
+          <div class="flow-lab">
+            <div class="flow-controls" role="tablist" aria-label="Event journey steps">
+              <button class="flow-step" type="button" role="tab" aria-selected="true" data-flow="0"><span>1</span><span>Adapter receives</span></button>
+              <button class="flow-step" type="button" role="tab" aria-selected="false" data-flow="1"><span>2</span><span>Ingest validates</span></button>
+              <button class="flow-step" type="button" role="tab" aria-selected="false" data-flow="2"><span>3</span><span>Store + publish</span></button>
+              <button class="flow-step" type="button" role="tab" aria-selected="false" data-flow="3"><span>4</span><span>Workers derive</span></button>
+              <button class="flow-step" type="button" role="tab" aria-selected="false" data-flow="4"><span>5</span><span>API composes</span></button>
+              <button class="flow-step" type="button" role="tab" aria-selected="false" data-flow="5"><span>6</span><span>React renders</span></button>
+            </div>
+            <div class="flow-display" role="tabpanel" tabindex="0" aria-live="polite">
+              <h3 id="flow-title">1. A provider adapter receives a trade</h3>
+              <p id="flow-body">
+                The selected adapter—synthetic for safe local work or Alpaca for a provider
+                connection—translates provider-specific data into Islandflow's common
+                <code>EquityPrint</code> shape. Everything downstream can ignore the provider's
+                peculiar field names.
+              </p>
+              <p class="flow-path" id="flow-path">services/ingest-equities/src/adapters/* → onTrade(candidate)</p>
+              <p class="flow-question" id="flow-question"><strong>Developer question:</strong> Where is provider-specific mess converted into domain language?</p>
+            </div>
+          </div>
+          <div class="reading-block">
+            <h3>The key decoupling move</h3>
+            <p>
+              The ingest service does not call the candle service directly. It publishes to a
+              subject. Candles, compute, and API consumers can listen independently. That means a
+              new consumer can be added without teaching ingest about it, and one worker can be
+              restarted without turning the whole application into a single process.
+            </p>
+            <div class="request-flow" aria-label="Event fan out">
+              <div><strong>Ingest</strong>publishes <code>equities.prints</code></div>
+              <div><strong>Candles</strong>updates OHLCV windows</div>
+              <div><strong>Compute</strong>joins quotes and infers signals</div>
+              <div><strong>API</strong>updates live client state</div>
+            </div>
+            <p>
+              This pattern is called <strong>publish/subscribe</strong>. One publisher states a
+              fact; many subscribers choose whether that fact concerns them.
+            </p>
+          </div>
+        </section>
+
+        <section class="chapter" id="services" data-section aria-labelledby="services-title">
+          <div class="chapter-heading">
+            <div class="chapter-number">04</div>
+            <div>
+              <h2 id="services-title">Each service is a worker with a narrow job.</h2>
+              <p class="chapter-intro">
+                “Microservice” can sound grand. Here it mostly means a separately running program
+                with its own inputs, outputs, configuration, and shutdown behavior.
+              </p>
+            </div>
+          </div>
+          <div class="reading-block">
+            <div class="service-ledger">
+              <div class="service-row">
+                <h3><code>ingest-options</code></h3>
+                <p class="plain">Normalizes option prints and NBBO quotes, enriches them with quote context, persists them, and publishes raw/signal streams.</p>
+                <p><strong>Reads:</strong> synthetic, Alpaca, Databento, IBKR; equity quotes.<br /><strong>Writes:</strong> ClickHouse + option NATS subjects.</p>
+              </div>
+              <div class="service-row">
+                <h3><code>ingest-equities</code></h3>
+                <p class="plain">Normalizes stock trades and quotes from synthetic or Alpaca adapters.</p>
+                <p><strong>Reads:</strong> provider adapter.<br /><strong>Writes:</strong> ClickHouse + <code>equities.prints</code>/<code>equities.quotes</code>.</p>
+              </div>
+              <div class="service-row">
+                <h3><code>ingest-news</code></h3>
+                <p class="plain">Backfills and listens for market news, converts it into canonical <code>NewsStory</code> events, and publishes them.</p>
+                <p><strong>Reads:</strong> Alpaca news paths.<br /><strong>Writes:</strong> NATS; API persists consumed stories.</p>
+              </div>
+              <div class="service-row">
+                <h3><code>compute</code></h3>
+                <p class="plain">The interpretation workshop: clusters option activity, builds flow packets, scores smart-flow hypotheses, joins equity prints to quotes, and infers dark/off-exchange evidence.</p>
+                <p><strong>Reads:</strong> option/equity subjects, ClickHouse context, Redis rolling state.<br /><strong>Writes:</strong> derived ClickHouse tables + derived NATS subjects.</p>
+              </div>
+              <div class="service-row">
+                <h3><code>candles</code></h3>
+                <p class="plain">Groups individual equity prints into time windows and calculates open, high, low, close, volume, and trade count.</p>
+                <p><strong>Reads:</strong> <code>equities.prints</code>.<br /><strong>Writes:</strong> ClickHouse, NATS, and a Redis sorted-set cache.</p>
+              </div>
+              <div class="service-row">
+                <h3><code>api</code></h3>
+                <p class="plain">The client boundary. It offers REST history/current reads, WebSocket live feeds, detail hydration, rate limiting, CORS, and synthetic controls.</p>
+                <p><strong>Reads:</strong> NATS, ClickHouse, Redis, HTTP requests.<br /><strong>Writes:</strong> HTTP/WS responses; live Redis state.</p>
+              </div>
+              <div class="service-row">
+                <h3><code>replay</code></h3>
+                <p class="plain">Reads saved or generated events, orders them, waits according to replay speed, and republishes them as if they were arriving live.</p>
+                <p><strong>Reads:</strong> ClickHouse or synthetic fixture.<br /><strong>Writes:</strong> the same raw NATS subjects used by live ingest.</p>
+              </div>
+              <div class="service-row">
+                <h3><code>refdata</code> / <code>eod-enricher</code></h3>
+                <p class="plain">Supporting and future-facing workers for reference/event-calendar knowledge and end-of-day enrichment.</p>
+                <p><strong>Status:</strong> scaffolding and incomplete paths; useful reminders that architecture can include planned seams without pretending they are finished.</p>
+              </div>
+            </div>
+            <div class="callout" data-tone="coral">
+              <h3>Services are not automatically “better”</h3>
+              <p>
+                Separate processes cost more: network connections, retries, ordering rules,
+                deployment, monitoring, and partial failure. The split earns its keep when jobs
+                truly have different lifecycles, scaling needs, or ownership. A good developer
+                learns to see both the boundary's benefit and its tax.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section class="chapter" id="infrastructure" data-section aria-labelledby="infra-title">
+          <div class="chapter-heading">
+            <div class="chapter-number">05</div>
+            <div>
+              <h2 id="infra-title">NATS moves, ClickHouse remembers, Redis keeps the hot answer close.</h2>
+              <p class="chapter-intro">
+                These tools overlap just enough to be confusing. The cleanest way to learn them is
+                by the question each one answers.
+              </p>
+            </div>
+          </div>
+          <div class="reading-block">
+            <div class="infra-stage">
+              <div class="infra-tabs" role="tablist" aria-label="Infrastructure services">
+                <button class="infra-tab" type="button" role="tab" aria-selected="true" data-infra="nats">NATS + JetStream</button>
+                <button class="infra-tab" type="button" role="tab" aria-selected="false" data-infra="clickhouse">ClickHouse</button>
+                <button class="infra-tab" type="button" role="tab" aria-selected="false" data-infra="redis">Redis</button>
+              </div>
+              <div class="infra-panel" data-panel="nats" data-open="true" role="tabpanel">
+                <div>
+                  <h3>Question: who needs to hear that something happened?</h3>
+                  <p>NATS is the communication layer. JetStream adds stored streams, durable consumers, delivery policies, and acknowledgements.</p>
+                  <p>A publisher sends JSON to a named <strong>subject</strong>, such as <code>equities.prints</code>. JetStream keeps messages for a configured time/size window. A durable consumer remembers its position and explicitly acknowledges processed messages.</p>
+                  <p><strong>Not the permanent analytical database:</strong> JetStream retention is deliberately bounded. It supports reliable movement and catch-up, while ClickHouse owns long-lived queryable history.</p>
+                </div>
+                <dl class="infra-facts">
+                  <dt>ISLANDFLOW IMAGE</dt><dd>Post office + numbered ticket rail</dd>
+                  <dt>CODE HOME</dt><dd><code>packages/bus</code></dd>
+                  <dt>EXAMPLE SUBJECT</dt><dd><code>flow.smart_flow_alerts</code></dd>
+                  <dt>FAILURE IDEA</dt><dd>No acknowledgement means the message may be delivered again.</dd>
+                </dl>
+              </div>
+              <div class="infra-panel" data-panel="clickhouse" data-open="false" role="tabpanel">
+                <div>
+                  <h3>Question: what happened over a large span of time?</h3>
+                  <p>ClickHouse is a column-oriented analytical database. It is good at scanning many rows while reading only the columns a query needs—useful for time-series market data.</p>
+                  <p>Ingest services persist raw facts. Compute and candles persist derived facts. The API asks for recent windows, cursor pages, ranges, replay slices, and evidence lookups.</p>
+                  <p><strong>Durable does not mean magical:</strong> table design, ordering keys, retention, disk space, and duplicate behavior still matter. The <code>packages/storage</code> package centralizes those details.</p>
+                </div>
+                <dl class="infra-facts">
+                  <dt>ISLANDFLOW IMAGE</dt><dd>Permanent, indexed research archive</dd>
+                  <dt>CODE HOME</dt><dd><code>packages/storage</code></dd>
+                  <dt>EXAMPLE QUERY</dt><dd>Recent SPY prints before a cursor</dd>
+                  <dt>FAILURE IDEA</dt><dd>If storage fails, an event should not be presented as durably recorded.</dd>
+                </dl>
+              </div>
+              <div class="infra-panel" data-panel="redis" data-open="false" role="tabpanel">
+                <div>
+                  <h3>Question: what answer is needed repeatedly, right now?</h3>
+                  <p>Redis is an in-memory data structure server. Islandflow uses it as a hot cache and rolling-state surface, not as the canonical historical record.</p>
+                  <p>The API keeps hot live channel snapshots and cursors there. Candles store recent time-ordered values in sorted sets. Compute can flush rolling statistics so expensive context is close at hand.</p>
+                  <p><strong>Redis can disappear:</strong> robust code can hydrate live state from ClickHouse and continue with reduced performance when the cache is unavailable.</p>
+                </div>
+                <dl class="infra-facts">
+                  <dt>ISLANDFLOW IMAGE</dt><dd>Fast shared whiteboard</dd>
+                  <dt>CODE HOMES</dt><dd><code>services/api</code>, <code>candles</code>, <code>compute</code></dd>
+                  <dt>EXAMPLE KEY</dt><dd><code>live:options</code></dd>
+                  <dt>FAILURE IDEA</dt><dd>Cache loss should cost speed, not erase truth.</dd>
+                </dl>
+              </div>
+            </div>
+
+            <h3>How they interact on a live event</h3>
+            <div class="request-flow" aria-label="Infrastructure interaction sequence">
+              <div><strong>1 · ClickHouse</strong>ingest saves the validated fact</div>
+              <div><strong>2 · NATS</strong>ingest publishes the fact</div>
+              <div><strong>3 · Workers</strong>consume, derive, save, republish</div>
+              <div><strong>4 · Redis</strong>API/candles refresh hot views</div>
+              <div><strong>5 · Browser</strong>receives snapshot or live event</div>
+            </div>
+
+            <div class="comparison-wrap">
+              <table>
+                <thead><tr><th>Tool</th><th>Primary role</th><th>Typical lifetime</th><th>Optimized for</th><th>If it is down</th></tr></thead>
+                <tbody>
+                  <tr><td><strong>NATS / JetStream</strong></td><td>Move events and let workers catch up.</td><td>Bounded stream retention.</td><td>Fan-out, ordering, acknowledgement.</td><td>New event movement pauses; services retry/reconnect.</td></tr>
+                  <tr><td><strong>ClickHouse</strong></td><td>Durable analytical history.</td><td>Long-lived, policy-dependent.</td><td>Large time-range scans and append-heavy data.</td><td>History/replay fail; writers must surface persistence failure.</td></tr>
+                  <tr><td><strong>Redis</strong></td><td>Hot cache and rolling state.</td><td>Short-lived/rebuildable.</td><td>Very fast reads and small mutable structures.</td><td>Performance degrades; ClickHouse can rebuild much live state.</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="callout" data-tone="yellow">
+              <h3>The durable + hot pattern travels well</h3>
+              <p>
+                Many systems keep a slower source of truth and a faster disposable view. You will
+                see this in ecommerce catalogs, social feeds, analytics dashboards, and game
+                leaderboards. The architectural question is always: can the fast view be rebuilt
+                from durable truth?
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section class="chapter" id="typescript" data-section aria-labelledby="typescript-title">
+          <div class="chapter-heading">
+            <div class="chapter-number">06</div>
+            <div>
+              <h2 id="typescript-title">Read the TypeScript as sentences.</h2>
+              <p class="chapter-intro">
+                Syntax becomes less intimidating when you translate it into actors, actions, and
+                constraints. Here are the recurring patterns in Islandflow.
+              </p>
+            </div>
+          </div>
+          <div class="reading-block">
+            <h3>Imports say “this file does not know everything”</h3>
+            <div class="code-window">
+              <div class="code-head"><span>services/ingest-equities/src/index.ts · representative</span><button class="copy-button" type="button">Copy</button></div>
+              <pre><code><span class="tok-key">import</span> { publishJson, SUBJECT_EQUITY_PRINTS } <span class="tok-key">from</span> <span class="tok-str">"@islandflow/bus"</span>;
+<span class="tok-key">import</span> { insertEquityPrint } <span class="tok-key">from</span> <span class="tok-str">"@islandflow/storage"</span>;
+<span class="tok-key">import</span> { EquityPrintSchema } <span class="tok-key">from</span> <span class="tok-str">"@islandflow/types"</span>;</code></pre>
+            </div>
+            <ol class="annotation-list">
+              <li><span><code>@islandflow/bus</code> owns how messages move and what subjects are named.</span></li>
+              <li><span><code>@islandflow/storage</code> owns database details.</span></li>
+              <li><span><code>@islandflow/types</code> owns what an equity print means.</span></li>
+            </ol>
+
+            <h3><code>async</code> / <code>await</code> means “this takes time”</h3>
+            <div class="code-window">
+              <div class="code-head"><span>the ingest boundary · simplified from live code</span><button class="copy-button" type="button">Copy</button></div>
+              <pre><code><span class="tok-prop">onTrade</span>: <span class="tok-key">async</span> (candidate: <span class="tok-type">EquityPrint</span>) =&gt; {
+  <span class="tok-key">const</span> print = EquityPrintSchema.<span class="tok-fn">parse</span>(candidate);
+
+  <span class="tok-key">await</span> <span class="tok-fn">insertEquityPrint</span>(clickhouse, print);
+  <span class="tok-key">await</span> <span class="tok-fn">publishJson</span>(js, SUBJECT_EQUITY_PRINTS, print);
+}</code></pre>
+            </div>
+            <p>
+              Read it aloud: “When a trade arrives, validate it. Wait for ClickHouse to store it.
+              Then wait for JetStream to publish it.” The ordering is intentional. A network call
+              returns a <code>Promise</code>; <code>await</code> pauses this function without freezing
+              the entire runtime.
+            </p>
+
+            <h3>Generics describe a slot without choosing its contents yet</h3>
+            <div class="code-window">
+              <div class="code-head"><span>packages/bus/src/jetstream.ts · real helper</span><button class="copy-button" type="button">Copy</button></div>
+              <pre><code><span class="tok-key">export const</span> publishJson = <span class="tok-key">async</span> &lt;<span class="tok-type">T</span>&gt;(
+  js: <span class="tok-type">JetStreamClient</span>,
+  subject: <span class="tok-type">string</span>,
+  payload: <span class="tok-type">T</span>
+): <span class="tok-type">Promise&lt;void&gt;</span> =&gt; {
+  <span class="tok-key">const</span> codec = <span class="tok-fn">JSONCodec</span>&lt;<span class="tok-type">T</span>&gt;();
+  <span class="tok-key">await</span> js.<span class="tok-fn">publish</span>(subject, codec.<span class="tok-fn">encode</span>(payload));
+};</code></pre>
+            </div>
+            <p>
+              <code>T</code> means “whatever payload type the caller supplies.” The same helper can
+              publish an <code>EquityPrint</code>, <code>NewsStory</code>, or <code>FlowPacket</code>
+              without using the unsafe catch-all type <code>any</code>.
+            </p>
+
+            <h3><code>for await</code> reads a stream over time</h3>
+            <div class="code-window">
+              <div class="code-head"><span>durable consumer loop · simplified</span><button class="copy-button" type="button">Copy</button></div>
+              <pre><code><span class="tok-key">for await</span> (<span class="tok-key">const</span> msg <span class="tok-key">of</span> subscription.messages) {
+  <span class="tok-key">const</span> event = Schema.<span class="tok-fn">parse</span>(subscription.<span class="tok-fn">decode</span>(msg));
+  <span class="tok-key">await</span> <span class="tok-fn">handleEvent</span>(event);
+  msg.<span class="tok-fn">ack</span>();
+}</code></pre>
+            </div>
+            <p>
+              This loop does not race through a finished array. It waits for each new message. The
+              explicit <code>ack()</code> tells JetStream the consumer finished. That creates
+              <strong>at-least-once delivery</strong>: after a crash, the system may deliver an
+              unacknowledged message again, so handlers should be prepared for duplicates.
+            </p>
+
+            <h3>Watch the architecture appear in a diff</h3>
+            <p>
+              This conceptual diff shows the mental upgrade from “trust a loose object and call a
+              downstream function” to “validate a contract and publish a fact.” It is educational,
+              not a literal current Git change.
+            </p>
+            <div class="diff-panel" data-diff-panel>
+              <div class="code-head"><span>conceptual: direct coupling → validated event</span></div>
+              <div class="diff-rich" aria-label="Rich rendered conceptual diff"></div>
+              <pre class="diff-fallback">diff --git a/lesson/ingest.ts b/lesson/ingest.ts
+--- a/lesson/ingest.ts
++++ b/lesson/ingest.ts
+@@ -1,5 +1,9 @@
+-async function onTrade(data: any) {
+-  updateCandles(data);
+-  updateDashboard(data);
++async function onTrade(candidate: EquityPrint) {
++  const print = EquityPrintSchema.parse(candidate);
++
++  await insertEquityPrint(clickhouse, print);
++  await publishJson(js, SUBJECT_EQUITY_PRINTS, print);
+ }
++
++// Candles, compute, and API subscribe independently.</pre>
+            </div>
+          </div>
+        </section>
+
+        <section class="chapter" id="web" data-section aria-labelledby="web-title">
+          <div class="chapter-heading">
+            <div class="chapter-number">07</div>
+            <div>
+              <h2 id="web-title">The API translates system truth into client-friendly views.</h2>
+              <p class="chapter-intro">
+                The web app does not connect directly to ClickHouse, Redis, or NATS. The API owns
+                that boundary and exposes HTTP and WebSocket contracts.
+              </p>
+            </div>
+          </div>
+          <div class="reading-block">
+            <h3>Two ways the browser asks for data</h3>
+            <div class="concept-pair">
+              <div>
+                <h3>HTTP / REST</h3>
+                <p>The browser asks a question and receives one response. Good for initial snapshots, history pages, ranges, and detail lookups.</p>
+                <p><code>GET /history/equities?before_ts=…</code></p>
+              </div>
+              <div>
+                <h3>WebSocket</h3>
+                <p>The connection stays open. Server and client can exchange messages over time. Good for live prints, quotes, candles, alerts, and health.</p>
+                <p><code>new WebSocket("/ws/live")</code></p>
+              </div>
+            </div>
+            <div class="request-flow" aria-label="Browser request flow">
+              <div><strong>React hook</strong>requests/subscribes</div>
+              <div><strong>API route</strong>validates query or message</div>
+              <div><strong>Live manager</strong>checks hot state</div>
+              <div><strong>Storage</strong>backfills when needed</div>
+              <div><strong>React state</strong>merges and renders</div>
+            </div>
+
+            <h3>React: UI as a function of state</h3>
+            <p>
+              React components return a description of the interface. When state changes, React
+              calculates what the browser DOM needs to update. Islandflow’s terminal code uses
+              hooks heavily because live data, filters, focus, history, and replay all affect the
+              visible result.
+            </p>
+            <div class="code-window">
+              <div class="code-head"><span>apps/web/features/terminal/state.tsx · simplified</span><button class="copy-button" type="button">Copy</button></div>
+              <pre><code><span class="tok-key">const</span> [filterInput, setFilterInput] = <span class="tok-fn">useState</span>(<span class="tok-str">""</span>);
+
+<span class="tok-key">const</span> activeTickers = <span class="tok-fn">useMemo</span>(
+  () =&gt; <span class="tok-fn">parseTickerFilterInput</span>(filterInput),
+  [filterInput]
+);
+
+<span class="tok-key">const</span> liveSession = <span class="tok-fn">useLiveSession</span>(
+  mode === <span class="tok-str">"live"</span>,
+  pathname,
+  liveManifest
+);</code></pre>
+            </div>
+            <ol class="annotation-list">
+              <li><span><code>useState</code> stores a value that can change and trigger a render.</span></li>
+              <li><span><code>useMemo</code> derives a value and recalculates it only when dependencies change.</span></li>
+              <li><span>A custom hook such as <code>useLiveSession</code> packages reusable behavior behind a React-friendly interface.</span></li>
+            </ol>
+
+            <div class="callout" data-tone="mint">
+              <h3>Where beginners often get tangled</h3>
+              <p>
+                React state is not the database. It is the browser's current working model. The API
+                cache is not the database either. Neither is Redis. Asking “which layer owns the
+                durable truth?” will prevent a surprising number of bugs.
+              </p>
+            </div>
+
+            <h3>Server-composed rows reduce frontend detective work</h3>
+            <p>
+              A raw option print is not always enough for a useful row. The API’s durable-row code
+              can combine prints, NBBO, flow packets, and smart-flow support into a client-ready
+              view model. This is a tradeoff: more server work, but fewer fragile joins duplicated
+              in the browser.
+            </p>
+          </div>
+        </section>
+
+        <section class="chapter" id="time" data-section aria-labelledby="time-title">
+          <div class="chapter-heading">
+            <div class="chapter-number">08</div>
+            <div>
+              <h2 id="time-title">Live, history, and replay are three views of time.</h2>
+              <p class="chapter-intro">
+                They can share event contracts while using different delivery mechanics. That
+                separation is central to event-sourced systems.
+              </p>
+            </div>
+          </div>
+          <div class="reading-block">
+            <div class="service-ledger">
+              <div class="service-row">
+                <h3>Live</h3>
+                <p class="plain">“What is happening now?” The API consumes NATS subjects, maintains bounded hot state, and fans new events to subscribed WebSockets.</p>
+                <p>Optimizes freshness, connection health, bounded memory, and stable UI updates.</p>
+              </div>
+              <div class="service-row">
+                <h3>History</h3>
+                <p class="plain">“What happened before this point?” The API queries ClickHouse using cursor pairs such as timestamp + sequence.</p>
+                <p>Optimizes deterministic pagination and large retained datasets.</p>
+              </div>
+              <div class="service-row">
+                <h3>Replay</h3>
+                <p class="plain">“What if old events arrived again, in their original order?” The replay service merges streams and republishes them at a chosen speed.</p>
+                <p>Optimizes repeatable investigation, demos, and testing of downstream behavior.</p>
+              </div>
+            </div>
+            <h3>Why timestamp + sequence?</h3>
+            <p>
+              Millisecond timestamps can tie. Pagination using only “before this timestamp” may
+              skip or repeat rows. A cursor with <code>ts</code> and <code>seq</code> creates a stable
+              total order: first compare time, then use sequence to break ties.
+            </p>
+            <div class="analogy">
+              <div class="analogy-label">PHOTO FINISH</div>
+              <p>
+                Two runners cross during the same displayed millisecond. The timestamp says it was
+                a tie; the sequence is the photo-finish ordering. A stable cursor needs both.
+              </p>
+            </div>
+            <h3>Replay is possible because events carry their own meaning</h3>
+            <p>
+              If downstream logic depends only on “whatever happens to be in process memory,” old
+              data is hard to reproduce. Islandflow’s direction is to make inputs explicit enough
+              that the same compute pipeline can process a live event or a republished historical
+              event.
+            </p>
+            <div class="diff-panel" data-diff-panel>
+              <div class="code-head"><span>conceptual: wall-clock logic → event-time logic</span></div>
+              <div class="diff-rich" aria-label="Rich rendered conceptual diff"></div>
+              <pre class="diff-fallback">diff --git a/lesson/window.ts b/lesson/window.ts
+--- a/lesson/window.ts
++++ b/lesson/window.ts
+@@ -1,5 +1,7 @@
+-const now = Date.now();
+-if (now - lastTradeAt &lt; WINDOW_MS) {
++const eventTime = trade.source_ts;
++
++if (eventTime - previousTrade.source_ts &lt; WINDOW_MS) {
+   addToCluster(trade);
+ }
++// The same result can be reproduced during replay.</pre>
+            </div>
+            <div class="callout" data-tone="coral">
+              <h3>Event sourcing is a direction, not a purity badge</h3>
+              <p>
+                Islandflow still has caches, mutable in-process maps, materialized tables, and
+                composed views. “Event-sourced” does not mean every byte is reconstructed from an
+                eternal log on every request. It means important facts are explicit and replayable,
+                while derived state can be rebuilt or explained from them.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section class="chapter" id="failure" data-section aria-labelledby="failure-title">
+          <div class="chapter-heading">
+            <div class="chapter-number">09</div>
+            <div>
+              <h2 id="failure-title">A “real developer” thinks about the unhappy path.</h2>
+              <p class="chapter-intro">
+                The jump from toy programs to production systems is less about fancy syntax and
+                more about recognizing time, failure, ownership, and uncertainty.
+              </p>
+            </div>
+          </div>
+          <div class="reading-block">
+            <div class="comparison-wrap">
+              <table class="failure-table">
+                <thead><tr><th>Failure</th><th>Why it is normal</th><th>Architectural response</th></tr></thead>
+                <tbody>
+                  <tr><td>NATS disconnects</td><td>Networks and containers restart.</td><td>Retry connections, durable consumers, explicit acknowledgements, graceful shutdown.</td></tr>
+                  <tr><td>A message arrives twice</td><td>At-least-once delivery prefers duplication over silent loss.</td><td>Stable identities, dedupe windows, idempotent writes/handlers where required.</td></tr>
+                  <tr><td>Redis is empty</td><td>Caches expire, restart, or are flushed.</td><td>Hydrate from ClickHouse; treat Redis as rebuildable acceleration.</td></tr>
+                  <tr><td>Quote context is stale</td><td>Feeds arrive at different speeds.</td><td>Track ages, freshness thresholds, missing/stale states, and abstain from overconfident conclusions.</td></tr>
+                  <tr><td>The browser falls behind</td><td>Live feeds can outpace rendering and memory.</td><td>Bounded retention, virtualized rows, pause/hold state, snapshots and overflow policies.</td></tr>
+                  <tr><td>Shutdown starts mid-task</td><td>Deploys and interrupts happen anytime.</td><td>Stop accepting work, drain/close connections, ignore expected shutdown errors, await cleanup.</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <h3>Notice the vocabulary in the code</h3>
+            <p>
+              Names such as <code>connectJetStreamWithRetry</code>, <code>buildDurableConsumer</code>,
+              <code>LIVE_FRESHNESS_THRESHOLDS</code>, <code>shuttingDown</code>, and
+              <code>fetchRecent…</code> are architecture made visible. Good names let you read the
+              safety model before understanding every implementation detail.
+            </p>
+            <div class="callout" data-tone="yellow">
+              <h3>Five questions to carry into any codebase</h3>
+              <ol>
+                <li>What is the source of truth?</li>
+                <li>What can be rebuilt, and from what?</li>
+                <li>What happens if this operation runs twice?</li>
+                <li>Which clock or ordering rule does this depend on?</li>
+                <li>How does failure become visible to a human or another service?</li>
+              </ol>
+            </div>
+            <h3>Observability is how the system tells its story</h3>
+            <p>
+              Logs describe individual events and errors. Metrics count patterns over time. Health
+              endpoints answer a narrow availability question. A trace ID connects related facts.
+              None replaces the others. When you add behavior, ask what evidence would let you
+              prove it worked—or explain why it did not.
+            </p>
+          </div>
+        </section>
+
+        <section class="chapter" id="practice" data-section aria-labelledby="practice-title">
+          <div class="chapter-heading">
+            <div class="chapter-number">10</div>
+            <div>
+              <h2 id="practice-title">Learn by following one narrow thread end to end.</h2>
+              <p class="chapter-intro">
+                Do not start by “learning all of React” or “understanding the whole backend.” Build
+                a chain of small, evidenced wins.
+              </p>
+            </div>
+          </div>
+          <div class="reading-block">
+            <div class="learning-path">
+              <div>
+                <h3>A one-session route</h3>
+                <p>Use synthetic data. Keep the scope to equity prints so every hop has an obvious name.</p>
+              </div>
+              <ol>
+                <li><span>Open <code>packages/types/src/events.ts</code>. Write down the fields of <code>EquityPrint</code> in your own words.</span></li>
+                <li><span>Open <code>services/ingest-equities/src/index.ts</code>. Find validation, ClickHouse insertion, and NATS publication.</span></li>
+                <li><span>Open <code>packages/bus/src/subjects.ts</code>. Find <code>equities.prints</code>.</span></li>
+                <li><span>Open <code>services/candles/src/index.ts</code>. Find the subscription and <code>emitCandle</code>.</span></li>
+                <li><span>Open <code>services/api/src/index.ts</code>. Find the same subject and a history route.</span></li>
+                <li><span>Open <code>apps/web/features/terminal/live.ts</code>. Find <code>fetch</code> and <code>new WebSocket</code>.</span></li>
+                <li><span>Draw the path from memory. Then compare it to chapter 03.</span></li>
+              </ol>
+            </div>
+            <h3>Small experiments that teach real skills</h3>
+            <ul class="portable-list">
+              <li><strong>TypeScript:</strong> create a tiny object missing <code>exchange</code> and see what the type checker says.</li>
+              <li><strong>Zod:</strong> call <code>EquityPrintSchema.safeParse</code> with bad data and inspect the error structure.</li>
+              <li><strong>Async:</strong> add timing logs around an awaited function and observe ordering.</li>
+              <li><strong>React:</strong> build a 10-line component with <code>useState</code> and a filter input before reading Islandflow’s larger state module.</li>
+              <li><strong>Events:</strong> write a 20-line in-memory publisher with two subscribers to feel fan-out directly.</li>
+              <li><strong>Testing:</strong> change one expected schema field in a focused test, watch it fail, restore it, and watch it pass.</li>
+            </ul>
+            <h3>The commands form layers too</h3>
+            <div class="code-window">
+              <div class="code-head"><span>safe local orientation</span><button class="copy-button" type="button">Copy</button></div>
+              <pre><code><span class="tok-comment"># install workspace dependencies</span>
+bun install
+
+<span class="tok-comment"># start NATS, ClickHouse, and Redis</span>
+bun run dev:infra
+
+<span class="tok-comment"># start the TypeScript backend workers</span>
+bun run dev:services
+
+<span class="tok-comment"># start Next.js + React</span>
+bun run dev:web
+
+<span class="tok-comment"># run a focused test folder</span>
+bun test services/compute/tests</code></pre>
+            </div>
+            <div class="callout" data-tone="mint">
+              <h3>What progress actually looks like</h3>
+              <p>
+                You do not need to recall every API. Progress is being able to predict where a
+                concern belongs, form a testable hypothesis, use tooling to find the exact code,
+                and explain what evidence would confirm your change. That is already real
+                development.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section class="chapter" id="glossary" data-section aria-labelledby="glossary-title">
+          <div class="chapter-heading">
+            <div class="chapter-number">11</div>
+            <div>
+              <h2 id="glossary-title">A pocket glossary and source map.</h2>
+              <p class="chapter-intro">
+                Architecture vocabulary is compressed meaning. Use these definitions as handles,
+                then return to the code whenever a word starts feeling abstract.
+              </p>
+            </div>
+          </div>
+          <div class="reading-block">
+            <dl class="glossary">
+              <div><dt>Adapter</dt><dd>Translates an external provider or protocol into the application's own interface and vocabulary.</dd></div>
+              <div><dt>API</dt><dd>An agreed way for software components to communicate; here, especially HTTP and WebSocket endpoints.</dd></div>
+              <div><dt>Cache</dt><dd>A faster copy or derived view that should be safe to rebuild from a source of truth.</dd></div>
+              <div><dt>Consumer</dt><dd>A process that receives and handles messages from a stream or subject.</dd></div>
+              <div><dt>Cursor</dt><dd>A stable position used to request the next or previous page of ordered data.</dd></div>
+              <div><dt>Derived event</dt><dd>A new fact calculated from earlier facts, such as a candle, join, packet, or alert.</dd></div>
+              <div><dt>Durable</dt><dd>Expected to survive process restarts; always ask what storage and retention policy make that true.</dd></div>
+              <div><dt>Event</dt><dd>An immutable description of something that happened, with identity and time.</dd></div>
+              <div><dt>Event sourcing</dt><dd>An architecture that treats recorded events as the basis for rebuilding or explaining state.</dd></div>
+              <div><dt>Hydration</dt><dd>Filling a partial view with data from storage or another endpoint.</dd></div>
+              <div><dt>Idempotent</dt><dd>Safe to perform more than once without changing the final result after the first success.</dd></div>
+              <div><dt>NBBO</dt><dd>National Best Bid and Offer: the best displayed buy and sell prices across venues.</dd></div>
+              <div><dt>OHLCV</dt><dd>Open, high, low, close, and volume—a compact summary of trades in a time window.</dd></div>
+              <div><dt>Publisher</dt><dd>A component that sends a message without needing to know every receiver.</dd></div>
+              <div><dt>Schema</dt><dd>An executable description that validates the shape and rules of runtime data.</dd></div>
+              <div><dt>Service</dt><dd>A separately running program that owns a continuous job and lifecycle.</dd></div>
+              <div><dt>Subject</dt><dd>A named NATS channel to which publishers send and consumers subscribe.</dd></div>
+              <div><dt>WebSocket</dt><dd>A long-lived, two-way connection between browser and server.</dd></div>
+            </dl>
+
+            <h3>Where to verify this guide in the current repo</h3>
+            <ul class="source-map">
+              <li><code>README.md</code> — current direction, maturity, commands, and surface inventory.</li>
+              <li><code>deployment/docker/docker-compose.yml</code> — which processes run and what infrastructure they depend on.</li>
+              <li><code>packages/types/src/events.ts</code> — canonical raw and derived event shapes.</li>
+              <li><code>packages/types/src/live.ts</code> — live channel and subscription contracts.</li>
+              <li><code>packages/bus/src/subjects.ts</code> — stream and subject names.</li>
+              <li><code>packages/bus/src/streams.ts</code> — raw versus derived stream catalog.</li>
+              <li><code>packages/bus/src/jetstream.ts</code> — connections, durable consumers, publish/subscribe helpers.</li>
+              <li><code>packages/storage/src/clickhouse.ts</code> — ClickHouse client, DDL, insert, and query machinery.</li>
+              <li><code>services/ingest-equities/src/index.ts</code> — the cleanest raw-event entry path.</li>
+              <li><code>services/ingest-options/src/index.ts</code> — richer adapter, quote-context, and signal flow.</li>
+              <li><code>services/compute/src/index.ts</code> — multi-stream derived-event pipeline.</li>
+              <li><code>services/candles/src/index.ts</code> — ClickHouse + NATS + Redis in one focused service.</li>
+              <li><code>services/api/src/index.ts</code> — REST/WS boundary and stream wiring.</li>
+              <li><code>services/api/src/live.ts</code> — hot-state hydration, retention, and fan-out.</li>
+              <li><code>services/replay/src/index.ts</code> — ordered republishing.</li>
+              <li><code>apps/web/features/terminal/live.ts</code> — browser fetch/WebSocket data flow.</li>
+              <li><code>apps/web/features/terminal/state.tsx</code> — React state composition.</li>
+            </ul>
+          </div>
+        </section>
+
+        <footer class="closing">
+          <blockquote>Opaque systems become ordinary when you follow the data.</blockquote>
+          <p>
+            Start at one boundary. Name the fact. Follow who validates it, who moves it, who stores
+            it, who transforms it, and who presents it. Then do it again.
+          </p>
+        </footer>
+      </main>
+    </div>
+
+    <script type="module">
+      const flowContent = [
+        {
+          title: "1. A provider adapter receives a trade",
+          body: "The selected adapter—synthetic for safe local work or Alpaca for a provider connection—translates provider-specific data into Islandflow's common EquityPrint shape. Everything downstream can ignore the provider's peculiar field names.",
+          path: "services/ingest-equities/src/adapters/* → onTrade(candidate)",
+          question: "Where is provider-specific mess converted into domain language?"
+        },
+        {
+          title: "2. The ingest boundary validates it",
+          body: "EquityPrintSchema.parse(candidate) checks the actual runtime value. A TypeScript annotation helps during development; the Zod parse protects the service from malformed external data while it is running.",
+          path: "candidate → EquityPrintSchema.parse(candidate) → print",
+          question: "Which boundaries receive data that TypeScript alone cannot trust?"
+        },
+        {
+          title: "3. The service stores, then publishes",
+          body: "The ingest service awaits insertEquityPrint and then publishes the validated event to equities.prints. ClickHouse becomes durable history; NATS tells independent workers that a new fact is available.",
+          path: "insertEquityPrint(clickhouse, print) → publishJson(js, SUBJECT_EQUITY_PRINTS, print)",
+          question: "What guarantee does the order of these awaited operations imply?"
+        },
+        {
+          title: "4. Specialized workers derive new facts",
+          body: "Candles groups prints into OHLCV windows. Compute joins prints with quotes and may produce equity joins or inferred-dark evidence. Each result is validated, stored, and published as its own event.",
+          path: "equities.prints → candles / compute → equities.candles / equities.joins / dark.inferred",
+          question: "Is this value an observed fact, a derived fact, or a temporary view?"
+        },
+        {
+          title: "5. The API composes client-facing state",
+          body: "The API consumes the same live subjects, maintains bounded hot channel state, flushes selected views and cursors to Redis, backfills from ClickHouse, and exposes REST and WebSocket contracts.",
+          path: "NATS + ClickHouse + Redis → services/api → /history/* and /ws/live",
+          question: "Why should the browser not know how to query every backend dependency?"
+        },
+        {
+          title: "6. React turns state into a visible surface",
+          body: "Custom hooks open fetch and WebSocket paths, merge snapshots with live events, retain bounded history, and expose state to route components. React re-renders the affected UI when that state changes.",
+          path: "apps/web/features/terminal/live.ts → state.tsx → route components",
+          question: "Which state is durable truth, and which state is only the browser's current view?"
+        }
+      ];
+
+      const flowButtons = [...document.querySelectorAll("[data-flow]")];
+      const flowTitle = document.querySelector("#flow-title");
+      const flowBody = document.querySelector("#flow-body");
+      const flowPath = document.querySelector("#flow-path");
+      const flowQuestion = document.querySelector("#flow-question");
+
+      function selectFlow(index) {
+        const item = flowContent[index];
+        flowButtons.forEach((button, buttonIndex) => {
+          button.setAttribute("aria-selected", String(buttonIndex === index));
+        });
+        flowTitle.textContent = item.title;
+        flowBody.textContent = item.body;
+        flowPath.textContent = item.path;
+        flowQuestion.innerHTML = `<strong>Developer question:</strong> ${item.question}`;
+      }
+
+      flowButtons.forEach((button, index) => {
+        button.addEventListener("click", () => selectFlow(index));
+        button.addEventListener("keydown", (event) => {
+          if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+          event.preventDefault();
+          const direction = event.key === "ArrowRight" ? 1 : -1;
+          const next = (index + direction + flowButtons.length) % flowButtons.length;
+          flowButtons[next].focus();
+          selectFlow(next);
+        });
+      });
+
+      const infraTabs = [...document.querySelectorAll("[data-infra]")];
+      const infraPanels = [...document.querySelectorAll("[data-panel]")];
+      infraTabs.forEach((tab, index) => {
+        tab.addEventListener("click", () => {
+          const name = tab.dataset.infra;
+          infraTabs.forEach((item) => item.setAttribute("aria-selected", String(item === tab)));
+          infraPanels.forEach((panel) => { panel.dataset.open = String(panel.dataset.panel === name); });
+        });
+        tab.addEventListener("keydown", (event) => {
+          if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+          event.preventDefault();
+          const direction = event.key === "ArrowRight" ? 1 : -1;
+          infraTabs[(index + direction + infraTabs.length) % infraTabs.length].click();
+          infraTabs[(index + direction + infraTabs.length) % infraTabs.length].focus();
+        });
+      });
+
+      document.querySelectorAll(".copy-button").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const code = button.closest(".code-window")?.querySelector("pre")?.textContent ?? "";
+          try {
+            await navigator.clipboard.writeText(code);
+            const previous = button.textContent;
+            button.textContent = "Copied";
+            window.setTimeout(() => { button.textContent = previous; }, 1200);
+          } catch {
+            button.textContent = "Select text";
+          }
+        });
+      });
+
+      const sections = [...document.querySelectorAll("[data-section]")];
+      const navLinks = [...document.querySelectorAll(".side-nav nav a")];
+      const progressBar = document.querySelector(".progress-bar");
+      const sectionObserver = new IntersectionObserver((entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (!visible) return;
+        navLinks.forEach((link) => {
+          link.setAttribute("aria-current", String(link.getAttribute("href") === `#${visible.target.id}`));
+        });
+      }, { rootMargin: "-20% 0px -65% 0px", threshold: [0, 0.2, 0.6] });
+      sections.forEach((section) => sectionObserver.observe(section));
+
+      function updateProgress() {
+        const root = document.documentElement;
+        const max = root.scrollHeight - root.clientHeight;
+        progressBar.style.width = `${max > 0 ? (root.scrollTop / max) * 100 : 0}%`;
+      }
+      document.addEventListener("scroll", updateProgress, { passive: true });
+      updateProgress();
+
+      const diffPanels = [...document.querySelectorAll("[data-diff-panel]")];
+      try {
+        const [{ createElement, useEffect }, { createRoot }, { PatchDiff }] = await Promise.all([
+          import("https://esm.sh/react@18.3.1"),
+          import("https://esm.sh/react-dom@18.3.1/client"),
+          import("https://esm.sh/@pierre/diffs@1.2.2/react?deps=react@18.3.1")
+        ]);
+
+        diffPanels.forEach((panel) => {
+          const fallback = panel.querySelector(".diff-fallback");
+          const target = panel.querySelector(".diff-rich");
+          const DiffView = () => {
+            useEffect(() => { panel.dataset.richReady = "true"; }, []);
+            return createElement(PatchDiff, {
+              patch: fallback.textContent || "",
+              options: {
+                themeType: "dark",
+                diffStyle: "unified",
+                overflow: "wrap"
+              }
+            });
+          };
+          createRoot(target).render(createElement(DiffView));
+        });
+      } catch (error) {
+        console.warn("Diffs rich renderer failed; keeping readable HTML fallbacks.", error);
+      }
+    </script>
+  </body>
+</html>
